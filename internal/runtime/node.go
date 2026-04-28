@@ -478,7 +478,7 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 
 	// Evaluate the executor config if set
 	execConfig := n.Step().ExecutorConfig
-	cfg, err := EvalObject(ctx, n.Step().ExecutorConfig.Config)
+	cfg, err := evalExecutorConfig(ctx, n.Step())
 	if err != nil {
 		return nil, fmt.Errorf("failed to eval executor config: %w", err)
 	}
@@ -536,6 +536,13 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 	}
 
 	return cmd, nil
+}
+
+func evalExecutorConfig(ctx context.Context, step core.Step) (map[string]any, error) {
+	if step.ExecutorConfig.Type == "template" {
+		return evalObjectTreatingOmittedParamsAsEmpty(ctx, step.ExecutorConfig.Config)
+	}
+	return EvalObject(ctx, step.ExecutorConfig.Config)
 }
 
 func (n *Node) configureSubDAGExecutor(cmd executor.Executor, subRuns []SubDAGRun) error {

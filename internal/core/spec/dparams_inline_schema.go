@@ -15,27 +15,60 @@ import (
 	"github.com/google/jsonschema-go/jsonschema"
 )
 
+type inlineJSONSchemaClassification struct {
+	valid               bool
+	propertiesPresent   bool
+	malformedProperties any
+}
+
 // isInlineJSONSchema returns true when params is a top-level JSON Schema object
 // using the canonical object form. This keeps legacy params maps compatible.
 func isInlineJSONSchema(input any) bool {
+	return classifyInlineJSONSchema(input).valid
+}
+
+func classifyInlineJSONSchema(input any) inlineJSONSchemaClassification {
 	m, ok := input.(map[string]any)
 	if !ok {
-		return false
+		return inlineJSONSchemaClassification{}
 	}
 	// External schema format takes precedence.
 	if _, ok := extractParamsSchemaDeclaration(input); ok {
-		return false
+		return inlineJSONSchemaClassification{}
 	}
 	typeName, ok := m["type"].(string)
 	if !ok || strings.TrimSpace(typeName) != "object" {
-		return false
+		return inlineJSONSchemaClassification{}
 	}
 	props, ok := m["properties"]
 	if !ok {
-		return false
+		return inlineJSONSchemaClassification{}
 	}
-	_, ok = props.(map[string]any)
-	return ok
+
+	if _, ok := props.(map[string]any); ok {
+		return inlineJSONSchemaClassification{
+			valid:             true,
+			propertiesPresent: true,
+		}
+	}
+
+	return inlineJSONSchemaClassification{
+		propertiesPresent:   true,
+		malformedProperties: props,
+	}
+}
+
+func malformedInlineJSONSchemaShapeError(input any) error {
+	classification := classifyInlineJSONSchema(input)
+	if !classification.propertiesPresent || classification.valid {
+		return nil
+	}
+
+	return core.NewValidationError(
+		"params",
+		classification.malformedProperties,
+		fmt.Errorf("inline JSON Schema properties must be an object keyed by parameter name"),
+	)
 }
 
 func buildInlineSchemaParamPlan(input any, skipValidation bool) (*dagParamPlan, error) {

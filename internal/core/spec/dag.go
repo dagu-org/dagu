@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -22,6 +23,16 @@ import (
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/spec/types"
 	"github.com/go-viper/mapstructure/v2"
+)
+
+const dagRunArtifactsDirEnvKey = "DAG_RUN_ARTIFACTS_DIR"
+
+var dagRunArtifactsDirReferencePattern = regexp.MustCompile(
+	`(?:\$\{` + regexp.QuoteMeta(dagRunArtifactsDirEnvKey) + `\}` +
+		`|\$` + regexp.QuoteMeta(dagRunArtifactsDirEnvKey) + `(?:\b|[^A-Za-z0-9_])` +
+		`|\$env:` + regexp.QuoteMeta(dagRunArtifactsDirEnvKey) + `(?:\b|[^A-Za-z0-9_])` +
+		`|%` + regexp.QuoteMeta(dagRunArtifactsDirEnvKey) + `%` +
+		`|env\(["']` + regexp.QuoteMeta(dagRunArtifactsDirEnvKey) + `["']\))`,
 )
 
 // dag is the intermediate representation of a DAG specification.
@@ -823,7 +834,12 @@ func buildLogDir(_ BuildContext, d *dag) (string, error) {
 }
 
 func buildArtifacts(_ BuildContext, d *dag) (*core.ArtifactsConfig, error) {
+	autoEnable := dagReferencesRunArtifactsDir(d)
+
 	if d.Artifacts == nil {
+		if autoEnable {
+			return &core.ArtifactsConfig{Enabled: true}, nil
+		}
 		return nil, nil
 	}
 
@@ -832,11 +848,87 @@ func buildArtifacts(_ BuildContext, d *dag) (*core.ArtifactsConfig, error) {
 	}
 	if d.Artifacts.Enabled != nil {
 		cfg.Enabled = *d.Artifacts.Enabled
+	} else if autoEnable {
+		cfg.Enabled = true
 	}
 	if d.Artifacts.Enabled == nil && cfg.Dir == "" {
-		return nil, nil
+		if !cfg.Enabled {
+			return nil, nil
+		}
 	}
 	return cfg, nil
+}
+
+func dagReferencesRunArtifactsDir(d *dag) bool {
+	return valueReferencesRunArtifactsDir(reflect.ValueOf(d))
+}
+
+func referencesArtifactsEnvVar(s string) bool {
+	return dagRunArtifactsDirReferencePattern.MatchString(s)
+}
+
+func valueReferencesRunArtifactsDir(v reflect.Value) bool {
+	if !v.IsValid() {
+		return false
+	}
+
+	for v.Kind() == reflect.Pointer || v.Kind() == reflect.Interface {
+		if v.IsNil() {
+			return false
+		}
+		v = v.Elem()
+	}
+
+	switch v.Kind() {
+	case reflect.String:
+		return referencesArtifactsEnvVar(v.String())
+	case reflect.Array, reflect.Slice:
+		for i := 0; i < v.Len(); i++ {
+			if valueReferencesRunArtifactsDir(v.Index(i)) {
+				return true
+			}
+		}
+	case reflect.Map:
+		iter := v.MapRange()
+		for iter.Next() {
+			if valueReferencesRunArtifactsDir(iter.Key()) || valueReferencesRunArtifactsDir(iter.Value()) {
+				return true
+			}
+		}
+	case reflect.Struct:
+		for _, field := range v.Fields() {
+			if valueReferencesRunArtifactsDir(field) {
+				return true
+			}
+		}
+	case reflect.Invalid,
+		reflect.Bool,
+		reflect.Int,
+		reflect.Int8,
+		reflect.Int16,
+		reflect.Int32,
+		reflect.Int64,
+		reflect.Uint,
+		reflect.Uint8,
+		reflect.Uint16,
+		reflect.Uint32,
+		reflect.Uint64,
+		reflect.Uintptr,
+		reflect.Float32,
+		reflect.Float64,
+		reflect.Complex64,
+		reflect.Complex128,
+		reflect.Chan,
+		reflect.Func,
+		reflect.Interface,
+		reflect.Pointer,
+		reflect.UnsafePointer:
+		return false
+	default:
+		return false
+	}
+
+	return false
 }
 
 func buildLogOutput(_ BuildContext, d *dag) (core.LogOutputMode, error) {

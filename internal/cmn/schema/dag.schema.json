@@ -1119,6 +1119,16 @@
           },
           {
             "$ref": "#/definitions/dagParamInlineSchema"
+          },
+          {
+            "type": "object",
+            "required": ["type", "properties"],
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "object"
+              }
+            }
           }
         ]
       },

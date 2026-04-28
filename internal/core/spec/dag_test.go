@@ -2259,6 +2259,59 @@ artifacts:
 				Dir:     "/var/lib/dagu/artifacts",
 			},
 		},
+		{
+			name: "AutoEnableWhenCommandReferencesArtifactsDir",
+			yaml: `
+steps:
+  - name: write
+    command: printf 'artifact' > "$DAG_RUN_ARTIFACTS_DIR/out.txt"
+`,
+			expected: &core.ArtifactsConfig{Enabled: true},
+		},
+		{
+			name: "AutoEnableWhenNestedExecutorConfigReferencesArtifactsDir",
+			yaml: `
+steps:
+  - name: render
+    type: template
+    with:
+      output: ${DAG_RUN_ARTIFACTS_DIR}/greeting.txt
+      data:
+        name: tom
+    script: |
+      Hello, {{ .name }}!
+`,
+			expected: &core.ArtifactsConfig{Enabled: true},
+		},
+		{
+			name: "AutoEnableWhenPowerShellEnvReferenceArtifactsDir",
+			yaml: `
+steps:
+  - name: write
+    command: Write-Output $env:DAG_RUN_ARTIFACTS_DIR
+`,
+			expected: &core.ArtifactsConfig{Enabled: true},
+		},
+		{
+			name: "LiteralMentionWithoutEnvReferenceDoesNotAutoEnable",
+			yaml: `
+steps:
+  - name: write
+    command: printf 'DAG_RUN_ARTIFACTS_DIR'
+`,
+			expected: nil,
+		},
+		{
+			name: "ExplicitDisableWinsOverAutoEnable",
+			yaml: `
+artifacts:
+  enabled: false
+steps:
+  - name: write
+    command: printf 'artifact' > "$DAG_RUN_ARTIFACTS_DIR/out.txt"
+`,
+			expected: &core.ArtifactsConfig{Enabled: false},
+		},
 	}
 
 	for _, tt := range tests {

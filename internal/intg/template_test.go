@@ -8,8 +8,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/dagucloud/dagu/internal/cmd"
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/test"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -67,6 +69,42 @@ func TestTemplateExecutor(t *testing.T) {
 		content, err := os.ReadFile(outFile)
 		require.NoError(t, err)
 		assert.Contains(t, string(content), "# Test Report")
+	})
+
+	t.Run("ArtifactOutputAutoEnablesArtifacts", func(t *testing.T) {
+		t.Parallel()
+
+		th := test.SetupCommand(t)
+		dagFile := th.CreateDAGFile(t, "template-artifact-auto-enable.yaml", `
+name: template-artifact-auto-enable
+steps:
+  - name: render
+    type: template
+    with:
+      output: "${DAG_RUN_ARTIFACTS_DIR}/greeting.txt"
+      data:
+        greeting: hello
+    script: |
+      {{ .greeting }}, world!
+`)
+
+		runID := uuid.Must(uuid.NewV7()).String()
+		th.RunCommand(t, cmd.Start(), test.CmdTest{
+			Args: []string{
+				"start",
+				"--run-id", runID,
+				dagFile,
+			},
+			ExpectedOut: []string{"DAG run finished"},
+		})
+
+		status, _ := readAttemptStatusAndOutputs(t, th, "template-artifact-auto-enable", runID)
+		require.Equal(t, core.Succeeded, status.Status)
+		require.NotEmpty(t, status.ArchiveDir)
+
+		content, err := os.ReadFile(filepath.Join(status.ArchiveDir, "greeting.txt"))
+		require.NoError(t, err)
+		assert.Contains(t, string(content), "hello, world!")
 	})
 
 	t.Run("RelativeOutputPath", func(t *testing.T) {
@@ -229,6 +267,59 @@ steps:
 		dag.AssertOutputs(t, map[string]any{
 			"RESULT": test.Contains("No items found."),
 		})
+	})
+
+	t.Run("OmittedOptionalParamResolvesToEmptyString", func(t *testing.T) {
+		t.Parallel()
+
+		th := test.SetupCommand(t)
+		dagFile := th.CreateDAGFile(t, "template-optional-param.yaml", `
+name: template-optional-param
+type: graph
+params:
+  - name: name
+    type: string
+    required: true
+  - name: age
+    type: integer
+    required: true
+  - name: favorite_color
+    type: string
+steps:
+  - id: render
+    type: template
+    with:
+      data:
+        name: ${name}
+        age: ${age}
+        favorite_color: ${favorite_color}
+    script: |
+      Hello, {{ .name }}!
+      You are {{ .age }} years old.
+      {{- if .favorite_color }}
+      Your favorite color is {{ .favorite_color }}.
+      {{- end }}
+    output: RESULT
+`)
+
+		runID := uuid.Must(uuid.NewV7()).String()
+		th.RunCommand(t, cmd.Start(), test.CmdTest{
+			Args: []string{
+				"start",
+				"--run-id", runID,
+				"--params", "name=tom age=21",
+				dagFile,
+			},
+			ExpectedOut: []string{"DAG run finished"},
+		})
+
+		status, outputs := readAttemptStatusAndOutputs(t, th, "template-optional-param", runID)
+		require.Equal(t, core.Succeeded, status.Status)
+		require.Contains(t, outputs.Outputs, "result")
+		assert.Contains(t, outputs.Outputs["result"], "Hello, tom!")
+		assert.Contains(t, outputs.Outputs["result"], "You are 21 years old.")
+		assert.NotContains(t, outputs.Outputs["result"], "${favorite_color}")
+		assert.NotContains(t, outputs.Outputs["result"], "Your favorite color is")
 	})
 
 	t.Run("DefaultFunction", func(t *testing.T) {
