@@ -46,6 +46,16 @@ func WebhookRawBodyMiddleware() func(http.Handler) http.Handler {
 				return
 			}
 
+			// Keep oversized payloads on the normal handler path so the API layer
+			// can return a structured 413 before auth/HMAC verification instead of
+			// handing truncated JSON to the generated strict decoder.
+			if len(rawBody) > maxWebhookPayloadSize {
+				r.Body = io.NopCloser(bytes.NewReader([]byte("{}")))
+				ctx := context.WithValue(r.Context(), rawBodyContextKey, rawBody)
+				next.ServeHTTP(w, r.WithContext(ctx))
+				return
+			}
+
 			// Replace r.Body so the generated code can still read it.
 			r.Body = io.NopCloser(bytes.NewReader(rawBody))
 

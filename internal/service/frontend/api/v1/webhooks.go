@@ -483,6 +483,18 @@ func (a *API) TriggerWebhook(ctx context.Context, request api.TriggerWebhookRequ
 	token := extractWebhookToken(valueOf(request.Params.Authorization))
 	signature := valueOf(request.Params.XDaguSignature)
 	rawBody := rawBodyFromContext(ctx)
+	if len(rawBody) > maxWebhookPayloadSize {
+		logger.Warn(ctx, "Webhook: payload too large",
+			tag.Name(request.FileName),
+			tag.Key("size"), tag.Value(len(rawBody)),
+			tag.Key("maxSize"), tag.Value(maxWebhookPayloadSize),
+		)
+		return nil, &Error{
+			HTTPStatus: http.StatusRequestEntityTooLarge,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    fmt.Sprintf("webhook payload too large (max %d bytes)", maxWebhookPayloadSize),
+		}
+	}
 
 	webhook, err := a.authService.AuthorizeWebhookRequest(ctx, request.FileName, token, signature, rawBody)
 	if err != nil {

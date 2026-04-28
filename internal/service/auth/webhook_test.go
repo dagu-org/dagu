@@ -563,6 +563,62 @@ func TestService_EnableWebhookHMAC(t *testing.T) {
 	})
 }
 
+func TestService_ConfigureWebhookHMAC(t *testing.T) {
+	t.Parallel()
+
+	t.Run("PreservesExistingObserveWhenOmitted", func(t *testing.T) {
+		t.Parallel()
+		service, _ := setupWebhookTestServiceWithEncryptedStore(t)
+		ctx := context.Background()
+
+		_, err := service.CreateWebhook(ctx, "configure-preserve-observe-dag", "admin")
+		require.NoError(t, err)
+
+		_, err = service.EnableWebhookHMAC(
+			ctx,
+			"configure-preserve-observe-dag",
+			auth.WebhookAuthModeTokenAndHMAC,
+			auth.WebhookHMACEnforcementModeObserve,
+		)
+		require.NoError(t, err)
+
+		webhook, err := service.ConfigureWebhookHMAC(
+			ctx,
+			"configure-preserve-observe-dag",
+			auth.WebhookAuthModeTokenAndHMAC,
+			"",
+		)
+		require.NoError(t, err)
+		assert.Equal(t, auth.WebhookHMACEnforcementModeObserve, webhook.HMACEnforcementMode)
+	})
+
+	t.Run("OmittedEnforcementKeepsHMACOnlyStrict", func(t *testing.T) {
+		t.Parallel()
+		service, _ := setupWebhookTestServiceWithEncryptedStore(t)
+		ctx := context.Background()
+
+		_, err := service.CreateWebhook(ctx, "configure-hmac-only-strict-dag", "admin")
+		require.NoError(t, err)
+
+		_, err = service.EnableWebhookHMAC(
+			ctx,
+			"configure-hmac-only-strict-dag",
+			auth.WebhookAuthModeTokenAndHMAC,
+			auth.WebhookHMACEnforcementModeObserve,
+		)
+		require.NoError(t, err)
+
+		webhook, err := service.ConfigureWebhookHMAC(
+			ctx,
+			"configure-hmac-only-strict-dag",
+			auth.WebhookAuthModeHMACOnly,
+			"",
+		)
+		require.NoError(t, err)
+		assert.Equal(t, auth.WebhookHMACEnforcementModeStrict, webhook.HMACEnforcementMode)
+	})
+}
+
 func TestService_AuthorizeWebhookRequest(t *testing.T) {
 	t.Parallel()
 

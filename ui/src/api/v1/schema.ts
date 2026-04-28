@@ -1759,7 +1759,8 @@ export interface paths {
         /**
          * Enable webhook HMAC
          * @description Enables HMAC authentication for the existing webhook and returns the generated
-         *     HMAC secret exactly once. Developer, manager, or admin only.
+         *     HMAC secret exactly once. If enforcementMode is omitted, it defaults to
+         *     strict. Developer, manager, or admin only.
          *
          */
         post: operations["enableDAGWebhookHMAC"];
@@ -1780,7 +1781,11 @@ export interface paths {
         put?: never;
         /**
          * Configure webhook HMAC
-         * @description Updates the webhook HMAC auth mode or enforcement mode without rotating the secret. Developer, manager, or admin only.
+         * @description Updates the webhook HMAC auth mode or enforcement mode without rotating
+         *     the secret. If enforcementMode is omitted, the current enforcement mode
+         *     is preserved for token_and_hmac, while hmac_only always uses strict.
+         *     Developer, manager, or admin only.
+         *
          */
         post: operations["configureDAGWebhookHMAC"];
         delete?: never;
@@ -3172,7 +3177,11 @@ export interface components {
             /** @description Whether to enable or disable the webhook */
             enabled: boolean;
         };
-        /** @description Request to configure webhook HMAC auth mode and enforcement */
+        /** @description Request to configure webhook HMAC auth mode and enforcement.
+         *     If enforcementMode is omitted when enabling HMAC, it defaults to strict.
+         *     If omitted when configuring an existing webhook, the current enforcement
+         *     mode is preserved for token_and_hmac, while hmac_only always uses strict.
+         *      */
         WebhookHMACConfigureRequest: {
             /** @enum {string} */
             authMode: WebhookHMACConfigureRequestAuthMode;
@@ -9841,7 +9850,7 @@ export interface operations {
             header?: {
                 /** @description Bearer token for webhook authentication (e.g., 'Bearer dagu_wh_...'). Required only when the webhook auth mode includes token authentication. */
                 Authorization?: string;
-                /** @description HMAC webhook signature in the format 'sha256=<hex>'. Required only when the webhook auth mode includes HMAC authentication. */
+                /** @description HMAC webhook signature in the format 'sha256=<hex>'. Required only when the webhook auth mode includes HMAC authentication with strict enforcement. */
                 "X-Dagu-Signature"?: string;
             };
             path: {

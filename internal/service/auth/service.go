@@ -890,17 +890,17 @@ func (s *Service) ConfigureWebhookHMAC(
 		return nil, ErrInvalidWebhookAuthMode
 	}
 
-	enforcementMode, err := validateWebhookHMACMode(authMode, enforcementMode)
-	if err != nil {
-		return nil, err
-	}
-
 	webhook, err := s.webhookStore.GetByDAGName(ctx, dagName)
 	if err != nil {
 		return nil, err
 	}
 	if webhook.HMACSecret == "" {
 		return nil, ErrWebhookHMACNotConfigured
+	}
+
+	enforcementMode, err = normalizeWebhookHMACModeForConfigure(webhook, authMode, enforcementMode)
+	if err != nil {
+		return nil, err
 	}
 
 	webhook.AuthMode = authMode
@@ -1094,6 +1094,25 @@ func validateWebhookHMACMode(
 	default:
 		return "", ErrInvalidWebhookAuthMode
 	}
+}
+
+func normalizeWebhookHMACModeForConfigure(
+	webhook *auth.Webhook,
+	authMode auth.WebhookAuthMode,
+	enforcementMode auth.WebhookHMACEnforcementMode,
+) (auth.WebhookHMACEnforcementMode, error) {
+	if enforcementMode != "" {
+		return validateWebhookHMACMode(authMode, enforcementMode)
+	}
+	if authMode == auth.WebhookAuthModeHMACOnly {
+		return auth.WebhookHMACEnforcementModeStrict, nil
+	}
+
+	current := webhook.HMACEnforcementMode
+	if current == "" {
+		current = auth.WebhookHMACEnforcementModeStrict
+	}
+	return validateWebhookHMACMode(authMode, current)
 }
 
 func validateWebhookTokenAgainst(webhook *auth.Webhook, token string) error {

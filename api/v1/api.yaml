@@ -3877,7 +3877,7 @@ paths:
           required: false
           schema:
             type: string
-          description: "HMAC webhook signature in the format 'sha256=<hex>'. Required only when the webhook auth mode includes HMAC authentication."
+          description: "HMAC webhook signature in the format 'sha256=<hex>'. Required only when the webhook auth mode includes HMAC authentication with strict enforcement."
       requestBody:
         required: false
         content:
@@ -4112,7 +4112,8 @@ paths:
       summary: "Enable webhook HMAC"
       description: |
         Enables HMAC authentication for the existing webhook and returns the generated
-        HMAC secret exactly once. Developer, manager, or admin only.
+        HMAC secret exactly once. If enforcementMode is omitted, it defaults to
+        strict. Developer, manager, or admin only.
       operationId: "enableDAGWebhookHMAC"
       tags:
         - "webhooks"
@@ -4148,7 +4149,11 @@ paths:
   /dags/{fileName}/webhook/hmac/configure:
     post:
       summary: "Configure webhook HMAC"
-      description: "Updates the webhook HMAC auth mode or enforcement mode without rotating the secret. Developer, manager, or admin only."
+      description: |
+        Updates the webhook HMAC auth mode or enforcement mode without rotating
+        the secret. If enforcementMode is omitted, the current enforcement mode
+        is preserved for token_and_hmac, while hmac_only always uses strict.
+        Developer, manager, or admin only.
       operationId: "configureDAGWebhookHMAC"
       tags:
         - "webhooks"
@@ -8046,7 +8051,11 @@ components:
 
     WebhookHMACConfigureRequest:
       type: object
-      description: "Request to configure webhook HMAC auth mode and enforcement"
+      description: |
+        Request to configure webhook HMAC auth mode and enforcement.
+        If enforcementMode is omitted when enabling HMAC, it defaults to strict.
+        If omitted when configuring an existing webhook, the current enforcement
+        mode is preserved for token_and_hmac, while hmac_only always uses strict.
       required:
         - authMode
       properties:

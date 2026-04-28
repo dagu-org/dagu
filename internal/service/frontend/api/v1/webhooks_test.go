@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -730,6 +731,27 @@ func TestWebhooks_EnableHMAC_HMACOnlyAllowsSignedRequestWithoutToken(t *testing.
 	server.Client().Post("/api/v1/webhooks/"+dagName, body).
 		WithBearerToken("dagu_wh_not_the_real_token").
 		ExpectStatus(http.StatusUnauthorized).Send(t)
+}
+
+func TestWebhooks_TriggerOversizedBodyRejectedBeforeAuth(t *testing.T) {
+	webhookParallel(t)
+	server := setupWebhookTestServer(t)
+	token := getWebhookAdminToken(t, server)
+
+	dagName := "webhook_oversized_body_test"
+	createTestDAG(t, server, token, dagName)
+
+	server.Client().Post("/api/v1/dags/"+dagName+"/webhook", nil).
+		WithBearerToken(token).ExpectStatus(http.StatusCreated).Send(t)
+
+	body := api.WebhookRequest{
+		Payload: &map[string]any{
+			"blob": strings.Repeat("x", 1024*1024),
+		},
+	}
+
+	server.Client().Post("/api/v1/webhooks/"+dagName, body).
+		ExpectStatus(http.StatusRequestEntityTooLarge).Send(t)
 }
 
 // TestWebhooks_TriggerNonExistentDAG tests triggering webhook for non-existent DAG

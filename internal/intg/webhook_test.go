@@ -121,10 +121,8 @@ steps:
 		ExpectStatus(http.StatusCreated).Send(t)
 
 	enableResp := server.Client().Post("/api/v1/dags/"+dagName+"/webhook/hmac/enable", api.WebhookHMACConfigureRequest{
-		AuthMode: api.WebhookHMACConfigureRequestAuthModeHmacOnly,
-		EnforcementMode: webhookHMACEnforcementModePtr(
-			api.WebhookHMACEnforcementModeStrict,
-		),
+		AuthMode:        api.WebhookHMACConfigureRequestAuthModeHmacOnly,
+		EnforcementMode: new(api.WebhookHMACEnforcementModeStrict),
 	}).WithBearerToken(adminToken).ExpectStatus(http.StatusOK).Send(t)
 
 	var enableBody api.WebhookHMACSecretResponse
@@ -136,7 +134,7 @@ steps:
 		"repository": "dagu",
 	}
 	body := api.WebhookRequest{
-		DagRunId: dagRunIDPtr(runID),
+		DagRunId: new(runID),
 		Payload:  &payload,
 	}
 	signature := signWebhookRequestBody(t, enableBody.HmacSecret, body)
@@ -253,14 +251,4 @@ func waitForWebhookRunStatus(
 
 		return status.Status == expected
 	}, intgTestTimeout(30*time.Second), 200*time.Millisecond)
-}
-
-//go:fix inline
-func dagRunIDPtr(id string) *string {
-	return new(id)
-}
-
-//go:fix inline
-func webhookHMACEnforcementModePtr(mode api.WebhookHMACEnforcementMode) *api.WebhookHMACEnforcementMode {
-	return new(mode)
 }

@@ -76,17 +76,18 @@ func runtimeParamLoadOptions(dag *core.DAG, params any, opts ResolveRuntimeParam
 
 func resolveLegacyRuntimePairs(entries []dagParamEntry, rawParams string, paramsList []string) ([]paramPair, error) {
 	finalPairs := runtimePairsFromEntries(entries)
+	declaredNames := declaredRuntimeParamNames(entries)
 
 	if rawParams != "" {
 		overridePairs, err := parseRuntimeLegacyOverrideInput(rawParams)
 		if err != nil {
 			return nil, core.NewValidationError("params", rawParams, fmt.Errorf("%w: %s", ErrInvalidParamValue, err))
 		}
-		overridePairs, internalPairs := splitInternalRuntimeOverridePairs(overridePairs)
+		overridePairs, internalPairs := splitInternalRuntimeOverridePairs(overridePairs, declaredNames)
 		if err := overrideParams(&finalPairs, overridePairs); err != nil {
 			return nil, err
 		}
-		finalPairs = append(finalPairs, internalPairs...)
+		finalPairs = appendInternalRuntimePairs(finalPairs, internalPairs)
 	}
 
 	if len(paramsList) > 0 {
@@ -94,11 +95,11 @@ func resolveLegacyRuntimePairs(entries []dagParamEntry, rawParams string, params
 		if err != nil {
 			return nil, core.NewValidationError("params", paramsList, fmt.Errorf("%w: %s", ErrInvalidParamValue, err))
 		}
-		overridePairs, internalPairs := splitInternalRuntimeOverridePairs(overridePairs)
+		overridePairs, internalPairs := splitInternalRuntimeOverridePairs(overridePairs, declaredNames)
 		if err := overrideParams(&finalPairs, overridePairs); err != nil {
 			return nil, err
 		}
-		finalPairs = append(finalPairs, internalPairs...)
+		finalPairs = appendInternalRuntimePairs(finalPairs, internalPairs)
 	}
 
 	return finalPairs, nil
@@ -120,7 +121,7 @@ func resolveLegacyEntries(ctx BuildContext, plan *dagParamPlan, rawParams string
 	if err != nil {
 		return nil, err
 	}
-	overridePairs, internalPairs := splitInternalRuntimeOverridePairs(overridePairs)
+	overridePairs, internalPairs := splitInternalRuntimeOverridePairs(overridePairs, declaredRuntimeParamNames(plan.entries))
 
 	entries, overridden, err := applyOverridePairsTracked(plan.entries, overridePairs)
 	if err != nil {
@@ -256,9 +257,9 @@ func rejectUnknownNamedParamsForEntries(entries []dagParamEntry, overrides []par
 	)
 }
 
-func splitInternalRuntimeOverridePairs(pairs []paramPair) (userPairs []paramPair, internalPairs []paramPair) {
+func splitInternalRuntimeOverridePairs(pairs []paramPair, declaredNames map[string]struct{}) (userPairs []paramPair, internalPairs []paramPair) {
 	for _, pair := range pairs {
-		if isInternalRuntimeParam(pair.Name) {
+		if isInternalRuntimeParam(pair.Name) && !isDeclaredRuntimeParam(declaredNames, pair.Name) {
 			internalPairs = append(internalPairs, pair)
 			continue
 		}
@@ -272,9 +273,10 @@ func appendInternalRuntimeEntries(entries []dagParamEntry, internalPairs []param
 		return entries
 	}
 
-	result := make([]dagParamEntry, 0, len(entries)+len(internalPairs))
+	normalizedInternalPairs := appendInternalRuntimePairs(nil, internalPairs)
+	result := make([]dagParamEntry, 0, len(entries)+len(normalizedInternalPairs))
 	result = append(result, entries...)
-	for _, pair := range internalPairs {
+	for _, pair := range normalizedInternalPairs {
 		result = append(result, dagParamEntry{
 			Name:     pair.Name,
 			Value:    pair.Value,
@@ -282,6 +284,62 @@ func appendInternalRuntimeEntries(entries []dagParamEntry, internalPairs []param
 		})
 	}
 	return result
+}
+
+func appendInternalRuntimePairs(existing []paramPair, internalPairs []paramPair) []paramPair {
+	if len(internalPairs) == 0 {
+		return existing
+	}
+
+	result := append([]paramPair(nil), existing...)
+	indexByName := make(map[string]int, len(result))
+	for i, pair := range result {
+		if pair.Name == "" {
+			continue
+		}
+		indexByName[pair.Name] = i
+	}
+
+	for _, pair := range internalPairs {
+		if pair.Name == "" {
+			result = append(result, pair)
+			continue
+		}
+		if idx, ok := indexByName[pair.Name]; ok {
+			result[idx].Value = pair.Value
+			continue
+		}
+		indexByName[pair.Name] = len(result)
+		result = append(result, pair)
+	}
+
+	return result
+}
+
+func declaredRuntimeParamNames(entries []dagParamEntry) map[string]struct{} {
+	if len(entries) == 0 {
+		return nil
+	}
+
+	names := make(map[string]struct{}, len(entries))
+	for _, entry := range entries {
+		if entry.Name == "" {
+			continue
+		}
+		names[entry.Name] = struct{}{}
+	}
+	if len(names) == 0 {
+		return nil
+	}
+	return names
+}
+
+func isDeclaredRuntimeParam(declaredNames map[string]struct{}, name string) bool {
+	if len(declaredNames) == 0 {
+		return false
+	}
+	_, ok := declaredNames[name]
+	return ok
 }
 
 func isInternalRuntimeParam(name string) bool {

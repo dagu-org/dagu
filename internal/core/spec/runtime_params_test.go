@@ -313,6 +313,32 @@ steps:
 	assert.JSONEq(t, `{"idea":"ship","WEBHOOK_PAYLOAD":"{\"event\":\"push\"}"}`, resolved.ParamsJSON)
 }
 
+func TestResolveLegacyRuntimePairs_InternalOverridesLastWriteWins(t *testing.T) {
+	t.Parallel()
+
+	pairs, err := resolveLegacyRuntimePairs(
+		nil,
+		`WEBHOOK_PAYLOAD=first`,
+		[]string{`WEBHOOK_PAYLOAD=second`},
+	)
+	require.NoError(t, err)
+	assert.Equal(t, []paramPair{
+		{Name: "WEBHOOK_PAYLOAD", Value: "second"},
+	}, pairs)
+}
+
+func TestSplitInternalRuntimeOverridePairs_DeclaredWebhookPayloadStaysUserParam(t *testing.T) {
+	t.Parallel()
+
+	userPairs, internalPairs := splitInternalRuntimeOverridePairs(
+		[]paramPair{{Name: "WEBHOOK_PAYLOAD", Value: "42"}},
+		map[string]struct{}{"WEBHOOK_PAYLOAD": {}},
+	)
+
+	assert.Equal(t, []paramPair{{Name: "WEBHOOK_PAYLOAD", Value: "42"}}, userPairs)
+	assert.Empty(t, internalPairs)
+}
+
 func TestResolveRuntimeParams_RejectsUnknownNamedParam_LegacyNamed(t *testing.T) {
 	t.Parallel()
 
