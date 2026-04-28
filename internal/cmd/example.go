@@ -360,6 +360,9 @@ defaults:
 steps:
   - id: gather_logs
     command: 'echo "error: connection timeout at 10:23 AM"'
+    # output captures stdout into a variable, but the default max_output_size
+    # is 1048576 bytes (1 MiB). If logs can exceed that, write them to a
+    # temporary file instead and pass the file path to later steps.
     output: ERROR_LOG
   - id: build_prompt
     type: template
