@@ -82,9 +82,11 @@ func resolveLegacyRuntimePairs(entries []dagParamEntry, rawParams string, params
 		if err != nil {
 			return nil, core.NewValidationError("params", rawParams, fmt.Errorf("%w: %s", ErrInvalidParamValue, err))
 		}
+		overridePairs, internalPairs := splitInternalRuntimeOverridePairs(overridePairs)
 		if err := overrideParams(&finalPairs, overridePairs); err != nil {
 			return nil, err
 		}
+		finalPairs = append(finalPairs, internalPairs...)
 	}
 
 	if len(paramsList) > 0 {
@@ -92,9 +94,11 @@ func resolveLegacyRuntimePairs(entries []dagParamEntry, rawParams string, params
 		if err != nil {
 			return nil, core.NewValidationError("params", paramsList, fmt.Errorf("%w: %s", ErrInvalidParamValue, err))
 		}
+		overridePairs, internalPairs := splitInternalRuntimeOverridePairs(overridePairs)
 		if err := overrideParams(&finalPairs, overridePairs); err != nil {
 			return nil, err
 		}
+		finalPairs = append(finalPairs, internalPairs...)
 	}
 
 	return finalPairs, nil
@@ -116,6 +120,7 @@ func resolveLegacyEntries(ctx BuildContext, plan *dagParamPlan, rawParams string
 	if err != nil {
 		return nil, err
 	}
+	overridePairs, internalPairs := splitInternalRuntimeOverridePairs(overridePairs)
 
 	entries, overridden, err := applyOverridePairsTracked(plan.entries, overridePairs)
 	if err != nil {
@@ -134,7 +139,7 @@ func resolveLegacyEntries(ctx BuildContext, plan *dagParamPlan, rawParams string
 	}
 
 	if plan.schema == nil {
-		return entries, nil
+		return appendInternalRuntimeEntries(entries, internalPairs), nil
 	}
 
 	entries, err = validateSchemaBackedEntries(entries, plan.schema, plan.schemaProperties, plan.schemaOrder, metadataMode, false)
@@ -142,7 +147,7 @@ func resolveLegacyEntries(ctx BuildContext, plan *dagParamPlan, rawParams string
 		return nil, err
 	}
 
-	return entries, nil
+	return appendInternalRuntimeEntries(entries, internalPairs), nil
 }
 
 func parseOverridePairs(rawParams string, paramsList []string) ([]paramPair, error) {
@@ -249,6 +254,43 @@ func rejectUnknownNamedParamsForEntries(entries []dagParamEntry, overrides []par
 		quotedNames(unknown),
 		strings.Join(accepted, ", "),
 	)
+}
+
+func splitInternalRuntimeOverridePairs(pairs []paramPair) (userPairs []paramPair, internalPairs []paramPair) {
+	for _, pair := range pairs {
+		if isInternalRuntimeParam(pair.Name) {
+			internalPairs = append(internalPairs, pair)
+			continue
+		}
+		userPairs = append(userPairs, pair)
+	}
+	return userPairs, internalPairs
+}
+
+func appendInternalRuntimeEntries(entries []dagParamEntry, internalPairs []paramPair) []dagParamEntry {
+	if len(internalPairs) == 0 {
+		return entries
+	}
+
+	result := make([]dagParamEntry, 0, len(entries)+len(internalPairs))
+	result = append(result, entries...)
+	for _, pair := range internalPairs {
+		result = append(result, dagParamEntry{
+			Name:     pair.Name,
+			Value:    pair.Value,
+			HasValue: true,
+		})
+	}
+	return result
+}
+
+func isInternalRuntimeParam(name string) bool {
+	switch name {
+	case "WEBHOOK_PAYLOAD":
+		return true
+	default:
+		return false
+	}
 }
 
 func runtimePairsFromEntries(entries []dagParamEntry) []paramPair {

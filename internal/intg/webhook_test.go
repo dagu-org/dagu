@@ -101,6 +101,10 @@ func TestWebhookHMACOnlyTriggerExecutesSignedRequest(t *testing.T) {
 
 	payloadFile := t.TempDir() + "/webhook-payload.json"
 	spec := fmt.Sprintf(`name: %s
+params:
+  - name: idea
+    type: string
+    default: existing-default
 steps:
   - name: capture-payload
 %s    command: |

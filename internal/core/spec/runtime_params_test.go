@@ -281,6 +281,38 @@ steps:
 	assert.Equal(t, []string{"region=us-west-2"}, resolved.Params)
 }
 
+func TestResolveRuntimeParams_AcceptsWebhookPayload_InlineTyped(t *testing.T) {
+	t.Parallel()
+
+	yaml := []byte(`
+name: accept-webhook-payload
+params:
+  - name: idea
+    type: string
+    required: true
+steps:
+  - name: echo
+    command: echo "$idea"
+`)
+
+	dag, err := LoadYAML(context.Background(), yaml, WithoutEval())
+	require.NoError(t, err)
+	dag.YamlData = yaml
+
+	resolved, err := ResolveRuntimeParams(
+		context.Background(),
+		dag,
+		`idea=ship WEBHOOK_PAYLOAD="{\"event\":\"push\"}"`,
+		ResolveRuntimeParamsOptions{},
+	)
+	require.NoError(t, err)
+	assert.Equal(t, []string{
+		"idea=ship",
+		`WEBHOOK_PAYLOAD={"event":"push"}`,
+	}, resolved.Params)
+	assert.JSONEq(t, `{"idea":"ship","WEBHOOK_PAYLOAD":"{\"event\":\"push\"}"}`, resolved.ParamsJSON)
+}
+
 func TestResolveRuntimeParams_RejectsUnknownNamedParam_LegacyNamed(t *testing.T) {
 	t.Parallel()
 
@@ -404,6 +436,46 @@ params:
 	resolved, err := ResolveRuntimeParams(context.Background(), dag, "region=us-west-2 extra=ok", ResolveRuntimeParamsOptions{})
 	require.NoError(t, err)
 	assert.NotNil(t, resolved)
+}
+
+func TestResolveRuntimeParams_ExternalSchemaAcceptsWebhookPayloadWhenClosed(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	schemaPath := filepath.Join(dir, "params.schema.json")
+	require.NoError(t, os.WriteFile(schemaPath, []byte(`{
+  "type": "object",
+  "properties": {
+    "idea": {
+      "type": "string"
+    }
+  },
+  "required": ["idea"],
+  "additionalProperties": false
+}`), 0o600))
+
+	dagPath := filepath.Join(dir, "external-webhook-payload.yaml")
+	require.NoError(t, os.WriteFile(dagPath, []byte(`
+name: external-webhook-payload
+params:
+  schema: params.schema.json
+`), 0o600))
+
+	dag, err := Load(context.Background(), dagPath, WithoutEval())
+	require.NoError(t, err)
+
+	resolved, err := ResolveRuntimeParams(
+		context.Background(),
+		dag,
+		`idea=ship WEBHOOK_PAYLOAD="{\"event\":\"push\"}"`,
+		ResolveRuntimeParamsOptions{},
+	)
+	require.NoError(t, err)
+	assert.Equal(t, []string{
+		"idea=ship",
+		`WEBHOOK_PAYLOAD={"event":"push"}`,
+	}, resolved.Params)
+	assert.JSONEq(t, `{"idea":"ship","WEBHOOK_PAYLOAD":"{\"event\":\"push\"}"}`, resolved.ParamsJSON)
 }
 
 func TestToFloat64_RejectsUnsafeIntegerPrecision(t *testing.T) {

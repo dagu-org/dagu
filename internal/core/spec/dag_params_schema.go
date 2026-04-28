@@ -105,6 +105,7 @@ func resolveExternalSchemaEntries(plan *dagParamPlan, rawParams string, paramsLi
 	if err != nil {
 		return nil, err
 	}
+	overridePairs, internalPairs := splitInternalRuntimeOverridePairs(overridePairs)
 
 	basePairs := make([]paramPair, 0, len(plan.entries))
 	for _, entry := range plan.entries {
@@ -134,7 +135,7 @@ func resolveExternalSchemaEntries(plan *dagParamPlan, rawParams string, paramsLi
 		return nil, err
 	}
 
-	return entriesFromTypedMap(typedMap, plan.schemaOrder), nil
+	return appendInternalRuntimeEntries(entriesFromTypedMap(typedMap, plan.schemaOrder), internalPairs), nil
 }
 
 func validateSchemaMap(values map[string]any, schema *jsonschema.Resolved, metadataMode bool) (map[string]any, error) {
