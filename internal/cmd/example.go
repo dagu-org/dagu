@@ -298,6 +298,8 @@ steps:
 		Name:        "approval-gate",
 		Description: "Review, push back with rewind_to, then continue to deploy",
 		Content: `type: graph
+artifacts:
+  enabled: true
 steps:
   - id: build
     command: echo "v1.2.3"
@@ -317,9 +319,25 @@ steps:
     output: RELEASE_NOTES
   - id: review_release
     depends: [prepare_release_notes]
-    command: echo "${RELEASE_NOTES}"
+    type: template
+    with:
+      output: ${DAG_RUN_ARTIFACTS_DIR}/release-notes.md
+      data:
+        version: ${VERSION}
+        release_notes: ${RELEASE_NOTES}
+        deploy_window: ${DEPLOY_WINDOW}
+    script: |
+      # Release {{ .version }}
+      
+      ## Summary
+      
+      {{ .release_notes }}
+      
+      ## Deployment Window
+      
+      {{ .deploy_window | default "Pending approval input" }}
     approval:
-      prompt: "Review the release notes. Push back with FEEDBACK to regenerate them, or approve with DEPLOY_WINDOW to continue."
+      prompt: "Review the release-notes.md artifact. Push back with FEEDBACK to regenerate it, or approve with DEPLOY_WINDOW to continue."
       input: [FEEDBACK, DEPLOY_WINDOW]
       required: [DEPLOY_WINDOW]
       rewind_to: prepare_release_notes
