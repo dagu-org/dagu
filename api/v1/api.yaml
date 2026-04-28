@@ -4128,6 +4128,18 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/WebhookHMACConfigureRequest"
+            examples:
+              token_and_hmac_strict:
+                value:
+                  authMode: token_and_hmac
+                  enforcementMode: strict
+              token_and_hmac_observe:
+                value:
+                  authMode: token_and_hmac
+                  enforcementMode: observe
+              hmac_only:
+                value:
+                  authMode: hmac_only
       responses:
         "200":
           description: "Webhook HMAC enabled successfully"
@@ -4180,6 +4192,18 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/WebhookHMACConfigureRequest"
+            examples:
+              token_and_hmac_strict:
+                value:
+                  authMode: token_and_hmac
+                  enforcementMode: strict
+              token_and_hmac_observe:
+                value:
+                  authMode: token_and_hmac
+                  enforcementMode: observe
+              hmac_only:
+                value:
+                  authMode: hmac_only
       responses:
         "200":
           description: "Webhook HMAC updated successfully"
@@ -8100,7 +8124,8 @@ components:
         If enforcementMode is omitted when enabling HMAC, it defaults to strict.
         If omitted when configuring an existing webhook, the current enforcement
         mode is preserved for token_and_hmac, while hmac_only always uses strict.
-        Requests that set authMode to hmac_only must not pass enforcementMode=observe.
+        Clients should omit enforcementMode when authMode is hmac_only; the
+        server enforces strict mode and rejects observe.
       required:
         - authMode
       properties:

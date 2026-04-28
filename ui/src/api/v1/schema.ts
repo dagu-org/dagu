@@ -3181,7 +3181,8 @@ export interface components {
          *     If enforcementMode is omitted when enabling HMAC, it defaults to strict.
          *     If omitted when configuring an existing webhook, the current enforcement
          *     mode is preserved for token_and_hmac, while hmac_only always uses strict.
-         *     Requests that set authMode to hmac_only must not pass enforcementMode=observe.
+         *     Clients should omit enforcementMode when authMode is hmac_only; the
+         *     server enforces strict mode and rejects observe.
          *      */
         WebhookHMACConfigureRequest: {
             /** @enum {string} */
