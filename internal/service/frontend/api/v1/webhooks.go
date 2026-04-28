@@ -26,8 +26,7 @@ import (
 
 const (
 	// maxWebhookPayloadSize is the maximum size of the webhook payload in bytes (1MB).
-	maxWebhookPayloadSize      = 1 * 1024 * 1024
-	webhookAuthorizationHeader = "authorization"
+	maxWebhookPayloadSize = 1 * 1024 * 1024
 )
 
 // ListWebhooks returns all webhooks across all DAGs.
@@ -535,51 +534,10 @@ func (a *API) TriggerWebhook(ctx context.Context, request api.TriggerWebhookRequ
 		}
 	}
 
-	// Prepare the WEBHOOK_PAYLOAD parameter
-	payload, err := marshalWebhookPayload(ctx, request.Body)
-	if err != nil {
-		logger.Warn(ctx, "Webhook: failed to marshal payload",
-			tag.Name(dag.Name),
-			tag.Error(err),
-		)
-		return nil, &Error{
-			HTTPStatus: http.StatusBadRequest,
-			Code:       api.ErrorCodeBadRequest,
-			Message:    "failed to process request body",
-		}
+	params, apiErr := buildWebhookRequestRuntimeParams(ctx, dag, request.Body)
+	if apiErr != nil {
+		return nil, apiErr
 	}
-	if len(payload) > maxWebhookPayloadSize {
-		logger.Warn(ctx, "Webhook: payload too large",
-			tag.Name(dag.Name),
-			tag.Key("size"), tag.Value(len(payload)),
-			tag.Key("maxSize"), tag.Value(maxWebhookPayloadSize),
-		)
-		return nil, &Error{
-			HTTPStatus: http.StatusRequestEntityTooLarge,
-			Code:       api.ErrorCodeBadRequest,
-			Message:    fmt.Sprintf("webhook payload too large (max %d bytes)", maxWebhookPayloadSize),
-		}
-	}
-
-	headerAllowList := []string(nil)
-	if dag.Webhook != nil {
-		headerAllowList = dag.Webhook.ForwardHeaders
-	}
-
-	headers, err := marshalWebhookHeaders(ctx, headerAllowList)
-	if err != nil {
-		logger.Warn(ctx, "Webhook: failed to marshal headers",
-			tag.Name(dag.Name),
-			tag.Error(err),
-		)
-		return nil, &Error{
-			HTTPStatus: http.StatusBadRequest,
-			Code:       api.ErrorCodeBadRequest,
-			Message:    "failed to process request headers",
-		}
-	}
-
-	params := buildWebhookRuntimeParams(payload, headers)
 
 	// Determine the dag-run ID (use provided one for idempotency, or generate new)
 	var dagRunID string
@@ -626,6 +584,57 @@ func (a *API) TriggerWebhook(ctx context.Context, request api.TriggerWebhookRequ
 		DagRunId: dagRunID,
 		DagName:  dag.Name,
 	}, nil
+}
+
+func buildWebhookRequestRuntimeParams(
+	ctx context.Context,
+	dag *core.DAG,
+	body *api.TriggerWebhookJSONRequestBody,
+) (string, *Error) {
+	payload, err := marshalWebhookPayload(ctx, body)
+	if err != nil {
+		logger.Warn(ctx, "Webhook: failed to marshal payload",
+			tag.Name(dag.Name),
+			tag.Error(err),
+		)
+		return "", &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    "failed to process request body",
+		}
+	}
+	if len(payload) > maxWebhookPayloadSize {
+		logger.Warn(ctx, "Webhook: payload too large",
+			tag.Name(dag.Name),
+			tag.Key("size"), tag.Value(len(payload)),
+			tag.Key("maxSize"), tag.Value(maxWebhookPayloadSize),
+		)
+		return "", &Error{
+			HTTPStatus: http.StatusRequestEntityTooLarge,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    fmt.Sprintf("webhook payload too large (max %d bytes)", maxWebhookPayloadSize),
+		}
+	}
+
+	headerAllowList := []string(nil)
+	if dag.Webhook != nil {
+		headerAllowList = dag.Webhook.ForwardHeaders
+	}
+
+	headers, err := marshalWebhookHeaders(ctx, headerAllowList)
+	if err != nil {
+		logger.Warn(ctx, "Webhook: failed to marshal headers",
+			tag.Name(dag.Name),
+			tag.Error(err),
+		)
+		return "", &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    "failed to process request headers",
+		}
+	}
+
+	return buildWebhookRuntimeParams(payload, headers), nil
 }
 
 // requireWebhookManagement checks if webhook management is enabled and
@@ -747,8 +756,8 @@ func marshalWebhookHeaders(ctx context.Context, allowList []string) (string, err
 	}
 
 	for _, raw := range allowList {
-		headerName := strings.ToLower(strings.TrimSpace(raw))
-		if headerName == "" || headerName == webhookAuthorizationHeader {
+		headerName := core.NormalizeWebhookForwardHeader(raw)
+		if headerName == "" || core.IsDeniedWebhookForwardHeader(headerName) {
 			continue
 		}
 		values := headers[headerName]

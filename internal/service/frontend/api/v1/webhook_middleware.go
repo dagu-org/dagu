@@ -9,6 +9,8 @@ import (
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/dagucloud/dagu/internal/core"
 )
 
 // contextKey is a private type for context keys in this package.
@@ -21,14 +23,15 @@ const (
 	requestHeadersContextKey contextKey = "webhook_request_headers"
 )
 
-// WebhookRawBodyMiddleware is a chi middleware that captures the raw request
-// body into the request context before the generated strict handler consumes it.
-// This allows the webhook handler to fall back to the full raw body when the
-// structured "payload" field is not present in the request.
+// WebhookRequestContextMiddleware is a chi middleware that captures the raw
+// request body and normalized request headers into the request context before
+// the generated strict handler consumes them. This allows the webhook handler
+// to fall back to the full raw body when the structured "payload" field is not
+// present in the request and to forward selected request headers into runtime.
 //
 // The middleware only activates for POST requests to webhook trigger paths
 // (paths containing "/webhooks/" with a fileName segment after it).
-func WebhookRawBodyMiddleware() func(http.Handler) http.Handler {
+func WebhookRequestContextMiddleware() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != http.MethodPost || !isWebhookTriggerPath(r.URL.Path) {
@@ -68,7 +71,7 @@ func WebhookRawBodyMiddleware() func(http.Handler) http.Handler {
 }
 
 // rawBodyFromContext retrieves the raw request body bytes stored by
-// WebhookRawBodyMiddleware. Returns nil if not present.
+// WebhookRequestContextMiddleware. Returns nil if not present.
 func rawBodyFromContext(ctx context.Context) []byte {
 	raw, _ := ctx.Value(rawBodyContextKey).([]byte)
 	return raw
@@ -80,7 +83,7 @@ func withRawBody(ctx context.Context, body []byte) context.Context {
 }
 
 // requestHeadersFromContext retrieves the request headers stored by
-// WebhookRawBodyMiddleware. Returns nil if not present.
+// WebhookRequestContextMiddleware. Returns nil if not present.
 func requestHeadersFromContext(ctx context.Context) http.Header {
 	headers, _ := ctx.Value(requestHeadersContextKey).(http.Header)
 	return headers
@@ -94,7 +97,7 @@ func withRequestHeaders(ctx context.Context, headers http.Header) context.Contex
 
 	normalized := make(http.Header, len(headers))
 	for key, values := range headers {
-		normalized[strings.ToLower(strings.TrimSpace(key))] = append([]string(nil), values...)
+		normalized[core.NormalizeWebhookForwardHeader(key)] = append([]string(nil), values...)
 	}
 	return context.WithValue(ctx, requestHeadersContextKey, normalized)
 }

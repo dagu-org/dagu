@@ -357,7 +357,7 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router) error {
 		r.Use(frontendauth.ClientIPMiddleware())
 		r.Use(frontendauth.Middleware(authOptions))
 		r.Use(WithRemoteNode(a.remoteNodeResolver, mountedAPIPath))
-		r.Use(WebhookRawBodyMiddleware())
+		r.Use(WebhookRequestContextMiddleware())
 
 		middlewares := []api.StrictMiddlewareFunc{validateDAGFileNameMiddleware}
 		options := api.StrictHTTPServerOptions{

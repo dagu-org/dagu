@@ -883,7 +883,7 @@ func buildWebhookConfig(_ BuildContext, d *dag) (*core.WebhookConfig, error) {
 
 	headers := make([]string, 0, len(d.Webhook.ForwardHeaders))
 	for i, raw := range d.Webhook.ForwardHeaders {
-		header := strings.ToLower(strings.TrimSpace(raw))
+		header := core.NormalizeWebhookForwardHeader(raw)
 		if header == "" {
 			return nil, core.NewValidationError(
 				fmt.Sprintf("webhook.forward_headers[%d]", i),
@@ -891,7 +891,7 @@ func buildWebhookConfig(_ BuildContext, d *dag) (*core.WebhookConfig, error) {
 				fmt.Errorf("header name cannot be empty"),
 			)
 		}
-		if header == "authorization" {
+		if core.IsDeniedWebhookForwardHeader(header) {
 			return nil, core.NewValidationError(
 				fmt.Sprintf("webhook.forward_headers[%d]", i),
 				raw,

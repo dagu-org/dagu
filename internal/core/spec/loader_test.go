@@ -827,6 +827,29 @@ steps:
 		assert.Empty(t, dag.Webhook.ForwardHeaders)
 	})
 
+	t.Run("EmptyWebhookObjectClearsInheritedWebhookConfig", func(t *testing.T) {
+		t.Parallel()
+
+		baseDAG := createTempYAMLFile(t, `
+webhook:
+  forward_headers:
+    - X-GitHub-Event
+`)
+
+		childDAG := createTempYAMLFile(t, `
+webhook: {}
+steps:
+  - name: "step1"
+    command: echo "test"
+`)
+
+		dag, err := spec.Load(context.Background(), childDAG, spec.WithBaseConfig(baseDAG))
+		require.NoError(t, err)
+		require.NotNil(t, dag)
+		require.NotNil(t, dag.Webhook)
+		assert.Empty(t, dag.Webhook.ForwardHeaders)
+	})
+
 	t.Run("RejectAuthorizationInWebhookForwardHeaders", func(t *testing.T) {
 		t.Parallel()
 
