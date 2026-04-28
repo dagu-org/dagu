@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"maps"
 	"strconv"
 	"strings"
 	"time"
@@ -39,9 +40,7 @@ func configEvalVariables(env Env) map[string]string {
 	}
 
 	cloned := make(map[string]string, len(vars)+len(env.DAG.ParamDefs))
-	for key, value := range vars {
-		cloned[key] = value
-	}
+	maps.Copy(cloned, vars)
 
 	for _, def := range env.DAG.ParamDefs {
 		name := strings.TrimSpace(def.Name)

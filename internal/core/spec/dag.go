@@ -883,8 +883,8 @@ func valueReferencesRunArtifactsDir(v reflect.Value) bool {
 			}
 		}
 	case reflect.Struct:
-		for i := 0; i < v.NumField(); i++ {
-			if valueReferencesRunArtifactsDir(v.Field(i)) {
+		for _, field := range v.Fields() {
+			if valueReferencesRunArtifactsDir(field) {
 				return true
 			}
 		}
