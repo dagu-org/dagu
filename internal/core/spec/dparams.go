@@ -159,6 +159,9 @@ func buildDAGParamPlan(ctx BuildContext, d *dag) (*dagParamPlan, error) {
 		}
 		return buildExternalSchemaParamPlan(d.Params, d.WorkingDir, ctx.file)
 	}
+	if err := malformedInlineJSONSchemaShapeError(d.Params); err != nil {
+		return nil, err
+	}
 	if isInlineJSONSchema(d.Params) {
 		return buildInlineSchemaParamPlan(d.Params, ctx.opts.Has(BuildFlagSkipSchemaValidation))
 	}

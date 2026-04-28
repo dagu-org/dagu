@@ -268,6 +268,30 @@ func TestEvalObjectWithExecutorConfig(t *testing.T) {
 	require.Equal(t, nestedExpected["value"], nestedResult["value"])
 }
 
+func TestEvalObjectWithExecutorConfig_PreservesUnresolvedPlaceholderWhenOptionalParamIsOmitted(t *testing.T) {
+	t.Parallel()
+
+	ctx := exec.NewContext(
+		context.Background(),
+		&core.DAG{
+			Name: "test-dag",
+			ParamDefs: []core.ParamDef{
+				{Name: "HOME", Type: core.ParamDefTypeString},
+			},
+		},
+		"",
+		"",
+	)
+	env := runtime.NewEnv(ctx, core.Step{Name: "test-step"})
+	ctx = runtime.WithEnv(ctx, env)
+
+	result, err := runtime.EvalObject(ctx, map[string]any{
+		"key": "${HOME}/.ssh/id_ed25519",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "${HOME}/.ssh/id_ed25519", result["key"])
+}
+
 func TestGenerateSubDAGRunID(t *testing.T) {
 	t.Parallel()
 

@@ -52,6 +52,76 @@ func TestIsInlineJSONSchema_MapWithPropertiesAsStringReturnsFalse(t *testing.T) 
 	assert.False(t, isInlineJSONSchema(input))
 }
 
+func TestBuildInlineSchemaParamPlan_RejectsPropertiesArrayShape(t *testing.T) {
+	t.Parallel()
+
+	yaml := []byte(`
+name: inline-schema-properties-array
+params:
+  type: object
+  properties:
+    - name: region
+      type: string
+  required:
+    - region
+`)
+
+	_, err := LoadYAML(context.Background(), yaml, WithoutEval())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "params")
+	assert.Contains(t, err.Error(), "properties must be an object")
+}
+
+func TestBuildInlineSchemaParamPlan_SkipSchemaValidationStillRejectsPropertiesArrayShape(t *testing.T) {
+	t.Parallel()
+
+	yaml := []byte(`
+name: inline-schema-properties-array-skip
+params:
+  type: object
+  properties:
+    - name: region
+      type: string
+`)
+
+	_, err := LoadYAML(context.Background(), yaml, SkipSchemaValidation(), WithoutEval())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "params")
+	assert.Contains(t, err.Error(), "properties must be an object")
+}
+
+func TestBuildInlineSchemaParamPlan_RejectsPropertiesNullShape(t *testing.T) {
+	t.Parallel()
+
+	yaml := []byte(`
+name: inline-schema-properties-null
+params:
+  type: object
+  properties: null
+`)
+
+	_, err := LoadYAML(context.Background(), yaml, WithoutEval())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "params")
+	assert.Contains(t, err.Error(), "properties must be an object")
+}
+
+func TestBuildInlineSchemaParamPlan_SkipSchemaValidationStillRejectsPropertiesNullShape(t *testing.T) {
+	t.Parallel()
+
+	yaml := []byte(`
+name: inline-schema-properties-null-skip
+params:
+  type: object
+  properties: null
+`)
+
+	_, err := LoadYAML(context.Background(), yaml, SkipSchemaValidation(), WithoutEval())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "params")
+	assert.Contains(t, err.Error(), "properties must be an object")
+}
+
 // U6: map with properties as a map IS an inline schema
 func TestIsInlineJSONSchema_MapWithPropertiesAsMapReturnsTrue(t *testing.T) {
 	t.Parallel()
