@@ -5,10 +5,15 @@ package auth
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"testing"
 	"time"
 
 	"github.com/dagucloud/dagu/internal/auth"
+	cryptoutil "github.com/dagucloud/dagu/internal/cmn/crypto"
 	"github.com/dagucloud/dagu/internal/persis/filewebhook"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -30,6 +35,31 @@ func setupWebhookTestService(t *testing.T) (*Service, string) {
 	return service, tmpDir
 }
 
+func setupWebhookTestServiceWithEncryptedStore(t *testing.T) (*Service, string) {
+	t.Helper()
+
+	tmpDir := t.TempDir()
+	encryptor, err := cryptoutil.NewEncryptor("test-encryption-key")
+	require.NoError(t, err)
+
+	webhookStore, err := filewebhook.New(tmpDir, filewebhook.WithEncryptor(encryptor))
+	require.NoError(t, err)
+
+	service := New(nil, Config{
+		TokenSecret: mustTokenSecret("test"),
+		TokenTTL:    time.Hour,
+		BcryptCost:  4,
+	}, WithWebhookStore(webhookStore))
+
+	return service, tmpDir
+}
+
+func signWebhookBody(secret string, body []byte) string {
+	mac := hmac.New(sha256.New, []byte(secret))
+	_, _ = mac.Write(body)
+	return "sha256=" + hex.EncodeToString(mac.Sum(nil))
+}
+
 func TestService_CreateWebhook(t *testing.T) {
 	t.Parallel()
 
@@ -48,6 +78,28 @@ func TestService_CreateWebhook(t *testing.T) {
 		assert.Equal(t, "admin-user", result.Webhook.CreatedBy)
 		assert.NotEmpty(t, result.FullToken)
 		assert.Contains(t, result.FullToken, "dagu_wh_")
+	})
+
+	t.Run("DefaultsToTokenOnlyAuthMode", func(t *testing.T) {
+		t.Parallel()
+		service, _ := setupWebhookTestService(t)
+		ctx := context.Background()
+
+		result, err := service.CreateWebhook(ctx, "default-auth-mode-dag", "admin-user")
+		require.NoError(t, err)
+
+		raw, err := json.Marshal(result.Webhook)
+		require.NoError(t, err)
+
+		var decoded map[string]any
+		require.NoError(t, json.Unmarshal(raw, &decoded))
+
+		assert.Equal(t, "token_only", decoded["authMode"])
+
+		hmacDetails, ok := decoded["hmac"].(map[string]any)
+		require.True(t, ok, "expected hmac details object in webhook JSON")
+		assert.Equal(t, false, hmacDetails["enabled"])
+		assert.Equal(t, false, hmacDetails["secretConfigured"])
 	})
 
 	t.Run("EmptyDAGName", func(t *testing.T) {
@@ -464,6 +516,183 @@ func TestService_HasWebhookStore(t *testing.T) {
 		t.Parallel()
 		service := New(nil, Config{TokenSecret: mustTokenSecret("test")})
 		assert.False(t, service.HasWebhookStore())
+	})
+}
+
+func TestService_EnableWebhookHMAC(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Success", func(t *testing.T) {
+		t.Parallel()
+		service, _ := setupWebhookTestServiceWithEncryptedStore(t)
+		ctx := context.Background()
+
+		_, err := service.CreateWebhook(ctx, "enable-hmac-dag", "admin")
+		require.NoError(t, err)
+
+		result, err := service.EnableWebhookHMAC(
+			ctx,
+			"enable-hmac-dag",
+			auth.WebhookAuthModeTokenAndHMAC,
+			auth.WebhookHMACEnforcementModeStrict,
+		)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+
+		assert.Equal(t, auth.WebhookAuthModeTokenAndHMAC, result.Webhook.AuthMode)
+		assert.Equal(t, auth.WebhookHMACEnforcementModeStrict, result.Webhook.HMACEnforcementMode)
+		assert.NotEmpty(t, result.FullSecret)
+		assert.NotNil(t, result.Webhook.HMACSecretGeneratedAt)
+	})
+
+	t.Run("RejectsObserveForHMACOnly", func(t *testing.T) {
+		t.Parallel()
+		service, _ := setupWebhookTestServiceWithEncryptedStore(t)
+		ctx := context.Background()
+
+		_, err := service.CreateWebhook(ctx, "hmac-only-observe-dag", "admin")
+		require.NoError(t, err)
+
+		_, err = service.EnableWebhookHMAC(
+			ctx,
+			"hmac-only-observe-dag",
+			auth.WebhookAuthModeHMACOnly,
+			auth.WebhookHMACEnforcementModeObserve,
+		)
+		assert.ErrorIs(t, err, ErrInvalidWebhookHMACEnforcementMode)
+	})
+}
+
+func TestService_ConfigureWebhookHMAC(t *testing.T) {
+	t.Parallel()
+
+	t.Run("PreservesExistingObserveWhenOmitted", func(t *testing.T) {
+		t.Parallel()
+		service, _ := setupWebhookTestServiceWithEncryptedStore(t)
+		ctx := context.Background()
+
+		_, err := service.CreateWebhook(ctx, "configure-preserve-observe-dag", "admin")
+		require.NoError(t, err)
+
+		_, err = service.EnableWebhookHMAC(
+			ctx,
+			"configure-preserve-observe-dag",
+			auth.WebhookAuthModeTokenAndHMAC,
+			auth.WebhookHMACEnforcementModeObserve,
+		)
+		require.NoError(t, err)
+
+		webhook, err := service.ConfigureWebhookHMAC(
+			ctx,
+			"configure-preserve-observe-dag",
+			auth.WebhookAuthModeTokenAndHMAC,
+			"",
+		)
+		require.NoError(t, err)
+		assert.Equal(t, auth.WebhookHMACEnforcementModeObserve, webhook.HMACEnforcementMode)
+	})
+
+	t.Run("OmittedEnforcementKeepsHMACOnlyStrict", func(t *testing.T) {
+		t.Parallel()
+		service, _ := setupWebhookTestServiceWithEncryptedStore(t)
+		ctx := context.Background()
+
+		_, err := service.CreateWebhook(ctx, "configure-hmac-only-strict-dag", "admin")
+		require.NoError(t, err)
+
+		_, err = service.EnableWebhookHMAC(
+			ctx,
+			"configure-hmac-only-strict-dag",
+			auth.WebhookAuthModeTokenAndHMAC,
+			auth.WebhookHMACEnforcementModeObserve,
+		)
+		require.NoError(t, err)
+
+		webhook, err := service.ConfigureWebhookHMAC(
+			ctx,
+			"configure-hmac-only-strict-dag",
+			auth.WebhookAuthModeHMACOnly,
+			"",
+		)
+		require.NoError(t, err)
+		assert.Equal(t, auth.WebhookHMACEnforcementModeStrict, webhook.HMACEnforcementMode)
+	})
+}
+
+func TestService_AuthorizeWebhookRequest(t *testing.T) {
+	t.Parallel()
+
+	t.Run("TokenAndHMACStrictRequiresBoth", func(t *testing.T) {
+		t.Parallel()
+		service, _ := setupWebhookTestServiceWithEncryptedStore(t)
+		ctx := context.Background()
+
+		created, err := service.CreateWebhook(ctx, "strict-auth-dag", "admin")
+		require.NoError(t, err)
+
+		hmacResult, err := service.EnableWebhookHMAC(
+			ctx,
+			"strict-auth-dag",
+			auth.WebhookAuthModeTokenAndHMAC,
+			auth.WebhookHMACEnforcementModeStrict,
+		)
+		require.NoError(t, err)
+
+		body := []byte(`{"payload":{"event":"push"}}`)
+		signature := signWebhookBody(hmacResult.FullSecret, body)
+
+		_, err = service.AuthorizeWebhookRequest(ctx, "strict-auth-dag", created.FullToken, "", body)
+		assert.ErrorIs(t, err, ErrMissingWebhookHMACSignature)
+
+		webhook, err := service.AuthorizeWebhookRequest(ctx, "strict-auth-dag", created.FullToken, signature, body)
+		require.NoError(t, err)
+		assert.Equal(t, "strict-auth-dag", webhook.DAGName)
+	})
+
+	t.Run("TokenAndHMACObserveAllowsMissingSignature", func(t *testing.T) {
+		t.Parallel()
+		service, _ := setupWebhookTestServiceWithEncryptedStore(t)
+		ctx := context.Background()
+
+		created, err := service.CreateWebhook(ctx, "observe-auth-dag", "admin")
+		require.NoError(t, err)
+
+		_, err = service.EnableWebhookHMAC(
+			ctx,
+			"observe-auth-dag",
+			auth.WebhookAuthModeTokenAndHMAC,
+			auth.WebhookHMACEnforcementModeObserve,
+		)
+		require.NoError(t, err)
+
+		body := []byte(`{"payload":{"event":"push"}}`)
+		webhook, err := service.AuthorizeWebhookRequest(ctx, "observe-auth-dag", created.FullToken, "", body)
+		require.NoError(t, err)
+		assert.Equal(t, "observe-auth-dag", webhook.DAGName)
+	})
+
+	t.Run("HMACOnlyAllowsSignedRequestWithoutToken", func(t *testing.T) {
+		t.Parallel()
+		service, _ := setupWebhookTestServiceWithEncryptedStore(t)
+		ctx := context.Background()
+
+		_, err := service.CreateWebhook(ctx, "hmac-only-dag", "admin")
+		require.NoError(t, err)
+
+		hmacResult, err := service.EnableWebhookHMAC(
+			ctx,
+			"hmac-only-dag",
+			auth.WebhookAuthModeHMACOnly,
+			auth.WebhookHMACEnforcementModeStrict,
+		)
+		require.NoError(t, err)
+
+		body := []byte(`{"payload":{"event":"push"}}`)
+		signature := signWebhookBody(hmacResult.FullSecret, body)
+
+		webhook, err := service.AuthorizeWebhookRequest(ctx, "hmac-only-dag", "", signature, body)
+		require.NoError(t, err)
+		assert.Equal(t, "hmac-only-dag", webhook.DAGName)
 	})
 }
 

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/dagucloud/dagu/internal/auth"
+	"github.com/dagucloud/dagu/internal/cmn/crypto"
 	"github.com/dagucloud/dagu/internal/cmn/fileutil"
 )
 
@@ -33,7 +34,8 @@ var _ auth.WebhookStore = (*Store)(nil)
 // Webhooks are stored as individual JSON files in the configured directory.
 // Thread-safe through internal locking.
 type Store struct {
-	baseDir string
+	baseDir   string
+	encryptor *crypto.Encryptor
 
 	// mu protects the index maps
 	mu sync.RWMutex
@@ -53,6 +55,13 @@ type Option func(*Store)
 func WithFileCache(cache *fileutil.Cache[*auth.Webhook]) Option {
 	return func(s *Store) {
 		s.fileCache = cache
+	}
+}
+
+// WithEncryptor sets the encryptor used for encrypted-at-rest webhook fields.
+func WithEncryptor(enc *crypto.Encryptor) Option {
+	return func(s *Store) {
+		s.encryptor = enc
 	}
 }
 
@@ -111,6 +120,9 @@ func (s *Store) rebuildIndex() error {
 		filePath := filepath.Join(s.baseDir, entry.Name())
 		webhook, err := s.loadWebhookFromFile(filePath)
 		if err != nil {
+			if errors.Is(err, auth.ErrWebhookHMACEncryptorRequired) || errors.Is(err, auth.ErrWebhookHMACDecryptFailed) {
+				return err
+			}
 			// Log warning but continue - don't fail entire index for one bad file
 			slog.Warn("Failed to load webhook file during index rebuild",
 				slog.String("file", filePath),
@@ -137,7 +149,19 @@ func (s *Store) loadWebhookFromFile(filePath string) (*auth.Webhook, error) {
 		return nil, fmt.Errorf("failed to parse webhook file %s: %w", filePath, err)
 	}
 
-	return stored.ToWebhook(), nil
+	webhook := stored.ToWebhook()
+	if stored.HMACSecretEnc != "" {
+		if s.encryptor == nil {
+			return nil, auth.ErrWebhookHMACEncryptorRequired
+		}
+		secret, err := s.encryptor.Decrypt(stored.HMACSecretEnc)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", auth.ErrWebhookHMACDecryptFailed, err)
+		}
+		webhook.HMACSecret = secret
+	}
+
+	return webhook, nil
 }
 
 // webhookFilePath returns the file path for a webhook ID.
@@ -185,7 +209,19 @@ func (s *Store) Create(_ context.Context, webhook *auth.Webhook) error {
 
 // writeWebhookToFile writes a webhook to a JSON file atomically.
 func (s *Store) writeWebhookToFile(filePath string, webhook *auth.Webhook) error {
-	if err := fileutil.WriteJSONAtomic(filePath, webhook.ToStorage(), webhookFilePermissions); err != nil {
+	stored := webhook.ToStorage()
+	if webhook.HMACSecret != "" {
+		if s.encryptor == nil {
+			return auth.ErrWebhookHMACEncryptorRequired
+		}
+		enc, err := s.encryptor.Encrypt(webhook.HMACSecret)
+		if err != nil {
+			return fmt.Errorf("filewebhook: failed to encrypt HMAC secret: %w", err)
+		}
+		stored.HMACSecretEnc = enc
+	}
+
+	if err := fileutil.WriteJSONAtomic(filePath, stored, webhookFilePermissions); err != nil {
 		return fmt.Errorf("filewebhook: %w", err)
 	}
 	return nil
