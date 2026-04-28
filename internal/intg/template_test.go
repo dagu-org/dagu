@@ -8,8 +8,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/dagucloud/dagu/internal/cmd"
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/test"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -229,6 +231,59 @@ steps:
 		dag.AssertOutputs(t, map[string]any{
 			"RESULT": test.Contains("No items found."),
 		})
+	})
+
+	t.Run("OmittedOptionalParamResolvesToEmptyString", func(t *testing.T) {
+		t.Parallel()
+
+		th := test.SetupCommand(t)
+		dagFile := th.CreateDAGFile(t, "template-optional-param.yaml", `
+name: template-optional-param
+type: graph
+params:
+  - name: name
+    type: string
+    required: true
+  - name: age
+    type: integer
+    required: true
+  - name: favorite_color
+    type: string
+steps:
+  - id: render
+    type: template
+    with:
+      data:
+        name: ${name}
+        age: ${age}
+        favorite_color: ${favorite_color}
+    script: |
+      Hello, {{ .name }}!
+      You are {{ .age }} years old.
+      {{- if .favorite_color }}
+      Your favorite color is {{ .favorite_color }}.
+      {{- end }}
+    output: RESULT
+`)
+
+		runID := uuid.Must(uuid.NewV7()).String()
+		th.RunCommand(t, cmd.Start(), test.CmdTest{
+			Args: []string{
+				"start",
+				"--run-id", runID,
+				"--params", "name=tom age=21",
+				dagFile,
+			},
+			ExpectedOut: []string{"DAG run finished"},
+		})
+
+		status, outputs := readAttemptStatusAndOutputs(t, th, "template-optional-param", runID)
+		require.Equal(t, core.Succeeded, status.Status)
+		require.Contains(t, outputs.Outputs, "result")
+		assert.Contains(t, outputs.Outputs["result"], "Hello, tom!")
+		assert.Contains(t, outputs.Outputs["result"], "You are 21 years old.")
+		assert.NotContains(t, outputs.Outputs["result"], "${favorite_color}")
+		assert.NotContains(t, outputs.Outputs["result"], "Your favorite color is")
 	})
 
 	t.Run("DefaultFunction", func(t *testing.T) {

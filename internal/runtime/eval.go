@@ -7,6 +7,8 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/dagucloud/dagu/internal/cmn/eval"
@@ -27,7 +29,37 @@ func EvalBool(ctx context.Context, value any) (bool, error) {
 // EvalObject recursively evaluates the string fields of the given object
 // with the variables within the execution context.
 func EvalObject[T any](ctx context.Context, obj T) (T, error) {
-	return eval.Object(ctx, obj, GetEnv(ctx).UserEnvsMap())
+	return eval.Object(ctx, obj, configEvalVariables(GetEnv(ctx)))
+}
+
+func configEvalVariables(env Env) map[string]string {
+	vars := env.UserEnvsMap()
+	if env.DAG == nil || len(env.DAG.ParamDefs) == 0 {
+		return vars
+	}
+
+	cloned := make(map[string]string, len(vars)+len(env.DAG.ParamDefs))
+	for key, value := range vars {
+		cloned[key] = value
+	}
+
+	for _, def := range env.DAG.ParamDefs {
+		name := strings.TrimSpace(def.Name)
+		if name == "" || isPositionalParamName(name) {
+			continue
+		}
+		if _, ok := cloned[name]; ok {
+			continue
+		}
+		cloned[name] = ""
+	}
+
+	return cloned
+}
+
+func isPositionalParamName(name string) bool {
+	_, err := strconv.Atoi(name)
+	return err == nil
 }
 
 // GenerateSubDAGRunID generates a unique run ID based on the current DAG run ID, step name, and parameters.
