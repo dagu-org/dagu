@@ -17,6 +17,7 @@ import (
 
 type inlineJSONSchemaClassification struct {
 	valid               bool
+	propertiesPresent   bool
 	malformedProperties any
 }
 
@@ -45,15 +46,21 @@ func classifyInlineJSONSchema(input any) inlineJSONSchemaClassification {
 	}
 
 	if _, ok := props.(map[string]any); ok {
-		return inlineJSONSchemaClassification{valid: true}
+		return inlineJSONSchemaClassification{
+			valid:             true,
+			propertiesPresent: true,
+		}
 	}
 
-	return inlineJSONSchemaClassification{malformedProperties: props}
+	return inlineJSONSchemaClassification{
+		propertiesPresent:   true,
+		malformedProperties: props,
+	}
 }
 
 func malformedInlineJSONSchemaShapeError(input any) error {
 	classification := classifyInlineJSONSchema(input)
-	if classification.malformedProperties == nil {
+	if !classification.propertiesPresent || classification.valid {
 		return nil
 	}
 
