@@ -537,7 +537,7 @@ function WebhookTab({ fileName }: WebhookTabProps) {
             <CardTitle className="text-sm">{secretLabel}</CardTitle>
           </div>
         </CardHeader>
-        <CardContent className="px-4 pb-3 pt-0 space-y-3">
+        <CardContent className="px-4 pb-3 pt-3 space-y-3">
           <div className="p-3 bg-warning/10 border border-warning/20 rounded-md">
             <p className="text-sm text-warning-foreground">
               {secretWarning}
@@ -713,16 +713,17 @@ function WebhookTab({ fileName }: WebhookTabProps) {
 
       {/* Authentication Card */}
       <Card className="gap-0 py-0">
-        <CardHeader className="pb-0 px-4 pt-3">
+        <CardHeader className="pb-3 px-4 pt-3">
           <div className="flex items-center gap-2">
             <CardTitle className="text-sm">Authentication</CardTitle>
           </div>
           <CardDescription className="text-xs">
-            Optional HMAC validation signs the exact raw request body with{' '}
+            Choose how requests authenticate to this webhook. If you enable
+            HMAC, callers must send{' '}
             <code className="bg-accent px-1 rounded-md border">
               X-Dagu-Signature: sha256=&lt;hex&gt;
             </code>
-            .
+            {' '}computed from the exact raw request body.
           </CardDescription>
         </CardHeader>
         <CardContent className="px-4 pb-3 pt-2 space-y-3">
@@ -740,7 +741,7 @@ function WebhookTab({ fileName }: WebhookTabProps) {
                     }
                   >
                     <SelectTrigger className="h-9">
-                    <SelectValue />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value={WebhookAuthModeValue.token_and_hmac}>
@@ -835,8 +836,8 @@ function WebhookTab({ fileName }: WebhookTabProps) {
           ) : (
             <>
               <div className="rounded-md border bg-accent/40 px-3 py-2 text-xs text-muted-foreground">
-                HMAC authentication is disabled. Existing token-only webhook
-                behavior remains unchanged until you opt in.
+                This webhook currently accepts the existing token only. HMAC
+                signing is off until you enable it.
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button
@@ -847,7 +848,7 @@ function WebhookTab({ fileName }: WebhookTabProps) {
                   }
                   disabled={isActioning}
                 >
-                  Enable Token + HMAC
+                  Keep Token and Add HMAC
                 </Button>
                 <Button
                   variant="outline"
@@ -857,7 +858,7 @@ function WebhookTab({ fileName }: WebhookTabProps) {
                   }
                   disabled={isActioning}
                 >
-                  Enable HMAC Only
+                  Use HMAC Only
                 </Button>
               </div>
             </>
