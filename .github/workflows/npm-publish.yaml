@@ -22,6 +22,7 @@ jobs:
   # arbitrary code when interpolated into shell via ${{ inputs.version }}.
   validate-inputs:
     runs-on: ubuntu-latest
+    permissions: {}
     steps:
       - name: Validate version format
         env:
@@ -168,8 +169,11 @@ jobs:
           npm version "${PKG_VERSION}" --no-git-tag-version --allow-same-version
 
       - name: Publish to NPM
+        env:
+          PACKAGE_NAME: ${{ matrix.package }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          cd npm/${{ matrix.package }}
+          cd "npm/${PACKAGE_NAME}"
           # Try to publish, but don't fail if version already exists
           npm publish --access public --provenance 2>&1 | tee publish.log || {
             if grep -q "cannot publish over the previously published versions" publish.log; then
@@ -179,14 +183,12 @@ jobs:
               exit 1
             fi
           }
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         continue-on-error: ${{ matrix.arch == 'ppc64' || matrix.arch == 's390x' || matrix.arch == 'armv6' }}
 
   # Then publish the main package that depends on platform packages
   publish-main-package:
-    needs: publish-platform-packages
-    if: always()
+    needs: [validate-inputs, publish-platform-packages]
+    if: ${{ always() && needs.validate-inputs.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -251,8 +253,8 @@ jobs:
 
   # Verify the published packages
   verify-packages:
-    needs: [publish-platform-packages, publish-main-package]
-    if: always()
+    needs: [validate-inputs, publish-platform-packages, publish-main-package]
+    if: ${{ always() && needs.validate-inputs.result == 'success' }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false

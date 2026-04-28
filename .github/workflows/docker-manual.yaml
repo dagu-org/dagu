@@ -14,6 +14,7 @@ jobs:
   # "Resolve version" run step via ${{ inputs.ref }}.
   validate-inputs:
     runs-on: ubuntu-latest
+    permissions: {}
     steps:
       - name: Validate ref input
         env:
