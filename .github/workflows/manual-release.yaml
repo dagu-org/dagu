@@ -8,9 +8,35 @@ on:
         required: true
         type: string
 
+# contents: write is required for GoReleaser to create the GitHub release and
+# upload assets. Restrict everything else to the minimum.
+permissions:
+  contents: write
+
 jobs:
+  # Validate the tag before any step that runs GoReleaser or checks out code.
+  # Passing an unsanitised ${{ github.event.inputs.tag }} into a checkout ref or
+  # shell command could otherwise allow injection of arbitrary git refs or commands.
+  validate-inputs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Validate tag format
+        env:
+          # Pass via env so the value is treated as plain data, not interpolated code.
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+        run: |
+          # Tags must be vX.Y.Z (with optional pre-release suffix like -rc.1).
+          # Reject anything else — in particular shell metacharacters.
+          if ! echo "$INPUT_TAG" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+([.\-][a-zA-Z0-9._-]+)?$'; then
+            echo "::error::inputs.tag must be a semver tag (e.g. v1.0.0), got: ${INPUT_TAG}"
+            exit 1
+          fi
+
   # Build release binaries
   goreleaser:
+    needs: validate-inputs
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
