@@ -17,7 +17,12 @@ import {
   WebhookOff,
 } from 'lucide-react';
 import { useCallback, useContext, useEffect, useState } from 'react';
-import { components } from '../../../../api/v1/schema';
+import {
+  components,
+  WebhookAuthMode as WebhookAuthModeValue,
+  WebhookHMACConfigureRequestAuthMode as WebhookHMACAuthModeValue,
+  WebhookHMACEnforcementMode as WebhookHMACEnforcementModeValue,
+} from '../../../../api/v1/schema';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -26,14 +31,27 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { TOKEN_KEY } from '../../../../contexts/AuthContext';
 import { useConfig } from '../../../../contexts/ConfigContext';
+import { useClient } from '../../../../hooks/api';
 import dayjs from '../../../../lib/dayjs';
 import ConfirmModal from '@/components/ui/confirm-dialog';
 
 type WebhookDetails = components['schemas']['WebhookDetails'];
+type WebhookAuthMode = components['schemas']['WebhookAuthMode'];
+type WebhookHMACAuthMode =
+  components['schemas']['WebhookHMACConfigureRequest']['authMode'];
+type WebhookHMACEnforcementMode =
+  components['schemas']['WebhookHMACEnforcementMode'];
 
 interface WebhookTabProps {
   fileName: string;
@@ -59,13 +77,41 @@ function CopyButton({ copied, onCopy, label }: CopyButtonProps) {
   );
 }
 
+function formatWebhookAuthMode(mode: WebhookAuthMode): string {
+  switch (mode) {
+    case WebhookAuthModeValue.token_and_hmac:
+      return 'Token + HMAC';
+    case WebhookAuthModeValue.hmac_only:
+      return 'HMAC only';
+    case WebhookAuthModeValue.token_only:
+    default:
+      return 'Token only';
+  }
+}
+
+function toHMACAuthMode(mode: WebhookAuthMode): WebhookHMACAuthMode {
+  switch (mode) {
+    case WebhookAuthModeValue.token_and_hmac:
+      return WebhookHMACAuthModeValue.token_and_hmac;
+    case WebhookAuthModeValue.hmac_only:
+      return WebhookHMACAuthModeValue.hmac_only;
+    case WebhookAuthModeValue.token_only:
+    default:
+      throw new Error('HMAC auth mode cannot be token only');
+  }
+}
+
 function WebhookTab({ fileName }: WebhookTabProps) {
   const config = useConfig();
   const appBarContext = useContext(AppBarContext);
+  const client = useClient();
 
   // State
   const [webhook, setWebhook] = useState<WebhookDetails | null>(null);
-  const [newToken, setNewToken] = useState<string | null>(null);
+  const [secretReveal, setSecretReveal] = useState<{
+    kind: 'token' | 'hmac';
+    value: string;
+  } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isActioning, setIsActioning] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -77,8 +123,17 @@ function WebhookTab({ fileName }: WebhookTabProps) {
 
   // Copy states
   const [copiedUrl, setCopiedUrl] = useState(false);
-  const [copiedToken, setCopiedToken] = useState(false);
+  const [copiedSecret, setCopiedSecret] = useState(false);
   const [copiedCurl, setCopiedCurl] = useState(false);
+  const [copiedHMACShell, setCopiedHMACShell] = useState(false);
+  const [copiedHMACNode, setCopiedHMACNode] = useState(false);
+  const [draftAuthMode, setDraftAuthMode] = useState<WebhookAuthMode>(
+    WebhookAuthModeValue.token_only
+  );
+  const [draftEnforcementMode, setDraftEnforcementMode] =
+    useState<WebhookHMACEnforcementMode>(
+      WebhookHMACEnforcementModeValue.strict
+    );
 
   // Construct webhook URL (include remoteNode if not local)
   const remoteNode = appBarContext.selectedRemoteNode;
@@ -138,6 +193,19 @@ function WebhookTab({ fileName }: WebhookTabProps) {
     fetchWebhook();
   }, [fetchWebhook]);
 
+  useEffect(() => {
+    if (!webhook) {
+      setDraftAuthMode(WebhookAuthModeValue.token_only);
+      setDraftEnforcementMode(WebhookHMACEnforcementModeValue.strict);
+      return;
+    }
+
+    setDraftAuthMode(webhook.authMode);
+    setDraftEnforcementMode(
+      webhook.hmac.enforcementMode || WebhookHMACEnforcementModeValue.strict
+    );
+  }, [webhook]);
+
   // Create webhook
   const handleCreate = async () => {
     try {
@@ -159,7 +227,7 @@ function WebhookTab({ fileName }: WebhookTabProps) {
 
       const data = await response.json();
       setWebhook(data.webhook);
-      setNewToken(data.token);
+      setSecretReveal({ kind: 'token', value: data.token });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create webhook');
     } finally {
@@ -187,7 +255,7 @@ function WebhookTab({ fileName }: WebhookTabProps) {
       }
 
       setWebhook(null);
-      setNewToken(null);
+      setSecretReveal(null);
       setShowDeleteConfirm(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete webhook');
@@ -217,7 +285,7 @@ function WebhookTab({ fileName }: WebhookTabProps) {
 
       const data = await response.json();
       setWebhook(data.webhook);
-      setNewToken(data.token);
+      setSecretReveal({ kind: 'token', value: data.token });
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Failed to regenerate token'
@@ -278,9 +346,145 @@ function WebhookTab({ fileName }: WebhookTabProps) {
     }
   };
 
-  // Dismiss token display
-  const handleDismissToken = () => {
-    setNewToken(null);
+  const handleEnableHMAC = async (authMode: WebhookHMACAuthMode) => {
+    try {
+      setIsActioning(true);
+      setError(null);
+      const remoteNode = getRemoteNodeParam();
+      const enforcementMode =
+        authMode === WebhookHMACAuthModeValue.hmac_only
+          ? WebhookHMACEnforcementModeValue.strict
+          : draftEnforcementMode;
+      const { data, error: apiError } = await client.POST(
+        '/dags/{fileName}/webhook/hmac/enable',
+        {
+          params: {
+            path: { fileName },
+            query: { remoteNode },
+          },
+          body: {
+            authMode,
+            enforcementMode,
+          },
+        }
+      );
+
+      if (apiError || !data) {
+        throw new Error(apiError?.message || 'Failed to enable HMAC');
+      }
+
+      setWebhook(data.webhook);
+      setDraftAuthMode(data.webhook.authMode);
+      setDraftEnforcementMode(
+        data.webhook.hmac.enforcementMode ||
+          WebhookHMACEnforcementModeValue.strict
+      );
+      setSecretReveal({ kind: 'hmac', value: data.hmacSecret });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to enable HMAC');
+    } finally {
+      setIsActioning(false);
+    }
+  };
+
+  const handleSaveHMACSettings = async () => {
+    try {
+      setIsActioning(true);
+      setError(null);
+      const remoteNode = getRemoteNodeParam();
+      const { data, error: apiError } = await client.POST(
+        '/dags/{fileName}/webhook/hmac/configure',
+        {
+          params: {
+            path: { fileName },
+            query: { remoteNode },
+          },
+          body: {
+            authMode: toHMACAuthMode(draftAuthMode),
+            enforcementMode:
+              draftAuthMode === WebhookAuthModeValue.hmac_only
+                ? WebhookHMACEnforcementModeValue.strict
+                : draftEnforcementMode,
+          },
+        }
+      );
+
+      if (apiError || !data) {
+        throw new Error(apiError?.message || 'Failed to update HMAC settings');
+      }
+
+      setWebhook(data);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Failed to update HMAC settings'
+      );
+    } finally {
+      setIsActioning(false);
+    }
+  };
+
+  const handleDisableHMAC = async () => {
+    try {
+      setIsActioning(true);
+      setError(null);
+      const remoteNode = getRemoteNodeParam();
+      const { data, error: apiError } = await client.POST(
+        '/dags/{fileName}/webhook/hmac/disable',
+        {
+          params: {
+            path: { fileName },
+            query: { remoteNode },
+          },
+        }
+      );
+
+      if (apiError || !data) {
+        throw new Error(apiError?.message || 'Failed to disable HMAC');
+      }
+
+      setWebhook(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to disable HMAC');
+    } finally {
+      setIsActioning(false);
+    }
+  };
+
+  const handleRegenerateHMAC = async () => {
+    try {
+      setIsActioning(true);
+      setError(null);
+      const remoteNode = getRemoteNodeParam();
+      const { data, error: apiError } = await client.POST(
+        '/dags/{fileName}/webhook/hmac/regenerate',
+        {
+          params: {
+            path: { fileName },
+            query: { remoteNode },
+          },
+        }
+      );
+
+      if (apiError || !data) {
+        throw new Error(
+          apiError?.message || 'Failed to regenerate HMAC secret'
+        );
+      }
+
+      setWebhook(data.webhook);
+      setSecretReveal({ kind: 'hmac', value: data.hmacSecret });
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Failed to regenerate HMAC secret'
+      );
+    } finally {
+      setIsActioning(false);
+    }
+  };
+
+  // Dismiss secret display
+  const handleDismissSecret = () => {
+    setSecretReveal(null);
   };
 
   // Loading state
@@ -320,38 +524,43 @@ function WebhookTab({ fileName }: WebhookTabProps) {
   }
 
   // Token reveal after create/regenerate
-  if (newToken) {
+  if (secretReveal) {
+    const secretLabel =
+      secretReveal.kind === 'token' ? 'Webhook Token' : 'Webhook HMAC Secret';
+    const secretWarning =
+      secretReveal.kind === 'token'
+        ? "Copy this token now. You won't be able to see it again!"
+        : "Copy this HMAC secret now. You won't be able to see it again!";
+
     return (
       <Card className="max-w-xl gap-0 py-0">
         <CardHeader className="pb-2 px-4 pt-3">
           <div className="flex items-center gap-2">
             <Webhook className="h-4 w-4 text-muted-foreground" />
-            <CardTitle className="text-sm">Webhook Created</CardTitle>
+            <CardTitle className="text-sm">{secretLabel}</CardTitle>
           </div>
         </CardHeader>
-        <CardContent className="px-4 pb-3 pt-0 space-y-3">
+        <CardContent className="px-4 pb-3 pt-3 space-y-3">
           <div className="p-3 bg-warning/10 border border-warning/20 rounded-md">
-            <p className="text-sm text-warning-foreground">
-              Copy this token now. You won&apos;t be able to see it again!
-            </p>
+            <p className="text-sm text-warning-foreground">{secretWarning}</p>
           </div>
           <div className="flex items-center gap-2">
             <code className="flex-1 p-2 text-xs bg-muted rounded-md break-all font-mono">
-              {newToken}
+              {secretReveal.value}
             </code>
             <Button
               variant="outline"
               size="icon"
-              onClick={() => handleCopy(newToken, setCopiedToken)}
+              onClick={() => handleCopy(secretReveal.value, setCopiedSecret)}
             >
-              {copiedToken ? (
+              {copiedSecret ? (
                 <Check className="h-4 w-4" />
               ) : (
                 <Copy className="h-4 w-4" />
               )}
             </Button>
           </div>
-          <Button variant="default" size="sm" onClick={handleDismissToken}>
+          <Button variant="default" size="sm" onClick={handleDismissSecret}>
             Done
           </Button>
         </CardContent>
@@ -391,12 +600,54 @@ function WebhookTab({ fileName }: WebhookTabProps) {
     );
   }
 
-  // Generate example curl command
-  const tokenForCurl = '<YOUR_TOKEN>';
-  const curlExample = `curl -X POST "${webhookUrl}" \\
-  -H "Authorization: Bearer ${tokenForCurl}" \\
+  const isHMACEnabled = webhook.authMode !== WebhookAuthModeValue.token_only;
+  const requestBody = `'{"dagRunId": "my-unique-id", "payload": {"key": "value"}}'`;
+  const curlExample =
+    webhook.authMode === WebhookAuthModeValue.hmac_only
+      ? `curl -X POST "${webhookUrl}" \\
+  -H "X-Dagu-Signature: sha256=<SIGNATURE>" \\
   -H "Content-Type: application/json" \\
-  -d '{"dagRunId": "my-unique-id", "payload": {"key": "value"}}'`;
+  -d ${requestBody}`
+      : webhook.authMode === WebhookAuthModeValue.token_and_hmac
+        ? `curl -X POST "${webhookUrl}" \\
+  -H "Authorization: Bearer <YOUR_TOKEN>" \\
+  -H "X-Dagu-Signature: sha256=<SIGNATURE>" \\
+  -H "Content-Type: application/json" \\
+  -d ${requestBody}`
+        : `curl -X POST "${webhookUrl}" \\
+  -H "Authorization: Bearer <YOUR_TOKEN>" \\
+  -H "Content-Type: application/json" \\
+  -d ${requestBody}`;
+  const hmacShellExample = `body='{"dagRunId":"my-unique-id","payload":{"key":"value"}}'
+sig=$(printf '%s' "$body" | openssl dgst -sha256 -hmac "$DAGU_HMAC_SECRET" -hex | sed 's/^.* //')
+
+curl -X POST "${webhookUrl}" \\
+  ${webhook.authMode === WebhookAuthModeValue.token_and_hmac ? '-H "Authorization: Bearer <YOUR_TOKEN>" \\\n  ' : ''}-H "X-Dagu-Signature: sha256=$sig" \\
+  -H "Content-Type: application/json" \\
+  -d "$body"`;
+  const hmacNodeExample = `import crypto from 'node:crypto';
+
+const body = JSON.stringify({
+  dagRunId: 'my-unique-id',
+  payload: { key: 'value' },
+});
+
+const signature =
+  'sha256=' +
+  crypto.createHmac('sha256', process.env.DAGU_HMAC_SECRET!)
+    .update(body, 'utf8')
+    .digest('hex');
+
+const headers = {
+  'Content-Type': 'application/json',
+  'X-Dagu-Signature': signature,
+  ${webhook.authMode === WebhookAuthModeValue.token_and_hmac ? "'Authorization': 'Bearer <YOUR_TOKEN>',\n  " : ''}}
+
+await fetch('${webhookUrl}', {
+  method: 'POST',
+  headers,
+  body,
+});`;
 
   // Webhook configured
   return (
@@ -449,6 +700,7 @@ function WebhookTab({ fileName }: WebhookTabProps) {
 
           {/* Metadata */}
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            <div>Auth: {formatWebhookAuthMode(webhook.authMode)}</div>
             <div>
               Created: {dayjs(webhook.createdAt).format('MMM D, YYYY HH:mm')}
             </div>
@@ -490,6 +742,215 @@ function WebhookTab({ fileName }: WebhookTabProps) {
         </CardContent>
       </Card>
 
+      {/* Authentication Card */}
+      <Card className="gap-0 py-0">
+        <CardHeader className="pb-3 px-4 pt-3">
+          <div className="flex items-center gap-2">
+            <CardTitle className="text-sm">Authentication</CardTitle>
+          </div>
+          <CardDescription className="text-xs">
+            Choose how requests authenticate to this webhook. If you enable
+            HMAC, callers must send{' '}
+            <code className="bg-accent px-1 rounded-md border">
+              X-Dagu-Signature: sha256=&lt;hex&gt;
+            </code>{' '}
+            computed from the exact raw request body.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="px-4 pb-3 pt-2 space-y-3">
+          {isHMACEnabled ? (
+            <>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-1">
+                  <span className="text-xs text-muted-foreground">
+                    Auth mode
+                  </span>
+                  <Select
+                    value={draftAuthMode}
+                    onValueChange={(value) =>
+                      setDraftAuthMode(value as WebhookAuthMode)
+                    }
+                  >
+                    <SelectTrigger className="h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={WebhookAuthModeValue.token_and_hmac}>
+                        Token + HMAC
+                      </SelectItem>
+                      <SelectItem value={WebhookAuthModeValue.hmac_only}>
+                        HMAC only
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-xs text-muted-foreground">
+                    HMAC enforcement
+                  </span>
+                  <Select
+                    value={
+                      draftAuthMode === WebhookAuthModeValue.hmac_only
+                        ? WebhookHMACEnforcementModeValue.strict
+                        : draftEnforcementMode
+                    }
+                    onValueChange={(value) =>
+                      setDraftEnforcementMode(
+                        value as WebhookHMACEnforcementMode
+                      )
+                    }
+                    disabled={draftAuthMode === WebhookAuthModeValue.hmac_only}
+                  >
+                    <SelectTrigger className="h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem
+                        value={WebhookHMACEnforcementModeValue.strict}
+                      >
+                        Strict
+                      </SelectItem>
+                      <SelectItem
+                        value={WebhookHMACEnforcementModeValue.observe}
+                      >
+                        Observe
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="rounded-md border bg-accent/40 px-3 py-2 text-xs text-muted-foreground space-y-1">
+                <div>Algorithm: {webhook.hmac.algorithm || 'HMAC-SHA256'}</div>
+                <div>
+                  Header: {webhook.hmac.headerName || 'X-Dagu-Signature'}{' '}
+                  {webhook.hmac.format
+                    ? `(${webhook.hmac.format})`
+                    : '(sha256=<hex>)'}
+                </div>
+                <div>
+                  Last secret rotation:{' '}
+                  {webhook.hmac.updatedAt
+                    ? dayjs(webhook.hmac.updatedAt).format('MMM D, YYYY HH:mm')
+                    : 'Not available'}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSaveHMACSettings}
+                  disabled={isActioning}
+                >
+                  Save HMAC Settings
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRegenerateHMAC}
+                  disabled={isActioning}
+                >
+                  Regenerate HMAC Secret
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDisableHMAC}
+                  disabled={isActioning}
+                >
+                  Disable HMAC
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="rounded-md border bg-accent/40 px-3 py-2 text-xs text-muted-foreground">
+                This webhook currently accepts the existing token only. HMAC
+                signing is off until you enable it.
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    handleEnableHMAC(WebhookHMACAuthModeValue.token_and_hmac)
+                  }
+                  disabled={isActioning}
+                >
+                  Keep Token and Add HMAC
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    handleEnableHMAC(WebhookHMACAuthModeValue.hmac_only)
+                  }
+                  disabled={isActioning}
+                >
+                  Use HMAC Only
+                </Button>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {isHMACEnabled && (
+        <Card className="gap-0 py-0">
+          <CardHeader className="pb-3 px-4 pt-3">
+            <CardTitle className="text-sm">Generate HMAC</CardTitle>
+            <CardDescription className="text-xs">
+              Compute the HMAC from the exact raw request body you send. If the
+              body is reformatted before sending, verification will fail.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="px-4 pb-3 pt-2 space-y-3">
+            <div className="rounded-md border bg-accent/40 px-3 py-2 text-xs text-muted-foreground">
+              Use your webhook HMAC secret as{' '}
+              <code className="bg-accent px-1 rounded-md border">
+                DAGU_HMAC_SECRET
+              </code>
+              .
+            </div>
+
+            <div>
+              <div className="mb-1 flex items-center justify-between">
+                <span className="text-xs font-medium text-muted-foreground">
+                  Shell (OpenSSL)
+                </span>
+                <CopyButton
+                  copied={copiedHMACShell}
+                  onCopy={() =>
+                    handleCopy(hmacShellExample, setCopiedHMACShell)
+                  }
+                  label="Copy"
+                />
+              </div>
+              <pre className="px-3 py-2 bg-accent rounded-md text-xs font-mono border overflow-x-auto whitespace-pre-wrap">
+                {hmacShellExample}
+              </pre>
+            </div>
+
+            <div>
+              <div className="mb-1 flex items-center justify-between">
+                <span className="text-xs font-medium text-muted-foreground">
+                  Node.js
+                </span>
+                <CopyButton
+                  copied={copiedHMACNode}
+                  onCopy={() => handleCopy(hmacNodeExample, setCopiedHMACNode)}
+                  label="Copy"
+                />
+              </div>
+              <pre className="px-3 py-2 bg-accent rounded-md text-xs font-mono border overflow-x-auto whitespace-pre-wrap">
+                {hmacNodeExample}
+              </pre>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Example Card */}
       <Card className="gap-0 py-0">
         <CardHeader className="pb-0 px-4 pt-3">
@@ -522,6 +983,16 @@ function WebhookTab({ fileName }: WebhookTabProps) {
               <code className="bg-accent px-1 rounded-md border">dagRunId</code>{' '}
               (optional) can be used as an idempotency key.
             </li>
+            {isHMACEnabled && (
+              <li>
+                Sign the exact raw JSON request body bytes with your HMAC secret
+                and send the hex digest in{' '}
+                <code className="bg-accent px-1 rounded-md border">
+                  X-Dagu-Signature
+                </code>
+                .
+              </li>
+            )}
           </ul>
         </CardContent>
       </Card>

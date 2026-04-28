@@ -1638,8 +1638,8 @@ export interface paths {
         /**
          * Trigger DAG execution via webhook
          * @description Triggers a DAG execution via webhook. The DAG must have a webhook configured
-         *     and enabled. Authentication is performed using a bearer token generated when
-         *     the webhook was created (format: 'dagu_wh_...').
+         *     and enabled. Authentication depends on the webhook auth mode:
+         *     bearer token only, bearer token plus HMAC, or HMAC only.
          *
          *     The request body is passed to the DAG as the WEBHOOK_PAYLOAD environment
          *     variable. The DAG run is enqueued and the endpoint returns immediately
@@ -1741,6 +1741,96 @@ export interface paths {
          * @description Enables or disables the webhook without changing the token. Developer, manager, or admin only.
          */
         post: operations["toggleDAGWebhook"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dags/{fileName}/webhook/hmac/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enable webhook HMAC
+         * @description Enables HMAC authentication for the existing webhook and returns the generated
+         *     HMAC secret exactly once. If enforcementMode is omitted, it defaults to
+         *     strict. Developer, manager, or admin only.
+         *
+         */
+        post: operations["enableDAGWebhookHMAC"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dags/{fileName}/webhook/hmac/configure": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Configure webhook HMAC
+         * @description Updates the webhook HMAC auth mode or enforcement mode without rotating
+         *     the secret. If enforcementMode is omitted, the current enforcement mode
+         *     is preserved for token_and_hmac, while hmac_only always uses strict.
+         *     Developer, manager, or admin only.
+         *
+         */
+        post: operations["configureDAGWebhookHMAC"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dags/{fileName}/webhook/hmac/regenerate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Regenerate webhook HMAC secret
+         * @description Generates a new HMAC secret for the existing webhook. The old secret becomes
+         *     invalid immediately. Returns the new secret exactly once.
+         *     Developer, manager, or admin only.
+         *
+         */
+        post: operations["regenerateDAGWebhookHMACSecret"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dags/{fileName}/webhook/hmac/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Disable webhook HMAC
+         * @description Disables HMAC authentication and returns the webhook to token-only mode. Developer, manager, or admin only.
+         */
+        post: operations["disableDAGWebhookHMAC"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3010,6 +3100,35 @@ export interface components {
             /** @description Name of the triggered DAG */
             dagName: string;
         };
+        /**
+         * @description Authentication mode for a webhook trigger endpoint
+         * @enum {string}
+         */
+        WebhookAuthMode: WebhookAuthMode;
+        /**
+         * @description How HMAC validation is enforced when HMAC is enabled
+         * @enum {string}
+         */
+        WebhookHMACEnforcementMode: WebhookHMACEnforcementMode;
+        /** @description Public webhook HMAC configuration details */
+        WebhookHMACDetails: {
+            /** @description Whether HMAC authentication is currently enabled */
+            enabled: boolean;
+            enforcementMode?: components["schemas"]["WebhookHMACEnforcementMode"];
+            /** @description Fixed HMAC algorithm for v1 */
+            algorithm?: string;
+            /** @description Header containing the HMAC signature */
+            headerName?: string;
+            /** @description Expected signature header value format */
+            format?: string;
+            /** @description Whether an HMAC secret is configured for the webhook */
+            secretConfigured: boolean;
+            /**
+             * Format: date-time
+             * @description When the HMAC secret was last generated
+             */
+            updatedAt?: string;
+        };
         /** @description Webhook configuration details (token not included) */
         WebhookDetails: {
             /**
@@ -3023,6 +3142,8 @@ export interface components {
             tokenPrefix: string;
             /** @description Whether the webhook is active */
             enabled: boolean;
+            authMode: components["schemas"]["WebhookAuthMode"];
+            hmac: components["schemas"]["WebhookHMACDetails"];
             /**
              * Format: date-time
              * @description When the webhook was created
@@ -3055,6 +3176,24 @@ export interface components {
         WebhookToggleRequest: {
             /** @description Whether to enable or disable the webhook */
             enabled: boolean;
+        };
+        /** @description Request to configure webhook HMAC auth mode and enforcement.
+         *     If enforcementMode is omitted when enabling HMAC, it defaults to strict.
+         *     If omitted when configuring an existing webhook, the current enforcement
+         *     mode is preserved for token_and_hmac, while hmac_only always uses strict.
+         *     Clients should omit enforcementMode when authMode is hmac_only; the
+         *     server enforces strict mode and rejects observe.
+         *      */
+        WebhookHMACConfigureRequest: {
+            /** @enum {string} */
+            authMode: WebhookHMACConfigureRequestAuthMode;
+            enforcementMode?: components["schemas"]["WebhookHMACEnforcementMode"];
+        };
+        /** @description Response when enabling or regenerating webhook HMAC (includes full secret) */
+        WebhookHMACSecretResponse: {
+            webhook: components["schemas"]["WebhookDetails"];
+            /** @description Full HMAC secret (only shown once, store securely!) */
+            hmacSecret: string;
         };
         /**
          * Format: string
@@ -3623,7 +3762,10 @@ export interface components {
             iteration: number;
             /** @description Authenticated user who pushed the step back */
             by?: string;
-            /** @description RFC3339 timestamp when the push-back was recorded */
+            /**
+             * Format: date-time
+             * @description RFC3339 timestamp when the push-back was recorded
+             */
             at?: string;
             /** @description Inputs provided for this push-back event */
             inputs?: {
@@ -9708,8 +9850,10 @@ export interface operations {
                 remoteNode?: components["parameters"]["RemoteNode"];
             };
             header?: {
-                /** @description Bearer token for webhook authentication (e.g., 'Bearer dagu_wh_...'). Required for authentication but marked optional in schema so the handler can return proper 401 responses. */
+                /** @description Bearer token for webhook authentication (e.g., 'Bearer dagu_wh_...'). Required only when the webhook auth mode includes token authentication. */
                 Authorization?: string;
+                /** @description HMAC webhook signature in the format 'sha256=<hex>'. Required only when the webhook auth mode includes HMAC authentication with strict enforcement. */
+                "X-Dagu-Signature"?: string;
             };
             path: {
                 /** @description the name of the DAG file */
@@ -9741,7 +9885,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Unauthorized - missing or invalid token */
+            /** @description Unauthorized - missing or invalid token, or invalid/missing X-Dagu-Signature when strict HMAC enforcement is active */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -10024,6 +10168,253 @@ export interface operations {
             };
             /** @description No webhook configured for this DAG */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    enableDAGWebhookHMAC: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WebhookHMACConfigureRequest"];
+            };
+        };
+        responses: {
+            /** @description Webhook HMAC enabled successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookHMACSecretResponse"];
+                };
+            };
+            /** @description Invalid request or invalid HMAC configuration */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No webhook configured for this DAG */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Webhook HMAC is not supported on this node */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    configureDAGWebhookHMAC: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WebhookHMACConfigureRequest"];
+            };
+        };
+        responses: {
+            /** @description Webhook HMAC updated successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookDetails"];
+                };
+            };
+            /** @description Invalid request or invalid HMAC configuration */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No webhook configured for this DAG */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Webhook HMAC is not supported on this node */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    regenerateDAGWebhookHMACSecret: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Webhook HMAC secret regenerated successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookHMACSecretResponse"];
+                };
+            };
+            /** @description Webhook HMAC is not configured */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No webhook configured for this DAG */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Webhook HMAC is not supported on this node */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    disableDAGWebhookHMAC: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Webhook HMAC disabled successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookDetails"];
+                };
+            };
+            /** @description No webhook configured for this DAG */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Webhook HMAC is not supported on this node */
+            501: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -13769,6 +14160,19 @@ export enum ErrorCode {
     auth_token_invalid = "auth.token_invalid",
     auth_forbidden = "auth.forbidden",
     timeout = "timeout"
+}
+export enum WebhookAuthMode {
+    token_only = "token_only",
+    token_and_hmac = "token_and_hmac",
+    hmac_only = "hmac_only"
+}
+export enum WebhookHMACEnforcementMode {
+    strict = "strict",
+    observe = "observe"
+}
+export enum WebhookHMACConfigureRequestAuthMode {
+    token_and_hmac = "token_and_hmac",
+    hmac_only = "hmac_only"
 }
 export enum Stream {
     stdout = "stdout",

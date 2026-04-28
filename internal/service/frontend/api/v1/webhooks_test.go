@@ -5,8 +5,15 @@ package api_test
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"net/http"
+	"os"
+	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -135,6 +142,33 @@ steps:
 		Name: name,
 		Spec: &spec,
 	}).WithBearerToken(token).ExpectStatus(http.StatusCreated).Send(t)
+}
+
+func signWebhookPayload(t *testing.T, secret string, body any) string {
+	t.Helper()
+
+	raw, err := json.Marshal(body)
+	require.NoError(t, err)
+
+	mac := hmac.New(sha256.New, []byte(secret))
+	_, _ = mac.Write(raw)
+	return "sha256=" + hex.EncodeToString(mac.Sum(nil))
+}
+
+func decodeBodyMap(t *testing.T, resp *test.Response) map[string]any {
+	t.Helper()
+
+	var decoded map[string]any
+	resp.Unmarshal(t, &decoded)
+	return decoded
+}
+
+func nestedMap(t *testing.T, input map[string]any, key string) map[string]any {
+	t.Helper()
+
+	value, ok := input[key].(map[string]any)
+	require.True(t, ok, "expected %q to be an object", key)
+	return value
 }
 
 // TestWebhooks_ListEmpty tests listing webhooks when none exist
@@ -330,6 +364,27 @@ func TestWebhooks_CRUD(t *testing.T) {
 	server.Client().Post("/api/v1/webhooks/"+dagName, api.WebhookRequest{}).
 		WithBearerToken(webhookToken).
 		ExpectStatus(http.StatusUnauthorized).Send(t)
+}
+
+func TestWebhooks_CreateDefaultsToTokenOnlyAuthShape(t *testing.T) {
+	webhookParallel(t)
+	server := setupWebhookTestServer(t)
+	token := getWebhookAdminToken(t, server)
+
+	dagName := "webhook_default_auth_shape_test"
+	createTestDAG(t, server, token, dagName)
+
+	createResp := server.Client().Post("/api/v1/dags/"+dagName+"/webhook", nil).
+		WithBearerToken(token).
+		ExpectStatus(http.StatusCreated).Send(t)
+
+	decoded := decodeBodyMap(t, createResp)
+	webhook := nestedMap(t, decoded, "webhook")
+	hmacDetails := nestedMap(t, webhook, "hmac")
+
+	assert.Equal(t, "token_only", webhook["authMode"])
+	assert.Equal(t, false, hmacDetails["enabled"])
+	assert.Equal(t, false, hmacDetails["secretConfigured"])
 }
 
 // TestWebhooks_Toggle tests enabling and disabling webhooks
@@ -549,6 +604,154 @@ func TestWebhooks_TriggerInvalidToken(t *testing.T) {
 	server.Client().Post("/api/v1/webhooks/"+dagName, api.WebhookRequest{}).
 		WithBearerToken("dagu_wh_invalidtoken12345678901234567890").
 		ExpectStatus(http.StatusUnauthorized).Send(t)
+}
+
+func TestWebhooks_EnableHMAC_StrictRequiresSignature(t *testing.T) {
+	webhookParallel(t)
+	server := setupWebhookTestServer(t)
+	token := getWebhookAdminToken(t, server)
+
+	dagName := "webhook_hmac_strict_test"
+	createTestDAG(t, server, token, dagName)
+
+	createResp := server.Client().Post("/api/v1/dags/"+dagName+"/webhook", nil).
+		WithBearerToken(token).ExpectStatus(http.StatusCreated).Send(t)
+	var createResult api.WebhookCreateResponse
+	createResp.Unmarshal(t, &createResult)
+
+	enableResp := server.Client().Post("/api/v1/dags/"+dagName+"/webhook/hmac/enable", map[string]any{
+		"authMode":        "token_and_hmac",
+		"enforcementMode": "strict",
+	}).WithBearerToken(token).ExpectStatus(http.StatusOK).Send(t)
+
+	enabled := decodeBodyMap(t, enableResp)
+	hmacSecret, ok := enabled["hmacSecret"].(string)
+	require.True(t, ok, "expected hmacSecret in enable response")
+	require.NotEmpty(t, hmacSecret)
+
+	body := api.WebhookRequest{
+		Payload: &map[string]any{"event": "push"},
+	}
+	signature := signWebhookPayload(t, hmacSecret, body)
+
+	server.Client().Post("/api/v1/webhooks/"+dagName, body).
+		WithBearerToken(createResult.Token).
+		ExpectStatus(http.StatusUnauthorized).Send(t)
+
+	server.Client().Post("/api/v1/webhooks/"+dagName, body).
+		WithBearerToken(createResult.Token).
+		WithHeader("X-Dagu-Signature", signature).
+		ExpectStatus(http.StatusOK).Send(t)
+}
+
+func TestWebhooks_EnableHMAC_NotSupportedReturnsNotImplemented(t *testing.T) {
+	webhookParallel(t)
+
+	tmpDir := t.TempDir()
+	brokenDataDir := filepath.Join(tmpDir, "broken-data-dir")
+	require.NoError(t, os.WriteFile(brokenDataDir, []byte("not-a-directory"), 0600))
+
+	server := setupWebhookTestServer(t, func(cfg *config.Config) {
+		cfg.Paths.DataDir = brokenDataDir
+		cfg.Paths.WebhooksDir = filepath.Join(tmpDir, "webhooks")
+	})
+	token := getWebhookAdminToken(t, server)
+
+	dagName := "webhook_hmac_not_supported_test"
+	createTestDAG(t, server, token, dagName)
+
+	server.Client().Post("/api/v1/dags/"+dagName+"/webhook", nil).
+		WithBearerToken(token).ExpectStatus(http.StatusCreated).Send(t)
+
+	resp := server.Client().Post("/api/v1/dags/"+dagName+"/webhook/hmac/enable", map[string]any{
+		"authMode":        "token_and_hmac",
+		"enforcementMode": "strict",
+	}).WithBearerToken(token).ExpectStatus(http.StatusNotImplemented).Send(t)
+
+	var apiErr api.Error
+	resp.Unmarshal(t, &apiErr)
+	assert.Equal(t, "webhook HMAC is not supported by this store", apiErr.Message)
+}
+
+func TestWebhooks_EnableHMAC_ObserveAllowsTokenOnly(t *testing.T) {
+	webhookParallel(t)
+	server := setupWebhookTestServer(t)
+	token := getWebhookAdminToken(t, server)
+
+	dagName := "webhook_hmac_observe_test"
+	createTestDAG(t, server, token, dagName)
+
+	createResp := server.Client().Post("/api/v1/dags/"+dagName+"/webhook", nil).
+		WithBearerToken(token).ExpectStatus(http.StatusCreated).Send(t)
+	var createResult api.WebhookCreateResponse
+	createResp.Unmarshal(t, &createResult)
+
+	server.Client().Post("/api/v1/dags/"+dagName+"/webhook/hmac/enable", map[string]any{
+		"authMode":        "token_and_hmac",
+		"enforcementMode": "observe",
+	}).WithBearerToken(token).ExpectStatus(http.StatusOK).Send(t)
+
+	server.Client().Post("/api/v1/webhooks/"+dagName, api.WebhookRequest{
+		Payload: &map[string]any{"event": "push"},
+	}).
+		WithBearerToken(createResult.Token).
+		ExpectStatus(http.StatusOK).Send(t)
+}
+
+func TestWebhooks_EnableHMAC_HMACOnlyAllowsSignedRequestWithoutToken(t *testing.T) {
+	webhookParallel(t)
+	server := setupWebhookTestServer(t)
+	token := getWebhookAdminToken(t, server)
+
+	dagName := "webhook_hmac_only_test"
+	createTestDAG(t, server, token, dagName)
+
+	server.Client().Post("/api/v1/dags/"+dagName+"/webhook", nil).
+		WithBearerToken(token).ExpectStatus(http.StatusCreated).Send(t)
+
+	enableResp := server.Client().Post("/api/v1/dags/"+dagName+"/webhook/hmac/enable", map[string]any{
+		"authMode":        "hmac_only",
+		"enforcementMode": "strict",
+	}).WithBearerToken(token).ExpectStatus(http.StatusOK).Send(t)
+
+	enabled := decodeBodyMap(t, enableResp)
+	hmacSecret, ok := enabled["hmacSecret"].(string)
+	require.True(t, ok, "expected hmacSecret in enable response")
+	require.NotEmpty(t, hmacSecret)
+
+	body := api.WebhookRequest{
+		Payload: &map[string]any{"event": "push"},
+	}
+	signature := signWebhookPayload(t, hmacSecret, body)
+
+	server.Client().Post("/api/v1/webhooks/"+dagName, body).
+		WithHeader("X-Dagu-Signature", signature).
+		ExpectStatus(http.StatusOK).Send(t)
+
+	server.Client().Post("/api/v1/webhooks/"+dagName, body).
+		WithBearerToken("dagu_wh_not_the_real_token").
+		ExpectStatus(http.StatusUnauthorized).Send(t)
+}
+
+func TestWebhooks_TriggerOversizedBodyRejectedBeforeAuth(t *testing.T) {
+	webhookParallel(t)
+	server := setupWebhookTestServer(t)
+	token := getWebhookAdminToken(t, server)
+
+	dagName := "webhook_oversized_body_test"
+	createTestDAG(t, server, token, dagName)
+
+	server.Client().Post("/api/v1/dags/"+dagName+"/webhook", nil).
+		WithBearerToken(token).ExpectStatus(http.StatusCreated).Send(t)
+
+	body := api.WebhookRequest{
+		Payload: &map[string]any{
+			"blob": strings.Repeat("x", 1024*1024),
+		},
+	}
+
+	server.Client().Post("/api/v1/webhooks/"+dagName, body).
+		ExpectStatus(http.StatusRequestEntityTooLarge).Send(t)
 }
 
 // TestWebhooks_TriggerNonExistentDAG tests triggering webhook for non-existent DAG

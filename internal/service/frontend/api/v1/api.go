@@ -113,6 +113,11 @@ type AuthService interface {
 	ListWebhooks(ctx context.Context) ([]*auth.Webhook, error)
 	DeleteWebhook(ctx context.Context, dagName string) error
 	RegenerateWebhookToken(ctx context.Context, dagName string) (*authservice.CreateWebhookResult, error)
+	EnableWebhookHMAC(ctx context.Context, dagName string, authMode auth.WebhookAuthMode, enforcementMode auth.WebhookHMACEnforcementMode) (*authservice.WebhookHMACSecretResult, error)
+	ConfigureWebhookHMAC(ctx context.Context, dagName string, authMode auth.WebhookAuthMode, enforcementMode auth.WebhookHMACEnforcementMode) (*auth.Webhook, error)
+	RegenerateWebhookHMACSecret(ctx context.Context, dagName string) (*authservice.WebhookHMACSecretResult, error)
+	DisableWebhookHMAC(ctx context.Context, dagName string) (*auth.Webhook, error)
+	AuthorizeWebhookRequest(ctx context.Context, dagName, token, signature string, body []byte) (*auth.Webhook, error)
 	ToggleWebhook(ctx context.Context, dagName string, enabled bool) (*auth.Webhook, error)
 	ValidateWebhookToken(ctx context.Context, dagName, token string) (*auth.Webhook, error)
 	HasWebhookStore() bool
