@@ -3877,6 +3877,8 @@ paths:
           required: false
           schema:
             type: string
+            pattern: '^sha256=[0-9a-fA-F]{64}$'
+            example: "sha256=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
           description: "HMAC webhook signature in the format 'sha256=<hex>'. Required only when the webhook auth mode includes HMAC authentication with strict enforcement."
       requestBody:
         required: false
@@ -3898,7 +3900,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "401":
-          description: "Unauthorized - missing or invalid token"
+          description: "Unauthorized - missing or invalid token, or invalid/missing X-Dagu-Signature when strict HMAC enforcement is active"
           content:
             application/json:
               schema:
@@ -4133,6 +4135,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/WebhookHMACSecretResponse"
+        "400":
+          description: "Invalid request or invalid HMAC configuration"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "501":
+          description: "Webhook HMAC is not supported on this node"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "404":
           description: "No webhook configured for this DAG"
           content:
@@ -4173,6 +4187,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/WebhookDetails"
+        "400":
+          description: "Invalid request or invalid HMAC configuration"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "501":
+          description: "Webhook HMAC is not supported on this node"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "404":
           description: "No webhook configured for this DAG"
           content:
@@ -4206,6 +4232,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/WebhookHMACSecretResponse"
+        "400":
+          description: "Webhook HMAC is not configured"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "501":
+          description: "Webhook HMAC is not supported on this node"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "404":
           description: "No webhook configured for this DAG"
           content:
@@ -4236,6 +4274,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/WebhookDetails"
+        "501":
+          description: "Webhook HMAC is not supported on this node"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "404":
           description: "No webhook configured for this DAG"
           content:
@@ -8056,6 +8100,7 @@ components:
         If enforcementMode is omitted when enabling HMAC, it defaults to strict.
         If omitted when configuring an existing webhook, the current enforcement
         mode is preserved for token_and_hmac, while hmac_only always uses strict.
+        Requests that set authMode to hmac_only must not pass enforcementMode=observe.
       required:
         - authMode
       properties:

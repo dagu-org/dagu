@@ -748,12 +748,23 @@ func generateWebhookHMACSecret() (string, error) {
 	return stringutil.Base58Encode(randomBytes), nil
 }
 
+func mapWebhookHMACCapabilityError(err error) error {
+	if errors.Is(err, auth.ErrWebhookHMACEncryptorRequired) {
+		return ErrWebhookHMACNotSupported
+	}
+	return err
+}
+
 // GetWebhookByDAGName retrieves the webhook for a specific DAG.
 func (s *Service) GetWebhookByDAGName(ctx context.Context, dagName string) (*auth.Webhook, error) {
 	if s.webhookStore == nil {
 		return nil, ErrWebhookNotConfigured
 	}
-	return s.webhookStore.GetByDAGName(ctx, dagName)
+	webhook, err := s.webhookStore.GetByDAGName(ctx, dagName)
+	if err != nil {
+		return nil, mapWebhookHMACCapabilityError(err)
+	}
+	return webhook, nil
 }
 
 // ListWebhooks returns all webhooks.
@@ -779,7 +790,7 @@ func (s *Service) RegenerateWebhookToken(ctx context.Context, dagName string) (*
 		return nil, ErrWebhookNotConfigured
 	}
 
-	webhook, err := s.webhookStore.GetByDAGName(ctx, dagName)
+	webhook, err := s.GetWebhookByDAGName(ctx, dagName)
 	if err != nil {
 		return nil, err
 	}
@@ -811,7 +822,7 @@ func (s *Service) ToggleWebhook(ctx context.Context, dagName string, enabled boo
 		return nil, ErrWebhookNotConfigured
 	}
 
-	webhook, err := s.webhookStore.GetByDAGName(ctx, dagName)
+	webhook, err := s.GetWebhookByDAGName(ctx, dagName)
 	if err != nil {
 		return nil, err
 	}
@@ -846,7 +857,7 @@ func (s *Service) EnableWebhookHMAC(
 		return nil, err
 	}
 
-	webhook, err := s.webhookStore.GetByDAGName(ctx, dagName)
+	webhook, err := s.GetWebhookByDAGName(ctx, dagName)
 	if err != nil {
 		return nil, err
 	}
@@ -890,7 +901,7 @@ func (s *Service) ConfigureWebhookHMAC(
 		return nil, ErrInvalidWebhookAuthMode
 	}
 
-	webhook, err := s.webhookStore.GetByDAGName(ctx, dagName)
+	webhook, err := s.GetWebhookByDAGName(ctx, dagName)
 	if err != nil {
 		return nil, err
 	}
@@ -923,7 +934,7 @@ func (s *Service) DisableWebhookHMAC(ctx context.Context, dagName string) (*auth
 		return nil, ErrWebhookNotConfigured
 	}
 
-	webhook, err := s.webhookStore.GetByDAGName(ctx, dagName)
+	webhook, err := s.GetWebhookByDAGName(ctx, dagName)
 	if err != nil {
 		return nil, err
 	}
@@ -948,7 +959,7 @@ func (s *Service) RegenerateWebhookHMACSecret(ctx context.Context, dagName strin
 		return nil, ErrWebhookNotConfigured
 	}
 
-	webhook, err := s.webhookStore.GetByDAGName(ctx, dagName)
+	webhook, err := s.GetWebhookByDAGName(ctx, dagName)
 	if err != nil {
 		return nil, err
 	}
@@ -991,7 +1002,7 @@ func (s *Service) ValidateWebhookToken(ctx context.Context, dagName, token strin
 		return nil, ErrInvalidWebhookToken
 	}
 
-	webhook, err := s.webhookStore.GetByDAGName(ctx, dagName)
+	webhook, err := s.GetWebhookByDAGName(ctx, dagName)
 	if err != nil {
 		if errors.Is(err, auth.ErrWebhookNotFound) {
 			return nil, ErrInvalidWebhookToken
@@ -1026,7 +1037,7 @@ func (s *Service) AuthorizeWebhookRequest(
 		return nil, ErrWebhookNotConfigured
 	}
 
-	webhook, err := s.webhookStore.GetByDAGName(ctx, dagName)
+	webhook, err := s.GetWebhookByDAGName(ctx, dagName)
 	if err != nil {
 		if errors.Is(err, auth.ErrWebhookNotFound) {
 			return nil, ErrInvalidWebhookToken

@@ -242,6 +242,30 @@ func (a *API) ToggleDAGWebhook(ctx context.Context, request api.ToggleDAGWebhook
 	return api.ToggleDAGWebhook200JSONResponse(toWebhookDetails(webhook)), nil
 }
 
+func mapWebhookHMACError(err error, dagName string) (int, api.Error, bool) {
+	switch {
+	case errors.Is(err, auth.ErrWebhookNotFound):
+		return http.StatusNotFound, api.Error{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("no webhook configured for DAG %s", dagName),
+		}, true
+	case errors.Is(err, authservice.ErrInvalidWebhookAuthMode),
+		errors.Is(err, authservice.ErrInvalidWebhookHMACEnforcementMode),
+		errors.Is(err, authservice.ErrWebhookHMACNotConfigured):
+		return http.StatusBadRequest, api.Error{
+			Code:    api.ErrorCodeBadRequest,
+			Message: err.Error(),
+		}, true
+	case errors.Is(err, authservice.ErrWebhookHMACNotSupported):
+		return http.StatusNotImplemented, api.Error{
+			Code:    api.ErrorCodeInternalError,
+			Message: err.Error(),
+		}, true
+	default:
+		return 0, api.Error{}, false
+	}
+}
+
 // EnableDAGWebhookHMAC enables HMAC auth for an existing webhook.
 // Requires developer role or above.
 func (a *API) EnableDAGWebhookHMAC(ctx context.Context, request api.EnableDAGWebhookHMACRequestObject) (api.EnableDAGWebhookHMACResponseObject, error) {
@@ -265,28 +289,13 @@ func (a *API) EnableDAGWebhookHMAC(ctx context.Context, request api.EnableDAGWeb
 		auth.WebhookHMACEnforcementMode(valueOf(request.Body.EnforcementMode)),
 	)
 	if err != nil {
-		if errors.Is(err, auth.ErrWebhookNotFound) {
-			return api.EnableDAGWebhookHMAC404JSONResponse{
-				Code:    api.ErrorCodeNotFound,
-				Message: fmt.Sprintf("no webhook configured for DAG %s", request.FileName),
-			}, nil
-		}
-		if errors.Is(err, authservice.ErrInvalidWebhookAuthMode) || errors.Is(err, authservice.ErrInvalidWebhookHMACEnforcementMode) {
+		if statusCode, body, handled := mapWebhookHMACError(err, request.FileName); handled {
+			if statusCode == http.StatusNotFound {
+				return api.EnableDAGWebhookHMAC404JSONResponse(body), nil
+			}
 			return api.EnableDAGWebhookHMACdefaultJSONResponse{
-				StatusCode: http.StatusBadRequest,
-				Body: api.Error{
-					Code:    api.ErrorCodeBadRequest,
-					Message: err.Error(),
-				},
-			}, nil
-		}
-		if errors.Is(err, authservice.ErrWebhookHMACNotSupported) {
-			return api.EnableDAGWebhookHMACdefaultJSONResponse{
-				StatusCode: http.StatusNotImplemented,
-				Body: api.Error{
-					Code:    api.ErrorCodeInternalError,
-					Message: err.Error(),
-				},
+				StatusCode: statusCode,
+				Body:       body,
 			}, nil
 		}
 		logger.Error(ctx, "Failed to enable webhook HMAC", tag.Name(request.FileName), tag.Error(err))
@@ -335,28 +344,13 @@ func (a *API) ConfigureDAGWebhookHMAC(ctx context.Context, request api.Configure
 		auth.WebhookHMACEnforcementMode(valueOf(request.Body.EnforcementMode)),
 	)
 	if err != nil {
-		if errors.Is(err, auth.ErrWebhookNotFound) {
-			return api.ConfigureDAGWebhookHMAC404JSONResponse{
-				Code:    api.ErrorCodeNotFound,
-				Message: fmt.Sprintf("no webhook configured for DAG %s", request.FileName),
-			}, nil
-		}
-		if errors.Is(err, authservice.ErrInvalidWebhookAuthMode) || errors.Is(err, authservice.ErrInvalidWebhookHMACEnforcementMode) || errors.Is(err, authservice.ErrWebhookHMACNotConfigured) {
+		if statusCode, body, handled := mapWebhookHMACError(err, request.FileName); handled {
+			if statusCode == http.StatusNotFound {
+				return api.ConfigureDAGWebhookHMAC404JSONResponse(body), nil
+			}
 			return api.ConfigureDAGWebhookHMACdefaultJSONResponse{
-				StatusCode: http.StatusBadRequest,
-				Body: api.Error{
-					Code:    api.ErrorCodeBadRequest,
-					Message: err.Error(),
-				},
-			}, nil
-		}
-		if errors.Is(err, authservice.ErrWebhookHMACNotSupported) {
-			return api.ConfigureDAGWebhookHMACdefaultJSONResponse{
-				StatusCode: http.StatusNotImplemented,
-				Body: api.Error{
-					Code:    api.ErrorCodeInternalError,
-					Message: err.Error(),
-				},
+				StatusCode: statusCode,
+				Body:       body,
 			}, nil
 		}
 		logger.Error(ctx, "Failed to configure webhook HMAC", tag.Name(request.FileName), tag.Error(err))
@@ -388,28 +382,13 @@ func (a *API) RegenerateDAGWebhookHMACSecret(ctx context.Context, request api.Re
 
 	result, err := a.authService.RegenerateWebhookHMACSecret(ctx, request.FileName)
 	if err != nil {
-		if errors.Is(err, auth.ErrWebhookNotFound) {
-			return api.RegenerateDAGWebhookHMACSecret404JSONResponse{
-				Code:    api.ErrorCodeNotFound,
-				Message: fmt.Sprintf("no webhook configured for DAG %s", request.FileName),
-			}, nil
-		}
-		if errors.Is(err, authservice.ErrWebhookHMACNotConfigured) {
+		if statusCode, body, handled := mapWebhookHMACError(err, request.FileName); handled {
+			if statusCode == http.StatusNotFound {
+				return api.RegenerateDAGWebhookHMACSecret404JSONResponse(body), nil
+			}
 			return api.RegenerateDAGWebhookHMACSecretdefaultJSONResponse{
-				StatusCode: http.StatusBadRequest,
-				Body: api.Error{
-					Code:    api.ErrorCodeBadRequest,
-					Message: err.Error(),
-				},
-			}, nil
-		}
-		if errors.Is(err, authservice.ErrWebhookHMACNotSupported) {
-			return api.RegenerateDAGWebhookHMACSecretdefaultJSONResponse{
-				StatusCode: http.StatusNotImplemented,
-				Body: api.Error{
-					Code:    api.ErrorCodeInternalError,
-					Message: err.Error(),
-				},
+				StatusCode: statusCode,
+				Body:       body,
 			}, nil
 		}
 		logger.Error(ctx, "Failed to regenerate webhook HMAC secret", tag.Name(request.FileName), tag.Error(err))
@@ -443,10 +422,13 @@ func (a *API) DisableDAGWebhookHMAC(ctx context.Context, request api.DisableDAGW
 
 	webhook, err := a.authService.DisableWebhookHMAC(ctx, request.FileName)
 	if err != nil {
-		if errors.Is(err, auth.ErrWebhookNotFound) {
-			return api.DisableDAGWebhookHMAC404JSONResponse{
-				Code:    api.ErrorCodeNotFound,
-				Message: fmt.Sprintf("no webhook configured for DAG %s", request.FileName),
+		if statusCode, body, handled := mapWebhookHMACError(err, request.FileName); handled {
+			if statusCode == http.StatusNotFound {
+				return api.DisableDAGWebhookHMAC404JSONResponse(body), nil
+			}
+			return api.DisableDAGWebhookHMACdefaultJSONResponse{
+				StatusCode: statusCode,
+				Body:       body,
 			}, nil
 		}
 		logger.Error(ctx, "Failed to disable webhook HMAC", tag.Name(request.FileName), tag.Error(err))

@@ -3181,6 +3181,7 @@ export interface components {
          *     If enforcementMode is omitted when enabling HMAC, it defaults to strict.
          *     If omitted when configuring an existing webhook, the current enforcement
          *     mode is preserved for token_and_hmac, while hmac_only always uses strict.
+         *     Requests that set authMode to hmac_only must not pass enforcementMode=observe.
          *      */
         WebhookHMACConfigureRequest: {
             /** @enum {string} */
@@ -9883,7 +9884,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Unauthorized - missing or invalid token */
+            /** @description Unauthorized - missing or invalid token, or invalid/missing X-Dagu-Signature when strict HMAC enforcement is active */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -10212,8 +10213,26 @@ export interface operations {
                     "application/json": components["schemas"]["WebhookHMACSecretResponse"];
                 };
             };
+            /** @description Invalid request or invalid HMAC configuration */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description No webhook configured for this DAG */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Webhook HMAC is not supported on this node */
+            501: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -10260,8 +10279,26 @@ export interface operations {
                     "application/json": components["schemas"]["WebhookDetails"];
                 };
             };
+            /** @description Invalid request or invalid HMAC configuration */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description No webhook configured for this DAG */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Webhook HMAC is not supported on this node */
+            501: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -10304,8 +10341,26 @@ export interface operations {
                     "application/json": components["schemas"]["WebhookHMACSecretResponse"];
                 };
             };
+            /** @description Webhook HMAC is not configured */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description No webhook configured for this DAG */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Webhook HMAC is not supported on this node */
+            501: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -10350,6 +10405,15 @@ export interface operations {
             };
             /** @description No webhook configured for this DAG */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Webhook HMAC is not supported on this node */
+            501: {
                 headers: {
                     [name: string]: unknown;
                 };

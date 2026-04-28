@@ -139,7 +139,7 @@ func resolveInlineSchemaEntriesNoValidation(plan *dagParamPlan, rawParams string
 	if err != nil {
 		return nil, err
 	}
-	overridePairs, internalPairs := splitInternalRuntimeOverridePairs(overridePairs, declaredRuntimeParamNames(plan.entries))
+	overridePairs, internalPairs := splitInternalRuntimeOverridePairs(overridePairs, declaredRuntimeParamNamesForPlan(plan))
 
 	values := make(map[string]any, len(plan.entries)+len(overridePairs))
 	for _, entry := range plan.entries {

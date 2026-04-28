@@ -121,7 +121,7 @@ func resolveLegacyEntries(ctx BuildContext, plan *dagParamPlan, rawParams string
 	if err != nil {
 		return nil, err
 	}
-	overridePairs, internalPairs := splitInternalRuntimeOverridePairs(overridePairs, declaredRuntimeParamNames(plan.entries))
+	overridePairs, internalPairs := splitInternalRuntimeOverridePairs(overridePairs, declaredRuntimeParamNamesForPlan(plan))
 
 	entries, overridden, err := applyOverridePairsTracked(plan.entries, overridePairs)
 	if err != nil {
@@ -330,6 +330,18 @@ func declaredRuntimeParamNames(entries []dagParamEntry) map[string]struct{} {
 	}
 	if len(names) == 0 {
 		return nil
+	}
+	return names
+}
+
+func declaredRuntimeParamNamesForPlan(plan *dagParamPlan) map[string]struct{} {
+	if len(plan.schemaProperties) == 0 {
+		return declaredRuntimeParamNames(plan.entries)
+	}
+
+	names := make(map[string]struct{}, len(plan.schemaProperties))
+	for name := range plan.schemaProperties {
+		names[name] = struct{}{}
 	}
 	return names
 }
