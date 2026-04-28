@@ -331,30 +331,56 @@ steps:
 	{
 		ID:          12,
 		Name:        "agent-step",
-		Description: "Run an AI agent as a workflow step",
+		Description: "Build the agent prompt with a template and write a report artifact",
 		Content: `type: graph
+artifacts:
+  enabled: true
 defaults:
   retry_policy:
     limit: 2
     interval_sec: 5
 steps:
-  - name: gather-logs
+  - id: gather_logs
     command: 'echo "error: connection timeout at 10:23 AM"'
     output: ERROR_LOG
-  - name: analyze
+  - id: build_prompt
+    type: template
+    with:
+      data:
+        error_log: ${ERROR_LOG}
+    script: |
+      Analyze this incident log and suggest a fix:
+      
+      {{ .error_log }}
+    output: ANALYSIS_PROMPT
+    depends: [gather_logs]
+  - id: analyze
     type: agent
     agent:
       prompt: "You are a concise incident analyst."
       max_iterations: 10
     messages:
       - role: user
-        content: |
-          Analyze this error and suggest a fix:
-          ${ERROR_LOG}
+        content: ${ANALYSIS_PROMPT}
     output: ANALYSIS
-    depends: [gather-logs]
-  - name: report
-    command: echo "Analysis result - ${ANALYSIS}"
+    depends: [build_prompt]
+  - id: report
+    type: template
+    with:
+      output: ${DAG_RUN_ARTIFACTS_DIR}/report.md
+      data:
+        error_log: ${ERROR_LOG}
+        analysis: ${ANALYSIS}
+    script: |
+      # Incident Report
+      
+      ## Error Log
+      
+      {{ .error_log }}
+      
+      ## Analysis
+      
+      {{ .analysis }}
     depends: [analyze]
 `,
 	},
