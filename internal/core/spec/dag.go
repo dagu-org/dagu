@@ -891,6 +891,13 @@ func buildWebhookConfig(_ BuildContext, d *dag) (*core.WebhookConfig, error) {
 				fmt.Errorf("header name cannot be empty"),
 			)
 		}
+		if !core.IsValidWebhookHeaderToken(header) {
+			return nil, core.NewValidationError(
+				fmt.Sprintf("webhook.forward_headers[%d]", i),
+				raw,
+				fmt.Errorf("invalid HTTP header name"),
+			)
+		}
 		if core.IsDeniedWebhookForwardHeader(header) {
 			return nil, core.NewValidationError(
 				fmt.Sprintf("webhook.forward_headers[%d]", i),

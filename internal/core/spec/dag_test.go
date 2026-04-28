@@ -802,6 +802,13 @@ func TestBuildWebhookConfig(t *testing.T) {
 			},
 			wantErr: "authorization",
 		},
+		{
+			name: "RejectsInvalidHeaderToken",
+			input: &webhookConfig{
+				ForwardHeaders: []string{"my header"},
+			},
+			wantErr: "invalid HTTP header name",
+		},
 	}
 
 	for _, tt := range tests {

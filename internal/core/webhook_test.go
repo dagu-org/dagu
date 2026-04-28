@@ -23,3 +23,26 @@ func TestIsDeniedWebhookForwardHeader(t *testing.T) {
 	assert.True(t, IsDeniedWebhookForwardHeader(" authorization "))
 	assert.False(t, IsDeniedWebhookForwardHeader("X-GitHub-Event"))
 }
+
+func TestIsValidWebhookHeaderToken(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		header string
+		want   bool
+	}{
+		{name: "simple token", header: "x-github-event", want: true},
+		{name: "allowed punctuation", header: "x.custom_header+value", want: true},
+		{name: "empty", header: "", want: false},
+		{name: "contains whitespace", header: "my header", want: false},
+		{name: "contains colon", header: "x:header", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, IsValidWebhookHeaderToken(tt.header))
+		})
+	}
+}

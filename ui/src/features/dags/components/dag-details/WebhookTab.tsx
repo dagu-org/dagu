@@ -984,7 +984,9 @@ await fetch('${webhookUrl}', {
               <code className="bg-accent px-1 rounded-md border">
                 webhook.forward_headers
               </code>{' '}
-              in the DAG or base config to expose selected request headers as{' '}
+              in the DAG YAML. It can also be inherited from{' '}
+              <code className="bg-accent px-1 rounded-md border">base.yaml</code>{' '}
+              to expose selected request headers as{' '}
               <code className="bg-accent px-1 rounded-md border">
                 WEBHOOK_HEADERS
               </code>
