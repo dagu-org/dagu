@@ -296,22 +296,36 @@ steps:
 	{
 		ID:          11,
 		Name:        "approval-gate",
-		Description: "Add human approval gates to a workflow",
+		Description: "Review, push back with rewind_to, then continue to deploy",
 		Content: `type: graph
 steps:
-  - name: build
-    command: echo "build artifact v1.2.3"
+  - id: build
+    command: echo "v1.2.3"
     output: VERSION
-  - name: review
-    command: echo "ready to deploy v${VERSION}"
-    approval:
-      prompt: "Approve deployment to production?"
-      input: [APPROVER, NOTES]
-      required: [APPROVER]
+  - id: prepare_release_notes
     depends: [build]
-  - name: deploy
-    command: echo "deploying v${VERSION} approved by ${APPROVER}"
-    depends: [review]
+    type: template
+    with:
+      data:
+        version: ${VERSION}
+        feedback: ${FEEDBACK}
+        deploy_window: ${DEPLOY_WINDOW}
+    script: |
+      Release {{ .version }}
+      Summary: {{ .feedback | default "Initial release notes draft" }}
+      Deployment window: {{ .deploy_window | default "Pending approval input" }}
+    output: RELEASE_NOTES
+  - id: review_release
+    depends: [prepare_release_notes]
+    command: echo "${RELEASE_NOTES}"
+    approval:
+      prompt: "Review the release notes. Push back with FEEDBACK to regenerate them, or approve with DEPLOY_WINDOW to continue."
+      input: [FEEDBACK, DEPLOY_WINDOW]
+      required: [DEPLOY_WINDOW]
+      rewind_to: prepare_release_notes
+  - id: deploy
+    depends: [review_release]
+    command: echo "deploying ${VERSION} during ${DEPLOY_WINDOW}"
 `,
 	},
 	{
