@@ -510,11 +510,12 @@ func decodeStructuredOutputValue(ctx context.Context, key, raw, selectPath, deco
 }
 
 func readStructuredOutputFile(path string, limit int64) (string, error) {
+	// #nosec G304 -- file source paths come from the loaded workflow spec and are intentionally user-configurable.
 	file, err := os.Open(path)
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	data, err := io.ReadAll(io.LimitReader(file, limit+1))
 	if err != nil {
