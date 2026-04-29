@@ -302,6 +302,110 @@ func TestDataRootRemoveOld(t *testing.T) {
 		assert.True(t, fileutil.FileExists(dagRun2.baseDir), "Recent dag-run should be kept")
 	})
 
+	t.Run("KeepNewestRunsWhenRetentionRunsIsPositive", func(t *testing.T) {
+		root := setupTestDataRoot(t)
+
+		times := []time.Time{
+			time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC),
+			time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC),
+			time.Date(2021, 1, 3, 0, 0, 0, 0, time.UTC),
+			time.Date(2021, 1, 4, 0, 0, 0, 0, time.UTC),
+		}
+		dagRuns := make([]DAGRunTest, 0, len(times))
+		for i, ts := range times {
+			dagRun := root.CreateTestDAGRun(t, fmt.Sprintf("dag-run-%d", i+1), exec.NewUTC(ts))
+			attempt, err := dagRun.CreateAttempt(root.Context, exec.NewUTC(ts), nil, "")
+			require.NoError(t, err)
+			require.NoError(t, attempt.Open(root.Context))
+			status := exec.DAGRunStatus{
+				Name:     "test-dag",
+				DAGRunID: dagRun.dagRunID,
+				Status:   core.Succeeded,
+			}
+			require.NoError(t, attempt.Write(root.Context, status))
+			require.NoError(t, attempt.Close(root.Context))
+			require.NoError(t, os.Chtimes(attempt.file, ts, ts))
+			dagRuns = append(dagRuns, dagRun)
+		}
+
+		removedIDs, err := root.RemoveOldByRuns(root.Context, 2, false)
+		require.NoError(t, err)
+		assert.ElementsMatch(t, []string{"dag-run-1", "dag-run-2"}, removedIDs)
+
+		assert.False(t, fileutil.FileExists(dagRuns[0].baseDir), "oldest dag-run should be removed")
+		assert.False(t, fileutil.FileExists(dagRuns[1].baseDir), "second oldest dag-run should be removed")
+		assert.True(t, fileutil.FileExists(dagRuns[2].baseDir), "second newest dag-run should be kept")
+		assert.True(t, fileutil.FileExists(dagRuns[3].baseDir), "newest dag-run should be kept")
+	})
+
+	t.Run("RetentionRunsDryRunDoesNotDelete", func(t *testing.T) {
+		root := setupTestDataRoot(t)
+
+		oldTime := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
+		newTime := time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC)
+		oldRun := root.CreateTestDAGRun(t, "old-dag-run", exec.NewUTC(oldTime))
+		newRun := root.CreateTestDAGRun(t, "new-dag-run", exec.NewUTC(newTime))
+
+		for _, item := range []struct {
+			run DAGRunTest
+			ts  time.Time
+		}{
+			{run: oldRun, ts: oldTime},
+			{run: newRun, ts: newTime},
+		} {
+			attempt, err := item.run.CreateAttempt(root.Context, exec.NewUTC(item.ts), nil, "")
+			require.NoError(t, err)
+			require.NoError(t, attempt.Open(root.Context))
+			require.NoError(t, attempt.Write(root.Context, exec.DAGRunStatus{
+				Name:     "test-dag",
+				DAGRunID: item.run.dagRunID,
+				Status:   core.Succeeded,
+			}))
+			require.NoError(t, attempt.Close(root.Context))
+		}
+
+		removedIDs, err := root.RemoveOldByRuns(root.Context, 1, true)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"old-dag-run"}, removedIDs)
+		assert.True(t, fileutil.FileExists(oldRun.baseDir), "dry-run should not delete old dag-run")
+		assert.True(t, fileutil.FileExists(newRun.baseDir), "dry-run should keep new dag-run")
+	})
+
+	t.Run("RetentionRunsPreservesActiveRunsOutsideWindow", func(t *testing.T) {
+		root := setupTestDataRoot(t)
+
+		oldTime := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
+		newTime := time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC)
+		activeRun := root.CreateTestDAGRun(t, "active-old-run", exec.NewUTC(oldTime))
+		newRun := root.CreateTestDAGRun(t, "new-dag-run", exec.NewUTC(newTime))
+
+		attempt, err := activeRun.CreateAttempt(root.Context, exec.NewUTC(oldTime), nil, "")
+		require.NoError(t, err)
+		require.NoError(t, attempt.Open(root.Context))
+		require.NoError(t, attempt.Write(root.Context, exec.DAGRunStatus{
+			Name:     "test-dag",
+			DAGRunID: activeRun.dagRunID,
+			Status:   core.Running,
+		}))
+		require.NoError(t, attempt.Close(root.Context))
+
+		attempt, err = newRun.CreateAttempt(root.Context, exec.NewUTC(newTime), nil, "")
+		require.NoError(t, err)
+		require.NoError(t, attempt.Open(root.Context))
+		require.NoError(t, attempt.Write(root.Context, exec.DAGRunStatus{
+			Name:     "test-dag",
+			DAGRunID: newRun.dagRunID,
+			Status:   core.Succeeded,
+		}))
+		require.NoError(t, attempt.Close(root.Context))
+
+		removedIDs, err := root.RemoveOldByRuns(root.Context, 1, false)
+		require.NoError(t, err)
+		assert.Empty(t, removedIDs)
+		assert.True(t, fileutil.FileExists(activeRun.baseDir), "active dag-run should be preserved")
+		assert.True(t, fileutil.FileExists(newRun.baseDir), "newest dag-run should be kept")
+	})
+
 	t.Run("RemoveEmptyDirectories", func(t *testing.T) {
 		root := setupTestDataRoot(t)
 

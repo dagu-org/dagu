@@ -464,6 +464,7 @@ func toDAGDetails(dag *core.DAG) *api.DAGDetails {
 		Group:             ptrOf(dag.Group),
 		HandlerOn:         ptrOf(handlerOn),
 		HistRetentionDays: ptrOf(dag.HistRetentionDays),
+		HistRetentionRuns: ptrOf(dag.HistRetentionRuns),
 		LogDir:            ptrOf(dag.LogDir),
 		MaxActiveRuns:     ptrOf(dag.MaxActiveRuns),
 		MaxActiveSteps:    ptrOf(dag.MaxActiveSteps),

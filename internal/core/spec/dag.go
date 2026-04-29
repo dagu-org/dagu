@@ -108,6 +108,8 @@ type dag struct {
 	RestartWaitSec int `yaml:"restart_wait_sec,omitempty"`
 	// HistRetentionDays is the retention days of the dag-runs history.
 	HistRetentionDays *int `yaml:"hist_retention_days,omitempty"`
+	// HistRetentionRuns is the number of dag-runs to retain in history.
+	HistRetentionRuns *int `yaml:"hist_retention_runs,omitempty"`
 	// Preconditions is the condition to run the DAG.
 	Preconditions any `yaml:"preconditions,omitempty"`
 	// MaxActiveRuns is the maximum number of concurrent dag-runs.
@@ -509,6 +511,7 @@ var fullTransformers = []transform{
 	{"run_config", newTransformer("RunConfig", buildRunConfig)},
 	{"webhook", newTransformer("Webhook", buildWebhookConfig)},
 	{"hist_retention_days", newTransformer("HistRetentionDays", buildHistRetentionDays)},
+	{"hist_retention_runs", newTransformer("HistRetentionRuns", buildHistRetentionRuns)},
 	{"max_clean_up_time_sec", newTransformer("MaxCleanUpTime", buildMaxCleanUpTime)},
 	{"shell", newTransformer("Shell", buildShell)},
 	{"shell_args", newTransformer("ShellArgs", buildShellArgs)},
@@ -571,6 +574,10 @@ func (d *dag) build(ctx BuildContext) (*core.DAG, error) {
 	result := &core.DAG{
 		Location: ctx.file,
 	}
+	var errs core.ErrorList
+	if err := validateHistoryRetentionConfig(d); err != nil {
+		errs = append(errs, err)
+	}
 
 	// Initialize shared envScope state for thread-safe env var handling.
 	// Start with OS environment as base layer.
@@ -592,7 +599,7 @@ func (d *dag) build(ctx BuildContext) (*core.DAG, error) {
 	ctx.paramsState = &paramsState{}
 
 	// Run the transformer pipeline
-	errs := runTransformers(ctx, d, result)
+	errs = append(errs, runTransformers(ctx, d, result)...)
 
 	buildResult := result
 	if ctx.baseDAG != nil {
@@ -685,8 +692,18 @@ func composeBuildDAGContext(base, current *core.DAG) (*core.DAG, error) {
 	if err := merge(effective, current); err != nil {
 		return nil, err
 	}
+	applyHistoryRetentionOverride(effective, current)
 
 	return effective, nil
+}
+
+func applyHistoryRetentionOverride(effective, current *core.DAG) {
+	if current.HistRetentionRuns > 0 {
+		effective.HistRetentionDays = 0
+	}
+	if current.HistRetentionDays > 0 {
+		effective.HistRetentionRuns = 0
+	}
 }
 
 // Builder functions - each returns a value instead of modifying result
@@ -1005,9 +1022,33 @@ func buildWebhookConfig(_ BuildContext, d *dag) (*core.WebhookConfig, error) {
 
 func buildHistRetentionDays(_ BuildContext, d *dag) (int, error) {
 	if d.HistRetentionDays != nil {
+		if *d.HistRetentionDays < 0 {
+			return 0, fmt.Errorf("hist_retention_days must be >= 0")
+		}
 		return *d.HistRetentionDays, nil
 	}
 	return 0, nil
+}
+
+func buildHistRetentionRuns(_ BuildContext, d *dag) (int, error) {
+	if d.HistRetentionRuns != nil {
+		if *d.HistRetentionRuns <= 0 {
+			return 0, fmt.Errorf("hist_retention_runs must be > 0")
+		}
+		return *d.HistRetentionRuns, nil
+	}
+	return 0, nil
+}
+
+func validateHistoryRetentionConfig(d *dag) error {
+	if d.HistRetentionDays == nil || d.HistRetentionRuns == nil {
+		return nil
+	}
+	return core.NewValidationError(
+		"hist_retention_runs",
+		*d.HistRetentionRuns,
+		fmt.Errorf("hist_retention_days and hist_retention_runs cannot both be specified"),
+	)
 }
 
 func buildMaxCleanUpTime(_ BuildContext, d *dag) (time.Duration, error) {

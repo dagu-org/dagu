@@ -80,7 +80,7 @@ type DAGRunStore interface {
 	// This is used for distributed sub-DAG execution where the coordinator needs
 	// to create the attempt directory before the worker reports status.
 	CreateSubAttempt(ctx context.Context, rootRef DAGRunRef, subDAGRunID string) (DAGRunAttempt, error)
-	// RemoveOldDAGRuns deletes dag-run records older than retentionDays.
+	// RemoveOldDAGRuns deletes dag-run records older than retentionDays, or by run count when configured by option.
 	// If retentionDays is negative, it won't delete any records.
 	// If retentionDays is zero, it will delete all records for the DAG name.
 	// But it will not delete the records with non-final statuses (e.g., running, queued).
@@ -231,6 +231,8 @@ func WithRejectActiveDAGRun() RemoveDAGRunOption {
 type RemoveOldDAGRunsOptions struct {
 	// DryRun if true, only returns the paths that would be removed without actually deleting
 	DryRun bool
+	// RetentionRuns keeps the most recent number of dag-runs when set.
+	RetentionRuns *int
 }
 
 // RemoveOldDAGRunsOption is a functional option for configuring RemoveOldDAGRunsOptions
@@ -240,6 +242,13 @@ type RemoveOldDAGRunsOption func(*RemoveOldDAGRunsOptions)
 func WithDryRun() RemoveOldDAGRunsOption {
 	return func(o *RemoveOldDAGRunsOptions) {
 		o.DryRun = true
+	}
+}
+
+// WithRetentionRuns keeps the most recent number of dag-runs.
+func WithRetentionRuns(runs int) RemoveOldDAGRunsOption {
+	return func(o *RemoveOldDAGRunsOptions) {
+		o.RetentionRuns = &runs
 	}
 }
 

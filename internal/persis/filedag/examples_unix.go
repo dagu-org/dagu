@@ -75,7 +75,7 @@ description: Example of a scheduled workflow
 #   "0 9 * * 1-5"    - Weekdays at 9 AM
 #   "0 0 1 * *"      - First day of each month
 
-hist_retention_days: 7  # Keep 7 days of history
+hist_retention_days: 7  # Keep 7 days of history (or use hist_retention_runs)
 
 steps:
   - |

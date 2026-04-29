@@ -154,6 +154,22 @@ func TestAgent_Run(t *testing.T) {
 		// Check if only the latest history file exists
 		dag.AssertDAGRunCount(t, 1)
 	})
+	t.Run("DeleteOldHistoryByRuns", func(t *testing.T) {
+		th := test.Setup(t)
+		dag := th.DAG(t, `steps:
+  - "exit 0"
+`)
+
+		dag.HistRetentionRuns = 2
+		dag.Agent().RunSuccess(t)
+		dag.AssertDAGRunCount(t, 1)
+
+		dag.Agent().RunSuccess(t)
+		dag.AssertDAGRunCount(t, 2)
+
+		dag.Agent().RunSuccess(t)
+		dag.AssertDAGRunCount(t, 2)
+	})
 	t.Run("AlreadyRunning", func(t *testing.T) {
 		th := test.Setup(t)
 		runDir := t.TempDir()

@@ -30,7 +30,11 @@ overlap_policy: skip
 log_output: separate
 
 # Number of days to retain DAG run history before automatic purge.
+# Use either hist_retention_days or hist_retention_runs, not both.
 hist_retention_days: 30
+
+# Number of recent DAG runs to retain before automatic purge.
+# hist_retention_runs: 100
 
 # Maximum seconds to wait for step cleanup when a DAG is stopped.
 max_clean_up_time_sec: 5
