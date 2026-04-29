@@ -33,7 +33,8 @@ type SessionForStorage struct {
 	ID              string          `json:"id"`
 	UserID          string          `json:"user_id"`
 	DAGName         string          `json:"dag_name,omitempty"`
-	AutomataName    string          `json:"automata_name,omitempty"`
+	AutopilotName   string          `json:"autopilot_name,omitempty"`
+	LegacyName      string          `json:"automata_name,omitempty"`
 	Title           string          `json:"title,omitempty"`
 	Model           string          `json:"model,omitempty"`
 	CreatedAt       time.Time       `json:"created_at"`
@@ -45,11 +46,15 @@ type SessionForStorage struct {
 
 // ToSession converts a SessionForStorage to an agent.Session.
 func (c *SessionForStorage) ToSession() *agent.Session {
+	autopilotName := c.AutopilotName
+	if autopilotName == "" {
+		autopilotName = c.LegacyName
+	}
 	return &agent.Session{
 		ID:              c.ID,
 		UserID:          c.UserID,
 		DAGName:         c.DAGName,
-		AutomataName:    c.AutomataName,
+		AutopilotName:   autopilotName,
 		Title:           c.Title,
 		Model:           c.Model,
 		CreatedAt:       c.CreatedAt,
@@ -65,7 +70,7 @@ func FromSession(sess *agent.Session, messages []agent.Message) *SessionForStora
 		ID:              sess.ID,
 		UserID:          sess.UserID,
 		DAGName:         sess.DAGName,
-		AutomataName:    sess.AutomataName,
+		AutopilotName:   sess.AutopilotName,
 		Title:           sess.Title,
 		Model:           sess.Model,
 		CreatedAt:       sess.CreatedAt,

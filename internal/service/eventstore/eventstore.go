@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -25,12 +26,19 @@ const SchemaVersion = 1
 
 var ErrInvalidQueryCursor = errors.New("eventstore: invalid query cursor")
 
+const (
+	legacyKindAutomata           EventKind = "automata"
+	legacyTypeAutomataNeedsInput EventType = "automata.needs_input"
+	legacyTypeAutomataError      EventType = "automata.error"
+	legacyTypeAutomataFinished   EventType = "automata.finished"
+)
+
 type EventKind string
 
 const (
-	KindDAGRun   EventKind = "dag_run"
-	KindAutomata EventKind = "automata"
-	KindLLMUsage EventKind = "llm_usage"
+	KindDAGRun    EventKind = "dag_run"
+	KindAutopilot EventKind = "autopilot"
+	KindLLMUsage  EventKind = "llm_usage"
 )
 
 type EventType string
@@ -45,9 +53,9 @@ const (
 	TypeDAGRunAborted   EventType = "dag.run.aborted"
 	TypeDAGRunRejected  EventType = "dag.run.rejected"
 
-	TypeAutomataNeedsInput EventType = "automata.needs_input"
-	TypeAutomataError      EventType = "automata.error"
-	TypeAutomataFinished   EventType = "automata.finished"
+	TypeAutopilotNeedsInput EventType = "autopilot.needs_input"
+	TypeAutopilotError      EventType = "autopilot.error"
+	TypeAutopilotFinished   EventType = "autopilot.finished"
 
 	TypeLLMUsageRecorded EventType = "llm.usage.recorded"
 )
@@ -66,30 +74,95 @@ type Source struct {
 }
 
 type Event struct {
-	ID              string         `json:"id"`
-	SchemaVersion   int            `json:"schema_version"`
-	OccurredAt      time.Time      `json:"occurred_at"`
-	RecordedAt      time.Time      `json:"recorded_at"`
-	Kind            EventKind      `json:"kind"`
-	Type            EventType      `json:"type"`
-	SourceService   string         `json:"source_service"`
-	SourceInstance  string         `json:"source_instance,omitempty"`
-	DAGName         string         `json:"dag_name,omitempty"`
-	DAGRunID        string         `json:"dag_run_id,omitempty"`
-	AttemptID       string         `json:"attempt_id,omitempty"`
-	AutomataName    string         `json:"automata_name,omitempty"`
-	AutomataKind    string         `json:"automata_kind,omitempty"`
-	AutomataCycleID string         `json:"automata_cycle_id,omitempty"`
-	SessionID       string         `json:"session_id,omitempty"`
-	UserID          string         `json:"user_id,omitempty"`
-	Model           string         `json:"model,omitempty"`
-	Status          string         `json:"status,omitempty"`
-	Data            map[string]any `json:"data,omitempty"`
+	ID               string         `json:"id"`
+	SchemaVersion    int            `json:"schema_version"`
+	OccurredAt       time.Time      `json:"occurred_at"`
+	RecordedAt       time.Time      `json:"recorded_at"`
+	Kind             EventKind      `json:"kind"`
+	Type             EventType      `json:"type"`
+	SourceService    string         `json:"source_service"`
+	SourceInstance   string         `json:"source_instance,omitempty"`
+	DAGName          string         `json:"dag_name,omitempty"`
+	DAGRunID         string         `json:"dag_run_id,omitempty"`
+	AttemptID        string         `json:"attempt_id,omitempty"`
+	AutopilotName    string         `json:"autopilot_name,omitempty"`
+	AutopilotKind    string         `json:"autopilot_kind,omitempty"`
+	AutopilotCycleID string         `json:"autopilot_cycle_id,omitempty"`
+	SessionID        string         `json:"session_id,omitempty"`
+	UserID           string         `json:"user_id,omitempty"`
+	Model            string         `json:"model,omitempty"`
+	Status           string         `json:"status,omitempty"`
+	Data             map[string]any `json:"data,omitempty"`
+}
+
+type eventJSONAlias struct {
+	ID               string         `json:"id"`
+	SchemaVersion    int            `json:"schema_version"`
+	OccurredAt       time.Time      `json:"occurred_at"`
+	RecordedAt       time.Time      `json:"recorded_at"`
+	Kind             EventKind      `json:"kind"`
+	Type             EventType      `json:"type"`
+	SourceService    string         `json:"source_service"`
+	SourceInstance   string         `json:"source_instance,omitempty"`
+	DAGName          string         `json:"dag_name,omitempty"`
+	DAGRunID         string         `json:"dag_run_id,omitempty"`
+	AttemptID        string         `json:"attempt_id,omitempty"`
+	AutopilotName    string         `json:"autopilot_name,omitempty"`
+	LegacyName       string         `json:"automata_name,omitempty"`
+	AutopilotKind    string         `json:"autopilot_kind,omitempty"`
+	LegacyKind       string         `json:"automata_kind,omitempty"`
+	AutopilotCycleID string         `json:"autopilot_cycle_id,omitempty"`
+	LegacyCycleID    string         `json:"automata_cycle_id,omitempty"`
+	SessionID        string         `json:"session_id,omitempty"`
+	UserID           string         `json:"user_id,omitempty"`
+	Model            string         `json:"model,omitempty"`
+	Status           string         `json:"status,omitempty"`
+	Data             map[string]any `json:"data,omitempty"`
+}
+
+func (e *Event) UnmarshalJSON(data []byte) error {
+	var aux eventJSONAlias
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	e.ID = aux.ID
+	e.SchemaVersion = aux.SchemaVersion
+	e.OccurredAt = aux.OccurredAt
+	e.RecordedAt = aux.RecordedAt
+	e.Kind = aux.Kind
+	e.Type = aux.Type
+	e.SourceService = aux.SourceService
+	e.SourceInstance = aux.SourceInstance
+	e.DAGName = aux.DAGName
+	e.DAGRunID = aux.DAGRunID
+	e.AttemptID = aux.AttemptID
+	e.AutopilotName = firstNonEmpty(aux.AutopilotName, aux.LegacyName)
+	e.AutopilotKind = firstNonEmpty(aux.AutopilotKind, aux.LegacyKind)
+	e.AutopilotCycleID = firstNonEmpty(aux.AutopilotCycleID, aux.LegacyCycleID)
+	e.SessionID = aux.SessionID
+	e.UserID = aux.UserID
+	e.Model = aux.Model
+	e.Status = aux.Status
+	e.Data = aux.Data
+	e.Normalize()
+	return nil
 }
 
 func (e *Event) Normalize() {
 	if e == nil {
 		return
+	}
+	switch e.Kind {
+	case legacyKindAutomata:
+		e.Kind = KindAutopilot
+	}
+	switch e.Type {
+	case legacyTypeAutomataNeedsInput:
+		e.Type = TypeAutopilotNeedsInput
+	case legacyTypeAutomataError:
+		e.Type = TypeAutopilotError
+	case legacyTypeAutomataFinished:
+		e.Type = TypeAutopilotFinished
 	}
 	if !e.RecordedAt.IsZero() {
 		e.RecordedAt = e.RecordedAt.UTC()
@@ -146,24 +219,24 @@ func (e *Event) Validate() error {
 }
 
 type QueryFilter struct {
-	Kind            EventKind
-	Type            EventType
-	DAGName         string
-	DAGRunID        string
-	AttemptID       string
-	AutomataName    string
-	AutomataKind    string
-	AutomataCycleID string
-	SessionID       string
-	UserID          string
-	Model           string
-	Status          string
-	StartTime       time.Time
-	EndTime         time.Time
-	Limit           int
-	Offset          int
-	Cursor          string
-	PaginationMode  QueryPaginationMode
+	Kind             EventKind
+	Type             EventType
+	DAGName          string
+	DAGRunID         string
+	AttemptID        string
+	AutopilotName    string
+	AutopilotKind    string
+	AutopilotCycleID string
+	SessionID        string
+	UserID           string
+	Model            string
+	Status           string
+	StartTime        time.Time
+	EndTime          time.Time
+	Limit            int
+	Offset           int
+	Cursor           string
+	PaginationMode   QueryPaginationMode
 }
 
 type QueryResult struct {
@@ -219,15 +292,24 @@ func DefaultSourceInstance() string {
 	return fmt.Sprintf("%s:%d", hostname, os.Getpid())
 }
 
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
 func DAGRunEventID(eventType EventType, dagName, dagRunID, attemptID string) string {
 	return "dag_" + stableID(string(eventType), dagName, dagRunID, attemptID)
 }
 
-func AutomataEventID(eventType EventType, automataName string, identityParts ...string) string {
+func AutopilotEventID(eventType EventType, autopilotName string, identityParts ...string) string {
 	parts := make([]string, 0, len(identityParts)+2)
-	parts = append(parts, string(eventType), automataName)
+	parts = append(parts, string(eventType), autopilotName)
 	parts = append(parts, identityParts...)
-	return "automata_" + stableID(parts...)
+	return "autopilot_" + stableID(parts...)
 }
 
 func DAGRunUpdateEventID(dagName, dagRunID, attemptID string, recordedAt time.Time) string {
@@ -286,7 +368,7 @@ func NewDAGRunEvent(source Source, eventType EventType, status *exec.DAGRunStatu
 	return event
 }
 
-type AutomataEventInput struct {
+type AutopilotEventInput struct {
 	Name                   string
 	Kind                   string
 	CycleID                string
@@ -302,33 +384,33 @@ type AutomataEventInput struct {
 	DoneTaskCount          int
 }
 
-func NewAutomataEvent(source Source, eventType EventType, id string, input AutomataEventInput, data map[string]any) *Event {
+func NewAutopilotEvent(source Source, eventType EventType, id string, input AutopilotEventInput, data map[string]any) *Event {
 	if strings.TrimSpace(input.Name) == "" || strings.TrimSpace(id) == "" {
 		return nil
 	}
 	source = normalizeSource(source)
 	data = cloneData(data)
-	if snapshot := newNotificationAutomataSnapshot(eventType, input); snapshot != nil {
+	if snapshot := newNotificationAutopilotSnapshot(eventType, input); snapshot != nil {
 		if data == nil {
 			data = make(map[string]any, 1)
 		}
-		data[notificationAutomataSnapshotDataKey] = snapshot
+		data[notificationAutopilotSnapshotDataKey] = snapshot
 	}
 	event := &Event{
-		ID:              id,
-		SchemaVersion:   SchemaVersion,
-		OccurredAt:      automataOccurredAt(input),
-		RecordedAt:      time.Now().UTC(),
-		Kind:            KindAutomata,
-		Type:            eventType,
-		SourceService:   source.Service,
-		SourceInstance:  source.Instance,
-		AutomataName:    input.Name,
-		AutomataKind:    input.Kind,
-		AutomataCycleID: input.CycleID,
-		SessionID:       input.SessionID,
-		Status:          input.Status,
-		Data:            data,
+		ID:               id,
+		SchemaVersion:    SchemaVersion,
+		OccurredAt:       autopilotOccurredAt(input),
+		RecordedAt:       time.Now().UTC(),
+		Kind:             KindAutopilot,
+		Type:             eventType,
+		SourceService:    source.Service,
+		SourceInstance:   source.Instance,
+		AutopilotName:    input.Name,
+		AutopilotKind:    input.Kind,
+		AutopilotCycleID: input.CycleID,
+		SessionID:        input.SessionID,
+		Status:           input.Status,
+		Data:             data,
 	}
 	event.Normalize()
 	return event
@@ -413,7 +495,7 @@ func normalizeSource(source Source) Source {
 	return source
 }
 
-func automataOccurredAt(input AutomataEventInput) time.Time {
+func autopilotOccurredAt(input AutopilotEventInput) time.Time {
 	if !input.OccurredAt.IsZero() {
 		return input.OccurredAt.UTC()
 	}
@@ -450,7 +532,7 @@ func dagRunOccurredAt(status *exec.DAGRunStatus, eventType EventType) time.Time 
 		}
 	case TypeLLMUsageRecorded:
 		// This builder is only used for DAG-run events, but fall back safely.
-	case TypeAutomataNeedsInput, TypeAutomataError, TypeAutomataFinished:
+	case TypeAutopilotNeedsInput, TypeAutopilotError, TypeAutopilotFinished:
 		// This builder is only used for DAG-run events, but fall back safely.
 	}
 	if status.CreatedAt > 0 {

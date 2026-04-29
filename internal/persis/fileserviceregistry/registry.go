@@ -77,13 +77,13 @@ func (r *registry) Register(ctx context.Context, serviceName exec.ServiceName, h
 	reg := &registrationInfo{
 		serviceName: serviceName,
 		instanceInfo: &instanceInfo{
-			ID:                 hostInfo.ID,
-			Host:               hostInfo.Host,
-			Port:               hostInfo.Port,
-			PID:                os.Getpid(),
-			Status:             hostInfo.Status,
-			StartedAt:          time.Now(),
-			AutomataController: hostInfo.AutomataController,
+			ID:                  hostInfo.ID,
+			Host:                hostInfo.Host,
+			Port:                hostInfo.Port,
+			PID:                 os.Getpid(),
+			Status:              hostInfo.Status,
+			StartedAt:           time.Now(),
+			AutopilotController: hostInfo.AutopilotController,
 		},
 	}
 

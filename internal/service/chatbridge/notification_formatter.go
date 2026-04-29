@@ -182,8 +182,8 @@ func formatSingleNotification(event NotificationEvent) string {
 	switch notificationEventKind(event) {
 	case eventstore.KindDAGRun:
 		return formatSingleDAGNotification(notificationDAGRun(event))
-	case eventstore.KindAutomata:
-		return formatSingleAutomataNotification(event)
+	case eventstore.KindAutopilot:
+		return formatSingleAutopilotNotification(event)
 	case eventstore.KindLLMUsage:
 		return "Update."
 	default:
@@ -231,8 +231,8 @@ func notificationGroupDetail(group notificationGroup) string {
 		default:
 			return ""
 		}
-	case eventstore.KindAutomata:
-		return automataNotificationDetail(group.Sample)
+	case eventstore.KindAutopilot:
+		return autopilotNotificationDetail(group.Sample)
 	case eventstore.KindLLMUsage:
 		return ""
 	default:
@@ -240,55 +240,55 @@ func notificationGroupDetail(group notificationGroup) string {
 	}
 }
 
-func formatSingleAutomataNotification(event NotificationEvent) string {
-	if event.Automata == nil {
-		return "Automata update."
+func formatSingleAutopilotNotification(event NotificationEvent) string {
+	if event.Autopilot == nil {
+		return "Autopilot update."
 	}
 	var b strings.Builder
-	snapshot := event.Automata
+	snapshot := event.Autopilot
 
 	switch event.Type {
-	case eventstore.TypeAutomataNeedsInput:
-		fmt.Fprintf(&b, "%s Automata `%s` needs input.", notificationTextEmoji(event), snapshot.Name)
-		if detail := automataNotificationDetail(event); detail != "" {
+	case eventstore.TypeAutopilotNeedsInput:
+		fmt.Fprintf(&b, "%s Autopilot `%s` needs input.", notificationTextEmoji(event), snapshot.Name)
+		if detail := autopilotNotificationDetail(event); detail != "" {
 			fmt.Fprintf(&b, "\n%s", detail)
 		}
-	case eventstore.TypeAutomataError:
-		fmt.Fprintf(&b, "%s Automata `%s` hit an error.", notificationTextEmoji(event), snapshot.Name)
-		if detail := automataNotificationDetail(event); detail != "" {
+	case eventstore.TypeAutopilotError:
+		fmt.Fprintf(&b, "%s Autopilot `%s` hit an error.", notificationTextEmoji(event), snapshot.Name)
+		if detail := autopilotNotificationDetail(event); detail != "" {
 			fmt.Fprintf(&b, "\n%s", detail)
 		}
-	case eventstore.TypeAutomataFinished:
-		fmt.Fprintf(&b, "%s Automata `%s` finished.", notificationTextEmoji(event), snapshot.Name)
-		if detail := automataNotificationDetail(event); detail != "" {
+	case eventstore.TypeAutopilotFinished:
+		fmt.Fprintf(&b, "%s Autopilot `%s` finished.", notificationTextEmoji(event), snapshot.Name)
+		if detail := autopilotNotificationDetail(event); detail != "" {
 			fmt.Fprintf(&b, "\n%s", detail)
 		}
 	case eventstore.TypeDAGRunQueued, eventstore.TypeDAGRunRunning, eventstore.TypeDAGRunUpdated, eventstore.TypeDAGRunWaiting, eventstore.TypeDAGRunSucceeded, eventstore.TypeDAGRunFailed, eventstore.TypeDAGRunAborted, eventstore.TypeDAGRunRejected, eventstore.TypeLLMUsageRecorded:
-		fmt.Fprintf(&b, "%s Automata `%s` event: %s.", notificationTextEmoji(event), snapshot.Name, event.Type)
+		fmt.Fprintf(&b, "%s Autopilot `%s` event: %s.", notificationTextEmoji(event), snapshot.Name, event.Type)
 	default:
-		fmt.Fprintf(&b, "%s Automata `%s` event: %s.", notificationTextEmoji(event), snapshot.Name, event.Type)
+		fmt.Fprintf(&b, "%s Autopilot `%s` event: %s.", notificationTextEmoji(event), snapshot.Name, event.Type)
 	}
 
 	return b.String()
 }
 
-func automataNotificationDetail(event NotificationEvent) string {
-	if event.Automata == nil {
+func autopilotNotificationDetail(event NotificationEvent) string {
+	if event.Autopilot == nil {
 		return ""
 	}
-	snapshot := event.Automata
+	snapshot := event.Autopilot
 	switch event.Type {
-	case eventstore.TypeAutomataNeedsInput:
+	case eventstore.TypeAutopilotNeedsInput:
 		if question := trimNotificationDetail(snapshot.PromptQuestion); question != "" {
 			return "Prompt: " + question
 		}
-		return "Action is required to continue the automata."
-	case eventstore.TypeAutomataError:
+		return "Action is required to continue the autopilot."
+	case eventstore.TypeAutopilotError:
 		if detail := trimNotificationDetail(snapshot.Error); detail != "" {
 			return "Latest error: " + detail
 		}
 		return ""
-	case eventstore.TypeAutomataFinished:
+	case eventstore.TypeAutopilotFinished:
 		if detail := trimNotificationDetail(snapshot.Summary); detail != "" {
 			return detail
 		}

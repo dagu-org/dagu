@@ -45,12 +45,12 @@ const (
 
 // NotificationEvent is a typed subject snapshot buffered for delivery.
 type NotificationEvent struct {
-	Key        string                                   `json:"key"`
-	Kind       eventstore.EventKind                     `json:"kind"`
-	Type       eventstore.EventType                     `json:"type,omitempty"`
-	DAGRun     *exec.DAGRunStatus                       `json:"dagRun,omitempty"`
-	Automata   *eventstore.NotificationAutomataSnapshot `json:"automata,omitempty"`
-	ObservedAt time.Time                                `json:"observedAt"`
+	Key        string                                    `json:"key"`
+	Kind       eventstore.EventKind                      `json:"kind"`
+	Type       eventstore.EventType                      `json:"type,omitempty"`
+	DAGRun     *exec.DAGRunStatus                        `json:"dagRun,omitempty"`
+	Autopilot  *eventstore.NotificationAutopilotSnapshot `json:"autopilot,omitempty"`
+	ObservedAt time.Time                                 `json:"observedAt"`
 }
 
 // NotificationBatch is a flushed batch of buffered notification events.
@@ -74,8 +74,8 @@ func notificationEventKind(event NotificationEvent) eventstore.EventKind {
 	if event.DAGRun != nil {
 		return eventstore.KindDAGRun
 	}
-	if event.Automata != nil {
-		return eventstore.KindAutomata
+	if event.Autopilot != nil {
+		return eventstore.KindAutopilot
 	}
 	return ""
 }
@@ -111,14 +111,14 @@ func NotificationClassForEvent(event NotificationEvent) (NotificationClass, bool
 			return NotificationClassUrgent, true
 		case eventstore.TypeDAGRunSucceeded:
 			return NotificationClassSuccessDigest, true
-		case eventstore.TypeDAGRunUpdated, eventstore.TypeAutomataNeedsInput, eventstore.TypeAutomataError, eventstore.TypeAutomataFinished, eventstore.TypeLLMUsageRecorded:
+		case eventstore.TypeDAGRunUpdated, eventstore.TypeAutopilotNeedsInput, eventstore.TypeAutopilotError, eventstore.TypeAutopilotFinished, eventstore.TypeLLMUsageRecorded:
 			return NotificationClassUnknown, false
 		default:
 			return NotificationClassForStatus(dagRun.Status)
 		}
-	case eventstore.KindAutomata:
+	case eventstore.KindAutopilot:
 		switch event.Type {
-		case eventstore.TypeAutomataNeedsInput, eventstore.TypeAutomataError, eventstore.TypeAutomataFinished:
+		case eventstore.TypeAutopilotNeedsInput, eventstore.TypeAutopilotError, eventstore.TypeAutopilotFinished:
 			return NotificationClassUrgent, true
 		case eventstore.TypeDAGRunQueued, eventstore.TypeDAGRunRunning, eventstore.TypeDAGRunUpdated, eventstore.TypeDAGRunWaiting, eventstore.TypeDAGRunSucceeded, eventstore.TypeDAGRunFailed, eventstore.TypeDAGRunAborted, eventstore.TypeDAGRunRejected, eventstore.TypeLLMUsageRecorded:
 			return NotificationClassUnknown, false
@@ -156,11 +156,11 @@ func NotificationSeenKeyForEvent(event NotificationEvent) string {
 	switch notificationEventKind(event) {
 	case eventstore.KindDAGRun:
 		return NotificationSeenKey(notificationDAGRun(event))
-	case eventstore.KindAutomata:
-		if event.Automata == nil {
+	case eventstore.KindAutopilot:
+		if event.Autopilot == nil {
 			return ""
 		}
-		return "automata:" + string(event.Type) + ":" + event.Automata.Name + ":" + event.Automata.CycleID
+		return "autopilot:" + string(event.Type) + ":" + event.Autopilot.Name + ":" + event.Autopilot.CycleID
 	case eventstore.KindLLMUsage:
 		return ""
 	default:
@@ -177,8 +177,8 @@ func NotificationGroupKey(event NotificationEvent) string {
 			return ""
 		}
 		return "dag:" + NotificationRunKey(dagRun)
-	case eventstore.KindAutomata:
-		return "automata:" + NotificationSeenKeyForEvent(event)
+	case eventstore.KindAutopilot:
+		return "autopilot:" + NotificationSeenKeyForEvent(event)
 	case eventstore.KindLLMUsage:
 		return ""
 	default:
@@ -216,8 +216,8 @@ func BuildNotificationPrompt(event NotificationEvent) string {
 	switch notificationEventKind(event) {
 	case eventstore.KindDAGRun:
 		return buildDAGNotificationPrompt(notificationDAGRun(event))
-	case eventstore.KindAutomata:
-		return buildAutomataNotificationPrompt(event)
+	case eventstore.KindAutopilot:
+		return buildAutopilotNotificationPrompt(event)
 	case eventstore.KindLLMUsage:
 		return ""
 	default:
@@ -249,11 +249,11 @@ func NotificationEventFromStoredEvent(event *eventstore.Event) (NotificationEven
 		}
 		notification.DAGRun = payload.DAGRun.DAGRunStatus()
 		notification.Key = NotificationSeenKey(notification.DAGRun)
-	case eventstore.KindAutomata:
-		if payload.Automata == nil {
-			return NotificationEvent{}, fmt.Errorf("automata notification snapshot is missing")
+	case eventstore.KindAutopilot:
+		if payload.Autopilot == nil {
+			return NotificationEvent{}, fmt.Errorf("autopilot notification snapshot is missing")
 		}
-		notification.Automata = payload.Automata
+		notification.Autopilot = payload.Autopilot
 		notification.Key = event.ID
 	case eventstore.KindLLMUsage:
 		return NotificationEvent{}, fmt.Errorf("unsupported notification kind %q", payload.Kind)
@@ -308,22 +308,22 @@ DAG Run ID: %s`, intro, status.Name, status.Status.String(), status.DAGRunID)
 	return prompt.String()
 }
 
-func buildAutomataNotificationPrompt(event NotificationEvent) string {
-	if event.Automata == nil {
+func buildAutopilotNotificationPrompt(event NotificationEvent) string {
+	if event.Autopilot == nil {
 		return ""
 	}
 
-	snapshot := event.Automata
-	intro := "An automata generated an urgent runtime event. Please write a brief, helpful notification message for the user. Keep it concise (2-4 sentences). Include the key facts and any immediate action."
-	if event.Type == eventstore.TypeAutomataNeedsInput {
-		intro = "An automata needs human input. Please write a brief, urgent notification message for the user. Explain what needs input and what question they need to answer. Keep it concise (2-4 sentences)."
+	snapshot := event.Autopilot
+	intro := "An autopilot generated an urgent runtime event. Please write a brief, helpful notification message for the user. Keep it concise (2-4 sentences). Include the key facts and any immediate action."
+	if event.Type == eventstore.TypeAutopilotNeedsInput {
+		intro = "An autopilot needs human input. Please write a brief, urgent notification message for the user. Explain what needs input and what question they need to answer. Keep it concise (2-4 sentences)."
 	}
 
 	var prompt strings.Builder
 	fmt.Fprintf(&prompt, `%s
 
-Automata Name: %s
-Automata Kind: %s
+Autopilot Name: %s
+Autopilot Kind: %s
 Event Type: %s`, intro, snapshot.Name, snapshot.Kind, event.Type)
 
 	if snapshot.CycleID != "" {
@@ -376,11 +376,11 @@ func notificationSubjectName(event NotificationEvent) string {
 			return ""
 		}
 		return dagRun.Name
-	case eventstore.KindAutomata:
-		if event.Automata == nil {
+	case eventstore.KindAutopilot:
+		if event.Autopilot == nil {
 			return ""
 		}
-		return event.Automata.Name
+		return event.Autopilot.Name
 	case eventstore.KindLLMUsage:
 		return ""
 	default:
@@ -400,13 +400,13 @@ func notificationStatusLabel(event NotificationEvent) string {
 			return string(event.Type)
 		}
 		return dagRun.Status.String()
-	case eventstore.KindAutomata:
+	case eventstore.KindAutopilot:
 		switch event.Type {
-		case eventstore.TypeAutomataNeedsInput:
+		case eventstore.TypeAutopilotNeedsInput:
 			return "needs_input"
-		case eventstore.TypeAutomataError:
+		case eventstore.TypeAutopilotError:
 			return "error"
-		case eventstore.TypeAutomataFinished:
+		case eventstore.TypeAutopilotFinished:
 			return "finished"
 		case eventstore.TypeDAGRunQueued, eventstore.TypeDAGRunRunning, eventstore.TypeDAGRunUpdated, eventstore.TypeDAGRunWaiting, eventstore.TypeDAGRunSucceeded, eventstore.TypeDAGRunFailed, eventstore.TypeDAGRunAborted, eventstore.TypeDAGRunRejected, eventstore.TypeLLMUsageRecorded:
 			return string(event.Type)
@@ -465,9 +465,9 @@ func cloneNotificationEvent(event NotificationEvent) NotificationEvent {
 		ObservedAt: event.ObservedAt,
 		DAGRun:     cloneNotificationStatus(notificationDAGRun(event)),
 	}
-	if event.Automata != nil {
-		snapshot := *event.Automata
-		cloned.Automata = &snapshot
+	if event.Autopilot != nil {
+		snapshot := *event.Autopilot
+		cloned.Autopilot = &snapshot
 	}
 	return cloned
 }
@@ -516,13 +516,13 @@ func notificationTextEmoji(event NotificationEvent) string {
 			return "\u2139\uFE0F"
 		}
 		return notificationEmoji(dagRun.Status)
-	case eventstore.KindAutomata:
+	case eventstore.KindAutopilot:
 		switch event.Type {
-		case eventstore.TypeAutomataFinished:
+		case eventstore.TypeAutopilotFinished:
 			return "\u2705"
-		case eventstore.TypeAutomataNeedsInput:
+		case eventstore.TypeAutopilotNeedsInput:
 			return "\u23F3"
-		case eventstore.TypeAutomataError:
+		case eventstore.TypeAutopilotError:
 			return "\u274C"
 		case eventstore.TypeDAGRunQueued, eventstore.TypeDAGRunRunning, eventstore.TypeDAGRunUpdated, eventstore.TypeDAGRunWaiting, eventstore.TypeDAGRunSucceeded, eventstore.TypeDAGRunFailed, eventstore.TypeDAGRunAborted, eventstore.TypeDAGRunRejected, eventstore.TypeLLMUsageRecorded:
 			return "\u2139\uFE0F"

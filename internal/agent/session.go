@@ -56,7 +56,7 @@ type SessionManager struct {
 	totalCost             float64
 	memoryStore           MemoryStore
 	dagName               string
-	automataName          string
+	autopilotName         string
 	sessionStore          SessionStore
 	parentSessionID       string
 	delegateTask          string
@@ -68,7 +68,7 @@ type SessionManager struct {
 	promptWaitInterval    time.Duration
 	allowedTools          []string
 	systemPromptExtra     string
-	automataRuntime       AutomataRuntime
+	autopilotRuntime      AutopilotRuntime
 }
 
 // SessionSnapshot is a point-in-time copy of the session state.
@@ -105,7 +105,7 @@ type SessionManagerConfig struct {
 	ThinkingEffort  llm.ThinkingEffort
 	MemoryStore     MemoryStore
 	DAGName         string
-	AutomataName    string
+	AutopilotName   string
 	SessionStore    SessionStore
 	// ParentSessionID links this session to its parent (non-empty = sub-session).
 	ParentSessionID string
@@ -128,8 +128,8 @@ type SessionManagerConfig struct {
 	AllowedTools []string
 	// SystemPromptExtra appends runtime-specific instructions to the generated system prompt.
 	SystemPromptExtra string
-	// AutomataRuntime exposes scheduler-owned workflow controls for Automata sessions.
-	AutomataRuntime AutomataRuntime
+	// AutopilotRuntime exposes scheduler-owned workflow controls for Autopilot sessions.
+	AutopilotRuntime AutopilotRuntime
 }
 
 // NewSessionManager creates a new SessionManager.
@@ -203,7 +203,7 @@ func NewSessionManager(cfg SessionManagerConfig) *SessionManager {
 		totalCost:             totalCost,
 		memoryStore:           cfg.MemoryStore,
 		dagName:               cfg.DAGName,
-		automataName:          cfg.AutomataName,
+		autopilotName:         cfg.AutopilotName,
 		sessionStore:          cfg.SessionStore,
 		parentSessionID:       cfg.ParentSessionID,
 		delegateTask:          cfg.DelegateTask,
@@ -214,7 +214,7 @@ func NewSessionManager(cfg SessionManagerConfig) *SessionManager {
 		promptWaitInterval:    promptWaitInterval,
 		allowedTools:          append([]string(nil), cfg.AllowedTools...),
 		systemPromptExtra:     cfg.SystemPromptExtra,
-		automataRuntime:       cfg.AutomataRuntime,
+		autopilotRuntime:      cfg.AutopilotRuntime,
 	}
 }
 
@@ -479,7 +479,7 @@ func (sm *SessionManager) GetSession() Session {
 		ID:              sm.id,
 		UserID:          sm.user.UserID,
 		DAGName:         sm.dagName,
-		AutomataName:    sm.automataName,
+		AutopilotName:   sm.autopilotName,
 		Title:           sm.title,
 		ParentSessionID: sm.parentSessionID,
 		DelegateTask:    sm.delegateTask,
@@ -510,7 +510,7 @@ func (sm *SessionManager) snapshotLocked() SessionSnapshot {
 			ID:              sm.id,
 			UserID:          sm.user.UserID,
 			DAGName:         sm.dagName,
-			AutomataName:    sm.automataName,
+			AutopilotName:   sm.autopilotName,
 			Title:           sm.title,
 			ParentSessionID: sm.parentSessionID,
 			DelegateTask:    sm.delegateTask,
@@ -853,7 +853,7 @@ func (sm *SessionManager) createLoop(provider llm.Provider, model string, histor
 		SessionStore:     sm.sessionStore,
 		Registry:         sm.registry,
 		WebSearch:        sm.webSearch,
-		AutomataRuntime:  sm.automataRuntime,
+		AutopilotRuntime: sm.autopilotRuntime,
 	})
 }
 
@@ -864,7 +864,7 @@ func (sm *SessionManager) buildRuntimeArtifacts() ([]*AgentTool, string) {
 		DAGsDir:               sm.environment.DAGsDir,
 		AllowedTools:          allowedTools,
 		RemoteContextResolver: sm.remoteContextResolver,
-		AutomataRuntime:       sm.automataRuntime,
+		AutopilotRuntime:      sm.autopilotRuntime,
 	})
 	systemPrompt := GenerateSystemPrompt(SystemPromptParams{
 		Env:    sm.environment,
@@ -886,13 +886,13 @@ func (sm *SessionManager) ApplyRuntimeOptions(opts *SessionRuntimeOptions) {
 	sm.mu.Lock()
 	sm.allowedTools = append([]string(nil), opts.AllowedTools...)
 	sm.systemPromptExtra = opts.SystemPromptExtra
-	sm.automataRuntime = opts.AutomataRuntime
+	sm.autopilotRuntime = opts.AutopilotRuntime
 	if opts.WorkingDir != "" {
 		sm.workingDir = opts.WorkingDir
 		sm.environment.WorkingDir = opts.WorkingDir
 	}
-	if opts.AutomataName != "" {
-		sm.automataName = opts.AutomataName
+	if opts.AutopilotName != "" {
+		sm.autopilotName = opts.AutopilotName
 	}
 	if opts.Soul != nil || opts.AllowClearSoul {
 		sm.soul = opts.Soul
@@ -902,7 +902,7 @@ func (sm *SessionManager) ApplyRuntimeOptions(opts *SessionRuntimeOptions) {
 
 	if loop != nil {
 		tools, systemPrompt := sm.buildRuntimeArtifacts()
-		loop.UpdateRuntime(tools, systemPrompt, sm.automataRuntime, sm.workingDir)
+		loop.UpdateRuntime(tools, systemPrompt, sm.autopilotRuntime, sm.workingDir)
 	}
 }
 
@@ -934,11 +934,11 @@ func (sm *SessionManager) loadMemory() MemoryContent {
 			sm.logger.Debug("failed to load DAG memory", "error", err, "dag_name", sm.dagName)
 		}
 	}
-	var automataMem string
-	if sm.automataName != "" {
-		automataMem, err = sm.memoryStore.LoadAutomataMemory(ctx, sm.automataName)
+	var autopilotMem string
+	if sm.autopilotName != "" {
+		autopilotMem, err = sm.memoryStore.LoadAutopilotMemory(ctx, sm.autopilotName)
 		if err != nil {
-			sm.logger.Debug("failed to load automata memory", "error", err, "automata_name", sm.automataName)
+			sm.logger.Debug("failed to load autopilot memory", "error", err, "autopilot_name", sm.autopilotName)
 		}
 	}
 	readOnly := false
@@ -946,13 +946,13 @@ func (sm *SessionManager) loadMemory() MemoryContent {
 		readOnly = roStore.MemoryReadOnly()
 	}
 	return MemoryContent{
-		GlobalMemory:   global,
-		DAGMemory:      dagMem,
-		DAGName:        sm.dagName,
-		AutomataMemory: automataMem,
-		AutomataName:   sm.automataName,
-		MemoryDir:      sm.memoryStore.MemoryDir(),
-		ReadOnly:       readOnly,
+		GlobalMemory:    global,
+		DAGMemory:       dagMem,
+		DAGName:         sm.dagName,
+		AutopilotMemory: autopilotMem,
+		AutopilotName:   sm.autopilotName,
+		MemoryDir:       sm.memoryStore.MemoryDir(),
+		ReadOnly:        readOnly,
 	}
 }
 

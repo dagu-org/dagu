@@ -41,8 +41,8 @@ export function buildLocationParams(filters: EventLogFilters): URLSearchParams {
   if (nextFilters.dagName) {
     params.set('dagName', nextFilters.dagName);
   }
-  if (nextFilters.automataName) {
-    params.set('automataName', nextFilters.automataName);
+  if (nextFilters.autopilotName) {
+    params.set('autopilotName', nextFilters.autopilotName);
   }
   if (nextFilters.dagRunId) {
     params.set('dagRunId', nextFilters.dagRunId);
@@ -94,8 +94,8 @@ export function parseLocationState(args: {
   if (params.has('dagName')) {
     next.dagName = params.get('dagName') || '';
   }
-  if (params.has('automataName')) {
-    next.automataName = params.get('automataName') || '';
+  if (params.has('autopilotName')) {
+    next.autopilotName = params.get('autopilotName') || '';
   }
   if (params.has('dagRunId')) {
     next.dagRunId = params.get('dagRunId') || '';
@@ -152,7 +152,7 @@ export function buildEventLogQuery(args: {
     paginationMode: ComponentsParametersEventLogPaginationMode.cursor,
     type: filters.type !== 'all' ? filters.type : undefined,
     dagName: filters.dagName || undefined,
-    automataName: filters.automataName || undefined,
+    autopilotName: filters.autopilotName || undefined,
     dagRunId: filters.dagRunId || undefined,
     attemptId: filters.attemptId || undefined,
     startTime: formatDateForApi(filters.fromDate, tzOffsetInSec),

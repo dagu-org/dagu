@@ -29,8 +29,8 @@ vi.mock('@/features/cockpit/components/DateKanbanList', () => ({
   DateKanbanList: () => <div data-testid="dag-runs-cockpit" />,
 }));
 
-vi.mock('@/features/cockpit/components/AutomataCockpit', () => ({
-  AutomataCockpit: () => <div data-testid="automata-cockpit" />,
+vi.mock('@/features/cockpit/components/AutopilotCockpit', () => ({
+  AutopilotCockpit: () => <div data-testid="autopilot-cockpit" />,
 }));
 
 function makeConfig(overrides: Partial<Config> = {}): Config {
@@ -51,7 +51,7 @@ function makeConfig(overrides: Partial<Config> = {}): Config {
     oidcButtonLabel: '',
     terminalEnabled: false,
     gitSyncEnabled: false,
-    automataEnabled: false,
+    autopilotEnabled: false,
     agentEnabled: true,
     updateAvailable: false,
     latestVersion: '',
@@ -114,29 +114,38 @@ describe('CockpitPage', () => {
     localStorage.clear();
   });
 
-  it('hides the Automata mode switch when Automata UI is disabled', () => {
-    renderPage(makeConfig({ automataEnabled: false }));
+  it('hides the Autopilot mode switch when Autopilot UI is disabled', () => {
+    renderPage(makeConfig({ autopilotEnabled: false }));
 
     expect(
-      screen.queryByRole('button', { name: 'Automata cockpit' })
+      screen.queryByRole('button', { name: 'Autopilot cockpit' })
     ).not.toBeInTheDocument();
     expect(screen.getByTestId('dag-runs-cockpit')).toBeInTheDocument();
   });
 
-  it('shows the Automata mode switch when Automata UI is enabled', () => {
-    renderPage(makeConfig({ automataEnabled: true }));
+  it('shows the Autopilot mode switch when Autopilot UI is enabled', () => {
+    renderPage(makeConfig({ autopilotEnabled: true }));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Automata cockpit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Autopilot cockpit' }));
 
-    expect(screen.getByTestId('automata-cockpit')).toBeInTheDocument();
+    expect(screen.getByTestId('autopilot-cockpit')).toBeInTheDocument();
   });
 
-  it('opens Automata mode from query params', () => {
+  it('opens Autopilot mode from query params', () => {
     renderPage(
-      makeConfig({ automataEnabled: true }),
+      makeConfig({ autopilotEnabled: true }),
+      '/cockpit?mode=autopilot&autopilot=builder'
+    );
+
+    expect(screen.getByTestId('autopilot-cockpit')).toBeInTheDocument();
+  });
+
+  it('opens Autopilot mode from legacy Automata query params', () => {
+    renderPage(
+      makeConfig({ autopilotEnabled: true }),
       '/cockpit?mode=automata&automata=builder'
     );
 
-    expect(screen.getByTestId('automata-cockpit')).toBeInTheDocument();
+    expect(screen.getByTestId('autopilot-cockpit')).toBeInTheDocument();
   });
 });

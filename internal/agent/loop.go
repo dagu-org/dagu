@@ -81,8 +81,8 @@ type LoopConfig struct {
 	Registry SubSessionRegistry
 	// WebSearch configures provider-native web search for requests.
 	WebSearch *llm.WebSearchRequest
-	// AutomataRuntime exposes workflow control methods for restricted Automata sessions.
-	AutomataRuntime AutomataRuntime
+	// AutopilotRuntime exposes workflow control methods for restricted Autopilot sessions.
+	AutopilotRuntime AutopilotRuntime
 	// OnTurnComplete is called after a queued message batch is successfully
 	// processed (processLLMRequest returned nil). For single-shot callers
 	// like the agent-step executor this is the signal to cancel the loop.
@@ -116,7 +116,7 @@ type Loop struct {
 	sessionStore       SessionStore
 	registry           SubSessionRegistry
 	webSearch          *llm.WebSearchRequest
-	automataRuntime    AutomataRuntime
+	autopilotRuntime   AutopilotRuntime
 	onTurnComplete     func()
 	activeTurn         bool
 	interruptRequested bool
@@ -151,7 +151,7 @@ func NewLoop(config LoopConfig) *Loop {
 		sessionStore:     config.SessionStore,
 		registry:         config.Registry,
 		webSearch:        config.WebSearch,
-		automataRuntime:  config.AutomataRuntime,
+		autopilotRuntime: config.AutopilotRuntime,
 		onTurnComplete:   config.OnTurnComplete,
 	}
 }
@@ -199,14 +199,14 @@ func (l *Loop) AppendExternalHistory(message llm.Message) {
 func (l *Loop) UpdateRuntime(
 	tools []*AgentTool,
 	systemPrompt string,
-	automataRuntime AutomataRuntime,
+	autopilotRuntime AutopilotRuntime,
 	workingDir string,
 ) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.tools = tools
 	l.systemPrompt = systemPrompt
-	l.automataRuntime = automataRuntime
+	l.autopilotRuntime = autopilotRuntime
 	if workingDir != "" {
 		l.workingDir = workingDir
 	}
@@ -538,7 +538,7 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 		SafeMode:         safeMode,
 		Role:             user.Role,
 		Delegate:         delegate,
-		AutomataRuntime:  l.automataRuntime,
+		AutopilotRuntime: l.autopilotRuntime,
 	}, input)
 
 	l.hooks.RunAfterToolExec(ctx, info, result)

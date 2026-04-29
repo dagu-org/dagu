@@ -230,7 +230,7 @@ function LicensedRoute({
   );
 }
 
-function AutomataCockpitRedirect({
+function AutopilotCockpitRedirect({
   enabled,
 }: {
   enabled: boolean;
@@ -240,8 +240,8 @@ function AutomataCockpitRedirect({
     return <Navigate to="/dags" replace />;
   }
   const target = name
-    ? `/cockpit?mode=automata&automata=${encodeURIComponent(name)}`
-    : '/cockpit?mode=automata';
+    ? `/cockpit?mode=autopilot&autopilot=${encodeURIComponent(name)}`
+    : '/cockpit?mode=autopilot';
   return <Navigate to={target} replace />;
 }
 
@@ -470,7 +470,7 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
     document.documentElement.style.backgroundColor = 'var(--background)';
   }, [theme]);
 
-  const automataFeatureEnabled = config.agentEnabled && config.automataEnabled;
+  const autopilotFeatureEnabled = config.agentEnabled && config.autopilotEnabled;
 
   return (
     <SWRConfig
@@ -576,18 +576,34 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
                                           element={<QueueDetailsPage />}
                                         />
                                         <Route
+                                          path="/autopilot"
+                                          element={
+                                            <AutopilotCockpitRedirect
+                                              enabled={autopilotFeatureEnabled}
+                                            />
+                                          }
+                                        />
+                                        <Route
+                                          path="/autopilot/:name"
+                                          element={
+                                            <AutopilotCockpitRedirect
+                                              enabled={autopilotFeatureEnabled}
+                                            />
+                                          }
+                                        />
+                                        <Route
                                           path="/automata"
                                           element={
-                                            <AutomataCockpitRedirect
-                                              enabled={automataFeatureEnabled}
+                                            <AutopilotCockpitRedirect
+                                              enabled={autopilotFeatureEnabled}
                                             />
                                           }
                                         />
                                         <Route
                                           path="/automata/:name"
                                           element={
-                                            <AutomataCockpitRedirect
-                                              enabled={automataFeatureEnabled}
+                                            <AutopilotCockpitRedirect
+                                              enabled={autopilotFeatureEnabled}
                                             />
                                           }
                                         />

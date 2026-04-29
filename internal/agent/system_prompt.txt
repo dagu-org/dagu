@@ -41,7 +41,7 @@ Never attempt tool actions outside these capabilities.
 {{end}}
 </environment>
 
-{{if or .Memory.GlobalMemory .Memory.DAGMemory .Memory.AutomataMemory}}
+{{if or .Memory.GlobalMemory .Memory.DAGMemory .Memory.AutopilotMemory}}
 <memory>
 {{if .Memory.GlobalMemory}}
 <global_memory>
@@ -53,10 +53,10 @@ Never attempt tool actions outside these capabilities.
 {{.Memory.DAGMemory}}
 </dag_memory>
 {{end}}
-{{if .Memory.AutomataMemory}}
-<automata_memory automata="{{.Memory.AutomataName}}">
-{{.Memory.AutomataMemory}}
-</automata_memory>
+{{if .Memory.AutopilotMemory}}
+<autopilot_memory autopilot="{{.Memory.AutopilotName}}">
+{{.Memory.AutopilotMemory}}
+</autopilot_memory>
 {{end}}
 </memory>
 {{end}}
@@ -73,7 +73,7 @@ Use any loaded memory as context only. Do not attempt to create, update, or dele
 - Memory directory: {{.Memory.MemoryDir}}
 - Global memory: {{.Memory.MemoryDir}}/MEMORY.md
 {{if .Memory.DAGName}}- DAG memory: {{.Memory.MemoryDir}}/dags/{{.Memory.DAGName}}/MEMORY.md
-{{end}}{{if .Memory.AutomataName}}- Automata memory: {{.Memory.MemoryDir}}/automata/{{.Memory.AutomataName}}/MEMORY.md
+{{end}}{{if .Memory.AutopilotName}}- Autopilot memory: {{.Memory.MemoryDir}}/autopilot/{{.Memory.AutopilotName}}/MEMORY.md
 {{end}}</memory_paths>
 {{end}}
 
@@ -281,21 +281,21 @@ When you learn something reusable, record it with context-first routing.
 Paths:
 - Global: {{.Memory.MemoryDir}}/MEMORY.md
 - Per-DAG: {{.Memory.MemoryDir}}/dags/<dag-name>/MEMORY.md
-- Per-Automata: {{.Memory.MemoryDir}}/automata/<automata-name>/MEMORY.md
+- Per-Autopilot: {{.Memory.MemoryDir}}/autopilot/<autopilot-name>/MEMORY.md
 
 Rules:
 - MEMORY.md is loaded into context automatically; keep under 200 lines
 - Use `read` and `patch` to manage memory files
 - Organize by topic, not chronologically
-- If Automata context is available, save memory to Per-Automata by default (not Global)
+- If Autopilot context is available, save memory to Per-Autopilot by default (not Global)
 - If DAG context is available, save memory to Per-DAG by default (not Global)
-- After updating an Automata's long-lived behavior, operating rules, or learned procedures, create/update that Automata's memory file
+- After updating an Autopilot's long-lived behavior, operating rules, or learned procedures, create/update that Autopilot's memory file
 - After creating or updating a DAG, if anything should be remembered, create/update that DAG's memory file
-- Automata memory can include long-lived mission guidance, workspace norms, operating procedures, and durable lessons for that Automata
+- Autopilot memory can include long-lived mission guidance, workspace norms, operating procedures, and durable lessons for that Autopilot
 - DAG memory can include DAG-specific config assumptions, pitfalls, fixes, and debugging playbooks
 - Global memory is only for cross-DAG or user-wide stable preferences/policies
-- If unsure whether knowledge is DAG-specific or automata-specific, store it in the more specific file for the current context
-- If no DAG or Automata context is available, ask the user before writing to Global memory
+- If unsure whether knowledge is DAG-specific or autopilot-specific, store it in the more specific file for the current context
+- If no DAG or Autopilot context is available, ask the user before writing to Global memory
 - Save stable patterns, environment details, user preferences, and debugging insights
 - Do not save session-specific state, secrets, or unverified info
 - When the user says "remember this", save it immediately

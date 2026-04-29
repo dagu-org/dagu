@@ -47,17 +47,17 @@ func TestListEventLogsBuildsFilterAndMapsResponse(t *testing.T) {
 					},
 				},
 				{
-					ID:              "evt-2",
-					SchemaVersion:   eventstore.SchemaVersion,
-					OccurredAt:      startTime.Add(3 * time.Hour),
-					RecordedAt:      startTime.Add(3*time.Hour + time.Minute),
-					Kind:            eventstore.KindAutomata,
-					Type:            eventstore.TypeAutomataNeedsInput,
-					SourceService:   eventstore.SourceServiceScheduler,
-					AutomataName:    "service_ops",
-					AutomataKind:    "service",
-					AutomataCycleID: "cycle-1",
-					Status:          "waiting",
+					ID:               "evt-2",
+					SchemaVersion:    eventstore.SchemaVersion,
+					OccurredAt:       startTime.Add(3 * time.Hour),
+					RecordedAt:       startTime.Add(3*time.Hour + time.Minute),
+					Kind:             eventstore.KindAutopilot,
+					Type:             eventstore.TypeAutopilotNeedsInput,
+					SourceService:    eventstore.SourceServiceScheduler,
+					AutopilotName:    "service_ops",
+					AutopilotKind:    "service",
+					AutopilotCycleID: "cycle-1",
+					Status:           "waiting",
 				},
 			},
 			NextCursor: "cursor-1",
@@ -128,12 +128,12 @@ func TestListEventLogsBuildsFilterAndMapsResponse(t *testing.T) {
 	assert.Equal(t, "dag.run.failed", okResp.Entries[0].Type)
 	require.NotNil(t, okResp.Entries[0].Data)
 	assert.Equal(t, "boom", (*okResp.Entries[0].Data)["reason"])
-	require.NotNil(t, okResp.Entries[1].AutomataName)
-	assert.Equal(t, "service_ops", *okResp.Entries[1].AutomataName)
-	require.NotNil(t, okResp.Entries[1].AutomataKind)
-	assert.Equal(t, "service", *okResp.Entries[1].AutomataKind)
-	require.NotNil(t, okResp.Entries[1].AutomataCycleId)
-	assert.Equal(t, "cycle-1", *okResp.Entries[1].AutomataCycleId)
+	require.NotNil(t, okResp.Entries[1].AutopilotName)
+	assert.Equal(t, "service_ops", *okResp.Entries[1].AutopilotName)
+	require.NotNil(t, okResp.Entries[1].AutopilotKind)
+	assert.Equal(t, "service", *okResp.Entries[1].AutopilotKind)
+	require.NotNil(t, okResp.Entries[1].AutopilotCycleId)
+	assert.Equal(t, "cycle-1", *okResp.Entries[1].AutopilotCycleId)
 	assert.Nil(t, okResp.Total)
 }
 
@@ -173,7 +173,7 @@ func TestListEventLogsSupportsOffsetCompatibilityPagination(t *testing.T) {
 	assert.Equal(t, total, *okResp.Total)
 }
 
-func TestListEventLogsBuildsAutomataFilter(t *testing.T) {
+func TestListEventLogsBuildsAutopilotFilter(t *testing.T) {
 	t.Parallel()
 
 	store := &mockEventStore{
@@ -187,23 +187,23 @@ func TestListEventLogsBuildsAutomataFilter(t *testing.T) {
 		frontendapi.WithEventService(eventstore.New(store)),
 	)
 
-	kind := "automata"
-	eventType := "automata.error"
-	automataName := "service_ops"
+	kind := "autopilot"
+	eventType := "autopilot.error"
+	autopilotName := "service_ops"
 	resp, err := api.ListEventLogs(context.Background(), apigen.ListEventLogsRequestObject{
 		Params: apigen.ListEventLogsParams{
-			Kind:         &kind,
-			Type:         &eventType,
-			AutomataName: &automataName,
+			Kind:          &kind,
+			Type:          &eventType,
+			AutopilotName: &autopilotName,
 		},
 	})
 	require.NoError(t, err)
 	_, ok := resp.(apigen.ListEventLogs200JSONResponse)
 	require.True(t, ok)
 	assert.Equal(t, eventstore.QueryFilter{
-		Kind:           eventstore.KindAutomata,
-		Type:           eventstore.TypeAutomataError,
-		AutomataName:   automataName,
+		Kind:           eventstore.KindAutopilot,
+		Type:           eventstore.TypeAutopilotError,
+		AutopilotName:  autopilotName,
 		Limit:          50,
 		PaginationMode: eventstore.QueryPaginationModeOffset,
 	}, store.lastFilter)

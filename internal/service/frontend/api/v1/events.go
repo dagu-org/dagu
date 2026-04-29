@@ -44,8 +44,8 @@ func (a *API) ListEventLogs(ctx context.Context, request api.ListEventLogsReques
 	if request.Params.AttemptId != nil {
 		filter.AttemptID = *request.Params.AttemptId
 	}
-	if request.Params.AutomataName != nil {
-		filter.AutomataName = *request.Params.AutomataName
+	if request.Params.AutopilotName != nil {
+		filter.AutopilotName = *request.Params.AutopilotName
 	}
 	if request.Params.SessionId != nil {
 		filter.SessionID = *request.Params.SessionId
@@ -142,14 +142,14 @@ func (a *API) ListEventLogs(ctx context.Context, request api.ListEventLogsReques
 		if e.AttemptID != "" {
 			entry.AttemptId = &e.AttemptID
 		}
-		if e.AutomataName != "" {
-			entry.AutomataName = &e.AutomataName
+		if e.AutopilotName != "" {
+			entry.AutopilotName = &e.AutopilotName
 		}
-		if e.AutomataKind != "" {
-			entry.AutomataKind = &e.AutomataKind
+		if e.AutopilotKind != "" {
+			entry.AutopilotKind = &e.AutopilotKind
 		}
-		if e.AutomataCycleID != "" {
-			entry.AutomataCycleId = &e.AutomataCycleID
+		if e.AutopilotCycleID != "" {
+			entry.AutopilotCycleId = &e.AutopilotCycleID
 		}
 		if e.SessionID != "" {
 			entry.SessionId = &e.SessionID

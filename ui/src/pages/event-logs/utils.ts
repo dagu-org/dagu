@@ -12,11 +12,11 @@ export function getEventTypeLabel(type: string, status?: string): string {
       return 'Waiting';
     case 'dag.run.rejected':
       return 'Rejected';
-    case 'automata.needs_input':
+    case 'autopilot.needs_input':
       return 'Needs input';
-    case 'automata.error':
+    case 'autopilot.error':
       return 'Error';
-    case 'automata.finished':
+    case 'autopilot.finished':
       return 'Finished';
     case 'llm.usage.recorded':
       return 'Usage recorded';
@@ -32,8 +32,8 @@ export function getKindLabel(kind: string): string {
   switch (kind) {
     case 'dag_run':
       return 'DAG run';
-    case 'automata':
-      return 'Automata';
+    case 'autopilot':
+      return 'Autopilot';
     case 'llm_usage':
       return 'LLM usage';
     default:
@@ -42,7 +42,7 @@ export function getKindLabel(kind: string): string {
 }
 
 export function getSubjectName(entry: EventLogEntry): string {
-  return entry.dagName || entry.automataName || entry.sessionId || '-';
+  return entry.dagName || entry.autopilotName || entry.sessionId || '-';
 }
 
 export function getContextLabel(entry: EventLogEntry): string {
@@ -50,8 +50,8 @@ export function getContextLabel(entry: EventLogEntry): string {
     const parts = [entry.dagRunId, entry.attemptId].filter(Boolean);
     return parts.length > 0 ? parts.join(' / ') : '-';
   }
-  if (entry.kind === 'automata') {
-    const parts = [entry.automataKind, entry.automataCycleId].filter(Boolean);
+  if (entry.kind === 'autopilot') {
+    const parts = [entry.autopilotKind, entry.autopilotCycleId].filter(Boolean);
     return parts.length > 0 ? parts.join(' / ') : '-';
   }
   const parts = [entry.model, entry.sessionId].filter(Boolean);
@@ -132,7 +132,7 @@ export function areEventLogFiltersEqual(
     a.kind === b.kind &&
     a.type === b.type &&
     a.dagName === b.dagName &&
-    a.automataName === b.automataName &&
+    a.autopilotName === b.autopilotName &&
     a.dagRunId === b.dagRunId &&
     a.attemptId === b.attemptId &&
     a.fromDate === b.fromDate &&

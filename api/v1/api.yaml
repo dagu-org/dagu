@@ -49,8 +49,8 @@ tags:
     description: "Git synchronization operations for DAGs"
   - name: "agent"
     description: "AI Agent configuration operations (admin only)"
-  - name: "automata"
-    description: "Automata workflow management operations"
+  - name: "autopilot"
+    description: "Autopilot workflow management operations"
   - name: "docs"
     description: "Document management operations"
   - name: "remote-nodes"
@@ -4384,13 +4384,13 @@ paths:
         - $ref: "#/components/parameters/RemoteNode"
         - name: kind
           in: query
-          description: "Filter by event kind (e.g., dag_run, automata, llm_usage)"
+          description: "Filter by event kind (e.g., dag_run, autopilot, llm_usage)"
           required: false
           schema:
             type: string
         - name: type
           in: query
-          description: "Filter by event type (e.g., dag.run.failed, automata.needs_input, llm.usage.recorded)"
+          description: "Filter by event type (e.g., dag.run.failed, autopilot.needs_input, llm.usage.recorded)"
           required: false
           schema:
             type: string
@@ -4412,9 +4412,9 @@ paths:
           required: false
           schema:
             type: string
-        - name: automataName
+        - name: autopilotName
           in: query
-          description: "Filter by automata name"
+          description: "Filter by autopilot name"
           required: false
           schema:
             type: string
@@ -6173,20 +6173,20 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /automata:
+  /autopilot:
     get:
-      summary: "List automata"
-      description: "Returns all Automata definitions with current lifecycle and display state."
-      operationId: "listAutomata"
+      summary: "List autopilot"
+      description: "Returns all Autopilot definitions with current lifecycle and display state."
+      operationId: "listAutopilot"
       tags:
-        - "automata"
+        - "autopilot"
       responses:
         "200":
-          description: "List of automata"
+          description: "List of autopilot"
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AutomataListResponse"
+                $ref: "#/components/schemas/AutopilotListResponse"
         "401":
           description: "Not authenticated"
           content:
@@ -6200,22 +6200,22 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /automata/{name}:
+  /autopilot/{name}:
     get:
-      summary: "Get automata detail"
-      description: "Returns Automata detail including definition, runtime state, transcript, and recent runs."
-      operationId: "getAutomata"
+      summary: "Get autopilot detail"
+      description: "Returns Autopilot detail including definition, runtime state, transcript, and recent runs."
+      operationId: "getAutopilot"
       tags:
-        - "automata"
+        - "autopilot"
       parameters:
-        - $ref: "#/components/parameters/AutomataName"
+        - $ref: "#/components/parameters/AutopilotName"
       responses:
         "200":
-          description: "Automata detail"
+          description: "Autopilot detail"
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AutomataDetailResponse"
+                $ref: "#/components/schemas/AutopilotDetailResponse"
         "401":
           description: "Not authenticated"
           content:
@@ -6223,7 +6223,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "404":
-          description: "Automata not found"
+          description: "Autopilot not found"
           content:
             application/json:
               schema:
@@ -6235,16 +6235,16 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
     delete:
-      summary: "Delete automata"
-      description: "Deletes an Automata definition and its runtime state."
-      operationId: "deleteAutomata"
+      summary: "Delete autopilot"
+      description: "Deletes an Autopilot definition and its runtime state."
+      operationId: "deleteAutopilot"
       tags:
-        - "automata"
+        - "autopilot"
       parameters:
-        - $ref: "#/components/parameters/AutomataName"
+        - $ref: "#/components/parameters/AutopilotName"
       responses:
         "204":
-          description: "Automata deleted"
+          description: "Autopilot deleted"
         "401":
           description: "Not authenticated"
           content:
@@ -6258,7 +6258,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "404":
-          description: "Automata not found"
+          description: "Autopilot not found"
           content:
             application/json:
               schema:
@@ -6270,22 +6270,22 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /automata/{name}/spec:
+  /autopilot/{name}/spec:
     get:
-      summary: "Get automata raw spec"
-      description: "Returns the raw YAML specification for an Automata."
-      operationId: "getAutomataSpec"
+      summary: "Get autopilot raw spec"
+      description: "Returns the raw YAML specification for an Autopilot."
+      operationId: "getAutopilotSpec"
       tags:
-        - "automata"
+        - "autopilot"
       parameters:
-        - $ref: "#/components/parameters/AutomataName"
+        - $ref: "#/components/parameters/AutopilotName"
       responses:
         "200":
-          description: "Automata raw spec"
+          description: "Autopilot raw spec"
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AutomataSpecResponse"
+                $ref: "#/components/schemas/AutopilotSpecResponse"
         "401":
           description: "Not authenticated"
           content:
@@ -6293,7 +6293,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "404":
-          description: "Automata not found"
+          description: "Autopilot not found"
           content:
             application/json:
               schema:
@@ -6305,22 +6305,22 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
     put:
-      summary: "Create or update automata spec"
-      description: "Creates or updates an Automata definition from a raw YAML spec."
-      operationId: "putAutomataSpec"
+      summary: "Create or update autopilot spec"
+      description: "Creates or updates an Autopilot definition from a raw YAML spec."
+      operationId: "putAutopilotSpec"
       tags:
-        - "automata"
+        - "autopilot"
       parameters:
-        - $ref: "#/components/parameters/AutomataName"
+        - $ref: "#/components/parameters/AutopilotName"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/AutomataSpecUpsertRequest"
+              $ref: "#/components/schemas/AutopilotSpecUpsertRequest"
       responses:
         "204":
-          description: "Automata spec saved"
+          description: "Autopilot spec saved"
         "400":
           description: "Invalid request"
           content:
@@ -6340,7 +6340,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "409":
-          description: "Automata controller is not ready"
+          description: "Autopilot controller is not ready"
           content:
             application/json:
               schema:
@@ -6352,23 +6352,23 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /automata/{name}/documents/{document}:
+  /autopilot/{name}/documents/{document}:
     get:
-      summary: "Get automata document"
-      description: "Returns an Automata-specific document content and resolved path. Supported documents are MEMORY.md and SOUL.md."
-      operationId: "getAutomataDocument"
+      summary: "Get autopilot document"
+      description: "Returns an Autopilot-specific document content and resolved path. Supported documents are MEMORY.md and SOUL.md."
+      operationId: "getAutopilotDocument"
       tags:
-        - "automata"
+        - "autopilot"
       parameters:
-        - $ref: "#/components/parameters/AutomataName"
-        - $ref: "#/components/parameters/AutomataDocument"
+        - $ref: "#/components/parameters/AutopilotName"
+        - $ref: "#/components/parameters/AutopilotDocument"
       responses:
         "200":
-          description: "Automata document"
+          description: "Autopilot document"
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AutomataDocumentResponse"
+                $ref: "#/components/schemas/AutopilotDocumentResponse"
         "401":
           description: "Not authenticated"
           content:
@@ -6376,7 +6376,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "404":
-          description: "Automata not found"
+          description: "Autopilot not found"
           content:
             application/json:
               schema:
@@ -6388,14 +6388,14 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
     put:
-      summary: "Update automata document"
-      description: "Creates or updates an Automata-specific document. Supported documents are MEMORY.md and SOUL.md."
-      operationId: "updateAutomataDocument"
+      summary: "Update autopilot document"
+      description: "Creates or updates an Autopilot-specific document. Supported documents are MEMORY.md and SOUL.md."
+      operationId: "updateAutopilotDocument"
       tags:
-        - "automata"
+        - "autopilot"
       parameters:
-        - $ref: "#/components/parameters/AutomataName"
-        - $ref: "#/components/parameters/AutomataDocument"
+        - $ref: "#/components/parameters/AutopilotName"
+        - $ref: "#/components/parameters/AutopilotDocument"
       requestBody:
         required: true
         content:
@@ -6404,11 +6404,11 @@ paths:
               $ref: "#/components/schemas/UpdateAgentMemoryRequest"
       responses:
         "200":
-          description: "Automata document saved"
+          description: "Autopilot document saved"
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AutomataDocumentResponse"
+                $ref: "#/components/schemas/AutopilotDocumentResponse"
         "400":
           description: "Invalid request"
           content:
@@ -6428,7 +6428,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "404":
-          description: "Automata not found"
+          description: "Autopilot not found"
           content:
             application/json:
               schema:
@@ -6440,17 +6440,17 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
     delete:
-      summary: "Clear automata document"
-      description: "Deletes an Automata-specific document. Supported documents are MEMORY.md and SOUL.md."
-      operationId: "deleteAutomataDocument"
+      summary: "Clear autopilot document"
+      description: "Deletes an Autopilot-specific document. Supported documents are MEMORY.md and SOUL.md."
+      operationId: "deleteAutopilotDocument"
       tags:
-        - "automata"
+        - "autopilot"
       parameters:
-        - $ref: "#/components/parameters/AutomataName"
-        - $ref: "#/components/parameters/AutomataDocument"
+        - $ref: "#/components/parameters/AutopilotName"
+        - $ref: "#/components/parameters/AutopilotDocument"
       responses:
         "204":
-          description: "Automata document cleared"
+          description: "Autopilot document cleared"
         "401":
           description: "Not authenticated"
           content:
@@ -6464,7 +6464,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "404":
-          description: "Automata not found"
+          description: "Autopilot not found"
           content:
             application/json:
               schema:
@@ -6476,22 +6476,22 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /automata/{name}/memory/reflect:
+  /autopilot/{name}/memory/reflect:
     post:
-      summary: "Reflect automata memory"
-      description: "Generates a proposed MEMORY.md update from the Automata's current session transcript. The proposal is not saved automatically."
-      operationId: "reflectAutomataMemory"
+      summary: "Reflect autopilot memory"
+      description: "Generates a proposed MEMORY.md update from the Autopilot's current session transcript. The proposal is not saved automatically."
+      operationId: "reflectAutopilotMemory"
       tags:
-        - "automata"
+        - "autopilot"
       parameters:
-        - $ref: "#/components/parameters/AutomataName"
+        - $ref: "#/components/parameters/AutopilotName"
       responses:
         "200":
-          description: "Automata memory reflection proposal"
+          description: "Autopilot memory reflection proposal"
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AutomataMemoryReflectionResponse"
+                $ref: "#/components/schemas/AutopilotMemoryReflectionResponse"
         "400":
           description: "Invalid request"
           content:
@@ -6511,7 +6511,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "404":
-          description: "Automata or agent feature not found"
+          description: "Autopilot or agent feature not found"
           content:
             application/json:
               schema:
@@ -6523,24 +6523,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /automata/{name}/start:
+  /autopilot/{name}/start:
     post:
-      summary: "Start automata task"
-      description: "Starts an Automata task cycle."
-      operationId: "startAutomata"
+      summary: "Start autopilot task"
+      description: "Starts an Autopilot task cycle."
+      operationId: "startAutopilot"
       tags:
-        - "automata"
+        - "autopilot"
       parameters:
-        - $ref: "#/components/parameters/AutomataName"
+        - $ref: "#/components/parameters/AutopilotName"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/AutomataStartRequest"
+              $ref: "#/components/schemas/AutopilotStartRequest"
       responses:
         "204":
-          description: "Automata started"
+          description: "Autopilot started"
         "400":
           description: "Invalid request"
           content:
@@ -6560,7 +6560,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "409":
-          description: "Automata controller is not ready"
+          description: "Autopilot controller is not ready"
           content:
             application/json:
               schema:
@@ -6572,18 +6572,18 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /automata/{name}/pause:
+  /autopilot/{name}/pause:
     post:
-      summary: "Pause automata"
-      description: "Pauses Automata orchestration without deleting the active task."
-      operationId: "pauseAutomata"
+      summary: "Pause autopilot"
+      description: "Pauses Autopilot orchestration without deleting the active task."
+      operationId: "pauseAutopilot"
       tags:
-        - "automata"
+        - "autopilot"
       parameters:
-        - $ref: "#/components/parameters/AutomataName"
+        - $ref: "#/components/parameters/AutopilotName"
       responses:
         "204":
-          description: "Automata paused"
+          description: "Autopilot paused"
         "400":
           description: "Invalid request"
           content:
@@ -6603,7 +6603,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "409":
-          description: "Automata controller is not ready"
+          description: "Autopilot controller is not ready"
           content:
             application/json:
               schema:
@@ -6615,18 +6615,18 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /automata/{name}/resume:
+  /autopilot/{name}/resume:
     post:
-      summary: "Resume automata"
-      description: "Resumes a paused Automata."
-      operationId: "resumeAutomata"
+      summary: "Resume autopilot"
+      description: "Resumes a paused Autopilot."
+      operationId: "resumeAutopilot"
       tags:
-        - "automata"
+        - "autopilot"
       parameters:
-        - $ref: "#/components/parameters/AutomataName"
+        - $ref: "#/components/parameters/AutopilotName"
       responses:
         "204":
-          description: "Automata resumed"
+          description: "Autopilot resumed"
         "400":
           description: "Invalid request"
           content:
@@ -6646,7 +6646,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "409":
-          description: "Automata controller is not ready"
+          description: "Autopilot controller is not ready"
           content:
             application/json:
               schema:
@@ -6658,21 +6658,21 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /automata/{name}/message:
+  /autopilot/{name}/message:
     post:
-      summary: "Send operator message to automata"
-      description: "Adds an operator message to the current Automata task."
-      operationId: "messageAutomata"
+      summary: "Send operator message to autopilot"
+      description: "Adds an operator message to the current Autopilot task."
+      operationId: "messageAutopilot"
       tags:
-        - "automata"
+        - "autopilot"
       parameters:
-        - $ref: "#/components/parameters/AutomataName"
+        - $ref: "#/components/parameters/AutopilotName"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/AutomataOperatorMessageRequest"
+              $ref: "#/components/schemas/AutopilotOperatorMessageRequest"
       responses:
         "204":
           description: "Operator message accepted"
@@ -6695,7 +6695,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "409":
-          description: "Automata controller is not ready"
+          description: "Autopilot controller is not ready"
           content:
             application/json:
               schema:
@@ -6707,28 +6707,28 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /automata/{name}/tasks:
+  /autopilot/{name}/tasks:
     post:
-      summary: "Create automata task"
-      description: "Creates a new persistent task template for an Automata."
-      operationId: "createAutomataTask"
+      summary: "Create autopilot task"
+      description: "Creates a new persistent task template for an Autopilot."
+      operationId: "createAutopilotTask"
       tags:
-        - "automata"
+        - "autopilot"
       parameters:
-        - $ref: "#/components/parameters/AutomataName"
+        - $ref: "#/components/parameters/AutopilotName"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/AutomataTaskCreateRequest"
+              $ref: "#/components/schemas/AutopilotTaskCreateRequest"
       responses:
         "200":
-          description: "Automata task created"
+          description: "Autopilot task created"
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AutomataTask"
+                $ref: "#/components/schemas/AutopilotTask"
         "400":
           description: "Invalid request"
           content:
@@ -6754,24 +6754,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /automata/{name}/tasks/reorder:
+  /autopilot/{name}/tasks/reorder:
     post:
-      summary: "Reorder automata tasks"
-      description: "Reorders the persistent task templates for an Automata."
-      operationId: "reorderAutomataTasks"
+      summary: "Reorder autopilot tasks"
+      description: "Reorders the persistent task templates for an Autopilot."
+      operationId: "reorderAutopilotTasks"
       tags:
-        - "automata"
+        - "autopilot"
       parameters:
-        - $ref: "#/components/parameters/AutomataName"
+        - $ref: "#/components/parameters/AutopilotName"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/AutomataTaskReorderRequest"
+              $ref: "#/components/schemas/AutopilotTaskReorderRequest"
       responses:
         "204":
-          description: "Automata tasks reordered"
+          description: "Autopilot tasks reordered"
         "400":
           description: "Invalid request"
           content:
@@ -6797,15 +6797,15 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /automata/{name}/tasks/{taskId}:
+  /autopilot/{name}/tasks/{taskId}:
     patch:
-      summary: "Update automata task"
-      description: "Updates an Automata task template description and, when requested, the current cycle task state."
-      operationId: "updateAutomataTask"
+      summary: "Update autopilot task"
+      description: "Updates an Autopilot task template description and, when requested, the current cycle task state."
+      operationId: "updateAutopilotTask"
       tags:
-        - "automata"
+        - "autopilot"
       parameters:
-        - $ref: "#/components/parameters/AutomataName"
+        - $ref: "#/components/parameters/AutopilotName"
         - name: "taskId"
           in: "path"
           required: true
@@ -6816,14 +6816,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/AutomataTaskUpdateRequest"
+              $ref: "#/components/schemas/AutopilotTaskUpdateRequest"
       responses:
         "200":
-          description: "Automata task updated"
+          description: "Autopilot task updated"
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AutomataTask"
+                $ref: "#/components/schemas/AutopilotTask"
         "400":
           description: "Invalid request"
           content:
@@ -6849,13 +6849,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
     delete:
-      summary: "Delete automata task"
-      description: "Deletes a persistent task template from an Automata."
-      operationId: "deleteAutomataTask"
+      summary: "Delete autopilot task"
+      description: "Deletes a persistent task template from an Autopilot."
+      operationId: "deleteAutopilotTask"
       tags:
-        - "automata"
+        - "autopilot"
       parameters:
-        - $ref: "#/components/parameters/AutomataName"
+        - $ref: "#/components/parameters/AutopilotName"
         - name: "taskId"
           in: "path"
           required: true
@@ -6863,7 +6863,7 @@ paths:
             type: string
       responses:
         "204":
-          description: "Automata task deleted"
+          description: "Autopilot task deleted"
         "400":
           description: "Invalid request"
           content:
@@ -6889,15 +6889,15 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /automata/{name}/response:
+  /autopilot/{name}/response:
     post:
-      summary: "Respond to automata prompt"
-      description: "Submits a human response for an Automata prompt."
-      operationId: "respondAutomata"
+      summary: "Respond to autopilot prompt"
+      description: "Submits a human response for an Autopilot prompt."
+      operationId: "respondAutopilot"
       tags:
-        - "automata"
+        - "autopilot"
       parameters:
-        - $ref: "#/components/parameters/AutomataName"
+        - $ref: "#/components/parameters/AutopilotName"
       requestBody:
         required: true
         content:
@@ -6932,24 +6932,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /automata/{name}/rename:
+  /autopilot/{name}/rename:
     post:
-      summary: "Rename automata"
-      description: "Renames an Automata definition and preserves its runtime transcript."
-      operationId: "renameAutomata"
+      summary: "Rename autopilot"
+      description: "Renames an Autopilot definition and preserves its runtime transcript."
+      operationId: "renameAutopilot"
       tags:
-        - "automata"
+        - "autopilot"
       parameters:
-        - $ref: "#/components/parameters/AutomataName"
+        - $ref: "#/components/parameters/AutopilotName"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/AutomataRenameRequest"
+              $ref: "#/components/schemas/AutopilotRenameRequest"
       responses:
         "204":
-          description: "Automata renamed"
+          description: "Autopilot renamed"
         "400":
           description: "Invalid request"
           content:
@@ -6969,13 +6969,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "404":
-          description: "Automata not found"
+          description: "Autopilot not found"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "409":
-          description: "Automata controller is not ready"
+          description: "Autopilot controller is not ready"
           content:
             application/json:
               schema:
@@ -6987,24 +6987,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /automata/{name}/duplicate:
+  /autopilot/{name}/duplicate:
     post:
-      summary: "Duplicate automata"
-      description: "Creates a new Automata definition by copying an existing one."
-      operationId: "duplicateAutomata"
+      summary: "Duplicate autopilot"
+      description: "Creates a new Autopilot definition by copying an existing one."
+      operationId: "duplicateAutopilot"
       tags:
-        - "automata"
+        - "autopilot"
       parameters:
-        - $ref: "#/components/parameters/AutomataName"
+        - $ref: "#/components/parameters/AutopilotName"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/AutomataDuplicateRequest"
+              $ref: "#/components/schemas/AutopilotDuplicateRequest"
       responses:
         "204":
-          description: "Automata duplicated"
+          description: "Autopilot duplicated"
         "400":
           description: "Invalid request"
           content:
@@ -7024,7 +7024,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "404":
-          description: "Automata not found"
+          description: "Autopilot not found"
           content:
             application/json:
               schema:
@@ -7036,18 +7036,18 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /automata/{name}/reset:
+  /autopilot/{name}/reset:
     post:
-      summary: "Reset automata state"
-      description: "Resets Automata runtime state back to idle while keeping the definition."
-      operationId: "resetAutomata"
+      summary: "Reset autopilot state"
+      description: "Resets Autopilot runtime state back to idle while keeping the definition."
+      operationId: "resetAutopilot"
       tags:
-        - "automata"
+        - "autopilot"
       parameters:
-        - $ref: "#/components/parameters/AutomataName"
+        - $ref: "#/components/parameters/AutopilotName"
       responses:
         "204":
-          description: "Automata state reset"
+          description: "Autopilot state reset"
         "400":
           description: "Invalid request"
           content:
@@ -7067,7 +7067,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "404":
-          description: "Automata not found"
+          description: "Autopilot not found"
           content:
             application/json:
               schema:
@@ -8457,22 +8457,22 @@ components:
       schema:
         type: string
 
-    AutomataName:
+    AutopilotName:
       name: name
       in: path
       required: true
-      description: "The Automata name"
+      description: "The Autopilot name"
       schema:
         type: string
         minLength: 1
 
-    AutomataDocument:
+    AutopilotDocument:
       name: document
       in: path
       required: true
-      description: "Automata document file name"
+      description: "Autopilot document file name"
       schema:
-        $ref: "#/components/schemas/AutomataDocument"
+        $ref: "#/components/schemas/AutopilotDocument"
 
   schemas:
     Tags:
@@ -8561,10 +8561,10 @@ components:
           description: "When the event was recorded by the producer"
         kind:
           type: string
-          description: "High-level event kind (e.g., dag_run, automata, llm_usage)"
+          description: "High-level event kind (e.g., dag_run, autopilot, llm_usage)"
         type:
           type: string
-          description: "Specific event type (e.g., dag.run.failed, automata.error)"
+          description: "Specific event type (e.g., dag.run.failed, autopilot.error)"
         sourceService:
           type: string
           description: "Service that produced the event"
@@ -8580,15 +8580,15 @@ components:
         attemptId:
           type: string
           description: "Attempt ID for DAG-run events"
-        automataName:
+        autopilotName:
           type: string
-          description: "Automata name for automata events"
-        automataKind:
+          description: "Autopilot name for autopilot events"
+        autopilotKind:
           type: string
-          description: "Automata kind for automata events"
-        automataCycleId:
+          description: "Autopilot kind for autopilot events"
+        autopilotCycleId:
           type: string
-          description: "Automata cycle ID for automata events"
+          description: "Autopilot cycle ID for autopilot events"
         sessionId:
           type: string
           description: "Session ID for LLM usage events"
@@ -9335,7 +9335,7 @@ components:
       type: string
       description: "How the DAG-run was initiated"
       enum:
-        - "automata"
+        - "autopilot"
         - "unknown"
         - "scheduler"
         - "manual"
@@ -9415,8 +9415,8 @@ components:
           type: string
           enum: ["active", "inactive", "unknown"]
           description: "Scheduler status (active = holds lock and scheduling)"
-        automataController:
-          $ref: "#/components/schemas/AutomataControllerStatus"
+        autopilotController:
+          $ref: "#/components/schemas/AutopilotControllerStatus"
         startedAt:
           type: string
           description: "RFC3339 timestamp when scheduler started"
@@ -9427,9 +9427,9 @@ components:
         - status
         - startedAt
 
-    AutomataControllerStatus:
+    AutopilotControllerStatus:
       type: object
-      description: "Scheduler-owned Automata controller readiness"
+      description: "Scheduler-owned Autopilot controller readiness"
       required:
         - state
       properties:
@@ -12232,39 +12232,39 @@ components:
         content:
           type: string
 
-    AutomataDocument:
+    AutopilotDocument:
       type: string
-      description: "Automata document file name"
+      description: "Autopilot document file name"
       enum:
         - MEMORY.md
         - SOUL.md
 
-    AutomataDocumentResponse:
+    AutopilotDocumentResponse:
       type: object
       required:
         - name
         - document
         - content
         - path
-      description: "Automata-specific document content"
+      description: "Autopilot-specific document content"
       properties:
         name:
           type: string
         document:
-          $ref: "#/components/schemas/AutomataDocument"
+          $ref: "#/components/schemas/AutopilotDocument"
         content:
           type: string
         path:
           type: string
 
-    AutomataMemoryReflectionResponse:
+    AutopilotMemoryReflectionResponse:
       type: object
       required:
         - name
         - currentContent
         - proposedContent
         - rationale
-      description: "Generated Automata MEMORY.md update proposal"
+      description: "Generated Autopilot MEMORY.md update proposal"
       properties:
         name:
           type: string
@@ -12675,9 +12675,9 @@ components:
         status:
           type: string
 
-    AutomataLifecycleState:
+    AutopilotLifecycleState:
       type: string
-      description: "Automata lifecycle state"
+      description: "Autopilot lifecycle state"
       enum:
         - idle
         - running
@@ -12685,30 +12685,30 @@ components:
         - paused
         - finished
 
-    AutomataKind:
+    AutopilotKind:
       type: string
-      description: "Compatibility Automata kind. Runtime behavior is configured through explicit fields such as resetOnFinish."
+      description: "Compatibility Autopilot kind. Runtime behavior is configured through explicit fields such as resetOnFinish."
       enum:
         - workflow
         - service
 
-    AutomataDisplayStatus:
+    AutopilotDisplayStatus:
       type: string
-      description: "User-facing Automata status"
+      description: "User-facing Autopilot status"
       enum:
         - idle
         - running
         - paused
         - finished
 
-    AutomataWaitingReason:
+    AutopilotWaitingReason:
       type: string
-      description: "Why an Automata is waiting"
+      description: "Why an Autopilot is waiting"
       enum:
         - human_input
         - dag_wait
 
-    AutomataAllowedDAGs:
+    AutopilotAllowedDAGs:
       type: object
       description: "Allowlisted DAG names and tags"
       properties:
@@ -12721,16 +12721,16 @@ components:
           items:
             type: string
 
-    AutomataTaskState:
+    AutopilotTaskState:
       type: string
       description: "Checklist task state"
       enum:
         - open
         - done
 
-    AutomataTask:
+    AutopilotTask:
       type: object
-      description: "Runtime current-cycle task for an Automata"
+      description: "Runtime current-cycle task for an Autopilot"
       required:
         - id
         - description
@@ -12741,7 +12741,7 @@ components:
         description:
           type: string
         state:
-          $ref: "#/components/schemas/AutomataTaskState"
+          $ref: "#/components/schemas/AutopilotTaskState"
         createdAt:
           type: string
           format: date-time
@@ -12758,9 +12758,9 @@ components:
         doneBy:
           type: string
 
-    AutomataTaskTemplate:
+    AutopilotTaskTemplate:
       type: object
-      description: "Persistent task template for an Automata"
+      description: "Persistent task template for an Autopilot"
       required:
         - id
         - description
@@ -12780,9 +12780,9 @@ components:
         updatedBy:
           type: string
 
-    AutomataAgentConfig:
+    AutopilotAgentConfig:
       type: object
-      description: "Agent runtime configuration for an Automata definition"
+      description: "Agent runtime configuration for an Autopilot definition"
       properties:
         model:
           type: string
@@ -12791,9 +12791,9 @@ components:
         safeMode:
           type: boolean
 
-    AutomataDefinition:
+    AutopilotDefinition:
       type: object
-      description: "Automata definition"
+      description: "Autopilot definition"
       required:
         - name
         - kind
@@ -12801,7 +12801,7 @@ components:
         name:
           type: string
         kind:
-          $ref: "#/components/schemas/AutomataKind"
+          $ref: "#/components/schemas/AutopilotKind"
         nickname:
           type: string
         iconUrl:
@@ -12825,15 +12825,15 @@ components:
           items:
             type: string
         allowedDAGs:
-          $ref: "#/components/schemas/AutomataAllowedDAGs"
+          $ref: "#/components/schemas/AutopilotAllowedDAGs"
         agent:
-          $ref: "#/components/schemas/AutomataAgentConfig"
+          $ref: "#/components/schemas/AutopilotAgentConfig"
         disabled:
           type: boolean
 
-    AutomataPrompt:
+    AutopilotPrompt:
       type: object
-      description: "Pending human prompt for an Automata"
+      description: "Pending human prompt for an Autopilot"
       required:
         - id
         - question
@@ -12855,9 +12855,9 @@ components:
           type: string
           format: date-time
 
-    AutomataPromptResponse:
+    AutopilotPromptResponse:
       type: object
-      description: "Recorded human response for an Automata prompt"
+      description: "Recorded human response for an Autopilot prompt"
       required:
         - promptId
         - respondedAt
@@ -12874,9 +12874,9 @@ components:
           type: string
           format: date-time
 
-    AutomataPendingTurnMessage:
+    AutopilotPendingTurnMessage:
       type: object
-      description: "Queued message to be delivered on the next Automata turn"
+      description: "Queued message to be delivered on the next Autopilot turn"
       required:
         - id
         - kind
@@ -12893,7 +12893,7 @@ components:
           type: string
           format: date-time
 
-    AutomataRunRef:
+    AutopilotRunRef:
       type: object
       description: "Reference to a tracked child DAG run"
       required:
@@ -12905,9 +12905,9 @@ components:
         id:
           type: string
 
-    AutomataRunSummary:
+    AutopilotRunSummary:
       type: object
-      description: "Summary of a child DAG run launched by an Automata"
+      description: "Summary of a child DAG run launched by an Autopilot"
       required:
         - name
         - dagRunId
@@ -12931,9 +12931,9 @@ components:
         error:
           type: string
 
-    AutomataAllowedDAGInfo:
+    AutopilotAllowedDAGInfo:
       type: object
-      description: "Resolved DAG allowed in the current Automata"
+      description: "Resolved DAG allowed in the current Autopilot"
       required:
         - name
       properties:
@@ -12946,16 +12946,16 @@ components:
           items:
             type: string
 
-    AutomataState:
+    AutopilotState:
       type: object
-      description: "Current runtime state for an Automata"
+      description: "Current runtime state for an Autopilot"
       required:
         - state
       properties:
         state:
-          $ref: "#/components/schemas/AutomataLifecycleState"
+          $ref: "#/components/schemas/AutopilotLifecycleState"
         displayStatus:
-          $ref: "#/components/schemas/AutomataDisplayStatus"
+          $ref: "#/components/schemas/AutopilotDisplayStatus"
         busy:
           type: boolean
         needsInput:
@@ -12975,25 +12975,25 @@ components:
         tasks:
           type: array
           items:
-            $ref: "#/components/schemas/AutomataTask"
+            $ref: "#/components/schemas/AutopilotTask"
         sessionId:
           type: string
         currentRunRef:
-          $ref: "#/components/schemas/AutomataRunRef"
+          $ref: "#/components/schemas/AutopilotRunRef"
         lastRunRef:
-          $ref: "#/components/schemas/AutomataRunRef"
+          $ref: "#/components/schemas/AutopilotRunRef"
         currentCycleId:
           type: string
         waitingReason:
-          $ref: "#/components/schemas/AutomataWaitingReason"
+          $ref: "#/components/schemas/AutopilotWaitingReason"
         pendingPrompt:
-          $ref: "#/components/schemas/AutomataPrompt"
+          $ref: "#/components/schemas/AutopilotPrompt"
         pendingResponse:
-          $ref: "#/components/schemas/AutomataPromptResponse"
+          $ref: "#/components/schemas/AutopilotPromptResponse"
         pendingTurnMessages:
           type: array
           items:
-            $ref: "#/components/schemas/AutomataPendingTurnMessage"
+            $ref: "#/components/schemas/AutopilotPendingTurnMessage"
         startRequestedAt:
           type: string
           format: date-time
@@ -13019,9 +13019,9 @@ components:
         lastError:
           type: string
 
-    AutomataSummary:
+    AutopilotSummary:
       type: object
-      description: "Summary row for an Automata"
+      description: "Summary row for an Autopilot"
       required:
         - name
         - kind
@@ -13030,7 +13030,7 @@ components:
         name:
           type: string
         kind:
-          $ref: "#/components/schemas/AutomataKind"
+          $ref: "#/components/schemas/AutopilotKind"
         nickname:
           type: string
         iconUrl:
@@ -13050,9 +13050,9 @@ components:
         instruction:
           type: string
         state:
-          $ref: "#/components/schemas/AutomataLifecycleState"
+          $ref: "#/components/schemas/AutopilotLifecycleState"
         displayStatus:
-          $ref: "#/components/schemas/AutomataDisplayStatus"
+          $ref: "#/components/schemas/AutopilotDisplayStatus"
         busy:
           type: boolean
         needsInput:
@@ -13060,7 +13060,7 @@ components:
         disabled:
           type: boolean
         currentRun:
-          $ref: "#/components/schemas/AutomataRunSummary"
+          $ref: "#/components/schemas/AutopilotRunSummary"
         openTaskCount:
           type: integer
         doneTaskCount:
@@ -13070,99 +13070,99 @@ components:
         lastUpdatedAt:
           type: string
           format: date-time
-        automataController:
-          $ref: "#/components/schemas/AutomataControllerStatus"
+        autopilotController:
+          $ref: "#/components/schemas/AutopilotControllerStatus"
 
-    AutomataListResponse:
+    AutopilotListResponse:
       type: object
-      description: "List of Automata"
+      description: "List of Autopilot"
       required:
-        - automata
+        - autopilot
       properties:
-        automata:
+        autopilot:
           type: array
           items:
-            $ref: "#/components/schemas/AutomataSummary"
+            $ref: "#/components/schemas/AutopilotSummary"
 
-    AutomataDetailResponse:
+    AutopilotDetailResponse:
       type: object
-      description: "Automata detail response"
+      description: "Autopilot detail response"
       required:
         - definition
         - state
         - allowedDags
       properties:
         definition:
-          $ref: "#/components/schemas/AutomataDefinition"
+          $ref: "#/components/schemas/AutopilotDefinition"
         state:
-          $ref: "#/components/schemas/AutomataState"
+          $ref: "#/components/schemas/AutopilotState"
         allowedDags:
           type: array
           items:
-            $ref: "#/components/schemas/AutomataAllowedDAGInfo"
+            $ref: "#/components/schemas/AutopilotAllowedDAGInfo"
         taskTemplates:
           type: array
           items:
-            $ref: "#/components/schemas/AutomataTaskTemplate"
+            $ref: "#/components/schemas/AutopilotTaskTemplate"
         currentRun:
-          $ref: "#/components/schemas/AutomataRunSummary"
+          $ref: "#/components/schemas/AutopilotRunSummary"
         recentRuns:
           type: array
           items:
-            $ref: "#/components/schemas/AutomataRunSummary"
+            $ref: "#/components/schemas/AutopilotRunSummary"
         messages:
           type: array
           items:
             $ref: "#/components/schemas/AgentMessage"
-        automataController:
-          $ref: "#/components/schemas/AutomataControllerStatus"
+        autopilotController:
+          $ref: "#/components/schemas/AutopilotControllerStatus"
 
-    AutomataSpecResponse:
+    AutopilotSpecResponse:
       type: object
-      description: "Raw Automata YAML spec"
+      description: "Raw Autopilot YAML spec"
       required:
         - spec
       properties:
         spec:
           type: string
 
-    AutomataSpecUpsertRequest:
+    AutopilotSpecUpsertRequest:
       type: object
-      description: "Request body for creating or updating an Automata from raw YAML"
+      description: "Request body for creating or updating an Autopilot from raw YAML"
       required:
         - spec
       properties:
         spec:
           type: string
 
-    AutomataStartRequest:
+    AutopilotStartRequest:
       type: object
-      description: "Request body for starting an Automata task"
+      description: "Request body for starting an Autopilot task"
       properties:
         instruction:
           type: string
 
-    AutomataTaskCreateRequest:
+    AutopilotTaskCreateRequest:
       type: object
-      description: "Request body for creating an Automata checklist task"
+      description: "Request body for creating an Autopilot checklist task"
       required:
         - description
       properties:
         description:
           type: string
 
-    AutomataTaskUpdateRequest:
+    AutopilotTaskUpdateRequest:
       type: object
-      description: "Request body for updating an Automata checklist task"
+      description: "Request body for updating an Autopilot checklist task"
       properties:
         description:
           type: string
         done:
           type: boolean
 
-    AutomataTaskReorderRequest:
+    AutopilotTaskReorderRequest:
       type: object
-      description: "Request body for reordering Automata checklist tasks"
+      description: "Request body for reordering Autopilot checklist tasks"
       required:
         - taskIds
       properties:
@@ -13171,7 +13171,7 @@ components:
           items:
             type: string
 
-    AutomataOperatorMessageRequest:
+    AutopilotOperatorMessageRequest:
       type: object
       description: "Request body for an operator message"
       required:
@@ -13180,18 +13180,18 @@ components:
         message:
           type: string
 
-    AutomataRenameRequest:
+    AutopilotRenameRequest:
       type: object
-      description: "Request body for renaming an Automata"
+      description: "Request body for renaming an Autopilot"
       required:
         - newName
       properties:
         newName:
           type: string
 
-    AutomataDuplicateRequest:
+    AutopilotDuplicateRequest:
       type: object
-      description: "Request body for duplicating an Automata"
+      description: "Request body for duplicating an Autopilot"
       required:
         - newName
       properties:

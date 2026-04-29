@@ -143,7 +143,7 @@ export function createDefaultEventLogFilters(
     kind: 'all',
     type: 'all',
     dagName: '',
-    automataName: '',
+    autopilotName: '',
     dagRunId: '',
     attemptId: '',
     fromDate: dates.from,

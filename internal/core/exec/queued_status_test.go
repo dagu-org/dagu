@@ -27,12 +27,12 @@ func TestPreservedQueueTriggerType(t *testing.T) {
 			want: core.TriggerTypeCatchUp,
 		},
 		{
-			name: "QueuedAutomata",
+			name: "QueuedAutopilot",
 			status: &DAGRunStatus{
 				Status:      core.Queued,
-				TriggerType: core.TriggerTypeAutomata,
+				TriggerType: core.TriggerTypeAutopilot,
 			},
-			want: core.TriggerTypeAutomata,
+			want: core.TriggerTypeAutopilot,
 		},
 		{
 			name: "QueuedManual",
@@ -43,10 +43,10 @@ func TestPreservedQueueTriggerType(t *testing.T) {
 			want: core.TriggerTypeUnknown,
 		},
 		{
-			name: "FinishedAutomata",
+			name: "FinishedAutopilot",
 			status: &DAGRunStatus{
 				Status:      core.Succeeded,
-				TriggerType: core.TriggerTypeAutomata,
+				TriggerType: core.TriggerTypeAutopilot,
 			},
 			want: core.TriggerTypeUnknown,
 		},

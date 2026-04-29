@@ -157,14 +157,14 @@ func TestLoadDAGMemory(t *testing.T) {
 	})
 }
 
-func TestLoadAutomataMemory(t *testing.T) {
+func TestLoadAutopilotMemory(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
 	t.Run("no file returns empty", func(t *testing.T) {
 		t.Parallel()
 		store := newTestStore(t)
-		content, err := store.LoadAutomataMemory(ctx, "queue_worker")
+		content, err := store.LoadAutopilotMemory(ctx, "queue_worker")
 		require.NoError(t, err)
 		assert.Empty(t, content)
 	})
@@ -172,23 +172,40 @@ func TestLoadAutomataMemory(t *testing.T) {
 	t.Run("reads existing file", func(t *testing.T) {
 		t.Parallel()
 		store := newTestStore(t)
-		expected := "# Automata Memory\n\nKeep the service concise."
-		automataDir := filepath.Join(store.baseDir, automataSubDir, "queue_worker")
-		require.NoError(t, os.MkdirAll(automataDir, 0750))
-		writeTestFile(t, filepath.Join(automataDir, memoryFileName), expected)
+		expected := "# Autopilot Memory\n\nKeep the service concise."
+		autopilotDir := filepath.Join(store.baseDir, autopilotSubDir, "queue_worker")
+		require.NoError(t, os.MkdirAll(autopilotDir, 0750))
+		writeTestFile(t, filepath.Join(autopilotDir, memoryFileName), expected)
 
-		content, err := store.LoadAutomataMemory(ctx, "queue_worker")
+		content, err := store.LoadAutopilotMemory(ctx, "queue_worker")
 		require.NoError(t, err)
 		assert.Equal(t, expected, content)
 	})
 
-	t.Run("rejects invalid automata name", func(t *testing.T) {
+	t.Run("falls back to legacy automata directory", func(t *testing.T) {
+		t.Parallel()
+		store := newTestStore(t)
+		expected := "# Legacy Memory\n\nStill available after rename."
+		legacyDir := filepath.Join(store.baseDir, legacyAutopilotSubDir, "queue_worker")
+		require.NoError(t, os.MkdirAll(legacyDir, 0o750))
+		writeTestFile(t, filepath.Join(legacyDir, memoryFileName), expected)
+
+		content, err := store.LoadAutopilotMemory(ctx, "queue_worker")
+		require.NoError(t, err)
+		assert.Equal(t, expected, content)
+
+		path, err := store.AutopilotMemoryPath("queue_worker")
+		require.NoError(t, err)
+		assert.Equal(t, filepath.Join(legacyDir, memoryFileName), path)
+	})
+
+	t.Run("rejects invalid autopilot name", func(t *testing.T) {
 		t.Parallel()
 		store := newTestStore(t)
 
-		_, err := store.LoadAutomataMemory(ctx, "queue-worker")
+		_, err := store.LoadAutopilotMemory(ctx, "queue-worker")
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid automataName")
+		assert.Contains(t, err.Error(), "invalid autopilotName")
 	})
 }
 
@@ -254,31 +271,31 @@ func TestSaveDAGMemory(t *testing.T) {
 	})
 }
 
-func TestSaveAutomataMemory(t *testing.T) {
+func TestSaveAutopilotMemory(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
 	t.Run("creates file and parent dirs", func(t *testing.T) {
 		t.Parallel()
 		store := newTestStore(t)
-		content := "# Automata Memory\n\nFollow the standing instruction."
-		require.NoError(t, store.SaveAutomataMemory(ctx, "queue_worker", content))
+		content := "# Autopilot Memory\n\nFollow the standing instruction."
+		require.NoError(t, store.SaveAutopilotMemory(ctx, "queue_worker", content))
 
-		data, err := os.ReadFile(store.automataMemoryPath("queue_worker"))
+		data, err := os.ReadFile(store.autopilotMemoryPath("queue_worker"))
 		require.NoError(t, err)
 		assert.Equal(t, content, string(data))
 	})
 
-	t.Run("rejects invalid automata name", func(t *testing.T) {
+	t.Run("rejects invalid autopilot name", func(t *testing.T) {
 		t.Parallel()
 		store := newTestStore(t)
-		err := store.SaveAutomataMemory(ctx, "queue-worker", "bad")
+		err := store.SaveAutopilotMemory(ctx, "queue-worker", "bad")
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid automataName")
+		assert.Contains(t, err.Error(), "invalid autopilotName")
 	})
 }
 
-func TestAutomataDocuments(t *testing.T) {
+func TestAutopilotDocuments(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
@@ -286,24 +303,42 @@ func TestAutomataDocuments(t *testing.T) {
 		t.Parallel()
 		store := newTestStore(t)
 		content := "# Soul\n\nBe precise."
-		require.NoError(t, store.SaveAutomataDocument(ctx, "queue_worker", soulFileName, content))
+		require.NoError(t, store.SaveAutopilotDocument(ctx, "queue_worker", soulFileName, content))
 
-		loaded, err := store.LoadAutomataDocument(ctx, "queue_worker", soulFileName)
+		loaded, err := store.LoadAutopilotDocument(ctx, "queue_worker", soulFileName)
 		require.NoError(t, err)
 		assert.Equal(t, content, loaded)
 
-		path, err := store.AutomataDocumentPath("queue_worker", soulFileName)
+		path, err := store.AutopilotDocumentPath("queue_worker", soulFileName)
 		require.NoError(t, err)
-		assert.Equal(t, filepath.Join(store.baseDir, automataSubDir, "queue_worker", soulFileName), path)
+		assert.Equal(t, filepath.Join(store.baseDir, autopilotSubDir, "queue_worker", soulFileName), path)
+	})
+
+	t.Run("preserves legacy document location when it already exists", func(t *testing.T) {
+		t.Parallel()
+		store := newTestStore(t)
+		legacyDir := filepath.Join(store.baseDir, legacyAutopilotSubDir, "queue_worker")
+		require.NoError(t, os.MkdirAll(legacyDir, 0o750))
+		writeTestFile(t, filepath.Join(legacyDir, soulFileName), "old")
+
+		require.NoError(t, store.SaveAutopilotDocument(ctx, "queue_worker", soulFileName, "new"))
+
+		path, err := store.AutopilotDocumentPath("queue_worker", soulFileName)
+		require.NoError(t, err)
+		assert.Equal(t, filepath.Join(legacyDir, soulFileName), path)
+
+		data, err := os.ReadFile(path)
+		require.NoError(t, err)
+		assert.Equal(t, "new", string(data))
 	})
 
 	t.Run("rejects unsupported document", func(t *testing.T) {
 		t.Parallel()
 		store := newTestStore(t)
 
-		err := store.SaveAutomataDocument(ctx, "queue_worker", "PROMPT.md", "bad")
+		err := store.SaveAutopilotDocument(ctx, "queue_worker", "PROMPT.md", "bad")
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid automata document")
+		assert.Contains(t, err.Error(), "invalid autopilot document")
 	})
 }
 
@@ -315,13 +350,13 @@ func TestMemoryDir(t *testing.T) {
 	assert.Equal(t, filepath.Join(dir, agentMemoryDir), store.MemoryDir())
 }
 
-func TestAutomataMemoryPath(t *testing.T) {
+func TestAutopilotMemoryPath(t *testing.T) {
 	t.Parallel()
 
 	store := newTestStore(t)
-	path, err := store.AutomataMemoryPath("queue_worker")
+	path, err := store.AutopilotMemoryPath("queue_worker")
 	require.NoError(t, err)
-	assert.Equal(t, filepath.Join(store.baseDir, automataSubDir, "queue_worker", memoryFileName), path)
+	assert.Equal(t, filepath.Join(store.baseDir, autopilotSubDir, "queue_worker", memoryFileName), path)
 }
 
 func TestListDAGMemories(t *testing.T) {
@@ -364,34 +399,34 @@ func TestListDAGMemories(t *testing.T) {
 	})
 }
 
-func TestDeleteAutomataMemory(t *testing.T) {
+func TestDeleteAutopilotMemory(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
 	t.Run("removes file and directory", func(t *testing.T) {
 		t.Parallel()
 		store := newTestStore(t)
-		require.NoError(t, store.SaveAutomataMemory(ctx, "queue_worker", "remember this"))
+		require.NoError(t, store.SaveAutopilotMemory(ctx, "queue_worker", "remember this"))
 
-		require.NoError(t, store.DeleteAutomataMemory(ctx, "queue_worker"))
+		require.NoError(t, store.DeleteAutopilotMemory(ctx, "queue_worker"))
 
-		_, err := os.Stat(filepath.Join(store.baseDir, automataSubDir, "queue_worker"))
+		_, err := os.Stat(filepath.Join(store.baseDir, autopilotSubDir, "queue_worker"))
 		assert.True(t, os.IsNotExist(err))
 	})
 
 	t.Run("keeps soul document", func(t *testing.T) {
 		t.Parallel()
 		store := newTestStore(t)
-		require.NoError(t, store.SaveAutomataMemory(ctx, "queue_worker", "remember this"))
-		require.NoError(t, store.SaveAutomataDocument(ctx, "queue_worker", soulFileName, "be precise"))
+		require.NoError(t, store.SaveAutopilotMemory(ctx, "queue_worker", "remember this"))
+		require.NoError(t, store.SaveAutopilotDocument(ctx, "queue_worker", soulFileName, "be precise"))
 
-		require.NoError(t, store.DeleteAutomataMemory(ctx, "queue_worker"))
+		require.NoError(t, store.DeleteAutopilotMemory(ctx, "queue_worker"))
 
-		memory, err := store.LoadAutomataMemory(ctx, "queue_worker")
+		memory, err := store.LoadAutopilotMemory(ctx, "queue_worker")
 		require.NoError(t, err)
 		assert.Empty(t, memory)
 
-		soul, err := store.LoadAutomataDocument(ctx, "queue_worker", soulFileName)
+		soul, err := store.LoadAutopilotDocument(ctx, "queue_worker", soulFileName)
 		require.NoError(t, err)
 		assert.Equal(t, "be precise", soul)
 	})
@@ -550,12 +585,12 @@ func TestCacheInvalidation(t *testing.T) {
 		assert.False(t, found)
 	})
 
-	t.Run("missing automata memory returns empty with cache", func(t *testing.T) {
+	t.Run("missing autopilot memory returns empty with cache", func(t *testing.T) {
 		t.Parallel()
 		cache := fileutil.NewCache[string]("memory_test", 10, time.Hour)
 		store := newTestStoreWithOptions(t, WithFileCache(cache))
 
-		content, err := store.LoadAutomataMemory(ctx, "queue_worker")
+		content, err := store.LoadAutopilotMemory(ctx, "queue_worker")
 		require.NoError(t, err)
 		assert.Empty(t, content)
 	})

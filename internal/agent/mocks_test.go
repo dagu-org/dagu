@@ -360,15 +360,15 @@ func (m *mockSessionStore) HasSession(id string) bool {
 var _ SessionStore = (*mockSessionStore)(nil)
 
 type mockMemoryStore struct {
-	global   string
-	dag      map[string]string
-	automata map[string]string
+	global    string
+	dag       map[string]string
+	autopilot map[string]string
 }
 
 func newMockMemoryStore() *mockMemoryStore {
 	return &mockMemoryStore{
-		dag:      make(map[string]string),
-		automata: make(map[string]string),
+		dag:       make(map[string]string),
+		autopilot: make(map[string]string),
 	}
 }
 
@@ -385,8 +385,8 @@ func (m *mockMemoryStore) SaveGlobalMemory(_ context.Context, content string) er
 	return nil
 }
 
-func (m *mockMemoryStore) LoadAutomataMemory(_ context.Context, automataName string) (string, error) {
-	return m.automata[automataName], nil
+func (m *mockMemoryStore) LoadAutopilotMemory(_ context.Context, autopilotName string) (string, error) {
+	return m.autopilot[autopilotName], nil
 }
 
 func (m *mockMemoryStore) SaveDAGMemory(_ context.Context, dagName string, content string) error {
@@ -394,8 +394,8 @@ func (m *mockMemoryStore) SaveDAGMemory(_ context.Context, dagName string, conte
 	return nil
 }
 
-func (m *mockMemoryStore) SaveAutomataMemory(_ context.Context, automataName string, content string) error {
-	m.automata[automataName] = content
+func (m *mockMemoryStore) SaveAutopilotMemory(_ context.Context, autopilotName string, content string) error {
+	m.autopilot[autopilotName] = content
 	return nil
 }
 
@@ -403,8 +403,8 @@ func (m *mockMemoryStore) MemoryDir() string {
 	return "/tmp/mock-memory"
 }
 
-func (m *mockMemoryStore) AutomataMemoryPath(automataName string) (string, error) {
-	return "/tmp/mock-memory/automata/" + automataName + "/MEMORY.md", nil
+func (m *mockMemoryStore) AutopilotMemoryPath(autopilotName string) (string, error) {
+	return "/tmp/mock-memory/autopilot/" + autopilotName + "/MEMORY.md", nil
 }
 
 func (m *mockMemoryStore) ListDAGMemories(_ context.Context) ([]string, error) {
@@ -425,8 +425,8 @@ func (m *mockMemoryStore) DeleteDAGMemory(_ context.Context, dagName string) err
 	return nil
 }
 
-func (m *mockMemoryStore) DeleteAutomataMemory(_ context.Context, automataName string) error {
-	delete(m.automata, automataName)
+func (m *mockMemoryStore) DeleteAutopilotMemory(_ context.Context, autopilotName string) error {
+	delete(m.autopilot, autopilotName)
 	return nil
 }
 

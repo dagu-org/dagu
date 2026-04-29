@@ -19,24 +19,25 @@ import (
 
 // Verify Store implements agent.MemoryStore at compile time.
 var (
-	_ agent.MemoryStore           = (*Store)(nil)
-	_ agent.AutomataDocumentStore = (*Store)(nil)
+	_ agent.MemoryStore            = (*Store)(nil)
+	_ agent.AutopilotDocumentStore = (*Store)(nil)
 )
 
 const (
-	agentMemoryDir  = "memory"
-	dagSubDir       = "dags"
-	automataSubDir  = "automata"
-	memoryFileName  = "MEMORY.md"
-	soulFileName    = "SOUL.md"
-	maxLines        = 200
-	dirPermissions  = 0750
-	filePermissions = 0600
+	agentMemoryDir        = "memory"
+	dagSubDir             = "dags"
+	autopilotSubDir       = "autopilot"
+	legacyAutopilotSubDir = "automata"
+	memoryFileName        = "MEMORY.md"
+	soulFileName          = "SOUL.md"
+	maxLines              = 200
+	dirPermissions        = 0750
+	filePermissions       = 0600
 )
 
-var automataNamePattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_]*$`)
+var autopilotNamePattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_]*$`)
 
-var automataDocumentNames = map[string]struct{}{
+var autopilotDocumentNames = map[string]struct{}{
 	memoryFileName: {},
 	soulFileName:   {},
 }
@@ -109,16 +110,16 @@ func (s *Store) LoadDAGMemory(_ context.Context, dagName string) (string, error)
 	return s.readMemoryFile(path)
 }
 
-// LoadAutomataMemory reads the MEMORY.md for a specific Automata, truncated to maxLines.
+// LoadAutopilotMemory reads the MEMORY.md for a specific Autopilot, truncated to maxLines.
 // Returns empty string if the file does not exist.
-func (s *Store) LoadAutomataMemory(ctx context.Context, automataName string) (string, error) {
-	return s.LoadAutomataDocument(ctx, automataName, memoryFileName)
+func (s *Store) LoadAutopilotMemory(ctx context.Context, autopilotName string) (string, error) {
+	return s.LoadAutopilotDocument(ctx, autopilotName, memoryFileName)
 }
 
-// LoadAutomataDocument reads an allowed Automata document, truncated to maxLines.
+// LoadAutopilotDocument reads an allowed Autopilot document, truncated to maxLines.
 // Returns empty string if the file does not exist.
-func (s *Store) LoadAutomataDocument(_ context.Context, automataName, document string) (string, error) {
-	path, err := s.AutomataDocumentPath(automataName, document)
+func (s *Store) LoadAutopilotDocument(_ context.Context, autopilotName, document string) (string, error) {
+	path, err := s.AutopilotDocumentPath(autopilotName, document)
 	if err != nil {
 		return "", err
 	}
@@ -171,14 +172,14 @@ func (s *Store) SaveDAGMemory(_ context.Context, dagName string, content string)
 	return nil
 }
 
-// SaveAutomataMemory writes content to an Automata-specific MEMORY.md atomically.
-func (s *Store) SaveAutomataMemory(ctx context.Context, automataName string, content string) error {
-	return s.SaveAutomataDocument(ctx, automataName, memoryFileName, content)
+// SaveAutopilotMemory writes content to an Autopilot-specific MEMORY.md atomically.
+func (s *Store) SaveAutopilotMemory(ctx context.Context, autopilotName string, content string) error {
+	return s.SaveAutopilotDocument(ctx, autopilotName, memoryFileName, content)
 }
 
-// SaveAutomataDocument writes an allowed Automata document atomically.
-func (s *Store) SaveAutomataDocument(_ context.Context, automataName, document, content string) error {
-	path, err := s.AutomataDocumentPath(automataName, document)
+// SaveAutopilotDocument writes an allowed Autopilot document atomically.
+func (s *Store) SaveAutopilotDocument(_ context.Context, autopilotName, document, content string) error {
+	path, err := s.AutopilotDocumentPath(autopilotName, document)
 	if err != nil {
 		return err
 	}
@@ -187,7 +188,7 @@ func (s *Store) SaveAutomataDocument(_ context.Context, automataName, document, 
 	defer s.mu.Unlock()
 
 	if err := os.MkdirAll(filepath.Dir(path), dirPermissions); err != nil {
-		return fmt.Errorf("filememory: failed to create automata document directory: %w", err)
+		return fmt.Errorf("filememory: failed to create autopilot document directory: %w", err)
 	}
 
 	if err := fileutil.WriteFileAtomic(path, []byte(content), filePermissions); err != nil {
@@ -204,20 +205,20 @@ func (s *Store) MemoryDir() string {
 	return s.baseDir
 }
 
-// AutomataMemoryPath returns the resolved path to an Automata-specific MEMORY.md.
-func (s *Store) AutomataMemoryPath(automataName string) (string, error) {
-	return s.AutomataDocumentPath(automataName, memoryFileName)
+// AutopilotMemoryPath returns the resolved path to an Autopilot-specific MEMORY.md.
+func (s *Store) AutopilotMemoryPath(autopilotName string) (string, error) {
+	return s.AutopilotDocumentPath(autopilotName, memoryFileName)
 }
 
-// AutomataDocumentPath returns the resolved path to an allowed Automata document.
-func (s *Store) AutomataDocumentPath(automataName, document string) (string, error) {
-	if err := s.validateAutomataName(automataName); err != nil {
+// AutopilotDocumentPath returns the resolved path to an allowed Autopilot document.
+func (s *Store) AutopilotDocumentPath(autopilotName, document string) (string, error) {
+	if err := s.validateAutopilotName(autopilotName); err != nil {
 		return "", err
 	}
-	if err := validateAutomataDocumentName(document); err != nil {
+	if err := validateAutopilotDocumentName(document); err != nil {
 		return "", err
 	}
-	return s.automataDocumentPath(automataName, document), nil
+	return s.resolveAutopilotDocumentPath(autopilotName, document), nil
 }
 
 // ListDAGMemories returns the names of all DAGs that have memory files.
@@ -285,15 +286,15 @@ func (s *Store) DeleteDAGMemory(_ context.Context, dagName string) error {
 	return nil
 }
 
-// DeleteAutomataMemory removes an Automata-specific MEMORY.md file.
-func (s *Store) DeleteAutomataMemory(ctx context.Context, automataName string) error {
-	return s.DeleteAutomataDocument(ctx, automataName, memoryFileName)
+// DeleteAutopilotMemory removes an Autopilot-specific MEMORY.md file.
+func (s *Store) DeleteAutopilotMemory(ctx context.Context, autopilotName string) error {
+	return s.DeleteAutopilotDocument(ctx, autopilotName, memoryFileName)
 }
 
-// DeleteAutomataDocument removes an allowed Automata document and removes the
-// containing Automata document directory when it becomes empty.
-func (s *Store) DeleteAutomataDocument(_ context.Context, automataName, document string) error {
-	path, err := s.AutomataDocumentPath(automataName, document)
+// DeleteAutopilotDocument removes an allowed Autopilot document and removes the
+// containing Autopilot document directory when it becomes empty.
+func (s *Store) DeleteAutopilotDocument(_ context.Context, autopilotName, document string) error {
+	path, err := s.AutopilotDocumentPath(autopilotName, document)
 	if err != nil {
 		return err
 	}
@@ -303,13 +304,13 @@ func (s *Store) DeleteAutomataDocument(_ context.Context, automataName, document
 
 	err = os.Remove(path)
 	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("filememory: failed to delete automata document: %w", err)
+		return fmt.Errorf("filememory: failed to delete autopilot document: %w", err)
 	}
 	if s.fileCache != nil {
 		s.fileCache.Invalidate(path)
 	}
 	if err := removeEmptyDir(filepath.Dir(path)); err != nil {
-		return fmt.Errorf("filememory: failed to remove empty automata document directory: %w", err)
+		return fmt.Errorf("filememory: failed to remove empty autopilot document directory: %w", err)
 	}
 	return nil
 }
@@ -362,13 +363,29 @@ func (s *Store) dagMemoryPath(dagName string) string {
 	return filepath.Join(s.baseDir, dagSubDir, dagName, memoryFileName)
 }
 
-// automataMemoryPath returns the path to an Automata-specific MEMORY.md.
-func (s *Store) automataMemoryPath(automataName string) string {
-	return s.automataDocumentPath(automataName, memoryFileName)
+// autopilotMemoryPath returns the path to an Autopilot-specific MEMORY.md.
+func (s *Store) autopilotMemoryPath(autopilotName string) string {
+	return s.autopilotDocumentPath(autopilotName, memoryFileName)
 }
 
-func (s *Store) automataDocumentPath(automataName, document string) string {
-	return filepath.Join(s.baseDir, automataSubDir, automataName, document)
+func (s *Store) autopilotDocumentPath(autopilotName, document string) string {
+	return filepath.Join(s.baseDir, autopilotSubDir, autopilotName, document)
+}
+
+func (s *Store) legacyAutopilotDocumentPath(autopilotName, document string) string {
+	return filepath.Join(s.baseDir, legacyAutopilotSubDir, autopilotName, document)
+}
+
+func (s *Store) resolveAutopilotDocumentPath(autopilotName, document string) string {
+	newPath := s.autopilotDocumentPath(autopilotName, document)
+	if pathExists(newPath) {
+		return newPath
+	}
+	legacyPath := s.legacyAutopilotDocumentPath(autopilotName, document)
+	if pathExists(legacyPath) || pathExists(filepath.Dir(legacyPath)) {
+		return legacyPath
+	}
+	return newPath
 }
 
 // validateDAGName checks that the DAG name is safe and doesn't escape the base directory.
@@ -391,21 +408,21 @@ func (s *Store) validateDAGName(dagName string) error {
 	return nil
 }
 
-func (s *Store) validateAutomataName(automataName string) error {
-	if automataName == "" {
-		return errors.New("filememory: automataName cannot be empty")
+func (s *Store) validateAutopilotName(autopilotName string) error {
+	if autopilotName == "" {
+		return errors.New("filememory: autopilotName cannot be empty")
 	}
-	if !automataNamePattern.MatchString(automataName) {
-		return fmt.Errorf("filememory: invalid automataName %q", automataName)
+	if !autopilotNamePattern.MatchString(autopilotName) {
+		return fmt.Errorf("filememory: invalid autopilotName %q", autopilotName)
 	}
 	return nil
 }
 
-func validateAutomataDocumentName(document string) error {
-	if _, ok := automataDocumentNames[document]; ok {
+func validateAutopilotDocumentName(document string) error {
+	if _, ok := autopilotDocumentNames[document]; ok {
 		return nil
 	}
-	return fmt.Errorf("filememory: invalid automata document %q", document)
+	return fmt.Errorf("filememory: invalid autopilot document %q", document)
 }
 
 func removeEmptyDir(path string) error {
@@ -420,4 +437,9 @@ func removeEmptyDir(path string) error {
 		return nil
 	}
 	return os.Remove(path)
+}
+
+func pathExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }

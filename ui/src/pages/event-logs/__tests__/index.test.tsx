@@ -54,7 +54,7 @@ function makeConfig(overrides: Partial<Config> = {}): Config {
     oidcButtonLabel: '',
     terminalEnabled: false,
     gitSyncEnabled: false,
-    automataEnabled: false,
+    autopilotEnabled: false,
     agentEnabled: false,
     updateAvailable: false,
     latestVersion: '',
@@ -235,7 +235,7 @@ describe('EventLogsPage', () => {
     });
 
     renderPage({
-      initialEntry: '/event-logs?kind=automata&type=dag.run.failed',
+      initialEntry: '/event-logs?kind=autopilot&type=dag.run.failed',
     });
 
     await waitFor(() => {
@@ -244,7 +244,7 @@ describe('EventLogsPage', () => {
         expect.objectContaining({
           params: {
             query: expect.objectContaining({
-              kind: 'automata',
+              kind: 'autopilot',
             }),
           },
         })
@@ -261,7 +261,7 @@ describe('EventLogsPage', () => {
       'dagu.searchState',
       JSON.stringify({
         'eventLogs:remote-a': {
-          kind: 'automata',
+          kind: 'autopilot',
           type: 'dag.run.failed',
         },
       })
@@ -281,7 +281,7 @@ describe('EventLogsPage', () => {
         expect.objectContaining({
           params: {
             query: expect.objectContaining({
-              kind: 'automata',
+              kind: 'autopilot',
             }),
           },
         })

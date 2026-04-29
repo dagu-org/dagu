@@ -150,11 +150,11 @@ func ValidateModelID(id string) error {
 
 // MemoryContent holds loaded memory for system prompt injection.
 type MemoryContent struct {
-	GlobalMemory   string // Contents of global MEMORY.md (truncated)
-	DAGMemory      string // Contents of per-DAG MEMORY.md (truncated)
-	DAGName        string // Name of the DAG (empty if no DAG context)
-	AutomataMemory string // Contents of per-Automata MEMORY.md (truncated)
-	AutomataName   string // Name of the Automata (empty if no Automata context)
-	MemoryDir      string // Root memory directory path
-	ReadOnly       bool   // Memory is execution-scoped read-only context
+	GlobalMemory    string // Contents of global MEMORY.md (truncated)
+	DAGMemory       string // Contents of per-DAG MEMORY.md (truncated)
+	DAGName         string // Name of the DAG (empty if no DAG context)
+	AutopilotMemory string // Contents of per-Autopilot MEMORY.md (truncated)
+	AutopilotName   string // Name of the Autopilot (empty if no Autopilot context)
+	MemoryDir       string // Root memory directory path
+	ReadOnly        bool   // Memory is execution-scoped read-only context
 }

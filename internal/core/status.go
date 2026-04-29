@@ -138,7 +138,7 @@ const (
 	TriggerTypeSubDAG
 	TriggerTypeRetry
 	TriggerTypeCatchUp
-	TriggerTypeAutomata
+	TriggerTypeAutopilot
 )
 
 // String returns the canonical lowercase token for the trigger type.
@@ -158,8 +158,8 @@ func (t TriggerType) String() string {
 		return "retry"
 	case TriggerTypeCatchUp:
 		return "catchup"
-	case TriggerTypeAutomata:
-		return "automata"
+	case TriggerTypeAutopilot:
+		return "autopilot"
 	default:
 		return "unknown"
 	}
@@ -180,8 +180,10 @@ func ParseTriggerType(s string) TriggerType {
 		return TriggerTypeRetry
 	case "catchup":
 		return TriggerTypeCatchUp
+	case "autopilot":
+		return TriggerTypeAutopilot
 	case "automata":
-		return TriggerTypeAutomata
+		return TriggerTypeAutopilot
 	default:
 		return TriggerTypeUnknown
 	}

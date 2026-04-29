@@ -2492,7 +2492,7 @@ export interface paths {
         patch: operations["updateAgentSoul"];
         trace?: never;
     };
-    "/automata": {
+    "/autopilot": {
         parameters: {
             query?: never;
             header?: never;
@@ -2500,10 +2500,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List automata
-         * @description Returns all Automata definitions with current lifecycle and display state.
+         * List autopilot
+         * @description Returns all Autopilot definitions with current lifecycle and display state.
          */
-        get: operations["listAutomata"];
+        get: operations["listAutopilot"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2512,7 +2512,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/automata/{name}": {
+    "/autopilot/{name}": {
         parameters: {
             query?: never;
             header?: never;
@@ -2520,23 +2520,23 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get automata detail
-         * @description Returns Automata detail including definition, runtime state, transcript, and recent runs.
+         * Get autopilot detail
+         * @description Returns Autopilot detail including definition, runtime state, transcript, and recent runs.
          */
-        get: operations["getAutomata"];
+        get: operations["getAutopilot"];
         put?: never;
         post?: never;
         /**
-         * Delete automata
-         * @description Deletes an Automata definition and its runtime state.
+         * Delete autopilot
+         * @description Deletes an Autopilot definition and its runtime state.
          */
-        delete: operations["deleteAutomata"];
+        delete: operations["deleteAutopilot"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/automata/{name}/spec": {
+    "/autopilot/{name}/spec": {
         parameters: {
             query?: never;
             header?: never;
@@ -2544,15 +2544,15 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get automata raw spec
-         * @description Returns the raw YAML specification for an Automata.
+         * Get autopilot raw spec
+         * @description Returns the raw YAML specification for an Autopilot.
          */
-        get: operations["getAutomataSpec"];
+        get: operations["getAutopilotSpec"];
         /**
-         * Create or update automata spec
-         * @description Creates or updates an Automata definition from a raw YAML spec.
+         * Create or update autopilot spec
+         * @description Creates or updates an Autopilot definition from a raw YAML spec.
          */
-        put: operations["putAutomataSpec"];
+        put: operations["putAutopilotSpec"];
         post?: never;
         delete?: never;
         options?: never;
@@ -2560,7 +2560,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/automata/{name}/documents/{document}": {
+    "/autopilot/{name}/documents/{document}": {
         parameters: {
             query?: never;
             header?: never;
@@ -2568,27 +2568,27 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get automata document
-         * @description Returns an Automata-specific document content and resolved path. Supported documents are MEMORY.md and SOUL.md.
+         * Get autopilot document
+         * @description Returns an Autopilot-specific document content and resolved path. Supported documents are MEMORY.md and SOUL.md.
          */
-        get: operations["getAutomataDocument"];
+        get: operations["getAutopilotDocument"];
         /**
-         * Update automata document
-         * @description Creates or updates an Automata-specific document. Supported documents are MEMORY.md and SOUL.md.
+         * Update autopilot document
+         * @description Creates or updates an Autopilot-specific document. Supported documents are MEMORY.md and SOUL.md.
          */
-        put: operations["updateAutomataDocument"];
+        put: operations["updateAutopilotDocument"];
         post?: never;
         /**
-         * Clear automata document
-         * @description Deletes an Automata-specific document. Supported documents are MEMORY.md and SOUL.md.
+         * Clear autopilot document
+         * @description Deletes an Autopilot-specific document. Supported documents are MEMORY.md and SOUL.md.
          */
-        delete: operations["deleteAutomataDocument"];
+        delete: operations["deleteAutopilotDocument"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/automata/{name}/memory/reflect": {
+    "/autopilot/{name}/memory/reflect": {
         parameters: {
             query?: never;
             header?: never;
@@ -2598,17 +2598,17 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Reflect automata memory
-         * @description Generates a proposed MEMORY.md update from the Automata's current session transcript. The proposal is not saved automatically.
+         * Reflect autopilot memory
+         * @description Generates a proposed MEMORY.md update from the Autopilot's current session transcript. The proposal is not saved automatically.
          */
-        post: operations["reflectAutomataMemory"];
+        post: operations["reflectAutopilotMemory"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/automata/{name}/start": {
+    "/autopilot/{name}/start": {
         parameters: {
             query?: never;
             header?: never;
@@ -2618,17 +2618,17 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Start automata task
-         * @description Starts an Automata task cycle.
+         * Start autopilot task
+         * @description Starts an Autopilot task cycle.
          */
-        post: operations["startAutomata"];
+        post: operations["startAutopilot"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/automata/{name}/pause": {
+    "/autopilot/{name}/pause": {
         parameters: {
             query?: never;
             header?: never;
@@ -2638,17 +2638,17 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Pause automata
-         * @description Pauses Automata orchestration without deleting the active task.
+         * Pause autopilot
+         * @description Pauses Autopilot orchestration without deleting the active task.
          */
-        post: operations["pauseAutomata"];
+        post: operations["pauseAutopilot"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/automata/{name}/resume": {
+    "/autopilot/{name}/resume": {
         parameters: {
             query?: never;
             header?: never;
@@ -2658,17 +2658,17 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Resume automata
-         * @description Resumes a paused Automata.
+         * Resume autopilot
+         * @description Resumes a paused Autopilot.
          */
-        post: operations["resumeAutomata"];
+        post: operations["resumeAutopilot"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/automata/{name}/message": {
+    "/autopilot/{name}/message": {
         parameters: {
             query?: never;
             header?: never;
@@ -2678,17 +2678,17 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Send operator message to automata
-         * @description Adds an operator message to the current Automata task.
+         * Send operator message to autopilot
+         * @description Adds an operator message to the current Autopilot task.
          */
-        post: operations["messageAutomata"];
+        post: operations["messageAutopilot"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/automata/{name}/tasks": {
+    "/autopilot/{name}/tasks": {
         parameters: {
             query?: never;
             header?: never;
@@ -2698,17 +2698,17 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Create automata task
-         * @description Creates a new persistent task template for an Automata.
+         * Create autopilot task
+         * @description Creates a new persistent task template for an Autopilot.
          */
-        post: operations["createAutomataTask"];
+        post: operations["createAutopilotTask"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/automata/{name}/tasks/reorder": {
+    "/autopilot/{name}/tasks/reorder": {
         parameters: {
             query?: never;
             header?: never;
@@ -2718,17 +2718,17 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Reorder automata tasks
-         * @description Reorders the persistent task templates for an Automata.
+         * Reorder autopilot tasks
+         * @description Reorders the persistent task templates for an Autopilot.
          */
-        post: operations["reorderAutomataTasks"];
+        post: operations["reorderAutopilotTasks"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/automata/{name}/tasks/{taskId}": {
+    "/autopilot/{name}/tasks/{taskId}": {
         parameters: {
             query?: never;
             header?: never;
@@ -2739,20 +2739,20 @@ export interface paths {
         put?: never;
         post?: never;
         /**
-         * Delete automata task
-         * @description Deletes a persistent task template from an Automata.
+         * Delete autopilot task
+         * @description Deletes a persistent task template from an Autopilot.
          */
-        delete: operations["deleteAutomataTask"];
+        delete: operations["deleteAutopilotTask"];
         options?: never;
         head?: never;
         /**
-         * Update automata task
-         * @description Updates an Automata task template description and, when requested, the current cycle task state.
+         * Update autopilot task
+         * @description Updates an Autopilot task template description and, when requested, the current cycle task state.
          */
-        patch: operations["updateAutomataTask"];
+        patch: operations["updateAutopilotTask"];
         trace?: never;
     };
-    "/automata/{name}/response": {
+    "/autopilot/{name}/response": {
         parameters: {
             query?: never;
             header?: never;
@@ -2762,17 +2762,17 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Respond to automata prompt
-         * @description Submits a human response for an Automata prompt.
+         * Respond to autopilot prompt
+         * @description Submits a human response for an Autopilot prompt.
          */
-        post: operations["respondAutomata"];
+        post: operations["respondAutopilot"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/automata/{name}/rename": {
+    "/autopilot/{name}/rename": {
         parameters: {
             query?: never;
             header?: never;
@@ -2782,17 +2782,17 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Rename automata
-         * @description Renames an Automata definition and preserves its runtime transcript.
+         * Rename autopilot
+         * @description Renames an Autopilot definition and preserves its runtime transcript.
          */
-        post: operations["renameAutomata"];
+        post: operations["renameAutopilot"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/automata/{name}/duplicate": {
+    "/autopilot/{name}/duplicate": {
         parameters: {
             query?: never;
             header?: never;
@@ -2802,17 +2802,17 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Duplicate automata
-         * @description Creates a new Automata definition by copying an existing one.
+         * Duplicate autopilot
+         * @description Creates a new Autopilot definition by copying an existing one.
          */
-        post: operations["duplicateAutomata"];
+        post: operations["duplicateAutopilot"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/automata/{name}/reset": {
+    "/autopilot/{name}/reset": {
         parameters: {
             query?: never;
             header?: never;
@@ -2822,10 +2822,10 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Reset automata state
-         * @description Resets Automata runtime state back to idle while keeping the definition.
+         * Reset autopilot state
+         * @description Resets Autopilot runtime state back to idle while keeping the definition.
          */
-        post: operations["resetAutomata"];
+        post: operations["resetAutopilot"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3253,9 +3253,9 @@ export interface components {
              * @description When the event was recorded by the producer
              */
             recordedAt: string;
-            /** @description High-level event kind (e.g., dag_run, automata, llm_usage) */
+            /** @description High-level event kind (e.g., dag_run, autopilot, llm_usage) */
             kind: string;
-            /** @description Specific event type (e.g., dag.run.failed, automata.error) */
+            /** @description Specific event type (e.g., dag.run.failed, autopilot.error) */
             type: string;
             /** @description Service that produced the event */
             sourceService: string;
@@ -3267,12 +3267,12 @@ export interface components {
             dagRunId?: string;
             /** @description Attempt ID for DAG-run events */
             attemptId?: string;
-            /** @description Automata name for automata events */
-            automataName?: string;
-            /** @description Automata kind for automata events */
-            automataKind?: string;
-            /** @description Automata cycle ID for automata events */
-            automataCycleId?: string;
+            /** @description Autopilot name for autopilot events */
+            autopilotName?: string;
+            /** @description Autopilot kind for autopilot events */
+            autopilotKind?: string;
+            /** @description Autopilot cycle ID for autopilot events */
+            autopilotCycleId?: string;
             /** @description Session ID for LLM usage events */
             sessionId?: string;
             /** @description User ID associated with the event */
@@ -3730,14 +3730,14 @@ export interface components {
              * @enum {string}
              */
             status: SchedulerInstanceStatus;
-            automataController?: components["schemas"]["AutomataControllerStatus"];
+            autopilotController?: components["schemas"]["AutopilotControllerStatus"];
             /** @description RFC3339 timestamp when scheduler started */
             startedAt: string;
         };
-        /** @description Scheduler-owned Automata controller readiness */
-        AutomataControllerStatus: {
+        /** @description Scheduler-owned Autopilot controller readiness */
+        AutopilotControllerStatus: {
             /** @enum {string} */
-            state: AutomataControllerStatusState;
+            state: AutopilotControllerStatusState;
             message?: string;
         };
         /** @description Response containing status of all coordinator instances */
@@ -5189,19 +5189,19 @@ export interface components {
             content: string;
         };
         /**
-         * @description Automata document file name
+         * @description Autopilot document file name
          * @enum {string}
          */
-        AutomataDocument: AutomataDocument;
-        /** @description Automata-specific document content */
-        AutomataDocumentResponse: {
+        AutopilotDocument: AutopilotDocument;
+        /** @description Autopilot-specific document content */
+        AutopilotDocumentResponse: {
             name: string;
-            document: components["schemas"]["AutomataDocument"];
+            document: components["schemas"]["AutopilotDocument"];
             content: string;
             path: string;
         };
-        /** @description Generated Automata MEMORY.md update proposal */
-        AutomataMemoryReflectionResponse: {
+        /** @description Generated Autopilot MEMORY.md update proposal */
+        AutopilotMemoryReflectionResponse: {
             name: string;
             /** @description Current MEMORY.md content before applying the reflection */
             currentContent: string;
@@ -5382,27 +5382,27 @@ export interface components {
             status: string;
         };
         /**
-         * @description Automata lifecycle state
+         * @description Autopilot lifecycle state
          * @enum {string}
          */
-        AutomataLifecycleState: AutomataLifecycleState;
+        AutopilotLifecycleState: AutopilotLifecycleState;
         /**
-         * @description Compatibility Automata kind. Runtime behavior is configured through explicit fields such as resetOnFinish.
+         * @description Compatibility Autopilot kind. Runtime behavior is configured through explicit fields such as resetOnFinish.
          * @enum {string}
          */
-        AutomataKind: AutomataKind;
+        AutopilotKind: AutopilotKind;
         /**
-         * @description User-facing Automata status
+         * @description User-facing Autopilot status
          * @enum {string}
          */
-        AutomataDisplayStatus: AutomataDisplayStatus;
+        AutopilotDisplayStatus: AutopilotDisplayStatus;
         /**
-         * @description Why an Automata is waiting
+         * @description Why an Autopilot is waiting
          * @enum {string}
          */
-        AutomataWaitingReason: AutomataWaitingReason;
+        AutopilotWaitingReason: AutopilotWaitingReason;
         /** @description Allowlisted DAG names and tags */
-        AutomataAllowedDAGs: {
+        AutopilotAllowedDAGs: {
             names?: string[];
             tags?: string[];
         };
@@ -5410,12 +5410,12 @@ export interface components {
          * @description Checklist task state
          * @enum {string}
          */
-        AutomataTaskState: AutomataTaskState;
-        /** @description Runtime current-cycle task for an Automata */
-        AutomataTask: {
+        AutopilotTaskState: AutopilotTaskState;
+        /** @description Runtime current-cycle task for an Autopilot */
+        AutopilotTask: {
             id: string;
             description: string;
-            state: components["schemas"]["AutomataTaskState"];
+            state: components["schemas"]["AutopilotTaskState"];
             /** Format: date-time */
             createdAt?: string;
             createdBy?: string;
@@ -5426,8 +5426,8 @@ export interface components {
             doneAt?: string;
             doneBy?: string;
         };
-        /** @description Persistent task template for an Automata */
-        AutomataTaskTemplate: {
+        /** @description Persistent task template for an Autopilot */
+        AutopilotTaskTemplate: {
             id: string;
             description: string;
             /** Format: date-time */
@@ -5437,16 +5437,16 @@ export interface components {
             updatedAt?: string;
             updatedBy?: string;
         };
-        /** @description Agent runtime configuration for an Automata definition */
-        AutomataAgentConfig: {
+        /** @description Agent runtime configuration for an Autopilot definition */
+        AutopilotAgentConfig: {
             model?: string;
             soul?: string;
             safeMode?: boolean;
         };
-        /** @description Automata definition */
-        AutomataDefinition: {
+        /** @description Autopilot definition */
+        AutopilotDefinition: {
             name: string;
-            kind: components["schemas"]["AutomataKind"];
+            kind: components["schemas"]["AutopilotKind"];
             nickname?: string;
             iconUrl?: string;
             description?: string;
@@ -5456,12 +5456,12 @@ export interface components {
             resetOnFinish?: boolean;
             schedule?: string[];
             tags?: string[];
-            allowedDAGs?: components["schemas"]["AutomataAllowedDAGs"];
-            agent?: components["schemas"]["AutomataAgentConfig"];
+            allowedDAGs?: components["schemas"]["AutopilotAllowedDAGs"];
+            agent?: components["schemas"]["AutopilotAgentConfig"];
             disabled?: boolean;
         };
-        /** @description Pending human prompt for an Automata */
-        AutomataPrompt: {
+        /** @description Pending human prompt for an Autopilot */
+        AutopilotPrompt: {
             id: string;
             question: string;
             options?: components["schemas"]["AgentUserPromptOption"][];
@@ -5470,16 +5470,16 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
         };
-        /** @description Recorded human response for an Automata prompt */
-        AutomataPromptResponse: {
+        /** @description Recorded human response for an Autopilot prompt */
+        AutopilotPromptResponse: {
             promptId: string;
             selectedOptionIds?: string[];
             freeTextResponse?: string;
             /** Format: date-time */
             respondedAt: string;
         };
-        /** @description Queued message to be delivered on the next Automata turn */
-        AutomataPendingTurnMessage: {
+        /** @description Queued message to be delivered on the next Autopilot turn */
+        AutopilotPendingTurnMessage: {
             id: string;
             kind: string;
             message: string;
@@ -5487,12 +5487,12 @@ export interface components {
             createdAt: string;
         };
         /** @description Reference to a tracked child DAG run */
-        AutomataRunRef: {
+        AutopilotRunRef: {
             name: string;
             id: string;
         };
-        /** @description Summary of a child DAG run launched by an Automata */
-        AutomataRunSummary: {
+        /** @description Summary of a child DAG run launched by an Autopilot */
+        AutopilotRunSummary: {
             name: string;
             dagRunId: string;
             status: components["schemas"]["StatusLabel"];
@@ -5503,16 +5503,16 @@ export interface components {
             createdAt?: string;
             error?: string;
         };
-        /** @description Resolved DAG allowed in the current Automata */
-        AutomataAllowedDAGInfo: {
+        /** @description Resolved DAG allowed in the current Autopilot */
+        AutopilotAllowedDAGInfo: {
             name: string;
             description?: string;
             tags?: string[];
         };
-        /** @description Current runtime state for an Automata */
-        AutomataState: {
-            state: components["schemas"]["AutomataLifecycleState"];
-            displayStatus?: components["schemas"]["AutomataDisplayStatus"];
+        /** @description Current runtime state for an Autopilot */
+        AutopilotState: {
+            state: components["schemas"]["AutopilotLifecycleState"];
+            displayStatus?: components["schemas"]["AutopilotDisplayStatus"];
             busy?: boolean;
             needsInput?: boolean;
             instruction?: string;
@@ -5522,15 +5522,15 @@ export interface components {
             /** Format: date-time */
             activatedAt?: string;
             activatedBy?: string;
-            tasks?: components["schemas"]["AutomataTask"][];
+            tasks?: components["schemas"]["AutopilotTask"][];
             sessionId?: string;
-            currentRunRef?: components["schemas"]["AutomataRunRef"];
-            lastRunRef?: components["schemas"]["AutomataRunRef"];
+            currentRunRef?: components["schemas"]["AutopilotRunRef"];
+            lastRunRef?: components["schemas"]["AutopilotRunRef"];
             currentCycleId?: string;
-            waitingReason?: components["schemas"]["AutomataWaitingReason"];
-            pendingPrompt?: components["schemas"]["AutomataPrompt"];
-            pendingResponse?: components["schemas"]["AutomataPromptResponse"];
-            pendingTurnMessages?: components["schemas"]["AutomataPendingTurnMessage"][];
+            waitingReason?: components["schemas"]["AutopilotWaitingReason"];
+            pendingPrompt?: components["schemas"]["AutopilotPrompt"];
+            pendingResponse?: components["schemas"]["AutopilotPromptResponse"];
+            pendingTurnMessages?: components["schemas"]["AutopilotPendingTurnMessage"][];
             /** Format: date-time */
             startRequestedAt?: string;
             /** Format: date-time */
@@ -5547,10 +5547,10 @@ export interface components {
             lastSummary?: string;
             lastError?: string;
         };
-        /** @description Summary row for an Automata */
-        AutomataSummary: {
+        /** @description Summary row for an Autopilot */
+        AutopilotSummary: {
             name: string;
-            kind: components["schemas"]["AutomataKind"];
+            kind: components["schemas"]["AutopilotKind"];
             nickname?: string;
             iconUrl?: string;
             description?: string;
@@ -5559,69 +5559,69 @@ export interface components {
             resetOnFinish?: boolean;
             tags?: string[];
             instruction?: string;
-            state: components["schemas"]["AutomataLifecycleState"];
-            displayStatus?: components["schemas"]["AutomataDisplayStatus"];
+            state: components["schemas"]["AutopilotLifecycleState"];
+            displayStatus?: components["schemas"]["AutopilotDisplayStatus"];
             busy?: boolean;
             needsInput?: boolean;
             disabled?: boolean;
-            currentRun?: components["schemas"]["AutomataRunSummary"];
+            currentRun?: components["schemas"]["AutopilotRunSummary"];
             openTaskCount?: number;
             doneTaskCount?: number;
             nextTaskDescription?: string;
             /** Format: date-time */
             lastUpdatedAt?: string;
-            automataController?: components["schemas"]["AutomataControllerStatus"];
+            autopilotController?: components["schemas"]["AutopilotControllerStatus"];
         };
-        /** @description List of Automata */
-        AutomataListResponse: {
-            automata: components["schemas"]["AutomataSummary"][];
+        /** @description List of Autopilot */
+        AutopilotListResponse: {
+            autopilot: components["schemas"]["AutopilotSummary"][];
         };
-        /** @description Automata detail response */
-        AutomataDetailResponse: {
-            definition: components["schemas"]["AutomataDefinition"];
-            state: components["schemas"]["AutomataState"];
-            allowedDags: components["schemas"]["AutomataAllowedDAGInfo"][];
-            taskTemplates?: components["schemas"]["AutomataTaskTemplate"][];
-            currentRun?: components["schemas"]["AutomataRunSummary"];
-            recentRuns?: components["schemas"]["AutomataRunSummary"][];
+        /** @description Autopilot detail response */
+        AutopilotDetailResponse: {
+            definition: components["schemas"]["AutopilotDefinition"];
+            state: components["schemas"]["AutopilotState"];
+            allowedDags: components["schemas"]["AutopilotAllowedDAGInfo"][];
+            taskTemplates?: components["schemas"]["AutopilotTaskTemplate"][];
+            currentRun?: components["schemas"]["AutopilotRunSummary"];
+            recentRuns?: components["schemas"]["AutopilotRunSummary"][];
             messages?: components["schemas"]["AgentMessage"][];
-            automataController?: components["schemas"]["AutomataControllerStatus"];
+            autopilotController?: components["schemas"]["AutopilotControllerStatus"];
         };
-        /** @description Raw Automata YAML spec */
-        AutomataSpecResponse: {
+        /** @description Raw Autopilot YAML spec */
+        AutopilotSpecResponse: {
             spec: string;
         };
-        /** @description Request body for creating or updating an Automata from raw YAML */
-        AutomataSpecUpsertRequest: {
+        /** @description Request body for creating or updating an Autopilot from raw YAML */
+        AutopilotSpecUpsertRequest: {
             spec: string;
         };
-        /** @description Request body for starting an Automata task */
-        AutomataStartRequest: {
+        /** @description Request body for starting an Autopilot task */
+        AutopilotStartRequest: {
             instruction?: string;
         };
-        /** @description Request body for creating an Automata checklist task */
-        AutomataTaskCreateRequest: {
+        /** @description Request body for creating an Autopilot checklist task */
+        AutopilotTaskCreateRequest: {
             description: string;
         };
-        /** @description Request body for updating an Automata checklist task */
-        AutomataTaskUpdateRequest: {
+        /** @description Request body for updating an Autopilot checklist task */
+        AutopilotTaskUpdateRequest: {
             description?: string;
             done?: boolean;
         };
-        /** @description Request body for reordering Automata checklist tasks */
-        AutomataTaskReorderRequest: {
+        /** @description Request body for reordering Autopilot checklist tasks */
+        AutopilotTaskReorderRequest: {
             taskIds: string[];
         };
         /** @description Request body for an operator message */
-        AutomataOperatorMessageRequest: {
+        AutopilotOperatorMessageRequest: {
             message: string;
         };
-        /** @description Request body for renaming an Automata */
-        AutomataRenameRequest: {
+        /** @description Request body for renaming an Autopilot */
+        AutopilotRenameRequest: {
             newName: string;
         };
-        /** @description Request body for duplicating an Automata */
-        AutomataDuplicateRequest: {
+        /** @description Request body for duplicating an Autopilot */
+        AutopilotDuplicateRequest: {
             newName: string;
         };
         CreateRemoteNodeRequest: {
@@ -5791,10 +5791,10 @@ export interface components {
         SoulId: string;
         /** @description The unique identifier of the remote node */
         RemoteNodeId: string;
-        /** @description The Automata name */
-        AutomataName: string;
-        /** @description Automata document file name */
-        AutomataDocument: components["schemas"]["AutomataDocument"];
+        /** @description The Autopilot name */
+        AutopilotName: string;
+        /** @description Autopilot document file name */
+        AutopilotDocument: components["schemas"]["AutopilotDocument"];
     };
     requestBodies: never;
     headers: never;
@@ -11127,9 +11127,9 @@ export interface operations {
             query?: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description Filter by event kind (e.g., dag_run, automata, llm_usage) */
+                /** @description Filter by event kind (e.g., dag_run, autopilot, llm_usage) */
                 kind?: string;
-                /** @description Filter by event type (e.g., dag.run.failed, automata.needs_input, llm.usage.recorded) */
+                /** @description Filter by event type (e.g., dag.run.failed, autopilot.needs_input, llm.usage.recorded) */
                 type?: string;
                 /** @description Filter by DAG name */
                 dagName?: string;
@@ -11137,8 +11137,8 @@ export interface operations {
                 dagRunId?: string;
                 /** @description Filter by attempt ID */
                 attemptId?: string;
-                /** @description Filter by automata name */
-                automataName?: string;
+                /** @description Filter by autopilot name */
+                autopilotName?: string;
                 /** @description Filter by session ID */
                 sessionId?: string;
                 /** @description Filter by user ID */
@@ -13449,7 +13449,7 @@ export interface operations {
             };
         };
     };
-    listAutomata: {
+    listAutopilot: {
         parameters: {
             query?: never;
             header?: never;
@@ -13458,13 +13458,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description List of automata */
+            /** @description List of autopilot */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AutomataListResponse"];
+                    "application/json": components["schemas"]["AutopilotListResponse"];
                 };
             };
             /** @description Not authenticated */
@@ -13487,25 +13487,25 @@ export interface operations {
             };
         };
     };
-    getAutomata: {
+    getAutopilot: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Automata name */
-                name: components["parameters"]["AutomataName"];
+                /** @description The Autopilot name */
+                name: components["parameters"]["AutopilotName"];
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Automata detail */
+            /** @description Autopilot detail */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AutomataDetailResponse"];
+                    "application/json": components["schemas"]["AutopilotDetailResponse"];
                 };
             };
             /** @description Not authenticated */
@@ -13517,7 +13517,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Automata not found */
+            /** @description Autopilot not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -13537,19 +13537,19 @@ export interface operations {
             };
         };
     };
-    deleteAutomata: {
+    deleteAutopilot: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Automata name */
-                name: components["parameters"]["AutomataName"];
+                /** @description The Autopilot name */
+                name: components["parameters"]["AutopilotName"];
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Automata deleted */
+            /** @description Autopilot deleted */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -13574,7 +13574,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Automata not found */
+            /** @description Autopilot not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -13594,25 +13594,25 @@ export interface operations {
             };
         };
     };
-    getAutomataSpec: {
+    getAutopilotSpec: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Automata name */
-                name: components["parameters"]["AutomataName"];
+                /** @description The Autopilot name */
+                name: components["parameters"]["AutopilotName"];
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Automata raw spec */
+            /** @description Autopilot raw spec */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AutomataSpecResponse"];
+                    "application/json": components["schemas"]["AutopilotSpecResponse"];
                 };
             };
             /** @description Not authenticated */
@@ -13624,7 +13624,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Automata not found */
+            /** @description Autopilot not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -13644,23 +13644,23 @@ export interface operations {
             };
         };
     };
-    putAutomataSpec: {
+    putAutopilotSpec: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Automata name */
-                name: components["parameters"]["AutomataName"];
+                /** @description The Autopilot name */
+                name: components["parameters"]["AutopilotName"];
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AutomataSpecUpsertRequest"];
+                "application/json": components["schemas"]["AutopilotSpecUpsertRequest"];
             };
         };
         responses: {
-            /** @description Automata spec saved */
+            /** @description Autopilot spec saved */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -13694,7 +13694,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Automata controller is not ready */
+            /** @description Autopilot controller is not ready */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -13714,27 +13714,27 @@ export interface operations {
             };
         };
     };
-    getAutomataDocument: {
+    getAutopilotDocument: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Automata name */
-                name: components["parameters"]["AutomataName"];
-                /** @description Automata document file name */
-                document: components["parameters"]["AutomataDocument"];
+                /** @description The Autopilot name */
+                name: components["parameters"]["AutopilotName"];
+                /** @description Autopilot document file name */
+                document: components["parameters"]["AutopilotDocument"];
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Automata document */
+            /** @description Autopilot document */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AutomataDocumentResponse"];
+                    "application/json": components["schemas"]["AutopilotDocumentResponse"];
                 };
             };
             /** @description Not authenticated */
@@ -13746,7 +13746,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Automata not found */
+            /** @description Autopilot not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -13766,15 +13766,15 @@ export interface operations {
             };
         };
     };
-    updateAutomataDocument: {
+    updateAutopilotDocument: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Automata name */
-                name: components["parameters"]["AutomataName"];
-                /** @description Automata document file name */
-                document: components["parameters"]["AutomataDocument"];
+                /** @description The Autopilot name */
+                name: components["parameters"]["AutopilotName"];
+                /** @description Autopilot document file name */
+                document: components["parameters"]["AutopilotDocument"];
             };
             cookie?: never;
         };
@@ -13784,13 +13784,13 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Automata document saved */
+            /** @description Autopilot document saved */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AutomataDocumentResponse"];
+                    "application/json": components["schemas"]["AutopilotDocumentResponse"];
                 };
             };
             /** @description Invalid request */
@@ -13820,7 +13820,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Automata not found */
+            /** @description Autopilot not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -13840,21 +13840,21 @@ export interface operations {
             };
         };
     };
-    deleteAutomataDocument: {
+    deleteAutopilotDocument: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Automata name */
-                name: components["parameters"]["AutomataName"];
-                /** @description Automata document file name */
-                document: components["parameters"]["AutomataDocument"];
+                /** @description The Autopilot name */
+                name: components["parameters"]["AutopilotName"];
+                /** @description Autopilot document file name */
+                document: components["parameters"]["AutopilotDocument"];
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Automata document cleared */
+            /** @description Autopilot document cleared */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -13879,7 +13879,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Automata not found */
+            /** @description Autopilot not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -13899,25 +13899,25 @@ export interface operations {
             };
         };
     };
-    reflectAutomataMemory: {
+    reflectAutopilotMemory: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Automata name */
-                name: components["parameters"]["AutomataName"];
+                /** @description The Autopilot name */
+                name: components["parameters"]["AutopilotName"];
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Automata memory reflection proposal */
+            /** @description Autopilot memory reflection proposal */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AutomataMemoryReflectionResponse"];
+                    "application/json": components["schemas"]["AutopilotMemoryReflectionResponse"];
                 };
             };
             /** @description Invalid request */
@@ -13947,7 +13947,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Automata or agent feature not found */
+            /** @description Autopilot or agent feature not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -13967,23 +13967,23 @@ export interface operations {
             };
         };
     };
-    startAutomata: {
+    startAutopilot: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Automata name */
-                name: components["parameters"]["AutomataName"];
+                /** @description The Autopilot name */
+                name: components["parameters"]["AutopilotName"];
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AutomataStartRequest"];
+                "application/json": components["schemas"]["AutopilotStartRequest"];
             };
         };
         responses: {
-            /** @description Automata started */
+            /** @description Autopilot started */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -14017,7 +14017,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Automata controller is not ready */
+            /** @description Autopilot controller is not ready */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -14037,19 +14037,19 @@ export interface operations {
             };
         };
     };
-    pauseAutomata: {
+    pauseAutopilot: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Automata name */
-                name: components["parameters"]["AutomataName"];
+                /** @description The Autopilot name */
+                name: components["parameters"]["AutopilotName"];
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Automata paused */
+            /** @description Autopilot paused */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -14083,7 +14083,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Automata controller is not ready */
+            /** @description Autopilot controller is not ready */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -14103,19 +14103,19 @@ export interface operations {
             };
         };
     };
-    resumeAutomata: {
+    resumeAutopilot: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Automata name */
-                name: components["parameters"]["AutomataName"];
+                /** @description The Autopilot name */
+                name: components["parameters"]["AutopilotName"];
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Automata resumed */
+            /** @description Autopilot resumed */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -14149,7 +14149,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Automata controller is not ready */
+            /** @description Autopilot controller is not ready */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -14169,19 +14169,19 @@ export interface operations {
             };
         };
     };
-    messageAutomata: {
+    messageAutopilot: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Automata name */
-                name: components["parameters"]["AutomataName"];
+                /** @description The Autopilot name */
+                name: components["parameters"]["AutopilotName"];
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AutomataOperatorMessageRequest"];
+                "application/json": components["schemas"]["AutopilotOperatorMessageRequest"];
             };
         };
         responses: {
@@ -14219,7 +14219,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Automata controller is not ready */
+            /** @description Autopilot controller is not ready */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -14239,29 +14239,29 @@ export interface operations {
             };
         };
     };
-    createAutomataTask: {
+    createAutopilotTask: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Automata name */
-                name: components["parameters"]["AutomataName"];
+                /** @description The Autopilot name */
+                name: components["parameters"]["AutopilotName"];
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AutomataTaskCreateRequest"];
+                "application/json": components["schemas"]["AutopilotTaskCreateRequest"];
             };
         };
         responses: {
-            /** @description Automata task created */
+            /** @description Autopilot task created */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AutomataTask"];
+                    "application/json": components["schemas"]["AutopilotTask"];
                 };
             };
             /** @description Invalid request */
@@ -14302,23 +14302,23 @@ export interface operations {
             };
         };
     };
-    reorderAutomataTasks: {
+    reorderAutopilotTasks: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Automata name */
-                name: components["parameters"]["AutomataName"];
+                /** @description The Autopilot name */
+                name: components["parameters"]["AutopilotName"];
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AutomataTaskReorderRequest"];
+                "application/json": components["schemas"]["AutopilotTaskReorderRequest"];
             };
         };
         responses: {
-            /** @description Automata tasks reordered */
+            /** @description Autopilot tasks reordered */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -14363,20 +14363,20 @@ export interface operations {
             };
         };
     };
-    deleteAutomataTask: {
+    deleteAutopilotTask: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Automata name */
-                name: components["parameters"]["AutomataName"];
+                /** @description The Autopilot name */
+                name: components["parameters"]["AutopilotName"];
                 taskId: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Automata task deleted */
+            /** @description Autopilot task deleted */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -14421,30 +14421,30 @@ export interface operations {
             };
         };
     };
-    updateAutomataTask: {
+    updateAutopilotTask: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Automata name */
-                name: components["parameters"]["AutomataName"];
+                /** @description The Autopilot name */
+                name: components["parameters"]["AutopilotName"];
                 taskId: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AutomataTaskUpdateRequest"];
+                "application/json": components["schemas"]["AutopilotTaskUpdateRequest"];
             };
         };
         responses: {
-            /** @description Automata task updated */
+            /** @description Autopilot task updated */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AutomataTask"];
+                    "application/json": components["schemas"]["AutopilotTask"];
                 };
             };
             /** @description Invalid request */
@@ -14485,13 +14485,13 @@ export interface operations {
             };
         };
     };
-    respondAutomata: {
+    respondAutopilot: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Automata name */
-                name: components["parameters"]["AutomataName"];
+                /** @description The Autopilot name */
+                name: components["parameters"]["AutopilotName"];
             };
             cookie?: never;
         };
@@ -14546,23 +14546,23 @@ export interface operations {
             };
         };
     };
-    renameAutomata: {
+    renameAutopilot: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Automata name */
-                name: components["parameters"]["AutomataName"];
+                /** @description The Autopilot name */
+                name: components["parameters"]["AutopilotName"];
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AutomataRenameRequest"];
+                "application/json": components["schemas"]["AutopilotRenameRequest"];
             };
         };
         responses: {
-            /** @description Automata renamed */
+            /** @description Autopilot renamed */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -14596,7 +14596,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Automata not found */
+            /** @description Autopilot not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -14605,7 +14605,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Automata controller is not ready */
+            /** @description Autopilot controller is not ready */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -14625,23 +14625,23 @@ export interface operations {
             };
         };
     };
-    duplicateAutomata: {
+    duplicateAutopilot: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Automata name */
-                name: components["parameters"]["AutomataName"];
+                /** @description The Autopilot name */
+                name: components["parameters"]["AutopilotName"];
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AutomataDuplicateRequest"];
+                "application/json": components["schemas"]["AutopilotDuplicateRequest"];
             };
         };
         responses: {
-            /** @description Automata duplicated */
+            /** @description Autopilot duplicated */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -14675,7 +14675,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Automata not found */
+            /** @description Autopilot not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -14695,19 +14695,19 @@ export interface operations {
             };
         };
     };
-    resetAutomata: {
+    resetAutopilot: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Automata name */
-                name: components["parameters"]["AutomataName"];
+                /** @description The Autopilot name */
+                name: components["parameters"]["AutopilotName"];
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Automata state reset */
+            /** @description Autopilot state reset */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -14741,7 +14741,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Automata not found */
+            /** @description Autopilot not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -16150,7 +16150,7 @@ export enum StatusLabel {
     rejected = "rejected"
 }
 export enum TriggerType {
-    automata = "automata",
+    autopilot = "autopilot",
     unknown = "unknown",
     scheduler = "scheduler",
     manual = "manual",
@@ -16188,7 +16188,7 @@ export enum SchedulerInstanceStatus {
     inactive = "inactive",
     unknown = "unknown"
 }
-export enum AutomataControllerStatusState {
+export enum AutopilotControllerStatusState {
     ready = "ready",
     disabled = "disabled",
     unavailable = "unavailable",
@@ -16350,7 +16350,7 @@ export enum ModelPresetThinkingEffort {
     high = "high",
     xhigh = "xhigh"
 }
-export enum AutomataDocument {
+export enum AutopilotDocument {
     MEMORY_md = "MEMORY.md",
     SOUL_md = "SOUL.md"
 }
@@ -16369,28 +16369,28 @@ export enum AgentDelegateSnapshotStatus {
     running = "running",
     completed = "completed"
 }
-export enum AutomataLifecycleState {
+export enum AutopilotLifecycleState {
     idle = "idle",
     running = "running",
     waiting = "waiting",
     paused = "paused",
     finished = "finished"
 }
-export enum AutomataKind {
+export enum AutopilotKind {
     workflow = "workflow",
     service = "service"
 }
-export enum AutomataDisplayStatus {
+export enum AutopilotDisplayStatus {
     idle = "idle",
     running = "running",
     paused = "paused",
     finished = "finished"
 }
-export enum AutomataWaitingReason {
+export enum AutopilotWaitingReason {
     human_input = "human_input",
     dag_wait = "dag_wait"
 }
-export enum AutomataTaskState {
+export enum AutopilotTaskState {
     open = "open",
     done = "done"
 }

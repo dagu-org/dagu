@@ -16,7 +16,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/dagucloud/dagu/internal/automata"
+	"github.com/dagucloud/dagu/internal/autopilot"
 	"github.com/dagucloud/dagu/internal/cmn/config"
 	"github.com/dagucloud/dagu/internal/cmn/dirlock"
 	"github.com/dagucloud/dagu/internal/cmn/logger"
@@ -57,8 +57,8 @@ type Scheduler struct {
 	startupCancel       context.CancelFunc
 	lockHeld            atomic.Bool
 	clock               Clock // Clock function for getting current time
-	automataService     *automata.Service
-	automataController  *exec.AutomataControllerInfo
+	autopilotService    *autopilot.Service
+	autopilotController *exec.AutopilotControllerInfo
 	eventCollector      *fileeventstore.Collector
 }
 
@@ -247,15 +247,15 @@ func (s *Scheduler) SetClock(clock Clock) {
 	}
 }
 
-// SetAutomataService configures the Automata controller owned by the scheduler leader.
-func (s *Scheduler) SetAutomataService(service *automata.Service) {
-	s.automataService = service
+// SetAutopilotService configures the Autopilot controller owned by the scheduler leader.
+func (s *Scheduler) SetAutopilotService(service *autopilot.Service) {
+	s.autopilotService = service
 }
 
-// SetAutomataController configures the published scheduler-side Automata
+// SetAutopilotController configures the published scheduler-side Autopilot
 // controller readiness.
-func (s *Scheduler) SetAutomataController(info *exec.AutomataControllerInfo) {
-	s.automataController = info
+func (s *Scheduler) SetAutopilotController(info *exec.AutopilotControllerInfo) {
+	s.autopilotController = info
 }
 
 // SetEventCollector configures the scheduler-owned collector loop.
@@ -468,12 +468,12 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	if s.serviceRegistry != nil {
 		hostname, _ := os.Hostname()
 		hostInfo := exec.HostInfo{
-			ID:                 s.instanceID,
-			Host:               hostname,
-			Port:               s.registeredPort(),
-			Status:             exec.ServiceStatusInactive,
-			StartedAt:          time.Now(),
-			AutomataController: s.automataController,
+			ID:                  s.instanceID,
+			Host:                hostname,
+			Port:                s.registeredPort(),
+			Status:              exec.ServiceStatusInactive,
+			StartedAt:           time.Now(),
+			AutopilotController: s.autopilotController,
 		}
 		if err := s.serviceRegistry.Register(ctx, exec.ServiceNameScheduler, hostInfo); err != nil {
 			logger.Error(ctx, "Failed to register with service registry", tag.Error(err))
@@ -571,16 +571,16 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		s.entryReader.Start(ctx)
 	})
 
-	if s.automataService != nil {
+	if s.autopilotService != nil {
 		wg.Go(func() {
-			err := s.automataService.Run(ctx)
+			err := s.autopilotService.Run(ctx)
 			if ctx.Err() != nil || s.stopping() {
 				return
 			}
 			if err == nil {
-				err = errors.New("automata controller exited unexpectedly")
+				err = errors.New("autopilot controller exited unexpectedly")
 			}
-			logger.Error(ctx, "Automata controller stopped unexpectedly", tag.Error(err))
+			logger.Error(ctx, "Autopilot controller stopped unexpectedly", tag.Error(err))
 			s.Stop(ctx)
 		})
 	}
@@ -734,9 +734,9 @@ func (s *Scheduler) runTick(ctx context.Context, tickTime time.Time) {
 	for _, run := range s.planner.Plan(ctx, tickTime) {
 		s.dispatchRun(ctx, run)
 	}
-	if s.automataService != nil {
-		if err := s.automataService.HandleScheduleTick(ctx, tickTime); err != nil {
-			logger.Warn(ctx, "Automata schedule tick failed", tag.Error(err))
+	if s.autopilotService != nil {
+		if err := s.autopilotService.HandleScheduleTick(ctx, tickTime); err != nil {
+			logger.Warn(ctx, "Autopilot schedule tick failed", tag.Error(err))
 		}
 	}
 	s.planner.Advance(tickTime)

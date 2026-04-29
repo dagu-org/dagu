@@ -1,0 +1,588 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+import React from 'react';
+import { Search } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  isValidAutopilotIconUrl,
+  parseAutopilotScheduleText,
+  validateAutopilotScheduleExpressions,
+} from '@/features/autopilot/detail-utils';
+import {
+  applySelectedWorkspaceToAutopilotTags,
+  workspaceTagForAutopilotSelection,
+} from '@/features/autopilot/workspace';
+import { useClient, useQuery } from '@/hooks/api';
+
+const AUTOPILOT_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_]*$/;
+const MAX_AUTOPILOT_NICKNAME_LENGTH = 80;
+const MAX_AUTOPILOT_ICON_URL_LENGTH = 2048;
+const MAX_DAG_PICKER_MATCHES = 25;
+
+export type DAGOption = {
+  fileName: string;
+  name: string;
+};
+
+function parseTagInput(value: string): string[] {
+  return Array.from(
+    new Set(
+      value
+        .split(/[\n,]/)
+        .map((item) => item.trim())
+        .filter(Boolean)
+    )
+  );
+}
+
+function quoteYAML(value: string): string {
+  return JSON.stringify(value.trim());
+}
+
+function buildAutopilotSpec(input: {
+  nickname: string;
+  iconUrl: string;
+  description: string;
+  goal: string;
+  standingInstruction: string;
+  resetOnFinish: boolean;
+  schedule: string[];
+  tags: string[];
+  allowedDAGNames: string[];
+}): string {
+  const nickname = input.nickname.trim();
+  const iconUrl = input.iconUrl.trim();
+  const description = input.description.trim();
+  const standingInstruction = input.standingInstruction.trim();
+  const lines: string[] = [];
+
+  if (nickname) {
+    lines.push(`nickname: ${quoteYAML(nickname)}`);
+  }
+  if (iconUrl) {
+    lines.push(`icon_url: ${quoteYAML(iconUrl)}`);
+  }
+  if (description) {
+    lines.push(`description: ${quoteYAML(description)}`);
+  }
+  if (input.goal.trim()) {
+    lines.push(`goal: ${quoteYAML(input.goal)}`);
+  }
+  if (standingInstruction) {
+    lines.push(`standing_instruction: ${quoteYAML(standingInstruction)}`);
+  }
+  if (input.resetOnFinish) {
+    lines.push('reset_on_finish: true');
+  }
+  if (input.schedule.length === 1) {
+    lines.push(`schedule: ${quoteYAML(input.schedule[0] || '')}`);
+  } else if (input.schedule.length > 1) {
+    lines.push('schedule:');
+    input.schedule.forEach((expression) => {
+      lines.push(`  - ${quoteYAML(expression)}`);
+    });
+  }
+  if (input.tags.length) {
+    lines.push('tags:');
+    input.tags.forEach((tag) => {
+      lines.push(`  - ${quoteYAML(tag)}`);
+    });
+  }
+
+  lines.push('allowed_dags:');
+  lines.push('  names:');
+  Array.from(
+    new Set(input.allowedDAGNames.map((name) => name.trim()).filter(Boolean))
+  ).forEach((dagName) => {
+    lines.push(`    - ${quoteYAML(dagName)}`);
+  });
+
+  lines.push('');
+  lines.push('agent:');
+  lines.push('  safeMode: true');
+  lines.push('');
+
+  return lines.join('\n');
+}
+
+function validateAutopilotCreateForm(input: {
+  name: string;
+  nickname: string;
+  iconUrl: string;
+  goal: string;
+  schedule: string[];
+  allowedDAGNames: string[];
+}): string | null {
+  const name = input.name.trim();
+  const nickname = input.nickname.trim();
+  const iconUrl = input.iconUrl.trim();
+  if (!name) {
+    return 'Autopilot name is required.';
+  }
+  if (!AUTOPILOT_NAME_PATTERN.test(name)) {
+    return 'Autopilot name must start with a letter or number and use only letters, numbers, and underscores.';
+  }
+  if (nickname.includes('\n') || nickname.includes('\r')) {
+    return 'Nickname must be a single line.';
+  }
+  if (nickname.length > MAX_AUTOPILOT_NICKNAME_LENGTH) {
+    return `Nickname must be ${MAX_AUTOPILOT_NICKNAME_LENGTH} characters or fewer.`;
+  }
+  if (!isValidAutopilotIconUrl(iconUrl)) {
+    return 'Icon URL must be an absolute http(s) URL or a root-relative path.';
+  }
+  if (iconUrl.length > MAX_AUTOPILOT_ICON_URL_LENGTH) {
+    return `Icon URL must be ${MAX_AUTOPILOT_ICON_URL_LENGTH} characters or fewer.`;
+  }
+  const scheduleError = validateAutopilotScheduleExpressions(input.schedule);
+  if (scheduleError) {
+    return scheduleError;
+  }
+  if (input.allowedDAGNames.length === 0) {
+    return 'Select at least one allowed DAG.';
+  }
+  return null;
+}
+
+export function DAGNamePicker({
+  availableDAGs,
+  selectedNames,
+  onChange,
+  searchQuery,
+  onSearchQueryChange,
+  isLoading,
+  disabled,
+}: {
+  availableDAGs: DAGOption[];
+  selectedNames: string[];
+  onChange: (names: string[]) => void;
+  searchQuery?: string;
+  onSearchQueryChange?: (query: string) => void;
+  isLoading?: boolean;
+  disabled?: boolean;
+}): React.ReactElement {
+  const [internalSearchQuery, setInternalSearchQuery] = React.useState('');
+  const currentSearchQuery = searchQuery ?? internalSearchQuery;
+  const setCurrentSearchQuery = onSearchQueryChange ?? setInternalSearchQuery;
+  const selectedNameSet = React.useMemo(
+    () => new Set(selectedNames),
+    [selectedNames]
+  );
+  const searchText = currentSearchQuery.trim();
+  const filteredDAGs = React.useMemo(() => {
+    const query = searchText.toLowerCase();
+    if (!query) {
+      return [];
+    }
+    return availableDAGs
+      .filter(
+        (dag) =>
+          dag.fileName.toLowerCase().includes(query) ||
+          dag.name.toLowerCase().includes(query)
+      )
+      .slice(0, MAX_DAG_PICKER_MATCHES);
+  }, [availableDAGs, searchText]);
+
+  const toggleSelection = (fileName: string) => {
+    if (selectedNameSet.has(fileName)) {
+      onChange(selectedNames.filter((name) => name !== fileName));
+      return;
+    }
+    onChange([...selectedNames, fileName]);
+    setCurrentSearchQuery('');
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex min-h-8 flex-wrap gap-1">
+        {selectedNames.length ? (
+          selectedNames.map((dagName) => (
+            <span
+              key={dagName}
+              className="inline-flex items-center gap-1 rounded bg-secondary px-2 py-0.5 text-xs text-secondary-foreground"
+            >
+              <span className="max-w-[180px] truncate">{dagName}</span>
+              <button
+                type="button"
+                onClick={() =>
+                  onChange(selectedNames.filter((name) => name !== dagName))
+                }
+                disabled={disabled}
+                aria-label={`Remove ${dagName}`}
+                title={`Remove ${dagName}`}
+                className="rounded-sm px-1 py-0.5 text-[11px] font-medium text-muted-foreground transition hover:bg-background hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Remove
+              </button>
+            </span>
+          ))
+        ) : (
+          <div className="text-xs text-muted-foreground">No DAGs selected.</div>
+        )}
+      </div>
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-2 top-2 h-4 w-4 text-muted-foreground" />
+        <Input
+          value={currentSearchQuery}
+          onChange={(event) => setCurrentSearchQuery(event.target.value)}
+          placeholder="Search DAGs"
+          disabled={disabled}
+          className="pl-8"
+        />
+      </div>
+      {searchText ? (
+        <div className="max-h-64 overflow-y-auto rounded-md border p-1">
+          {filteredDAGs.length ? (
+            filteredDAGs.map((dag) => {
+              const selected = selectedNameSet.has(dag.fileName);
+              return (
+                <button
+                  key={dag.fileName}
+                  type="button"
+                  onClick={() => toggleSelection(dag.fileName)}
+                  disabled={disabled}
+                  className={`flex w-full items-start justify-between gap-3 rounded px-3 py-2 text-left text-sm hover:bg-accent ${selected ? 'bg-accent' : ''}`}
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block whitespace-normal break-words font-mono text-xs">
+                      {dag.fileName}
+                    </span>
+                    {dag.name && dag.name !== dag.fileName ? (
+                      <span className="mt-0.5 block whitespace-normal break-words text-xs text-muted-foreground">
+                        {dag.name}
+                      </span>
+                    ) : null}
+                  </span>
+                  {selected ? (
+                    <span className="shrink-0 text-primary">Selected</span>
+                  ) : null}
+                </button>
+              );
+            })
+          ) : (
+            <div className="px-3 py-2 text-sm text-muted-foreground">
+              {isLoading ? 'Loading DAGs...' : 'No DAGs found.'}
+            </div>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function AutopilotCreateModal({
+  open,
+  onClose,
+  selectedWorkspace,
+  remoteNode,
+  onCreated,
+}: {
+  open: boolean;
+  onClose: () => void;
+  selectedWorkspace: string;
+  remoteNode: string;
+  onCreated: (name: string) => void | Promise<void>;
+}): React.ReactElement {
+  const client = useClient();
+  const selectedWorkspaceTag =
+    workspaceTagForAutopilotSelection(selectedWorkspace);
+  const [createName, setCreateName] = React.useState('');
+  const [createNickname, setCreateNickname] = React.useState('');
+  const [createIconUrl, setCreateIconUrl] = React.useState('');
+  const [createDescription, setCreateDescription] = React.useState('');
+  const [createGoal, setCreateGoal] = React.useState('');
+  const [createStandingInstruction, setCreateStandingInstruction] =
+    React.useState('');
+  const [createResetOnFinish, setCreateResetOnFinish] = React.useState(false);
+  const [createSchedule, setCreateSchedule] = React.useState('');
+  const [createTags, setCreateTags] = React.useState('');
+  const [createAllowedDAGNames, setCreateAllowedDAGNames] = React.useState<
+    string[]
+  >([]);
+  const [dagSearchQuery, setDagSearchQuery] = React.useState('');
+  const [createError, setCreateError] = React.useState('');
+  const [isCreating, setIsCreating] = React.useState(false);
+  const dagSearchName = dagSearchQuery.trim();
+
+  const dagListQuery = useQuery(
+    '/dags',
+    open && dagSearchName
+      ? {
+          params: {
+            query: {
+              perPage: MAX_DAG_PICKER_MATCHES,
+              remoteNode: remoteNode || undefined,
+              labels: selectedWorkspaceTag,
+              name: dagSearchName,
+            },
+          },
+        }
+      : null,
+    { refreshInterval: 15000 }
+  );
+
+  const availableDAGOptions = React.useMemo<DAGOption[]>(() => {
+    return (dagListQuery.data?.dags || []).map((dag) => ({
+      fileName: dag.fileName,
+      name: dag.dag?.name || dag.fileName,
+    }));
+  }, [dagListQuery.data?.dags]);
+
+  const resetForm = React.useCallback(() => {
+    setCreateName('');
+    setCreateNickname('');
+    setCreateIconUrl('');
+    setCreateDescription('');
+    setCreateGoal('');
+    setCreateStandingInstruction('');
+    setCreateResetOnFinish(false);
+    setCreateSchedule('');
+    setCreateTags(selectedWorkspaceTag || '');
+    setCreateAllowedDAGNames([]);
+    setDagSearchQuery('');
+    setCreateError('');
+    setIsCreating(false);
+  }, [selectedWorkspaceTag]);
+
+  React.useEffect(() => {
+    if (open) {
+      resetForm();
+    }
+  }, [open, resetForm]);
+
+  const handleClose = () => {
+    if (isCreating) {
+      return;
+    }
+    onClose();
+  };
+
+  const onCreate = async () => {
+    const parsedSchedule = parseAutopilotScheduleText(createSchedule);
+    const validationError = validateAutopilotCreateForm({
+      name: createName,
+      nickname: createNickname,
+      iconUrl: createIconUrl,
+      goal: createGoal,
+      schedule: parsedSchedule,
+      allowedDAGNames: createAllowedDAGNames,
+    });
+    if (validationError) {
+      setCreateError(validationError);
+      return;
+    }
+
+    const autopilotName = createName.trim();
+    setCreateError('');
+    setIsCreating(true);
+    try {
+      const { error: apiError } = await client.PUT('/autopilot/{name}/spec', {
+        params: { path: { name: autopilotName } },
+        body: {
+          spec: buildAutopilotSpec({
+            nickname: createNickname,
+            iconUrl: createIconUrl,
+            description: createDescription,
+            goal: createGoal,
+            standingInstruction: createStandingInstruction,
+            resetOnFinish: createResetOnFinish,
+            schedule: parsedSchedule,
+            tags: applySelectedWorkspaceToAutopilotTags(
+              parseTagInput(createTags),
+              selectedWorkspace
+            ),
+            allowedDAGNames: createAllowedDAGNames,
+          }),
+        },
+      });
+      if (apiError) {
+        throw new Error(apiError.message || 'Failed to create autopilot');
+      }
+      await onCreated(autopilotName);
+      onClose();
+      resetForm();
+    } catch (err) {
+      setCreateError(
+        err instanceof Error ? err.message : 'Failed to create autopilot'
+      );
+      setIsCreating(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && handleClose()}>
+      <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Create Autopilot</DialogTitle>
+          <DialogDescription>
+            Configure the Autopilot, its task scope, and its allowlisted DAGs.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-4">
+          <div className="grid gap-2">
+            <Label htmlFor="autopilot-create-name">Name</Label>
+            <Input
+              id="autopilot-create-name"
+              value={createName}
+              onChange={(event) => setCreateName(event.target.value)}
+              placeholder="software_dev"
+              autoFocus
+              disabled={isCreating}
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="autopilot-create-nickname">Nickname</Label>
+            <Input
+              id="autopilot-create-nickname"
+              value={createNickname}
+              onChange={(event) => setCreateNickname(event.target.value)}
+              placeholder="Build Captain"
+              disabled={isCreating}
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="autopilot-create-icon-url">Image URL</Label>
+            <Input
+              id="autopilot-create-icon-url"
+              value={createIconUrl}
+              onChange={(event) => setCreateIconUrl(event.target.value)}
+              placeholder="https://cdn.example.com/autopilot/build-captain.png"
+              disabled={isCreating}
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="autopilot-create-description">Description</Label>
+            <Input
+              id="autopilot-create-description"
+              value={createDescription}
+              onChange={(event) => setCreateDescription(event.target.value)}
+              placeholder="Automates one software delivery workflow"
+              disabled={isCreating}
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="autopilot-create-goal">Goal</Label>
+            <Textarea
+              id="autopilot-create-goal"
+              value={createGoal}
+              onChange={(event) => setCreateGoal(event.target.value)}
+              placeholder="Complete the assigned task and leave it ready for review"
+              disabled={isCreating}
+            />
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-2">
+              <Label htmlFor="autopilot-create-standing-instruction">
+                Standing Instruction
+              </Label>
+              <Textarea
+                id="autopilot-create-standing-instruction"
+                value={createStandingInstruction}
+                onChange={(event) =>
+                  setCreateStandingInstruction(event.target.value)
+                }
+                placeholder="Handle each cycle and work through the task list."
+                disabled={isCreating}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="autopilot-create-schedule">Schedule</Label>
+              <Textarea
+                id="autopilot-create-schedule"
+                value={createSchedule}
+                onChange={(event) => setCreateSchedule(event.target.value)}
+                placeholder={'0 * * * *\n30 9 * * 1-5'}
+                disabled={isCreating}
+                rows={4}
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between gap-4 rounded-md border px-3 py-2">
+            <Label htmlFor="autopilot-create-reset-on-finish">
+              Reset on finish
+            </Label>
+            <Switch
+              id="autopilot-create-reset-on-finish"
+              checked={createResetOnFinish}
+              onCheckedChange={setCreateResetOnFinish}
+              disabled={isCreating}
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="autopilot-create-tags">Tags</Label>
+            <Textarea
+              id="autopilot-create-tags"
+              value={createTags}
+              onChange={(event) => setCreateTags(event.target.value)}
+              placeholder={'workspace=engineering, owner=team-ai'}
+              disabled={isCreating}
+              rows={2}
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <div className="flex items-center justify-between gap-3">
+              <Label>Allowed DAGs</Label>
+              <span className="text-xs text-muted-foreground">
+                {dagListQuery.isLoading
+                  ? 'Loading DAGs...'
+                  : `${createAllowedDAGNames.length} selected`}
+              </span>
+            </div>
+            <DAGNamePicker
+              availableDAGs={availableDAGOptions}
+              selectedNames={createAllowedDAGNames}
+              onChange={setCreateAllowedDAGNames}
+              searchQuery={dagSearchQuery}
+              onSearchQueryChange={setDagSearchQuery}
+              isLoading={dagListQuery.isLoading}
+              disabled={isCreating}
+            />
+          </div>
+
+          {createError ? (
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {createError}
+            </div>
+          ) : null}
+        </div>
+
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={handleClose}
+            disabled={isCreating}
+          >
+            Cancel
+          </Button>
+          <Button type="button" onClick={onCreate} disabled={isCreating}>
+            {isCreating ? 'Creating...' : 'Create Autopilot'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

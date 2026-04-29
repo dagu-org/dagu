@@ -370,11 +370,11 @@ func TestStart(t *testing.T) {
 	t.Run("StartWithDefaultWorkingDir", func(t *testing.T) {
 		t.Parallel()
 		opts := runtime.StartOptions{
-			DefaultWorkingDir: "/automata/workspace",
+			DefaultWorkingDir: "/autopilot/workspace",
 		}
 		spec := builder.Start(dag, opts)
 
-		assert.Contains(t, spec.Args, "--default-working-dir=/automata/workspace")
+		assert.Contains(t, spec.Args, "--default-working-dir=/autopilot/workspace")
 	})
 
 	t.Run("StartWithAllOptions", func(t *testing.T) {
@@ -486,11 +486,11 @@ func TestEnqueue(t *testing.T) {
 	t.Run("EnqueueWithDefaultWorkingDir", func(t *testing.T) {
 		t.Parallel()
 		opts := runtime.EnqueueOptions{
-			DefaultWorkingDir: "/automata/workspace",
+			DefaultWorkingDir: "/autopilot/workspace",
 		}
 		spec := builder.Enqueue(dag, opts)
 
-		assert.Contains(t, spec.Args, "--default-working-dir=/automata/workspace")
+		assert.Contains(t, spec.Args, "--default-working-dir=/autopilot/workspace")
 	})
 
 	t.Run("EnqueueWithAllOptions", func(t *testing.T) {

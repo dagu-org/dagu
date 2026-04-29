@@ -47,8 +47,8 @@ type MemoryStore interface {
 	// LoadDAGMemory reads the MEMORY.md for a specific DAG, truncated to maxLines.
 	LoadDAGMemory(ctx context.Context, dagName string) (string, error)
 
-	// LoadAutomataMemory reads the MEMORY.md for a specific Automata, truncated to maxLines.
-	LoadAutomataMemory(ctx context.Context, automataName string) (string, error)
+	// LoadAutopilotMemory reads the MEMORY.md for a specific Autopilot, truncated to maxLines.
+	LoadAutopilotMemory(ctx context.Context, autopilotName string) (string, error)
 
 	// SaveGlobalMemory writes content to the global MEMORY.md.
 	SaveGlobalMemory(ctx context.Context, content string) error
@@ -56,14 +56,14 @@ type MemoryStore interface {
 	// SaveDAGMemory writes content to a DAG-specific MEMORY.md.
 	SaveDAGMemory(ctx context.Context, dagName string, content string) error
 
-	// SaveAutomataMemory writes content to an Automata-specific MEMORY.md.
-	SaveAutomataMemory(ctx context.Context, automataName string, content string) error
+	// SaveAutopilotMemory writes content to an Autopilot-specific MEMORY.md.
+	SaveAutopilotMemory(ctx context.Context, autopilotName string, content string) error
 
 	// MemoryDir returns the root memory directory path.
 	MemoryDir() string
 
-	// AutomataMemoryPath returns the resolved path to an Automata-specific MEMORY.md.
-	AutomataMemoryPath(automataName string) (string, error)
+	// AutopilotMemoryPath returns the resolved path to an Autopilot-specific MEMORY.md.
+	AutopilotMemoryPath(autopilotName string) (string, error)
 
 	// ListDAGMemories returns the names of all DAGs that have memory files.
 	ListDAGMemories(ctx context.Context) ([]string, error)
@@ -74,16 +74,16 @@ type MemoryStore interface {
 	// DeleteDAGMemory removes a DAG-specific MEMORY.md file.
 	DeleteDAGMemory(ctx context.Context, dagName string) error
 
-	// DeleteAutomataMemory removes an Automata-specific MEMORY.md file.
-	DeleteAutomataMemory(ctx context.Context, automataName string) error
+	// DeleteAutopilotMemory removes an Autopilot-specific MEMORY.md file.
+	DeleteAutopilotMemory(ctx context.Context, autopilotName string) error
 }
 
-// AutomataDocumentStore provides access to per-Automata document files.
-type AutomataDocumentStore interface {
-	LoadAutomataDocument(ctx context.Context, automataName, document string) (string, error)
-	SaveAutomataDocument(ctx context.Context, automataName, document, content string) error
-	DeleteAutomataDocument(ctx context.Context, automataName, document string) error
-	AutomataDocumentPath(automataName, document string) (string, error)
+// AutopilotDocumentStore provides access to per-Autopilot document files.
+type AutopilotDocumentStore interface {
+	LoadAutopilotDocument(ctx context.Context, autopilotName, document string) (string, error)
+	SaveAutopilotDocument(ctx context.Context, autopilotName, document, content string) error
+	DeleteAutopilotDocument(ctx context.Context, autopilotName, document string) error
+	AutopilotDocumentPath(autopilotName, document string) (string, error)
 }
 
 // DAGMetadataStore resolves DAG metadata used by the agent API.

@@ -90,12 +90,12 @@ export function EventLogsFilters({
           />
         </div>
         <Input
-          value={draftFilters.automataName}
+          value={draftFilters.autopilotName}
           onChange={(event) =>
-            updateDraftFilters({ automataName: event.target.value })
+            updateDraftFilters({ autopilotName: event.target.value })
           }
           onKeyDown={onKeyDown}
-          placeholder="Automata name"
+          placeholder="Autopilot name"
           className="h-8 w-[220px]"
         />
         <Input

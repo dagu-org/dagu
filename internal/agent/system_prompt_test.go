@@ -64,7 +64,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 
 		assert.NotContains(t, result, "<global_memory>")
 		assert.NotContains(t, result, "<dag_memory")
-		assert.NotContains(t, result, "<automata_memory")
+		assert.NotContains(t, result, "<autopilot_memory")
 		assert.NotContains(t, result, "<memory_paths>")
 		assert.NotContains(t, result, "<memory_management>")
 	})
@@ -102,21 +102,21 @@ func TestGenerateSystemPrompt(t *testing.T) {
 		assert.Contains(t, result, "DAG-specific info.")
 	})
 
-	t.Run("includes automata memory", func(t *testing.T) {
+	t.Run("includes autopilot memory", func(t *testing.T) {
 		t.Parallel()
 		env := EnvironmentInfo{DAGsDir: "/dags"}
 		mem := MemoryContent{
-			GlobalMemory:   "Global info.",
-			AutomataMemory: "Automata-specific operating rules.",
-			AutomataName:   "queue_worker",
-			MemoryDir:      "/dags/memory",
+			GlobalMemory:    "Global info.",
+			AutopilotMemory: "Autopilot-specific operating rules.",
+			AutopilotName:   "queue_worker",
+			MemoryDir:       "/dags/memory",
 		}
 
 		result := GenerateSystemPrompt(SystemPromptParams{Env: env, Memory: mem, Role: auth.RoleViewer})
 
 		assert.Contains(t, result, "<global_memory>")
-		assert.Contains(t, result, `<automata_memory automata="queue_worker">`)
-		assert.Contains(t, result, "Automata-specific operating rules.")
+		assert.Contains(t, result, `<autopilot_memory autopilot="queue_worker">`)
+		assert.Contains(t, result, "Autopilot-specific operating rules.")
 	})
 
 	t.Run("memory paths appear in output", func(t *testing.T) {
@@ -133,18 +133,18 @@ func TestGenerateSystemPrompt(t *testing.T) {
 		assert.Contains(t, result, "/dags/memory/dags/test-dag/MEMORY.md")
 	})
 
-	t.Run("automata memory paths appear in output", func(t *testing.T) {
+	t.Run("autopilot memory paths appear in output", func(t *testing.T) {
 		t.Parallel()
 		env := EnvironmentInfo{DAGsDir: "/dags"}
 		mem := MemoryContent{
-			MemoryDir:    "/dags/memory",
-			AutomataName: "queue_worker",
+			MemoryDir:     "/dags/memory",
+			AutopilotName: "queue_worker",
 		}
 
 		result := GenerateSystemPrompt(SystemPromptParams{Env: env, Memory: mem, Role: auth.RoleViewer})
 
 		assert.Contains(t, result, "/dags/memory/MEMORY.md")
-		assert.Contains(t, result, "/dags/memory/automata/queue_worker/MEMORY.md")
+		assert.Contains(t, result, "/dags/memory/autopilot/queue_worker/MEMORY.md")
 	})
 
 	t.Run("memory management enforces DAG-first policy", func(t *testing.T) {
@@ -158,9 +158,9 @@ func TestGenerateSystemPrompt(t *testing.T) {
 		result := GenerateSystemPrompt(SystemPromptParams{Env: env, Memory: mem, Role: auth.RoleViewer})
 
 		assert.Contains(t, result, "If DAG context is available, save memory to Per-DAG by default (not Global)")
-		assert.Contains(t, result, "If Automata context is available, save memory to Per-Automata by default (not Global)")
+		assert.Contains(t, result, "If Autopilot context is available, save memory to Per-Autopilot by default (not Global)")
 		assert.Contains(t, result, "After creating or updating a DAG, if anything should be remembered, create/update that DAG's memory file")
-		assert.Contains(t, result, "After updating an Automata's long-lived behavior, operating rules, or learned procedures, create/update that Automata's memory file")
+		assert.Contains(t, result, "After updating an Autopilot's long-lived behavior, operating rules, or learned procedures, create/update that Autopilot's memory file")
 		assert.Contains(t, result, "Global memory is only for cross-DAG or user-wide stable preferences/policies")
 	})
 
@@ -173,7 +173,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 
 		result := GenerateSystemPrompt(SystemPromptParams{Env: env, Memory: mem, Role: auth.RoleViewer})
 
-		assert.Contains(t, result, "If no DAG or Automata context is available, ask the user before writing to Global memory")
+		assert.Contains(t, result, "If no DAG or Autopilot context is available, ask the user before writing to Global memory")
 	})
 
 	t.Run("read-only memory omits writable guidance and paths", func(t *testing.T) {

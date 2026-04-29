@@ -62,21 +62,21 @@ func (s ServiceStatus) String() string {
 	}
 }
 
-// AutomataControllerState represents the readiness of the scheduler-owned
-// Automata controller.
-type AutomataControllerState string
+// AutopilotControllerState represents the readiness of the scheduler-owned
+// Autopilot controller.
+type AutopilotControllerState string
 
 const (
-	AutomataControllerStateReady       AutomataControllerState = "ready"
-	AutomataControllerStateDisabled    AutomataControllerState = "disabled"
-	AutomataControllerStateUnavailable AutomataControllerState = "unavailable"
-	AutomataControllerStateUnknown     AutomataControllerState = "unknown"
+	AutopilotControllerStateReady       AutopilotControllerState = "ready"
+	AutopilotControllerStateDisabled    AutopilotControllerState = "disabled"
+	AutopilotControllerStateUnavailable AutopilotControllerState = "unavailable"
+	AutopilotControllerStateUnknown     AutopilotControllerState = "unknown"
 )
 
-// AutomataControllerInfo describes scheduler-owned Automata controller state.
-type AutomataControllerInfo struct {
-	State   AutomataControllerState `json:"state"`
-	Message string                  `json:"message,omitempty"`
+// AutopilotControllerInfo describes scheduler-owned Autopilot controller state.
+type AutopilotControllerInfo struct {
+	State   AutopilotControllerState `json:"state"`
+	Message string                   `json:"message,omitempty"`
 }
 
 // HostInfo contains information about a host in the service registry system
@@ -91,7 +91,7 @@ type HostInfo struct {
 	Status ServiceStatus
 	// StartedAt is when the service instance was started
 	StartedAt time.Time
-	// AutomataController describes scheduler-side Automata readiness when the
+	// AutopilotController describes scheduler-side Autopilot readiness when the
 	// service is a scheduler. Nil means the publisher did not provide it.
-	AutomataController *AutomataControllerInfo
+	AutopilotController *AutopilotControllerInfo
 }
