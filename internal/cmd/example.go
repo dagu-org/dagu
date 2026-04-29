@@ -77,8 +77,19 @@ defaults:
     limit: 2
     interval_sec: 5
 params:
-  - ENV: "production"
-  - BATCH_SIZE: "100"
+  - name: ENV
+    type: string
+    enum: [DEV, STG, PROD]
+    description: Target environment for the scheduled batch run
+    required: true
+    default: STG
+  - name: BATCH_SIZE
+    type: integer
+    minimum: 1
+    maximum: 1000
+    description: Number of records processed per batch
+    required: true
+    default: 100
 env:
   - LOG_LEVEL: "info"
   - TIMESTAMP: "` + "`date +%Y%m%d`" + `"
@@ -127,15 +138,20 @@ defaults:
     limit: 2
     interval_sec: 5
 params:
-  - ENV: "staging"
+  - name: ENV
+    type: string
+    enum: [DEV, STG, PROD]
+    description: Deployment environment; only PROD satisfies the gate
+    required: true
+    default: STG
 steps:
   - name: check-env
     command: echo "verifying environment"
   - name: deploy
     command: echo "deploying application"
     preconditions:
-      - condition: "echo ${ENV}"
-        expected: "production"
+      - condition: "${ENV}"
+        expected: "PROD"
     depends: [check-env]
   - name: notify
     command: echo "deployment complete"
@@ -202,15 +218,11 @@ container:
     - /tmp/dagu-example:/work
 steps:
   - name: write-data
-    command: python -c "
-      with open('/work/data.txt', 'w') as f:
-        f.write('Hello from Dagu!')
-      "
+    command: >-
+      python -c "with open('/work/data.txt', 'w') as f: f.write('Hello from Dagu!')"
   - name: process
-    command: python -c "
-      with open('/work/data.txt') as f:
-        print(f.read().upper())
-      "
+    command: >-
+      python -c "with open('/work/data.txt') as f: print(f.read().upper())"
     depends: [write-data]
 `,
 	},
@@ -228,9 +240,7 @@ steps:
     command: echo "starting main workflow"
   - name: run-etl
     call: etl-job
-    params:
-      SOURCE: "/data/input.csv"
-      TARGET: "/data/output.csv"
+    params: "SOURCE=/data/input.csv TARGET=/data/output.csv"
     depends: [prepare]
   - name: done
     command: echo "pipeline complete"
@@ -238,8 +248,16 @@ steps:
 ---
 name: etl-job
 params:
-  - SOURCE: ""
-  - TARGET: ""
+  - name: SOURCE
+    type: string
+    description: Input dataset or file path received from the parent DAG
+    required: true
+    default: /data/default-input.csv
+  - name: TARGET
+    type: string
+    description: Output dataset or file path produced by the sub-DAG
+    required: true
+    default: /data/default-output.csv
 type: graph
 steps:
   - name: extract
@@ -278,52 +296,279 @@ steps:
 	{
 		ID:          11,
 		Name:        "approval-gate",
-		Description: "Add human approval gates to a workflow",
+		Description: "Draft release notes with an agent, push back with rewind_to, then deploy",
 		Content: `type: graph
+artifacts:
+  enabled: true
 steps:
-  - name: build
-    command: echo "build artifact v1.2.3"
+  - id: build
+    command: echo "v1.2.3"
     output: VERSION
-  - name: review
-    command: echo "ready to deploy v${VERSION}"
-    approval:
-      prompt: "Approve deployment to production?"
-      input: [APPROVER, NOTES]
-      required: [APPROVER]
+  - id: draft_release_notes
     depends: [build]
-  - name: deploy
-    command: echo "deploying v${VERSION} approved by ${APPROVER}"
-    depends: [review]
+    type: agent
+    agent:
+      prompt: "You draft concise release notes."
+    messages:
+      - role: user
+        content: |
+          Draft release notes for version ${VERSION}.
+
+          Current draft path: ${DAG_RUN_ARTIFACTS_DIR}/release-notes.md
+
+          Reviewer feedback from the latest push-back: ${FEEDBACK}
+          
+          Return Markdown with a summary and deployment notes.
+          If FEEDBACK is empty, produce the first draft.
+          If FEEDBACK is set, read the existing draft from the path above and revise it to address the feedback.
+    stdout: ${DAG_RUN_ARTIFACTS_DIR}/release-notes.md
+    approval:
+      prompt: "Review the release-notes.md artifact. Push back with FEEDBACK to regenerate it, or approve to continue to deploy."
+      input: [FEEDBACK]
+      rewind_to: draft_release_notes
+  - id: deploy
+    depends: [draft_release_notes]
+    command: echo "deploying ${VERSION} with reviewed release notes"
 `,
 	},
 	{
 		ID:          12,
 		Name:        "agent-step",
-		Description: "Run an AI agent as a workflow step",
+		Description: "Build the agent prompt with a template and write a report artifact",
 		Content: `type: graph
+artifacts:
+  enabled: true
 defaults:
   retry_policy:
     limit: 2
     interval_sec: 5
 steps:
-  - name: gather-logs
-    command: echo "error: connection timeout at 10:23 AM"
+  - id: gather_logs
+    command: 'echo "error: connection timeout at 10:23 AM"'
+    # output captures stdout into a variable, but the default max_output_size
+    # is 1048576 bytes (1 MiB). If logs can exceed that, write them to a
+    # temporary file instead and pass the file path to later steps.
     output: ERROR_LOG
-  - name: analyze
+  - id: build_prompt
+    type: template
+    with:
+      data:
+        error_log: ${ERROR_LOG}
+    script: |
+      Analyze this incident log and suggest a fix:
+      
+      {{ .error_log }}
+    output: ANALYSIS_PROMPT
+    depends: [gather_logs]
+  - id: analyze
     type: agent
     agent:
       prompt: "You are a concise incident analyst."
       max_iterations: 10
     messages:
       - role: user
-        content: |
-          Analyze this error and suggest a fix:
-          ${ERROR_LOG}
+        content: ${ANALYSIS_PROMPT}
     output: ANALYSIS
-    depends: [gather-logs]
-  - name: report
-    command: echo "Analysis result - ${ANALYSIS}"
+    depends: [build_prompt]
+  - id: report
+    type: template
+    with:
+      output: ${DAG_RUN_ARTIFACTS_DIR}/report.md
+      data:
+        error_log: ${ERROR_LOG}
+        analysis: ${ANALYSIS}
+    script: |
+      # Incident Report
+      
+      ## Error Log
+      
+      {{ .error_log }}
+      
+      ## Analysis
+      
+      {{ .analysis }}
     depends: [analyze]
+`,
+	},
+	{
+		ID:          13,
+		Name:        "custom-step-type",
+		Description: "Define a typed reusable step with step_types and with",
+		Content: `type: graph
+step_types:
+  announce_release:
+    type: command
+    description: Print a reusable release announcement
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [channel, version]
+      properties:
+        channel:
+          type: string
+          enum: [changelog, email, slack]
+        version:
+          type: string
+        summary:
+          type: string
+          default: Ready for rollout
+    template:
+      command: echo {{ json .input.channel }} release {{ json .input.version }} - {{ json .input.summary }}
+steps:
+  - id: build
+    command: echo "v1.2.3"
+    output: VERSION
+  - id: announce_changelog
+    type: announce_release
+    with:
+      channel: changelog
+      version: ${VERSION}
+    depends: [build]
+  - id: announce_email
+    type: announce_release
+    with:
+      channel: email
+      version: ${VERSION}
+      summary: Sent to subscribers
+    depends: [build]
+`,
+	},
+	{
+		ID:          14,
+		Name:        "template-step",
+		Description: "Render a deployment config artifact with structured data",
+		Content: `type: graph
+artifacts:
+  enabled: true
+params:
+  - name: ENV
+    type: string
+    enum: [DEV, STG, PROD]
+    description: Target environment for the rendered config
+    required: true
+    default: STG
+steps:
+  - id: build
+    command: echo "v1.2.3"
+    output: VERSION
+  - id: render_config
+    type: template
+    with:
+      output: ${DAG_RUN_ARTIFACTS_DIR}/deploy.env
+      data:
+        env: ${ENV}
+        version: ${VERSION}
+    script: |
+      APP_ENV={{ .env }}
+      APP_VERSION={{ .version }}
+      FEATURE_FLAG=true
+    depends: [build]
+  - id: preview
+    command: cat ${DAG_RUN_ARTIFACTS_DIR}/deploy.env
+    depends: [render_config]
+`,
+	},
+	{
+		ID:          15,
+		Name:        "harness-step",
+		Description: "Build a harness prompt with template and write the result as an artifact",
+		Content: `type: graph
+artifacts:
+  enabled: true
+harness:
+  # DAG-level defaults for harness steps. provider may be built-in or from harnesses:.
+  provider: claude
+  model: sonnet
+  bare: true
+steps:
+  - id: gather_issue
+    command: echo "scheduler retries the same task after it already succeeded"
+    output: ISSUE
+  - id: build_prompt
+    type: template
+    with:
+      data:
+        issue: ${ISSUE}
+    script: |
+      Review this workflow issue and suggest a fix:
+      
+      {{ .issue }}
+    output: HARNESS_PROMPT
+    depends: [gather_issue]
+  - id: analyze
+    type: harness
+    command: ${HARNESS_PROMPT}
+    with:
+      effort: high
+    output: ANALYSIS
+    depends: [build_prompt]
+  - id: report
+    type: template
+    with:
+      output: ${DAG_RUN_ARTIFACTS_DIR}/harness-report.md
+      data:
+        issue: ${ISSUE}
+        analysis: ${ANALYSIS}
+    script: |
+      # Harness Review
+      
+      ## Issue
+      
+      {{ .issue }}
+      
+      ## Suggested Fix
+      
+      {{ .analysis }}
+    depends: [analyze]
+`,
+	},
+	{
+		ID:          16,
+		Name:        "named-harnesses",
+		Description: "Define a named harness under harnesses and call it from a step",
+		Content: `type: graph
+artifacts:
+  enabled: true
+harnesses:
+  # Named custom harness adapters for CLIs that are not built in.
+  gemini:
+    binary: gemini
+    prompt_mode: flag
+    prompt_flag: --prompt
+    option_flags:
+      model: --model
+steps:
+  - id: gather_task
+    command: echo "Summarize the deployment checklist for the next engineer"
+    output: TASK
+  - id: build_prompt
+    type: template
+    with:
+      data:
+        task: ${TASK}
+    script: |
+      {{ .task }}
+      
+      Return a short handoff note.
+    output: PROMPT
+    depends: [gather_task]
+  - id: summarize
+    type: harness
+    command: ${PROMPT}
+    with:
+      provider: gemini
+      model: gemini-2.5-pro
+    output: SUMMARY
+    depends: [build_prompt]
+  - id: save_summary
+    type: template
+    with:
+      output: ${DAG_RUN_ARTIFACTS_DIR}/handoff.md
+      data:
+        summary: ${SUMMARY}
+    script: |
+      {{ .summary }}
+    depends: [summarize]
 `,
 	},
 }

@@ -7,7 +7,7 @@ Set automatically during DAG execution. Defined in `internal/core/exec/env.go`.
 ### Always Available (set for every step)
 
 | Variable | Description |
-|----------|-------------|
+| --------- | ----------- |
 | `DAG_NAME` | Name of the executing DAG |
 | `DAG_RUN_ID` | Unique run identifier |
 | `DAG_RUN_LOG_FILE` | Path to the main log file for the DAG run |
@@ -18,7 +18,7 @@ Set automatically during DAG execution. Defined in `internal/core/exec/env.go`.
 ### Conditionally Set
 
 | Variable | Condition | Description |
-|----------|-----------|-------------|
+| -------- | --------- | ----------- |
 | `DAG_RUN_WORK_DIR` | Only if a per-run working directory is configured | Path to the per-DAG-run working directory |
 | `DAG_DOCS_DIR` | Only if `paths.docs_dir` is configured | Per-DAG docs directory (`{docs_dir}/{dag_name}`) |
 | `DAGU_PARAMS_JSON` | Only if the DAG has parameters | Resolved parameters encoded as JSON |
@@ -27,10 +27,10 @@ Set automatically during DAG execution. Defined in `internal/core/exec/env.go`.
 
 These are only available inside lifecycle handler steps, not during normal step execution.
 
-| Variable | Handler Scope | Description |
-|----------|---------------|-------------|
-| `DAG_RUN_STATUS` | `onSuccess`, `onFailure`, `onAbort`, `onExit`, `onWait` | Current DAG run status (e.g., `success`, `failed`) |
-| `DAG_WAITING_STEPS` | `onWait` only | Comma-separated list of step names that are waiting for approval |
+| Variable            | Handler Scope                                        | Description                                                                |
+| ------------------- | ---------------------------------------------------- | -------------------------------------------------------------------------- |
+| `DAG_RUN_STATUS`    | `onSuccess`, `onFailure`, `onAbort`, `onExit`, `onWait` | Current DAG run status (e.g., `success`, `failed`)                         |
+| `DAG_WAITING_STEPS` | `onWait` only                                        | Comma-separated list of step names that are waiting for approval           |
 
 ## Param and Env Resolution
 
@@ -53,7 +53,7 @@ All configuration environment variables use the `DAGU_` prefix. They map to conf
 ### Paths
 
 | Variable | Default | Description |
-|----------|---------|-------------|
+| -------- | ------- | ----------- |
 | `DAGU_HOME` | XDG dirs | Base directory for all Dagu data. When set, all paths use unified structure under this directory |
 | `DAGU_DAGS_DIR` | `$DAGU_HOME/dags` | DAG YAML files directory |
 | `DAGU_LOG_DIR` | `$DAGU_HOME/logs` | Log files directory |
@@ -63,7 +63,7 @@ All configuration environment variables use the `DAGU_` prefix. They map to conf
 ### Server
 
 | Variable | Default | Description |
-|----------|---------|-------------|
+| -------- | ------- | ----------- |
 | `DAGU_HOST` | `127.0.0.1` | Server bind address |
 | `DAGU_PORT` | `8080` | Server port |
 | `DAGU_BASE_PATH` | `""` (empty) | URL base path for reverse proxy setups |
@@ -72,22 +72,22 @@ All configuration environment variables use the `DAGU_` prefix. They map to conf
 ### Core
 
 | Variable | Default | Description |
-|----------|---------|-------------|
+| -------- | ------- | ----------- |
 | `DAGU_DEFAULT_SHELL` | — | Default shell for commands |
 | `DAGU_SKIP_EXAMPLES` | `false` | Skip creating example DAGs |
 | `DAGU_DEFAULT_EXECUTION_MODE` | `local` | Execution mode: `local` or `distributed` |
 
 ### Features
 
-| Variable | Default | Description |
-|----------|---------|-------------|
+| Variable                | Default | Description                 |
+| ----------------------- | ------- | --------------------------- |
 | `DAGU_TERMINAL_ENABLED` | `false` | Enable web terminal feature |
-| `DAGU_QUEUE_ENABLED` | `true` | Enable queue system |
+| `DAGU_QUEUE_ENABLED`    | `true`  | Enable queue system         |
 
 ### Authentication
 
 | Variable | Default | Description |
-|----------|---------|-------------|
+| -------- | ------- | ----------- |
 | `DAGU_AUTH_MODE` | `builtin` | Auth mode: `none`, `basic`, `builtin` |
 | `DAGU_AUTH_BASIC_USERNAME` | — | Basic auth username (requires `auth.mode=basic`) |
 | `DAGU_AUTH_BASIC_PASSWORD` | — | Basic auth password (requires `auth.mode=basic`) |
@@ -97,7 +97,7 @@ OIDC settings are available under the `DAGU_AUTH_OIDC_*` prefix (client ID, secr
 ### TLS
 
 | Variable | Description |
-|----------|-------------|
+| -------- | ----------- |
 | `DAGU_CERT_FILE` | TLS certificate file path |
 | `DAGU_KEY_FILE` | TLS key file path |
 
@@ -117,7 +117,7 @@ Worker settings use the `DAGU_WORKER_*` prefix (worker ID, max active runs, labe
 
 When `DAGU_HOME` is set, all paths use a **unified structure** under that directory:
 
-```
+```sh
 $DAGU_HOME/
 ├── dags/          # DAG definitions
 ├── data/          # Application data
