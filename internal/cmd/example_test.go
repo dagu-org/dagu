@@ -95,15 +95,18 @@ func TestExampleCommand(t *testing.T) {
 		}
 	})
 
-	t.Run("ApprovalGateExampleLeavesDeployWindowForApprovePath", func(t *testing.T) {
+	t.Run("ApprovalGateExampleUsesAgentRedraftFlow", func(t *testing.T) {
 		dag := loadExampleDAG(t, 11)
 
-		reviewStep := findStep(t, dag, "review_release")
-		require.NotNil(t, reviewStep.Approval)
-		assert.NotContains(t, reviewStep.Approval.Required, "DEPLOY_WINDOW")
+		draftStep := findStep(t, dag, "draft_release_notes")
+		assert.Equal(t, core.ExecutorTypeAgent, draftStep.ExecutorConfig.Type)
+		assert.Equal(t, "${DAG_RUN_ARTIFACTS_DIR}/release-notes.md", draftStep.Stdout)
+		require.NotNil(t, draftStep.Approval)
+		assert.Equal(t, []string{"FEEDBACK"}, draftStep.Approval.Input)
+		assert.Empty(t, draftStep.Approval.Required)
+		assert.Equal(t, "draft_release_notes", draftStep.Approval.RewindTo)
 
-		confirmStep := findStep(t, dag, "confirm_deploy_window")
-		require.NotNil(t, confirmStep.Approval)
-		assert.Equal(t, []string{"DEPLOY_WINDOW"}, confirmStep.Approval.Required)
+		deployStep := findStep(t, dag, "deploy")
+		assert.Equal(t, []string{"draft_release_notes"}, deployStep.Depends)
 	})
 }

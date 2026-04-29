@@ -296,7 +296,7 @@ steps:
 	{
 		ID:          11,
 		Name:        "approval-gate",
-		Description: "Review, push back with rewind_to, then confirm the deploy window",
+		Description: "Draft release notes with an agent, push back with rewind_to, then deploy",
 		Content: `type: graph
 artifacts:
   enabled: true
@@ -304,52 +304,26 @@ steps:
   - id: build
     command: echo "v1.2.3"
     output: VERSION
-  - id: prepare_release_notes
+  - id: draft_release_notes
     depends: [build]
-    type: template
-    with:
-      data:
-        version: ${VERSION}
-        feedback: ${FEEDBACK}
-        deploy_window: ${DEPLOY_WINDOW}
-    script: |
-      Release {{ .version }}
-      Summary: {{ .feedback | default "Initial release notes draft" }}
-      Deployment window: {{ .deploy_window | default "Pending approval input" }}
-    output: RELEASE_NOTES
-  - id: review_release
-    depends: [prepare_release_notes]
-    type: template
-    with:
-      output: ${DAG_RUN_ARTIFACTS_DIR}/release-notes.md
-      data:
-        version: ${VERSION}
-        release_notes: ${RELEASE_NOTES}
-        deploy_window: ${DEPLOY_WINDOW}
-    script: |
-      # Release {{ .version }}
-      
-      ## Summary
-      
-      {{ .release_notes }}
-      
-      ## Deployment Window
-      
-      {{ .deploy_window | default "Pending approval input" }}
+    type: agent
+    agent:
+      prompt: "You draft concise release notes."
+      max_iterations: 10
+    messages:
+      - role: user
+        content: |
+          Draft release notes for version ${VERSION}.
+          
+          Return Markdown with a summary and deployment notes.
+    stdout: ${DAG_RUN_ARTIFACTS_DIR}/release-notes.md
     approval:
-      prompt: "Review the release-notes.md artifact. Push back with FEEDBACK to regenerate it, or approve to continue."
+      prompt: "Review the release-notes.md artifact. Push back with FEEDBACK to regenerate it, or approve to continue to deploy."
       input: [FEEDBACK]
-      rewind_to: prepare_release_notes
-  - id: confirm_deploy_window
-    depends: [review_release]
-    command: echo "confirm deployment window for ${VERSION}"
-    approval:
-      prompt: "Approve deployment by providing DEPLOY_WINDOW."
-      input: [DEPLOY_WINDOW]
-      required: [DEPLOY_WINDOW]
+      rewind_to: draft_release_notes
   - id: deploy
-    depends: [confirm_deploy_window]
-    command: echo "deploying ${VERSION} during ${DEPLOY_WINDOW}"
+    depends: [draft_release_notes]
+    command: echo "deploying ${VERSION} with reviewed release notes"
 `,
 	},
 	{
