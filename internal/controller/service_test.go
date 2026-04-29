@@ -1326,7 +1326,7 @@ workflows:
 	require.Contains(t, detail.State.LastError, "requires at least one task template")
 }
 
-func TestServiceReconcileOnceReturnsInactiveRunningControllerToIdle(t *testing.T) {
+func TestServiceReconcileOnceReturnsInactiveRunningControllerToFinished(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -1380,9 +1380,71 @@ func TestServiceReconcileOnceReturnsInactiveRunningControllerToIdle(t *testing.T
 
 	detail, err := svc.Detail(ctx, "software_dev")
 	require.NoError(t, err)
+	require.Equal(t, StateFinished, detail.State.State)
+	require.Equal(t, WaitingReasonNone, detail.State.WaitingReason)
+	require.Equal(t, "Handle the current assigned task.", detail.State.Instruction)
+	require.Equal(t, fixedTime, detail.State.FinishedAt)
+}
+
+func TestServiceReconcileOnceResetsInactiveRunningControllerWhenConfigured(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, fixedTime := newTestServiceWithSessionStore(t)
+	configStore := &testAgentConfigStore{
+		cfg: &agent.Config{
+			Enabled:        true,
+			DefaultModelID: "local-test",
+		},
+	}
+	modelStore := &testAgentModelStore{
+		models: map[string]*agent.ModelConfig{
+			"local-test": {
+				ID:       "local-test",
+				Name:     "Local Test",
+				Provider: "local",
+				Model:    "local-test",
+				BaseURL:  "http://127.0.0.1:11434/v1",
+			},
+		},
+	}
+	svc.agentAPI = agent.NewAPI(agent.APIConfig{
+		ConfigStore:  configStore,
+		ModelStore:   modelStore,
+		SessionStore: svc.sessionStore,
+	})
+
+	spec := controllerSpec("build-app") + "reset_on_finish: true\n"
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", spec))
+	createTask(t, svc, ctx, "software_dev", "Investigate the failing test", "tester")
+
+	def, err := svc.GetDefinition(ctx, "software_dev")
+	require.NoError(t, err)
+	state, err := svc.ensureState(ctx, def)
+	require.NoError(t, err)
+
+	state.State = StateRunning
+	state.Instruction = "Handle the current assigned task."
+	state.InstructionUpdatedAt = fixedTime
+	state.InstructionUpdatedBy = "tester"
+	state.SessionID = "sess-inactive-reset"
+
+	require.NoError(t, svc.sessionStore.CreateSession(ctx, &agent.Session{
+		ID:        state.SessionID,
+		UserID:    svc.systemUser(def.Name).UserID,
+		CreatedAt: fixedTime,
+		UpdatedAt: fixedTime,
+	}))
+	require.NoError(t, svc.saveState(ctx, def.Name, state))
+
+	require.NoError(t, svc.ReconcileOnce(ctx))
+
+	detail, err := svc.Detail(ctx, "software_dev")
+	require.NoError(t, err)
 	require.Equal(t, StateIdle, detail.State.State)
 	require.Equal(t, WaitingReasonNone, detail.State.WaitingReason)
 	require.Equal(t, "Handle the current assigned task.", detail.State.Instruction)
+	require.Equal(t, fixedTime, detail.State.FinishedAt)
 }
 
 func TestServiceReconcileOnceRecordsActionableDefaultModelError(t *testing.T) {

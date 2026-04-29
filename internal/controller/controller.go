@@ -134,12 +134,29 @@ func (s *Service) reconcileDefinition(ctx context.Context, def *Definition) erro
 	// the Controller in `running` once this reconcile pass failed to start it.
 	activity := s.inspectSessionActivity(ctx, def.Name, state)
 	if !activity.Working && !activity.HasPendingPrompt {
-		state.State = StateIdle
-		state.WaitingReason = WaitingReasonNone
+		s.markCycleQuiescent(def, state)
 		return s.saveState(ctx, def.Name, state)
 	}
 
 	return nil
+}
+
+func (s *Service) markCycleQuiescent(def *Definition, state *State) {
+	if state == nil {
+		return
+	}
+	finishedAt := s.clock()
+	summary := state.LastSummary
+	if def != nil && def.ResetOnFinish {
+		resetStateAfterFinish(state, finishedAt, summary)
+		return
+	}
+	state.State = StateFinished
+	state.WaitingReason = WaitingReasonNone
+	state.PendingPrompt = nil
+	state.PendingResponse = nil
+	state.FinishedAt = finishedAt
+	state.LastSummary = summary
 }
 
 func (s *Service) reconcilePausedDefinition(ctx context.Context, def *Definition, state *State) error {
