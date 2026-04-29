@@ -8,8 +8,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"sync"
@@ -28,6 +30,7 @@ import (
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/exec"
 	"github.com/dagucloud/dagu/internal/runtime/executor"
+	"github.com/goccy/go-yaml"
 )
 
 // systemVarPrefix is the prefix for temporary variables used internally by Dagu
@@ -254,17 +257,6 @@ func (n *Node) Execute(ctx context.Context, onSetup ...func()) error {
 		return err
 	}
 
-	// Validate captured output against schema if defined.
-	// Only treat schema validation as a failure when the command itself succeeded.
-	if n.Error() == nil {
-		if err := n.validateOutput(ctx); err != nil {
-			n.SetExitCode(1)
-			n.SetError(err)
-			logger.Error(ctx, "Output schema validation failed", tag.Error(err))
-			return err
-		}
-	}
-
 	statusErr := n.determineNodeStatus(cmd)
 
 	// Prefer the execution error over the status determination error,
@@ -383,57 +375,226 @@ func (n *Node) handleCommandError(cmd executor.Executor, err error) (int, error)
 
 // captureOutput captures and stores the command output to a variable if configured.
 func (n *Node) captureOutput(ctx context.Context) error {
-	n.mu.Lock()
-	defer n.mu.Unlock()
+	step := n.Step()
 
-	output := n.Step().Output
-	if output == "" {
+	if step.Output != "" {
+		value, err := n.outputs.capturedOutput(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to capture output: %w", err)
+		}
+		n.setVariable(step.Output, value)
+		n.setOutputValue(value)
 		return nil
 	}
 
-	value, err := n.outputs.capturedOutput(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to capture output: %w", err)
+	if !step.HasStructuredOutput() {
+		return nil
 	}
-	n.setVariable(output, value)
+
+	value, err := n.evaluateStructuredOutput(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to evaluate structured output: %w", err)
+	}
+	n.setOutputValue(value)
 	return nil
 }
 
-// validateOutput validates captured output against the step's output schema if defined.
-func (n *Node) validateOutput(_ context.Context) error {
-	schema := n.Step().OutputSchema
-	if schema == nil {
-		return nil
+func (n *Node) evaluateStructuredOutput(ctx context.Context) (string, error) {
+	step := n.Step()
+	result := make(map[string]any, len(step.StructuredOutput))
+
+	for key, entry := range step.StructuredOutput {
+		value, err := n.resolveStructuredOutputEntry(ctx, key, entry)
+		if err != nil {
+			return "", err
+		}
+		result[key] = value
 	}
 
-	output := n.Step().Output
-	if output == "" {
-		return nil
+	data, err := json.Marshal(result)
+	if err != nil {
+		return "", fmt.Errorf("failed to serialize structured output: %w", err)
+	}
+	if int64(len(data)) > maxOutputSize(ctx) {
+		return "", fmt.Errorf("output exceeded maximum size limit of %d bytes", maxOutputSize(ctx))
+	}
+	return string(data), nil
+}
+
+func (n *Node) resolveStructuredOutputEntry(ctx context.Context, key string, entry core.StepOutputEntry) (any, error) {
+	if entry.HasValue {
+		value, err := n.evaluateStructuredLiteral(ctx, entry.Value)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", key, err)
+		}
+		return value, nil
 	}
 
-	// getVariable returns (stringutil.KeyValue, bool)
-	kv, ok := n.getVariable(output)
+	raw, err := n.readStructuredOutputSource(ctx, key, entry)
+	if err != nil {
+		return nil, err
+	}
+
+	switch entry.Decode {
+	case "", core.StepOutputDecodeText:
+		return strings.TrimSpace(raw), nil
+	case core.StepOutputDecodeJSON:
+		return decodeStructuredOutputValue(ctx, key, raw, entry.Select, core.StepOutputDecodeJSON)
+	case core.StepOutputDecodeYAML:
+		return decodeStructuredOutputValue(ctx, key, raw, entry.Select, core.StepOutputDecodeYAML)
+	default:
+		return nil, fmt.Errorf("%s: unsupported decode %q", key, entry.Decode)
+	}
+}
+
+func (n *Node) readStructuredOutputSource(ctx context.Context, key string, entry core.StepOutputEntry) (string, error) {
+	switch entry.From {
+	case core.StepOutputSourceStdout:
+		value, err := n.outputs.capturedOutput(ctx)
+		if err != nil {
+			return "", fmt.Errorf("%s: failed to capture stdout: %w", key, err)
+		}
+		return value, nil
+	case core.StepOutputSourceStderr:
+		value, err := n.outputs.capturedStderr(ctx)
+		if err != nil {
+			return "", fmt.Errorf("%s: failed to capture stderr: %w", key, err)
+		}
+		return value, nil
+	case core.StepOutputSourceFile:
+		path, err := EvalString(ctx, entry.Path, eval.WithoutExpandShell(), eval.WithoutSubstitute())
+		if err != nil {
+			return "", fmt.Errorf("%s: failed to evaluate file path: %w", key, err)
+		}
+		env := GetEnv(ctx)
+		if !filepath.IsAbs(path) {
+			path = filepath.Join(env.WorkingDir, path)
+		}
+		path = filepath.Clean(path)
+
+		data, err := readStructuredOutputFile(path, maxOutputSize(ctx))
+		if err != nil {
+			return "", fmt.Errorf("%s: failed to read file %q: %w", key, path, err)
+		}
+		return data, nil
+	default:
+		return "", fmt.Errorf("%s: unsupported output source %q", key, entry.From)
+	}
+}
+
+func decodeStructuredOutputValue(ctx context.Context, key, raw, selectPath, decode string) (any, error) {
+	var decoded any
+
+	switch decode {
+	case core.StepOutputDecodeJSON:
+		if err := json.Unmarshal([]byte(raw), &decoded); err != nil {
+			return nil, fmt.Errorf("%s: failed to decode JSON: %w", key, err)
+		}
+	case core.StepOutputDecodeYAML:
+		if err := yaml.Unmarshal([]byte(raw), &decoded); err != nil {
+			return nil, fmt.Errorf("%s: failed to decode YAML: %w", key, err)
+		}
+	default:
+		return nil, fmt.Errorf("%s: unsupported decode %q", key, decode)
+	}
+
+	if selectPath == "" {
+		return decoded, nil
+	}
+
+	selected, ok := eval.ResolveDataPath(ctx, key, decoded, selectPath)
 	if !ok {
-		return fmt.Errorf("output validation failed: output %q is empty but schema requires content", output)
+		return nil, fmt.Errorf("%s: failed to resolve select path %q", key, selectPath)
+	}
+	return selected, nil
+}
+
+func readStructuredOutputFile(path string, limit int64) (string, error) {
+	// #nosec G304 -- file source paths come from the loaded workflow spec and are intentionally user-configurable.
+	file, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = file.Close() }()
+
+	data, err := io.ReadAll(io.LimitReader(file, limit+1))
+	if err != nil {
+		return "", err
+	}
+	if int64(len(data)) > limit {
+		return "", fmt.Errorf("output exceeded maximum size limit of %d bytes", limit)
+	}
+	return string(data), nil
+}
+
+func (n *Node) evaluateStructuredLiteral(ctx context.Context, value any) (any, error) {
+	switch v := value.(type) {
+	case nil:
+		return nil, nil
+	case string:
+		return EvalString(ctx, v, eval.WithoutExpandShell(), eval.WithoutSubstitute())
+	case []any:
+		result := make([]any, len(v))
+		for i, item := range v {
+			evaluated, err := n.evaluateStructuredLiteral(ctx, item)
+			if err != nil {
+				return nil, err
+			}
+			result[i] = evaluated
+		}
+		return result, nil
+	case map[string]any:
+		result := make(map[string]any, len(v))
+		for key, item := range v {
+			evaluated, err := n.evaluateStructuredLiteral(ctx, item)
+			if err != nil {
+				return nil, err
+			}
+			result[key] = evaluated
+		}
+		return result, nil
 	}
 
-	value := kv.Value()
-	if value == "" {
-		return fmt.Errorf("output validation failed: output %q is empty but schema requires content", output)
+	rv := reflect.ValueOf(value)
+	//nolint:exhaustive // Only composite kinds require recursive evaluation; primitive kinds return as-is.
+	switch rv.Kind() {
+	case reflect.Interface, reflect.Pointer:
+		if rv.IsNil() {
+			return nil, nil
+		}
+		return n.evaluateStructuredLiteral(ctx, rv.Elem().Interface())
+	case reflect.Slice, reflect.Array:
+		result := make([]any, rv.Len())
+		for i := range rv.Len() {
+			evaluated, err := n.evaluateStructuredLiteral(ctx, rv.Index(i).Interface())
+			if err != nil {
+				return nil, err
+			}
+			result[i] = evaluated
+		}
+		return result, nil
+	case reflect.Map:
+		result := make(map[string]any, rv.Len())
+		iter := rv.MapRange()
+		for iter.Next() {
+			evaluated, err := n.evaluateStructuredLiteral(ctx, iter.Value().Interface())
+			if err != nil {
+				return nil, err
+			}
+			result[fmt.Sprint(iter.Key().Interface())] = evaluated
+		}
+		return result, nil
+	default:
+		return value, nil
 	}
+}
 
-	// Parse output as JSON
-	var parsed any
-	if err := json.Unmarshal([]byte(value), &parsed); err != nil {
-		return fmt.Errorf("output validation failed: output %q is not valid JSON: %w", output, err)
+func maxOutputSize(ctx context.Context) int64 {
+	maxSize := int64(defaultMaxOutputSizeBytes)
+	if rCtx := GetDAGContext(ctx); rCtx.DAG != nil && rCtx.DAG.MaxOutputSize > 0 {
+		maxSize = int64(rCtx.DAG.MaxOutputSize)
 	}
-
-	// Validate against schema
-	if err := schema.Validate(parsed); err != nil {
-		return fmt.Errorf("output validation failed for %q: %w", output, err)
-	}
-
-	return nil
+	return maxSize
 }
 
 // determineNodeStatus uses the executor to determine the final node status if supported.
@@ -760,7 +921,7 @@ func (n *Node) LogContainsPattern(ctx context.Context, patterns []string) (bool,
 	}()
 
 	// Get maxOutputSize from DAG configuration
-	var maxOutputSize = 1024 * 1024 // Default 1MB
+	var maxOutputSize = defaultMaxOutputSizeBytes
 	if rCtx := GetDAGContext(ctx); rCtx.DAG != nil && rCtx.DAG.MaxOutputSize > 0 {
 		maxOutputSize = rCtx.DAG.MaxOutputSize
 	}

@@ -71,6 +71,7 @@ var builtinStepTypeNames = map[string]struct{}{
 	"k8s":           {},
 	"kubernetes":    {},
 	"mail":          {},
+	"noop":          {},
 	"parallel":      {},
 	"postgres":      {},
 	"redis":         {},

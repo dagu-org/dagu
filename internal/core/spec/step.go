@@ -20,7 +20,6 @@ import (
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/spec/types"
 	"github.com/dagucloud/dagu/internal/llm"
-	"github.com/google/jsonschema-go/jsonschema"
 )
 
 // step defines a step in the DAG.
@@ -55,7 +54,7 @@ type step struct {
 	// or "merged" for a single combined .log file.
 	LogOutput types.LogOutputValue `yaml:"log_output,omitempty"`
 	// Output is the variable name to store the output.
-	// Can be a string or an object with name, key, and omit fields.
+	// Can be a string for captured stdout or an object for structured step output.
 	Output any `yaml:"output,omitempty"`
 	// Depends is the list of steps to depend on.
 	Depends types.StringOrArray `yaml:"depends,omitempty"`
@@ -125,6 +124,11 @@ type step struct {
 	Value string `yaml:"value,omitempty"`
 	// Routes maps patterns to target step names
 	Routes map[string][]string `yaml:"routes,omitempty"`
+
+	// parsedOutput caches parsed output configuration during a single step build.
+	parsedOutput       *outputConfig
+	parsedOutputErr    error
+	parsedOutputCached bool
 }
 
 type execSpec struct {
@@ -150,6 +154,19 @@ func (s *step) executorConfigFieldName() string {
 		return "config"
 	}
 	return "with"
+}
+
+func (s *step) parsedOutputConfig() (*outputConfig, error) {
+	if s == nil {
+		return nil, nil
+	}
+	if s.parsedOutputCached {
+		return s.parsedOutput, s.parsedOutputErr
+	}
+
+	s.parsedOutput, s.parsedOutputErr = parseOutputConfig(s.Output)
+	s.parsedOutputCached = true
+	return s.parsedOutput, s.parsedOutputErr
 }
 
 func validateStepConfigAliasStruct(s *step) error {
@@ -405,9 +422,7 @@ var stepTransformers = []stepTransform{
 	{"repeat_policy", newStepTransformer("RepeatPolicy", buildStepRepeatPolicy)},
 	{"signal_on_stop", newStepTransformer("SignalOnStop", buildStepSignalOnStop)},
 	{"output", newStepTransformer("Output", buildStepOutput)},
-	{"output_key", newStepTransformer("OutputKey", buildStepOutputKey)},
-	{"output_omit", newStepTransformer("OutputOmit", buildStepOutputOmit)},
-	{"output_schema", newStepTransformer("OutputSchema", buildStepOutputSchema)},
+	{"structured_output", newStepTransformer("StructuredOutput", buildStepStructuredOutput)},
 	{"env", newStepTransformer("Env", buildStepEnvs)},
 	{"preconditions", newStepTransformer("Preconditions", buildStepPreconditions)},
 }
@@ -862,10 +877,8 @@ func buildStepSignalOnStop(_ StepBuildContext, s *step) (string, error) {
 
 // outputConfig holds the parsed output configuration
 type outputConfig struct {
-	Name   string
-	Key    string
-	Omit   bool
-	Schema any // raw schema from YAML, compiled later by buildStepOutputSchema
+	Name             string
+	StructuredOutput map[string]core.StepOutputEntry
 }
 
 // parseOutputConfig parses the output field which can be string or object
@@ -887,31 +900,143 @@ func parseOutputConfig(output any) (*outputConfig, error) {
 		return &outputConfig{Name: name}, nil
 
 	case map[string]any:
-		cfg := &outputConfig{}
-		if name, ok := v["name"].(string); ok {
-			cfg.Name = strings.TrimPrefix(strings.TrimSpace(name), "$")
+		structuredOutput, err := parseStructuredOutput(v)
+		if err != nil {
+			return nil, err
 		}
-		if key, ok := v["key"].(string); ok {
-			cfg.Key = strings.TrimSpace(key)
-		}
-		if omit, ok := v["omit"].(bool); ok {
-			cfg.Omit = omit
-		}
-		if schema, ok := v["schema"]; ok {
-			cfg.Schema = schema
-		}
-		if cfg.Name == "" {
-			return nil, fmt.Errorf("output.name is required when using object form")
-		}
-		return cfg, nil
+		return &outputConfig{StructuredOutput: structuredOutput}, nil
 
 	default:
 		return nil, fmt.Errorf("output must be a string or object, got %T", output)
 	}
 }
 
+var stepOutputReservedFields = map[string]struct{}{
+	"value":  {},
+	"from":   {},
+	"path":   {},
+	"decode": {},
+	"select": {},
+}
+
+func parseStructuredOutput(raw map[string]any) (map[string]core.StepOutputEntry, error) {
+	if len(raw) == 0 {
+		return nil, nil
+	}
+
+	entries := make(map[string]core.StepOutputEntry, len(raw))
+	for key, value := range raw {
+		entry, err := parseStructuredOutputEntry(value)
+		if err != nil {
+			return nil, fmt.Errorf("output.%s: %w", key, err)
+		}
+		entries[key] = entry
+	}
+	return entries, nil
+}
+
+func parseStructuredOutputEntry(raw any) (core.StepOutputEntry, error) {
+	obj, ok := raw.(map[string]any)
+	if !ok {
+		return core.StepOutputEntry{
+			HasValue: true,
+			Value:    raw,
+		}, nil
+	}
+
+	hasReservedField := false
+	for key := range obj {
+		if _, ok := stepOutputReservedFields[key]; ok {
+			hasReservedField = true
+			break
+		}
+	}
+	if !hasReservedField {
+		return core.StepOutputEntry{
+			HasValue: true,
+			Value:    obj,
+		}, nil
+	}
+
+	var entry core.StepOutputEntry
+	for key, value := range obj {
+		switch key {
+		case "value":
+			entry.HasValue = true
+			entry.Value = value
+		case "from":
+			str, ok := value.(string)
+			if !ok {
+				return core.StepOutputEntry{}, fmt.Errorf("from must be a string")
+			}
+			entry.From = strings.TrimSpace(str)
+		case "path":
+			str, ok := value.(string)
+			if !ok {
+				return core.StepOutputEntry{}, fmt.Errorf("path must be a string")
+			}
+			entry.Path = strings.TrimSpace(str)
+		case "decode":
+			str, ok := value.(string)
+			if !ok {
+				return core.StepOutputEntry{}, fmt.Errorf("decode must be a string")
+			}
+			entry.Decode = strings.TrimSpace(str)
+		case "select":
+			str, ok := value.(string)
+			if !ok {
+				return core.StepOutputEntry{}, fmt.Errorf("select must be a string")
+			}
+			entry.Select = strings.TrimSpace(str)
+		default:
+			return core.StepOutputEntry{}, fmt.Errorf("unknown field %q", key)
+		}
+	}
+
+	if entry.HasValue && entry.From != "" {
+		return core.StepOutputEntry{}, fmt.Errorf("value and from cannot be used together")
+	}
+	if !entry.HasValue && entry.From == "" {
+		return core.StepOutputEntry{}, fmt.Errorf("entry must specify either a literal value or from")
+	}
+	if entry.HasValue {
+		if entry.Path != "" || entry.Decode != "" || entry.Select != "" {
+			return core.StepOutputEntry{}, fmt.Errorf("path, decode, and select are only valid with from")
+		}
+		return entry, nil
+	}
+
+	switch entry.From {
+	case core.StepOutputSourceStdout, core.StepOutputSourceStderr:
+		if entry.Path != "" {
+			return core.StepOutputEntry{}, fmt.Errorf("path is only valid when from is file")
+		}
+	case core.StepOutputSourceFile:
+		if entry.Path == "" {
+			return core.StepOutputEntry{}, fmt.Errorf("path is required when from is file")
+		}
+	default:
+		return core.StepOutputEntry{}, fmt.Errorf("from must be one of %q, %q, or %q",
+			core.StepOutputSourceStdout, core.StepOutputSourceStderr, core.StepOutputSourceFile)
+	}
+
+	switch entry.Decode {
+	case "", core.StepOutputDecodeText, core.StepOutputDecodeJSON, core.StepOutputDecodeYAML:
+	default:
+		return core.StepOutputEntry{}, fmt.Errorf("decode must be one of %q, %q, or %q",
+			core.StepOutputDecodeText, core.StepOutputDecodeJSON, core.StepOutputDecodeYAML)
+	}
+
+	if entry.Select != "" && entry.Decode != core.StepOutputDecodeJSON && entry.Decode != core.StepOutputDecodeYAML {
+		return core.StepOutputEntry{}, fmt.Errorf("select requires decode to be %q or %q",
+			core.StepOutputDecodeJSON, core.StepOutputDecodeYAML)
+	}
+
+	return entry, nil
+}
+
 func buildStepOutput(_ StepBuildContext, s *step) (string, error) {
-	cfg, err := parseOutputConfig(s.Output)
+	cfg, err := s.parsedOutputConfig()
 	if err != nil {
 		return "", err
 	}
@@ -921,50 +1046,15 @@ func buildStepOutput(_ StepBuildContext, s *step) (string, error) {
 	return cfg.Name, nil
 }
 
-func buildStepOutputKey(_ StepBuildContext, s *step) (string, error) {
-	cfg, err := parseOutputConfig(s.Output)
-	if err != nil {
-		return "", err
-	}
-	if cfg == nil {
-		return "", nil
-	}
-	return cfg.Key, nil
-}
-
-func buildStepOutputOmit(_ StepBuildContext, s *step) (bool, error) {
-	cfg, err := parseOutputConfig(s.Output)
-	if err != nil {
-		return false, err
-	}
-	if cfg == nil {
-		return false, nil
-	}
-	return cfg.Omit, nil
-}
-
-func buildStepOutputSchema(ctx StepBuildContext, s *step) (*jsonschema.Resolved, error) {
-	cfg, err := parseOutputConfig(s.Output)
+func buildStepStructuredOutput(_ StepBuildContext, s *step) (map[string]core.StepOutputEntry, error) {
+	cfg, err := s.parsedOutputConfig()
 	if err != nil {
 		return nil, err
 	}
-	if cfg == nil || cfg.Schema == nil {
+	if cfg == nil {
 		return nil, nil
 	}
-
-	// Schema references resolve relative to DAG build context, matching params.schema.
-	// Step working_dir is execution-time behavior and is intentionally not part of
-	// schema file resolution.
-	workingDir := ""
-	if ctx.dag != nil {
-		workingDir = ctx.dag.WorkingDir
-	}
-
-	resolved, err := resolveSchemaDeclaration(cfg.Schema, workingDir, ctx.file)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve output schema: %w", err)
-	}
-	return resolved, nil
+	return cfg.StructuredOutput, nil
 }
 
 func buildStepEnvs(_ StepBuildContext, s *step) ([]string, error) {
@@ -1393,6 +1483,12 @@ func buildStepExecutor(ctx StepBuildContext, s *step, result *core.Step) error {
 		return nil
 	}
 
+	// Publish-only steps with object-form output do not need a real executor.
+	if shouldInferNoopStep(s, result) {
+		result.ExecutorConfig.Type = "noop"
+		return nil
+	}
+
 	// Infer type from DAG-level configuration
 	if result.ExecutorConfig.Type == "" && ctx.dag != nil {
 		if ctx.dag.Container != nil {
@@ -1443,6 +1539,23 @@ func buildStepExecutor(ctx StepBuildContext, s *step, result *core.Step) error {
 	}
 
 	return nil
+}
+
+func shouldInferNoopStep(s *step, result *core.Step) bool {
+	if result.ExecutorConfig.Type != "" || !result.HasStructuredOutput() {
+		return false
+	}
+	if result.UsesStructuredOutputSource(core.StepOutputSourceStdout) ||
+		result.UsesStructuredOutputSource(core.StepOutputSourceStderr) {
+		return false
+	}
+	if result.Container != nil || result.SubDAG != nil || result.Parallel != nil {
+		return false
+	}
+	if s == nil {
+		return false
+	}
+	return s.Command == nil && s.Exec == nil && strings.TrimSpace(s.Script) == ""
 }
 
 // mergeRedisConfig merges DAG-level Redis defaults into step config.

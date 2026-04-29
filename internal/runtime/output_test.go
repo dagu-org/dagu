@@ -107,6 +107,27 @@ func startNodeExecuteAsync(t *testing.T, node *Node, ctx context.Context) <-chan
 	return done
 }
 
+type outputTestExecutor struct {
+	stdout io.Writer
+	stderr io.Writer
+}
+
+func (e *outputTestExecutor) SetStdout(out io.Writer) {
+	e.stdout = out
+}
+
+func (e *outputTestExecutor) SetStderr(out io.Writer) {
+	e.stderr = out
+}
+
+func (e *outputTestExecutor) Kill(_ os.Signal) error {
+	return nil
+}
+
+func (e *outputTestExecutor) Run(_ context.Context) error {
+	return nil
+}
+
 func TestNode_LargeOutput(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -690,5 +711,93 @@ func TestOutputCoordinator_CapturedOutput(t *testing.T) {
 		// Should contain both previous and new output
 		assert.Contains(t, output, "previous output")
 		assert.Contains(t, output, "new output")
+	})
+}
+
+func TestOutputCoordinator_CapturedStderr(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ReturnsCachedResult", func(t *testing.T) {
+		t.Parallel()
+
+		oc := &OutputCoordinator{
+			stderrOutputCaptured: true,
+			stderrOutputData:     "cached stderr",
+		}
+		ctx := context.Background()
+
+		output, err := oc.capturedStderr(ctx)
+		assert.NoError(t, err)
+		assert.Equal(t, "cached stderr", output)
+	})
+
+	t.Run("ReturnsEmptyWhenNoCapture", func(t *testing.T) {
+		t.Parallel()
+
+		oc := &OutputCoordinator{}
+		ctx := context.Background()
+
+		output, err := oc.capturedStderr(ctx)
+		assert.NoError(t, err)
+		assert.Empty(t, output)
+	})
+
+	t.Run("CapturesFromStderrCapture", func(t *testing.T) {
+		t.Parallel()
+
+		reader, writer, err := os.Pipe()
+		require.NoError(t, err)
+
+		oc := &OutputCoordinator{
+			stderrCapture:      newOutputCapture(1024 * 1024),
+			stderrOutputReader: reader,
+			stderrOutputWriter: writer,
+		}
+
+		ctx := context.Background()
+		oc.stderrCapture.start(ctx, reader)
+
+		_, err = writer.WriteString("captured stderr")
+		require.NoError(t, err)
+
+		output, err := oc.capturedStderr(ctx)
+		assert.NoError(t, err)
+		assert.Equal(t, "captured stderr", output)
+		assert.True(t, oc.stderrOutputCaptured)
+	})
+
+	t.Run("PreservesPreviousAttemptsWhenRetryPipesAreRecreated", func(t *testing.T) {
+		t.Parallel()
+
+		oc := &OutputCoordinator{
+			stderrWriter:         io.Discard,
+			stderrOutputData:     "first attempt",
+			stderrOutputCaptured: true,
+		}
+		t.Cleanup(func() {
+			_ = oc.closeResources()
+		})
+
+		cmd := &outputTestExecutor{}
+		data := NodeData{
+			Step: core.Step{
+				Name: "stderr-structured-output",
+				StructuredOutput: map[string]core.StepOutputEntry{
+					"warning": {From: core.StepOutputSourceStderr},
+				},
+			},
+		}
+		ctx := context.Background()
+
+		err := oc.setupExecutorIO(ctx, cmd, data)
+		require.NoError(t, err)
+		require.NotNil(t, cmd.stderr)
+
+		_, err = io.WriteString(cmd.stderr, "second attempt")
+		require.NoError(t, err)
+
+		output, err := oc.capturedStderr(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, "first attempt\nsecond attempt", output)
 	})
 }

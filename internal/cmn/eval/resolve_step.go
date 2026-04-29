@@ -29,6 +29,14 @@ func resolveStepProperty(ctx context.Context, stepName, path string, stepMap map
 		return "", false
 	}
 
+	if strings.HasPrefix(path, ".output.") || strings.HasPrefix(path, ".output[") {
+		if stepInfo.Output == nil {
+			logger.Debug(ctx, "Step has no output configured", tag.Step(stepName))
+			return "", false
+		}
+		return resolveJSONPath(ctx, stepName, *stepInfo.Output, strings.TrimPrefix(path, ".output"))
+	}
+
 	property, sliceSpec, err := parseStepReference(path)
 	if err != nil {
 		logger.Warn(ctx, "Invalid step reference slice",

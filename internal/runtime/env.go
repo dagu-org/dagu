@@ -368,7 +368,7 @@ func (e Env) WithEnvVars(envs ...string) Env {
 		panic("invalid number of arguments")
 	}
 	newEnvs := make(map[string]string)
-	for i := 0; i < len(envs); i += 2 {
+	for i := 0; i+1 < len(envs); i += 2 {
 		newEnvs[envs[i]] = envs[i+1]
 	}
 	e.Scope = e.Scope.WithEntries(newEnvs, eval.EnvSourceStepEnv)

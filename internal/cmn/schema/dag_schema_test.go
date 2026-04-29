@@ -217,7 +217,7 @@ steps:
 	}
 }
 
-func TestDAGSchemaStepOutputSchema(t *testing.T) {
+func TestDAGSchemaStepOutputObject(t *testing.T) {
 	t.Parallel()
 
 	resolved := mustResolveDAGSchema(t)
@@ -228,35 +228,60 @@ func TestDAGSchemaStepOutputSchema(t *testing.T) {
 		wantErr string
 	}{
 		{
-			name: "InlineObjectSchema",
+			name: "LiteralObjectValue",
 			spec: `
 steps:
   - command: echo hi
     output:
-      name: RESULT
-      schema:
-        type: object
+      meta:
+        version: v1.2.3
 `,
 		},
 		{
-			name: "BooleanSchema",
+			name: "StructuredSourceEntry",
 			spec: `
 steps:
   - command: echo hi
     output:
-      name: RESULT
-      schema: true
+      version:
+        from: stdout
+        decode: json
+        select: .version
 `,
 		},
 		{
-			name: "StringSchemaReference",
+			name: "RejectInvalidStructuredSource",
 			spec: `
 steps:
   - command: echo hi
     output:
-      name: RESULT
-      schema: ./output.schema.json
+      version:
+        from: network
 `,
+			wantErr: "did not validate",
+		},
+		{
+			name: "RejectFileSourceWithoutPath",
+			spec: `
+steps:
+  - command: echo hi
+    output:
+      version:
+        from: file
+`,
+			wantErr: "did not validate",
+		},
+		{
+			name: "RejectInvalidDecode",
+			spec: `
+steps:
+  - command: echo hi
+    output:
+      version:
+        from: stdout
+        decode: xml
+`,
+			wantErr: "did not validate",
 		},
 	}
 

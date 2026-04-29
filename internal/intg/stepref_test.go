@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/dagucloud/dagu/internal/core"
+	exec1 "github.com/dagucloud/dagu/internal/core/exec"
 	"github.com/dagucloud/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -288,10 +289,11 @@ func TestStepScopedOutputAccess(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name           string
-		yaml           string
-		expectedStatus core.Status
-		expectedOutput map[string]any
+		name               string
+		yaml               string
+		expectedStatus     core.Status
+		expectedOutput     map[string]any
+		expectedStepOutput map[string]string
 	}{
 		{
 			name: "BasicOutputAccess",
@@ -427,6 +429,125 @@ steps:
 				"RESULT": "sliced=hello",
 			},
 		},
+		{
+			name: "NestedJSONOutputAccess",
+			yaml: `
+type: graph
+steps:
+  - id: build
+    output: BUILD_JSON
+    script: |
+      printf '{"version":"v1.2.3","artifact":{"url":"https://example.test/release.tgz"}}'
+
+  - id: consumer
+    depends: [build]
+    script: |
+      printf 'version=%s\nartifact=%s' "${build.output.version}" "${build.output.artifact.url}"
+    output: RESULT
+`,
+			expectedStatus: core.Succeeded,
+			expectedOutput: map[string]any{
+				"BUILD_JSON": `{"version":"v1.2.3","artifact":{"url":"https://example.test/release.tgz"}}`,
+				"RESULT":     "version=v1.2.3\nartifact=https://example.test/release.tgz",
+			},
+		},
+		{
+			name: "StructuredOutputFromStdout",
+			yaml: `
+type: graph
+steps:
+  - id: analyze
+    script: |
+      printf '{"version":"v1.2.3","artifact":{"url":"https://example.test/release.tgz"}}'
+    output:
+      version:
+        from: stdout
+        decode: json
+        select: .version
+      artifact:
+        from: stdout
+        decode: json
+        select: .artifact
+
+  - id: consumer
+    depends: [analyze]
+    script: |
+      printf 'version=%s\nartifact=%s' "${analyze.output.version}" "${analyze.output.artifact.url}"
+    output: RESULT
+`,
+			expectedStatus: core.Succeeded,
+			expectedOutput: map[string]any{
+				"RESULT": "version=v1.2.3\nartifact=https://example.test/release.tgz",
+			},
+			expectedStepOutput: map[string]string{
+				"analyze": `{"artifact":{"url":"https://example.test/release.tgz"},"version":"v1.2.3"}`,
+			},
+		},
+		{
+			name: "StructuredOutputPublishOnlyNoop",
+			yaml: `
+type: graph
+steps:
+  - id: build
+    script: |
+      printf '{"version":"v1.2.3","artifact":{"url":"https://example.test/release.tgz"}}'
+    output: BUILD_JSON
+
+  - id: publish
+    depends: [build]
+    output:
+      version: "${build.output.version}"
+      versionLabel: "ver - ${build.output.version}"
+      artifact:
+        url: "${build.output.artifact.url}"
+
+  - id: consumer
+    depends: [publish]
+    script: |
+      printf 'version=%s\nlabel=%s\nartifact=%s' "${publish.output.version}" "${publish.output.versionLabel}" "${publish.output.artifact.url}"
+    output: RESULT
+`,
+			expectedStatus: core.Succeeded,
+			expectedOutput: map[string]any{
+				"BUILD_JSON": `{"version":"v1.2.3","artifact":{"url":"https://example.test/release.tgz"}}`,
+				"RESULT":     "version=v1.2.3\nlabel=ver - v1.2.3\nartifact=https://example.test/release.tgz",
+			},
+			expectedStepOutput: map[string]string{
+				"publish": `{"artifact":{"url":"https://example.test/release.tgz"},"version":"v1.2.3","versionLabel":"ver - v1.2.3"}`,
+			},
+		},
+		{
+			name: "StructuredOutputFromFileAndStderr",
+			yaml: `
+type: graph
+steps:
+  - id: producer
+    script: |
+      #!/bin/sh
+      printf '{"artifact":{"path":"build/report.md"}}' > meta.json
+      printf '{"warning":"retry required"}' >&2
+    output:
+      artifactPath:
+        from: file
+        path: meta.json
+        decode: json
+        select: .artifact.path
+      warning:
+        from: stderr
+        decode: json
+        select: .warning
+
+  - id: consumer
+    depends: [producer]
+    script: |
+      printf 'artifact=%s\nwarning=%s' "${producer.output.artifactPath}" "${producer.output.warning}"
+    output: RESULT
+`,
+			expectedStatus: core.Succeeded,
+			expectedOutput: map[string]any{
+				"RESULT": "artifact=build/report.md\nwarning=retry required",
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -448,8 +569,32 @@ steps:
 			if tc.expectedOutput != nil {
 				testDAG.AssertOutputs(t, tc.expectedOutput)
 			}
+
+			if tc.expectedStepOutput != nil {
+				status, statusErr := th.DAGRunMgr.GetLatestStatus(th.Context, testDAG.DAG)
+				require.NoError(t, statusErr)
+
+				for stepID, expected := range tc.expectedStepOutput {
+					node := findNodeByStepID(t, status.Nodes, stepID)
+					require.NotNil(t, node.OutputValue, "step %s should expose step-scoped output", stepID)
+					require.JSONEq(t, expected, *node.OutputValue)
+				}
+			}
 		})
 	}
+}
+
+func findNodeByStepID(t *testing.T, nodes []*exec1.Node, stepID string) *exec1.Node {
+	t.Helper()
+
+	for _, node := range nodes {
+		if node.Step.ID == stepID {
+			return node
+		}
+	}
+
+	t.Fatalf("step %s not found", stepID)
+	return nil
 }
 
 func TestStepIDErrorCases(t *testing.T) {

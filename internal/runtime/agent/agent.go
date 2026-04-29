@@ -993,9 +993,9 @@ func errorString(err error) string {
 	return err.Error()
 }
 
-// collectOutputs gathers all step outputs into a map for the outputs.json file.
+// collectOutputs gathers string-form step outputs into a map for the outputs.json file.
 // It iterates through nodes in execution order and collects output values.
-// Steps with OutputOmit=true are skipped. Last value wins for key conflicts.
+// Last value wins for key conflicts.
 func (a *Agent) collectOutputs(ctx context.Context) map[string]string {
 	outputs := make(map[string]string)
 
@@ -1006,40 +1006,17 @@ func (a *Agent) collectOutputs(ctx context.Context) map[string]string {
 		nodeData := node.NodeData()
 		step := nodeData.Step
 
-		// Skip if no output defined or omit is set
-		if step.Output == "" || step.OutputOmit {
+		// Only string-form output participates in outputs.json.
+		if step.Output == "" {
 			continue
 		}
 
-		// Skip if no output variables captured
-		if nodeData.State.OutputVariables == nil {
-			continue
-		}
-
-		// Get the output value from captured variables
-		rawValue, ok := nodeData.State.OutputVariables.Load(step.Output)
+		value, ok := nodeData.StringFormOutputValue()
 		if !ok {
 			continue
 		}
 
-		// Parse the KeyValue format (KEY=VALUE)
-		strValue, ok := rawValue.(string)
-		if !ok {
-			logger.Warn(ctx, "Output variable is not a string, skipping",
-				slog.String("step", step.Name),
-				slog.String("output", step.Output),
-				slog.String("type", fmt.Sprintf("%T", rawValue)),
-			)
-			continue
-		}
-		kv := stringutil.KeyValue(strValue)
-		value := kv.Value()
-
-		// Determine the key: use OutputKey if set, otherwise convert from UPPER_CASE
-		key := step.OutputKey
-		if key == "" {
-			key = stringutil.ScreamingSnakeToCamel(step.Output)
-		}
+		key := stringutil.ScreamingSnakeToCamel(step.Output)
 
 		// Store the output (last one wins for conflicts)
 		outputs[key] = value
