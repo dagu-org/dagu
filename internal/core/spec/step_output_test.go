@@ -172,3 +172,134 @@ func TestBuildStepExecutorInfersNoopForStructuredOutput(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "noop", result.ExecutorConfig.Type)
 }
+
+func TestParseStructuredOutputEmpty(t *testing.T) {
+	t.Parallel()
+
+	result, err := parseStructuredOutput(map[string]any{})
+	require.NoError(t, err)
+	assert.Nil(t, result)
+}
+
+func TestBuildStepStructuredOutputError(t *testing.T) {
+	t.Parallel()
+
+	s := &step{
+		Output: map[string]any{
+			"meta": map[string]any{
+				"from": "network",
+			},
+		},
+	}
+
+	_, err := buildStepStructuredOutput(testStepBuildContext(), s)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `output.meta: from must be one of "stdout", "stderr", or "file"`)
+}
+
+func TestParseStructuredOutputEntryValidation(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		input   any
+		wantErr string
+	}{
+		{
+			name: "FromMustBeString",
+			input: map[string]any{
+				"from": 123,
+			},
+			wantErr: "from must be a string",
+		},
+		{
+			name: "PathMustBeString",
+			input: map[string]any{
+				"from": "file",
+				"path": 123,
+			},
+			wantErr: "path must be a string",
+		},
+		{
+			name: "DecodeMustBeString",
+			input: map[string]any{
+				"from":   "stdout",
+				"decode": 123,
+			},
+			wantErr: "decode must be a string",
+		},
+		{
+			name: "SelectMustBeString",
+			input: map[string]any{
+				"from":   "stdout",
+				"decode": "json",
+				"select": 123,
+			},
+			wantErr: "select must be a string",
+		},
+		{
+			name: "UnknownField",
+			input: map[string]any{
+				"from":    "stdout",
+				"invalid": true,
+			},
+			wantErr: `unknown field "invalid"`,
+		},
+		{
+			name: "ValueAndFromConflict",
+			input: map[string]any{
+				"value": "hello",
+				"from":  "stdout",
+			},
+			wantErr: "value and from cannot be used together",
+		},
+		{
+			name: "MissingValueAndFrom",
+			input: map[string]any{
+				"decode": "json",
+			},
+			wantErr: "entry must specify either a literal value or from",
+		},
+		{
+			name: "ValueCannotUseSourceFields",
+			input: map[string]any{
+				"value":  "hello",
+				"decode": "json",
+			},
+			wantErr: "path, decode, and select are only valid with from",
+		},
+		{
+			name: "PathOnlyValidForFile",
+			input: map[string]any{
+				"from": "stdout",
+				"path": "meta.json",
+			},
+			wantErr: "path is only valid when from is file",
+		},
+		{
+			name: "FileSourceRequiresPath",
+			input: map[string]any{
+				"from": "file",
+			},
+			wantErr: "path is required when from is file",
+		},
+		{
+			name: "DecodeMustBeSupported",
+			input: map[string]any{
+				"from":   "stdout",
+				"decode": "xml",
+			},
+			wantErr: `decode must be one of "text", "json", or "yaml"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := parseStructuredOutputEntry(tt.input)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.wantErr)
+		})
+	}
+}

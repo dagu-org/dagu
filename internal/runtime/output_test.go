@@ -692,3 +692,56 @@ func TestOutputCoordinator_CapturedOutput(t *testing.T) {
 		assert.Contains(t, output, "new output")
 	})
 }
+
+func TestOutputCoordinator_CapturedStderr(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ReturnsCachedResult", func(t *testing.T) {
+		t.Parallel()
+
+		oc := &OutputCoordinator{
+			stderrOutputCaptured: true,
+			stderrOutputData:     "cached stderr",
+		}
+		ctx := context.Background()
+
+		output, err := oc.capturedStderr(ctx)
+		assert.NoError(t, err)
+		assert.Equal(t, "cached stderr", output)
+	})
+
+	t.Run("ReturnsEmptyWhenNoCapture", func(t *testing.T) {
+		t.Parallel()
+
+		oc := &OutputCoordinator{}
+		ctx := context.Background()
+
+		output, err := oc.capturedStderr(ctx)
+		assert.NoError(t, err)
+		assert.Empty(t, output)
+	})
+
+	t.Run("CapturesFromStderrCapture", func(t *testing.T) {
+		t.Parallel()
+
+		reader, writer, err := os.Pipe()
+		require.NoError(t, err)
+
+		oc := &OutputCoordinator{
+			stderrCapture:      newOutputCapture(1024 * 1024),
+			stderrOutputReader: reader,
+			stderrOutputWriter: writer,
+		}
+
+		ctx := context.Background()
+		oc.stderrCapture.start(ctx, reader)
+
+		_, err = writer.WriteString("captured stderr")
+		require.NoError(t, err)
+
+		output, err := oc.capturedStderr(ctx)
+		assert.NoError(t, err)
+		assert.Equal(t, "captured stderr", output)
+		assert.True(t, oc.stderrOutputCaptured)
+	})
+}
