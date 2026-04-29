@@ -15,6 +15,7 @@ import (
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/exec"
 	"github.com/dagucloud/dagu/internal/service/eventstore"
+	"github.com/dagucloud/dagu/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -239,12 +240,13 @@ func TestNotificationMonitor_BootstrapFailureDoesNotReplayFromZeroCursor(t *test
 		Name:       "briefing",
 		DAGRunID:   "run-old",
 		AttemptID:  "attempt-old",
-		Status:     core.Succeeded,
+		Status:     core.Failed,
+		Error:      "old failure",
 		FinishedAt: time.Now().Add(-time.Minute).UTC().Format(time.RFC3339),
 	}
 	require.NoError(t, service.Emit(context.Background(), eventstore.NewDAGRunEvent(
 		eventstore.Source{Service: eventstore.SourceServiceServer, Instance: "test"},
-		eventstore.TypeDAGRunSucceeded,
+		eventstore.TypeDAGRunFailed,
 		oldStatus,
 		nil,
 	)))
@@ -273,12 +275,13 @@ func TestNotificationMonitor_BootstrapFailureDoesNotReplayFromZeroCursor(t *test
 		Name:       "briefing",
 		DAGRunID:   "run-new",
 		AttemptID:  "attempt-new",
-		Status:     core.Succeeded,
+		Status:     core.Failed,
+		Error:      "new failure",
 		FinishedAt: time.Now().UTC().Format(time.RFC3339),
 	}
 	require.NoError(t, service.Emit(context.Background(), eventstore.NewDAGRunEvent(
 		eventstore.Source{Service: eventstore.SourceServiceServer, Instance: "test"},
-		eventstore.TypeDAGRunSucceeded,
+		eventstore.TypeDAGRunFailed,
 		newStatus,
 		nil,
 	)))
@@ -328,9 +331,10 @@ func TestNotificationMonitor_ShutdownDrainFlushesPendingBatchWithoutLLM(t *testi
 
 	status := &exec.DAGRunStatus{
 		Name:      "briefing",
-		Status:    core.Succeeded,
+		Status:    core.Failed,
 		DAGRunID:  "run-2",
 		AttemptID: "attempt-2",
+		Error:     "boom",
 	}
 	require.True(t, monitor.NotifyCompletion(status))
 	cancel()
@@ -346,6 +350,58 @@ func TestNotificationMonitor_ShutdownDrainFlushesPendingBatchWithoutLLM(t *testi
 	require.Len(t, calls, 1)
 	assert.Equal(t, call{destination: "dest-1", allowLLM: false}, calls[0])
 	assert.True(t, monitor.IsDelivered("dest-1", status))
+}
+
+func TestNotificationMonitor_SuccessEventsAreAcknowledgedWithoutDelivery(t *testing.T) {
+	t.Parallel()
+
+	var (
+		mu    sync.Mutex
+		calls []string
+	)
+	transport := &fakeNotificationTransport{
+		destinations: []string{"dest-1"},
+		flushFn: func(_ context.Context, destination string, _ NotificationBatch, _ bool) bool {
+			mu.Lock()
+			defer mu.Unlock()
+			calls = append(calls, destination)
+			return true
+		},
+	}
+
+	cfg := DefaultNotificationMonitorConfig()
+	cfg.UrgentWindow = 10 * time.Millisecond
+	cfg.SuccessWindow = 10 * time.Millisecond
+	cfg.PollInterval = time.Hour
+	cfg.SeenEvictInterval = time.Hour
+
+	monitor := NewNotificationMonitor(nil, "", transport, slog.New(slog.NewTextHandler(io.Discard, nil)), cfg)
+	stopMonitor := testutil.StartContextRunner(t, monitor)
+	defer stopMonitor()
+
+	first := &exec.DAGRunStatus{
+		Name:      "briefing",
+		Status:    core.Succeeded,
+		DAGRunID:  "run-1",
+		AttemptID: "attempt-1",
+	}
+	second := &exec.DAGRunStatus{
+		Name:      "briefing",
+		Status:    core.Succeeded,
+		DAGRunID:  "run-2",
+		AttemptID: "attempt-2",
+	}
+
+	require.True(t, monitor.NotifyCompletion(first))
+	require.True(t, monitor.NotifyCompletion(second))
+
+	require.Eventually(t, func() bool {
+		return monitor.IsDelivered("dest-1", first) && monitor.IsDelivered("dest-1", second)
+	}, time.Second, 10*time.Millisecond)
+
+	mu.Lock()
+	defer mu.Unlock()
+	assert.Empty(t, calls, "successful completions should be acknowledged without transport delivery")
 }
 
 func TestNotificationMonitor_PollSourceFiltersInterestedEventTypes(t *testing.T) {

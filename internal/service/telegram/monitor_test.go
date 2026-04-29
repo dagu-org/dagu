@@ -42,9 +42,10 @@ func TestDAGRunMonitor_RetriesOnlyUndeliveredTelegramChat(t *testing.T) {
 
 	status := &exec.DAGRunStatus{
 		Name:      "briefing",
-		Status:    core.Succeeded,
+		Status:    core.Failed,
 		DAGRunID:  "run-1",
 		AttemptID: "attempt-1",
+		Error:     "boom",
 	}
 
 	require.True(t, monitor.notifyCompletion(context.Background(), status))
