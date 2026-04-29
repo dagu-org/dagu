@@ -1261,7 +1261,7 @@
         },
         "interested_event_types": {
           "type": "array",
-          "description": "DAG-run lifecycle event types that should generate Telegram notifications. Defaults to waiting, succeeded, failed, aborted, and rejected.",
+          "description": "DAG-run lifecycle event types that the bot tracks for notification delivery. Defaults to waiting, succeeded, failed, aborted, and rejected. Succeeded events are used to suppress stale pending alerts and do not send a chat message.",
           "items": {
             "type": "string",
             "enum": [
@@ -1299,7 +1299,7 @@
         },
         "interested_event_types": {
           "type": "array",
-          "description": "DAG-run lifecycle event types that should generate Slack notifications. Defaults to waiting, succeeded, failed, aborted, and rejected.",
+          "description": "DAG-run lifecycle event types that the bot tracks for notification delivery. Defaults to waiting, succeeded, failed, aborted, and rejected. Succeeded events are used to suppress stale pending alerts and do not send a chat message.",
           "items": {
             "type": "string",
             "enum": [

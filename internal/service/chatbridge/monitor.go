@@ -551,6 +551,13 @@ func (m *NotificationMonitor) flushPendingBatch(ctx context.Context, pending Not
 		return false
 	}
 
+	// Successful completions still flow through the notification state machine so
+	// they can replace pending wait alerts, but they should not post chat digests.
+	if pending.Batch.Class == NotificationClassSuccessDigest {
+		m.markBatchDelivered(ctx, pending.Destination, pending.Batch)
+		return true
+	}
+
 	flushCtx := ctx
 	cancel := func() {}
 	if allowLLM {

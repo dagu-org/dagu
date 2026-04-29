@@ -217,7 +217,7 @@ func (s *fakeSlackAgentService) SubscribeSession(context.Context, string, agent.
 	return agent.StreamResponse{}, func() (agent.StreamResponse, bool) { return agent.StreamResponse{}, false }, nil
 }
 
-func TestDAGRunMonitor_FlushesSuccessDigestIntoSingleThreadAndSkipsReplay(t *testing.T) {
+func TestDAGRunMonitor_SuppressesSuccessDigestAndMarksRunsDelivered(t *testing.T) {
 	t.Parallel()
 
 	client := &fakeSlackClient{}
@@ -234,54 +234,30 @@ func TestDAGRunMonitor_FlushesSuccessDigestIntoSingleThreadAndSkipsReplay(t *tes
 	stopMonitor := testutil.StartContextRunner(t, monitor)
 	defer stopMonitor()
 
-	ok := monitor.notifyCompletion(context.Background(), &exec.DAGRunStatus{
+	first := &exec.DAGRunStatus{
 		Name:      "briefing",
 		Status:    core.Succeeded,
 		DAGRunID:  "run-1",
 		AttemptID: "attempt-1",
-	})
-	require.True(t, ok)
-	ok = monitor.notifyCompletion(context.Background(), &exec.DAGRunStatus{
+	}
+	second := &exec.DAGRunStatus{
 		Name:      "briefing",
 		Status:    core.Succeeded,
 		DAGRunID:  "run-2",
 		AttemptID: "attempt-2",
-	})
-	require.True(t, ok)
+	}
+	require.True(t, monitor.notifyCompletion(context.Background(), first))
+	require.True(t, monitor.notifyCompletion(context.Background(), second))
 
 	require.Eventually(t, func() bool {
-		service.mu.Lock()
-		appended := len(service.appendMessages) == 1
-		service.mu.Unlock()
-		val, exists := bot.chats.Load("C123:1")
-		if !exists {
-			return false
-		}
-		cs := val.(*chatState)
-		return appended && client.postCount() == 1 && bot.lastDeliveredSeq(cs) == 1
+		return monitor.isSeen("C123", first) && monitor.isSeen("C123", second)
 	}, time.Second, 10*time.Millisecond)
-	assert.Equal(t, 1, client.postCount(), "digest should be delivered once as a single thread root")
-
-	val, exists := bot.chats.Load("C123:1")
-	require.True(t, exists)
-	cs := val.(*chatState)
-	assert.Equal(t, "sess-1", cs.SessionID())
-	assert.Equal(t, "1", cs.threadTS)
-	assert.Equal(t, int64(1), bot.lastDeliveredSeq(cs))
+	assert.Zero(t, client.postCount(), "successful completions should not post a Slack digest")
+	_, exists := bot.chats.Load("C123:1")
+	assert.False(t, exists, "successful completions should not open a Slack thread")
 	service.mu.Lock()
-	require.Len(t, service.appendMessages, 1)
-	assert.Contains(t, service.appendMessages[0].Content, "DAG completion digest")
-	assert.Contains(t, service.appendMessages[0].Content, "briefing: succeeded x2")
+	assert.Empty(t, service.appendMessages)
 	service.mu.Unlock()
-
-	bot.processStreamResponse(context.Background(), cs, agent.StreamResponse{
-		Messages: []agent.Message{
-			{Type: agent.MessageTypeAssistant, SequenceID: 1, Content: "digest"},
-			{Type: agent.MessageTypeAssistant, SequenceID: 2, Content: "follow-up answer"},
-		},
-	})
-
-	assert.Equal(t, 2, client.postCount(), "snapshot replay should skip the already delivered digest")
 }
 
 func TestDAGRunMonitor_FlushesUrgentSingleIntoExistingDMSession(t *testing.T) {

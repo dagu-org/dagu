@@ -52,12 +52,13 @@ func TestNotificationMonitor_BootstrapsFromCurrentHeadAndOnlyDeliversFutureEvent
 		Name:       "briefing",
 		DAGRunID:   "run-old",
 		AttemptID:  "attempt-old",
-		Status:     core.Succeeded,
+		Status:     core.Failed,
+		Error:      "old failure",
 		FinishedAt: time.Now().Add(-time.Minute).UTC().Format(time.RFC3339),
 	}
 	require.NoError(t, service.Emit(context.Background(), eventstore.NewDAGRunEvent(
 		eventstore.Source{Service: eventstore.SourceServiceServer, Instance: "test"},
-		eventstore.TypeDAGRunSucceeded,
+		eventstore.TypeDAGRunFailed,
 		oldStatus,
 		nil,
 	)))
@@ -95,12 +96,13 @@ func TestNotificationMonitor_BootstrapsFromCurrentHeadAndOnlyDeliversFutureEvent
 		Name:       "briefing",
 		DAGRunID:   "run-new",
 		AttemptID:  "attempt-new",
-		Status:     core.Succeeded,
+		Status:     core.Failed,
+		Error:      "new failure",
 		FinishedAt: time.Now().UTC().Format(time.RFC3339),
 	}
 	require.NoError(t, service.Emit(context.Background(), eventstore.NewDAGRunEvent(
 		eventstore.Source{Service: eventstore.SourceServiceServer, Instance: "test"},
-		eventstore.TypeDAGRunSucceeded,
+		eventstore.TypeDAGRunFailed,
 		newStatus,
 		nil,
 	)))
@@ -264,12 +266,13 @@ func TestNotificationMonitor_StateLockAllowsSingleWriterAndTakeover(t *testing.T
 		Name:       "briefing",
 		DAGRunID:   "run-first",
 		AttemptID:  "attempt-first",
-		Status:     core.Succeeded,
+		Status:     core.Failed,
+		Error:      "first failure",
 		FinishedAt: time.Now().UTC().Format(time.RFC3339),
 	}
 	require.NoError(t, service.Emit(context.Background(), eventstore.NewDAGRunEvent(
 		eventstore.Source{Service: eventstore.SourceServiceServer, Instance: "test"},
-		eventstore.TypeDAGRunSucceeded,
+		eventstore.TypeDAGRunFailed,
 		firstStatus,
 		nil,
 	)))
@@ -328,12 +331,13 @@ func TestNotificationMonitor_StateLockAllowsSingleWriterAndTakeover(t *testing.T
 		Name:       "briefing",
 		DAGRunID:   "run-second",
 		AttemptID:  "attempt-second",
-		Status:     core.Succeeded,
+		Status:     core.Failed,
+		Error:      "second failure",
 		FinishedAt: time.Now().UTC().Format(time.RFC3339),
 	}
 	require.NoError(t, service.Emit(context.Background(), eventstore.NewDAGRunEvent(
 		eventstore.Source{Service: eventstore.SourceServiceServer, Instance: "test"},
-		eventstore.TypeDAGRunSucceeded,
+		eventstore.TypeDAGRunFailed,
 		secondStatus,
 		nil,
 	)))
@@ -367,12 +371,13 @@ func TestNotificationMonitor_CorruptStateIsQuarantinedAndOnlyFutureEventsAreDeli
 		Name:       "briefing",
 		DAGRunID:   "run-old",
 		AttemptID:  "attempt-old",
-		Status:     core.Succeeded,
+		Status:     core.Failed,
+		Error:      "old failure",
 		FinishedAt: time.Now().Add(-time.Minute).UTC().Format(time.RFC3339),
 	}
 	require.NoError(t, service.Emit(context.Background(), eventstore.NewDAGRunEvent(
 		eventstore.Source{Service: eventstore.SourceServiceServer, Instance: "test"},
-		eventstore.TypeDAGRunSucceeded,
+		eventstore.TypeDAGRunFailed,
 		oldStatus,
 		nil,
 	)))
@@ -416,12 +421,13 @@ func TestNotificationMonitor_CorruptStateIsQuarantinedAndOnlyFutureEventsAreDeli
 		Name:       "briefing",
 		DAGRunID:   "run-new",
 		AttemptID:  "attempt-new",
-		Status:     core.Succeeded,
+		Status:     core.Failed,
+		Error:      "new failure",
 		FinishedAt: time.Now().UTC().Format(time.RFC3339),
 	}
 	require.NoError(t, service.Emit(context.Background(), eventstore.NewDAGRunEvent(
 		eventstore.Source{Service: eventstore.SourceServiceServer, Instance: "test"},
-		eventstore.TypeDAGRunSucceeded,
+		eventstore.TypeDAGRunFailed,
 		newStatus,
 		nil,
 	)))
@@ -506,12 +512,13 @@ func TestNotificationMonitor_SaveFailureDoesNotLoseUnreadEvents(t *testing.T) {
 		Name:       "briefing",
 		DAGRunID:   "run-save-retry",
 		AttemptID:  "attempt-save-retry",
-		Status:     core.Succeeded,
+		Status:     core.Failed,
+		Error:      "retry failure",
 		FinishedAt: time.Now().UTC().Format(time.RFC3339),
 	}
 	require.NoError(t, service.Emit(context.Background(), eventstore.NewDAGRunEvent(
 		eventstore.Source{Service: eventstore.SourceServiceServer, Instance: "test"},
-		eventstore.TypeDAGRunSucceeded,
+		eventstore.TypeDAGRunFailed,
 		status,
 		nil,
 	)))
@@ -753,12 +760,13 @@ func TestNotificationMonitor_LockTheftSelfFencesActiveOwner(t *testing.T) {
 		Name:       "briefing",
 		DAGRunID:   "run-stolen-lock",
 		AttemptID:  "attempt-stolen-lock",
-		Status:     core.Succeeded,
+		Status:     core.Failed,
+		Error:      "lock failure",
 		FinishedAt: time.Now().UTC().Format(time.RFC3339),
 	}
 	require.NoError(t, service.Emit(context.Background(), eventstore.NewDAGRunEvent(
 		eventstore.Source{Service: eventstore.SourceServiceServer, Instance: "test"},
-		eventstore.TypeDAGRunSucceeded,
+		eventstore.TypeDAGRunFailed,
 		status,
 		nil,
 	)))

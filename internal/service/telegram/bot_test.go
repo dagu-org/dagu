@@ -212,7 +212,7 @@ func (s *fakeTelegramAgentService) SubscribeSession(context.Context, string, age
 	return agent.StreamResponse{}, func() (agent.StreamResponse, bool) { return agent.StreamResponse{}, false }, nil
 }
 
-func TestDAGRunMonitor_FlushesSuccessDigestIntoExistingChatAndSkipsReplay(t *testing.T) {
+func TestDAGRunMonitor_SuppressesSuccessDigestAndMarksRunsDelivered(t *testing.T) {
 	t.Parallel()
 
 	api := &fakeTelegramAPI{}
@@ -232,48 +232,32 @@ func TestDAGRunMonitor_FlushesSuccessDigestIntoExistingChatAndSkipsReplay(t *tes
 	cs := bot.getOrCreateChat(123)
 	bot.setActiveSession(cs, "existing-session", "telegram:123")
 
-	ok := monitor.notifyCompletion(context.Background(), &exec.DAGRunStatus{
+	first := &exec.DAGRunStatus{
 		Name:      "briefing",
 		Status:    core.Succeeded,
 		DAGRunID:  "run-1",
 		AttemptID: "attempt-1",
-	})
-	require.True(t, ok)
-	ok = monitor.notifyCompletion(context.Background(), &exec.DAGRunStatus{
+	}
+	second := &exec.DAGRunStatus{
 		Name:      "briefing",
 		Status:    core.Succeeded,
 		DAGRunID:  "run-2",
 		AttemptID: "attempt-2",
-	})
-	require.True(t, ok)
+	}
+	require.True(t, monitor.notifyCompletion(context.Background(), first))
+	require.True(t, monitor.notifyCompletion(context.Background(), second))
 
 	require.Eventually(t, func() bool {
-		service.mu.Lock()
-		defer service.mu.Unlock()
-		return len(service.appendMessages) == 1
+		return monitor.isSeen("123", first) && monitor.isSeen("123", second)
 	}, time.Second, 10*time.Millisecond)
 
 	service.mu.Lock()
-	assert.Equal(t, 0, service.createEmptyCalls, "existing chat session should be reused")
-	require.Len(t, service.appendSessionIDs, 1)
-	assert.Equal(t, "existing-session", service.appendSessionIDs[0])
+	assert.Zero(t, service.createEmptyCalls)
+	assert.Empty(t, service.appendSessionIDs)
+	assert.Empty(t, service.appendMessages)
 	service.mu.Unlock()
-	assert.Equal(t, int64(1), bot.lastDeliveredSeq(cs))
-	assert.Equal(t, 1, api.sendCount())
-	service.mu.Lock()
-	require.Len(t, service.appendMessages, 1)
-	assert.Contains(t, service.appendMessages[0].Content, "DAG completion digest")
-	assert.Contains(t, service.appendMessages[0].Content, "briefing: succeeded x2")
-	service.mu.Unlock()
-
-	bot.processStreamResponse(context.Background(), cs, 123, agent.StreamResponse{
-		Messages: []agent.Message{
-			{Type: agent.MessageTypeAssistant, SequenceID: 1, Content: "digest"},
-			{Type: agent.MessageTypeAssistant, SequenceID: 2, Content: "actual reply"},
-		},
-	})
-
-	assert.Equal(t, 2, api.sendCount(), "the manually delivered digest must not be replayed")
+	assert.Equal(t, int64(0), bot.lastDeliveredSeq(cs))
+	assert.Zero(t, api.sendCount(), "successful completions should not send a Telegram digest")
 }
 
 func TestDAGRunMonitor_FlushesUrgentSingleCreatesSessionWhenMissing(t *testing.T) {
