@@ -32,6 +32,10 @@ func (r *testControllerRuntime) ListWorkflows(_ context.Context) ([]ControllerWo
 	return []ControllerWorkflow{{Name: "example"}}, nil
 }
 
+func (r *testControllerRuntime) RegisterWorkflow(_ context.Context, workflowName string) (ControllerRegisterWorkflowResult, error) {
+	return ControllerRegisterWorkflowResult{WorkflowName: workflowName}, nil
+}
+
 func (r *testControllerRuntime) RunWorkflow(_ context.Context, input ControllerRunWorkflowInput) (ControllerRunWorkflowResult, error) {
 	return ControllerRunWorkflowResult{WorkflowName: input.WorkflowName, DAGRunID: "run-1"}, nil
 }
@@ -61,7 +65,7 @@ func TestRegisteredTools_ContainsAllExpected(t *testing.T) {
 		"delegate",
 		"remote_agent", "list_contexts",
 		"list_controller_tasks",
-		"list_workflows", "run_workflow", "retry_controller_run",
+		"list_workflows", "register_workflow", "run_workflow", "retry_controller_run",
 		"set_controller_task_done", "request_human_input", "finish_controller",
 	}
 

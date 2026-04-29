@@ -13,6 +13,7 @@ import (
 const (
 	listControllerTasksToolName = "list_controller_tasks"
 	listWorkflowsToolName       = "list_workflows"
+	registerWorkflowToolName    = "register_workflow"
 	runWorkflowToolName         = "run_workflow"
 	retryControllerRunTool      = "retry_controller_run"
 	setControllerTaskDoneTool   = "set_controller_task_done"
@@ -43,6 +44,18 @@ func init() {
 				return nil
 			}
 			return newListWorkflowsTool(cfg.ControllerRuntime)
+		},
+	})
+	RegisterTool(ToolRegistration{
+		Name:           registerWorkflowToolName,
+		Label:          "Register Workflow",
+		Description:    "Register an existing workflow so this Controller can execute it",
+		DefaultEnabled: true,
+		Factory: func(cfg ToolConfig) *AgentTool {
+			if cfg.ControllerRuntime == nil {
+				return nil
+			}
+			return newRegisterWorkflowTool(cfg.ControllerRuntime)
 		},
 	})
 	RegisterTool(ToolRegistration{
@@ -157,6 +170,46 @@ func newListWorkflowsTool(runtime ControllerRuntime) *AgentTool {
 				return toolError("failed to format workflows: %v", err)
 			}
 			return ToolOut{Content: string(body)}
+		},
+	}
+}
+
+type registerWorkflowInput struct {
+	WorkflowName string `json:"workflow_name"`
+}
+
+func newRegisterWorkflowTool(runtime ControllerRuntime) *AgentTool {
+	return &AgentTool{
+		Tool: llm.Tool{
+			Type: "function",
+			Function: llm.ToolFunction{
+				Name:        registerWorkflowToolName,
+				Description: "Add an existing DAG name to this Controller's workflows.names list so it becomes runnable.",
+				Parameters: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"workflow_name": map[string]any{
+							"type":        "string",
+							"description": "Name of the existing DAG to register for this Controller.",
+						},
+					},
+					"required": []string{"workflow_name"},
+				},
+			},
+		},
+		Run: func(ctx ToolContext, input json.RawMessage) ToolOut {
+			var args registerWorkflowInput
+			if err := json.Unmarshal(input, &args); err != nil {
+				return toolError("invalid input: %v", err)
+			}
+			result, err := runtime.RegisterWorkflow(ctx.Context, args.WorkflowName)
+			if err != nil {
+				return toolError("failed to register workflow %q: %v", args.WorkflowName, err)
+			}
+			if result.AlreadyManaged {
+				return ToolOut{Content: fmt.Sprintf("Workflow %q is already registered for this Controller.", result.WorkflowName)}
+			}
+			return ToolOut{Content: fmt.Sprintf("Registered workflow %q for this Controller.", result.WorkflowName)}
 		},
 	}
 }

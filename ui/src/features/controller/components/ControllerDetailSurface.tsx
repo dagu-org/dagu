@@ -5,7 +5,6 @@ import React from 'react';
 
 import {
   ControllerDocument,
-  AgentMessageType,
   type components,
 } from '@/api/v1/schema';
 import { Button } from '@/components/ui/button';
@@ -26,9 +25,9 @@ import {
 import { ControllerAvatar } from '@/features/controller/components/ControllerAvatar';
 import { DAGNamePicker } from '@/features/controller/components/ControllerCreateModal';
 import { ControllerDocumentSection } from '@/features/controller/components/ControllerMemorySection';
+import { ControllerTalkThread } from '@/features/controller/components/ControllerTalkThread';
 import type { ControllerDetailController } from '@/features/controller/hooks/useControllerDetail';
 import {
-  agentMessageLabel,
   controllerDisplayName,
   dagRunStatusToStatus,
   displayStatusClass,
@@ -37,7 +36,6 @@ import {
   type ControllerTask,
   type ControllerTaskTemplate,
 } from '@/features/controller/detail-utils';
-import { cn } from '@/lib/utils';
 import StatusChip from '@/components/ui/status-chip';
 import DAGDetailsModal from '@/features/dags/components/dag-details/DAGDetailsModal';
 import DAGRunDetailsModal from '@/features/dag-runs/components/dag-run-details/DAGRunDetailsModal';
@@ -98,159 +96,6 @@ function RunRow({
         {run.finishedAt || run.startedAt || run.createdAt || ''}
       </div>
     </button>
-  );
-}
-
-function ThreadBubble({
-  item,
-}: {
-  item: ControllerDetailController['threadItems'][number];
-}): React.ReactElement {
-  if (item.kind === 'queued') {
-    return (
-      <div className="flex items-start">
-        <div className="max-w-[90%] rounded-2xl border border-amber-300/40 bg-amber-50 px-4 py-3 text-sm dark:border-amber-700/40 dark:bg-amber-950/20">
-          <div className="mb-1 flex items-center justify-between gap-4 text-[11px] font-medium uppercase tracking-wide text-amber-800 dark:text-amber-200">
-            <span>{item.queuedKind.replace(/_/g, ' ')} queued</span>
-            {item.createdAt ? (
-              <span className="normal-case tracking-normal">
-                {formatAbsoluteTime(item.createdAt)}
-              </span>
-            ) : null}
-          </div>
-          <div className="whitespace-pre-wrap break-words">{item.message}</div>
-        </div>
-      </div>
-    );
-  }
-
-  const message = item.message;
-  const isUser = message.type === AgentMessageType.user;
-  const isError = message.type === AgentMessageType.error;
-
-  return (
-    <div className={cn('flex', isUser ? 'justify-end' : 'justify-start')}>
-      <div
-        className={cn(
-          'max-w-[90%] rounded-2xl border px-4 py-3 text-sm',
-          isUser
-            ? 'border-primary/20 bg-primary/5'
-            : isError
-              ? 'border-destructive/30 bg-destructive/5'
-              : 'bg-muted/40'
-        )}
-      >
-        <div className="mb-1 flex items-center justify-between gap-4 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-          <span>{agentMessageLabel(message.type)}</span>
-          {message.createdAt ? (
-            <span className="normal-case tracking-normal">
-              {formatAbsoluteTime(message.createdAt)}
-            </span>
-          ) : null}
-        </div>
-        {message.content ? (
-          <div className="whitespace-pre-wrap break-words">
-            {message.content}
-          </div>
-        ) : null}
-        {message.userPrompt?.question ? (
-          <div className="whitespace-pre-wrap break-words">
-            {message.userPrompt.question}
-          </div>
-        ) : null}
-        {message.toolResults?.length ? (
-          <div className="mt-3 space-y-2">
-            {message.toolResults.map((result, index) => (
-              <div
-                key={`${message.id}-tool-${index}`}
-                className="rounded-md border bg-background/80 p-2 text-xs whitespace-pre-wrap break-words"
-              >
-                {result.content}
-              </div>
-            ))}
-          </div>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-function TalkThread({
-  items,
-  sessionId,
-  active,
-}: {
-  items: ControllerDetailController['threadItems'];
-  sessionId?: string;
-  active: boolean;
-}): React.ReactElement {
-  const containerRef = React.useRef<HTMLDivElement | null>(null);
-  const shouldFollowRef = React.useRef(true);
-
-  const scrollToBottom = React.useCallback(() => {
-    const node = containerRef.current;
-    if (!node) {
-      return;
-    }
-    node.scrollTop = node.scrollHeight;
-  }, []);
-
-  React.useEffect(() => {
-    const node = containerRef.current;
-    if (!node) {
-      return;
-    }
-
-    const onScroll = () => {
-      const remaining = node.scrollHeight - node.scrollTop - node.clientHeight;
-      shouldFollowRef.current = remaining < 48;
-    };
-
-    onScroll();
-    node.addEventListener('scroll', onScroll);
-    return () => node.removeEventListener('scroll', onScroll);
-  }, []);
-
-  React.useLayoutEffect(() => {
-    if (!active) {
-      return;
-    }
-    shouldFollowRef.current = true;
-    requestAnimationFrame(scrollToBottom);
-  }, [active, scrollToBottom, sessionId]);
-
-  React.useLayoutEffect(() => {
-    if (!active || !shouldFollowRef.current) {
-      return;
-    }
-    requestAnimationFrame(scrollToBottom);
-  }, [active, items.length, scrollToBottom]);
-
-  return (
-    <div className="min-w-0 rounded-lg border p-4">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold">Talk Thread</h2>
-        {sessionId ? (
-          <span className="text-[11px] text-muted-foreground">
-            Session: {sessionId}
-          </span>
-        ) : null}
-      </div>
-      {items.length ? (
-        <div
-          ref={containerRef}
-          className="max-h-[34rem] space-y-3 overflow-y-auto pr-1"
-        >
-          {items.map((item) => (
-            <ThreadBubble key={item.id} item={item} />
-          ))}
-        </div>
-      ) : (
-        <div className="text-sm text-muted-foreground">
-          No session or queued messages yet.
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -598,7 +443,7 @@ function StatusTab({
         </div>
       </div>
 
-      <TalkThread
+      <ControllerTalkThread
         items={controller.threadItems}
         sessionId={controller.detail?.state.sessionId || undefined}
         active={active}

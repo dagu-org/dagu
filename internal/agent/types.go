@@ -318,6 +318,12 @@ type ControllerWorkflow struct {
 	Labels      []string `json:"labels,omitempty"`
 }
 
+// ControllerRegisterWorkflowResult describes the outcome of registering a workflow.
+type ControllerRegisterWorkflowResult struct {
+	WorkflowName   string `json:"workflow_name"`
+	AlreadyManaged bool   `json:"already_managed,omitempty"`
+}
+
 // ControllerTask describes a single checklist item in a Controller runtime.
 type ControllerTask struct {
 	ID          string `json:"id"`
@@ -349,6 +355,7 @@ type ControllerHumanPrompt struct {
 type ControllerRuntime interface {
 	ListTasks(ctx context.Context) ([]ControllerTask, error)
 	ListWorkflows(ctx context.Context) ([]ControllerWorkflow, error)
+	RegisterWorkflow(ctx context.Context, workflowName string) (ControllerRegisterWorkflowResult, error)
 	RunWorkflow(ctx context.Context, input ControllerRunWorkflowInput) (ControllerRunWorkflowResult, error)
 	RetryCurrentRun(ctx context.Context) (ControllerRunWorkflowResult, error)
 	SetTaskDone(ctx context.Context, taskID string, done bool) error

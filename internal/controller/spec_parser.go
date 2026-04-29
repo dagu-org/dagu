@@ -92,6 +92,44 @@ func annotateClonedFromInSpec(spec, sourceName string) (string, error) {
 	return string(data), nil
 }
 
+func upsertWorkflowNameInSpec(spec, workflowName string) (string, bool, error) {
+	workflowName = strings.TrimSpace(workflowName)
+	if workflowName == "" {
+		return "", false, errors.New("workflow name is required")
+	}
+
+	var doc yaml.Node
+	if err := yaml.Unmarshal([]byte(spec), &doc); err != nil {
+		return "", false, fmt.Errorf("parse yaml: %w", err)
+	}
+	if len(doc.Content) == 0 || isNullNode(doc.Content[0]) {
+		return "", false, errors.New("definition is required")
+	}
+	root := doc.Content[0]
+	if root.Kind != yaml.MappingNode {
+		return "", false, errors.New("definition must be an object")
+	}
+
+	workflowsNode := ensureMappingValue(root, "workflows")
+	namesNode := ensureSequenceValue(workflowsNode, "names")
+	for _, child := range namesNode.Content {
+		if strings.TrimSpace(child.Value) == workflowName {
+			return spec, false, nil
+		}
+	}
+	namesNode.Content = append(namesNode.Content, &yaml.Node{
+		Kind:  yaml.ScalarNode,
+		Tag:   "!!str",
+		Value: workflowName,
+	})
+
+	data, err := yaml.Marshal(&doc)
+	if err != nil {
+		return "", false, fmt.Errorf("marshal yaml: %w", err)
+	}
+	return string(data), true, nil
+}
+
 func setMappingScalar(node *yaml.Node, key, value string, aliases ...string) {
 	matchingKeys := map[string]struct{}{key: {}}
 	for _, alias := range aliases {
@@ -135,6 +173,48 @@ func setMappingScalar(node *yaml.Node, key, value string, aliases ...string) {
 	copy(node.Content[insertAt+2:], node.Content[insertAt:])
 	node.Content[insertAt] = keyNode
 	node.Content[insertAt+1] = valueNode
+}
+
+func ensureMappingValue(node *yaml.Node, key string) *yaml.Node {
+	for i := 0; i < len(node.Content); i += 2 {
+		keyNode := node.Content[i]
+		if strings.TrimSpace(keyNode.Value) == key {
+			valueNode := node.Content[i+1]
+			if isNullNode(valueNode) {
+				valueNode = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+				node.Content[i+1] = valueNode
+			}
+			return valueNode
+		}
+	}
+
+	valueNode := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+	node.Content = append(node.Content,
+		&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key},
+		valueNode,
+	)
+	return valueNode
+}
+
+func ensureSequenceValue(node *yaml.Node, key string) *yaml.Node {
+	for i := 0; i < len(node.Content); i += 2 {
+		keyNode := node.Content[i]
+		if strings.TrimSpace(keyNode.Value) == key {
+			valueNode := node.Content[i+1]
+			if isNullNode(valueNode) {
+				valueNode = &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
+				node.Content[i+1] = valueNode
+			}
+			return valueNode
+		}
+	}
+
+	valueNode := &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
+	node.Content = append(node.Content,
+		&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key},
+		valueNode,
+	)
+	return valueNode
 }
 
 func validateTriggerNode(node *yaml.Node, path string) error {

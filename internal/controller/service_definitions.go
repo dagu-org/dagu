@@ -190,6 +190,28 @@ func (s *Service) workflowIsManaged(ctx context.Context, workflows Workflows, wo
 	return false, nil
 }
 
+func (s *Service) registerWorkflow(ctx context.Context, controllerName, workflowName string) error {
+	workflowName = strings.TrimSpace(workflowName)
+	if workflowName == "" {
+		return errors.New("workflow name is required")
+	}
+	if _, err := s.dagStore.GetMetadata(ctx, workflowName); err != nil {
+		return fmt.Errorf("workflow %q not found: %w", workflowName, err)
+	}
+	spec, err := s.GetSpec(ctx, controllerName)
+	if err != nil {
+		return err
+	}
+	updatedSpec, changed, err := upsertWorkflowNameInSpec(spec, workflowName)
+	if err != nil {
+		return err
+	}
+	if !changed {
+		return nil
+	}
+	return s.PutSpec(ctx, controllerName, updatedSpec)
+}
+
 func shouldResetRuntimeForSpecChange(previous, next *Definition) bool {
 	if previous == nil || next == nil {
 		return false

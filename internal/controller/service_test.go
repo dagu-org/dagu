@@ -1365,7 +1365,8 @@ func TestServiceRuntimeOptionsPromptRestrictsWorkflowExecutionToConfiguredList(t
 	opts, err := svc.runtimeOptions(ctx, def, state)
 	require.NoError(t, err)
 	require.Contains(t, opts.SystemPromptExtra, "Run only workflows listed under Managed workflows.")
-	require.Contains(t, opts.SystemPromptExtra, "If none of the configured workflows fits the task, create a new workflow YAML in the DAGs directory with patch, add its name to this controller's workflows list in the controller spec, then run it.")
+	require.Contains(t, opts.SystemPromptExtra, "If none of the configured workflows fits the task, create a new workflow YAML in the DAGs directory with patch, register it with register_workflow, then run it.")
+	require.Contains(t, opts.SystemPromptExtra, "Use register_workflow to add a created DAG name to this controller's workflows.names list. Do not edit the controller spec manually.")
 	require.Contains(t, opts.SystemPromptExtra, "Controller spec path:")
 }
 
@@ -1513,6 +1514,82 @@ goal: Complete the assigned software work
 	items, err := rt.ListWorkflows(ctx)
 	require.NoError(t, err)
 	require.Empty(t, items)
+}
+
+func TestControllerRuntimeRegisterWorkflowCreatesManagedEntry(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+
+	spec := `description: Workflow-less controller
+trigger:
+  type: manual
+goal: Complete the assigned software work
+`
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", spec))
+	def, err := svc.GetDefinition(ctx, "software_dev")
+	require.NoError(t, err)
+	state, err := svc.ensureState(ctx, def)
+	require.NoError(t, err)
+
+	rt := &controllerRuntime{service: svc, def: def, state: state}
+	result, err := rt.RegisterWorkflow(ctx, "run-tests")
+	require.NoError(t, err)
+	require.Equal(t, "run-tests", result.WorkflowName)
+	require.False(t, result.AlreadyManaged)
+
+	reloaded, err := svc.GetDefinition(ctx, "software_dev")
+	require.NoError(t, err)
+	require.Equal(t, []string{"run-tests"}, reloaded.Workflows.Names)
+
+	items, err := rt.ListWorkflows(ctx)
+	require.NoError(t, err)
+	require.Equal(t, []string{"run-tests"}, workflowNamesFromAgent(items))
+}
+
+func TestControllerRuntimeRegisterWorkflowPreservesExistingWorkflowNames(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", controllerSpec("build-app")))
+	def, err := svc.GetDefinition(ctx, "software_dev")
+	require.NoError(t, err)
+	state, err := svc.ensureState(ctx, def)
+	require.NoError(t, err)
+
+	rt := &controllerRuntime{service: svc, def: def, state: state}
+	_, err = rt.RegisterWorkflow(ctx, "run-tests")
+	require.NoError(t, err)
+
+	reloaded, err := svc.GetDefinition(ctx, "software_dev")
+	require.NoError(t, err)
+	require.Equal(t, []string{"build-app", "run-tests"}, reloaded.Workflows.Names)
+}
+
+func TestControllerRuntimeRegisterWorkflowReturnsAlreadyManaged(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", controllerSpec("build-app")))
+	def, err := svc.GetDefinition(ctx, "software_dev")
+	require.NoError(t, err)
+	state, err := svc.ensureState(ctx, def)
+	require.NoError(t, err)
+
+	rt := &controllerRuntime{service: svc, def: def, state: state}
+	result, err := rt.RegisterWorkflow(ctx, "build-app")
+	require.NoError(t, err)
+	require.Equal(t, "build-app", result.WorkflowName)
+	require.True(t, result.AlreadyManaged)
+
+	reloaded, err := svc.GetDefinition(ctx, "software_dev")
+	require.NoError(t, err)
+	require.Equal(t, []string{"build-app"}, reloaded.Workflows.Names)
 }
 
 func TestControllerRuntimeListWorkflowsIgnoresWorkflowLabels(t *testing.T) {
@@ -1735,5 +1812,6 @@ func TestServiceRuntimeOptionsIncludeFinishToolForLegacyService(t *testing.T) {
 	require.Contains(t, opts.AllowedTools, "patch")
 	require.Contains(t, opts.AllowedTools, "request_human_input")
 	require.Contains(t, opts.AllowedTools, "list_workflows")
+	require.Contains(t, opts.AllowedTools, "register_workflow")
 	require.Contains(t, opts.AllowedTools, "run_workflow")
 }
