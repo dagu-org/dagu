@@ -493,14 +493,6 @@ func (n *Node) readStructuredOutputSource(ctx context.Context, key string, entry
 		}
 		path = filepath.Clean(path)
 
-		info, err := os.Stat(path)
-		if err != nil {
-			return "", fmt.Errorf("%s: failed to stat file %q: %w", key, path, err)
-		}
-		if info.Size() > maxOutputSize(ctx) {
-			return "", fmt.Errorf("output exceeded maximum size limit of %d bytes", maxOutputSize(ctx))
-		}
-
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return "", fmt.Errorf("%s: failed to read file %q: %w", key, path, err)
@@ -577,7 +569,7 @@ func (n *Node) evaluateStructuredLiteral(ctx context.Context, value any) (any, e
 }
 
 func maxOutputSize(ctx context.Context) int64 {
-	maxSize := int64(1024 * 1024)
+	maxSize := int64(defaultMaxOutputSizeBytes)
 	if rCtx := GetDAGContext(ctx); rCtx.DAG != nil && rCtx.DAG.MaxOutputSize > 0 {
 		maxSize = int64(rCtx.DAG.MaxOutputSize)
 	}
@@ -908,7 +900,7 @@ func (n *Node) LogContainsPattern(ctx context.Context, patterns []string) (bool,
 	}()
 
 	// Get maxOutputSize from DAG configuration
-	var maxOutputSize = 1024 * 1024 // Default 1MB
+	var maxOutputSize = defaultMaxOutputSizeBytes
 	if rCtx := GetDAGContext(ctx); rCtx.DAG != nil && rCtx.DAG.MaxOutputSize > 0 {
 		maxOutputSize = rCtx.DAG.MaxOutputSize
 	}

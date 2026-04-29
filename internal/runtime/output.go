@@ -141,7 +141,7 @@ func (oc *OutputCoordinator) setupExecutorIO(ctx context.Context, cmd executor.E
 		oc.outputCaptured = false
 
 		// Get max output size from DAG configuration, default to 1MB
-		oc.maxOutputSize = 1024 * 1024 // 1MB default
+		oc.maxOutputSize = defaultMaxOutputSizeBytes
 		if rCtx := GetDAGContext(ctx); rCtx.DAG != nil && rCtx.DAG.MaxOutputSize > 0 {
 			oc.maxOutputSize = int64(rCtx.DAG.MaxOutputSize)
 		}
@@ -177,7 +177,7 @@ func (oc *OutputCoordinator) setupExecutorIO(ctx context.Context, cmd executor.E
 		oc.stderrOutputCaptured = false
 		oc.stderrOutputData = ""
 		if oc.maxOutputSize == 0 {
-			oc.maxOutputSize = 1024 * 1024
+			oc.maxOutputSize = defaultMaxOutputSizeBytes
 			if rCtx := GetDAGContext(ctx); rCtx.DAG != nil && rCtx.DAG.MaxOutputSize > 0 {
 				oc.maxOutputSize = int64(rCtx.DAG.MaxOutputSize)
 			}

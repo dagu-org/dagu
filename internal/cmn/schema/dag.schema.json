@@ -1086,6 +1086,148 @@
       },
       "description": "Rich DAG parameter definition written as an object with a required name field and at least one additional definition field. Types drive validation and UI metadata; runtime env values remain strings. The optional eval field computes the effective default during normal DAG builds unless evaluation is disabled."
     },
+    "stepOutputJSONValue": {
+      "oneOf": [
+        {
+          "type": ["string", "number", "boolean", "null"]
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/stepOutputJSONValue"
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/stepOutputJSONValue"
+          }
+        }
+      ],
+      "description": "Recursive JSON-compatible value used by structured step outputs."
+    },
+    "stepOutputLiteralEntry": {
+      "oneOf": [
+        {
+          "type": ["string", "number", "boolean", "null"]
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/stepOutputJSONValue"
+          }
+        },
+        {
+          "type": "object",
+          "propertyNames": {
+            "not": {
+              "enum": ["value", "from", "path", "decode", "select"]
+            }
+          },
+          "additionalProperties": {
+            "$ref": "#/definitions/stepOutputJSONValue"
+          }
+        }
+      ],
+      "description": "Literal step output entry value. Top-level objects that use reserved structured-output keys must use the structured entry form instead."
+    },
+    "stepOutputStructuredEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "$ref": "#/definitions/stepOutputJSONValue"
+        },
+        "from": {
+          "type": "string",
+          "enum": ["stdout", "stderr", "file"]
+        },
+        "path": {
+          "type": "string"
+        },
+        "decode": {
+          "type": "string",
+          "enum": ["text", "json", "yaml"]
+        },
+        "select": {
+          "type": "string"
+        }
+      },
+      "oneOf": [
+        {
+          "required": ["value"],
+          "not": {
+            "anyOf": [
+              { "required": ["from"] },
+              { "required": ["path"] },
+              { "required": ["decode"] },
+              { "required": ["select"] }
+            ]
+          }
+        },
+        {
+          "required": ["from"],
+          "properties": {
+            "from": {
+              "enum": ["stdout", "stderr"]
+            }
+          },
+          "not": {
+            "required": ["path"]
+          },
+          "oneOf": [
+            {
+              "not": {
+                "required": ["select"]
+              }
+            },
+            {
+              "required": ["select", "decode"],
+              "properties": {
+                "decode": {
+                  "enum": ["json", "yaml"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "required": ["from", "path"],
+          "properties": {
+            "from": {
+              "const": "file"
+            }
+          },
+          "oneOf": [
+            {
+              "not": {
+                "required": ["select"]
+              }
+            },
+            {
+              "required": ["select", "decode"],
+              "properties": {
+                "decode": {
+                  "enum": ["json", "yaml"]
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Structured step output entry that reads from stdout, stderr, or a file and optionally decodes/selects a nested value."
+    },
+    "stepOutputEntry": {
+      "oneOf": [
+        {
+          "$ref": "#/definitions/stepOutputLiteralEntry"
+        },
+        {
+          "$ref": "#/definitions/stepOutputStructuredEntry"
+        }
+      ],
+      "description": "One entry in an object-form step output."
+    },
     "dagParamExternalSchema": {
       "type": "object",
       "properties": {
@@ -1305,7 +1447,9 @@
             },
             {
               "type": "object",
-              "additionalProperties": true,
+              "additionalProperties": {
+                "$ref": "#/definitions/stepOutputEntry"
+              },
               "description": "Structured step output published after the step completes. Entry values can be literal JSON-compatible values or objects using fields like value, from, path, decode, and select."
             }
           ],

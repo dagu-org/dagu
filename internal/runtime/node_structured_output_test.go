@@ -252,7 +252,7 @@ func TestNodeResolveStructuredOutputEntry(t *testing.T) {
 				From: core.StepOutputSourceFile,
 				Path: "missing.json",
 			},
-			wantErr: `result: failed to stat file`,
+			wantErr: `result: failed to read file`,
 		},
 		{
 			name: "FileSourceReadError",

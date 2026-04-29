@@ -249,6 +249,40 @@ steps:
         select: .version
 `,
 		},
+		{
+			name: "RejectInvalidStructuredSource",
+			spec: `
+steps:
+  - command: echo hi
+    output:
+      version:
+        from: network
+`,
+			wantErr: "did not validate",
+		},
+		{
+			name: "RejectFileSourceWithoutPath",
+			spec: `
+steps:
+  - command: echo hi
+    output:
+      version:
+        from: file
+`,
+			wantErr: "did not validate",
+		},
+		{
+			name: "RejectInvalidDecode",
+			spec: `
+steps:
+  - command: echo hi
+    output:
+      version:
+        from: stdout
+        decode: xml
+`,
+			wantErr: "did not validate",
+		},
 	}
 
 	for _, tt := range tests {
