@@ -140,7 +140,7 @@ func newListWorkflowsTool(runtime ControllerRuntime) *AgentTool {
 			Type: "function",
 			Function: llm.ToolFunction{
 				Name:        listWorkflowsToolName,
-				Description: "Return the workflows this Controller can inspect or execute, including descriptions and labels when available.",
+				Description: "Return only the workflows configured for this Controller, including descriptions and labels when available.",
 				Parameters: map[string]any{
 					"type":       "object",
 					"properties": map[string]any{},
@@ -172,13 +172,13 @@ func newRunWorkflowTool(runtime ControllerRuntime) *AgentTool {
 			Type: "function",
 			Function: llm.ToolFunction{
 				Name:        runWorkflowToolName,
-				Description: "Launch one workflow as the next unit of work, then pause until that DAG run changes state.",
+				Description: "Launch one configured workflow as the next unit of work, then pause until that DAG run changes state.",
 				Parameters: map[string]any{
 					"type": "object",
 					"properties": map[string]any{
 						"workflow_name": map[string]any{
 							"type":        "string",
-							"description": "Name of the workflow to execute.",
+							"description": "Name of the configured workflow to execute.",
 						},
 						"params": map[string]any{
 							"type":        "string",

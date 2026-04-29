@@ -959,6 +959,71 @@ export function useControllerDetailController({
     triggerTypeDraft,
   ]);
 
+  const onWorkflowNamesChange = React.useCallback(
+    async (names: string[]) => {
+      const nextWorkflowNames = normalizeDAGNameList(names);
+      setWorkflowNamesDraft(nextWorkflowNames);
+
+      if (
+        !name ||
+        !detail ||
+        !specQuery.data?.spec ||
+        !!busyAction ||
+        isSavingSpec ||
+        isEditingSpec ||
+        sameDAGNameList(nextWorkflowNames, detail.definition.workflows?.names)
+      ) {
+        return;
+      }
+
+      setActionError('');
+      setBusyAction('workflow-names');
+      try {
+        const nextSpec = updateControllerMetadataInSpec(specQuery.data.spec, {
+          description: detail.definition.description || '',
+          iconUrl: detail.definition.iconUrl || '',
+          goal: detail.definition.goal || '',
+          model: detail.definition.agent?.model || '',
+          triggerPrompt: persistedTriggerPrompt,
+          resetOnFinish: !!detail.definition.resetOnFinish,
+          triggerType,
+          cronSchedules: persistedCronSchedules,
+          workflowNames: nextWorkflowNames,
+        });
+        const { error: apiError } = await client.PUT('/controller/{name}/spec', {
+          params: { path: { name } },
+          body: { spec: nextSpec },
+        });
+        if (apiError) {
+          throw new Error(apiError.message || 'Failed to save workflows');
+        }
+        await refreshAfterAction();
+      } catch (err) {
+        setWorkflowNamesDraft(
+          normalizeDAGNameList(detail.definition.workflows?.names)
+        );
+        setActionError(
+          err instanceof Error ? err.message : 'Failed to save workflows'
+        );
+      } finally {
+        setBusyAction(null);
+      }
+    },
+    [
+      busyAction,
+      client,
+      detail,
+      isEditingSpec,
+      isSavingSpec,
+      name,
+      persistedCronSchedules,
+      persistedTriggerPrompt,
+      refreshAfterAction,
+      specQuery.data?.spec,
+      triggerType,
+    ]
+  );
+
   const onCancelMetadata = React.useCallback(() => {
     setDescriptionDraft(detail?.definition?.description || '');
     setIconUrlDraft(detail?.definition?.iconUrl || '');
@@ -1060,6 +1125,7 @@ export function useControllerDetailController({
     metadataChanged,
     metadataValidationError,
     metadataSaveDisabled,
+    onWorkflowNamesChange,
     onStart,
     onCreateTask,
     onToggleTask,

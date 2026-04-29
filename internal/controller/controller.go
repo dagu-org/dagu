@@ -424,6 +424,7 @@ func (s *Service) buildSystemPromptExtra(def *Definition, state *State, workflow
 		fmt.Fprintf(&sb, "Description: %s\n", def.Description)
 	}
 	fmt.Fprintf(&sb, "Trigger: %s\n", def.Trigger.Type)
+	fmt.Fprintf(&sb, "Controller spec path: %s\n", s.definitionPath(def.Name))
 	if def.Trigger.Type == TriggerModeCron && len(def.Trigger.Schedules) > 0 {
 		sb.WriteString("Trigger schedules:\n")
 		for _, item := range def.Trigger.Schedules {
@@ -464,9 +465,12 @@ func (s *Service) buildSystemPromptExtra(def *Definition, state *State, workflow
 	sb.WriteString("- Do not create, edit, reorder, or delete task list items.\n")
 	sb.WriteString("- Use list_controller_tasks when you need a fresh view of the task list.\n")
 	sb.WriteString("- Use set_controller_task_done to mark an existing task done or reopen it if more work is needed.\n")
-	sb.WriteString("- Use list_workflows to inspect existing workflows when you need more options.\n")
-	sb.WriteString("- Use patch to create or improve workflow YAML when the right workflow does not exist yet.\n")
-	sb.WriteString("- Use run_workflow for execution and wait for the scheduler to resume you.\n")
+	sb.WriteString("- Use list_workflows to inspect only the workflows configured for this Controller.\n")
+	sb.WriteString("- Run only workflows listed under Managed workflows.\n")
+	sb.WriteString("- If none of the configured workflows fits the task, create a new workflow YAML in the DAGs directory with patch, add its name to this controller's workflows list in the controller spec, then run it.\n")
+	sb.WriteString("- Keep improving existing workflows with patch whenever the current implementation is incomplete, brittle, or incorrect.\n")
+	sb.WriteString("- Use patch only for workflow YAML and this controller spec; do not use it to make unrelated file changes.\n")
+	sb.WriteString("- Use run_workflow only with a workflow listed under Managed workflows, then wait for the scheduler to resume you.\n")
 	sb.WriteString("- Use request_human_input if blocked on approval or clarification.\n")
 	sb.WriteString("- Use finish_controller only when the current cycle is complete.\n")
 	sb.WriteString("- Do not ask for shell commands or tools you do not have.\n")
@@ -476,13 +480,13 @@ func (s *Service) buildSystemPromptExtra(def *Definition, state *State, workflow
 func (s *Service) buildKickoffMessage(def *Definition, state *State) string {
 	if strings.TrimSpace(def.Goal) == "" {
 		return fmt.Sprintf(
-			"Continue Controller %q. Current instruction: %q. Review the open tasks and current context, then choose the most appropriate work. If work must be executed, run one workflow. If the right workflow does not exist yet, create or improve it with patch, then run it. If blocked, request human input. If complete, finish the controller.",
+			"Continue Controller %q. Current instruction: %q. Review the open tasks and current context, then choose the most appropriate work. If work must be executed, run one workflow from the configured workflows list. Do not run workflows outside that list. If none of the configured workflows fits, create one, add it to the workflows list, and keep improving it until it is usable. If complete, finish the controller.",
 			def.Name,
 			state.Instruction,
 		)
 	}
 	return fmt.Sprintf(
-		"Continue Controller %q. Current instruction: %q. Review the open tasks and choose the most appropriate work toward the goal. If work must be executed, run one workflow. If the right workflow does not exist yet, create or improve it with patch, then run it. If blocked, request human input. If complete, finish the controller.",
+		"Continue Controller %q. Current instruction: %q. Review the open tasks and choose the most appropriate work toward the goal. If work must be executed, run one workflow from the configured workflows list. Do not run workflows outside that list. If none of the configured workflows fits, create one, add it to the workflows list, and keep improving it until it is usable. If complete, finish the controller.",
 		def.Name,
 		state.Instruction,
 	)
@@ -526,7 +530,7 @@ func (s *Service) buildHumanResponseMessage(prompt *Prompt, response *PromptResp
 
 func (s *Service) buildScheduledTickMessage(def *Definition, state *State, tickTime time.Time) string {
 	return fmt.Sprintf(
-		"Scheduled wake-up for Controller %q at %s. Current instruction: %q. Review the open tasks and current context. If there is actionable work, continue it or run one workflow. If the right workflow does not exist yet, create or improve it with patch, then run it. Choose whichever open task is most appropriate. If blocked, request human input. If complete, finish the controller.",
+		"Scheduled wake-up for Controller %q at %s. Current instruction: %q. Review the open tasks and current context. If there is actionable work, continue it or run one workflow from the configured workflows list. Do not run workflows outside that list. Choose whichever open task is most appropriate. If none of the configured workflows fits, create one, add it to the workflows list, and keep improving it until it is usable. If complete, finish the controller.",
 		def.Name,
 		tickTime.Format(time.RFC3339),
 		state.Instruction,
@@ -537,6 +541,15 @@ type controllerRuntime struct {
 	service *Service
 	def     *Definition
 	state   *State
+}
+
+func (r *controllerRuntime) reloadDefinition(ctx context.Context) error {
+	def, err := r.service.GetDefinition(ctx, r.def.Name)
+	if err != nil {
+		return err
+	}
+	r.def = def
+	return nil
 }
 
 func (r *controllerRuntime) ListTasks(_ context.Context) ([]agent.ControllerTask, error) {
@@ -552,7 +565,10 @@ func (r *controllerRuntime) ListTasks(_ context.Context) ([]agent.ControllerTask
 }
 
 func (r *controllerRuntime) ListWorkflows(ctx context.Context) ([]agent.ControllerWorkflow, error) {
-	items, err := r.service.listAvailableWorkflowSet(ctx, r.def.Workflows)
+	if err := r.reloadDefinition(ctx); err != nil {
+		return nil, err
+	}
+	items, err := r.service.resolveManagedWorkflowSet(ctx, r.def.Workflows)
 	if err != nil {
 		return nil, err
 	}
@@ -568,11 +584,24 @@ func (r *controllerRuntime) ListWorkflows(ctx context.Context) ([]agent.Controll
 }
 
 func (r *controllerRuntime) RunWorkflow(ctx context.Context, input agent.ControllerRunWorkflowInput) (agent.ControllerRunWorkflowResult, error) {
+	if err := r.reloadDefinition(ctx); err != nil {
+		return agent.ControllerRunWorkflowResult{}, err
+	}
 	if r.state.CurrentRunRef != nil {
 		return agent.ControllerRunWorkflowResult{}, fmt.Errorf("a child DAG run is already active")
 	}
 	if r.state.PendingPrompt != nil {
 		return agent.ControllerRunWorkflowResult{}, fmt.Errorf("cannot start a child DAG while waiting for human input")
+	}
+	if !hasWorkflows(r.def.Workflows) {
+		return agent.ControllerRunWorkflowResult{}, fmt.Errorf("no workflows are configured for this controller")
+	}
+	managed, err := r.service.workflowIsManaged(ctx, r.def.Workflows, input.WorkflowName)
+	if err != nil {
+		return agent.ControllerRunWorkflowResult{}, err
+	}
+	if !managed {
+		return agent.ControllerRunWorkflowResult{}, fmt.Errorf("workflow %q is not included in this controller's workflows list", input.WorkflowName)
 	}
 	dag, err := r.service.dagStore.GetDetails(ctx, input.WorkflowName)
 	if err != nil {
@@ -609,9 +638,6 @@ func (r *controllerRuntime) RunWorkflow(ctx context.Context, input agent.Control
 	r.state.CurrentRunRef = &ref
 	r.state.State = StateRunning
 	r.state.WaitingReason = WaitingReasonNone
-	if err := r.service.rememberWorkflow(ctx, r.def, dag.Name); err != nil {
-		return agent.ControllerRunWorkflowResult{}, err
-	}
 	if err := r.service.saveState(ctx, r.def.Name, r.state); err != nil {
 		return agent.ControllerRunWorkflowResult{}, err
 	}

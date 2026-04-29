@@ -796,7 +796,6 @@ function ConfigTab({
     !!controller.busyAction ||
     controller.isSavingSpec ||
     controller.isEditingSpec;
-  const workflowLabels = controller.detail?.definition.workflows?.labels || [];
   const selectedWorkflows = React.useMemo(() => {
     const infoByName = new Map(
       (controller.detail?.workflows || []).map((workflow) => [
@@ -1062,8 +1061,7 @@ function ConfigTab({
                 availableDAGs={controller.availableDAGOptions}
                 selectedNames={controller.workflowNamesDraft}
                 onChange={(names) => {
-                  controller.setWorkflowNamesDraft(names);
-                  controller.setIsEditingMetadata(true);
+                  void controller.onWorkflowNamesChange(names);
                 }}
                 searchQuery={controller.workflowSearchQuery}
                 onSearchQueryChange={controller.setWorkflowSearchQuery}
@@ -1079,12 +1077,6 @@ function ConfigTab({
                   {controller.dagListQuery.error instanceof Error
                     ? controller.dagListQuery.error.message
                     : 'Failed to load DAGs'}
-                </div>
-              ) : null}
-              {workflowLabels.length ? (
-                <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-                  The raw spec also includes workflows matching labels:{' '}
-                  <span className="font-mono">{workflowLabels.join(', ')}</span>
                 </div>
               ) : null}
             </div>

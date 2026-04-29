@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagucloud/dagu/internal/agent"
 	"github.com/dagucloud/dagu/internal/cmn/config"
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/persis/filedag"
@@ -262,6 +263,14 @@ workflows:
 }
 
 func workflowNames(items []WorkflowInfo) []string {
+	names := make([]string, 0, len(items))
+	for _, item := range items {
+		names = append(names, item.Name)
+	}
+	return names
+}
+
+func workflowNamesFromAgent(items []agent.ControllerWorkflow) []string {
 	names := make([]string, 0, len(items))
 	for _, item := range items {
 		names = append(names, item.Name)

@@ -12,6 +12,7 @@ import (
 	"github.com/dagucloud/dagu/internal/agent"
 	"github.com/dagucloud/dagu/internal/core/exec"
 	_ "github.com/dagucloud/dagu/internal/llm/allproviders"
+	"github.com/dagucloud/dagu/internal/runtime"
 	"github.com/dagucloud/dagu/internal/service/eventstore"
 	"github.com/stretchr/testify/require"
 )
@@ -1349,6 +1350,25 @@ agent:
 	require.DirExists(t, opts.WorkingDir)
 }
 
+func TestServiceRuntimeOptionsPromptRestrictsWorkflowExecutionToConfiguredList(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", controllerSpec("build-app")))
+	def, err := svc.GetDefinition(ctx, "software_dev")
+	require.NoError(t, err)
+	state, err := svc.ensureState(ctx, def)
+	require.NoError(t, err)
+
+	opts, err := svc.runtimeOptions(ctx, def, state)
+	require.NoError(t, err)
+	require.Contains(t, opts.SystemPromptExtra, "Run only workflows listed under Managed workflows.")
+	require.Contains(t, opts.SystemPromptExtra, "If none of the configured workflows fits the task, create a new workflow YAML in the DAGs directory with patch, add its name to this controller's workflows list in the controller spec, then run it.")
+	require.Contains(t, opts.SystemPromptExtra, "Controller spec path:")
+}
+
 func TestControllerRuntimeDefaultWorkingDirForDAGRun(t *testing.T) {
 	t.Parallel()
 
@@ -1428,6 +1448,143 @@ func TestControllerRuntimeRunWorkflowRejectsConcurrentRun(t *testing.T) {
 	rt := &controllerRuntime{service: svc, def: def, state: state}
 	_, err = rt.RunWorkflow(ctx, agent.ControllerRunWorkflowInput{WorkflowName: "build-app"})
 	require.ErrorContains(t, err, "already active")
+}
+
+func TestControllerRuntimeRunWorkflowRejectsWorkflowOutsideConfiguredList(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", controllerSpec("build-app")))
+	def, err := svc.GetDefinition(ctx, "software_dev")
+	require.NoError(t, err)
+	state, err := svc.ensureState(ctx, def)
+	require.NoError(t, err)
+
+	rt := &controllerRuntime{service: svc, def: def, state: state}
+	_, err = rt.RunWorkflow(ctx, agent.ControllerRunWorkflowInput{WorkflowName: "run-tests"})
+	require.ErrorContains(t, err, `is not included in this controller's workflows list`)
+}
+
+func TestControllerRuntimeRunWorkflowRejectsWorkflowMatchedOnlyByLabels(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+
+	spec := `description: Label-scoped controller
+trigger:
+  type: manual
+goal: Complete the assigned software work
+workflows:
+  labels:
+    - dev
+`
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", spec))
+	def, err := svc.GetDefinition(ctx, "software_dev")
+	require.NoError(t, err)
+	state, err := svc.ensureState(ctx, def)
+	require.NoError(t, err)
+
+	rt := &controllerRuntime{service: svc, def: def, state: state}
+	_, err = rt.RunWorkflow(ctx, agent.ControllerRunWorkflowInput{WorkflowName: "run-tests"})
+	require.ErrorContains(t, err, `is not included in this controller's workflows list`)
+}
+
+func TestControllerRuntimeListWorkflowsReturnsEmptyWhenNothingIsConfigured(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+
+	spec := `description: Workflow-less controller
+trigger:
+  type: manual
+goal: Complete the assigned software work
+`
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", spec))
+	def, err := svc.GetDefinition(ctx, "software_dev")
+	require.NoError(t, err)
+	state, err := svc.ensureState(ctx, def)
+	require.NoError(t, err)
+
+	rt := &controllerRuntime{service: svc, def: def, state: state}
+	items, err := rt.ListWorkflows(ctx)
+	require.NoError(t, err)
+	require.Empty(t, items)
+}
+
+func TestControllerRuntimeListWorkflowsIgnoresWorkflowLabels(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+
+	spec := `description: Label-scoped controller
+trigger:
+  type: manual
+goal: Complete the assigned software work
+workflows:
+  labels:
+    - dev
+`
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", spec))
+	def, err := svc.GetDefinition(ctx, "software_dev")
+	require.NoError(t, err)
+	state, err := svc.ensureState(ctx, def)
+	require.NoError(t, err)
+
+	rt := &controllerRuntime{service: svc, def: def, state: state}
+	items, err := rt.ListWorkflows(ctx)
+	require.NoError(t, err)
+	require.Empty(t, items)
+}
+
+func TestControllerRuntimeListWorkflowsReloadsUpdatedDefinition(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", controllerSpec("build-app")))
+	def, err := svc.GetDefinition(ctx, "software_dev")
+	require.NoError(t, err)
+	state, err := svc.ensureState(ctx, def)
+	require.NoError(t, err)
+
+	rt := &controllerRuntime{service: svc, def: def, state: state}
+
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", controllerSpecMultiDAGs()))
+
+	items, err := rt.ListWorkflows(ctx)
+	require.NoError(t, err)
+	require.Equal(t, []string{"build-app", "run-tests"}, workflowNamesFromAgent(items))
+}
+
+func TestControllerRuntimeRunWorkflowUsesUpdatedDefinition(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+	svc.cfg.Paths.Executable = "true"
+	svc.subCmdBuilder = runtime.NewSubCmdBuilder(svc.cfg)
+
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", controllerSpec("build-app")))
+	def, err := svc.GetDefinition(ctx, "software_dev")
+	require.NoError(t, err)
+	state, err := svc.ensureState(ctx, def)
+	require.NoError(t, err)
+
+	rt := &controllerRuntime{service: svc, def: def, state: state}
+
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", controllerSpecMultiDAGs()))
+
+	result, err := rt.RunWorkflow(ctx, agent.ControllerRunWorkflowInput{WorkflowName: "run-tests"})
+	require.NoError(t, err)
+	require.Equal(t, "run-tests", result.WorkflowName)
+	require.NotNil(t, state.CurrentRunRef)
+	require.Equal(t, "run-tests", state.CurrentRunRef.Name)
 }
 
 func TestControllerRuntimeRequestHumanInputEmitsEvent(t *testing.T) {

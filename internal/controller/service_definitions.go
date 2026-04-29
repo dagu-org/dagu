@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -20,7 +19,6 @@ import (
 	"github.com/dagucloud/dagu/internal/cmn/fileutil"
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/exec"
-	"gopkg.in/yaml.v3"
 )
 
 func (s *Service) definitionPath(name string) string {
@@ -183,129 +181,13 @@ func (s *Service) PutSpec(ctx context.Context, name, spec string) error {
 	return nil
 }
 
-func (s *Service) rememberWorkflow(ctx context.Context, def *Definition, workflowName string) error {
-	if def == nil {
-		return errors.New("definition is required")
-	}
-	workflowName = strings.TrimSpace(workflowName)
-	if workflowName == "" {
-		return errors.New("workflow name is required")
-	}
-	managed, err := s.workflowIsManaged(ctx, def.Workflows, workflowName)
-	if err != nil {
-		return err
-	}
-	if managed {
-		return nil
-	}
-
-	spec, err := s.GetSpec(ctx, def.Name)
-	if err != nil {
-		return err
-	}
-	updatedSpec, err := upsertWorkflowNameInSpec(spec, workflowName)
-	if err != nil {
-		return err
-	}
-	if err := s.PutSpec(ctx, def.Name, updatedSpec); err != nil {
-		return err
-	}
-
-	def.Workflows.Names = append(def.Workflows.Names, workflowName)
-	return nil
-}
-
 func (s *Service) workflowIsManaged(ctx context.Context, workflows Workflows, workflowName string) (bool, error) {
 	for _, name := range workflows.Names {
 		if strings.TrimSpace(name) == workflowName {
 			return true, nil
 		}
 	}
-	if len(workflows.Labels) == 0 {
-		return false, nil
-	}
-	items, err := s.resolveManagedWorkflowSet(ctx, workflows)
-	if err != nil {
-		return false, err
-	}
-	for _, item := range items {
-		if item.Name == workflowName {
-			return true, nil
-		}
-	}
 	return false, nil
-}
-
-func upsertWorkflowNameInSpec(spec, workflowName string) (string, error) {
-	var doc map[string]any
-	if err := yaml.Unmarshal([]byte(spec), &doc); err != nil {
-		return "", fmt.Errorf("parse yaml: %w", err)
-	}
-	if len(doc) == 0 {
-		return "", errors.New("definition is required")
-	}
-
-	workflows := asStringMap(doc["workflows"])
-	names := appendUniqueString(stringListFromAny(workflows["names"]), workflowName)
-	workflows["names"] = names
-	doc["workflows"] = workflows
-
-	data, err := yaml.Marshal(doc)
-	if err != nil {
-		return "", fmt.Errorf("marshal yaml: %w", err)
-	}
-	return string(data), nil
-}
-
-func asStringMap(value any) map[string]any {
-	if value == nil {
-		return map[string]any{}
-	}
-	if typed, ok := value.(map[string]any); ok {
-		return typed
-	}
-	return map[string]any{}
-}
-
-func stringListFromAny(value any) []string {
-	switch typed := value.(type) {
-	case []string:
-		return append([]string(nil), typed...)
-	case []any:
-		out := make([]string, 0, len(typed))
-		for _, item := range typed {
-			if text, ok := item.(string); ok && strings.TrimSpace(text) != "" {
-				out = append(out, strings.TrimSpace(text))
-			}
-		}
-		return out
-	default:
-		return nil
-	}
-}
-
-func appendUniqueString(items []string, value string) []string {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return items
-	}
-	out := make([]string, 0, len(items)+1)
-	seen := make(map[string]struct{}, len(items)+1)
-	for _, item := range items {
-		item = strings.TrimSpace(item)
-		if item == "" {
-			continue
-		}
-		if _, ok := seen[item]; ok {
-			continue
-		}
-		seen[item] = struct{}{}
-		out = append(out, item)
-	}
-	if _, ok := seen[value]; !ok {
-		out = append(out, value)
-	}
-	return out
 }
 
 func shouldResetRuntimeForSpecChange(previous, next *Definition) bool {
@@ -562,50 +444,9 @@ func (s *Service) resolveManagedWorkflowSet(ctx context.Context, workflows Workf
 			Labels:      dag.Labels.Strings(),
 		}
 	}
-	if len(workflows.Labels) > 0 {
-		pg := exec.NewPaginator(1, math.MaxInt)
-		result, _, err := s.dagStore.List(ctx, exec.ListDAGsOptions{
-			Paginator: &pg,
-			Labels:    workflows.Labels,
-		})
-		if err != nil {
-			return nil, err
-		}
-		for _, dag := range result.Items {
-			seen[dag.Name] = WorkflowInfo{
-				Name:        dag.Name,
-				Description: dag.Description,
-				Labels:      dag.Labels.Strings(),
-			}
-		}
-	}
 	out := make([]WorkflowInfo, 0, len(seen))
 	for _, item := range seen {
 		out = append(out, item)
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
-	return out, nil
-}
-
-func (s *Service) listAvailableWorkflowSet(ctx context.Context, workflows Workflows) ([]WorkflowInfo, error) {
-	if hasWorkflows(workflows) {
-		return s.resolveManagedWorkflowSet(ctx, workflows)
-	}
-
-	pg := exec.NewPaginator(1, math.MaxInt)
-	result, _, err := s.dagStore.List(ctx, exec.ListDAGsOptions{
-		Paginator: &pg,
-	})
-	if err != nil {
-		return nil, err
-	}
-	out := make([]WorkflowInfo, 0, len(result.Items))
-	for _, dag := range result.Items {
-		out = append(out, WorkflowInfo{
-			Name:        dag.Name,
-			Description: dag.Description,
-			Labels:      dag.Labels.Strings(),
-		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out, nil
