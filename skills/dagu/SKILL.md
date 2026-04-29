@@ -89,6 +89,7 @@ steps:
         select: .artifact
 
   - id: publish
+    depends: [inspect_build]
     output:
       versionLabel: "ver - ${inspect_build.output.version}"
       artifactUrl: "${inspect_build.output.artifact.url}"
