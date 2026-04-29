@@ -108,7 +108,6 @@ func TestLoad_Env(t *testing.T) {
 		"DAGU_UI_LOG_ENCODING_CHARSET":     "iso-8859-1",
 		"DAGU_UI_NAVBAR_COLOR":             "#123456",
 		"DAGU_UI_NAVBAR_TITLE":             "Test Dagu",
-		"DAGU_UI_CONTROLLER_ENABLED":        "true",
 
 		"DAGU_AUTH_MODE":           "basic",
 		"DAGU_AUTH_BASIC_USERNAME": "testuser",
@@ -289,7 +288,6 @@ func TestLoad_Env(t *testing.T) {
 				SortField: "status",
 				SortOrder: "desc",
 			},
-			Controller: ControllerUIConfig{Enabled: true},
 		},
 		Queues: Queues{Enabled: false},
 		Coordinator: Coordinator{
@@ -547,8 +545,6 @@ ui:
   navbar_color: "#ff5733"
   log_encoding_charset: "iso-8859-1"
   max_dashboard_page_limit: 50
-  controller:
-    enabled: true
   dags:
     sort_field: "name"
     sort_order: "asc"
@@ -736,7 +732,6 @@ scheduler:
 				SortField: "name",
 				SortOrder: "asc",
 			},
-			Controller: ControllerUIConfig{Enabled: true},
 		},
 		Queues: Queues{
 			Enabled: true,

@@ -17,8 +17,7 @@ export default function CockpitPage(): React.ReactElement {
   const { setTitle } = React.useContext(AppBarContext);
   const config = useConfig();
   const [searchParams, setSearchParams] = useSearchParams();
-  const controllerFeatureEnabled =
-    config.agentEnabled && config.controllerEnabled;
+  const controllerFeatureEnabled = config.agentEnabled;
   const requestedControllerName = searchParams.get('controller') || '';
   const requestedMode = searchParams.get('mode');
   const controllerRequested =

@@ -470,7 +470,7 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
     document.documentElement.style.backgroundColor = 'var(--background)';
   }, [theme]);
 
-  const controllerFeatureEnabled = config.agentEnabled && config.controllerEnabled;
+  const controllerFeatureEnabled = config.agentEnabled;
 
   return (
     <SWRConfig

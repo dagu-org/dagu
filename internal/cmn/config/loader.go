@@ -724,7 +724,6 @@ func (l *ConfigLoader) loadUIConfig(cfg *Config, def Definition) {
 	cfg.UI.LogEncodingCharset = l.v.GetString("ui.log_encoding_charset")
 	cfg.UI.DAGs.SortField = l.v.GetString("ui.dags.sort_field")
 	cfg.UI.DAGs.SortOrder = l.v.GetString("ui.dags.sort_order")
-	cfg.UI.Controller.Enabled = l.v.GetBool("ui.controller.enabled")
 
 	if def.UI == nil {
 		return
@@ -741,10 +740,6 @@ func (l *ConfigLoader) loadUIConfig(cfg *Config, def Definition) {
 	if def.UI.DAGs != nil {
 		setIfNotEmpty(&cfg.UI.DAGs.SortField, def.UI.DAGs.SortField)
 		setIfNotEmpty(&cfg.UI.DAGs.SortOrder, def.UI.DAGs.SortOrder)
-	}
-
-	if def.UI.Controller != nil && def.UI.Controller.Enabled != nil {
-		cfg.UI.Controller.Enabled = *def.UI.Controller.Enabled
 	}
 }
 
@@ -1582,7 +1577,6 @@ func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	l.v.SetDefault("ui.log_encoding_charset", getDefaultLogEncodingCharset())
 	l.v.SetDefault("ui.dags.sort_field", "name")
 	l.v.SetDefault("ui.dags.sort_order", "asc")
-	l.v.SetDefault("ui.controller.enabled", false)
 
 	// Execution
 	l.v.SetDefault("default_execution_mode", string(ExecutionModeLocal))
@@ -1695,7 +1689,6 @@ var envBindings = []envBinding{
 	{key: "ui.navbar_title", env: "UI_NAVBAR_TITLE"},
 	{key: "ui.dags.sort_field", env: "UI_DAGS_SORT_FIELD"},
 	{key: "ui.dags.sort_order", env: "UI_DAGS_SORT_ORDER"},
-	{key: "ui.controller.enabled", env: "UI_CONTROLLER_ENABLED"},
 	// UI (legacy)
 	{key: "ui.max_dashboard_page_limit", env: "MAX_DASHBOARD_PAGE_LIMIT"},
 	{key: "ui.log_encoding_charset", env: "LOG_ENCODING_CHARSET"},

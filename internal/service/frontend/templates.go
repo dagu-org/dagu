@@ -138,7 +138,6 @@ type funcsConfig struct {
 	OIDCEnabled           bool
 	OIDCButtonLabel       string
 	TerminalEnabled       bool
-	ControllerEnabled      bool
 	GitSyncEnabled        bool
 	WorkspaceStore        workspacepkg.Store
 
@@ -215,9 +214,8 @@ func defaultFunctions(cfg *funcsConfig) template.FuncMap {
 			}
 			return "true"
 		},
-		"terminalEnabled":  func() string { return boolStr(cfg.TerminalEnabled) },
-		"controllerEnabled": func() string { return boolStr(cfg.ControllerEnabled) },
-		"gitSyncEnabled":   func() string { return boolStr(cfg.GitSyncEnabled) },
+		"terminalEnabled": func() string { return boolStr(cfg.TerminalEnabled) },
+		"gitSyncEnabled":  func() string { return boolStr(cfg.GitSyncEnabled) },
 		"agentEnabled": func() string {
 			if cfg.AgentEnabledChecker == nil {
 				return "false"

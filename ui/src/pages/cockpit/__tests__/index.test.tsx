@@ -51,7 +51,6 @@ function makeConfig(overrides: Partial<Config> = {}): Config {
     oidcButtonLabel: '',
     terminalEnabled: false,
     gitSyncEnabled: false,
-    controllerEnabled: false,
     agentEnabled: true,
     updateAvailable: false,
     latestVersion: '',
@@ -114,8 +113,8 @@ describe('CockpitPage', () => {
     localStorage.clear();
   });
 
-  it('hides the Controller mode switch when Controller UI is disabled', () => {
-    renderPage(makeConfig({ controllerEnabled: false }));
+  it('hides the Controller mode switch when the agent feature is disabled', () => {
+    renderPage(makeConfig({ agentEnabled: false }));
 
     expect(
       screen.queryByRole('button', { name: 'Controller cockpit' })
@@ -123,8 +122,8 @@ describe('CockpitPage', () => {
     expect(screen.getByTestId('dag-runs-cockpit')).toBeInTheDocument();
   });
 
-  it('shows the Controller mode switch when Controller UI is enabled', () => {
-    renderPage(makeConfig({ controllerEnabled: true }));
+  it('shows the Controller mode switch when the agent feature is enabled', () => {
+    renderPage(makeConfig({ agentEnabled: true }));
 
     fireEvent.click(screen.getByRole('button', { name: 'Controller cockpit' }));
 
@@ -133,7 +132,7 @@ describe('CockpitPage', () => {
 
   it('opens Controller mode from query params', () => {
     renderPage(
-      makeConfig({ controllerEnabled: true }),
+      makeConfig({ agentEnabled: true }),
       '/cockpit?mode=controller&controller=builder'
     );
 

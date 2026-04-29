@@ -393,18 +393,12 @@ type UI struct {
 	NavbarTitle           string
 	MaxDashboardPageLimit int
 	DAGs                  DAGsConfig
-	Controller             ControllerUIConfig
 }
 
 // DAGsConfig holds DAG list page configuration.
 type DAGsConfig struct {
 	SortField string
 	SortOrder string
-}
-
-// ControllerUIConfig holds Controller UI feature visibility settings.
-type ControllerUIConfig struct {
-	Enabled bool
 }
 
 // RemoteNode represents a remote node configuration.

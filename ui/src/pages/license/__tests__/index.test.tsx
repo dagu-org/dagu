@@ -35,7 +35,6 @@ function makeConfig(licenseOverrides: Partial<LicenseStatus> = {}): Config {
     oidcButtonLabel: '',
     terminalEnabled: false,
     gitSyncEnabled: false,
-    controllerEnabled: false,
     agentEnabled: false,
     updateAvailable: false,
     latestVersion: '',

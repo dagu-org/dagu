@@ -94,7 +94,6 @@ var legacyToSnakeCaseKey = map[string]string{
 	"ui.maxdashboardpagelimit": "ui.max_dashboard_page_limit",
 	"ui.dags.sortfield":        "ui.dags.sort_field",
 	"ui.dags.sortorder":        "ui.dags.sort_order",
-	"ui.controllerenabled":      "ui.controller.enabled",
 
 	// Peer
 	"peer.certfile":      "peer.cert_file",

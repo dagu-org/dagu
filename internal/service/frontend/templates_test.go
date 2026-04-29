@@ -117,14 +117,6 @@ func TestDefaultFunctionsExposeInitialWorkspacesJSON(t *testing.T) {
 	assert.True(t, workspaces[0].UpdatedAt.Equal(updatedAt))
 }
 
-func TestDefaultFunctionsExposeControllerEnabled(t *testing.T) {
-	funcs := defaultFunctions(&funcsConfig{ControllerEnabled: true})
-	controllerEnabled, ok := funcs["controllerEnabled"].(func() string)
-	require.True(t, ok)
-
-	assert.Equal(t, "true", controllerEnabled())
-}
-
 func TestDefaultFunctionsExposeLicenseGraceEndsAt(t *testing.T) {
 	expiry := time.Date(2026, time.March, 15, 12, 0, 0, 0, time.UTC)
 
