@@ -124,6 +124,11 @@ type step struct {
 	Value string `yaml:"value,omitempty"`
 	// Routes maps patterns to target step names
 	Routes map[string][]string `yaml:"routes,omitempty"`
+
+	// parsedOutput caches parsed output configuration during a single step build.
+	parsedOutput       *outputConfig
+	parsedOutputErr    error
+	parsedOutputCached bool
 }
 
 type execSpec struct {
@@ -149,6 +154,19 @@ func (s *step) executorConfigFieldName() string {
 		return "config"
 	}
 	return "with"
+}
+
+func (s *step) parsedOutputConfig() (*outputConfig, error) {
+	if s == nil {
+		return nil, nil
+	}
+	if s.parsedOutputCached {
+		return s.parsedOutput, s.parsedOutputErr
+	}
+
+	s.parsedOutput, s.parsedOutputErr = parseOutputConfig(s.Output)
+	s.parsedOutputCached = true
+	return s.parsedOutput, s.parsedOutputErr
 }
 
 func validateStepConfigAliasStruct(s *step) error {
@@ -1018,7 +1036,7 @@ func parseStructuredOutputEntry(raw any) (core.StepOutputEntry, error) {
 }
 
 func buildStepOutput(_ StepBuildContext, s *step) (string, error) {
-	cfg, err := parseOutputConfig(s.Output)
+	cfg, err := s.parsedOutputConfig()
 	if err != nil {
 		return "", err
 	}
@@ -1029,7 +1047,7 @@ func buildStepOutput(_ StepBuildContext, s *step) (string, error) {
 }
 
 func buildStepStructuredOutput(_ StepBuildContext, s *step) (map[string]core.StepOutputEntry, error) {
-	cfg, err := parseOutputConfig(s.Output)
+	cfg, err := s.parsedOutputConfig()
 	if err != nil {
 		return nil, err
 	}

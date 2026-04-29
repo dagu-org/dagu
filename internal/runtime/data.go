@@ -311,6 +311,7 @@ func (d *Data) StepInfo() eval.StepInfo {
 		ExitCode: strconv.Itoa(d.inner.State.ExitCode),
 	}
 
+	// Step-scoped references use OutputValue for both string-form and object-form output.
 	if d.inner.State.OutputValue != nil {
 		value := *d.inner.State.OutputValue
 		info.Output = &value
@@ -318,17 +319,46 @@ func (d *Data) StepInfo() eval.StepInfo {
 	}
 
 	// Backward-compatible fallback for previously persisted string-form outputs.
-	if outputKey := d.inner.Step.Output; outputKey != "" && d.inner.State.OutputVariables != nil {
-		if raw, ok := d.inner.State.OutputVariables.Load(outputKey); ok {
-			if strVal, ok := raw.(string); ok {
-				if _, v, found := strings.Cut(strVal, "="); found {
-					info.Output = &v
-				}
-			}
-		}
+	if value, ok := d.inner.StringFormOutputValue(); ok {
+		info.Output = &value
 	}
 
 	return info
+}
+
+// StringFormOutputValue returns the canonical captured output for string-form output: NAME steps.
+// OutputValue is the source of truth for newly executed steps; OutputVariables remains as a
+// backward-compatible fallback for previously persisted state.
+func (d NodeData) StringFormOutputValue() (string, bool) {
+	if d.Step.Output == "" {
+		return "", false
+	}
+	if d.State.OutputValue != nil {
+		return *d.State.OutputValue, true
+	}
+	return legacyOutputVariableValue(d.Step.Output, d.State.OutputVariables)
+}
+
+func legacyOutputVariableValue(outputKey string, vars *collections.SyncMap) (string, bool) {
+	if outputKey == "" || vars == nil {
+		return "", false
+	}
+
+	raw, ok := vars.Load(outputKey)
+	if !ok {
+		return "", false
+	}
+
+	strVal, ok := raw.(string)
+	if !ok {
+		return "", false
+	}
+
+	if _, value, found := strings.Cut(strVal, "="); found {
+		return value, true
+	}
+
+	return "", false
 }
 
 func (d *Data) ContinueOn() core.ContinueOn {

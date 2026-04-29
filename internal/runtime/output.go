@@ -140,11 +140,7 @@ func (oc *OutputCoordinator) setupExecutorIO(ctx context.Context, cmd executor.E
 		// Reset the captured flag to allow new output capture for retry
 		oc.outputCaptured = false
 
-		// Get max output size from DAG configuration, default to 1MB
-		oc.maxOutputSize = defaultMaxOutputSizeBytes
-		if rCtx := GetDAGContext(ctx); rCtx.DAG != nil && rCtx.DAG.MaxOutputSize > 0 {
-			oc.maxOutputSize = int64(rCtx.DAG.MaxOutputSize)
-		}
+		oc.maxOutputSize = maxOutputSize(ctx)
 
 		// Reset the output data to empty
 		oc.outputData = ""
@@ -177,10 +173,7 @@ func (oc *OutputCoordinator) setupExecutorIO(ctx context.Context, cmd executor.E
 		oc.stderrOutputCaptured = false
 		oc.stderrOutputData = ""
 		if oc.maxOutputSize == 0 {
-			oc.maxOutputSize = defaultMaxOutputSizeBytes
-			if rCtx := GetDAGContext(ctx); rCtx.DAG != nil && rCtx.DAG.MaxOutputSize > 0 {
-				oc.maxOutputSize = int64(rCtx.DAG.MaxOutputSize)
-			}
+			oc.maxOutputSize = maxOutputSize(ctx)
 		}
 		oc.stderrCapture = newOutputCapture(oc.maxOutputSize)
 		oc.stderrCapture.start(ctx, oc.stderrOutputReader)

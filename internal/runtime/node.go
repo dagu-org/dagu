@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -438,31 +439,9 @@ func (n *Node) resolveStructuredOutputEntry(ctx context.Context, key string, ent
 	case "", core.StepOutputDecodeText:
 		return strings.TrimSpace(raw), nil
 	case core.StepOutputDecodeJSON:
-		var decoded any
-		if err := json.Unmarshal([]byte(raw), &decoded); err != nil {
-			return nil, fmt.Errorf("%s: failed to decode JSON: %w", key, err)
-		}
-		if entry.Select == "" {
-			return decoded, nil
-		}
-		selected, ok := eval.ResolveDataPath(ctx, key, decoded, entry.Select)
-		if !ok {
-			return nil, fmt.Errorf("%s: failed to resolve select path %q", key, entry.Select)
-		}
-		return selected, nil
+		return decodeStructuredOutputValue(ctx, key, raw, entry.Select, core.StepOutputDecodeJSON)
 	case core.StepOutputDecodeYAML:
-		var decoded any
-		if err := yaml.Unmarshal([]byte(raw), &decoded); err != nil {
-			return nil, fmt.Errorf("%s: failed to decode YAML: %w", key, err)
-		}
-		if entry.Select == "" {
-			return decoded, nil
-		}
-		selected, ok := eval.ResolveDataPath(ctx, key, decoded, entry.Select)
-		if !ok {
-			return nil, fmt.Errorf("%s: failed to resolve select path %q", key, entry.Select)
-		}
-		return selected, nil
+		return decodeStructuredOutputValue(ctx, key, raw, entry.Select, core.StepOutputDecodeYAML)
 	default:
 		return nil, fmt.Errorf("%s: unsupported decode %q", key, entry.Decode)
 	}
@@ -493,17 +472,58 @@ func (n *Node) readStructuredOutputSource(ctx context.Context, key string, entry
 		}
 		path = filepath.Clean(path)
 
-		data, err := os.ReadFile(path)
+		data, err := readStructuredOutputFile(path, maxOutputSize(ctx))
 		if err != nil {
 			return "", fmt.Errorf("%s: failed to read file %q: %w", key, path, err)
 		}
-		if int64(len(data)) > maxOutputSize(ctx) {
-			return "", fmt.Errorf("output exceeded maximum size limit of %d bytes", maxOutputSize(ctx))
-		}
-		return string(data), nil
+		return data, nil
 	default:
 		return "", fmt.Errorf("%s: unsupported output source %q", key, entry.From)
 	}
+}
+
+func decodeStructuredOutputValue(ctx context.Context, key, raw, selectPath, decode string) (any, error) {
+	var decoded any
+
+	switch decode {
+	case core.StepOutputDecodeJSON:
+		if err := json.Unmarshal([]byte(raw), &decoded); err != nil {
+			return nil, fmt.Errorf("%s: failed to decode JSON: %w", key, err)
+		}
+	case core.StepOutputDecodeYAML:
+		if err := yaml.Unmarshal([]byte(raw), &decoded); err != nil {
+			return nil, fmt.Errorf("%s: failed to decode YAML: %w", key, err)
+		}
+	default:
+		return nil, fmt.Errorf("%s: unsupported decode %q", key, decode)
+	}
+
+	if selectPath == "" {
+		return decoded, nil
+	}
+
+	selected, ok := eval.ResolveDataPath(ctx, key, decoded, selectPath)
+	if !ok {
+		return nil, fmt.Errorf("%s: failed to resolve select path %q", key, selectPath)
+	}
+	return selected, nil
+}
+
+func readStructuredOutputFile(path string, limit int64) (string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	data, err := io.ReadAll(io.LimitReader(file, limit+1))
+	if err != nil {
+		return "", err
+	}
+	if int64(len(data)) > limit {
+		return "", fmt.Errorf("output exceeded maximum size limit of %d bytes", limit)
+	}
+	return string(data), nil
 }
 
 func (n *Node) evaluateStructuredLiteral(ctx context.Context, value any) (any, error) {

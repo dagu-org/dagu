@@ -1011,29 +1011,10 @@ func (a *Agent) collectOutputs(ctx context.Context) map[string]string {
 			continue
 		}
 
-		// Skip if no output variables captured
-		if nodeData.State.OutputVariables == nil {
-			continue
-		}
-
-		// Get the output value from captured variables
-		rawValue, ok := nodeData.State.OutputVariables.Load(step.Output)
+		value, ok := nodeData.StringFormOutputValue()
 		if !ok {
 			continue
 		}
-
-		// Parse the KeyValue format (KEY=VALUE)
-		strValue, ok := rawValue.(string)
-		if !ok {
-			logger.Warn(ctx, "Output variable is not a string, skipping",
-				slog.String("step", step.Name),
-				slog.String("output", step.Output),
-				slog.String("type", fmt.Sprintf("%T", rawValue)),
-			)
-			continue
-		}
-		kv := stringutil.KeyValue(strValue)
-		value := kv.Value()
 
 		key := stringutil.ScreamingSnakeToCamel(step.Output)
 

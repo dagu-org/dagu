@@ -267,6 +267,22 @@ func TestNodeResolveStructuredOutputEntry(t *testing.T) {
 			wantErr: `result: failed to read file`,
 		},
 		{
+			name: "FileSourceAtLimit",
+			dag: &core.DAG{
+				Name:          "structured-output-test",
+				MaxOutputSize: 8,
+			},
+			entry: core.StepOutputEntry{
+				From: core.StepOutputSourceFile,
+				Path: "meta.txt",
+			},
+			prepare: func(t *testing.T, workDir string, _ *Node) {
+				t.Helper()
+				require.NoError(t, os.WriteFile(filepath.Join(workDir, "meta.txt"), []byte("12345678"), 0o600))
+			},
+			want: "12345678",
+		},
+		{
 			name: "FileSourceTooLarge",
 			dag: &core.DAG{
 				Name:          "structured-output-test",
