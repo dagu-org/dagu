@@ -1041,6 +1041,10 @@ function ConfigTab({
                 isLoading={controller.dagListQuery.isLoading}
                 disabled={metadataFieldDisabled}
               />
+              <div className="text-xs text-muted-foreground">
+                Remove selected DAGs from the chips above. Use the list below
+                to inspect each DAG.
+              </div>
               {controller.dagListQuery.error ? (
                 <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
                   {controller.dagListQuery.error instanceof Error

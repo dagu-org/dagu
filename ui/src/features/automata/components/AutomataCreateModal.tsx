@@ -222,9 +222,11 @@ export function DAGNamePicker({
                   onChange(selectedNames.filter((name) => name !== dagName))
                 }
                 disabled={disabled}
-                className="text-muted-foreground hover:text-foreground"
+                aria-label={`Remove ${dagName}`}
+                title={`Remove ${dagName}`}
+                className="rounded-sm px-1 py-0.5 text-[11px] font-medium text-muted-foreground transition hover:bg-background hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
               >
-                x
+                Remove
               </button>
             </span>
           ))
