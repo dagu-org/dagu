@@ -26,6 +26,7 @@ var legacyToSnakeCaseKey = map[string]string{
 	"delaySec":          "delay_sec",
 	"restartWaitSec":    "restart_wait_sec",
 	"histRetentionDays": "hist_retention_days",
+	"histRetentionRuns": "hist_retention_runs",
 	"maxActiveRuns":     "max_active_runs",
 	"maxActiveSteps":    "max_active_steps",
 	"maxCleanUpTimeSec": "max_clean_up_time_sec",

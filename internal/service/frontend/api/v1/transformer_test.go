@@ -116,6 +116,17 @@ func TestToDAGDetailsIncludesParamDefDescriptions(t *testing.T) {
 	assert.Equal(t, "Free-form operator notes", *(*details.ParamDefs)[0].Description)
 }
 
+func TestToDAGDetailsIncludesHistoryRetentionRuns(t *testing.T) {
+	details := toDAGDetails(&core.DAG{
+		Name:              "retention-runs",
+		HistRetentionRuns: 3,
+	})
+
+	require.NotNil(t, details)
+	require.NotNil(t, details.HistRetentionRuns)
+	assert.Equal(t, 3, *details.HistRetentionRuns)
+}
+
 func TestToDAGDetailsIncludesParamSchema(t *testing.T) {
 	details := toDAGDetails(&core.DAG{
 		Name:        "schema-params",

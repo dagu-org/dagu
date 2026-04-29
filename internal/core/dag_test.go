@@ -770,6 +770,7 @@ func TestDAG_InitializeDefaults(t *testing.T) {
 
 		assert.Equal(t, core.TypeChain, dag.Type)
 		assert.Equal(t, 30, dag.HistRetentionDays)
+		assert.Equal(t, 0, dag.HistRetentionRuns)
 		assert.Equal(t, 5*time.Second, dag.MaxCleanUpTime)
 		assert.Equal(t, 1, dag.MaxActiveRuns)
 		assert.Equal(t, 1024*1024, dag.MaxOutputSize)
@@ -789,6 +790,15 @@ func TestDAG_InitializeDefaults(t *testing.T) {
 		core.InitializeDefaults(dag)
 
 		assert.Equal(t, 90, dag.HistRetentionDays)
+	})
+
+	t.Run("pre-existing HistRetentionRuns prevents HistRetentionDays default", func(t *testing.T) {
+		t.Parallel()
+		dag := &core.DAG{HistRetentionRuns: 3}
+		core.InitializeDefaults(dag)
+
+		assert.Equal(t, 0, dag.HistRetentionDays)
+		assert.Equal(t, 3, dag.HistRetentionRuns)
 	})
 
 	t.Run("pre-existing MaxActiveRuns not overwritten", func(t *testing.T) {

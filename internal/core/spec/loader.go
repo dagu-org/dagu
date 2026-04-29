@@ -527,6 +527,7 @@ func processDAGDocument(
 	if err := merge(dest, dag); err != nil {
 		return nil, err
 	}
+	applyHistoryRetentionOverride(dest, dag)
 
 	dest.Location = filePath
 	dest.SourceFile = filePath

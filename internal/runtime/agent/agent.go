@@ -1778,11 +1778,14 @@ func (a *Agent) setupDAGRunAttempt(ctx context.Context) (exec.DAGRunAttempt, err
 		return exec.NewNoopDAGRunAttempt(a.noopAttemptID(), a.dag), nil
 	}
 
-	retentionDays := a.dag.HistRetentionDays
-	if _, err := a.dagRunStore.RemoveOldDAGRuns(ctx, a.dag.Name, retentionDays); err != nil {
-		logger.Error(ctx, "DAG runs data cleanup failed", tag.Error(err))
+	if a.dag.HistRetentionRuns == 0 {
+		retentionDays := a.dag.HistRetentionDays
+		if _, err := a.dagRunStore.RemoveOldDAGRuns(ctx, a.dag.Name, retentionDays); err != nil {
+			logger.Error(ctx, "DAG runs data cleanup failed", tag.Error(err))
+		}
 	}
 
+	var attempt exec.DAGRunAttempt
 	if a.preparedAttempt != nil {
 		if a.attemptID != "" && a.preparedAttempt.ID() != a.attemptID {
 			return nil, fmt.Errorf(
@@ -1792,10 +1795,22 @@ func (a *Agent) setupDAGRunAttempt(ctx context.Context) (exec.DAGRunAttempt, err
 			)
 		}
 		a.preparedAttempt.SetDAG(a.dag)
-		return a.preparedAttempt, nil
+		attempt = a.preparedAttempt
+	} else {
+		var err error
+		attempt, err = a.dagRunStore.CreateAttempt(ctx, a.dag, time.Now(), a.dagRunID, a.attemptOptions())
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	return a.dagRunStore.CreateAttempt(ctx, a.dag, time.Now(), a.dagRunID, a.attemptOptions())
+	if a.dag.HistRetentionRuns > 0 {
+		if _, err := a.dagRunStore.RemoveOldDAGRuns(ctx, a.dag.Name, 0, exec.WithRetentionRuns(a.dag.HistRetentionRuns)); err != nil {
+			logger.Error(ctx, "DAG runs data cleanup failed", tag.Error(err))
+		}
+	}
+
+	return attempt, nil
 }
 
 func (a *Agent) noopAttemptID() string {

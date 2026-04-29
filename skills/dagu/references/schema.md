@@ -30,7 +30,8 @@
 | `max_output_size` | int | 1048576 (1MB) | Max step output capture (bytes) |
 | `log_dir` | string | — | Log directory |
 | `log_output` | string | `separate` | `separate` (.out/.err) or `merged` (.log) |
-| `hist_retention_days` | int | 30 | History retention |
+| `hist_retention_days` | int | 30 | History retention by days. Mutually exclusive with `hist_retention_runs`. |
+| `hist_retention_runs` | int | — | History retention by number of runs. Mutually exclusive with `hist_retention_days`. |
 | `queue` | string | — | Queue name for concurrency control. Define queues in global config with `max_concurrency`. |
 | `preconditions` | array | — | DAG-level preconditions (`condition`, `expected`, `negate`) |
 | `retry_policy` | object | — | DAG-level automatic retry policy: `{limit, interval_sec, backoff, max_interval_sec}`. `limit: 0` disables automatic DAG retries. |

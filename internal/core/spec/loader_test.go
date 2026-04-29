@@ -115,12 +115,40 @@ steps:
 		assert.Equal(t, testDAG, dag.Location)
 		assert.Equal(t, time.Second*5, dag.MaxCleanUpTime)
 		assert.Equal(t, 30, dag.HistRetentionDays)
+		assert.Equal(t, 0, dag.HistRetentionRuns)
 
 		// Step level
 		require.Len(t, dag.Steps, 1)
 		assert.Equal(t, "1", dag.Steps[0].Name, "1")
 		require.Len(t, dag.Steps[0].Commands, 1)
 		assert.Equal(t, "true", dag.Steps[0].Commands[0].Command)
+	})
+	t.Run("HistoryRetentionRuns", func(t *testing.T) {
+		t.Parallel()
+
+		testDAG := createTempYAMLFile(t, `hist_retention_runs: 3
+steps:
+  - name: "1"
+    command: "true"
+`)
+		dag, err := spec.Load(context.Background(), testDAG)
+		require.NoError(t, err)
+
+		assert.Equal(t, 0, dag.HistRetentionDays)
+		assert.Equal(t, 3, dag.HistRetentionRuns)
+	})
+	t.Run("RejectBothHistoryRetentionModesInSameDocument", func(t *testing.T) {
+		t.Parallel()
+
+		testDAG := createTempYAMLFile(t, `hist_retention_days: 7
+hist_retention_runs: 3
+steps:
+  - name: "1"
+    command: "true"
+`)
+		_, err := spec.Load(context.Background(), testDAG)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "hist_retention_days and hist_retention_runs cannot both be specified")
 	})
 	t.Run("OverrideConfig", func(t *testing.T) {
 		t.Parallel()
@@ -541,6 +569,40 @@ steps:
 		assert.Equal(t, "openai", dag.LLM.Provider)
 		assert.Equal(t, "gpt-4o", dag.LLM.Model)
 		assert.Equal(t, "Base system prompt", dag.LLM.System)
+	})
+
+	t.Run("HistoryRetentionRunsOverrideBaseDays", func(t *testing.T) {
+		t.Parallel()
+
+		baseDAG := createTempYAMLFile(t, `hist_retention_days: 90
+`)
+		childDAG := createTempYAMLFile(t, `hist_retention_runs: 3
+steps:
+  - name: "step1"
+    command: echo "step1"
+`)
+		dag, err := spec.Load(context.Background(), childDAG, spec.WithBaseConfig(baseDAG))
+		require.NoError(t, err)
+
+		assert.Equal(t, 0, dag.HistRetentionDays)
+		assert.Equal(t, 3, dag.HistRetentionRuns)
+	})
+
+	t.Run("HistoryRetentionDaysOverrideBaseRuns", func(t *testing.T) {
+		t.Parallel()
+
+		baseDAG := createTempYAMLFile(t, `hist_retention_runs: 5
+`)
+		childDAG := createTempYAMLFile(t, `hist_retention_days: 7
+steps:
+  - name: "step1"
+    command: echo "step1"
+`)
+		dag, err := spec.Load(context.Background(), childDAG, spec.WithBaseConfig(baseDAG))
+		require.NoError(t, err)
+
+		assert.Equal(t, 7, dag.HistRetentionDays)
+		assert.Equal(t, 0, dag.HistRetentionRuns)
 	})
 
 	t.Run("WithBaseConfigContent_MergesEnvVars", func(t *testing.T) {

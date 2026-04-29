@@ -512,23 +512,35 @@ func (store *Store) CreateSubAttempt(ctx context.Context, rootRef exec.DAGRunRef
 	return subDAGRun.CreateAttempt(ctx, exec.NewUTC(time.Now()), store.cache, "")
 }
 
-// RemoveOldDAGRuns removes old history records older than the specified retention days.
-// It only removes records older than the specified retention days.
+// RemoveOldDAGRuns removes old history records by retention days, or by run count when configured by option.
+// Without run-count options, it only removes records older than the specified retention days.
 // If retentionDays is negative, no files will be removed.
 // If retentionDays is zero, all files will be removed.
 // If retentionDays is positive, only files older than the specified number of days will be removed.
 // Returns a list of file paths that were removed (or would be removed in dry-run mode).
 func (store *Store) RemoveOldDAGRuns(ctx context.Context, dagName string, retentionDays int, opts ...exec.RemoveOldDAGRunsOption) ([]string, error) {
+	var options exec.RemoveOldDAGRunsOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
+
+	if options.RetentionRuns != nil {
+		retentionRuns := *options.RetentionRuns
+		if retentionRuns <= 0 {
+			logger.Warn(ctx, "Non-positive retentionRuns, no files will be removed",
+				slog.Int("retention-runs", retentionRuns),
+			)
+			return nil, nil
+		}
+		root := NewDataRootWithArtifactDir(store.baseDir, dagName, store.artifactDir)
+		return root.RemoveOldByRuns(ctx, retentionRuns, options.DryRun)
+	}
+
 	if retentionDays < 0 {
 		logger.Warn(ctx, "Negative retentionDays, no files will be removed",
 			slog.Int("retention-days", retentionDays),
 		)
 		return nil, nil
-	}
-
-	var options exec.RemoveOldDAGRunsOptions
-	for _, opt := range opts {
-		opt(&options)
 	}
 
 	root := NewDataRootWithArtifactDir(store.baseDir, dagName, store.artifactDir)
