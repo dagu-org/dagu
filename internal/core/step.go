@@ -9,8 +9,6 @@ import (
 	"slices"
 	"strings"
 	"time"
-
-	"github.com/google/jsonschema-go/jsonschema"
 )
 
 // Step contains the runtime information for a step in a DAG.
@@ -60,16 +58,10 @@ type Step struct {
 	// LogOutput specifies how stdout and stderr are handled in log files for this step.
 	// Overrides the DAG-level LogOutput setting. Empty string means inherit from DAG.
 	LogOutput LogOutputMode `json:"logOutput,omitempty"`
-	// Output is the variable name to store the output.
+	// Output is the variable name to store captured stdout.
 	Output string `json:"output,omitempty"`
-	// OutputKey is the custom key for the output in outputs.json.
-	// If empty, the Output name is converted from UPPER_CASE to camelCase.
-	OutputKey string `json:"outputKey,omitempty"`
-	// OutputOmit excludes this output from outputs.json when true.
-	OutputOmit bool `json:"outputOmit,omitempty"`
-	// OutputSchema is the compiled JSON schema for validating step output.
-	// Not serialized - re-compiled from YAML on each load.
-	OutputSchema *jsonschema.Resolved `json:"-"`
+	// StructuredOutput publishes post-processed step-scoped outputs for ${step.output.*} access.
+	StructuredOutput map[string]StepOutputEntry `json:"structuredOutput,omitempty"`
 	// Depends contains the list of step names to depend on.
 	Depends []string `json:"depends,omitempty"`
 	// ExplicitlyNoDeps indicates the depends field was explicitly set to empty
@@ -120,6 +112,32 @@ type Step struct {
 	Approval *ApprovalConfig `json:"approval,omitempty"`
 }
 
+const (
+	StepOutputSourceStdout = "stdout"
+	StepOutputSourceStderr = "stderr"
+	StepOutputSourceFile   = "file"
+
+	StepOutputDecodeText = "text"
+	StepOutputDecodeJSON = "json"
+	StepOutputDecodeYAML = "yaml"
+)
+
+// StepOutputEntry defines one structured object-form output entry.
+type StepOutputEntry struct {
+	// HasValue distinguishes literal/null values from source-based outputs.
+	HasValue bool `json:"hasValue,omitempty"`
+	// Value is the literal value to publish when HasValue is true.
+	Value any `json:"value"`
+	// From selects a runtime source to read from: stdout, stderr, or file.
+	From string `json:"from,omitempty"`
+	// Path is the file path used when From is file.
+	Path string `json:"path,omitempty"`
+	// Decode controls how the source content is decoded before selection.
+	Decode string `json:"decode,omitempty"`
+	// Select is an optional jq/gojq path applied after decode.
+	Select string `json:"select,omitempty"`
+}
+
 // String returns a formatted string representation of the step
 func (s *Step) String() string {
 	return strings.Join([]string{
@@ -165,6 +183,21 @@ func (c CommandEntry) String() string {
 // HasMultipleCommands returns true if the step has multiple commands to execute.
 func (s *Step) HasMultipleCommands() bool {
 	return len(s.Commands) > 1
+}
+
+// HasStructuredOutput reports whether the step publishes object-form output.
+func (s Step) HasStructuredOutput() bool {
+	return len(s.StructuredOutput) > 0
+}
+
+// UsesStructuredOutputSource reports whether any structured output entry reads from source.
+func (s Step) UsesStructuredOutputSource(source string) bool {
+	for _, entry := range s.StructuredOutput {
+		if entry.From == source {
+			return true
+		}
+	}
+	return false
 }
 
 // UnmarshalJSON implements json.Unmarshaler for backward compatibility.

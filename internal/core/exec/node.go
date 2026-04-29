@@ -33,6 +33,7 @@ type Node struct {
 	SubRuns         []SubDAGRun          `json:"children,omitempty"`
 	SubRunsRepeated []SubDAGRun          `json:"childrenRepeated,omitempty"` // repeated sub DAG runs
 	OutputVariables *collections.SyncMap `json:"outputVariables,omitempty"`
+	OutputValue     *string              `json:"outputValue,omitempty"`
 	// ApprovedAt records when this wait step was approved
 	ApprovedAt string `json:"approvedAt,omitempty"`
 	// ApprovalInputs stores key-value parameters provided during approval

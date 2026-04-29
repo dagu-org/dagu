@@ -83,6 +83,22 @@ func TestResolveStepProperty(t *testing.T) {
 			wantVal: "hello",
 		},
 		{
+			name:    "NestedOutputField",
+			step:    "step1",
+			path:    ".output.version",
+			stepMap: map[string]StepInfo{"step1": {Output: new(`{"version":"v1.2.3"}`)}},
+			wantOK:  true,
+			wantVal: "v1.2.3",
+		},
+		{
+			name:    "NestedOutputObject",
+			step:    "step1",
+			path:    ".output.meta",
+			stepMap: map[string]StepInfo{"step1": {Output: new(`{"meta":{"env":"stg"}}`)}},
+			wantOK:  true,
+			wantVal: `{"env":"stg"}`,
+		},
+		{
 			name:    "UnknownProperty",
 			step:    "step1",
 			path:    ".unknown_prop",

@@ -427,6 +427,128 @@ steps:
 				"RESULT": "sliced=hello",
 			},
 		},
+		{
+			name: "NestedJSONOutputAccess",
+			yaml: `
+type: graph
+steps:
+  - id: build
+    output: BUILD_JSON
+    script: |
+      printf '{"version":"v1.2.3","artifact":{"url":"https://example.test/release.tgz"}}'
+
+  - id: consumer
+    depends: [build]
+    script: |
+      printf 'version=%s\nartifact=%s' "${build.output.version}" "${build.output.artifact.url}"
+    output: RESULT
+`,
+			expectedStatus: core.Succeeded,
+			expectedOutput: map[string]any{
+				"BUILD_JSON": `{"version":"v1.2.3","artifact":{"url":"https://example.test/release.tgz"}}`,
+				"RESULT":     "version=v1.2.3\nartifact=https://example.test/release.tgz",
+			},
+		},
+		{
+			name: "StructuredOutputFromStdout",
+			yaml: `
+type: graph
+steps:
+  - id: analyze
+    script: |
+      printf '{"version":"v1.2.3","artifact":{"url":"https://example.test/release.tgz"}}'
+    output:
+      version:
+        from: stdout
+        decode: json
+        select: .version
+      artifact:
+        from: stdout
+        decode: json
+        select: .artifact
+
+  - id: consumer
+    depends: [analyze]
+    script: |
+      printf 'version=%s\nartifact=%s\npayload=%s' "${analyze.output.version}" "${analyze.output.artifact.url}" "${analyze.output}"
+    output: RESULT
+`,
+			expectedStatus: core.Succeeded,
+			expectedOutput: map[string]any{
+				"RESULT": []test.Contains{
+					test.Contains("version=v1.2.3"),
+					test.Contains("artifact=https://example.test/release.tgz"),
+					test.Contains(`"version":"v1.2.3"`),
+				},
+			},
+		},
+		{
+			name: "StructuredOutputPublishOnlyNoop",
+			yaml: `
+type: graph
+steps:
+  - id: build
+    script: |
+      printf '{"version":"v1.2.3","artifact":{"url":"https://example.test/release.tgz"}}'
+    output: BUILD_JSON
+
+  - id: publish
+    depends: [build]
+    output:
+      version: "${build.output.version}"
+      versionLabel: "ver - ${build.output.version}"
+      artifact:
+        url: "${build.output.artifact.url}"
+
+  - id: consumer
+    depends: [publish]
+    script: |
+      printf 'version=%s\nlabel=%s\nartifact=%s\npayload=%s' "${publish.output.version}" "${publish.output.versionLabel}" "${publish.output.artifact.url}" "${publish.output}"
+    output: RESULT
+`,
+			expectedStatus: core.Succeeded,
+			expectedOutput: map[string]any{
+				"BUILD_JSON": `{"version":"v1.2.3","artifact":{"url":"https://example.test/release.tgz"}}`,
+				"RESULT": []test.Contains{
+					test.Contains("version=v1.2.3"),
+					test.Contains("label=ver - v1.2.3"),
+					test.Contains("artifact=https://example.test/release.tgz"),
+					test.Contains(`"versionLabel":"ver - v1.2.3"`),
+				},
+			},
+		},
+		{
+			name: "StructuredOutputFromFileAndStderr",
+			yaml: `
+type: graph
+steps:
+  - id: producer
+    script: |
+      #!/bin/sh
+      printf '{"artifact":{"path":"build/report.md"}}' > meta.json
+      printf '{"warning":"retry required"}' >&2
+    output:
+      artifactPath:
+        from: file
+        path: meta.json
+        decode: json
+        select: .artifact.path
+      warning:
+        from: stderr
+        decode: json
+        select: .warning
+
+  - id: consumer
+    depends: [producer]
+    script: |
+      printf 'artifact=%s\nwarning=%s' "${producer.output.artifactPath}" "${producer.output.warning}"
+    output: RESULT
+`,
+			expectedStatus: core.Succeeded,
+			expectedOutput: map[string]any{
+				"RESULT": "artifact=build/report.md\nwarning=retry required",
+			},
+		},
 	}
 
 	for _, tc := range tests {

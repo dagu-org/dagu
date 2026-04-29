@@ -72,6 +72,9 @@ type NodeState struct {
 	// OutputVariables stores the output variables for the following steps.
 	// It only contains the local output variables.
 	OutputVariables *collections.SyncMap
+	// OutputValue stores the step-scoped output payload for ${step.output} references.
+	// String-form output stores captured stdout; object-form output stores compact JSON.
+	OutputValue *string
 	// ChatMessages stores the chat session messages for message passing between steps.
 	ChatMessages []exec.LLMMessage
 	// ToolDefinitions stores the tool definitions that were available to the LLM during execution.
@@ -308,7 +311,13 @@ func (d *Data) StepInfo() eval.StepInfo {
 		ExitCode: strconv.Itoa(d.inner.State.ExitCode),
 	}
 
-	// Populate captured output if the step has output: configured and the value was stored
+	if d.inner.State.OutputValue != nil {
+		value := *d.inner.State.OutputValue
+		info.Output = &value
+		return info
+	}
+
+	// Backward-compatible fallback for previously persisted string-form outputs.
 	if outputKey := d.inner.Step.Output; outputKey != "" && d.inner.State.OutputVariables != nil {
 		if raw, ok := d.inner.State.OutputVariables.Load(outputKey); ok {
 			if strVal, ok := raw.(string); ok {
@@ -431,6 +440,14 @@ func (d *Data) setVariable(key, value string) {
 		d.mu.Unlock()
 	}
 	d.inner.State.OutputVariables.Store(key, stringutil.NewKeyValue(key, value).String())
+}
+
+func (d *Data) setOutputValue(value string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	v := value
+	d.inner.State.OutputValue = &v
 }
 
 func (d *Data) Finish() {

@@ -808,27 +808,12 @@ func TestAgent_OutputCollection(t *testing.T) {
 			expected: map[string]string{"myOutputVar": "value"},
 		},
 		{
-			name: "CustomOutputKey",
+			name: "StructuredOutputDoesNotParticipate",
 			dag: `steps:
-  - name: step1
-    command: echo "value"
+  - id: publish
     output:
-      name: RESULT
-      key: customKey`,
-			expected: map[string]string{"customKey": "value"},
-		},
-		{
-			name: "OmitExcludesFromOutputs",
-			dag: `steps:
-  - name: step1
-    command: echo "visible"
-    output: VISIBLE
-  - name: step2
-    command: echo "hidden"
-    output:
-      name: HIDDEN
-      omit: true`,
-			expected: map[string]string{"visible": "visible"},
+      label: "value"`,
+			expected: map[string]string{},
 		},
 		{
 			name: "MultipleSteps",

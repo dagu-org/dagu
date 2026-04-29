@@ -40,12 +40,17 @@ type OutputCoordinator struct {
 	stderrRedirectWriter io.Writer
 
 	// Output capture with size limits to prevent OOM
-	outputWriter   *os.File
-	outputReader   *os.File
-	outputData     string
-	outputCaptured bool
-	maxOutputSize  int64          // Max output size in bytes
-	outputCapture  *outputCapture // Concurrent output capture handler
+	outputWriter         *os.File
+	outputReader         *os.File
+	outputData           string
+	outputCaptured       bool
+	stderrOutputWriter   *os.File
+	stderrOutputReader   *os.File
+	stderrOutputData     string
+	stderrOutputCaptured bool
+	maxOutputSize        int64          // Max output size in bytes
+	outputCapture        *outputCapture // Concurrent output capture handler
+	stderrCapture        *outputCapture // Concurrent stderr capture handler
 
 	// Masker for environment variable masking
 	masker *masking.Masker
@@ -122,8 +127,8 @@ func (oc *OutputCoordinator) setupExecutorIO(ctx context.Context, cmd executor.E
 		stdout = newFlushableMultiWriter(oc.stdoutWriter, oc.stdoutRedirectWriter)
 	}
 
-	// Setup output capture only if not already set up
-	if data.Step.Output != "" && oc.outputReader == nil {
+	needStdoutCapture := data.Step.Output != "" || data.Step.UsesStructuredOutputSource("stdout")
+	if needStdoutCapture && oc.outputReader == nil {
 		var err error
 		if oc.outputReader, oc.outputWriter, err = os.Pipe(); err != nil {
 			return fmt.Errorf("failed to create pipe: %w", err)
@@ -162,6 +167,26 @@ func (oc *OutputCoordinator) setupExecutorIO(ctx context.Context, cmd executor.E
 	}
 	if oc.stderrRedirectWriter != nil {
 		stderr = newFlushableMultiWriter(oc.stderrWriter, oc.stderrRedirectWriter)
+	}
+	needStderrCapture := data.Step.UsesStructuredOutputSource("stderr")
+	if needStderrCapture && oc.stderrOutputReader == nil {
+		var err error
+		if oc.stderrOutputReader, oc.stderrOutputWriter, err = os.Pipe(); err != nil {
+			return fmt.Errorf("failed to create stderr pipe: %w", err)
+		}
+		oc.stderrOutputCaptured = false
+		oc.stderrOutputData = ""
+		if oc.maxOutputSize == 0 {
+			oc.maxOutputSize = 1024 * 1024
+			if rCtx := GetDAGContext(ctx); rCtx.DAG != nil && rCtx.DAG.MaxOutputSize > 0 {
+				oc.maxOutputSize = int64(rCtx.DAG.MaxOutputSize)
+			}
+		}
+		oc.stderrCapture = newOutputCapture(oc.maxOutputSize)
+		oc.stderrCapture.start(ctx, oc.stderrOutputReader)
+	}
+	if oc.stderrOutputWriter != nil {
+		stderr = newFlushableMultiWriter(stderr, oc.stderrOutputWriter)
 	}
 	cmd.SetStderr(stderr)
 
@@ -230,6 +255,10 @@ func (oc *OutputCoordinator) closeResources() error {
 		_ = oc.outputWriter.Close()
 		oc.outputWriter = nil
 	}
+	if oc.stderrOutputWriter != nil {
+		_ = oc.stderrOutputWriter.Close()
+		oc.stderrOutputWriter = nil
+	}
 
 	// Wait for concurrent capture to finish if it's running
 	if oc.outputCapture != nil && !oc.outputCaptured {
@@ -237,8 +266,20 @@ func (oc *OutputCoordinator) closeResources() error {
 			lastErr = err
 		}
 	}
+	if oc.stderrCapture != nil && !oc.stderrOutputCaptured {
+		if _, err := oc.stderrCapture.wait(); err != nil {
+			lastErr = err
+		}
+	}
 
-	for _, f := range []*os.File{oc.stdoutFile, oc.stderrFile, oc.stdoutRedirectFile, oc.StderrRedirectFile, oc.outputReader} {
+	for _, f := range []*os.File{
+		oc.stdoutFile,
+		oc.stderrFile,
+		oc.stdoutRedirectFile,
+		oc.StderrRedirectFile,
+		oc.outputReader,
+		oc.stderrOutputReader,
+	} {
 		if f != nil {
 			if err := f.Sync(); err != nil {
 				lastErr = err
@@ -500,6 +541,83 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 	oc.outputCaptured = true
 
 	return oc.outputData, nil
+}
+
+func (oc *OutputCoordinator) capturedStderr(ctx context.Context) (string, error) {
+	oc.mu.Lock()
+	defer oc.mu.Unlock()
+
+	ctx = logger.WithValues(ctx, tag.Output(oc.stderrOutputData), tag.Length(len(oc.stderrOutputData)))
+
+	if oc.stderrOutputCaptured {
+		return oc.stderrOutputData, nil
+	}
+
+	if oc.stderrCapture != nil {
+		if oc.stderrOutputWriter != nil {
+			if err := oc.stderrOutputWriter.Close(); err != nil {
+				logger.Error(ctx, "Failed to close stderr pipe writer", tag.Error(err))
+			}
+			oc.stderrOutputWriter = nil
+		}
+
+		output, err := oc.stderrCapture.wait()
+		if err != nil {
+			return "", err
+		}
+		if oc.stderrOutputData != "" && output != "" {
+			oc.stderrOutputData += "\n" + strings.TrimSpace(output)
+		} else if output != "" {
+			oc.stderrOutputData = strings.TrimSpace(output)
+		}
+
+		oc.stderrOutputCaptured = true
+		if oc.stderrOutputReader != nil {
+			if err := oc.stderrOutputReader.Close(); err != nil {
+				logger.Error(ctx, "Failed to close stderr pipe reader", tag.Error(err))
+			}
+			oc.stderrOutputReader = nil
+		}
+		return oc.stderrOutputData, nil
+	}
+
+	if oc.stderrOutputReader == nil {
+		return "", nil
+	}
+	if oc.stderrOutputWriter != nil {
+		if err := oc.stderrOutputWriter.Close(); err != nil {
+			logger.Error(ctx, "Failed to close stderr pipe writer", tag.Error(err))
+		}
+		oc.stderrOutputWriter = nil
+	}
+
+	limitedReader := io.LimitReader(oc.stderrOutputReader, oc.maxOutputSize)
+	var buf bytes.Buffer
+	if _, err := io.Copy(&buf, limitedReader); err != nil {
+		return "", fmt.Errorf("io: failed to read stderr output: %w", err)
+	}
+
+	output := strings.TrimSpace(buf.String())
+	if buf.Len() == int(oc.maxOutputSize) {
+		logger.Warn(ctx, "Stderr output truncated due to size limit",
+			slog.Int64("max-size", oc.maxOutputSize),
+		)
+		output += "\n[OUTPUT TRUNCATED]"
+	}
+
+	if oc.stderrOutputData != "" && output != "" {
+		oc.stderrOutputData += "\n" + output
+	} else if output != "" {
+		oc.stderrOutputData = output
+	}
+
+	if err := oc.stderrOutputReader.Close(); err != nil {
+		logger.Error(ctx, "Failed to close stderr pipe reader", tag.Error(err))
+	}
+	oc.stderrOutputReader = nil
+	oc.stderrOutputCaptured = true
+
+	return oc.stderrOutputData, nil
 }
 
 // outputCapture handles concurrent reading from a pipe to avoid deadlocks

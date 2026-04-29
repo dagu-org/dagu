@@ -107,57 +107,23 @@ steps:
 		},
 	},
 	{
-		name: "OutputWithCustomKey",
+		name: "StructuredObjectOutputNotCollected",
 		outputsCollectionCase: outputsCollectionCase{
 			dagYAML: `
 steps:
-  - name: produce-output
-    command: echo "MY_VALUE=hello world"
+  - id: publish
     output:
-      name: MY_VALUE
-      key: customKeyName
+      version: v1.2.3
 `,
 			runFunc: func(t *testing.T, _ context.Context, agent *test.Agent) {
 				agent.RunSuccess(t)
 			},
 			validateFunc: func(t *testing.T, status exec.DAGRunStatus) {
 				require.Equal(t, core.Succeeded, status.Status)
+				require.Len(t, status.Nodes, 1)
 			},
 			validateOutputs: func(t *testing.T, outputs map[string]string) {
-				require.NotNil(t, outputs)
-				assert.Equal(t, "MY_VALUE=hello world", outputs["customKeyName"])
-				_, hasDefault := outputs["myValue"]
-				assert.False(t, hasDefault, "should not have default key when custom key is specified")
-			},
-		},
-	},
-	{
-		name: "OutputWithOmit",
-		outputsCollectionCase: outputsCollectionCase{
-			dagYAML: `
-steps:
-  - name: step1
-    command: echo "VISIBLE=yes"
-    output: VISIBLE
-
-  - name: step2
-    command: echo "HIDDEN=secret"
-    output:
-      name: HIDDEN
-      omit: true
-`,
-			runFunc: func(t *testing.T, _ context.Context, agent *test.Agent) {
-				agent.RunSuccess(t)
-			},
-			validateFunc: func(t *testing.T, status exec.DAGRunStatus) {
-				require.Equal(t, core.Succeeded, status.Status)
-				require.Len(t, status.Nodes, 2)
-			},
-			validateOutputs: func(t *testing.T, outputs map[string]string) {
-				require.NotNil(t, outputs)
-				assert.Equal(t, "VISIBLE=yes", outputs["visible"])
-				_, hasHidden := outputs["hidden"]
-				assert.False(t, hasHidden, "omitted output should not be in outputs.json")
+				assert.Nil(t, outputs)
 			},
 		},
 	},
@@ -262,7 +228,7 @@ steps:
 		},
 	},
 	{
-		name: "MixedOutputConfigurations",
+		name: "MixedStringAndStructuredOutputs",
 		outputsCollectionCase: outputsCollectionCase{
 			dagYAML: `
 steps:
@@ -270,17 +236,9 @@ steps:
     command: echo "SIMPLE_OUT=simple_value"
     output: SIMPLE_OUT
 
-  - name: with-key
-    command: echo "KEYED=keyed_value"
+  - id: publish
     output:
-      name: KEYED
-      key: renamedKey
-
-  - name: omitted
-    command: echo "SECRET=secret_value"
-    output:
-      name: SECRET
-      omit: true
+      version: v1.2.3
 `,
 			runFunc: func(t *testing.T, _ context.Context, agent *test.Agent) {
 				agent.RunSuccess(t)
@@ -290,11 +248,8 @@ steps:
 			},
 			validateOutputs: func(t *testing.T, outputs map[string]string) {
 				require.NotNil(t, outputs)
-				assert.Len(t, outputs, 2)
+				assert.Len(t, outputs, 1)
 				assert.Equal(t, "SIMPLE_OUT=simple_value", outputs["simpleOut"])
-				assert.Equal(t, "KEYED=keyed_value", outputs["renamedKey"])
-				_, hasSecret := outputs["secret"]
-				assert.False(t, hasSecret)
 			},
 		},
 	},

@@ -217,7 +217,7 @@ steps:
 	}
 }
 
-func TestDAGSchemaStepOutputSchema(t *testing.T) {
+func TestDAGSchemaStepOutputObject(t *testing.T) {
 	t.Parallel()
 
 	resolved := mustResolveDAGSchema(t)
@@ -228,34 +228,25 @@ func TestDAGSchemaStepOutputSchema(t *testing.T) {
 		wantErr string
 	}{
 		{
-			name: "InlineObjectSchema",
+			name: "LiteralObjectValue",
 			spec: `
 steps:
   - command: echo hi
     output:
-      name: RESULT
-      schema:
-        type: object
+      meta:
+        version: v1.2.3
 `,
 		},
 		{
-			name: "BooleanSchema",
+			name: "StructuredSourceEntry",
 			spec: `
 steps:
   - command: echo hi
     output:
-      name: RESULT
-      schema: true
-`,
-		},
-		{
-			name: "StringSchemaReference",
-			spec: `
-steps:
-  - command: echo hi
-    output:
-      name: RESULT
-      schema: ./output.schema.json
+      version:
+        from: stdout
+        decode: json
+        select: .version
 `,
 		},
 	}

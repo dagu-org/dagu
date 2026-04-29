@@ -1305,30 +1305,11 @@
             },
             {
               "type": "object",
-              "properties": {
-                "name": {
-                  "type": "string",
-                  "description": "Variable name to capture the command's stdout (required)."
-                },
-                "key": {
-                  "type": "string",
-                  "description": "Custom key for this output in outputs.json. If not specified, the variable name is converted to camelCase."
-                },
-                "omit": {
-                  "type": "boolean",
-                  "default": false,
-                  "description": "When true, excludes this output from outputs.json."
-                },
-                "schema": {
-                  "$ref": "#/definitions/jsonSchemaDeclaration",
-                  "description": "JSON Schema declaration used to validate captured output. Output must be valid JSON matching this schema or the step fails."
-                }
-              },
-              "required": ["name"],
-              "additionalProperties": false
+              "additionalProperties": true,
+              "description": "Structured step output published after the step completes. Entry values can be literal JSON-compatible values or objects using fields like value, from, path, decode, and select."
             }
           ],
-          "description": "Variable name to capture the command's stdout. Can be a string or an object with name, key, omit, and schema fields. This output can be referenced in subsequent steps."
+          "description": "Step output configuration. Use a string to capture stdout into a flat variable, or an object to publish structured step-scoped output for ${step.output.*} references."
         },
         "depends": {
           "oneOf": [
