@@ -296,7 +296,7 @@ steps:
 	{
 		ID:          11,
 		Name:        "approval-gate",
-		Description: "Review, push back with rewind_to, then continue to deploy",
+		Description: "Review, push back with rewind_to, then confirm the deploy window",
 		Content: `type: graph
 artifacts:
   enabled: true
@@ -337,12 +337,18 @@ steps:
       
       {{ .deploy_window | default "Pending approval input" }}
     approval:
-      prompt: "Review the release-notes.md artifact. Push back with FEEDBACK to regenerate it, or approve with DEPLOY_WINDOW to continue."
-      input: [FEEDBACK, DEPLOY_WINDOW]
-      required: [DEPLOY_WINDOW]
+      prompt: "Review the release-notes.md artifact. Push back with FEEDBACK to regenerate it, or approve to continue."
+      input: [FEEDBACK]
       rewind_to: prepare_release_notes
-  - id: deploy
+  - id: confirm_deploy_window
     depends: [review_release]
+    command: echo "confirm deployment window for ${VERSION}"
+    approval:
+      prompt: "Approve deployment by providing DEPLOY_WINDOW."
+      input: [DEPLOY_WINDOW]
+      required: [DEPLOY_WINDOW]
+  - id: deploy
+    depends: [confirm_deploy_window]
     command: echo "deploying ${VERSION} during ${DEPLOY_WINDOW}"
 `,
 	},

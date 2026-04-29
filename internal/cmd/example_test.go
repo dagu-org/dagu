@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/dagucloud/dagu/internal/cmd"
+	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/spec"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -43,6 +44,31 @@ func extractExampleYAML(out string) string {
 	return strings.Join(lines[start:], "\n")
 }
 
+func loadExampleDAG(t *testing.T, id int) *core.DAG {
+	t.Helper()
+
+	out, err := runExampleCmd("example", fmt.Sprintf("%d", id))
+	require.NoError(t, err, "example %d failed", id)
+
+	dag, err := spec.LoadYAML(context.Background(), []byte(extractExampleYAML(out)), spec.WithoutEval())
+	require.NoError(t, err, "example %d failed to load", id)
+
+	return dag
+}
+
+func findStep(t *testing.T, dag *core.DAG, name string) core.Step {
+	t.Helper()
+
+	for _, step := range dag.Steps {
+		if step.Name == name {
+			return step
+		}
+	}
+
+	t.Fatalf("step %q not found", name)
+	return core.Step{}
+}
+
 func TestExampleCommand(t *testing.T) {
 	t.Run("ListAll", func(t *testing.T) {
 		out, err := runExampleCmd("example")
@@ -65,10 +91,19 @@ func TestExampleCommand(t *testing.T) {
 
 	t.Run("AllExamplesLoadYAML", func(t *testing.T) {
 		for i := 1; i <= cmd.ExampleCount(); i++ {
-			out, err := runExampleCmd("example", fmt.Sprintf("%d", i))
-			require.NoError(t, err, "example %d failed", i)
-			_, err = spec.LoadYAML(context.Background(), []byte(extractExampleYAML(out)), spec.WithoutEval())
-			require.NoError(t, err, "example %d failed to load", i)
+			_ = loadExampleDAG(t, i)
 		}
+	})
+
+	t.Run("ApprovalGateExampleLeavesDeployWindowForApprovePath", func(t *testing.T) {
+		dag := loadExampleDAG(t, 11)
+
+		reviewStep := findStep(t, dag, "review_release")
+		require.NotNil(t, reviewStep.Approval)
+		assert.NotContains(t, reviewStep.Approval.Required, "DEPLOY_WINDOW")
+
+		confirmStep := findStep(t, dag, "confirm_deploy_window")
+		require.NotNil(t, confirmStep.Approval)
+		assert.Equal(t, []string{"DEPLOY_WINDOW"}, confirmStep.Approval.Required)
 	})
 }

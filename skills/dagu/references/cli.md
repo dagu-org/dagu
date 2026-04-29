@@ -2,6 +2,8 @@
 
 Global flags on all commands: `--config/-c`, `--dagu-home`, `--quiet/-q`, `--cpu-profile`
 
+Advanced and deprecated flags below remain implemented in `internal/cmd/start.go`, `internal/cmd/enqueue.go`, `internal/cmd/exec.go`, and `internal/cmd/migrate.go`, so this reference keeps them documented even when they are mainly used by automation or backward-compatibility paths.
+
 ## Core Commands
 
 ### dagu start
@@ -17,8 +19,12 @@ Flags:
 - `--params/-p` — Parameters (key=value or positional)
 - `--name/-N` — Override DAG name
 - `--run-id/-r` — Custom run ID
+- `--from-run-id` — Historic dag-run ID to use as the template for a new run
 - `--labels` — Additional labels (comma-separated key=value or key-only)
+- `--tags` — Deprecated alias for `--labels`
 - `--default-working-dir` — Default working directory for DAGs without explicit workingDir
+- `--worker-id` — Worker ID executing this DAG run; auto-set in distributed mode and defaults to `local`
+- `--trigger-type` — Trigger source (`scheduler`, `manual`, `webhook`, `subdag`, `retry`, `catchup`); defaults to `manual`
 
 ### dagu enqueue
 
@@ -33,8 +39,30 @@ Flags:
 - `--params/-p` — Parameters (key=value or positional)
 - `--name/-N` — Override DAG name
 - `--run-id/-r` — Custom run ID
+- `--queue/-u` — Override the DAG-level queue definition
 - `--labels` — Additional labels (comma-separated key=value or key-only)
+- `--tags` — Deprecated alias for `--labels`
 - `--default-working-dir` — Default working directory for DAGs without explicit workingDir
+- `--trigger-type` — Trigger source (`scheduler`, `manual`, `webhook`, `subdag`, `retry`, `catchup`); defaults to `manual`
+
+### dagu exec
+
+Execute a one-off command as a DAG run without a DAG YAML file.
+
+```sh
+dagu exec [flags] -- <command> [args...]
+```
+
+Flags:
+
+- `--run-id/-r` — Custom run ID
+- `--name/-N` — Override DAG name
+- `--workdir` — Working directory for the command (defaults to the current directory)
+- `--shell` — Override shell binary for the command
+- `--base` — Path to a base DAG YAML whose defaults are applied before inline overrides
+- `--env/-E` — Environment variable (`KEY=VALUE`) to include in the run; repeatable
+- `--dotenv` — Path to a dotenv file to load before execution; repeatable
+- `--worker-label` — Worker label selector (`key=value`) for distributed execution; repeatable
 
 ### dagu dequeue
 
@@ -72,7 +100,7 @@ Show DAG run status: `dagu status <dag-name> [--run-id/-r <id>] [--sub-run-id/-s
 
 Show DAG run history.
 
-```
+```sh
 dagu history [dag-name]
 ```
 
@@ -181,7 +209,8 @@ Start distributed worker: `dagu worker [--worker.id/-w <id>] [--worker.max-activ
 ## Other Commands
 
 - `dagu ai install [--yes/-y] [--skills-dir <path>]` — Install DAG authoring skill into AI coding tools (Claude Code, Codex, etc.)
-- `dagu example [id]` — Show built-in example DAGs (12 available)
+- `dagu example [id]` — Show built-in example DAGs
+- `dagu migrate history` — Migrate legacy DAG run history from the v1.16 layout to the v1.17+ format and archive the old data
 - `dagu version` — Show version
 - `dagu upgrade [--check] [--version/-v <ver>] [--dry-run] [--yes/-y]` — Self-update binary
 - `dagu license <activate|deactivate|check>` — Manage license
