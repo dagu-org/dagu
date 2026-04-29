@@ -13,7 +13,7 @@ module.exports = merge(common, {
     port: 8081,
     proxy: [
       {
-        context: ['/api'],
+        context: ['/api', '/assets/dag.schema.json', '/assets/config.schema.json'],
         target: 'http://localhost:8080',
         changeOrigin: true,
         ws: true,

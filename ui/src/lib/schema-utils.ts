@@ -97,6 +97,7 @@ function resolveInternalRef(root: unknown, ref: string): unknown {
  */
 export function dereferenceSchema(schema: JSONSchema): JSONSchema {
   const cache = new Map<string, JSONSchema>();
+  const resolving = new Set<string>();
 
   function processNode(node: unknown): unknown {
     if (!node || typeof node !== 'object') {
@@ -110,25 +111,26 @@ export function dereferenceSchema(schema: JSONSchema): JSONSchema {
     const obj = node as Record<string, unknown>;
     if (typeof obj.$ref === 'string' && obj.$ref.startsWith('#')) {
       const ref = obj.$ref;
+      if (resolving.has(ref)) {
+        return { ...obj };
+      }
+
       let resolved = cache.get(ref);
       if (!resolved) {
-        const placeholder: JSONSchema = {};
-        cache.set(ref, placeholder);
-
-        const dereferenced = processNode(resolveInternalRef(schema, ref));
-        if (isRecord(dereferenced)) {
-          Object.assign(placeholder, dereferenced);
-          resolved = placeholder;
-        } else {
-          resolved = {};
+        resolving.add(ref);
+        try {
+          const dereferenced = processNode(resolveInternalRef(schema, ref));
+          resolved = isRecord(dereferenced) ? (dereferenced as JSONSchema) : {};
           cache.set(ref, resolved);
+        } finally {
+          resolving.delete(ref);
         }
       }
+
       const { $ref: _ref, ...rest } = obj;
-      if (Object.keys(rest).length === 0) {
-        return resolved;
-      }
-      return processNode({ ...resolved, ...rest });
+      return Object.keys(rest).length === 0
+        ? resolved
+        : processNode({ ...resolved, ...rest });
     }
 
     const result: Record<string, unknown> = {};
@@ -287,10 +289,11 @@ export function getSchemaAtPath(
     }
   }
 
-  let current: JSONSchema | null = schema;
+  let current: JSONSchema | null = resolveSchemaNode(schema, schema);
 
   for (let i = 0; i < path.length; i++) {
     const segment = path[i];
+    current = resolveSchemaNode(schema, current);
 
     if (!current || !segment) {
       return null;
@@ -393,6 +396,38 @@ export function getSchemaAtPath(
 
     // Not found
     return null;
+  }
+
+  return resolveSchemaNode(schema, current);
+}
+
+function resolveSchemaNode(
+  root: JSONSchema,
+  node: JSONSchema | null
+): JSONSchema | null {
+  if (!node) {
+    return null;
+  }
+
+  let current = node;
+  const visited = new Set<string>();
+
+  while (typeof current.$ref === 'string' && current.$ref.startsWith('#')) {
+    if (visited.has(current.$ref)) {
+      return current;
+    }
+    visited.add(current.$ref);
+
+    const resolved = resolveInternalRef(root, current.$ref);
+    if (!isRecord(resolved)) {
+      return current;
+    }
+
+    const { $ref: _ref, ...rest } = current;
+    current =
+      Object.keys(rest).length === 0
+        ? (resolved as JSONSchema)
+        : ({ ...(resolved as JSONSchema), ...rest } as JSONSchema);
   }
 
   return current;
