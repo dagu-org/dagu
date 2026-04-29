@@ -84,7 +84,7 @@ Uses step `call:` and `params:` fields. Sub-DAGs do not inherit parent env vars.
 Notes:
 
 - Pass values explicitly via `params:` when the child needs parent env vars or derived values.
-- Child step `output:` variables are not propagated back into the parent DAG output map. Use shared files or another explicit handoff if the parent needs results.
+- Child string-form `output:` variables are not propagated back into the parent DAG output map. Use files, explicit params, or another handoff if the parent needs results.
 
 ## parallel
 
@@ -237,7 +237,7 @@ Behavior:
 - `data` — Object exposed to the template as `.`
 - `output` — File path for rendered output; if omitted, rendered text is written to stdout
 
-Important: step `output:` and `with.output` are different. Step `output:` captures stdout into a Dagu variable. `with.output` writes the rendered result directly to a file.
+Important: step `output:` and `with.output` are different. String-form step `output:` captures stdout into a Dagu variable, object-form step `output:` publishes structured `${step_id.output.*}` values, and `with.output` writes the rendered result directly to a file.
 
 Use `template` when you need to generate text files such as Markdown, config files, SQL, JSON, or prompts. It is usually safer and simpler than building files with `echo`, heredocs, or shell string interpolation.
 

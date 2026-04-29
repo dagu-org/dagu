@@ -60,6 +60,11 @@ func sortedFiles(dir string) ([]string, error) {
 		if entry.IsDir() {
 			continue
 		}
+		// Store directories may temporarily contain atomic-write staging files
+		// such as "*.json.tmp.*". Only finalized JSON records should be listed.
+		if filepath.Ext(entry.Name()) != ".json" {
+			continue
+		}
 		files = append(files, filepath.Join(dir, entry.Name()))
 	}
 	sort.Strings(files)

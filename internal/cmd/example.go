@@ -48,21 +48,24 @@ steps:
 	{
 		ID:          2,
 		Name:        "output-passing",
-		Description: "Capture step output and pass between steps",
+		Description: "Use publish-only object-form output between steps",
 		Content: `type: graph
 steps:
-  - name: get-version
-    command: echo "2.5.0"
-    output: VERSION
-  - name: get-metadata
-    command: echo '{"build":"abc123","env":"staging"}'
+  - id: publish_version
     output:
-      name: BUILD_ID
-      key: build
-    depends: [get-version]
-  - name: deploy
-    command: echo "deploying v${VERSION} build ${BUILD_ID}"
-    depends: [get-version, get-metadata]
+      version: "2.5.0"
+  - id: publish_metadata
+    output:
+      build: abc123
+      env: staging
+  - id: publish_release
+    output:
+      version_label: "v${publish_version.output.version}"
+      target_env: "${publish_metadata.output.env}"
+    depends: [publish_version, publish_metadata]
+  - id: deploy
+    command: echo "deploying ${publish_release.output.version_label} build ${publish_metadata.output.build} to ${publish_release.output.target_env}"
+    depends: [publish_release]
 `,
 	},
 	{
@@ -187,20 +190,31 @@ steps:
 	{
 		ID:          7,
 		Name:        "http-requests",
-		Description: "Make HTTP requests and use responses",
+		Description: "Make HTTP requests and parse JSON response fields",
 		Content: `type: graph
 defaults:
   retry_policy:
     limit: 2
     interval_sec: 5
 steps:
-  - name: get-todo
+  - id: get_todo
     type: http
     command: "GET https://jsonplaceholder.typicode.com/todos/1"
-    output: TODO
-  - name: show-result
-    command: echo "Received - ${TODO}"
-    depends: [get-todo]
+    output:
+      # decode + select act as a lightweight contract check.
+      # malformed JSON or a missing selected field fails the step,
+      # so the normal retry_policy can retry it.
+      title:
+        from: stdout
+        decode: json
+        select: .title
+      completed:
+        from: stdout
+        decode: json
+        select: .completed
+  - id: show_result
+    command: 'echo "Todo: ${get_todo.output.title} (completed=${get_todo.output.completed})"'
+    depends: [get_todo]
 `,
 	},
 	{
@@ -277,19 +291,19 @@ defaults:
     limit: 2
     interval_sec: 5
 steps:
-  - name: check-status
-    command: "echo success"
-    output: STATUS
-  - name: route
+  - id: check_status
+    output:
+      status: success
+  - id: route
     type: router
-    value: ${STATUS}
+    value: ${check_status.output.status}
     routes:
-      success: [on-success]
-      "re:.*": [on-failure]
-    depends: [check-status]
-  - name: on-success
+      success: [on_success]
+      "re:.*": [on_failure]
+    depends: [check_status]
+  - id: on_success
     command: echo "status was success"
-  - name: on-failure
+  - id: on_failure
     command: echo "status was something else"
 `,
 	},
@@ -302,8 +316,8 @@ artifacts:
   enabled: true
 steps:
   - id: build
-    command: echo "v1.2.3"
-    output: VERSION
+    output:
+      version: "v1.2.3"
   - id: draft_release_notes
     depends: [build]
     type: agent
@@ -312,7 +326,7 @@ steps:
     messages:
       - role: user
         content: |
-          Draft release notes for version ${VERSION}.
+          Draft release notes for version ${build.output.version}.
 
           Current draft path: ${DAG_RUN_ARTIFACTS_DIR}/release-notes.md
 
@@ -328,7 +342,7 @@ steps:
       rewind_to: draft_release_notes
   - id: deploy
     depends: [draft_release_notes]
-    command: echo "deploying ${VERSION} with reviewed release notes"
+    command: echo "deploying ${build.output.version} with reviewed release notes"
 `,
 	},
 	{
@@ -416,19 +430,19 @@ step_types:
       command: echo {{ json .input.channel }} release {{ json .input.version }} - {{ json .input.summary }}
 steps:
   - id: build
-    command: echo "v1.2.3"
-    output: VERSION
+    output:
+      version: "v1.2.3"
   - id: announce_changelog
     type: announce_release
     with:
       channel: changelog
-      version: ${VERSION}
+      version: ${build.output.version}
     depends: [build]
   - id: announce_email
     type: announce_release
     with:
       channel: email
-      version: ${VERSION}
+      version: ${build.output.version}
       summary: Sent to subscribers
     depends: [build]
 `,
@@ -449,15 +463,15 @@ params:
     default: STG
 steps:
   - id: build
-    command: echo "v1.2.3"
-    output: VERSION
+    output:
+      version: "v1.2.3"
   - id: render_config
     type: template
     with:
       output: ${DAG_RUN_ARTIFACTS_DIR}/deploy.env
       data:
         env: ${ENV}
-        version: ${VERSION}
+        version: ${build.output.version}
     script: |
       APP_ENV={{ .env }}
       APP_VERSION={{ .version }}
@@ -482,13 +496,13 @@ harness:
   bare: true
 steps:
   - id: gather_issue
-    command: echo "scheduler retries the same task after it already succeeded"
-    output: ISSUE
+    output:
+      issue: "scheduler retries the same task after it already succeeded"
   - id: build_prompt
     type: template
     with:
       data:
-        issue: ${ISSUE}
+        issue: ${gather_issue.output.issue}
     script: |
       Review this workflow issue and suggest a fix:
       
@@ -507,7 +521,7 @@ steps:
     with:
       output: ${DAG_RUN_ARTIFACTS_DIR}/harness-report.md
       data:
-        issue: ${ISSUE}
+        issue: ${gather_issue.output.issue}
         analysis: ${ANALYSIS}
     script: |
       # Harness Review
@@ -539,13 +553,13 @@ harnesses:
       model: --model
 steps:
   - id: gather_task
-    command: echo "Summarize the deployment checklist for the next engineer"
-    output: TASK
+    output:
+      task: "Summarize the deployment checklist for the next engineer"
   - id: build_prompt
     type: template
     with:
       data:
-        task: ${TASK}
+        task: ${gather_task.output.task}
     script: |
       {{ .task }}
       
