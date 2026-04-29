@@ -357,9 +357,11 @@ function StatusTab({
   );
   const hasTaskTemplates = (controller.detail?.taskTemplates?.length || 0) > 0;
   const hasTriggerPrompt = !!controller.detail?.definition?.trigger?.prompt?.trim();
+  const followUpAfterCompletion = controller.canReopenCompletedTask;
   const startMode =
-    controller.lifecycleState === 'idle' ||
-    controller.lifecycleState === 'finished';
+    (controller.lifecycleState === 'idle' ||
+      controller.lifecycleState === 'finished') &&
+    !controller.canSendOperatorMessage;
   const conversationDraft = startMode
     ? controller.instructionDraft
     : controller.operatorMessageDraft;
@@ -429,6 +431,11 @@ function StatusTab({
               <p>
                 Human input is currently required before the Controller can
                 continue.
+              </p>
+            ) : followUpAfterCompletion ? (
+              <p>
+                A follow-up message will reopen the completed Controller and
+                continue from the latest context.
               </p>
             ) : controller.canSendOperatorMessage ? (
               <p>
@@ -553,6 +560,8 @@ function StatusTab({
             placeholder={
               startMode
                 ? 'Tell this Controller what task to work on.'
+                : followUpAfterCompletion
+                  ? 'Describe what was wrong and what should be reworked.'
                 : 'Add context, change priority, or clarify the current task.'
             }
             disabled={
@@ -574,6 +583,8 @@ function StatusTab({
                     : 'Starting is gated by scheduler controller readiness.'
                 : controller.detail?.state.pendingPrompt
                   ? 'Respond to the pending prompt before sending a general operator message.'
+                  : followUpAfterCompletion
+                    ? 'This follow-up reopens the completed Controller and continues from the latest result.'
                   : controller.canSendOperatorMessage
                     ? controller.detail?.state.state === 'paused'
                       ? 'This records your message now, but the Controller will stay paused until you resume it.'
@@ -596,6 +607,10 @@ function StatusTab({
                 ? controller.lifecycleState === 'finished'
                   ? 'Start New Task'
                   : 'Start'
+                : followUpAfterCompletion
+                  ? controller.busyAction === 'message'
+                    ? 'Sending...'
+                    : 'Send Follow-up'
                 : controller.busyAction === 'message'
                   ? 'Sending...'
                   : 'Send Message'}

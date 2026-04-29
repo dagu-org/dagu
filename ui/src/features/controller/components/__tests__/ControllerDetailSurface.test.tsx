@@ -136,6 +136,7 @@ function createController(
     displayStatus: 'idle',
     taskSummary: { done: 0, open: 0 },
     canStartTask: true,
+    canReopenCompletedTask: false,
     canSendOperatorMessage: false,
     canPause: false,
     canResume: false,
@@ -187,5 +188,40 @@ describe('ControllerDetailSurface', () => {
 
     expect(screen.getByText('Runtime State')).toBeInTheDocument();
     expect(screen.getByText('Artifacts')).toBeInTheDocument();
+  });
+
+  it('shows follow-up messaging instead of start-new-task for a completed controller', () => {
+    render(
+      <ControllerDetailSurface
+        controller={createController({
+          canStartTask: true,
+          canReopenCompletedTask: true,
+          canSendOperatorMessage: true,
+          lifecycleState:
+            'finished' as ControllerDetailController['lifecycleState'],
+          detail: {
+            ...createController().detail!,
+            state: {
+              ...createController().detail!.state,
+              state:
+                'finished' as NonNullable<
+                  NonNullable<
+                    ControllerDetailController['detail']
+                  >['state']
+                >['state'],
+              finishedAt: '2026-04-29T13:30:00Z',
+            },
+          },
+        })}
+      />
+    );
+
+    expect(screen.getByText('Send Follow-up')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'This follow-up reopens the completed Controller and continues from the latest result.'
+      )
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Start New Task')).not.toBeInTheDocument();
   });
 });

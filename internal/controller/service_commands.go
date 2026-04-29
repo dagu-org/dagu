@@ -318,11 +318,16 @@ func (s *Service) SubmitOperatorMessage(ctx context.Context, name string, req Op
 	if message == "" {
 		return errors.New("message is required")
 	}
-	if state.State != StateRunning && state.State != StateWaiting && state.State != StatePaused {
+	if !isActiveConversationState(state) && !canReopenCompletedConversation(state) {
 		return errors.New("controller is not running an active task")
 	}
 	if state.PendingPrompt != nil {
 		return errors.New("respond to the pending prompt before sending a general operator message")
+	}
+	if canReopenCompletedConversation(state) {
+		if err := s.reopenCompletedConversation(ctx, def, state, req.RequestedBy); err != nil {
+			return err
+		}
 	}
 	operatorMessage := buildOperatorMessage(req.RequestedBy, message)
 	turnMessage := operatorMessage
@@ -343,6 +348,44 @@ func (s *Service) SubmitOperatorMessage(ctx context.Context, name string, req Op
 		state.WaitingReason = WaitingReasonNone
 	}
 	return s.saveState(ctx, name, state)
+}
+
+func isActiveConversationState(state *State) bool {
+	if state == nil {
+		return false
+	}
+	return state.State == StateRunning || state.State == StateWaiting || state.State == StatePaused
+}
+
+func canReopenCompletedConversation(state *State) bool {
+	if state == nil {
+		return false
+	}
+	return state.State == StateFinished || (state.State == StateIdle && !state.FinishedAt.IsZero())
+}
+
+func (s *Service) reopenCompletedConversation(ctx context.Context, def *Definition, state *State, requestedBy string) error {
+	if state == nil {
+		return errors.New("controller state is required")
+	}
+	if state.State == StateIdle {
+		instruction := strings.TrimSpace(state.Instruction)
+		if instruction == "" {
+			return errors.New("controller has no prior instruction to continue")
+		}
+		if !hasTaskTemplates(state.TaskTemplates) {
+			return errors.New("at least one task template is required before continuing controller")
+		}
+		return s.startCycle(ctx, def, state, instruction, requestedBy)
+	}
+	state.State = StateRunning
+	state.WaitingReason = WaitingReasonNone
+	state.PendingPrompt = nil
+	state.PendingResponse = nil
+	state.FinishedAt = time.Time{}
+	state.LastSummary = ""
+	state.LastError = ""
+	return nil
 }
 
 func (s *Service) startCycle(ctx context.Context, def *Definition, state *State, instruction, requestedBy string) error {

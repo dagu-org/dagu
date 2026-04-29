@@ -322,13 +322,18 @@ export function useControllerDetailController({
     runtimeControllerReady &&
     triggerType === 'manual' &&
     (lifecycleState === 'idle' || lifecycleState === 'finished');
+  const canReopenCompletedTask =
+    !!detail &&
+    (lifecycleState === 'finished' ||
+      (lifecycleState === 'idle' && !!detail.state.finishedAt));
   const canSendOperatorMessage =
     !!detail &&
     runtimeControllerReady &&
     !detail.state.pendingPrompt &&
     (lifecycleState === 'running' ||
       lifecycleState === 'waiting' ||
-      lifecycleState === 'paused');
+      lifecycleState === 'paused' ||
+      canReopenCompletedTask);
   const canPause =
     runtimeControllerReady &&
     (lifecycleState === 'running' || lifecycleState === 'waiting');
@@ -1118,6 +1123,7 @@ export function useControllerDetailController({
     displayStatus,
     taskSummary,
     canStartTask,
+    canReopenCompletedTask,
     canSendOperatorMessage,
     canPause,
     canResume,

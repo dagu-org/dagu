@@ -680,6 +680,92 @@ func TestServiceSubmitOperatorMessageRequiresActiveTask(t *testing.T) {
 	require.ErrorContains(t, err, "not running an active task")
 }
 
+func TestServiceSubmitOperatorMessageReopensFinishedController(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, fixedTime := newTestServiceWithSessionStore(t)
+
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", controllerSpec("build-app")))
+	createTask(t, svc, ctx, "software_dev", "Investigate the failing test", "tester")
+
+	def, err := svc.GetDefinition(ctx, "software_dev")
+	require.NoError(t, err)
+	state, err := svc.ensureState(ctx, def)
+	require.NoError(t, err)
+	state.State = StateFinished
+	state.Instruction = "Handle the current assigned task."
+	state.InstructionUpdatedAt = fixedTime
+	state.InstructionUpdatedBy = "tester"
+	state.SessionID = "sess-finished"
+	state.FinishedAt = fixedTime
+	state.LastSummary = "Initial run completed, but the result needs review."
+	state.Tasks = cloneTasksFromTemplates(state.TaskTemplates, fixedTime)
+	require.NoError(t, svc.sessionStore.CreateSession(ctx, &agent.Session{
+		ID:        state.SessionID,
+		UserID:    svc.systemUser(def.Name).UserID,
+		CreatedAt: fixedTime,
+		UpdatedAt: fixedTime,
+	}))
+	require.NoError(t, svc.saveState(ctx, def.Name, state))
+
+	err = svc.SubmitOperatorMessage(ctx, "software_dev", OperatorMessageRequest{
+		RequestedBy: "tester",
+		Message:     "The previous result was weak. Rework it with stronger sources.",
+	})
+	require.NoError(t, err)
+
+	detail, err := svc.Detail(ctx, "software_dev")
+	require.NoError(t, err)
+	require.Equal(t, StateRunning, detail.State.State)
+	require.True(t, detail.State.FinishedAt.IsZero())
+	require.Empty(t, detail.State.LastSummary)
+	require.Len(t, detail.Messages, 1)
+	require.Equal(t, agent.MessageTypeUser, detail.Messages[0].Type)
+	require.Contains(t, detail.Messages[0].Content, "Rework it with stronger sources.")
+	require.Len(t, detail.State.PendingTurnMessages, 1)
+	require.Equal(t, "operator_message", detail.State.PendingTurnMessages[0].Kind)
+	require.Contains(t, detail.State.PendingTurnMessages[0].Message, "latest user message")
+}
+
+func TestServiceSubmitOperatorMessageReopensResetFinishedController(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, fixedTime := newTestService(t)
+
+	spec := controllerSpec("build-app") + "reset_on_finish: true\n"
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", spec))
+	createTask(t, svc, ctx, "software_dev", "Investigate the failing test", "tester")
+
+	def, err := svc.GetDefinition(ctx, "software_dev")
+	require.NoError(t, err)
+	state, err := svc.ensureState(ctx, def)
+	require.NoError(t, err)
+	state.State = StateIdle
+	state.Instruction = "Handle the current assigned task."
+	state.InstructionUpdatedBy = "tester"
+	state.FinishedAt = fixedTime
+	state.LastSummary = "Ready for the next cycle."
+	require.NoError(t, svc.saveState(ctx, def.Name, state))
+
+	err = svc.SubmitOperatorMessage(ctx, "software_dev", OperatorMessageRequest{
+		RequestedBy: "tester",
+		Message:     "The output was not good enough. Reopen and improve it.",
+	})
+	require.NoError(t, err)
+
+	detail, err := svc.Detail(ctx, "software_dev")
+	require.NoError(t, err)
+	require.Equal(t, StateRunning, detail.State.State)
+	require.True(t, detail.State.FinishedAt.IsZero())
+	require.Len(t, detail.State.Tasks, 1)
+	require.Equal(t, TaskStateOpen, detail.State.Tasks[0].State)
+	require.Len(t, detail.State.PendingTurnMessages, 1)
+	require.Equal(t, "operator_message", detail.State.PendingTurnMessages[0].Kind)
+	require.Contains(t, detail.State.PendingTurnMessages[0].Message, "Reopen and improve it.")
+}
+
 func TestServiceSubmitOperatorMessageAllowsIdleActiveService(t *testing.T) {
 	t.Parallel()
 
