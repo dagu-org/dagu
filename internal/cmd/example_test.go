@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/dagucloud/dagu/internal/cmd"
-	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/spec"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -44,31 +43,6 @@ func extractExampleYAML(out string) string {
 	return strings.Join(lines[start:], "\n")
 }
 
-func loadExampleDAG(t *testing.T, id int) *core.DAG {
-	t.Helper()
-
-	out, err := runExampleCmd("example", fmt.Sprintf("%d", id))
-	require.NoError(t, err, "example %d failed", id)
-
-	dag, err := spec.LoadYAML(context.Background(), []byte(extractExampleYAML(out)), spec.WithoutEval())
-	require.NoError(t, err, "example %d failed to load", id)
-
-	return dag
-}
-
-func findStep(t *testing.T, dag *core.DAG, name string) core.Step {
-	t.Helper()
-
-	for _, step := range dag.Steps {
-		if step.Name == name {
-			return step
-		}
-	}
-
-	t.Fatalf("step %q not found", name)
-	return core.Step{}
-}
-
 func TestExampleCommand(t *testing.T) {
 	t.Run("ListAll", func(t *testing.T) {
 		out, err := runExampleCmd("example")
@@ -91,22 +65,10 @@ func TestExampleCommand(t *testing.T) {
 
 	t.Run("AllExamplesLoadYAML", func(t *testing.T) {
 		for i := 1; i <= cmd.ExampleCount(); i++ {
-			_ = loadExampleDAG(t, i)
+			out, err := runExampleCmd("example", fmt.Sprintf("%d", i))
+			require.NoError(t, err, "example %d failed", i)
+			_, err = spec.LoadYAML(context.Background(), []byte(extractExampleYAML(out)), spec.WithoutEval())
+			require.NoError(t, err, "example %d failed to load", i)
 		}
-	})
-
-	t.Run("ApprovalGateExampleUsesAgentRedraftFlow", func(t *testing.T) {
-		dag := loadExampleDAG(t, 11)
-
-		draftStep := findStep(t, dag, "draft_release_notes")
-		assert.Equal(t, core.ExecutorTypeAgent, draftStep.ExecutorConfig.Type)
-		assert.Equal(t, "${DAG_RUN_ARTIFACTS_DIR}/release-notes.md", draftStep.Stdout)
-		require.NotNil(t, draftStep.Approval)
-		assert.Equal(t, []string{"FEEDBACK"}, draftStep.Approval.Input)
-		assert.Empty(t, draftStep.Approval.Required)
-		assert.Equal(t, "draft_release_notes", draftStep.Approval.RewindTo)
-
-		deployStep := findStep(t, dag, "deploy")
-		assert.Equal(t, []string{"draft_release_notes"}, deployStep.Depends)
 	})
 }

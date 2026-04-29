@@ -309,13 +309,18 @@ steps:
     type: agent
     agent:
       prompt: "You draft concise release notes."
-      max_iterations: 10
     messages:
       - role: user
         content: |
           Draft release notes for version ${VERSION}.
+
+          Current draft path: ${DAG_RUN_ARTIFACTS_DIR}/release-notes.md
+
+          Reviewer feedback from the latest push-back: ${FEEDBACK}
           
           Return Markdown with a summary and deployment notes.
+          If FEEDBACK is empty, produce the first draft.
+          If FEEDBACK is set, read the existing draft from the path above and revise it to address the feedback.
     stdout: ${DAG_RUN_ARTIFACTS_DIR}/release-notes.md
     approval:
       prompt: "Review the release-notes.md artifact. Push back with FEEDBACK to regenerate it, or approve to continue to deploy."
