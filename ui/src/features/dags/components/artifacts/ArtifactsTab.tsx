@@ -8,6 +8,8 @@ import { useClient } from '@/hooks/api';
 import { cn } from '@/lib/utils';
 import {
   AlertCircle,
+  Check,
+  ClipboardCopy,
   Download,
   File,
   FileImage,
@@ -167,6 +169,10 @@ export default function ArtifactsTab({
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [markdownViewMode, setMarkdownViewMode] = useState<'preview' | 'raw'>(
+    'preview'
+  );
+  const [copiedContent, setCopiedContent] = useState(false);
   const [openDirs, setOpenDirs] = useState<Set<string>>(new Set());
   const treeRequestRef = useRef<{
     id: number;
@@ -178,6 +184,12 @@ export default function ArtifactsTab({
     () => allNodes.find((node) => node.path === selectedPath) ?? null,
     [allNodes, selectedPath]
   );
+  const isMarkdownPreview = preview?.kind === 'markdown';
+  const isCopyablePreview =
+    preview?.kind === 'markdown' || preview?.kind === 'text';
+  const previewTruncatedNotice =
+    preview?.truncated &&
+    (preview.kind === 'markdown' || preview.kind === 'text');
 
   const requestArtifactTree = async (signal?: AbortSignal) => {
     if (isSubDAGRun) {
@@ -522,6 +534,32 @@ export default function ArtifactsTab({
     URL.revokeObjectURL(objectUrl);
   };
 
+  const handleCopyContent = async () => {
+    if (!preview || !selectedPath || !isCopyablePreview) {
+      return;
+    }
+
+    let text = preview.content ?? '';
+    if (preview.truncated || preview.tooLarge || preview.content == null) {
+      const request = await fetchArtifactDownload(selectedPath);
+      text = await request.data.text();
+    }
+
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+    }
+
+    setCopiedContent(true);
+    window.setTimeout(() => setCopiedContent(false), 2000);
+  };
+
   if (!artifactEnabled && !dagRun.artifactsAvailable) {
     return (
       <div className="rounded-lg border border-dashed border-border bg-muted/20 p-6 text-sm text-muted-foreground">
@@ -641,21 +679,74 @@ export default function ArtifactsTab({
               {selectedPath || 'Choose a file from the left panel'}
             </p>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!selectedPath || selectedNode?.type !== 'file'}
-            onClick={() => {
-              void handleDownload().catch((error: unknown) => {
-                setPreviewError(
-                  error instanceof Error ? error.message : 'Download failed'
-                );
-              });
-            }}
-          >
-            <Download className="h-4 w-4" />
-            Download
-          </Button>
+          <div className="flex items-center gap-2">
+            {isCopyablePreview ? (
+              <button
+                type="button"
+                onClick={() => {
+                  void handleCopyContent().catch((error: unknown) => {
+                    setPreviewError(
+                      error instanceof Error
+                        ? error.message
+                        : 'Failed to copy artifact contents'
+                    );
+                  });
+                }}
+                className="flex items-center gap-1 rounded-md px-2 py-0.5 text-xs text-muted-foreground transition-all hover:bg-muted hover:text-foreground"
+                title="Copy content"
+              >
+                {copiedContent ? (
+                  <Check className="h-3 w-3 text-green-500" />
+                ) : (
+                  <ClipboardCopy className="h-3 w-3" />
+                )}
+                <span>Copy</span>
+              </button>
+            ) : null}
+            {isMarkdownPreview ? (
+              <div className="flex overflow-hidden rounded-md border border-border">
+                <button
+                  type="button"
+                  className={cn(
+                    'px-2 py-0.5 text-xs transition-colors',
+                    markdownViewMode === 'preview'
+                      ? 'bg-accent text-accent-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                  onClick={() => setMarkdownViewMode('preview')}
+                >
+                  Preview
+                </button>
+                <button
+                  type="button"
+                  className={cn(
+                    'px-2 py-0.5 text-xs transition-colors',
+                    markdownViewMode === 'raw'
+                      ? 'bg-accent text-accent-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                  onClick={() => setMarkdownViewMode('raw')}
+                >
+                  Raw
+                </button>
+              </div>
+            ) : null}
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!selectedPath || selectedNode?.type !== 'file'}
+              onClick={() => {
+                void handleDownload().catch((error: unknown) => {
+                  setPreviewError(
+                    error instanceof Error ? error.message : 'Download failed'
+                  );
+                });
+              }}
+            >
+              <Download className="h-4 w-4" />
+              Download
+            </Button>
+          </div>
         </div>
 
         <div
@@ -702,11 +793,33 @@ export default function ArtifactsTab({
               </dl>
             </div>
           ) : preview.kind === 'markdown' ? (
-            <DocMarkdownPreview content={preview.content} />
+            <div className="space-y-3">
+              {previewTruncatedNotice ? (
+                <div className="rounded-md border border-dashed border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                  Inline preview is truncated. Use Copy or Download for the
+                  full file.
+                </div>
+              ) : null}
+              {markdownViewMode === 'raw' ? (
+                <pre className="overflow-auto rounded-md border border-border bg-muted/20 p-4 text-sm leading-6 whitespace-pre-wrap">
+                  {preview.content || ''}
+                </pre>
+              ) : (
+                <DocMarkdownPreview content={preview.content} />
+              )}
+            </div>
           ) : preview.kind === 'text' ? (
-            <pre className="overflow-auto rounded-md border border-border bg-muted/20 p-4 text-sm leading-6 whitespace-pre-wrap">
-              {preview.content || ''}
-            </pre>
+            <div className="space-y-3">
+              {previewTruncatedNotice ? (
+                <div className="rounded-md border border-dashed border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                  Inline preview is truncated. Use Copy or Download for the
+                  full file.
+                </div>
+              ) : null}
+              <pre className="overflow-auto rounded-md border border-border bg-muted/20 p-4 text-sm leading-6 whitespace-pre-wrap">
+                {preview.content || ''}
+              </pre>
+            </div>
           ) : preview.kind === 'image' ? (
             imageUrl ? (
               <img
