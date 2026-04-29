@@ -227,7 +227,7 @@ export function ControllerCockpit({
           params: {
             query: {
               remoteNode,
-              tags: workspaceTag,
+              labels: workspaceTag,
             },
           },
         }
@@ -340,11 +340,13 @@ export function ControllerCockpit({
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <Title>Controller Cockpit</Title>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {selectedWorkspace
-              ? `Showing Controller tagged for workspace ${selectedWorkspace}, with workspace-tagged activity overlaid on their lifecycle state.`
-              : 'Idle, running, paused, and finished Controller across the workspace environment.'}
-          </p>
+          {selectedWorkspace ? (
+            <p className="mt-1 text-sm text-muted-foreground">
+              Showing Controller labeled for workspace {selectedWorkspace},
+              with workspace-labeled activity overlaid on their lifecycle
+              state.
+            </p>
+          ) : null}
         </div>
         <Button
           size="sm"
@@ -358,22 +360,22 @@ export function ControllerCockpit({
 
       {selectedWorkspace ? (
         <div className="rounded-lg border border-dashed bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
-          Showing Controller tagged with
+          Showing Controller labeled with
           <span className="mx-1 font-mono text-foreground">
             {workspaceTag || 'workspace=<invalid>'}
           </span>
           . Workspace activity is derived from Controller-triggered DAG runs
-          carrying the same tag on
+          carrying the same label on
           <span className="mx-1 font-mono text-foreground">{remoteNode}</span>.
           {workspaceControllerCount > 0 ? (
             <span className="ml-1">
-              {workspaceControllerCount} Controller have workspace-tagged activity.
+              {workspaceControllerCount} Controller have workspace-labeled activity.
             </span>
           ) : null}
         </div>
       ) : (
         <div className="rounded-lg border border-dashed bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
-          Select a workspace to overlay workspace-tagged Controller activity on
+          Select a workspace to overlay workspace-labeled Controller activity on
           top of the lifecycle board.
         </div>
       )}
@@ -386,7 +388,7 @@ export function ControllerCockpit({
         <div className="rounded-lg border bg-card p-6 text-sm text-muted-foreground">
           <div>
             {selectedWorkspace
-              ? 'No Controller are tagged for the selected workspace.'
+              ? 'No Controller are labeled for the selected workspace.'
               : 'No Controller defined yet.'}
           </div>
           <div className="mt-4">
@@ -495,12 +497,12 @@ export function ControllerCockpit({
                                 disabled
                               </span>
                             ) : null}
-                            {item.tags?.map((tag) => (
+                            {item.labels?.map((label) => (
                               <span
-                                key={`${item.name}-${tag}`}
+                                key={`${item.name}-${label}`}
                                 className="rounded-full border px-2 py-1 text-muted-foreground"
                               >
-                                {tag}
+                                {label}
                               </span>
                             ))}
                             {activity ? (

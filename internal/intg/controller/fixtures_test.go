@@ -145,8 +145,8 @@ func newTestFixture(t *testing.T, dagName, dagYAML string, responses ...llmRespo
 func (f *testFixture) putController(name, dagName string) {
 	f.t.Helper()
 	require.NoError(f.t, f.controller.PutSpec(f.th.Context, name, `description: Integration test Controller
-goal: Run the allowlisted DAG
-allowed_dags:
+goal: Run the workflow
+workflows:
   names:
     - `+dagName+`
 agent:
@@ -163,7 +163,7 @@ func (f *testFixture) startController(name string) {
 	require.NoError(f.t, err)
 	require.NoError(f.t, f.controller.RequestStart(f.th.Context, name, controller.StartRequest{
 		RequestedBy: "integration-test",
-		Instruction: "Run the allowlisted DAG now.",
+		Instruction: "Run the workflow now.",
 	}))
 	require.NoError(f.t, f.controller.ReconcileOnce(f.th.Context))
 }
@@ -459,8 +459,8 @@ func chatCompletionResponse(resp llmResponse) map[string]any {
 	}
 }
 
-func controllerRunDAGArgs(dagName string) string {
-	return fmt.Sprintf(`{"dag_name":%q}`, dagName)
+func controllerRunWorkflowArgs(dagName string) string {
+	return fmt.Sprintf(`{"workflow_name":%q}`, dagName)
 }
 
 func workingDirProbeDAG(name string) string {

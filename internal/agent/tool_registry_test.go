@@ -28,16 +28,16 @@ func (r *testControllerRuntime) ListTasks(_ context.Context) ([]ControllerTask, 
 	return []ControllerTask{{ID: "task-1", Description: "Investigate failure", State: "open"}}, nil
 }
 
-func (r *testControllerRuntime) ListAllowedDAGs(_ context.Context) ([]ControllerAllowedDAG, error) {
-	return []ControllerAllowedDAG{{Name: "example"}}, nil
+func (r *testControllerRuntime) ListWorkflows(_ context.Context) ([]ControllerWorkflow, error) {
+	return []ControllerWorkflow{{Name: "example"}}, nil
 }
 
-func (r *testControllerRuntime) RunAllowedDAG(_ context.Context, input ControllerRunDAGInput) (ControllerRunDAGResult, error) {
-	return ControllerRunDAGResult{DAGName: input.DAGName, DAGRunID: "run-1"}, nil
+func (r *testControllerRuntime) RunWorkflow(_ context.Context, input ControllerRunWorkflowInput) (ControllerRunWorkflowResult, error) {
+	return ControllerRunWorkflowResult{WorkflowName: input.WorkflowName, DAGRunID: "run-1"}, nil
 }
 
-func (r *testControllerRuntime) RetryCurrentRun(_ context.Context) (ControllerRunDAGResult, error) {
-	return ControllerRunDAGResult{DAGName: "example", DAGRunID: "run-2"}, nil
+func (r *testControllerRuntime) RetryCurrentRun(_ context.Context) (ControllerRunWorkflowResult, error) {
+	return ControllerRunWorkflowResult{WorkflowName: "example", DAGRunID: "run-2"}, nil
 }
 
 func (r *testControllerRuntime) SetTaskDone(_ context.Context, _ string, _ bool) error {
@@ -61,7 +61,7 @@ func TestRegisteredTools_ContainsAllExpected(t *testing.T) {
 		"delegate",
 		"remote_agent", "list_contexts",
 		"list_controller_tasks",
-		"list_allowed_dags", "run_allowed_dag", "retry_controller_run",
+		"list_workflows", "run_workflow", "retry_controller_run",
 		"set_controller_task_done", "request_human_input", "finish_controller",
 	}
 
@@ -119,7 +119,7 @@ func TestRegisteredTools_FactoriesProduceValidTools(t *testing.T) {
 	cfg := ToolConfig{
 		DAGsDir:               "/tmp/test-dags",
 		RemoteContextResolver: &testRemoteContextResolver{},
-		ControllerRuntime:      &testControllerRuntime{},
+		ControllerRuntime:     &testControllerRuntime{},
 	}
 	for _, reg := range RegisteredTools() {
 		t.Run(reg.Name, func(t *testing.T) {
@@ -141,7 +141,7 @@ func TestCreateTools_UsesRegistry(t *testing.T) {
 	tools := CreateTools(ToolConfig{
 		DAGsDir:               "/tmp/dags",
 		RemoteContextResolver: &testRemoteContextResolver{},
-		ControllerRuntime:      &testControllerRuntime{},
+		ControllerRuntime:     &testControllerRuntime{},
 	})
 	regs := RegisteredTools()
 

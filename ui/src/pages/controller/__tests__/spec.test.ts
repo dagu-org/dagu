@@ -10,15 +10,31 @@ const baseMetadata = {
   iconUrl: '',
   goal: '',
   model: '',
-  standingInstruction: '',
+  triggerPrompt: '',
   resetOnFinish: false,
-  schedule: [] as string[],
+  triggerType: 'manual' as const,
+  cronSchedules: [] as string[],
 };
 
 describe('updateControllerMetadataInSpec', () => {
+  it('writes workflow names to the workflows field', () => {
+    const next = updateControllerMetadataInSpec('goal: "Ship it"\n', {
+      ...baseMetadata,
+      goal: 'Ship it',
+      workflowNames: ['deploy', 'build'],
+    });
+
+    expect(parse(next)).toMatchObject({
+      goal: 'Ship it',
+      workflows: {
+        names: ['deploy', 'build'],
+      },
+    });
+  });
+
   it('adds description when missing', () => {
     const next = updateControllerMetadataInSpec(
-      'goal: "Ship it"\nallowed_dags:\n  names:\n    - "build"\n',
+      'goal: "Ship it"\nworkflows:\n  names:\n    - "build"\n',
       {
         ...baseMetadata,
         description: 'Handles delivery work',
@@ -29,13 +45,13 @@ describe('updateControllerMetadataInSpec', () => {
     expect(parse(next)).toMatchObject({
       description: 'Handles delivery work',
       goal: 'Ship it',
-      allowed_dags: { names: ['build'] },
+      workflows: { names: ['build'] },
     });
   });
 
   it('updates an existing description', () => {
     const next = updateControllerMetadataInSpec(
-      'description: "Controller workflow"\ngoal: "Ship it"\nallowed_dags:\n  names:\n    - "build"\n',
+      'description: "Controller workflow"\ngoal: "Ship it"\nworkflows:\n  names:\n    - "build"\n',
       {
         ...baseMetadata,
         description: 'Handles delivery work',
@@ -51,7 +67,7 @@ describe('updateControllerMetadataInSpec', () => {
 
   it('removes description when blank', () => {
     const next = updateControllerMetadataInSpec(
-      'description: "Controller workflow"\ngoal: "Ship it"\nallowed_dags:\n  names:\n    - "build"\n',
+      'description: "Controller workflow"\ngoal: "Ship it"\nworkflows:\n  names:\n    - "build"\n',
       {
         ...baseMetadata,
         description: '   ',
@@ -61,7 +77,7 @@ describe('updateControllerMetadataInSpec', () => {
 
     expect(parse(next)).toMatchObject({
       goal: 'Ship it',
-      allowed_dags: { names: ['build'] },
+      workflows: { names: ['build'] },
     });
     expect(parse(next)).not.toHaveProperty('description');
   });
@@ -70,10 +86,13 @@ describe('updateControllerMetadataInSpec', () => {
     const next = updateControllerMetadataInSpec(
       [
         'goal: "Ship it"',
-        'tags:',
+        'labels:',
         '  - "team=platform"',
-        'schedule: "* * * * *"',
-        'allowed_dags:',
+        'trigger:',
+        '  type: "cron"',
+        '  schedules:',
+        '    - "* * * * *"',
+        'workflows:',
         '  names:',
         '    - "build"',
         'agent:',
@@ -83,10 +102,12 @@ describe('updateControllerMetadataInSpec', () => {
       ].join('\n'),
       {
         ...baseMetadata,
+        triggerType: 'cron',
         description: 'Handles delivery work',
         iconUrl: 'https://cdn.example.com/icon.png',
         goal: 'Ship it',
-        schedule: ['* * * * *'],
+        triggerPrompt: 'Handle the scheduled delivery cycle.',
+        cronSchedules: ['* * * * *'],
       }
     );
 
@@ -94,9 +115,13 @@ describe('updateControllerMetadataInSpec', () => {
       description: 'Handles delivery work',
       icon_url: 'https://cdn.example.com/icon.png',
       goal: 'Ship it',
-      tags: ['team=platform'],
-      schedule: '* * * * *',
-      allowed_dags: { names: ['build'] },
+      labels: ['team=platform'],
+      trigger: {
+        type: 'cron',
+        prompt: 'Handle the scheduled delivery cycle.',
+        schedules: ['* * * * *'],
+      },
+      workflows: { names: ['build'] },
       agent: { safeMode: true },
       disabled: false,
     });
@@ -104,7 +129,7 @@ describe('updateControllerMetadataInSpec', () => {
 
   it('removes icon url when blank', () => {
     const next = updateControllerMetadataInSpec(
-      'description: "Controller workflow"\nicon_url: "https://cdn.example.com/old.png"\ngoal: "Ship it"\nallowed_dags:\n  names:\n    - "build"\n',
+      'description: "Controller workflow"\nicon_url: "https://cdn.example.com/old.png"\ngoal: "Ship it"\nworkflows:\n  names:\n    - "build"\n',
       {
         ...baseMetadata,
         description: 'Controller workflow',
@@ -122,7 +147,7 @@ describe('updateControllerMetadataInSpec', () => {
 
   it('updates goal while preserving other metadata', () => {
     const next = updateControllerMetadataInSpec(
-      'description: "Controller workflow"\nicon_url: "https://cdn.example.com/old.png"\ngoal: "Ship it"\nallowed_dags:\n  names:\n    - "build"\n',
+      'description: "Controller workflow"\nicon_url: "https://cdn.example.com/old.png"\ngoal: "Ship it"\nworkflows:\n  names:\n    - "build"\n',
       {
         ...baseMetadata,
         description: 'Handles delivery work',
@@ -135,13 +160,13 @@ describe('updateControllerMetadataInSpec', () => {
       description: 'Handles delivery work',
       icon_url: 'https://cdn.example.com/new.png',
       goal: 'Handle triage and delivery',
-      allowed_dags: { names: ['build'] },
+      workflows: { names: ['build'] },
     });
   });
 
   it('removes goal when blank', () => {
     const next = updateControllerMetadataInSpec(
-      'description: "Controller workflow"\ngoal: "Ship it"\nallowed_dags:\n  names:\n    - "build"\n',
+      'description: "Controller workflow"\ngoal: "Ship it"\nworkflows:\n  names:\n    - "build"\n',
       {
         ...baseMetadata,
         description: 'Controller workflow',
@@ -151,7 +176,7 @@ describe('updateControllerMetadataInSpec', () => {
 
     expect(parse(next)).toMatchObject({
       description: 'Controller workflow',
-      allowed_dags: { names: ['build'] },
+      workflows: { names: ['build'] },
     });
     expect(parse(next)).not.toHaveProperty('goal');
   });
@@ -160,7 +185,7 @@ describe('updateControllerMetadataInSpec', () => {
     const next = updateControllerMetadataInSpec(
       [
         'goal: "Ship it"',
-        'allowed_dags:',
+        'workflows:',
         '  names:',
         '    - "build"',
         'agent:',
@@ -189,7 +214,7 @@ describe('updateControllerMetadataInSpec', () => {
     const next = updateControllerMetadataInSpec(
       [
         'goal: "Ship it"',
-        'allowed_dags:',
+        'workflows:',
         '  names:',
         '    - "build"',
         'agent:',
@@ -215,50 +240,32 @@ describe('updateControllerMetadataInSpec', () => {
     ).toBeUndefined();
   });
 
-  it('sets standing instruction', () => {
+  it('writes trigger prompt for cron controllers', () => {
     const next = updateControllerMetadataInSpec(
-      'kind: "service"\nallowed_dags:\n  names:\n    - "build"\n',
+      'kind: "service"\nworkflows:\n  names:\n    - "build"\n',
       {
         ...baseMetadata,
-        standingInstruction:
+        triggerType: 'cron',
+        cronSchedules: ['0 * * * *'],
+        triggerPrompt:
           'Handle each scheduled cycle and work through the task list.',
       }
     );
 
     expect(parse(next)).toMatchObject({
       kind: 'service',
-      standing_instruction:
-        'Handle each scheduled cycle and work through the task list.',
-      allowed_dags: { names: ['build'] },
+      trigger: {
+        type: 'cron',
+        schedules: ['0 * * * *'],
+        prompt: 'Handle each scheduled cycle and work through the task list.',
+      },
+      workflows: { names: ['build'] },
     });
-  });
-
-  it('removes standing instruction when blank', () => {
-    const next = updateControllerMetadataInSpec(
-      [
-        'kind: "service"',
-        'standing_instruction: "Handle each scheduled cycle."',
-        'allowed_dags:',
-        '  names:',
-        '    - "build"',
-        '',
-      ].join('\n'),
-      {
-        ...baseMetadata,
-        standingInstruction: '   ',
-      }
-    );
-
-    expect(parse(next)).toMatchObject({
-      kind: 'service',
-      allowed_dags: { names: ['build'] },
-    });
-    expect(parse(next)).not.toHaveProperty('standing_instruction');
   });
 
   it('writes reset on finish', () => {
     const next = updateControllerMetadataInSpec(
-      'allowed_dags:\n  names:\n    - "build"\n',
+      'workflows:\n  names:\n    - "build"\n',
       {
         ...baseMetadata,
         resetOnFinish: true,
@@ -272,13 +279,9 @@ describe('updateControllerMetadataInSpec', () => {
 
   it('removes reset on finish when disabled', () => {
     const next = updateControllerMetadataInSpec(
-      [
-        'reset_on_finish: true',
-        'allowed_dags:',
-        '  names:',
-        '    - "build"',
-        '',
-      ].join('\n'),
+      ['reset_on_finish: true', 'workflows:', '  names:', '    - "build"', ''].join(
+        '\n'
+      ),
       {
         ...baseMetadata,
         resetOnFinish: false,
@@ -288,121 +291,111 @@ describe('updateControllerMetadataInSpec', () => {
     expect(parse(next)).not.toHaveProperty('reset_on_finish');
   });
 
-  it('writes multi-line schedule expressions', () => {
+  it('writes multi-line cron schedule expressions', () => {
+    const metadata: Parameters<typeof updateControllerMetadataInSpec>[1] = {
+      ...baseMetadata,
+      triggerType: 'cron',
+      triggerPrompt: 'Handle each scheduled cycle and work through the task list.',
+      cronSchedules: ['0 * * * *', '30 9 * * 1-5'],
+    };
+
     const next = updateControllerMetadataInSpec(
-      'kind: "service"\nallowed_dags:\n  names:\n    - "build"\n',
-      {
-        ...baseMetadata,
-        schedule: ['0 * * * *', '30 9 * * 1-5'],
-      }
+      'kind: "service"\nworkflows:\n  names:\n    - "build"\n',
+      metadata
     );
 
     expect(parse(next)).toMatchObject({
       kind: 'service',
-      schedule: ['0 * * * *', '30 9 * * 1-5'],
+      trigger: {
+        type: 'cron',
+        prompt: 'Handle each scheduled cycle and work through the task list.',
+        schedules: ['0 * * * *', '30 9 * * 1-5'],
+      },
     });
   });
 
-  it('removes schedule when blank', () => {
+  it('removes cron schedules when switching back to manual trigger', () => {
+    const metadata: Parameters<typeof updateControllerMetadataInSpec>[1] = {
+      ...baseMetadata,
+      triggerType: 'manual',
+    };
+
     const next = updateControllerMetadataInSpec(
       [
         'kind: "service"',
-        'schedule:',
-        '  - "0 * * * *"',
-        '  - "30 9 * * 1-5"',
-        'allowed_dags:',
+        'trigger:',
+        '  type: "cron"',
+        '  schedules:',
+        '    - "0 * * * *"',
+        '    - "30 9 * * 1-5"',
+        '  prompt: "Handle each scheduled cycle and work through the task list."',
+        'workflows:',
         '  names:',
         '    - "build"',
         '',
       ].join('\n'),
-      {
-        ...baseMetadata,
-      }
+      metadata
     );
 
     expect(parse(next)).toMatchObject({
       kind: 'service',
-      allowed_dags: { names: ['build'] },
+      trigger: {
+        type: 'manual',
+      },
+      workflows: { names: ['build'] },
     });
-    expect(parse(next)).not.toHaveProperty('schedule');
+    expect(parse(next)).not.toHaveProperty('trigger.schedules');
   });
 
-  it('updates allowed DAG names while preserving tags', () => {
+  it('updates workflow names while preserving labels', () => {
     const next = updateControllerMetadataInSpec(
       [
         'kind: "service"',
-        'allowed_dags:',
+        'workflows:',
         '  names:',
         '    - "build"',
-        '  tags:',
+        '  labels:',
         '    - "team=platform"',
         '',
       ].join('\n'),
       {
         ...baseMetadata,
-        allowedDAGNames: ['deploy', 'build', 'deploy', ' '],
+        workflowNames: ['deploy', 'build', 'deploy', ' '],
       }
     );
 
     expect(parse(next)).toMatchObject({
       kind: 'service',
-      allowed_dags: {
+      workflows: {
         names: ['deploy', 'build'],
-        tags: ['team=platform'],
+        labels: ['team=platform'],
       },
     });
   });
 
-  it('normalizes camel-case allowed DAGs to the YAML spec field', () => {
+  it('removes workflow names when only labels remain', () => {
     const next = updateControllerMetadataInSpec(
       [
-        'allowedDAGs:',
+        'workflows:',
         '  names:',
         '    - "build"',
-        '  tags:',
+        '  labels:',
         '    - "team=platform"',
         '',
       ].join('\n'),
       {
         ...baseMetadata,
-        allowedDAGNames: ['release'],
-      }
-    );
-    const parsed = parse(next);
-
-    expect(parsed).toMatchObject({
-      allowed_dags: {
-        names: ['release'],
-        tags: ['team=platform'],
-      },
-    });
-    expect(parsed).not.toHaveProperty('allowedDAGs');
-  });
-
-  it('removes allowed DAG names when only tag allowlist remains', () => {
-    const next = updateControllerMetadataInSpec(
-      [
-        'allowed_dags:',
-        '  names:',
-        '    - "build"',
-        '  tags:',
-        '    - "team=platform"',
-        '',
-      ].join('\n'),
-      {
-        ...baseMetadata,
-        allowedDAGNames: [],
+        workflowNames: [],
       }
     );
 
     expect(parse(next)).toMatchObject({
-      allowed_dags: {
-        tags: ['team=platform'],
+      workflows: {
+        labels: ['team=platform'],
       },
     });
     expect(
-      (parse(next) as { allowed_dags?: { names?: string[] } }).allowed_dags
-        ?.names
+      (parse(next) as { workflows?: { names?: string[] } }).workflows?.names
     ).toBeUndefined();
   });
 });

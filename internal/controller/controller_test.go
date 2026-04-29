@@ -49,8 +49,10 @@ func TestStartTurnPersistsRuntimeOptionErrors(t *testing.T) {
 	svc, _, store := newTestServiceWithEventStore(t)
 	svc.soulStore = &failingSoulStore{err: errors.New("soul lookup failed")}
 
-	require.NoError(t, svc.PutSpec(ctx, "software_dev", `goal: Complete the assigned software work
-allowed_dags:
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", `trigger:
+  type: manual
+goal: Complete the assigned software work
+workflows:
   names:
     - build-app
 agent:

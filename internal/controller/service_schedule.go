@@ -27,7 +27,7 @@ func (s *Service) HandleScheduleTick(ctx context.Context, tickTime time.Time) er
 }
 
 func (s *Service) handleScheduledTick(ctx context.Context, def *Definition, tickTime time.Time) error {
-	if def == nil || def.Disabled || len(def.Schedule) == 0 {
+	if def == nil || def.Disabled || def.Trigger.Type != TriggerModeCron || len(def.Trigger.Schedules) == 0 {
 		return nil
 	}
 	state, err := s.ensureState(ctx, def)
@@ -40,12 +40,12 @@ func (s *Service) handleScheduledTick(ctx context.Context, def *Definition, tick
 	if !state.LastScheduleMinute.IsZero() && state.LastScheduleMinute.Equal(tickTime) {
 		return nil
 	}
-	if !scheduleListDueAt(def.Schedule, tickTime) {
+	if !cronScheduleListDueAt(def.Trigger.Schedules, tickTime) {
 		return nil
 	}
 	state.LastScheduleMinute = tickTime
-	if strings.TrimSpace(def.StandingInstruction) == "" {
-		return s.recordScheduleConfigError(ctx, def, state, tickTime, "controller schedule requires a standing instruction")
+	if strings.TrimSpace(def.Trigger.Prompt) == "" {
+		return s.recordScheduleConfigError(ctx, def, state, tickTime, "controller cron trigger requires trigger.prompt")
 	}
 	if !hasTaskTemplates(state.TaskTemplates) {
 		return s.recordScheduleConfigError(ctx, def, state, tickTime, "controller schedule requires at least one task template")
@@ -57,7 +57,7 @@ func (s *Service) handleScheduledTick(ctx context.Context, def *Definition, tick
 	if activity.Working || activity.HasPendingPrompt || activity.HasQueuedInput {
 		return s.saveState(ctx, def.Name, state)
 	}
-	if err := s.startCycle(ctx, def, state, strings.TrimSpace(def.StandingInstruction), "schedule"); err != nil {
+	if err := s.startCycle(ctx, def, state, strings.TrimSpace(def.Trigger.Prompt), "schedule"); err != nil {
 		return err
 	}
 	queueTurnMessage(state, "scheduled_tick", s.buildScheduledTickMessage(def, state, tickTime), s.clock())
@@ -81,7 +81,7 @@ func (s *Service) recordScheduleConfigError(ctx context.Context, def *Definition
 	return nil
 }
 
-func scheduleListDueAt(items ScheduleList, tickTime time.Time) bool {
+func cronScheduleListDueAt(items CronScheduleList, tickTime time.Time) bool {
 	for _, item := range items {
 		if _, due := item.DueAt(tickTime); due {
 			return true

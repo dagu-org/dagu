@@ -15,15 +15,22 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import {
   isValidControllerIconUrl,
-  parseControllerScheduleText,
-  validateControllerScheduleExpressions,
+  parseControllerCronScheduleText,
+  validateControllerCronScheduleExpressions,
 } from '@/features/controller/detail-utils';
 import {
-  applySelectedWorkspaceToControllerTags,
+  applySelectedWorkspaceToControllerLabels,
   workspaceTagForControllerSelection,
 } from '@/features/controller/workspace';
 import { useClient, useQuery } from '@/hooks/api';
@@ -32,13 +39,37 @@ const CONTROLLER_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_]*$/;
 const MAX_CONTROLLER_NICKNAME_LENGTH = 80;
 const MAX_CONTROLLER_ICON_URL_LENGTH = 2048;
 const MAX_DAG_PICKER_MATCHES = 25;
+type ControllerTriggerType = 'manual' | 'cron';
 
 export type DAGOption = {
   fileName: string;
   name: string;
 };
 
-function parseTagInput(value: string): string[] {
+function FieldLabel({
+  htmlFor,
+  label,
+  required,
+}: {
+  htmlFor?: string;
+  label: string;
+  required?: boolean;
+}): React.ReactElement {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Label htmlFor={htmlFor}>
+        {label}
+        {required ? (
+          <span className="ml-1 text-destructive" aria-hidden="true">
+            *
+          </span>
+        ) : null}
+      </Label>
+    </div>
+  );
+}
+
+function parseLabelInput(value: string): string[] {
   return Array.from(
     new Set(
       value
@@ -58,16 +89,17 @@ function buildControllerSpec(input: {
   iconUrl: string;
   description: string;
   goal: string;
-  standingInstruction: string;
+  triggerPrompt: string;
   resetOnFinish: boolean;
-  schedule: string[];
-  tags: string[];
-  allowedDAGNames: string[];
+  triggerType: ControllerTriggerType;
+  cronSchedules: string[];
+  labels: string[];
+  workflowNames: string[];
 }): string {
   const nickname = input.nickname.trim();
   const iconUrl = input.iconUrl.trim();
   const description = input.description.trim();
-  const standingInstruction = input.standingInstruction.trim();
+  const triggerPrompt = input.triggerPrompt.trim();
   const lines: string[] = [];
 
   if (nickname) {
@@ -82,34 +114,34 @@ function buildControllerSpec(input: {
   if (input.goal.trim()) {
     lines.push(`goal: ${quoteYAML(input.goal)}`);
   }
-  if (standingInstruction) {
-    lines.push(`standing_instruction: ${quoteYAML(standingInstruction)}`);
-  }
   if (input.resetOnFinish) {
     lines.push('reset_on_finish: true');
   }
-  if (input.schedule.length === 1) {
-    lines.push(`schedule: ${quoteYAML(input.schedule[0] || '')}`);
-  } else if (input.schedule.length > 1) {
-    lines.push('schedule:');
-    input.schedule.forEach((expression) => {
-      lines.push(`  - ${quoteYAML(expression)}`);
+  lines.push('trigger:');
+  lines.push(`  type: ${quoteYAML(input.triggerType)}`);
+  if (input.triggerType === 'cron') {
+    lines.push('  schedules:');
+    input.cronSchedules.forEach((expression) => {
+      lines.push(`    - ${quoteYAML(expression)}`);
+    });
+    lines.push(`  prompt: ${quoteYAML(triggerPrompt)}`);
+  }
+  if (input.labels.length) {
+    lines.push('labels:');
+    input.labels.forEach((label) => {
+      lines.push(`  - ${quoteYAML(label)}`);
     });
   }
-  if (input.tags.length) {
-    lines.push('tags:');
-    input.tags.forEach((tag) => {
-      lines.push(`  - ${quoteYAML(tag)}`);
+  const workflowNames = Array.from(
+    new Set(input.workflowNames.map((name) => name.trim()).filter(Boolean))
+  );
+  if (workflowNames.length > 0) {
+    lines.push('workflows:');
+    lines.push('  names:');
+    workflowNames.forEach((workflowName) => {
+      lines.push(`    - ${quoteYAML(workflowName)}`);
     });
   }
-
-  lines.push('allowed_dags:');
-  lines.push('  names:');
-  Array.from(
-    new Set(input.allowedDAGNames.map((name) => name.trim()).filter(Boolean))
-  ).forEach((dagName) => {
-    lines.push(`    - ${quoteYAML(dagName)}`);
-  });
 
   lines.push('');
   lines.push('agent:');
@@ -124,8 +156,10 @@ function validateControllerCreateForm(input: {
   nickname: string;
   iconUrl: string;
   goal: string;
-  schedule: string[];
-  allowedDAGNames: string[];
+  triggerType: ControllerTriggerType;
+  triggerPrompt: string;
+  cronSchedules: string[];
+  workflowNames: string[];
 }): string | null {
   const name = input.name.trim();
   const nickname = input.nickname.trim();
@@ -148,12 +182,19 @@ function validateControllerCreateForm(input: {
   if (iconUrl.length > MAX_CONTROLLER_ICON_URL_LENGTH) {
     return `Icon URL must be ${MAX_CONTROLLER_ICON_URL_LENGTH} characters or fewer.`;
   }
-  const scheduleError = validateControllerScheduleExpressions(input.schedule);
-  if (scheduleError) {
-    return scheduleError;
-  }
-  if (input.allowedDAGNames.length === 0) {
-    return 'Select at least one allowed DAG.';
+  if (input.triggerType === 'cron') {
+    const scheduleError = validateControllerCronScheduleExpressions(
+      input.cronSchedules
+    );
+    if (scheduleError) {
+      return scheduleError;
+    }
+    if (input.cronSchedules.length === 0) {
+      return 'Add at least one cron schedule for a cron-triggered Controller.';
+    }
+    if (!input.triggerPrompt.trim()) {
+      return 'Add a trigger prompt for a cron-triggered Controller.';
+    }
   }
   return null;
 }
@@ -231,7 +272,7 @@ export function DAGNamePicker({
             </span>
           ))
         ) : (
-          <div className="text-xs text-muted-foreground">No DAGs selected.</div>
+          <div className="text-xs text-muted-foreground">No workflows selected.</div>
         )}
       </div>
       <div className="relative">
@@ -239,7 +280,7 @@ export function DAGNamePicker({
         <Input
           value={currentSearchQuery}
           onChange={(event) => setCurrentSearchQuery(event.target.value)}
-          placeholder="Search DAGs"
+          placeholder="Search workflows"
           disabled={disabled}
           className="pl-8"
         />
@@ -275,7 +316,7 @@ export function DAGNamePicker({
             })
           ) : (
             <div className="px-3 py-2 text-sm text-muted-foreground">
-              {isLoading ? 'Loading DAGs...' : 'No DAGs found.'}
+              {isLoading ? 'Loading workflows...' : 'No workflows found.'}
             </div>
           )}
         </div>
@@ -305,12 +346,14 @@ export function ControllerCreateModal({
   const [createIconUrl, setCreateIconUrl] = React.useState('');
   const [createDescription, setCreateDescription] = React.useState('');
   const [createGoal, setCreateGoal] = React.useState('');
-  const [createStandingInstruction, setCreateStandingInstruction] =
+  const [createTriggerPrompt, setCreateTriggerPrompt] =
     React.useState('');
   const [createResetOnFinish, setCreateResetOnFinish] = React.useState(false);
+  const [createTriggerType, setCreateTriggerType] =
+    React.useState<ControllerTriggerType>('manual');
   const [createSchedule, setCreateSchedule] = React.useState('');
-  const [createTags, setCreateTags] = React.useState('');
-  const [createAllowedDAGNames, setCreateAllowedDAGNames] = React.useState<
+  const [createLabels, setCreateLabels] = React.useState('');
+  const [createWorkflowNames, setCreateWorkflowNames] = React.useState<
     string[]
   >([]);
   const [dagSearchQuery, setDagSearchQuery] = React.useState('');
@@ -348,11 +391,12 @@ export function ControllerCreateModal({
     setCreateIconUrl('');
     setCreateDescription('');
     setCreateGoal('');
-    setCreateStandingInstruction('');
+    setCreateTriggerPrompt('');
     setCreateResetOnFinish(false);
+    setCreateTriggerType('manual');
     setCreateSchedule('');
-    setCreateTags(selectedWorkspaceTag || '');
-    setCreateAllowedDAGNames([]);
+    setCreateLabels(selectedWorkspaceTag || '');
+    setCreateWorkflowNames([]);
     setDagSearchQuery('');
     setCreateError('');
     setIsCreating(false);
@@ -372,14 +416,16 @@ export function ControllerCreateModal({
   };
 
   const onCreate = async () => {
-    const parsedSchedule = parseControllerScheduleText(createSchedule);
+    const parsedCronSchedules = parseControllerCronScheduleText(createSchedule);
     const validationError = validateControllerCreateForm({
       name: createName,
       nickname: createNickname,
       iconUrl: createIconUrl,
       goal: createGoal,
-      schedule: parsedSchedule,
-      allowedDAGNames: createAllowedDAGNames,
+      triggerType: createTriggerType,
+      triggerPrompt: createTriggerPrompt,
+      cronSchedules: parsedCronSchedules,
+      workflowNames: createWorkflowNames,
     });
     if (validationError) {
       setCreateError(validationError);
@@ -398,14 +444,15 @@ export function ControllerCreateModal({
             iconUrl: createIconUrl,
             description: createDescription,
             goal: createGoal,
-            standingInstruction: createStandingInstruction,
+            triggerPrompt: createTriggerPrompt,
             resetOnFinish: createResetOnFinish,
-            schedule: parsedSchedule,
-            tags: applySelectedWorkspaceToControllerTags(
-              parseTagInput(createTags),
+            triggerType: createTriggerType,
+            cronSchedules: parsedCronSchedules,
+            labels: applySelectedWorkspaceToControllerLabels(
+              parseLabelInput(createLabels),
               selectedWorkspace
             ),
-            allowedDAGNames: createAllowedDAGNames,
+            workflowNames: createWorkflowNames,
           }),
         },
       });
@@ -429,13 +476,17 @@ export function ControllerCreateModal({
         <DialogHeader>
           <DialogTitle>Create Controller</DialogTitle>
           <DialogDescription>
-            Configure the Controller, its task scope, and its allowlisted DAGs.
+            Configure the Controller, its task scope, and its initial workflow context.
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-4">
           <div className="grid gap-2">
-            <Label htmlFor="controller-create-name">Name</Label>
+            <FieldLabel
+              htmlFor="controller-create-name"
+              label="Name"
+              required
+            />
             <Input
               id="controller-create-name"
               value={createName}
@@ -443,11 +494,18 @@ export function ControllerCreateModal({
               placeholder="software_dev"
               autoFocus
               disabled={isCreating}
+              aria-required={true}
             />
+            <div className="text-xs text-muted-foreground">
+              Used as the controller ID. Letters, numbers, and underscores only.
+            </div>
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="controller-create-nickname">Nickname</Label>
+            <FieldLabel
+              htmlFor="controller-create-nickname"
+              label="Nickname"
+            />
             <Input
               id="controller-create-nickname"
               value={createNickname}
@@ -458,7 +516,10 @@ export function ControllerCreateModal({
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="controller-create-icon-url">Image URL</Label>
+            <FieldLabel
+              htmlFor="controller-create-icon-url"
+              label="Image URL"
+            />
             <Input
               id="controller-create-icon-url"
               value={createIconUrl}
@@ -469,7 +530,10 @@ export function ControllerCreateModal({
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="controller-create-description">Description</Label>
+            <FieldLabel
+              htmlFor="controller-create-description"
+              label="Description"
+            />
             <Input
               id="controller-create-description"
               value={createDescription}
@@ -480,7 +544,10 @@ export function ControllerCreateModal({
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="controller-create-goal">Goal</Label>
+            <FieldLabel
+              htmlFor="controller-create-goal"
+              label="Goal"
+            />
             <Textarea
               id="controller-create-goal"
               value={createGoal}
@@ -488,40 +555,89 @@ export function ControllerCreateModal({
               placeholder="Complete the assigned task and leave it ready for review"
               disabled={isCreating}
             />
+            <div className="text-xs text-muted-foreground">
+              Leave blank if the controller should work from the task list and the start-time instruction alone.
+            </div>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="grid gap-2">
-              <Label htmlFor="controller-create-standing-instruction">
-                Standing Instruction
-              </Label>
-              <Textarea
-                id="controller-create-standing-instruction"
-                value={createStandingInstruction}
-                onChange={(event) =>
-                  setCreateStandingInstruction(event.target.value)
+            <FieldLabel
+              htmlFor="controller-create-trigger"
+              label="Trigger"
+              required
+            />
+              <Select
+                value={createTriggerType}
+                onValueChange={(value) =>
+                  setCreateTriggerType(value as ControllerTriggerType)
                 }
-                placeholder="Handle each cycle and work through the task list."
                 disabled={isCreating}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="controller-create-schedule">Schedule</Label>
-              <Textarea
-                id="controller-create-schedule"
-                value={createSchedule}
-                onChange={(event) => setCreateSchedule(event.target.value)}
-                placeholder={'0 * * * *\n30 9 * * 1-5'}
-                disabled={isCreating}
-                rows={4}
-              />
+              >
+                <SelectTrigger id="controller-create-trigger">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="manual">Manual</SelectItem>
+                  <SelectItem value="cron">Cron</SelectItem>
+                </SelectContent>
+              </Select>
+              <div className="text-xs text-muted-foreground">
+                {createTriggerType === 'cron'
+                  ? 'Cron controllers start from the schedules below and need a stored prompt for each cycle.'
+                  : 'Manual controllers start only when someone provides the instruction at run time.'}
+              </div>
             </div>
           </div>
 
+          {createTriggerType === 'cron' ? (
+            <>
+              <div className="grid gap-2">
+                <FieldLabel
+                  htmlFor="controller-create-schedule"
+                  label="Cron Schedules"
+                  required
+                />
+                <Textarea
+                  id="controller-create-schedule"
+                  value={createSchedule}
+                  onChange={(event) => setCreateSchedule(event.target.value)}
+                  placeholder={'0 * * * *\n30 9 * * 1-5'}
+                  disabled={isCreating}
+                  rows={4}
+                  aria-required={true}
+                />
+                <div className="text-xs text-muted-foreground">
+                  Use one cron expression per line.
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <FieldLabel
+                  htmlFor="controller-create-trigger-prompt"
+                  label="Trigger Prompt"
+                  required
+                />
+                <Textarea
+                  id="controller-create-trigger-prompt"
+                  value={createTriggerPrompt}
+                  onChange={(event) => setCreateTriggerPrompt(event.target.value)}
+                  placeholder="Handle each cycle and work through the task list."
+                  disabled={isCreating}
+                  rows={4}
+                  aria-required={true}
+                />
+                <div className="text-xs text-muted-foreground">
+                  Reused every time a cron tick starts a fresh controller cycle.
+                </div>
+              </div>
+            </>
+          ) : null}
+
           <div className="flex items-center justify-between gap-4 rounded-md border px-3 py-2">
-            <Label htmlFor="controller-create-reset-on-finish">
-              Reset on finish
-            </Label>
+            <FieldLabel
+              htmlFor="controller-create-reset-on-finish"
+              label="Reset on finish"
+            />
             <Switch
               id="controller-create-reset-on-finish"
               checked={createResetOnFinish}
@@ -531,30 +647,43 @@ export function ControllerCreateModal({
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="controller-create-tags">Tags</Label>
+            <FieldLabel
+              htmlFor="controller-create-labels"
+              label="Labels"
+            />
             <Textarea
-              id="controller-create-tags"
-              value={createTags}
-              onChange={(event) => setCreateTags(event.target.value)}
+              id="controller-create-labels"
+              value={createLabels}
+              onChange={(event) => setCreateLabels(event.target.value)}
               placeholder={'workspace=engineering, owner=team-ai'}
               disabled={isCreating}
               rows={2}
             />
+            <div className="text-xs text-muted-foreground">
+              {selectedWorkspaceTag
+                ? `The current workspace label ${selectedWorkspaceTag} is included by default.`
+                : 'Optional controller labels.'}
+            </div>
           </div>
 
           <div className="grid gap-2">
             <div className="flex items-center justify-between gap-3">
-              <Label>Allowed DAGs</Label>
+              <FieldLabel
+                label="Workflows"
+              />
               <span className="text-xs text-muted-foreground">
                 {dagListQuery.isLoading
-                  ? 'Loading DAGs...'
-                  : `${createAllowedDAGNames.length} selected`}
+                  ? 'Loading workflows...'
+                  : `${createWorkflowNames.length} selected`}
               </span>
+            </div>
+            <div className="text-xs text-muted-foreground">
+              Optional. Seed the controller with workflows it should start from.
             </div>
             <DAGNamePicker
               availableDAGs={availableDAGOptions}
-              selectedNames={createAllowedDAGNames}
-              onChange={setCreateAllowedDAGNames}
+              selectedNames={createWorkflowNames}
+              onChange={setCreateWorkflowNames}
               searchQuery={dagSearchQuery}
               onSearchQueryChange={setDagSearchQuery}
               isLoading={dagListQuery.isLoading}

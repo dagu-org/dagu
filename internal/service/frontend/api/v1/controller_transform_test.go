@@ -58,6 +58,13 @@ func TestToAPIControllerStateDerivesDisplayFields(t *testing.T) {
 		IconURL:    "https://cdn.example.com/queue-butler.png",
 		Goal:       "Handle inbound work continuously.",
 		ClonedFrom: "software_dev",
+		Trigger: controller.Trigger{
+			Type: controller.TriggerModeCron,
+			Schedules: controller.CronScheduleList{
+				{Expression: "0 * * * *"},
+			},
+			Prompt: "Handle inbound work continuously.",
+		},
 	}
 	state := &controller.State{
 		State:       controller.StateWaiting,
@@ -84,4 +91,9 @@ func TestToAPIControllerStateDerivesDisplayFields(t *testing.T) {
 	require.Equal(t, "https://cdn.example.com/queue-butler.png", *defResp.IconUrl)
 	require.NotNil(t, defResp.ClonedFrom)
 	require.Equal(t, "software_dev", *defResp.ClonedFrom)
+	require.Equal(t, openapi.ControllerTriggerTypeCron, defResp.Trigger.Type)
+	require.NotNil(t, defResp.Trigger.Schedules)
+	require.Equal(t, []string{"0 * * * *"}, *defResp.Trigger.Schedules)
+	require.NotNil(t, defResp.Trigger.Prompt)
+	require.Equal(t, "Handle inbound work continuously.", *defResp.Trigger.Prompt)
 }

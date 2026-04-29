@@ -20,6 +20,7 @@ import (
 	"github.com/dagucloud/dagu/internal/cmn/fileutil"
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/exec"
+	"gopkg.in/yaml.v3"
 )
 
 func (s *Service) definitionPath(name string) string {
@@ -55,11 +56,14 @@ func (s *Service) validateDefinition(ctx context.Context, def *Definition) error
 	def.ClonedFrom = strings.TrimSpace(def.ClonedFrom)
 	def.Nickname = strings.TrimSpace(def.Nickname)
 	def.IconURL = strings.TrimSpace(def.IconURL)
-	def.StandingInstruction = strings.TrimSpace(def.StandingInstruction)
+	def.Trigger.Prompt = strings.TrimSpace(def.Trigger.Prompt)
+	if err := def.Trigger.Validate(); err != nil {
+		return err
+	}
 	if err := validateControllerKind(def.Kind); err != nil {
 		return err
 	}
-	if err := normalizeTags(&def.Tags); err != nil {
+	if err := normalizeLabels(&def.Labels); err != nil {
 		return err
 	}
 	if err := validateName(def.Name); err != nil {
@@ -76,18 +80,8 @@ func (s *Service) validateDefinition(ctx context.Context, def *Definition) error
 	if err := validateIconURL(def.IconURL); err != nil {
 		return err
 	}
-	if !hasAllowedDAGs(def.AllowedDAGs) {
-		return errors.New("allowed_dags.names or allowed_dags.tags is required")
-	}
-	if err := s.normalizeAllowedDAGs(ctx, &def.AllowedDAGs); err != nil {
+	if err := s.normalizeWorkflows(ctx, &def.Workflows); err != nil {
 		return err
-	}
-	allowed, err := s.resolveAllowedDAGSet(ctx, def.AllowedDAGs)
-	if err != nil {
-		return err
-	}
-	if len(allowed) == 0 {
-		return errors.New("definition does not resolve to any allowed DAGs")
 	}
 	return nil
 }
@@ -187,6 +181,131 @@ func (s *Service) PutSpec(ctx context.Context, name, spec string) error {
 		}
 	}
 	return nil
+}
+
+func (s *Service) rememberWorkflow(ctx context.Context, def *Definition, workflowName string) error {
+	if def == nil {
+		return errors.New("definition is required")
+	}
+	workflowName = strings.TrimSpace(workflowName)
+	if workflowName == "" {
+		return errors.New("workflow name is required")
+	}
+	managed, err := s.workflowIsManaged(ctx, def.Workflows, workflowName)
+	if err != nil {
+		return err
+	}
+	if managed {
+		return nil
+	}
+
+	spec, err := s.GetSpec(ctx, def.Name)
+	if err != nil {
+		return err
+	}
+	updatedSpec, err := upsertWorkflowNameInSpec(spec, workflowName)
+	if err != nil {
+		return err
+	}
+	if err := s.PutSpec(ctx, def.Name, updatedSpec); err != nil {
+		return err
+	}
+
+	def.Workflows.Names = append(def.Workflows.Names, workflowName)
+	return nil
+}
+
+func (s *Service) workflowIsManaged(ctx context.Context, workflows Workflows, workflowName string) (bool, error) {
+	for _, name := range workflows.Names {
+		if strings.TrimSpace(name) == workflowName {
+			return true, nil
+		}
+	}
+	if len(workflows.Labels) == 0 {
+		return false, nil
+	}
+	items, err := s.resolveManagedWorkflowSet(ctx, workflows)
+	if err != nil {
+		return false, err
+	}
+	for _, item := range items {
+		if item.Name == workflowName {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func upsertWorkflowNameInSpec(spec, workflowName string) (string, error) {
+	var doc map[string]any
+	if err := yaml.Unmarshal([]byte(spec), &doc); err != nil {
+		return "", fmt.Errorf("parse yaml: %w", err)
+	}
+	if len(doc) == 0 {
+		return "", errors.New("definition is required")
+	}
+
+	workflows := asStringMap(doc["workflows"])
+	names := appendUniqueString(stringListFromAny(workflows["names"]), workflowName)
+	workflows["names"] = names
+	doc["workflows"] = workflows
+
+	data, err := yaml.Marshal(doc)
+	if err != nil {
+		return "", fmt.Errorf("marshal yaml: %w", err)
+	}
+	return string(data), nil
+}
+
+func asStringMap(value any) map[string]any {
+	if value == nil {
+		return map[string]any{}
+	}
+	if typed, ok := value.(map[string]any); ok {
+		return typed
+	}
+	return map[string]any{}
+}
+
+func stringListFromAny(value any) []string {
+	switch typed := value.(type) {
+	case []string:
+		return append([]string(nil), typed...)
+	case []any:
+		out := make([]string, 0, len(typed))
+		for _, item := range typed {
+			if text, ok := item.(string); ok && strings.TrimSpace(text) != "" {
+				out = append(out, strings.TrimSpace(text))
+			}
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
+func appendUniqueString(items []string, value string) []string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return items
+	}
+	out := make([]string, 0, len(items)+1)
+	seen := make(map[string]struct{}, len(items)+1)
+	for _, item := range items {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		if _, ok := seen[item]; ok {
+			continue
+		}
+		seen[item] = struct{}{}
+		out = append(out, item)
+	}
+	if _, ok := seen[value]; !ok {
+		out = append(out, value)
+	}
+	return out
 }
 
 func shouldResetRuntimeForSpecChange(previous, next *Definition) bool {
@@ -381,7 +500,7 @@ func (s *Service) List(ctx context.Context) ([]Summary, error) {
 			Goal:          def.Goal,
 			ClonedFrom:    def.ClonedFrom,
 			ResetOnFinish: def.ResetOnFinish,
-			Tags:          append([]string(nil), def.Tags...),
+			Labels:        append([]string(nil), def.Labels...),
 			Instruction:   state.Instruction,
 			State:         state.State,
 			DisplayStatus: view.DisplayStatus,
@@ -406,7 +525,7 @@ func (s *Service) Detail(ctx context.Context, name string) (*Detail, error) {
 	if err != nil {
 		return nil, err
 	}
-	allowed, err := s.resolveAllowedDAGSet(ctx, def.AllowedDAGs)
+	workflows, err := s.resolveManagedWorkflowSet(ctx, def.Workflows)
 	if err != nil {
 		return nil, err
 	}
@@ -422,7 +541,7 @@ func (s *Service) Detail(ctx context.Context, name string) (*Detail, error) {
 	return &Detail{
 		Definition:    def,
 		State:         state,
-		AllowedDAGs:   allowed,
+		Workflows:     workflows,
 		TaskTemplates: append([]TaskTemplate(nil), state.TaskTemplates...),
 		CurrentRun:    currentRun,
 		RecentRuns:    recentRuns,
@@ -430,39 +549,63 @@ func (s *Service) Detail(ctx context.Context, name string) (*Detail, error) {
 	}, nil
 }
 
-func (s *Service) resolveAllowedDAGSet(ctx context.Context, allowed AllowedDAGs) ([]AllowedDAGInfo, error) {
-	seen := make(map[string]AllowedDAGInfo)
-	for _, name := range allowed.Names {
+func (s *Service) resolveManagedWorkflowSet(ctx context.Context, workflows Workflows) ([]WorkflowInfo, error) {
+	seen := make(map[string]WorkflowInfo)
+	for _, name := range workflows.Names {
 		dag, err := s.dagStore.GetMetadata(ctx, name)
 		if err != nil {
 			return nil, err
 		}
-		seen[dag.Name] = AllowedDAGInfo{
+		seen[dag.Name] = WorkflowInfo{
 			Name:        dag.Name,
 			Description: dag.Description,
-			Tags:        dag.Labels.Strings(),
+			Labels:      dag.Labels.Strings(),
 		}
 	}
-	if len(allowed.Tags) > 0 {
+	if len(workflows.Labels) > 0 {
 		pg := exec.NewPaginator(1, math.MaxInt)
 		result, _, err := s.dagStore.List(ctx, exec.ListDAGsOptions{
 			Paginator: &pg,
-			Labels:    allowed.Tags,
+			Labels:    workflows.Labels,
 		})
 		if err != nil {
 			return nil, err
 		}
 		for _, dag := range result.Items {
-			seen[dag.Name] = AllowedDAGInfo{
+			seen[dag.Name] = WorkflowInfo{
 				Name:        dag.Name,
 				Description: dag.Description,
-				Tags:        dag.Labels.Strings(),
+				Labels:      dag.Labels.Strings(),
 			}
 		}
 	}
-	out := make([]AllowedDAGInfo, 0, len(seen))
+	out := make([]WorkflowInfo, 0, len(seen))
 	for _, item := range seen {
 		out = append(out, item)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out, nil
+}
+
+func (s *Service) listAvailableWorkflowSet(ctx context.Context, workflows Workflows) ([]WorkflowInfo, error) {
+	if hasWorkflows(workflows) {
+		return s.resolveManagedWorkflowSet(ctx, workflows)
+	}
+
+	pg := exec.NewPaginator(1, math.MaxInt)
+	result, _, err := s.dagStore.List(ctx, exec.ListDAGsOptions{
+		Paginator: &pg,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]WorkflowInfo, 0, len(result.Items))
+	for _, dag := range result.Items {
+		out = append(out, WorkflowInfo{
+			Name:        dag.Name,
+			Description: dag.Description,
+			Labels:      dag.Labels.Strings(),
+		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out, nil
@@ -503,41 +646,41 @@ func (s *Service) recentRuns(ctx context.Context, name string) ([]RunSummary, er
 	return out, nil
 }
 
-func (s *Service) normalizeAllowedDAGs(ctx context.Context, allowed *AllowedDAGs) error {
-	if allowed == nil {
+func (s *Service) normalizeWorkflows(ctx context.Context, workflows *Workflows) error {
+	if workflows == nil {
 		return nil
 	}
-	for i, name := range allowed.Names {
-		allowed.Names[i] = strings.TrimSpace(name)
-		if allowed.Names[i] == "" {
-			return errors.New("allowed_dags.names contains an empty entry")
+	for i, name := range workflows.Names {
+		workflows.Names[i] = strings.TrimSpace(name)
+		if workflows.Names[i] == "" {
+			return errors.New("workflows.names contains an empty entry")
 		}
-		if _, err := s.dagStore.GetMetadata(ctx, allowed.Names[i]); err != nil {
-			return fmt.Errorf("allowed DAG %q not found: %w", allowed.Names[i], err)
+		if _, err := s.dagStore.GetMetadata(ctx, workflows.Names[i]); err != nil {
+			return fmt.Errorf("workflow %q not found: %w", workflows.Names[i], err)
 		}
 	}
-	for i, tag := range allowed.Tags {
-		allowed.Tags[i] = strings.TrimSpace(tag)
-		if allowed.Tags[i] == "" {
-			return errors.New("allowed_dags.tags contains an empty entry")
+	for i, label := range workflows.Labels {
+		workflows.Labels[i] = strings.TrimSpace(label)
+		if workflows.Labels[i] == "" {
+			return errors.New("workflows.labels contains an empty entry")
 		}
 	}
 	return nil
 }
 
-func hasAllowedDAGs(allowed AllowedDAGs) bool {
-	return len(allowed.Names) > 0 || len(allowed.Tags) > 0
+func hasWorkflows(workflows Workflows) bool {
+	return len(workflows.Names) > 0 || len(workflows.Labels) > 0
 }
 
-func normalizeTags(tags *[]string) error {
-	if tags == nil {
+func normalizeLabels(labels *[]string) error {
+	if labels == nil {
 		return nil
 	}
-	parsed := core.NewLabels(*tags)
+	parsed := core.NewLabels(*labels)
 	if err := core.ValidateLabels(parsed); err != nil {
-		return fmt.Errorf("invalid tags: %w", err)
+		return fmt.Errorf("invalid labels: %w", err)
 	}
-	*tags = parsed.Strings()
+	*labels = parsed.Strings()
 	return nil
 }
 

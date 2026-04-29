@@ -23,6 +23,9 @@ func (s *Service) RequestStart(ctx context.Context, name string, req StartReques
 	if def.Disabled {
 		return errors.New("controller is disabled")
 	}
+	if def.Trigger.Type != TriggerModeManual {
+		return fmt.Errorf("controller trigger type %q does not support manual start", def.Trigger.Type)
+	}
 	state, err := s.ensureState(ctx, def)
 	if err != nil {
 		return err
@@ -31,12 +34,6 @@ func (s *Service) RequestStart(ctx context.Context, name string, req StartReques
 		return errors.New("controller already has an active task")
 	}
 	instruction := strings.TrimSpace(req.Instruction)
-	if instruction == "" {
-		instruction = strings.TrimSpace(state.Instruction)
-	}
-	if instruction == "" {
-		instruction = strings.TrimSpace(def.StandingInstruction)
-	}
 	if instruction == "" {
 		return errors.New("instruction is required before starting controller")
 	}

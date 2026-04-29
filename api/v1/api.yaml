@@ -12708,15 +12708,15 @@ components:
         - human_input
         - dag_wait
 
-    ControllerAllowedDAGs:
+    ControllerWorkflows:
       type: object
-      description: "Allowlisted DAG names and tags"
+      description: "Workflow names and labels managed by a Controller"
       properties:
         names:
           type: array
           items:
             type: string
-        tags:
+        labels:
           type: array
           items:
             type: string
@@ -12791,12 +12791,35 @@ components:
         safeMode:
           type: boolean
 
+    ControllerTriggerType:
+      type: string
+      description: "Controller activation mode"
+      enum:
+        - manual
+        - cron
+
+    ControllerTrigger:
+      type: object
+      description: "Controller activation configuration"
+      required:
+        - type
+      properties:
+        type:
+          $ref: "#/components/schemas/ControllerTriggerType"
+        schedules:
+          type: array
+          items:
+            type: string
+        prompt:
+          type: string
+
     ControllerDefinition:
       type: object
       description: "Controller definition"
       required:
         - name
         - kind
+        - trigger
       properties:
         name:
           type: string
@@ -12812,20 +12835,16 @@ components:
           type: string
         clonedFrom:
           type: string
-        standingInstruction:
-          type: string
         resetOnFinish:
           type: boolean
-        schedule:
+        trigger:
+          $ref: "#/components/schemas/ControllerTrigger"
+        labels:
           type: array
           items:
             type: string
-        tags:
-          type: array
-          items:
-            type: string
-        allowedDAGs:
-          $ref: "#/components/schemas/ControllerAllowedDAGs"
+        workflows:
+          $ref: "#/components/schemas/ControllerWorkflows"
         agent:
           $ref: "#/components/schemas/ControllerAgentConfig"
         disabled:
@@ -12931,9 +12950,9 @@ components:
         error:
           type: string
 
-    ControllerAllowedDAGInfo:
+    ControllerWorkflowInfo:
       type: object
-      description: "Resolved DAG allowed in the current Controller"
+      description: "Workflow currently managed or available to the Controller"
       required:
         - name
       properties:
@@ -12941,7 +12960,7 @@ components:
           type: string
         description:
           type: string
-        tags:
+        labels:
           type: array
           items:
             type: string
@@ -13043,7 +13062,7 @@ components:
           type: string
         resetOnFinish:
           type: boolean
-        tags:
+        labels:
           type: array
           items:
             type: string
@@ -13090,16 +13109,16 @@ components:
       required:
         - definition
         - state
-        - allowedDags
+        - workflows
       properties:
         definition:
           $ref: "#/components/schemas/ControllerDefinition"
         state:
           $ref: "#/components/schemas/ControllerState"
-        allowedDags:
+        workflows:
           type: array
           items:
-            $ref: "#/components/schemas/ControllerAllowedDAGInfo"
+            $ref: "#/components/schemas/ControllerWorkflowInfo"
         taskTemplates:
           type: array
           items:

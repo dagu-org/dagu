@@ -4,6 +4,7 @@
 package controller
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -50,9 +51,9 @@ const (
 	DisplayStatusFinished DisplayStatus = "finished"
 )
 
-type AllowedDAGs struct {
-	Names []string `json:"names,omitempty" yaml:"names,omitempty"`
-	Tags  []string `json:"tags,omitempty" yaml:"tags,omitempty"`
+type Workflows struct {
+	Names  []string `json:"names,omitempty" yaml:"names,omitempty"`
+	Labels []string `json:"labels,omitempty" yaml:"labels,omitempty"`
 }
 
 type AgentConfig struct {
@@ -61,30 +62,24 @@ type AgentConfig struct {
 	SafeMode bool   `json:"safeMode,omitempty" yaml:"safeMode,omitempty"`
 }
 
-type ScheduleList []core.Schedule
+type CronScheduleList []core.Schedule
 
-func (s *ScheduleList) UnmarshalYAML(value *yaml.Node) error {
+func (s *CronScheduleList) UnmarshalYAML(value *yaml.Node) error {
 	if value == nil || value.Kind == 0 {
 		*s = nil
 		return nil
 	}
 
-	var expressions []string
-	switch value.Kind {
-	case yaml.ScalarNode:
-		expressions = []string{strings.TrimSpace(value.Value)}
-	case yaml.SequenceNode:
-		expressions = make([]string, 0, len(value.Content))
-		for _, node := range value.Content {
-			if node.Kind != yaml.ScalarNode {
-				return fmt.Errorf("schedule entries must be strings")
-			}
-			expressions = append(expressions, strings.TrimSpace(node.Value))
+	if value.Kind != yaml.SequenceNode {
+		return fmt.Errorf("trigger.schedules must be a list of cron expressions")
+	}
+
+	expressions := make([]string, 0, len(value.Content))
+	for i, node := range value.Content {
+		if node.Kind != yaml.ScalarNode {
+			return fmt.Errorf("trigger.schedules[%d] must be a string", i)
 		}
-	case yaml.DocumentNode, yaml.MappingNode, yaml.AliasNode:
-		return fmt.Errorf("schedule must be a string or list of strings")
-	default:
-		return fmt.Errorf("schedule must be a string or list of strings")
+		expressions = append(expressions, strings.TrimSpace(node.Value))
 	}
 
 	if len(expressions) == 0 {
@@ -93,13 +88,13 @@ func (s *ScheduleList) UnmarshalYAML(value *yaml.Node) error {
 	}
 
 	out := make([]core.Schedule, 0, len(expressions))
-	for _, expr := range expressions {
+	for i, expr := range expressions {
 		if expr == "" {
 			continue
 		}
 		parsed, err := cron.ParseStandard(expr)
 		if err != nil {
-			return fmt.Errorf("invalid schedule %q: %w", expr, err)
+			return fmt.Errorf("invalid trigger.schedules[%d] %q: %w", i, expr, err)
 		}
 		out = append(out, core.Schedule{
 			Expression: expr,
@@ -110,22 +105,77 @@ func (s *ScheduleList) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
+type TriggerMode string
+
+const (
+	TriggerModeManual TriggerMode = "manual"
+	TriggerModeCron   TriggerMode = "cron"
+)
+
+type Trigger struct {
+	Type      TriggerMode      `json:"type" yaml:"type"`
+	Schedules CronScheduleList `json:"schedules,omitempty" yaml:"schedules,omitempty"`
+	Prompt    string           `json:"prompt,omitempty" yaml:"prompt,omitempty"`
+}
+
+func (t *Trigger) UnmarshalYAML(value *yaml.Node) error {
+	type rawTrigger struct {
+		Type      TriggerMode      `yaml:"type"`
+		Schedules CronScheduleList `yaml:"schedules,omitempty"`
+		Prompt    string           `yaml:"prompt,omitempty"`
+	}
+
+	var raw rawTrigger
+	if err := value.Decode(&raw); err != nil {
+		return err
+	}
+
+	t.Type = normalizeTriggerMode(raw.Type)
+	t.Schedules = raw.Schedules
+	t.Prompt = strings.TrimSpace(raw.Prompt)
+	return t.Validate()
+}
+
+func (t Trigger) Validate() error {
+	switch t.Type {
+	case TriggerModeManual:
+		if len(t.Schedules) > 0 {
+			return errors.New("trigger.schedules is only valid for cron trigger")
+		}
+		if t.Prompt != "" {
+			return errors.New("trigger.prompt is only valid for cron trigger")
+		}
+		return nil
+	case TriggerModeCron:
+		if len(t.Schedules) == 0 {
+			return errors.New("trigger.schedules is required for cron trigger")
+		}
+		if strings.TrimSpace(t.Prompt) == "" {
+			return errors.New("trigger.prompt is required for cron trigger")
+		}
+		return nil
+	case "":
+		return errors.New("trigger.type is required")
+	default:
+		return fmt.Errorf("invalid trigger.type %q", t.Type)
+	}
+}
+
 type Definition struct {
-	Name                string        `json:"name"`
-	Kind                ControllerKind `json:"kind" yaml:"kind,omitempty"`
-	Nickname            string        `json:"nickname,omitempty" yaml:"nickname,omitempty"`
-	IconURL             string        `json:"iconUrl,omitempty" yaml:"icon_url,omitempty"`
-	Description         string        `json:"description,omitempty" yaml:"description,omitempty"`
-	Purpose             string        `json:"purpose,omitempty" yaml:"purpose,omitempty"`
-	Goal                string        `json:"goal" yaml:"goal"`
-	ClonedFrom          string        `json:"clonedFrom,omitempty" yaml:"cloned_from,omitempty"`
-	StandingInstruction string        `json:"standingInstruction,omitempty" yaml:"standing_instruction,omitempty"`
-	ResetOnFinish       bool          `json:"resetOnFinish,omitempty" yaml:"reset_on_finish,omitempty"`
-	Tags                []string      `json:"tags,omitempty" yaml:"tags,omitempty"`
-	Schedule            ScheduleList  `json:"schedule,omitempty" yaml:"schedule,omitempty"`
-	AllowedDAGs         AllowedDAGs   `json:"allowedDAGs" yaml:"allowed_dags"`
-	Agent               AgentConfig   `json:"agent" yaml:"agent,omitempty"`
-	Disabled            bool          `json:"disabled,omitempty" yaml:"disabled,omitempty"`
+	Name          string         `json:"name"`
+	Kind          ControllerKind `json:"kind" yaml:"kind,omitempty"`
+	Nickname      string         `json:"nickname,omitempty" yaml:"nickname,omitempty"`
+	IconURL       string         `json:"iconUrl,omitempty" yaml:"icon_url,omitempty"`
+	Description   string         `json:"description,omitempty" yaml:"description,omitempty"`
+	Purpose       string         `json:"purpose,omitempty" yaml:"purpose,omitempty"`
+	Goal          string         `json:"goal" yaml:"goal"`
+	ClonedFrom    string         `json:"clonedFrom,omitempty" yaml:"cloned_from,omitempty"`
+	ResetOnFinish bool           `json:"resetOnFinish,omitempty" yaml:"reset_on_finish,omitempty"`
+	Labels        []string       `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Trigger       Trigger        `json:"trigger" yaml:"trigger"`
+	Workflows     Workflows      `json:"workflows,omitempty" yaml:"workflows,omitempty"`
+	Agent         AgentConfig    `json:"agent" yaml:"agent,omitempty"`
+	Disabled      bool           `json:"disabled,omitempty" yaml:"disabled,omitempty"`
 }
 
 type Prompt struct {
@@ -208,10 +258,10 @@ type State struct {
 	LastError            string               `json:"lastError,omitempty"`
 }
 
-type AllowedDAGInfo struct {
+type WorkflowInfo struct {
 	Name        string   `json:"name"`
 	Description string   `json:"description,omitempty"`
-	Tags        []string `json:"tags,omitempty"`
+	Labels      []string `json:"labels,omitempty"`
 }
 
 type RunSummary struct {
@@ -227,7 +277,7 @@ type RunSummary struct {
 
 type Summary struct {
 	Name                string         `json:"name"`
-	Kind                ControllerKind  `json:"kind"`
+	Kind                ControllerKind `json:"kind"`
 	Nickname            string         `json:"nickname,omitempty"`
 	IconURL             string         `json:"iconUrl,omitempty"`
 	Description         string         `json:"description,omitempty"`
@@ -235,7 +285,7 @@ type Summary struct {
 	Goal                string         `json:"goal"`
 	ClonedFrom          string         `json:"clonedFrom,omitempty"`
 	ResetOnFinish       bool           `json:"resetOnFinish,omitempty"`
-	Tags                []string       `json:"tags,omitempty"`
+	Labels              []string       `json:"labels,omitempty"`
 	Instruction         string         `json:"instruction,omitempty"`
 	State               LifecycleState `json:"state"`
 	DisplayStatus       DisplayStatus  `json:"displayStatus"`
@@ -250,13 +300,13 @@ type Summary struct {
 }
 
 type Detail struct {
-	Definition    *Definition      `json:"definition"`
-	State         *State           `json:"state"`
-	AllowedDAGs   []AllowedDAGInfo `json:"allowedDags"`
-	TaskTemplates []TaskTemplate   `json:"taskTemplates,omitempty"`
-	CurrentRun    *RunSummary      `json:"currentRun,omitempty"`
-	RecentRuns    []RunSummary     `json:"recentRuns,omitempty"`
-	Messages      []agent.Message  `json:"messages,omitempty"`
+	Definition    *Definition     `json:"definition"`
+	State         *State          `json:"state"`
+	Workflows     []WorkflowInfo  `json:"workflows"`
+	TaskTemplates []TaskTemplate  `json:"taskTemplates,omitempty"`
+	CurrentRun    *RunSummary     `json:"currentRun,omitempty"`
+	RecentRuns    []RunSummary    `json:"recentRuns,omitempty"`
+	Messages      []agent.Message `json:"messages,omitempty"`
 }
 
 type Document struct {
@@ -325,25 +375,22 @@ func nextCycleID() string {
 
 func (d *Definition) UnmarshalYAML(value *yaml.Node) error {
 	type rawDefinition struct {
-		Kind                     ControllerKind `yaml:"kind,omitempty"`
-		Nickname                 string        `yaml:"nickname,omitempty"`
-		IconURL                  string        `yaml:"iconUrl,omitempty"`
-		IconURLSnake             string        `yaml:"icon_url,omitempty"`
-		Description              string        `yaml:"description,omitempty"`
-		Purpose                  string        `yaml:"purpose"`
-		Goal                     string        `yaml:"goal"`
-		ClonedFrom               string        `yaml:"clonedFrom,omitempty"`
-		ClonedFromSnake          string        `yaml:"cloned_from,omitempty"`
-		StandingInstruction      string        `yaml:"standingInstruction,omitempty"`
-		StandingInstructionSnake string        `yaml:"standing_instruction,omitempty"`
-		ResetOnFinish            bool          `yaml:"resetOnFinish,omitempty"`
-		ResetOnFinishSnake       bool          `yaml:"reset_on_finish,omitempty"`
-		Tags                     []string      `yaml:"tags"`
-		Schedule                 ScheduleList  `yaml:"schedule,omitempty"`
-		AllowedDAGs              AllowedDAGs   `yaml:"allowedDAGs"`
-		AllowedDAGsSnake         AllowedDAGs   `yaml:"allowed_dags"`
-		Agent                    AgentConfig   `yaml:"agent,omitempty"`
-		Disabled                 bool          `yaml:"disabled,omitempty"`
+		Kind               ControllerKind `yaml:"kind,omitempty"`
+		Nickname           string         `yaml:"nickname,omitempty"`
+		IconURL            string         `yaml:"iconUrl,omitempty"`
+		IconURLSnake       string         `yaml:"icon_url,omitempty"`
+		Description        string         `yaml:"description,omitempty"`
+		Purpose            string         `yaml:"purpose"`
+		Goal               string         `yaml:"goal"`
+		ClonedFrom         string         `yaml:"clonedFrom,omitempty"`
+		ClonedFromSnake    string         `yaml:"cloned_from,omitempty"`
+		ResetOnFinish      bool           `yaml:"resetOnFinish,omitempty"`
+		ResetOnFinishSnake bool           `yaml:"reset_on_finish,omitempty"`
+		Labels             []string       `yaml:"labels"`
+		Trigger            Trigger        `yaml:"trigger"`
+		Workflows          Workflows      `yaml:"workflows,omitempty"`
+		Agent              AgentConfig    `yaml:"agent,omitempty"`
+		Disabled           bool           `yaml:"disabled,omitempty"`
 	}
 
 	var raw rawDefinition
@@ -364,20 +411,16 @@ func (d *Definition) UnmarshalYAML(value *yaml.Node) error {
 	if d.ClonedFrom == "" {
 		d.ClonedFrom = strings.TrimSpace(raw.ClonedFrom)
 	}
-	d.StandingInstruction = strings.TrimSpace(raw.StandingInstructionSnake)
-	if d.StandingInstruction == "" {
-		d.StandingInstruction = strings.TrimSpace(raw.StandingInstruction)
-	}
 	d.ResetOnFinish = raw.ResetOnFinish || raw.ResetOnFinishSnake
-	d.Tags = append([]string(nil), raw.Tags...)
+	d.Labels = append([]string(nil), raw.Labels...)
 	d.normalizeGoal()
-	d.Schedule = raw.Schedule
-	d.AllowedDAGs = raw.AllowedDAGsSnake
-	if len(d.AllowedDAGs.Names) == 0 && len(d.AllowedDAGs.Tags) == 0 {
-		d.AllowedDAGs = raw.AllowedDAGs
-	}
+	d.Trigger = raw.Trigger
+	d.Workflows = raw.Workflows
 	d.Agent = raw.Agent
 	d.Disabled = raw.Disabled
+	if err := d.Trigger.Validate(); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -398,4 +441,15 @@ func (d *Definition) normalizeGoal() {
 
 func normalizeControllerKind(_ ControllerKind) ControllerKind {
 	return ControllerKindWorkflow
+}
+
+func normalizeTriggerMode(value TriggerMode) TriggerMode {
+	switch TriggerMode(strings.ToLower(strings.TrimSpace(string(value)))) {
+	case TriggerModeManual:
+		return TriggerModeManual
+	case TriggerModeCron:
+		return TriggerModeCron
+	default:
+		return value
+	}
 }

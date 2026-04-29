@@ -45,32 +45,25 @@ func parseDefinitionYAML(data []byte, def *Definition) error {
 
 func validateDefinitionNode(node *yaml.Node) error {
 	return validateMappingNode(node, "definition", map[string]yamlFieldRule{
-		"kind":                 {},
-		"nickname":             {},
-		"iconUrl":              {canonical: "icon_url"},
-		"icon_url":             {canonical: "icon_url"},
-		"description":          {},
-		"purpose":              {},
-		"goal":                 {},
-		"clonedFrom":           {canonical: "cloned_from"},
-		"cloned_from":          {canonical: "cloned_from"},
-		"standingInstruction":  {canonical: "standing_instruction"},
-		"standing_instruction": {canonical: "standing_instruction"},
-		"resetOnFinish":        {canonical: "reset_on_finish"},
-		"reset_on_finish":      {canonical: "reset_on_finish"},
-		"tags": {
+		"kind":            {},
+		"nickname":        {},
+		"iconUrl":         {canonical: "icon_url"},
+		"icon_url":        {canonical: "icon_url"},
+		"description":     {},
+		"purpose":         {},
+		"goal":            {},
+		"clonedFrom":      {canonical: "cloned_from"},
+		"cloned_from":     {canonical: "cloned_from"},
+		"resetOnFinish":   {canonical: "reset_on_finish"},
+		"reset_on_finish": {canonical: "reset_on_finish"},
+		"labels": {
 			validate: validateStringListNode,
 		},
-		"schedule": {
-			validate: validateScheduleNode,
+		"trigger": {
+			validate: validateTriggerNode,
 		},
-		"allowedDAGs": {
-			canonical: "allowed_dags",
-			validate:  validateAllowedDAGsNode,
-		},
-		"allowed_dags": {
-			canonical: "allowed_dags",
-			validate:  validateAllowedDAGsNode,
+		"workflows": {
+			validate: validateWorkflowsNode,
 		},
 		"agent": {
 			validate: validateAgentConfigNode,
@@ -144,28 +137,22 @@ func setMappingScalar(node *yaml.Node, key, value string, aliases ...string) {
 	node.Content[insertAt+1] = valueNode
 }
 
-func validateScheduleNode(node *yaml.Node, path string) error {
+func validateTriggerNode(node *yaml.Node, path string) error {
 	if isNullNode(node) {
-		return nil
+		return fmt.Errorf("%s.type is required", path)
 	}
-	switch node.Kind {
-	case yaml.ScalarNode:
-		return nil
-	case yaml.SequenceNode:
-		for i, child := range node.Content {
-			if child.Kind != yaml.ScalarNode {
-				return fmt.Errorf("%s[%d] must be a string", path, i)
-			}
-		}
-		return nil
-	case yaml.DocumentNode, yaml.MappingNode, yaml.AliasNode:
-		return fmt.Errorf("%s must be a string or list of strings", path)
-	default:
-		return fmt.Errorf("%s must be a string or list of strings", path)
-	}
+	return validateMappingNode(node, path, map[string]yamlFieldRule{
+		"type": {},
+		"schedules": {
+			validate: validateStringListNode,
+		},
+		"prompt": {
+			validate: validateStringNode,
+		},
+	})
 }
 
-func validateAllowedDAGsNode(node *yaml.Node, path string) error {
+func validateWorkflowsNode(node *yaml.Node, path string) error {
 	if isNullNode(node) {
 		return nil
 	}
@@ -173,7 +160,7 @@ func validateAllowedDAGsNode(node *yaml.Node, path string) error {
 		"names": {
 			validate: validateStringListNode,
 		},
-		"tags": {
+		"labels": {
 			validate: validateStringListNode,
 		},
 	})
@@ -201,6 +188,16 @@ func validateStringListNode(node *yaml.Node, path string) error {
 		if child.Kind != yaml.ScalarNode {
 			return fmt.Errorf("%s[%d] must be a string", path, i)
 		}
+	}
+	return nil
+}
+
+func validateStringNode(node *yaml.Node, path string) error {
+	if isNullNode(node) {
+		return nil
+	}
+	if node.Kind != yaml.ScalarNode {
+		return fmt.Errorf("%s must be a string", path)
 	}
 	return nil
 }

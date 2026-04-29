@@ -51,7 +51,7 @@ func TestControllerRuntimeActionsRequireReadyController(t *testing.T) {
 		},
 	}
 
-	require.NoError(t, svc.PutSpec(ctx, "software_dev", "goal: Complete the assigned software work\nallowed_dags:\n  names:\n    - build-app\n"))
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", "trigger:\n  type: manual\ngoal: Complete the assigned software work\nworkflows:\n  names:\n    - build-app\n"))
 
 	_, err := api.StartController(ctx, openapi.StartControllerRequestObject{
 		Name: "software_dev",
@@ -84,7 +84,7 @@ func TestControllerListAndDetailExposeControllerStatus(t *testing.T) {
 		},
 	}
 
-	require.NoError(t, svc.PutSpec(ctx, "software_dev", "goal: Complete the assigned software work\nallowed_dags:\n  names:\n    - build-app\n"))
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", "trigger:\n  type: manual\ngoal: Complete the assigned software work\nworkflows:\n  names:\n    - build-app\n"))
 
 	listResp, err := api.ListController(ctx, openapi.ListControllerRequestObject{})
 	require.NoError(t, err)

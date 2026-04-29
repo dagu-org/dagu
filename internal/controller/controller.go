@@ -19,10 +19,11 @@ import (
 
 var controllerAllowedTools = []string{
 	"read",
+	"patch",
 	"think",
 	"list_controller_tasks",
-	"list_allowed_dags",
-	"run_allowed_dag",
+	"list_workflows",
+	"run_workflow",
 	"retry_controller_run",
 	"set_controller_task_done",
 	"request_human_input",
@@ -352,9 +353,13 @@ func (s *Service) inspectSessionActivity(ctx context.Context, name string, state
 }
 
 func (s *Service) runtimeOptions(ctx context.Context, def *Definition, state *State) (*agent.SessionRuntimeOptions, error) {
-	allowedDAGs, err := s.resolveAllowedDAGSet(ctx, def.AllowedDAGs)
-	if err != nil {
-		return nil, err
+	var managedWorkflows []WorkflowInfo
+	if hasWorkflows(def.Workflows) {
+		items, err := s.resolveManagedWorkflowSet(ctx, def.Workflows)
+		if err != nil {
+			return nil, err
+		}
+		managedWorkflows = items
 	}
 	workingDir, err := s.ensureControllerWorkingDir(def.Name)
 	if err != nil {
@@ -385,10 +390,10 @@ func (s *Service) runtimeOptions(ctx context.Context, def *Definition, state *St
 	return &agent.SessionRuntimeOptions{
 		Model:             def.Agent.Model,
 		AllowedTools:      allowedToolsForDefinition(def),
-		SystemPromptExtra: s.buildSystemPromptExtra(def, state, allowedDAGs),
+		SystemPromptExtra: s.buildSystemPromptExtra(def, state, managedWorkflows),
 		Soul:              soul,
 		AllowClearSoul:    def.Agent.Soul == "" && soul == nil,
-		ControllerName:     def.Name,
+		ControllerName:    def.Name,
 		WorkingDir:        workingDir,
 		ControllerRuntime: &controllerRuntime{
 			service: s,
@@ -402,7 +407,7 @@ func allowedToolsForDefinition(_ *Definition) []string {
 	return append([]string(nil), controllerAllowedTools...)
 }
 
-func (s *Service) buildSystemPromptExtra(def *Definition, state *State, allowed []AllowedDAGInfo) string {
+func (s *Service) buildSystemPromptExtra(def *Definition, state *State, workflows []WorkflowInfo) string {
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "You are controlling Controller %q.\n", def.Name)
 	if goal := strings.TrimSpace(def.Goal); goal != "" {
@@ -418,16 +423,17 @@ func (s *Service) buildSystemPromptExtra(def *Definition, state *State, allowed 
 	if def.Description != "" {
 		fmt.Fprintf(&sb, "Description: %s\n", def.Description)
 	}
-	if instruction := strings.TrimSpace(def.StandingInstruction); instruction != "" {
-		fmt.Fprintf(&sb, "Standing instruction: %s\n", instruction)
-	}
-	if len(def.Schedule) > 0 {
-		sb.WriteString("Schedule:\n")
-		for _, item := range def.Schedule {
+	fmt.Fprintf(&sb, "Trigger: %s\n", def.Trigger.Type)
+	if def.Trigger.Type == TriggerModeCron && len(def.Trigger.Schedules) > 0 {
+		sb.WriteString("Trigger schedules:\n")
+		for _, item := range def.Trigger.Schedules {
 			if item.Expression != "" {
 				fmt.Fprintf(&sb, "- %s\n", item.Expression)
 			}
 		}
+	}
+	if prompt := strings.TrimSpace(def.Trigger.Prompt); prompt != "" {
+		fmt.Fprintf(&sb, "Trigger prompt: %s\n", prompt)
 	}
 	if def.ResetOnFinish {
 		sb.WriteString("Reset on finish: enabled. Finishing this cycle returns the Controller to idle for the next cycle.\n")
@@ -436,17 +442,17 @@ func (s *Service) buildSystemPromptExtra(def *Definition, state *State, allowed 
 	sb.WriteString("Task list:\n")
 	sb.WriteString(buildTaskListSummary(state.Tasks))
 	sb.WriteString("\n")
-	sb.WriteString("Allowed DAGs:\n")
-	if len(allowed) == 0 {
-		sb.WriteString("- none\n")
+	sb.WriteString("Managed workflows:\n")
+	if len(workflows) == 0 {
+		sb.WriteString("- none configured yet\n")
 	} else {
-		for _, dag := range allowed {
-			fmt.Fprintf(&sb, "- %s", dag.Name)
-			if dag.Description != "" {
-				fmt.Fprintf(&sb, ": %s", dag.Description)
+		for _, workflow := range workflows {
+			fmt.Fprintf(&sb, "- %s", workflow.Name)
+			if workflow.Description != "" {
+				fmt.Fprintf(&sb, ": %s", workflow.Description)
 			}
-			if len(dag.Tags) > 0 {
-				fmt.Fprintf(&sb, " [tags: %s]", strings.Join(dag.Tags, ", "))
+			if len(workflow.Labels) > 0 {
+				fmt.Fprintf(&sb, " [labels: %s]", strings.Join(workflow.Labels, ", "))
 			}
 			sb.WriteString("\n")
 		}
@@ -458,23 +464,25 @@ func (s *Service) buildSystemPromptExtra(def *Definition, state *State, allowed 
 	sb.WriteString("- Do not create, edit, reorder, or delete task list items.\n")
 	sb.WriteString("- Use list_controller_tasks when you need a fresh view of the task list.\n")
 	sb.WriteString("- Use set_controller_task_done to mark an existing task done or reopen it if more work is needed.\n")
-	sb.WriteString("- Use run_allowed_dag for execution and wait for the scheduler to resume you.\n")
+	sb.WriteString("- Use list_workflows to inspect existing workflows when you need more options.\n")
+	sb.WriteString("- Use patch to create or improve workflow YAML when the right workflow does not exist yet.\n")
+	sb.WriteString("- Use run_workflow for execution and wait for the scheduler to resume you.\n")
 	sb.WriteString("- Use request_human_input if blocked on approval or clarification.\n")
 	sb.WriteString("- Use finish_controller only when the current cycle is complete.\n")
-	sb.WriteString("- Do not ask for shell commands, file edits, or tools you do not have.\n")
+	sb.WriteString("- Do not ask for shell commands or tools you do not have.\n")
 	return sb.String()
 }
 
 func (s *Service) buildKickoffMessage(def *Definition, state *State) string {
 	if strings.TrimSpace(def.Goal) == "" {
 		return fmt.Sprintf(
-			"Continue Controller %q. Current instruction: %q. Review the open tasks and current context, then choose the most appropriate work. If work must be executed, run one allowlisted DAG. If blocked, request human input. If complete, finish the controller.",
+			"Continue Controller %q. Current instruction: %q. Review the open tasks and current context, then choose the most appropriate work. If work must be executed, run one workflow. If the right workflow does not exist yet, create or improve it with patch, then run it. If blocked, request human input. If complete, finish the controller.",
 			def.Name,
 			state.Instruction,
 		)
 	}
 	return fmt.Sprintf(
-		"Continue Controller %q. Current instruction: %q. Review the open tasks and choose the most appropriate work toward the goal. If work must be executed, run one allowlisted DAG. If blocked, request human input. If complete, finish the controller.",
+		"Continue Controller %q. Current instruction: %q. Review the open tasks and choose the most appropriate work toward the goal. If work must be executed, run one workflow. If the right workflow does not exist yet, create or improve it with patch, then run it. If blocked, request human input. If complete, finish the controller.",
 		def.Name,
 		state.Instruction,
 	)
@@ -518,7 +526,7 @@ func (s *Service) buildHumanResponseMessage(prompt *Prompt, response *PromptResp
 
 func (s *Service) buildScheduledTickMessage(def *Definition, state *State, tickTime time.Time) string {
 	return fmt.Sprintf(
-		"Scheduled wake-up for Controller %q at %s. Current instruction: %q. Review the open tasks and current context. If there is actionable work, continue it or run one allowlisted DAG. Choose whichever open task is most appropriate. If blocked, request human input. If complete, finish the controller.",
+		"Scheduled wake-up for Controller %q at %s. Current instruction: %q. Review the open tasks and current context. If there is actionable work, continue it or run one workflow. If the right workflow does not exist yet, create or improve it with patch, then run it. Choose whichever open task is most appropriate. If blocked, request human input. If complete, finish the controller.",
 		def.Name,
 		tickTime.Format(time.RFC3339),
 		state.Instruction,
@@ -543,47 +551,36 @@ func (r *controllerRuntime) ListTasks(_ context.Context) ([]agent.ControllerTask
 	return out, nil
 }
 
-func (r *controllerRuntime) ListAllowedDAGs(ctx context.Context) ([]agent.ControllerAllowedDAG, error) {
-	items, err := r.service.resolveAllowedDAGSet(ctx, r.def.AllowedDAGs)
+func (r *controllerRuntime) ListWorkflows(ctx context.Context) ([]agent.ControllerWorkflow, error) {
+	items, err := r.service.listAvailableWorkflowSet(ctx, r.def.Workflows)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]agent.ControllerAllowedDAG, 0, len(items))
+	out := make([]agent.ControllerWorkflow, 0, len(items))
 	for _, item := range items {
-		out = append(out, agent.ControllerAllowedDAG{
+		out = append(out, agent.ControllerWorkflow{
 			Name:        item.Name,
 			Description: item.Description,
-			Tags:        item.Tags,
+			Labels:      item.Labels,
 		})
 	}
 	return out, nil
 }
 
-func (r *controllerRuntime) RunAllowedDAG(ctx context.Context, input agent.ControllerRunDAGInput) (agent.ControllerRunDAGResult, error) {
+func (r *controllerRuntime) RunWorkflow(ctx context.Context, input agent.ControllerRunWorkflowInput) (agent.ControllerRunWorkflowResult, error) {
 	if r.state.CurrentRunRef != nil {
-		return agent.ControllerRunDAGResult{}, fmt.Errorf("a child DAG run is already active")
+		return agent.ControllerRunWorkflowResult{}, fmt.Errorf("a child DAG run is already active")
 	}
 	if r.state.PendingPrompt != nil {
-		return agent.ControllerRunDAGResult{}, fmt.Errorf("cannot start a child DAG while waiting for human input")
+		return agent.ControllerRunWorkflowResult{}, fmt.Errorf("cannot start a child DAG while waiting for human input")
 	}
-	allowed, err := r.service.resolveAllowedDAGSet(ctx, r.def.AllowedDAGs)
+	dag, err := r.service.dagStore.GetDetails(ctx, input.WorkflowName)
 	if err != nil {
-		return agent.ControllerRunDAGResult{}, err
-	}
-	allowedSet := make(map[string]struct{}, len(allowed))
-	for _, item := range allowed {
-		allowedSet[item.Name] = struct{}{}
-	}
-	if _, ok := allowedSet[input.DAGName]; !ok {
-		return agent.ControllerRunDAGResult{}, fmt.Errorf("DAG %q is not allowlisted", input.DAGName)
-	}
-	dag, err := r.service.dagStore.GetDetails(ctx, input.DAGName)
-	if err != nil {
-		return agent.ControllerRunDAGResult{}, err
+		return agent.ControllerRunWorkflowResult{}, err
 	}
 	defaultWorkingDir, err := r.defaultWorkingDirForDAGRun(dag)
 	if err != nil {
-		return agent.ControllerRunDAGResult{}, err
+		return agent.ControllerRunWorkflowResult{}, err
 	}
 	if r.state.CurrentCycleID == "" {
 		r.state.CurrentCycleID = nextCycleID()
@@ -593,8 +590,8 @@ func (r *controllerRuntime) RunAllowedDAG(ctx context.Context, input agent.Contr
 		fmt.Sprintf("controller=%s", strings.ToLower(r.def.Name)),
 		fmt.Sprintf("controller_cycle=%s", r.state.CurrentCycleID),
 	}
-	if len(r.def.Tags) > 0 {
-		tags = append(tags, r.def.Tags...)
+	if len(r.def.Labels) > 0 {
+		tags = append(tags, r.def.Labels...)
 	}
 	tagText := strings.Join(tags, ",")
 	spec := r.service.subCmdBuilder.Enqueue(dag, runtime.EnqueueOptions{
@@ -606,16 +603,19 @@ func (r *controllerRuntime) RunAllowedDAG(ctx context.Context, input agent.Contr
 		DefaultWorkingDir: defaultWorkingDir,
 	})
 	if err := runtime.Run(ctx, spec); err != nil {
-		return agent.ControllerRunDAGResult{}, err
+		return agent.ControllerRunWorkflowResult{}, err
 	}
 	ref := exec.NewDAGRunRef(dag.Name, runID)
 	r.state.CurrentRunRef = &ref
 	r.state.State = StateRunning
 	r.state.WaitingReason = WaitingReasonNone
-	if err := r.service.saveState(ctx, r.def.Name, r.state); err != nil {
-		return agent.ControllerRunDAGResult{}, err
+	if err := r.service.rememberWorkflow(ctx, r.def, dag.Name); err != nil {
+		return agent.ControllerRunWorkflowResult{}, err
 	}
-	return agent.ControllerRunDAGResult{DAGName: dag.Name, DAGRunID: runID}, nil
+	if err := r.service.saveState(ctx, r.def.Name, r.state); err != nil {
+		return agent.ControllerRunWorkflowResult{}, err
+	}
+	return agent.ControllerRunWorkflowResult{WorkflowName: dag.Name, DAGRunID: runID}, nil
 }
 
 func (r *controllerRuntime) defaultWorkingDirForDAGRun(dag *core.DAG) (string, error) {
@@ -628,11 +628,11 @@ func (r *controllerRuntime) defaultWorkingDirForDAGRun(dag *core.DAG) (string, e
 	return r.service.ensureControllerWorkingDir(r.def.Name)
 }
 
-func (r *controllerRuntime) RetryCurrentRun(ctx context.Context) (agent.ControllerRunDAGResult, error) {
+func (r *controllerRuntime) RetryCurrentRun(ctx context.Context) (agent.ControllerRunWorkflowResult, error) {
 	if r.state.LastRunRef == nil {
-		return agent.ControllerRunDAGResult{}, fmt.Errorf("no prior DAG run available to retry")
+		return agent.ControllerRunWorkflowResult{}, fmt.Errorf("no prior DAG run available to retry")
 	}
-	return r.RunAllowedDAG(ctx, agent.ControllerRunDAGInput{DAGName: r.state.LastRunRef.Name})
+	return r.RunWorkflow(ctx, agent.ControllerRunWorkflowInput{WorkflowName: r.state.LastRunRef.Name})
 }
 
 func (r *controllerRuntime) SetTaskDone(ctx context.Context, taskID string, done bool) error {

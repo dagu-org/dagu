@@ -35,7 +35,7 @@ func (a *API) ListController(ctx context.Context, _ api.ListControllerRequestObj
 	}
 	resp := make([]api.ControllerSummary, 0, len(items))
 	for _, item := range items {
-		if !a.canAccessWorkspace(ctx, controllerWorkspaceNameFromTags(item.Tags)) {
+		if !a.canAccessWorkspace(ctx, controllerWorkspaceNameFromLabels(item.Labels)) {
 			continue
 		}
 		summary := toAPIControllerSummary(item)
@@ -448,8 +448,8 @@ func (a *API) RespondController(ctx context.Context, request api.RespondControll
 	return api.RespondController204Response{}, nil
 }
 
-func controllerWorkspaceNameFromTags(tags []string) string {
-	workspaceName, state := exec.WorkspaceLabelFromLabels(core.NewLabels(tags))
+func controllerWorkspaceNameFromLabels(labels []string) string {
+	workspaceName, state := exec.WorkspaceLabelFromLabels(core.NewLabels(labels))
 	switch state {
 	case exec.WorkspaceLabelValid:
 		return workspaceName
@@ -466,7 +466,7 @@ func controllerWorkspaceNameFromDefinition(def *controller.Definition) string {
 	if def == nil {
 		return ""
 	}
-	return controllerWorkspaceNameFromTags(def.Tags)
+	return controllerWorkspaceNameFromLabels(def.Labels)
 }
 
 func controllerWorkspaceNameFromDetail(detail *controller.Detail) string {
@@ -705,12 +705,12 @@ func toAPIControllerSummary(item controller.Summary) api.ControllerSummary {
 		OpenTaskCount:       ptrOf(item.OpenTaskCount),
 		ResetOnFinish:       ptrOf(item.ResetOnFinish),
 		State:               api.ControllerLifecycleState(item.State),
-		Tags: func() *[]string {
-			if len(item.Tags) == 0 {
+		Labels: func() *[]string {
+			if len(item.Labels) == 0 {
 				return nil
 			}
-			tags := append([]string(nil), item.Tags...)
-			return &tags
+			labels := append([]string(nil), item.Labels...)
+			return &labels
 		}(),
 	}
 }
@@ -730,15 +730,15 @@ func toAPIControllerDocument(item *controller.Document) api.ControllerDocumentRe
 func toAPIControllerDetail(item *controller.Detail) api.ControllerDetailResponse {
 	if item == nil {
 		return api.ControllerDetailResponse{
-			AllowedDags:   []api.ControllerAllowedDAGInfo{},
+			Workflows:     []api.ControllerWorkflowInfo{},
 			TaskTemplates: &[]api.ControllerTaskTemplate{},
 		}
 	}
 	resp := api.ControllerDetailResponse{
-		AllowedDags: toAPIControllerAllowedDAGInfos(item.AllowedDAGs),
-		CurrentRun:  toAPIControllerRunSummary(item.CurrentRun),
-		Definition:  toAPIControllerDefinition(item.Definition),
-		State:       toAPIControllerState(item.Definition, item.State),
+		Workflows:  toAPIControllerWorkflowInfos(item.Workflows),
+		CurrentRun: toAPIControllerRunSummary(item.CurrentRun),
+		Definition: toAPIControllerDefinition(item.Definition),
+		State:      toAPIControllerState(item.Definition, item.State),
 	}
 	taskTemplates := toAPIControllerTaskTemplates(item.TaskTemplates)
 	resp.TaskTemplates = &taskTemplates
@@ -764,36 +764,48 @@ func toAPIControllerDefinition(def *controller.Definition) api.ControllerDefinit
 		return api.ControllerDefinition{}
 	}
 	resp := api.ControllerDefinition{
-		Description:         ptrOf(def.Description),
-		Disabled:            ptrOf(def.Disabled),
-		Goal:                ptrOf(def.Goal),
-		IconUrl:             ptrOf(def.IconURL),
-		Kind:                api.ControllerKind(def.Kind),
-		Name:                def.Name,
-		Nickname:            ptrOf(def.Nickname),
-		ClonedFrom:          ptrOf(def.ClonedFrom),
-		AllowedDAGs:         toAPIControllerAllowedDAGs(def.AllowedDAGs),
-		ResetOnFinish:       ptrOf(def.ResetOnFinish),
-		StandingInstruction: ptrOf(def.StandingInstruction),
-		Tags: func() *[]string {
-			if len(def.Tags) == 0 {
+		Description:   ptrOf(def.Description),
+		Disabled:      ptrOf(def.Disabled),
+		Goal:          ptrOf(def.Goal),
+		IconUrl:       ptrOf(def.IconURL),
+		Kind:          api.ControllerKind(def.Kind),
+		Name:          def.Name,
+		Nickname:      ptrOf(def.Nickname),
+		ClonedFrom:    ptrOf(def.ClonedFrom),
+		Workflows:     toAPIControllerWorkflows(def.Workflows),
+		ResetOnFinish: ptrOf(def.ResetOnFinish),
+		Trigger:       toAPIControllerTrigger(def.Trigger),
+		Labels: func() *[]string {
+			if len(def.Labels) == 0 {
 				return nil
 			}
-			tags := append([]string(nil), def.Tags...)
-			return &tags
+			labels := append([]string(nil), def.Labels...)
+			return &labels
 		}(),
-	}
-	if len(def.Schedule) > 0 {
-		schedule := make([]string, 0, len(def.Schedule))
-		for _, item := range def.Schedule {
-			if item.Expression != "" {
-				schedule = append(schedule, item.Expression)
-			}
-		}
-		resp.Schedule = &schedule
 	}
 	if agentConfig := toAPIControllerAgentConfig(def.Agent); agentConfig != nil {
 		resp.Agent = agentConfig
+	}
+	return resp
+}
+
+func toAPIControllerTrigger(trigger controller.Trigger) api.ControllerTrigger {
+	resp := api.ControllerTrigger{
+		Type: api.ControllerTriggerType(trigger.Type),
+	}
+	if len(trigger.Schedules) > 0 {
+		schedules := make([]string, 0, len(trigger.Schedules))
+		for _, item := range trigger.Schedules {
+			if item.Expression != "" {
+				schedules = append(schedules, item.Expression)
+			}
+		}
+		if len(schedules) > 0 {
+			resp.Schedules = &schedules
+		}
+	}
+	if trigger.Prompt != "" {
+		resp.Prompt = ptrOf(trigger.Prompt)
 	}
 	return resp
 }
@@ -810,35 +822,35 @@ func toAPIControllerAgentConfig(cfg controller.AgentConfig) *api.ControllerAgent
 	return resp
 }
 
-func toAPIControllerAllowedDAGs(allowed controller.AllowedDAGs) *api.ControllerAllowedDAGs {
-	resp := &api.ControllerAllowedDAGs{}
-	if len(allowed.Names) > 0 {
-		names := append([]string(nil), allowed.Names...)
+func toAPIControllerWorkflows(workflows controller.Workflows) *api.ControllerWorkflows {
+	resp := &api.ControllerWorkflows{}
+	if len(workflows.Names) > 0 {
+		names := append([]string(nil), workflows.Names...)
 		resp.Names = &names
 	}
-	if len(allowed.Tags) > 0 {
-		tags := append([]string(nil), allowed.Tags...)
-		resp.Tags = &tags
+	if len(workflows.Labels) > 0 {
+		labels := append([]string(nil), workflows.Labels...)
+		resp.Labels = &labels
 	}
-	if resp.Names == nil && resp.Tags == nil {
+	if resp.Names == nil && resp.Labels == nil {
 		return nil
 	}
 	return resp
 }
 
-func toAPIControllerAllowedDAGInfos(items []controller.AllowedDAGInfo) []api.ControllerAllowedDAGInfo {
+func toAPIControllerWorkflowInfos(items []controller.WorkflowInfo) []api.ControllerWorkflowInfo {
 	if len(items) == 0 {
-		return []api.ControllerAllowedDAGInfo{}
+		return []api.ControllerWorkflowInfo{}
 	}
-	resp := make([]api.ControllerAllowedDAGInfo, 0, len(items))
+	resp := make([]api.ControllerWorkflowInfo, 0, len(items))
 	for _, item := range items {
-		apiItem := api.ControllerAllowedDAGInfo{
+		apiItem := api.ControllerWorkflowInfo{
 			Description: ptrOf(item.Description),
 			Name:        item.Name,
 		}
-		if len(item.Tags) > 0 {
-			tags := append([]string(nil), item.Tags...)
-			apiItem.Tags = &tags
+		if len(item.Labels) > 0 {
+			labels := append([]string(nil), item.Labels...)
+			apiItem.Labels = &labels
 		}
 		resp = append(resp, apiItem)
 	}

@@ -13,8 +13,8 @@ import (
 
 	openapi "github.com/dagucloud/dagu/api/v1"
 	"github.com/dagucloud/dagu/internal/agent"
-	"github.com/dagucloud/dagu/internal/controller"
 	"github.com/dagucloud/dagu/internal/cmn/config"
+	"github.com/dagucloud/dagu/internal/controller"
 	"github.com/dagucloud/dagu/internal/persis/filedag"
 	"github.com/dagucloud/dagu/internal/persis/filedagrun"
 	"github.com/dagucloud/dagu/internal/persis/filememory"
@@ -87,7 +87,7 @@ func TestControllerDocumentEndpoints(t *testing.T) {
 	ctx := context.Background()
 	api, svc, _ := newControllerMemoryAPI(t)
 
-	require.NoError(t, svc.PutSpec(ctx, "software_dev", "goal: Complete the assigned software work\nallowed_dags:\n  names:\n    - build-app\n"))
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", "trigger:\n  type: manual\ngoal: Complete the assigned software work\nworkflows:\n  names:\n    - build-app\n"))
 
 	getResp, err := api.GetControllerDocument(ctx, openapi.GetControllerDocumentRequestObject{
 		Name:     "software_dev",
@@ -180,9 +180,12 @@ func TestBuildControllerMemoryReflectionPrompt(t *testing.T) {
 
 	detail := &controller.Detail{
 		Definition: &controller.Definition{
-			Name:                "software_dev",
-			Goal:                "Maintain the product",
-			StandingInstruction: "Prefer small changes",
+			Name: "software_dev",
+			Goal: "Maintain the product",
+			Trigger: controller.Trigger{
+				Type:   controller.TriggerModeCron,
+				Prompt: "Prefer small changes",
+			},
 		},
 		State: &controller.State{
 			Instruction: "Fix the broken build",
@@ -210,6 +213,7 @@ func TestBuildControllerMemoryReflectionPrompt(t *testing.T) {
 	prompt := buildControllerMemoryReflectionPrompt(detail, "# Memory\n\nExisting rule.")
 	require.Contains(t, prompt, "Controller: software_dev")
 	require.Contains(t, prompt, "Goal: Maintain the product")
+	require.Contains(t, prompt, "Trigger prompt: Prefer small changes")
 	require.Contains(t, prompt, "1. [open] Update API schema")
 	require.Contains(t, prompt, "Please avoid broad DAG listings.")
 	require.Contains(t, prompt, "# Memory\n\nExisting rule.")

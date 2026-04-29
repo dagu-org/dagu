@@ -20,10 +20,11 @@ export function updateControllerMetadataInSpec(
     iconUrl: string;
     goal: string;
     model: string;
-    standingInstruction: string;
+    triggerPrompt: string;
     resetOnFinish: boolean;
-    schedule: string[];
-    allowedDAGNames?: string[];
+    triggerType: 'manual' | 'cron';
+    cronSchedules: string[];
+    workflowNames?: string[];
   }
 ): string {
   const parsed = parse(spec);
@@ -54,13 +55,6 @@ export function updateControllerMetadataInSpec(
     delete nextSpec.goal;
   }
 
-  const nextStandingInstruction = metadata.standingInstruction.trim();
-  if (nextStandingInstruction) {
-    nextSpec.standing_instruction = nextStandingInstruction;
-  } else {
-    delete nextSpec.standing_instruction;
-  }
-
   if (metadata.resetOnFinish) {
     nextSpec.reset_on_finish = true;
   } else {
@@ -68,28 +62,29 @@ export function updateControllerMetadataInSpec(
     delete nextSpec.resetOnFinish;
   }
 
-  if (metadata.schedule.length === 1) {
-    nextSpec.schedule = metadata.schedule[0];
-  } else if (metadata.schedule.length > 1) {
-    nextSpec.schedule = [...metadata.schedule];
-  } else {
-    delete nextSpec.schedule;
-  }
+  const nextTriggerPrompt = metadata.triggerPrompt.trim();
+  nextSpec.trigger =
+    metadata.triggerType === 'cron'
+      ? {
+          type: 'cron',
+          schedules: [...metadata.cronSchedules],
+          ...(nextTriggerPrompt ? { prompt: nextTriggerPrompt } : {}),
+        }
+      : { type: 'manual' };
 
-  if (metadata.allowedDAGNames !== undefined) {
-    const allowedDAGNames = normalizeNameList(metadata.allowedDAGNames);
-    const allowedDAGs = asRecord(nextSpec.allowed_dags ?? nextSpec.allowedDAGs);
-    if (allowedDAGNames.length > 0) {
-      allowedDAGs.names = allowedDAGNames;
+  if (metadata.workflowNames !== undefined) {
+    const workflowNames = normalizeNameList(metadata.workflowNames);
+    const workflows = asRecord(nextSpec.workflows);
+    if (workflowNames.length > 0) {
+      workflows.names = workflowNames;
     } else {
-      delete allowedDAGs.names;
+      delete workflows.names;
     }
-    if (Object.keys(allowedDAGs).length > 0) {
-      nextSpec.allowed_dags = allowedDAGs;
+    if (Object.keys(workflows).length > 0) {
+      nextSpec.workflows = workflows;
     } else {
-      delete nextSpec.allowed_dags;
+      delete nextSpec.workflows;
     }
-    delete nextSpec.allowedDAGs;
   }
 
   const nextModel = metadata.model.trim();

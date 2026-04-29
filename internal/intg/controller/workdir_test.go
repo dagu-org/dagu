@@ -12,14 +12,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRunAllowedDAGDefaultsLocalWorkingDirToControllerWorkspace(t *testing.T) {
+func TestRunWorkflowDefaultsLocalWorkingDirToControllerWorkspace(t *testing.T) {
 	const (
 		controllerName = "software_dev"
 		dagName       = "workspace-child"
 	)
 
 	f := newTestFixture(t, dagName, workingDirProbeDAG(dagName),
-		toolCallResponse("run_allowed_dag", controllerRunDAGArgs(dagName)),
+		toolCallResponse("run_workflow", controllerRunWorkflowArgs(dagName)),
 	)
 	f.putController(controllerName, dagName)
 	f.startController(controllerName)
@@ -43,7 +43,7 @@ func TestRunAllowedDAGDefaultsLocalWorkingDirToControllerWorkspace(t *testing.T)
 	assertSamePath(t, workspace, readTrimmedFile(t, actualPath))
 }
 
-func TestRunAllowedDAGKeepsExplicitWorkingDir(t *testing.T) {
+func TestRunWorkflowKeepsExplicitWorkingDir(t *testing.T) {
 	const (
 		controllerName = "software_dev"
 		dagName       = "explicit-workdir-child"
@@ -51,7 +51,7 @@ func TestRunAllowedDAGKeepsExplicitWorkingDir(t *testing.T) {
 
 	explicitDir := t.TempDir()
 	f := newTestFixture(t, dagName, explicitWorkingDirProbeDAG(dagName, explicitDir),
-		toolCallResponse("run_allowed_dag", controllerRunDAGArgs(dagName)),
+		toolCallResponse("run_workflow", controllerRunWorkflowArgs(dagName)),
 	)
 	f.putController(controllerName, dagName)
 	f.startController(controllerName)

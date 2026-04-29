@@ -16,17 +16,18 @@ import {
   type ControllerRunSummary,
   type ControllerTask,
   type ControllerTaskTemplate,
-  formatControllerScheduleText,
+  formatControllerCronScheduleText,
   isValidControllerIconUrl,
-  parseControllerScheduleText,
+  parseControllerCronScheduleText,
   taskCounts,
-  validateControllerScheduleExpressions,
+  validateControllerCronScheduleExpressions,
 } from '@/features/controller/detail-utils';
 
 type MutationCallback = (() => void | Promise<void>) | undefined;
 const CLONE_NAME_SUFFIX_LENGTH = 6;
 const CLONE_NAME_SUFFIX_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
 const DAG_PICKER_SEARCH_LIMIT = 25;
+type ControllerTriggerType = 'manual' | 'cron';
 
 function normalizeDAGNameList(items?: string[]): string[] {
   return Array.from(
@@ -145,14 +146,16 @@ export function useControllerDetailController({
   const [iconUrlDraft, setIconUrlDraft] = React.useState('');
   const [descriptionDraft, setDescriptionDraft] = React.useState('');
   const [goalDraft, setGoalDraft] = React.useState('');
-  const [standingInstructionDraft, setStandingInstructionDraft] =
+  const [triggerPromptDraft, setTriggerPromptDraft] =
     React.useState('');
   const [resetOnFinishDraft, setResetOnFinishDraft] = React.useState(false);
-  const [scheduleDraft, setScheduleDraft] = React.useState('');
-  const [allowedDAGNamesDraft, setAllowedDAGNamesDraft] = React.useState<
+  const [triggerTypeDraft, setTriggerTypeDraft] =
+    React.useState<ControllerTriggerType>('manual');
+  const [cronScheduleDraft, setCronScheduleDraft] = React.useState('');
+  const [workflowNamesDraft, setWorkflowNamesDraft] = React.useState<
     string[]
   >([]);
-  const [allowedDAGSearchQuery, setAllowedDAGSearchQuery] = React.useState('');
+  const [workflowSearchQuery, setWorkflowSearchQuery] = React.useState('');
   const [taskEditDraft, setTaskEditDraft] =
     React.useState<ControllerTaskTemplate | null>(null);
   const [taskEditDescription, setTaskEditDescription] = React.useState('');
@@ -171,16 +174,16 @@ export function useControllerDetailController({
   const [isSavingSpec, setIsSavingSpec] = React.useState(false);
   const selectedWorkspaceTag =
     workspaceTagForControllerSelection(selectedWorkspace);
-  const allowedDAGSearchName = allowedDAGSearchQuery.trim();
+  const workflowSearchName = workflowSearchQuery.trim();
   const dagListQuery = useQuery(
     '/dags',
-    whenEnabled(enabled && !!allowedDAGSearchName, {
+    whenEnabled(enabled && !!workflowSearchName, {
       params: {
         query: {
           perPage: DAG_PICKER_SEARCH_LIMIT,
           remoteNode: remoteNode || undefined,
           labels: selectedWorkspaceTag,
-          name: allowedDAGSearchName,
+          name: workflowSearchName,
         },
       },
     }),
@@ -191,7 +194,7 @@ export function useControllerDetailController({
     setInstructionDraft('');
     setOperatorMessageDraft('');
     setNewTaskDescription('');
-    setAllowedDAGSearchQuery('');
+    setWorkflowSearchQuery('');
     setTaskEditDraft(null);
     setTaskEditDescription('');
     setActionError('');
@@ -199,29 +202,37 @@ export function useControllerDetailController({
 
   React.useEffect(() => {
     if (!isEditingMetadata) {
+      const persistedTriggerType =
+        detail?.definition?.trigger?.type === 'cron' ? 'cron' : 'manual';
+      const persistedSchedules =
+        persistedTriggerType === 'cron'
+          ? detail?.definition?.trigger?.schedules
+          : [];
+      const persistedTriggerPrompt =
+        persistedTriggerType === 'cron'
+          ? detail?.definition?.trigger?.prompt || ''
+          : '';
       setDescriptionDraft(detail?.definition?.description || '');
       setIconUrlDraft(detail?.definition?.iconUrl || '');
       setGoalDraft(detail?.definition?.goal || '');
-      setStandingInstructionDraft(
-        detail?.definition?.standingInstruction || ''
-      );
+      setTriggerPromptDraft(persistedTriggerPrompt);
       setResetOnFinishDraft(!!detail?.definition?.resetOnFinish);
-      setScheduleDraft(
-        formatControllerScheduleText(detail?.definition?.schedule)
-      );
-      setAllowedDAGNamesDraft(
-        normalizeDAGNameList(detail?.definition?.allowedDAGs?.names)
+      setTriggerTypeDraft(persistedTriggerType);
+      setCronScheduleDraft(formatControllerCronScheduleText(persistedSchedules));
+      setWorkflowNamesDraft(
+        normalizeDAGNameList(detail?.definition?.workflows?.names)
       );
       setModelDraft(detail?.definition?.agent?.model || '');
     }
   }, [
-    detail?.definition?.allowedDAGs?.names,
+    detail?.definition?.workflows?.names,
     detail?.definition?.description,
     detail?.definition?.iconUrl,
     detail?.definition?.goal,
     detail?.definition?.resetOnFinish,
-    detail?.definition?.schedule,
-    detail?.definition?.standingInstruction,
+    detail?.definition?.trigger?.prompt,
+    detail?.definition?.trigger?.schedules,
+    detail?.definition?.trigger?.type,
     detail?.definition?.agent?.model,
     isEditingMetadata,
   ]);
@@ -291,16 +302,25 @@ export function useControllerDetailController({
   const runtimeControllerReady = controllerStatus?.state === 'ready';
   const displayStatus =
     detail?.state?.displayStatus ?? detail?.state?.state ?? '';
+  const triggerType =
+    detail?.definition?.trigger?.type === 'cron' ? 'cron' : 'manual';
+  const persistedTriggerPrompt =
+    triggerType === 'cron' ? detail?.definition?.trigger?.prompt || '' : '';
+  const persistedCronSchedules =
+    triggerType === 'cron' ? detail?.definition?.trigger?.schedules || [] : [];
   const taskSummary = React.useMemo(
     () => taskCounts(detail?.state?.tasks),
     [detail?.state?.tasks]
   );
-  const scheduleExpressions = React.useMemo(
-    () => parseControllerScheduleText(scheduleDraft),
-    [scheduleDraft]
+  const cronScheduleExpressions = React.useMemo(
+    () => parseControllerCronScheduleText(cronScheduleDraft),
+    [cronScheduleDraft]
   );
+  const effectiveCronSchedules =
+    triggerTypeDraft === 'cron' ? cronScheduleExpressions : [];
   const canStartTask =
     runtimeControllerReady &&
+    triggerType === 'manual' &&
     (lifecycleState === 'idle' || lifecycleState === 'finished');
   const canSendOperatorMessage =
     !!detail &&
@@ -313,7 +333,8 @@ export function useControllerDetailController({
     runtimeControllerReady &&
     (lifecycleState === 'running' || lifecycleState === 'waiting');
   const canResume = runtimeControllerReady && lifecycleState === 'paused';
-  const scheduleConfigured = (detail?.definition?.schedule?.length || 0) > 0;
+  const cronSchedulesConfigured =
+    triggerType === 'cron' && persistedCronSchedules.length > 0;
 
   const descriptionChanged =
     descriptionDraft.trim() !== (detail?.definition?.description || '').trim();
@@ -321,17 +342,17 @@ export function useControllerDetailController({
     iconUrlDraft.trim() !== (detail?.definition?.iconUrl || '').trim();
   const goalChanged =
     goalDraft.trim() !== (detail?.definition?.goal || '').trim();
-  const standingInstructionChanged =
-    standingInstructionDraft.trim() !==
-    (detail?.definition?.standingInstruction || '').trim();
+  const triggerPromptChanged =
+    triggerPromptDraft.trim() !== persistedTriggerPrompt.trim();
   const resetOnFinishChanged =
     resetOnFinishDraft !== !!detail?.definition?.resetOnFinish;
-  const scheduleChanged =
-    formatControllerScheduleText(scheduleExpressions) !==
-    formatControllerScheduleText(detail?.definition?.schedule);
-  const allowedDAGNamesChanged = !sameDAGNameList(
-    allowedDAGNamesDraft,
-    detail?.definition?.allowedDAGs?.names
+  const triggerTypeChanged = triggerTypeDraft !== triggerType;
+  const cronSchedulesChanged =
+    formatControllerCronScheduleText(effectiveCronSchedules) !==
+    formatControllerCronScheduleText(persistedCronSchedules);
+  const workflowNamesChanged = !sameDAGNameList(
+    workflowNamesDraft,
+    detail?.definition?.workflows?.names
   );
   const modelChanged =
     modelDraft.trim() !== (detail?.definition?.agent?.model || '').trim();
@@ -339,25 +360,28 @@ export function useControllerDetailController({
     descriptionChanged ||
     iconUrlChanged ||
     goalChanged ||
-    standingInstructionChanged ||
+    triggerPromptChanged ||
     resetOnFinishChanged ||
-    scheduleChanged ||
-    allowedDAGNamesChanged ||
+    triggerTypeChanged ||
+    cronSchedulesChanged ||
+    workflowNamesChanged ||
     modelChanged;
-  const allowedDAGNames = React.useMemo(
-    () => normalizeDAGNameList(allowedDAGNamesDraft),
-    [allowedDAGNamesDraft]
+  const workflowNames = React.useMemo(
+    () => normalizeDAGNameList(workflowNamesDraft),
+    [workflowNamesDraft]
   );
-  const allowedDAGTagsConfigured =
-    (detail?.definition?.allowedDAGs?.tags?.length || 0) > 0;
   const metadataValidationError = !isValidControllerIconUrl(iconUrlDraft)
     ? 'Icon URL must be an absolute http(s) URL or a root-relative path.'
     : iconUrlDraft.trim().length > 2048
       ? 'Icon URL must be 2048 characters or fewer.'
-      : validateControllerScheduleExpressions(scheduleExpressions) ||
-        (allowedDAGNames.length === 0 && !allowedDAGTagsConfigured
-          ? 'Select at least one allowed DAG, or configure allowed_dags.tags in raw spec.'
-          : null);
+      : (triggerTypeDraft === 'cron' &&
+          (validateControllerCronScheduleExpressions(cronScheduleExpressions) ||
+            (cronScheduleExpressions.length === 0
+              ? 'Add at least one cron schedule.'
+              : !triggerPromptDraft.trim()
+                ? 'Add a trigger prompt.'
+                : null))) ||
+        null;
   const metadataSaveDisabled =
     !name ||
     !detail ||
@@ -895,10 +919,11 @@ export function useControllerDetailController({
         iconUrl: iconUrlDraft,
         goal: goalDraft,
         model: modelDraft,
-        standingInstruction: standingInstructionDraft,
+        triggerPrompt: triggerPromptDraft,
         resetOnFinish: resetOnFinishDraft,
-        schedule: scheduleExpressions,
-        allowedDAGNames,
+        triggerType: triggerTypeDraft,
+        cronSchedules: effectiveCronSchedules,
+        workflowNames,
       });
       const { error: apiError } = await client.PUT('/controller/{name}/spec', {
         params: { path: { name } },
@@ -927,33 +952,38 @@ export function useControllerDetailController({
     name,
     refreshAfterAction,
     resetOnFinishDraft,
-    allowedDAGNames,
-    scheduleExpressions,
+    workflowNames,
+    effectiveCronSchedules,
     specQuery.data?.spec,
-    standingInstructionDraft,
+    triggerPromptDraft,
+    triggerTypeDraft,
   ]);
 
   const onCancelMetadata = React.useCallback(() => {
     setDescriptionDraft(detail?.definition?.description || '');
     setIconUrlDraft(detail?.definition?.iconUrl || '');
     setGoalDraft(detail?.definition?.goal || '');
-    setStandingInstructionDraft(detail?.definition?.standingInstruction || '');
+    setTriggerPromptDraft(persistedTriggerPrompt);
     setResetOnFinishDraft(!!detail?.definition?.resetOnFinish);
-    setScheduleDraft(formatControllerScheduleText(detail?.definition?.schedule));
-    setAllowedDAGNamesDraft(
-      normalizeDAGNameList(detail?.definition?.allowedDAGs?.names)
+    setTriggerTypeDraft(triggerType);
+    setCronScheduleDraft(
+      formatControllerCronScheduleText(persistedCronSchedules)
+    );
+    setWorkflowNamesDraft(
+      normalizeDAGNameList(detail?.definition?.workflows?.names)
     );
     setModelDraft(detail?.definition?.agent?.model || '');
     setIsEditingMetadata(false);
   }, [
     detail?.definition?.agent?.model,
-    detail?.definition?.allowedDAGs?.names,
+    detail?.definition?.workflows?.names,
     detail?.definition?.description,
     detail?.definition?.goal,
     detail?.definition?.iconUrl,
     detail?.definition?.resetOnFinish,
-    detail?.definition?.schedule,
-    detail?.definition?.standingInstruction,
+    persistedTriggerPrompt,
+    persistedCronSchedules,
+    triggerType,
   ]);
 
   return {
@@ -979,16 +1009,19 @@ export function useControllerDetailController({
     setDescriptionDraft,
     goalDraft,
     setGoalDraft,
-    standingInstructionDraft,
-    setStandingInstructionDraft,
+    triggerPromptDraft,
+    setTriggerPromptDraft,
     resetOnFinishDraft,
     setResetOnFinishDraft,
-    scheduleDraft,
-    setScheduleDraft,
-    allowedDAGNamesDraft,
-    setAllowedDAGNamesDraft,
-    allowedDAGSearchQuery,
-    setAllowedDAGSearchQuery,
+    triggerType,
+    triggerTypeDraft,
+    setTriggerTypeDraft,
+    cronScheduleDraft,
+    setCronScheduleDraft,
+    workflowNamesDraft,
+    setWorkflowNamesDraft,
+    workflowSearchQuery,
+    setWorkflowSearchQuery,
     availableDAGOptions,
     dagListQuery,
     modelDraft,
@@ -1023,7 +1056,7 @@ export function useControllerDetailController({
     canSendOperatorMessage,
     canPause,
     canResume,
-    scheduleConfigured,
+    cronSchedulesConfigured,
     metadataChanged,
     metadataValidationError,
     metadataSaveDisabled,

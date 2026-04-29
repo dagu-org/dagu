@@ -510,8 +510,7 @@ function StatusTab({
     null
   );
   const hasTaskTemplates = (controller.detail?.taskTemplates?.length || 0) > 0;
-  const hasStandingInstruction =
-    !!controller.detail?.definition?.standingInstruction?.trim();
+  const hasTriggerPrompt = !!controller.detail?.definition?.trigger?.prompt?.trim();
   const startMode =
     controller.lifecycleState === 'idle' ||
     controller.lifecycleState === 'finished';
@@ -521,7 +520,7 @@ function StatusTab({
   const canStartCycle =
     controller.canStartTask &&
     hasTaskTemplates &&
-    (!!controller.instructionDraft.trim() || hasStandingInstruction);
+    !!controller.instructionDraft.trim();
   const canSubmitConversation = startMode
     ? canStartCycle
     : !!controller.operatorMessageDraft.trim() &&
@@ -572,11 +571,13 @@ function StatusTab({
           <h2 className="mb-3 text-sm font-semibold">Status Notes</h2>
           <div className="space-y-2 text-sm text-muted-foreground">
             <p>
-              {controller.scheduleConfigured
-                ? hasStandingInstruction && hasTaskTemplates
-                  ? 'Due schedule ticks can start a fresh cycle automatically from the Config task template.'
-                  : 'Schedule is configured, but it cannot start clean cycles until Standing Instruction and at least one task template are set in Config.'
-                : 'No schedule is configured for this controller.'}
+              {controller.triggerType === 'cron'
+                ? controller.cronSchedulesConfigured
+                  ? hasTriggerPrompt && hasTaskTemplates
+                    ? 'Due cron ticks can start a fresh cycle automatically from the Config task template.'
+                    : 'Cron triggering is configured, but it cannot start clean cycles until Trigger Prompt and at least one task template are set in Config.'
+                  : 'Cron triggering is selected, but no schedules are configured yet.'
+                : 'This controller starts only from an explicit manual start.'}
             </p>
             {controller.detail?.state.pendingPrompt ? (
               <p>
@@ -675,18 +676,18 @@ function StatusTab({
       <div className="min-w-0 rounded-lg border p-4">
         <h2 className="mb-3 text-sm font-semibold">Conversation</h2>
         <div className="space-y-3">
-          {hasStandingInstruction ? (
+          {hasTriggerPrompt ? (
             <div className="space-y-3 rounded-md border bg-muted/20 p-3">
               <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Standing Instruction
+                Trigger Prompt
               </div>
-              {hasStandingInstruction ? (
+              {hasTriggerPrompt ? (
                 <div className="whitespace-pre-wrap break-words text-sm">
-                  {controller.detail?.definition?.standingInstruction}
+                  {controller.detail?.definition?.trigger?.prompt}
                 </div>
               ) : (
                 <div className="text-sm text-muted-foreground">
-                  No standing instruction is configured yet.
+                  No trigger prompt is configured yet.
                 </div>
               )}
             </div>
@@ -705,9 +706,7 @@ function StatusTab({
             className="min-h-24 overflow-hidden resize-none"
             placeholder={
               startMode
-                ? hasStandingInstruction
-                  ? 'Add an optional one-off instruction for this cycle.'
-                  : 'Tell this Controller what task to work on.'
+                ? 'Tell this Controller what task to work on.'
                 : 'Add context, change priority, or clarify the current task.'
             }
             disabled={
@@ -722,11 +721,11 @@ function StatusTab({
               {startMode
                 ? controller.canStartTask
                   ? hasTaskTemplates
-                    ? hasStandingInstruction
-                      ? 'Starting creates a fresh cycle from the Config task template. The standing instruction is used unless you enter a one-off instruction.'
-                      : 'Starting creates a fresh cycle from the Config task template.'
+                    ? 'Starting creates a fresh cycle from the Config task template.'
                     : 'Add at least one task template in Config before starting.'
-                  : 'Starting is gated by scheduler controller readiness.'
+                  : controller.triggerType === 'cron'
+                    ? 'Manual start is disabled because this Controller uses cron triggering.'
+                    : 'Starting is gated by scheduler controller readiness.'
                 : controller.detail?.state.pendingPrompt
                   ? 'Respond to the pending prompt before sending a general operator message.'
                   : controller.canSendOperatorMessage
@@ -797,16 +796,19 @@ function ConfigTab({
     !!controller.busyAction ||
     controller.isSavingSpec ||
     controller.isEditingSpec;
-  const allowedDAGTags = controller.detail?.definition.allowedDAGs?.tags || [];
-  const selectedAllowedDAGs = React.useMemo(() => {
+  const workflowLabels = controller.detail?.definition.workflows?.labels || [];
+  const selectedWorkflows = React.useMemo(() => {
     const infoByName = new Map(
-      (controller.detail?.allowedDags || []).map((dag) => [dag.name, dag])
+      (controller.detail?.workflows || []).map((workflow) => [
+        workflow.name,
+        workflow,
+      ])
     );
-    return controller.allowedDAGNamesDraft.map((name) => ({
+    return controller.workflowNamesDraft.map((name) => ({
       name,
       info: infoByName.get(name),
     }));
-  }, [controller.allowedDAGNamesDraft, controller.detail?.allowedDags]);
+  }, [controller.workflowNamesDraft, controller.detail?.workflows]);
 
   return (
     <div className="space-y-4">
@@ -833,43 +835,70 @@ function ConfigTab({
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="controller-detail-standing-instruction">
-                Standing Instruction
-              </Label>
-              <Textarea
-                id="controller-detail-standing-instruction"
-                value={controller.standingInstructionDraft}
-                onChange={(event) => {
-                  controller.setStandingInstructionDraft(event.target.value);
+              <Label htmlFor="controller-detail-trigger">Trigger</Label>
+              <Select
+                value={controller.triggerTypeDraft}
+                onValueChange={(value) => {
+                  controller.setTriggerTypeDraft(value as 'manual' | 'cron');
                   controller.setIsEditingMetadata(true);
                 }}
-                placeholder="Handle each scheduled cycle and use the task list as the default operating checklist."
                 disabled={metadataFieldDisabled}
-              />
+              >
+                <SelectTrigger id="controller-detail-trigger">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="manual">Manual</SelectItem>
+                  <SelectItem value="cron">Cron</SelectItem>
+                </SelectContent>
+              </Select>
               <div className="text-xs text-muted-foreground">
-                Optional. Used as the default instruction for starts and
-                scheduled cycles.
+                Choose exactly one activation mode for this Controller.
               </div>
             </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="controller-detail-schedule">Schedule</Label>
-              <Textarea
-                id="controller-detail-schedule"
-                value={controller.scheduleDraft}
-                onChange={(event) => {
-                  controller.setScheduleDraft(event.target.value);
-                  controller.setIsEditingMetadata(true);
-                }}
-                placeholder={'0 * * * *\n30 9 * * 1-5'}
-                disabled={metadataFieldDisabled}
-                rows={3}
-              />
-              <div className="text-xs text-muted-foreground">
-                Optional. Use one cron expression per line. Due ticks start a
-                fresh cycle by reopening the Config task template.
-              </div>
-            </div>
+            {controller.triggerTypeDraft === 'cron' ? (
+              <>
+                <div className="grid gap-2">
+                  <Label htmlFor="controller-detail-schedule">Cron Schedules</Label>
+                  <Textarea
+                    id="controller-detail-schedule"
+                    value={controller.cronScheduleDraft}
+                    onChange={(event) => {
+                      controller.setCronScheduleDraft(event.target.value);
+                      controller.setIsEditingMetadata(true);
+                    }}
+                    placeholder={'0 * * * *\n30 9 * * 1-5'}
+                    disabled={metadataFieldDisabled}
+                    rows={3}
+                  />
+                  <div className="text-xs text-muted-foreground">
+                    Use one cron expression per line. Due ticks start a fresh
+                    cycle by reopening the Config task template.
+                  </div>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="controller-detail-trigger-prompt">
+                    Trigger Prompt
+                  </Label>
+                  <Textarea
+                    id="controller-detail-trigger-prompt"
+                    value={controller.triggerPromptDraft}
+                    onChange={(event) => {
+                      controller.setTriggerPromptDraft(event.target.value);
+                      controller.setIsEditingMetadata(true);
+                    }}
+                    placeholder="Handle each scheduled cycle and use the task list as the default operating checklist."
+                    disabled={metadataFieldDisabled}
+                    rows={4}
+                  />
+                  <div className="text-xs text-muted-foreground">
+                    Required for cron mode. This prompt is used whenever a due
+                    trigger starts a new cycle.
+                  </div>
+                </div>
+              </>
+            ) : null}
 
             <div className="flex items-center justify-between gap-4 rounded-md border px-3 py-2">
               <Label htmlFor="controller-detail-reset-on-finish">
@@ -961,16 +990,16 @@ function ConfigTab({
               />
             </div>
 
-            {controller.detail?.definition.tags?.length ? (
+            {controller.detail?.definition.labels?.length ? (
               <div>
-                <span className="font-medium">Tags:</span>
+                <span className="font-medium">Labels:</span>
                 <div className="mt-1 flex flex-wrap gap-1">
-                  {controller.detail.definition.tags.map((tag) => (
+                  {controller.detail.definition.labels.map((label) => (
                     <span
-                      key={tag}
+                      key={label}
                       className="rounded-full border px-2 py-0.5 text-xs text-muted-foreground"
                     >
-                      {tag}
+                      {label}
                     </span>
                   ))}
                 </div>
@@ -1018,32 +1047,32 @@ function ConfigTab({
         </div>
 
         <div className="min-w-0 rounded-lg border p-4">
-          <h2 className="mb-3 text-sm font-semibold">Allowed DAGs</h2>
+          <h2 className="mb-3 text-sm font-semibold">Workflows</h2>
           <div className="space-y-4 text-sm">
             <div className="grid gap-2">
               <div className="flex items-center justify-between gap-3">
-                <Label>Allowed DAG names</Label>
+                <Label>Workflow names</Label>
                 <span className="text-xs text-muted-foreground">
-                  {controller.dagListQuery.isLoading
-                    ? 'Loading DAGs...'
-                    : `${controller.allowedDAGNamesDraft.length} selected`}
+                {controller.dagListQuery.isLoading
+                  ? 'Loading DAGs...'
+                  : `${controller.workflowNamesDraft.length} selected`}
                 </span>
               </div>
               <DAGNamePicker
                 availableDAGs={controller.availableDAGOptions}
-                selectedNames={controller.allowedDAGNamesDraft}
+                selectedNames={controller.workflowNamesDraft}
                 onChange={(names) => {
-                  controller.setAllowedDAGNamesDraft(names);
+                  controller.setWorkflowNamesDraft(names);
                   controller.setIsEditingMetadata(true);
                 }}
-                searchQuery={controller.allowedDAGSearchQuery}
-                onSearchQueryChange={controller.setAllowedDAGSearchQuery}
+                searchQuery={controller.workflowSearchQuery}
+                onSearchQueryChange={controller.setWorkflowSearchQuery}
                 isLoading={controller.dagListQuery.isLoading}
                 disabled={metadataFieldDisabled}
               />
               <div className="text-xs text-muted-foreground">
-                Remove selected DAGs from the chips above. Use the list below
-                to inspect each DAG.
+                Remove selected workflows from the chips above. Use the list
+                below to inspect each workflow.
               </div>
               {controller.dagListQuery.error ? (
                 <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
@@ -1052,20 +1081,20 @@ function ConfigTab({
                     : 'Failed to load DAGs'}
                 </div>
               ) : null}
-              {allowedDAGTags.length ? (
+              {workflowLabels.length ? (
                 <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-                  The raw spec also allows DAGs matching tags:{' '}
-                  <span className="font-mono">{allowedDAGTags.join(', ')}</span>
+                  The raw spec also includes workflows matching labels:{' '}
+                  <span className="font-mono">{workflowLabels.join(', ')}</span>
                 </div>
               ) : null}
             </div>
 
             <div className="space-y-2">
               <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Selected DAGs
+                Selected workflows
               </div>
-              {selectedAllowedDAGs.length ? (
-                selectedAllowedDAGs.map(({ name, info }) => (
+              {selectedWorkflows.length ? (
+                selectedWorkflows.map(({ name, info }) => (
                   <button
                     key={name}
                     type="button"
@@ -1078,16 +1107,16 @@ function ConfigTab({
                         {info.description}
                       </div>
                     ) : null}
-                    {info?.tags?.length ? (
+                    {info?.labels?.length ? (
                       <div className="mt-1 text-[11px] text-muted-foreground">
-                        {info.tags.join(', ')}
+                        {info.labels.join(', ')}
                       </div>
                     ) : null}
                   </button>
                 ))
               ) : (
                 <div className="rounded-md border border-dashed p-3 text-muted-foreground">
-                  No allowed DAG names are selected.
+                  No workflow names are selected.
                 </div>
               )}
             </div>

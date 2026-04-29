@@ -102,8 +102,8 @@ func buildControllerMemoryReflectionPrompt(detail *controller.Detail, currentCon
 		if detail.Definition.Goal != "" {
 			fmt.Fprintf(&b, "Goal: %s\n", detail.Definition.Goal)
 		}
-		if detail.Definition.StandingInstruction != "" {
-			fmt.Fprintf(&b, "Standing instruction: %s\n", detail.Definition.StandingInstruction)
+		if detail.Definition.Trigger.Prompt != "" {
+			fmt.Fprintf(&b, "Trigger prompt: %s\n", detail.Definition.Trigger.Prompt)
 		}
 	}
 	if detail.State != nil {

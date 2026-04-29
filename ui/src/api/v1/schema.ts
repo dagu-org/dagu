@@ -5401,10 +5401,10 @@ export interface components {
          * @enum {string}
          */
         ControllerWaitingReason: ControllerWaitingReason;
-        /** @description Allowlisted DAG names and tags */
-        ControllerAllowedDAGs: {
+        /** @description Workflow names and labels managed by a Controller */
+        ControllerWorkflows: {
             names?: string[];
-            tags?: string[];
+            labels?: string[];
         };
         /**
          * @description Checklist task state
@@ -5443,6 +5443,17 @@ export interface components {
             soul?: string;
             safeMode?: boolean;
         };
+        /**
+         * @description Controller activation mode
+         * @enum {string}
+         */
+        ControllerTriggerType: ControllerTriggerType;
+        /** @description Controller activation configuration */
+        ControllerTrigger: {
+            type: components["schemas"]["ControllerTriggerType"];
+            schedules?: string[];
+            prompt?: string;
+        };
         /** @description Controller definition */
         ControllerDefinition: {
             name: string;
@@ -5452,11 +5463,10 @@ export interface components {
             description?: string;
             goal?: string;
             clonedFrom?: string;
-            standingInstruction?: string;
             resetOnFinish?: boolean;
-            schedule?: string[];
-            tags?: string[];
-            allowedDAGs?: components["schemas"]["ControllerAllowedDAGs"];
+            trigger: components["schemas"]["ControllerTrigger"];
+            labels?: string[];
+            workflows?: components["schemas"]["ControllerWorkflows"];
             agent?: components["schemas"]["ControllerAgentConfig"];
             disabled?: boolean;
         };
@@ -5503,11 +5513,11 @@ export interface components {
             createdAt?: string;
             error?: string;
         };
-        /** @description Resolved DAG allowed in the current Controller */
-        ControllerAllowedDAGInfo: {
+        /** @description Workflow currently managed or available to the Controller */
+        ControllerWorkflowInfo: {
             name: string;
             description?: string;
-            tags?: string[];
+            labels?: string[];
         };
         /** @description Current runtime state for a Controller */
         ControllerState: {
@@ -5557,7 +5567,7 @@ export interface components {
             goal?: string;
             clonedFrom?: string;
             resetOnFinish?: boolean;
-            tags?: string[];
+            labels?: string[];
             instruction?: string;
             state: components["schemas"]["ControllerLifecycleState"];
             displayStatus?: components["schemas"]["ControllerDisplayStatus"];
@@ -5580,7 +5590,7 @@ export interface components {
         ControllerDetailResponse: {
             definition: components["schemas"]["ControllerDefinition"];
             state: components["schemas"]["ControllerState"];
-            allowedDags: components["schemas"]["ControllerAllowedDAGInfo"][];
+            workflows: components["schemas"]["ControllerWorkflowInfo"][];
             taskTemplates?: components["schemas"]["ControllerTaskTemplate"][];
             currentRun?: components["schemas"]["ControllerRunSummary"];
             recentRuns?: components["schemas"]["ControllerRunSummary"][];
@@ -16393,6 +16403,10 @@ export enum ControllerWaitingReason {
 export enum ControllerTaskState {
     open = "open",
     done = "done"
+}
+export enum ControllerTriggerType {
+    manual = "manual",
+    cron = "cron"
 }
 export enum CreateRemoteNodeRequestAuthType {
     none = "none",

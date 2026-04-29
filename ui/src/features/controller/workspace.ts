@@ -9,24 +9,24 @@ export function workspaceTagForControllerSelection(
   return workspaceLabel(selectedWorkspace);
 }
 
-export function applySelectedWorkspaceToControllerTags(
-  tags: string[],
+export function applySelectedWorkspaceToControllerLabels(
+  labels: string[],
   selectedWorkspace: string
 ): string[] {
   const workspaceTag = workspaceTagForControllerSelection(selectedWorkspace);
   if (!workspaceTag) {
-    return tags;
+    return labels;
   }
-  const filtered = tags.filter((tag) => !isWorkspaceLabel(tag));
+  const filtered = labels.filter((label) => !isWorkspaceLabel(label));
   return [...filtered, workspaceTag];
 }
 
-type WorkspaceTaggedController = {
-  tags?: string[] | null;
+type WorkspaceLabeledController = {
+  labels?: string[] | null;
 };
 
 export function controllerMatchesSelectedWorkspace(
-  item: WorkspaceTaggedController,
+  item: WorkspaceLabeledController,
   selectedWorkspace: string
 ): boolean {
   if (!selectedWorkspace) {
@@ -37,13 +37,13 @@ export function controllerMatchesSelectedWorkspace(
     return false;
   }
   const normalizedWorkspaceTag = workspaceTag.toLowerCase();
-  return (item.tags || []).some(
-    (tag) => tag.toLowerCase() === normalizedWorkspaceTag
+  return (item.labels || []).some(
+    (label) => label.toLowerCase() === normalizedWorkspaceTag
   );
 }
 
 export function filterControllerBySelectedWorkspace<
-  T extends WorkspaceTaggedController,
+  T extends WorkspaceLabeledController,
 >(items: T[], selectedWorkspace: string): T[] {
   return items.filter((item) =>
     controllerMatchesSelectedWorkspace(item, selectedWorkspace)

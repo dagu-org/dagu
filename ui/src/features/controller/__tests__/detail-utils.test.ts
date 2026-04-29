@@ -6,9 +6,9 @@ import { describe, expect, it } from 'vitest';
 import { AgentMessageType } from '@/api/v1/schema';
 import {
   buildControllerThread,
-  formatControllerScheduleText,
-  parseControllerScheduleText,
-  validateControllerScheduleExpressions,
+  formatControllerCronScheduleText,
+  parseControllerCronScheduleText,
+  validateControllerCronScheduleExpressions,
 } from '@/features/controller/detail-utils';
 
 describe('buildControllerThread', () => {
@@ -83,15 +83,19 @@ describe('buildControllerThread', () => {
 
 describe('controller schedule helpers', () => {
   it('normalizes newline-separated schedules', () => {
-    const parsed = parseControllerScheduleText('\n0 * * * *\n  \n30 9 * * 1-5\n');
+    const parsed = parseControllerCronScheduleText(
+      '\n0 * * * *\n  \n30 9 * * 1-5\n'
+    );
     expect(parsed).toEqual(['0 * * * *', '30 9 * * 1-5']);
-    expect(formatControllerScheduleText(parsed)).toBe('0 * * * *\n30 9 * * 1-5');
+    expect(formatControllerCronScheduleText(parsed)).toBe(
+      '0 * * * *\n30 9 * * 1-5'
+    );
   });
 
   it('validates cron expressions', () => {
-    expect(validateControllerScheduleExpressions(['0 * * * *'])).toBeNull();
-    expect(validateControllerScheduleExpressions(['not-a-cron'])).toContain(
-      'Invalid cron schedule'
-    );
+    expect(validateControllerCronScheduleExpressions(['0 * * * *'])).toBeNull();
+    expect(
+      validateControllerCronScheduleExpressions(['not-a-cron'])
+    ).toContain('Invalid cron schedule');
   });
 });

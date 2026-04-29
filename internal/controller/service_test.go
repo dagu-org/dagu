@@ -104,10 +104,10 @@ func TestServiceListInitializesStateAndTaskSummary(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, StateIdle, detail.State.State)
 	require.Empty(t, detail.State.Tasks)
-	require.Equal(t, []string{"build-app"}, allowedDAGNames(detail.AllowedDAGs))
+	require.Equal(t, []string{"build-app"}, workflowNames(detail.Workflows))
 }
 
-func TestServiceDetailUsesTopLevelAllowedDAGs(t *testing.T) {
+func TestServiceDetailUsesTopLevelWorkflows(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -117,7 +117,7 @@ func TestServiceDetailUsesTopLevelAllowedDAGs(t *testing.T) {
 
 	detail, err := svc.Detail(ctx, "software_dev")
 	require.NoError(t, err)
-	require.Equal(t, []string{"build-app", "run-tests"}, allowedDAGNames(detail.AllowedDAGs))
+	require.Equal(t, []string{"build-app", "run-tests"}, workflowNames(detail.Workflows))
 }
 
 func TestServicePutSpecAcceptsLegacyPurposeAsGoalAlias(t *testing.T) {
@@ -127,8 +127,10 @@ func TestServicePutSpecAcceptsLegacyPurposeAsGoalAlias(t *testing.T) {
 	svc, _ := newTestService(t)
 
 	spec := `description: Legacy controller
+trigger:
+  type: manual
 purpose: Complete the assigned software work
-allowed_dags:
+workflows:
   names:
     - build-app
 `
@@ -146,7 +148,9 @@ func TestServicePutSpecAcceptsMissingGoal(t *testing.T) {
 	svc, _ := newTestService(t)
 
 	spec := `description: Goal-free controller
-allowed_dags:
+trigger:
+  type: manual
+workflows:
   names:
     - build-app
 `
@@ -158,16 +162,107 @@ allowed_dags:
 	require.Equal(t, "Goal-free controller", detail.Definition.Description)
 }
 
+func TestServicePutSpecAcceptsMissingWorkflows(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+
+	spec := `description: Workflow-flexible controller
+trigger:
+  type: manual
+goal: Complete the assigned software work
+`
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", spec))
+
+	detail, err := svc.Detail(ctx, "software_dev")
+	require.NoError(t, err)
+	require.Empty(t, detail.Definition.Workflows.Names)
+	require.Empty(t, detail.Definition.Workflows.Labels)
+}
+
+func TestServicePutSpecRejectsMissingTrigger(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+
+	spec := `description: Goal-free controller
+workflows:
+  names:
+    - build-app
+`
+	err := svc.PutSpec(ctx, "software_dev", spec)
+	require.Error(t, err)
+	require.ErrorContains(t, err, `trigger`)
+}
+
+func TestServicePutSpecRejectsCronTriggerWithoutSchedules(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+
+	spec := `trigger:
+  type: cron
+workflows:
+  names:
+    - build-app
+`
+	err := svc.PutSpec(ctx, "software_dev", spec)
+	require.Error(t, err)
+	require.ErrorContains(t, err, `schedules`)
+}
+
+func TestServicePutSpecRejectsCronTriggerWithoutPrompt(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+
+	spec := `trigger:
+  type: cron
+  schedules:
+    - "* * * * *"
+workflows:
+  names:
+    - build-app
+`
+	err := svc.PutSpec(ctx, "software_dev", spec)
+	require.Error(t, err)
+	require.ErrorContains(t, err, `prompt`)
+}
+
+func TestServicePutSpecRejectsManualTriggerWithPrompt(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+
+	spec := `trigger:
+  type: manual
+  prompt: "Handle the current task."
+workflows:
+  names:
+    - build-app
+`
+	err := svc.PutSpec(ctx, "software_dev", spec)
+	require.Error(t, err)
+	require.ErrorContains(t, err, `trigger.prompt`)
+}
+
 func TestServicePutSpecRejectsStagesField(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
 	svc, _ := newTestService(t)
 
-	spec := `goal: Complete the assigned software work
+	spec := `trigger:
+  type: manual
+goal: Complete the assigned software work
 stages:
   - research
-allowed_dags:
+workflows:
   names:
     - build-app
 `
@@ -190,17 +285,19 @@ func TestServicePutSpecRejectsDotsAndHyphensInControllerName(t *testing.T) {
 	require.ErrorContains(t, err, `invalid controller name "software-dev"`)
 }
 
-func TestServicePutSpecNormalizesTagsAndExposesThemInSummary(t *testing.T) {
+func TestServicePutSpecNormalizesLabelsAndExposesThemInSummary(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
 	svc, _ := newTestService(t)
 
-	spec := `goal: Complete the assigned software work
-tags:
+	spec := `trigger:
+  type: manual
+goal: Complete the assigned software work
+labels:
   - workspace=Engineering
   - Owner=Team-AI
-allowed_dags:
+workflows:
   names:
     - build-app
 `
@@ -209,31 +306,33 @@ allowed_dags:
 
 	detail, err := svc.Detail(ctx, "software_dev")
 	require.NoError(t, err)
-	require.Equal(t, []string{"workspace=engineering", "owner=team-ai"}, detail.Definition.Tags)
+	require.Equal(t, []string{"workspace=engineering", "owner=team-ai"}, detail.Definition.Labels)
 
 	items, err := svc.List(ctx)
 	require.NoError(t, err)
 	require.Len(t, items, 1)
-	require.Equal(t, []string{"workspace=engineering", "owner=team-ai"}, items[0].Tags)
+	require.Equal(t, []string{"workspace=engineering", "owner=team-ai"}, items[0].Labels)
 }
 
-func TestServicePutSpecRejectsInvalidTags(t *testing.T) {
+func TestServicePutSpecRejectsInvalidLabels(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
 	svc, _ := newTestService(t)
 
-	spec := `goal: Complete the assigned software work
-tags:
+	spec := `trigger:
+  type: manual
+goal: Complete the assigned software work
+labels:
   - "bad tag"
-allowed_dags:
+workflows:
   names:
     - build-app
 `
 
 	err := svc.PutSpec(ctx, "software_dev", spec)
 	require.Error(t, err)
-	require.ErrorContains(t, err, "invalid tags")
+	require.ErrorContains(t, err, "invalid labels")
 }
 
 func TestServicePutSpecExposesNicknameAndIconURL(t *testing.T) {
@@ -242,10 +341,12 @@ func TestServicePutSpecExposesNicknameAndIconURL(t *testing.T) {
 	ctx := context.Background()
 	svc, _ := newTestService(t)
 
-	spec := `nickname: Build Captain
+	spec := `trigger:
+  type: manual
+nickname: Build Captain
 icon_url: https://cdn.example.com/controller/build-captain.png
 goal: Complete the assigned software work
-allowed_dags:
+workflows:
   names:
     - build-app
 `
@@ -310,9 +411,11 @@ func TestServicePutSpecRejectsInvalidIconURL(t *testing.T) {
 	ctx := context.Background()
 	svc, _ := newTestService(t)
 
-	spec := `goal: Complete the assigned software work
+	spec := `trigger:
+  type: manual
+goal: Complete the assigned software work
 icon_url: javascript:alert(1)
-allowed_dags:
+workflows:
   names:
     - build-app
 `
@@ -328,16 +431,20 @@ func TestServicePutSpecRejectsUnknownFields(t *testing.T) {
 	ctx := context.Background()
 	svc, _ := newTestService(t)
 
-	err := svc.PutSpec(ctx, "software_dev", `goal: Complete the assigned software work
+	err := svc.PutSpec(ctx, "software_dev", `trigger:
+  type: manual
+goal: Complete the assigned software work
 bogus: true
-allowed_dags:
+workflows:
   names:
     - build-app
 `)
 	require.ErrorContains(t, err, `unknown field "bogus"`)
 
-	err = svc.PutSpec(ctx, "software_dev", `goal: Complete the assigned software work
-allowed_dags:
+	err = svc.PutSpec(ctx, "software_dev", `trigger:
+  type: manual
+goal: Complete the assigned software work
+workflows:
   names:
     - build-app
   bogus:
@@ -345,8 +452,10 @@ allowed_dags:
 `)
 	require.ErrorContains(t, err, `unknown field "bogus"`)
 
-	err = svc.PutSpec(ctx, "software_dev", `goal: Complete the assigned software work
-allowed_dags:
+	err = svc.PutSpec(ctx, "software_dev", `trigger:
+  type: manual
+goal: Complete the assigned software work
+workflows:
   names:
     - build-app
 agent:
@@ -426,6 +535,13 @@ func TestServiceRequestStartRequiresInstructionAndOpenTask(t *testing.T) {
 	require.ErrorContains(t, err, "at least one task template is required")
 
 	createTask(t, svc, ctx, "software_dev", "Investigate the failing test", "tester")
+
+	def, err := svc.GetDefinition(ctx, "software_dev")
+	require.NoError(t, err)
+	state, err := svc.ensureState(ctx, def)
+	require.NoError(t, err)
+	state.Instruction = "Reuse the previous instruction."
+	require.NoError(t, svc.saveState(ctx, def.Name, state))
 
 	err = svc.RequestStart(ctx, "software_dev", StartRequest{RequestedBy: "tester"})
 	require.ErrorContains(t, err, "instruction is required before starting controller")
@@ -1006,7 +1122,7 @@ func TestServiceReconcileOnceDoesNotWakeIdleScheduledController(t *testing.T) {
 	ctx := context.Background()
 	svc, fixedTime := newTestService(t)
 
-	require.NoError(t, svc.PutSpec(ctx, "software_dev", controllerSpecWithSchedule("build-app", "* * * * *")))
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", controllerSpecWithCronTrigger("build-app", "* * * * *")))
 	createTask(t, svc, ctx, "software_dev", "Investigate the failing test", "tester")
 
 	def, err := svc.GetDefinition(ctx, "software_dev")
@@ -1033,16 +1149,13 @@ func TestServiceHandleScheduleTickQueuesTurnForActiveService(t *testing.T) {
 	ctx := context.Background()
 	svc, fixedTime := newTestService(t)
 
-	require.NoError(t, svc.PutSpec(ctx, "queue_worker", serviceControllerSpecWithSchedule("build-app", "* * * * *")))
+	require.NoError(t, svc.PutSpec(ctx, "queue_worker", serviceControllerSpecWithCronTrigger("build-app", "* * * * *")))
 	createTask(t, svc, ctx, "queue_worker", "Process the next queued request", "tester")
-	require.NoError(t, svc.RequestStart(ctx, "queue_worker", StartRequest{
-		RequestedBy: "tester",
-		Instruction: "Handle inbound work continuously.",
-	}))
 	def, err := svc.GetDefinition(ctx, "queue_worker")
 	require.NoError(t, err)
 	state, err := svc.ensureState(ctx, def)
 	require.NoError(t, err)
+	require.NoError(t, svc.startCycle(ctx, def, state, "Handle inbound work continuously.", "tester"))
 	state.State = StateIdle
 	state.PendingTurnMessages = nil
 	state.Tasks = nil
@@ -1058,13 +1171,30 @@ func TestServiceHandleScheduleTickQueuesTurnForActiveService(t *testing.T) {
 	require.Equal(t, "scheduled_tick", detail.State.PendingTurnMessages[0].Kind)
 }
 
+func TestServiceRequestStartRejectsCronTriggeredController(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+
+	require.NoError(t, svc.PutSpec(ctx, "queue_worker", serviceControllerSpecWithCronTrigger("build-app", "* * * * *")))
+	createTask(t, svc, ctx, "queue_worker", "Process the next queued request", "tester")
+
+	err := svc.RequestStart(ctx, "queue_worker", StartRequest{
+		RequestedBy: "tester",
+		Instruction: "Handle inbound work continuously.",
+	})
+	require.Error(t, err)
+	require.ErrorContains(t, err, "manual")
+}
+
 func TestServiceHandleScheduleTickIgnoresInactiveOrTasklessService(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
 	svc, fixedTime := newTestService(t)
 
-	require.NoError(t, svc.PutSpec(ctx, "queue_worker", serviceControllerSpecWithSchedule("build-app", "* * * * *")))
+	require.NoError(t, svc.PutSpec(ctx, "queue_worker", serviceControllerSpecWithCronTrigger("build-app", "* * * * *")))
 	createTask(t, svc, ctx, "queue_worker", "Process the next queued request", "tester")
 
 	require.NoError(t, svc.HandleScheduleTick(ctx, fixedTime))
@@ -1076,11 +1206,14 @@ func TestServiceHandleScheduleTickIgnoresInactiveOrTasklessService(t *testing.T)
 	require.Len(t, detail.State.PendingTurnMessages, 1)
 
 	require.NoError(t, svc.PutSpec(ctx, "taskless_worker", `kind: service
+trigger:
+  type: cron
+  schedules:
+    - "* * * * *"
+  prompt: "Handle inbound work continuously."
 description: Software development controller
 goal: Complete the assigned software work
-standing_instruction: Handle inbound work continuously.
-schedule: "* * * * *"
-allowed_dags:
+workflows:
   names:
     - build-app
 `))
@@ -1192,8 +1325,10 @@ func TestServiceRuntimeOptionsIncludeExplicitModel(t *testing.T) {
 	ctx := context.Background()
 	svc, _ := newTestService(t)
 
-	spec := `goal: Complete the assigned software work
-allowed_dags:
+	spec := `trigger:
+  type: manual
+goal: Complete the assigned software work
+workflows:
   names:
     - build-app
 agent:
@@ -1276,7 +1411,7 @@ func TestControllerRuntimeSetTaskDonePersists(t *testing.T) {
 	require.Equal(t, fixedTime, detail.State.Tasks[0].DoneAt)
 }
 
-func TestControllerRuntimeRunAllowedDAGRejectsConcurrentRun(t *testing.T) {
+func TestControllerRuntimeRunWorkflowRejectsConcurrentRun(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -1291,7 +1426,7 @@ func TestControllerRuntimeRunAllowedDAGRejectsConcurrentRun(t *testing.T) {
 	state.CurrentRunRef = &ref
 
 	rt := &controllerRuntime{service: svc, def: def, state: state}
-	_, err = rt.RunAllowedDAG(ctx, agent.ControllerRunDAGInput{DAGName: "build-app"})
+	_, err = rt.RunWorkflow(ctx, agent.ControllerRunWorkflowInput{WorkflowName: "build-app"})
 	require.ErrorContains(t, err, "already active")
 }
 
@@ -1440,5 +1575,8 @@ func TestServiceRuntimeOptionsIncludeFinishToolForLegacyService(t *testing.T) {
 	opts, err := svc.runtimeOptions(ctx, def, state)
 	require.NoError(t, err)
 	require.Contains(t, opts.AllowedTools, "finish_controller")
+	require.Contains(t, opts.AllowedTools, "patch")
 	require.Contains(t, opts.AllowedTools, "request_human_input")
+	require.Contains(t, opts.AllowedTools, "list_workflows")
+	require.Contains(t, opts.AllowedTools, "run_workflow")
 }

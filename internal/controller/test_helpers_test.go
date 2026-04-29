@@ -184,21 +184,25 @@ func createTask(t *testing.T, svc *Service, ctx context.Context, name, descripti
 	return task
 }
 
-func controllerSpec(allowedDAG string) string {
+func controllerSpec(workflowName string) string {
 	return `description: Software development controller
+trigger:
+  type: manual
 goal: Complete the assigned software work
-allowed_dags:
+workflows:
   names:
-    - ` + allowedDAG + `
+    - ` + workflowName + `
 `
 }
 
-func controllerSpecWithModel(allowedDAG, model string) string {
+func controllerSpecWithModel(workflowName, model string) string {
 	return `description: Software development controller
+trigger:
+  type: manual
 goal: Complete the assigned software work
-allowed_dags:
+workflows:
   names:
-    - ` + allowedDAG + `
+    - ` + workflowName + `
 agent:
   model: ` + model + `
 `
@@ -206,48 +210,58 @@ agent:
 
 func controllerSpecMultiDAGs() string {
 	return `description: Software development controller
+trigger:
+  type: manual
 goal: Complete the assigned software work
-allowed_dags:
+workflows:
   names:
     - build-app
     - run-tests
 `
 }
 
-func controllerSpecWithSchedule(allowedDAG, schedule string) string {
+func controllerSpecWithCronTrigger(workflowName, schedule string) string {
 	return `description: Software development controller
+trigger:
+  type: cron
+  schedules:
+    - "` + schedule + `"
+  prompt: "Handle the scheduled workflow cycle."
 goal: Complete the assigned software work
-schedule: "` + schedule + `"
-allowed_dags:
+workflows:
   names:
-    - ` + allowedDAG + `
+    - ` + workflowName + `
 `
 }
 
-func serviceControllerSpec(allowedDAG string) string {
+func serviceControllerSpec(workflowName string) string {
 	return `kind: service
+trigger:
+  type: manual
 description: Software development controller
 goal: Complete the assigned software work
-standing_instruction: Handle inbound work continuously.
-allowed_dags:
+workflows:
   names:
-    - ` + allowedDAG + `
+    - ` + workflowName + `
 `
 }
 
-func serviceControllerSpecWithSchedule(allowedDAG, schedule string) string {
+func serviceControllerSpecWithCronTrigger(workflowName, schedule string) string {
 	return `kind: service
+trigger:
+  type: cron
+  schedules:
+    - "` + schedule + `"
+  prompt: "Handle inbound work continuously."
 description: Software development controller
 goal: Complete the assigned software work
-standing_instruction: Handle inbound work continuously.
-schedule: "` + schedule + `"
-allowed_dags:
+workflows:
   names:
-    - ` + allowedDAG + `
+    - ` + workflowName + `
 `
 }
 
-func allowedDAGNames(items []AllowedDAGInfo) []string {
+func workflowNames(items []WorkflowInfo) []string {
 	names := make([]string, 0, len(items))
 	for _, item := range items {
 		names = append(names, item.Name)

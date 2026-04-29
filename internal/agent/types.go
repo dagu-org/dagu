@@ -311,11 +311,11 @@ type ToolOut struct {
 	AuditDetails map[string]any
 }
 
-// ControllerAllowedDAG describes a DAG that a Controller session is allowed to run.
-type ControllerAllowedDAG struct {
+// ControllerWorkflow describes a workflow visible to a Controller session.
+type ControllerWorkflow struct {
 	Name        string   `json:"name"`
 	Description string   `json:"description,omitempty"`
-	Tags        []string `json:"tags,omitempty"`
+	Labels      []string `json:"labels,omitempty"`
 }
 
 // ControllerTask describes a single checklist item in a Controller runtime.
@@ -325,16 +325,16 @@ type ControllerTask struct {
 	State       string `json:"state"`
 }
 
-// ControllerRunDAGInput contains the arguments for launching an allowed DAG.
-type ControllerRunDAGInput struct {
-	DAGName string `json:"dag_name"`
-	Params  string `json:"params,omitempty"`
+// ControllerRunWorkflowInput contains the arguments for launching a workflow.
+type ControllerRunWorkflowInput struct {
+	WorkflowName string `json:"workflow_name"`
+	Params       string `json:"params,omitempty"`
 }
 
-// ControllerRunDAGResult is returned after a Controller launches a DAG.
-type ControllerRunDAGResult struct {
-	DAGName  string `json:"dag_name"`
-	DAGRunID string `json:"dag_run_id"`
+// ControllerRunWorkflowResult is returned after a Controller launches a workflow.
+type ControllerRunWorkflowResult struct {
+	WorkflowName string `json:"workflow_name"`
+	DAGRunID     string `json:"dag_run_id"`
 }
 
 // ControllerHumanPrompt describes a persisted human-input request owned by Controller.
@@ -348,9 +348,9 @@ type ControllerHumanPrompt struct {
 // ControllerRuntime exposes scheduler-owned workflow controls to restricted Controller sessions.
 type ControllerRuntime interface {
 	ListTasks(ctx context.Context) ([]ControllerTask, error)
-	ListAllowedDAGs(ctx context.Context) ([]ControllerAllowedDAG, error)
-	RunAllowedDAG(ctx context.Context, input ControllerRunDAGInput) (ControllerRunDAGResult, error)
-	RetryCurrentRun(ctx context.Context) (ControllerRunDAGResult, error)
+	ListWorkflows(ctx context.Context) ([]ControllerWorkflow, error)
+	RunWorkflow(ctx context.Context, input ControllerRunWorkflowInput) (ControllerRunWorkflowResult, error)
+	RetryCurrentRun(ctx context.Context) (ControllerRunWorkflowResult, error)
 	SetTaskDone(ctx context.Context, taskID string, done bool) error
 	RequestHumanInput(ctx context.Context, prompt ControllerHumanPrompt) error
 	Finish(ctx context.Context, summary string) error

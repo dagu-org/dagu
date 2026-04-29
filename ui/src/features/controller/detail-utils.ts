@@ -69,18 +69,20 @@ export function taskCounts(tasks?: ControllerTask[]): {
   };
 }
 
-export function parseControllerScheduleText(value: string): string[] {
+export function parseControllerCronScheduleText(value: string): string[] {
   return value
     .split('\n')
     .map((item) => item.trim())
     .filter(Boolean);
 }
 
-export function formatControllerScheduleText(items?: string[]): string {
+export function formatControllerCronScheduleText(items?: string[]): string {
   return (items || []).join('\n');
 }
 
-export function validateControllerScheduleExpressions(items: string[]): string | null {
+export function validateControllerCronScheduleExpressions(
+  items: string[]
+): string | null {
   for (const item of items) {
     try {
       CronExpressionParser.parse(item);

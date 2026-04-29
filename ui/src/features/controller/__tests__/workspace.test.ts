@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 import {
-  applySelectedWorkspaceToControllerTags,
+  applySelectedWorkspaceToControllerLabels,
   controllerMatchesSelectedWorkspace,
   filterControllerBySelectedWorkspace,
   workspaceTagForControllerSelection,
@@ -24,7 +24,7 @@ describe('Controller workspace helpers', () => {
 
   it('replaces existing workspace tags when creating inside a workspace', () => {
     expect(
-      applySelectedWorkspaceToControllerTags(
+      applySelectedWorkspaceToControllerLabels(
         ['owner=team-ai', 'workspace=old'],
         'Engineering'
       )
@@ -32,34 +32,31 @@ describe('Controller workspace helpers', () => {
   });
 
   it('preserves tags when no workspace is selected', () => {
-    expect(applySelectedWorkspaceToControllerTags(['workspace=old'], '')).toEqual(
-      ['workspace=old']
-    );
+    expect(
+      applySelectedWorkspaceToControllerLabels(['workspace=old'], '')
+    ).toEqual(['workspace=old']);
   });
 
-  it('matches controller tags case-insensitively for the selected workspace', () => {
+  it('matches controller labels case-insensitively for the selected workspace', () => {
     expect(
       controllerMatchesSelectedWorkspace(
-        { tags: ['owner=team-ai', 'workspace=engineering'] },
+        { labels: ['owner=team-ai', 'workspace=engineering'] },
         'Engineering'
       )
     ).toBe(true);
     expect(
-      controllerMatchesSelectedWorkspace(
-        { tags: ['workspace=ops'] },
-        'Engineering'
-      )
+      controllerMatchesSelectedWorkspace({ labels: ['workspace=ops'] }, 'Engineering')
     ).toBe(false);
-    expect(controllerMatchesSelectedWorkspace({ tags: [] }, 'Engineering')).toBe(
+    expect(controllerMatchesSelectedWorkspace({ labels: [] }, 'Engineering')).toBe(
       false
     );
   });
 
-  it('filters the Controller list by the selected workspace tag', () => {
+  it('filters the Controller list by the selected workspace label', () => {
     const items = [
-      { name: 'build', tags: ['workspace=engineering'] },
-      { name: 'triage', tags: ['workspace=ops'] },
-      { name: 'general', tags: ['owner=team-ai'] },
+      { name: 'build', labels: ['workspace=engineering'] },
+      { name: 'triage', labels: ['workspace=ops'] },
+      { name: 'general', labels: ['owner=team-ai'] },
     ];
 
     expect(filterControllerBySelectedWorkspace(items, '')).toEqual(items);

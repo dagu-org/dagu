@@ -12,11 +12,11 @@ import (
 
 const (
 	listControllerTasksToolName = "list_controller_tasks"
-	listAllowedDAGsToolName    = "list_allowed_dags"
-	runAllowedDAGToolName      = "run_allowed_dag"
+	listWorkflowsToolName       = "list_workflows"
+	runWorkflowToolName         = "run_workflow"
 	retryControllerRunTool      = "retry_controller_run"
 	setControllerTaskDoneTool   = "set_controller_task_done"
-	requestHumanInputTool      = "request_human_input"
+	requestHumanInputTool       = "request_human_input"
 	finishControllerTool        = "finish_controller"
 )
 
@@ -34,27 +34,27 @@ func init() {
 		},
 	})
 	RegisterTool(ToolRegistration{
-		Name:           listAllowedDAGsToolName,
-		Label:          "List Allowed DAGs",
-		Description:    "List DAGs that this Controller is allowed to execute",
+		Name:           listWorkflowsToolName,
+		Label:          "List Workflows",
+		Description:    "List workflows that this Controller can inspect or execute",
 		DefaultEnabled: true,
 		Factory: func(cfg ToolConfig) *AgentTool {
 			if cfg.ControllerRuntime == nil {
 				return nil
 			}
-			return newListAllowedDAGsTool(cfg.ControllerRuntime)
+			return newListWorkflowsTool(cfg.ControllerRuntime)
 		},
 	})
 	RegisterTool(ToolRegistration{
-		Name:           runAllowedDAGToolName,
-		Label:          "Run Allowed DAG",
-		Description:    "Run an allowlisted DAG and pause the current Controller turn",
+		Name:           runWorkflowToolName,
+		Label:          "Run Workflow",
+		Description:    "Run a workflow and pause the current Controller turn",
 		DefaultEnabled: true,
 		Factory: func(cfg ToolConfig) *AgentTool {
 			if cfg.ControllerRuntime == nil {
 				return nil
 			}
-			return newRunAllowedDAGTool(cfg.ControllerRuntime)
+			return newRunWorkflowTool(cfg.ControllerRuntime)
 		},
 	})
 	RegisterTool(ToolRegistration{
@@ -134,13 +134,13 @@ func newListControllerTasksTool(runtime ControllerRuntime) *AgentTool {
 	}
 }
 
-func newListAllowedDAGsTool(runtime ControllerRuntime) *AgentTool {
+func newListWorkflowsTool(runtime ControllerRuntime) *AgentTool {
 	return &AgentTool{
 		Tool: llm.Tool{
 			Type: "function",
 			Function: llm.ToolFunction{
-				Name:        listAllowedDAGsToolName,
-				Description: "Return the DAGs this Controller is allowed to execute, including descriptions and tags when available.",
+				Name:        listWorkflowsToolName,
+				Description: "Return the workflows this Controller can inspect or execute, including descriptions and labels when available.",
 				Parameters: map[string]any{
 					"type":       "object",
 					"properties": map[string]any{},
@@ -148,61 +148,61 @@ func newListAllowedDAGsTool(runtime ControllerRuntime) *AgentTool {
 			},
 		},
 		Run: func(ctx ToolContext, _ json.RawMessage) ToolOut {
-			items, err := runtime.ListAllowedDAGs(ctx.Context)
+			items, err := runtime.ListWorkflows(ctx.Context)
 			if err != nil {
-				return toolError("failed to list allowed DAGs: %v", err)
+				return toolError("failed to list workflows: %v", err)
 			}
 			body, err := json.MarshalIndent(items, "", "  ")
 			if err != nil {
-				return toolError("failed to format allowed DAGs: %v", err)
+				return toolError("failed to format workflows: %v", err)
 			}
 			return ToolOut{Content: string(body)}
 		},
 	}
 }
 
-type runAllowedDAGInput struct {
-	DAGName string `json:"dag_name"`
-	Params  string `json:"params,omitempty"`
+type runWorkflowInput struct {
+	WorkflowName string `json:"workflow_name"`
+	Params       string `json:"params,omitempty"`
 }
 
-func newRunAllowedDAGTool(runtime ControllerRuntime) *AgentTool {
+func newRunWorkflowTool(runtime ControllerRuntime) *AgentTool {
 	return &AgentTool{
 		Tool: llm.Tool{
 			Type: "function",
 			Function: llm.ToolFunction{
-				Name:        runAllowedDAGToolName,
-				Description: "Launch one allowlisted DAG as the next unit of work, then pause until that DAG run changes state.",
+				Name:        runWorkflowToolName,
+				Description: "Launch one workflow as the next unit of work, then pause until that DAG run changes state.",
 				Parameters: map[string]any{
 					"type": "object",
 					"properties": map[string]any{
-						"dag_name": map[string]any{
+						"workflow_name": map[string]any{
 							"type":        "string",
-							"description": "Name of the allowlisted DAG to execute.",
+							"description": "Name of the workflow to execute.",
 						},
 						"params": map[string]any{
 							"type":        "string",
-							"description": "Optional CLI params string to pass to the DAG run.",
+							"description": "Optional CLI params string to pass to the workflow run.",
 						},
 					},
-					"required": []string{"dag_name"},
+					"required": []string{"workflow_name"},
 				},
 			},
 		},
 		Run: func(ctx ToolContext, input json.RawMessage) ToolOut {
-			var args runAllowedDAGInput
+			var args runWorkflowInput
 			if err := json.Unmarshal(input, &args); err != nil {
 				return toolError("invalid input: %v", err)
 			}
-			result, err := runtime.RunAllowedDAG(ctx.Context, ControllerRunDAGInput{
-				DAGName: args.DAGName,
-				Params:  args.Params,
+			result, err := runtime.RunWorkflow(ctx.Context, ControllerRunWorkflowInput{
+				WorkflowName: args.WorkflowName,
+				Params:       args.Params,
 			})
 			if err != nil {
-				return toolError("failed to run DAG %q: %v", args.DAGName, err)
+				return toolError("failed to run workflow %q: %v", args.WorkflowName, err)
 			}
 			return ToolOut{
-				Content:       fmt.Sprintf("Started DAG %q with run ID %q.", result.DAGName, result.DAGRunID),
+				Content:       fmt.Sprintf("Started workflow %q with run ID %q.", result.WorkflowName, result.DAGRunID),
 				InterruptTurn: true,
 			}
 		},
@@ -228,7 +228,7 @@ func newRetryControllerRunTool(runtime ControllerRuntime) *AgentTool {
 				return toolError("failed to retry Controller run: %v", err)
 			}
 			return ToolOut{
-				Content:       fmt.Sprintf("Retried DAG %q with run ID %q.", result.DAGName, result.DAGRunID),
+				Content:       fmt.Sprintf("Retried workflow %q with run ID %q.", result.WorkflowName, result.DAGRunID),
 				InterruptTurn: true,
 			}
 		},
