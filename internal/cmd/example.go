@@ -405,6 +405,49 @@ steps:
     depends: [analyze]
 `,
 	},
+	{
+		ID:          13,
+		Name:        "custom-step-type",
+		Description: "Define a typed reusable step with step_types and with",
+		Content: `type: graph
+step_types:
+  announce_release:
+    type: command
+    description: Print a reusable release announcement
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [channel, version]
+      properties:
+        channel:
+          type: string
+          enum: [changelog, email, slack]
+        version:
+          type: string
+        summary:
+          type: string
+          default: Ready for rollout
+    template:
+      command: echo {{ json .input.channel }} release {{ json .input.version }} - {{ json .input.summary }}
+steps:
+  - id: build
+    command: echo "v1.2.3"
+    output: VERSION
+  - id: announce_changelog
+    type: announce_release
+    with:
+      channel: changelog
+      version: ${VERSION}
+    depends: [build]
+  - id: announce_email
+    type: announce_release
+    with:
+      channel: email
+      version: ${VERSION}
+      summary: Sent to subscribers
+    depends: [build]
+`,
+	},
 }
 
 // ExampleCount returns the number of available examples.
