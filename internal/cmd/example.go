@@ -448,6 +448,144 @@ steps:
     depends: [build]
 `,
 	},
+	{
+		ID:          14,
+		Name:        "template-step",
+		Description: "Render a deployment config artifact with structured data",
+		Content: `type: graph
+artifacts:
+  enabled: true
+params:
+  - name: ENV
+    type: string
+    enum: [DEV, STG, PROD]
+    description: Target environment for the rendered config
+    required: true
+    default: STG
+steps:
+  - id: build
+    command: echo "v1.2.3"
+    output: VERSION
+  - id: render_config
+    type: template
+    with:
+      output: ${DAG_RUN_ARTIFACTS_DIR}/deploy.env
+      data:
+        env: ${ENV}
+        version: ${VERSION}
+    script: |
+      APP_ENV={{ .env }}
+      APP_VERSION={{ .version }}
+      FEATURE_FLAG=true
+    depends: [build]
+  - id: preview
+    command: cat ${DAG_RUN_ARTIFACTS_DIR}/deploy.env
+    depends: [render_config]
+`,
+	},
+	{
+		ID:          15,
+		Name:        "harness-step",
+		Description: "Build a harness prompt with template and write the result as an artifact",
+		Content: `type: graph
+artifacts:
+  enabled: true
+harness:
+  # DAG-level defaults for harness steps. provider may be built-in or from harnesses:.
+  provider: claude
+  model: sonnet
+  bare: true
+steps:
+  - id: gather_issue
+    command: echo "scheduler retries the same task after it already succeeded"
+    output: ISSUE
+  - id: build_prompt
+    type: template
+    with:
+      data:
+        issue: ${ISSUE}
+    script: |
+      Review this workflow issue and suggest a fix:
+      
+      {{ .issue }}
+    output: HARNESS_PROMPT
+    depends: [gather_issue]
+  - id: analyze
+    type: harness
+    command: ${HARNESS_PROMPT}
+    with:
+      effort: high
+    output: ANALYSIS
+    depends: [build_prompt]
+  - id: report
+    type: template
+    with:
+      output: ${DAG_RUN_ARTIFACTS_DIR}/harness-report.md
+      data:
+        issue: ${ISSUE}
+        analysis: ${ANALYSIS}
+    script: |
+      # Harness Review
+      
+      ## Issue
+      
+      {{ .issue }}
+      
+      ## Suggested Fix
+      
+      {{ .analysis }}
+    depends: [analyze]
+`,
+	},
+	{
+		ID:          16,
+		Name:        "named-harnesses",
+		Description: "Define a named harness under harnesses and call it from a step",
+		Content: `type: graph
+artifacts:
+  enabled: true
+harnesses:
+  # Named custom harness adapters for CLIs that are not built in.
+  gemini:
+    binary: gemini
+    prompt_mode: flag
+    prompt_flag: --prompt
+    option_flags:
+      model: --model
+steps:
+  - id: gather_task
+    command: echo "Summarize the deployment checklist for the next engineer"
+    output: TASK
+  - id: build_prompt
+    type: template
+    with:
+      data:
+        task: ${TASK}
+    script: |
+      {{ .task }}
+      
+      Return a short handoff note.
+    output: PROMPT
+    depends: [gather_task]
+  - id: summarize
+    type: harness
+    command: ${PROMPT}
+    with:
+      provider: gemini
+      model: gemini-2.5-pro
+    output: SUMMARY
+    depends: [build_prompt]
+  - id: save_summary
+    type: template
+    with:
+      output: ${DAG_RUN_ARTIFACTS_DIR}/handoff.md
+      data:
+        summary: ${SUMMARY}
+    script: |
+      {{ .summary }}
+    depends: [summarize]
+`,
+	},
 }
 
 // ExampleCount returns the number of available examples.
