@@ -1555,7 +1555,7 @@ func shouldInferNoopStep(s *step, result *core.Step) bool {
 	if s == nil {
 		return false
 	}
-	return s.Command == nil && s.Exec == nil && s.Script == ""
+	return s.Command == nil && s.Exec == nil && strings.TrimSpace(s.Script) == ""
 }
 
 // mergeRedisConfig merges DAG-level Redis defaults into step config.

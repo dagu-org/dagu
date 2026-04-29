@@ -173,6 +173,27 @@ func TestBuildStepExecutorInfersNoopForStructuredOutput(t *testing.T) {
 	assert.Equal(t, "noop", result.ExecutorConfig.Type)
 }
 
+func TestBuildStepExecutorInfersNoopForStructuredOutputWithWhitespaceScript(t *testing.T) {
+	t.Parallel()
+
+	s := &step{
+		Script: "  \n\t  ",
+		Output: map[string]any{
+			"versionLabel": "ver - ${build.output.version}",
+		},
+	}
+	result := &core.Step{
+		ExecutorConfig: core.ExecutorConfig{Config: make(map[string]any)},
+		StructuredOutput: map[string]core.StepOutputEntry{
+			"versionLabel": {HasValue: true, Value: "ver - ${build.output.version}"},
+		},
+	}
+
+	err := buildStepExecutor(testStepBuildContext(), s, result)
+	require.NoError(t, err)
+	assert.Equal(t, "noop", result.ExecutorConfig.Type)
+}
+
 func TestBuildStepExecutorDoesNotInferNoopForStructuredStreamOutput(t *testing.T) {
 	t.Parallel()
 
