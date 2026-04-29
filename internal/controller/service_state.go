@@ -29,6 +29,28 @@ func (s *Service) controllerWorkingDir(name string) (string, error) {
 	return filepath.Join(filepath.Dir(s.statePath(name)), "workspace"), nil
 }
 
+func (s *Service) controllerArtifactsRootDir() string {
+	return filepath.Join(s.stateDir, controllerArtifactsDirName)
+}
+
+func (s *Service) controllerArtifactDir(name string) (string, error) {
+	if err := validateName(name); err != nil {
+		return "", err
+	}
+	return filepath.Join(s.controllerArtifactsRootDir(), name), nil
+}
+
+func (s *Service) ensureControllerArtifactDir(name string) (string, error) {
+	dir, err := s.controllerArtifactDir(name)
+	if err != nil {
+		return "", err
+	}
+	if err := os.MkdirAll(dir, dirPerm); err != nil {
+		return "", fmt.Errorf("create controller artifacts dir: %w", err)
+	}
+	return dir, nil
+}
+
 func (s *Service) ensureControllerWorkingDir(name string) (string, error) {
 	dir, err := s.controllerWorkingDir(name)
 	if err != nil {
@@ -239,6 +261,9 @@ func (s *Service) assertControllerTargetAvailable(name string) error {
 	}
 	if pathExists(filepath.Join(s.stateDir, name)) {
 		return fmt.Errorf("controller %q already has existing runtime state", name)
+	}
+	if pathExists(filepath.Join(s.controllerArtifactsRootDir(), name)) {
+		return fmt.Errorf("controller %q already has existing artifacts", name)
 	}
 	return nil
 }

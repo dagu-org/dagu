@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ControllerAvatar } from '@/features/controller/components/ControllerAvatar';
+import { ControllerArtifactsTab } from '@/features/controller/components/ControllerArtifactsTab';
 import { DAGNamePicker } from '@/features/controller/components/ControllerCreateModal';
 import { ControllerDocumentSection } from '@/features/controller/components/ControllerMemorySection';
 import { ControllerTalkThread } from '@/features/controller/components/ControllerTalkThread';
@@ -40,7 +41,7 @@ import StatusChip from '@/components/ui/status-chip';
 import DAGDetailsModal from '@/features/dags/components/dag-details/DAGDetailsModal';
 import DAGRunDetailsModal from '@/features/dag-runs/components/dag-run-details/DAGRunDetailsModal';
 
-type DetailTab = 'status' | 'config';
+type DetailTab = 'status' | 'artifacts' | 'config';
 
 function controllerStatusMessage(
   status?: components['schemas']['ControllerStatus']
@@ -1070,6 +1071,13 @@ export function ControllerDetailSurface({
   const [selectedRun, setSelectedRun] =
     React.useState<ControllerRunSummary | null>(null);
   const [selectedDAG, setSelectedDAG] = React.useState<string | null>(null);
+  const hasArtifactsTab = !!controller.detail?.artifactDir;
+
+  React.useEffect(() => {
+    if (activeTab === 'artifacts' && !hasArtifactsTab) {
+      setActiveTab('status');
+    }
+  }, [activeTab, hasArtifactsTab]);
 
   if (controller.isLoading && !controller.detail) {
     return <LoadingIndicator />;
@@ -1194,6 +1202,14 @@ export function ControllerDetailSurface({
             >
               Status
             </Tab>
+            {hasArtifactsTab ? (
+              <Tab
+                isActive={activeTab === 'artifacts'}
+                onClick={() => setActiveTab('artifacts')}
+              >
+                Artifacts
+              </Tab>
+            ) : null}
             <Tab
               isActive={activeTab === 'config'}
               onClick={() => setActiveTab('config')}
@@ -1208,6 +1224,12 @@ export function ControllerDetailSurface({
             controller={controller}
             active={activeTab === 'status'}
             onOpenRun={setSelectedRun}
+          />
+        ) : activeTab === 'artifacts' ? (
+          <ControllerArtifactsTab
+            name={controller.detail.definition.name}
+            artifactDir={controller.detail.artifactDir}
+            artifactsAvailable={controller.detail.artifactsAvailable}
           />
         ) : (
           <ConfigTab controller={controller} onOpenDAG={setSelectedDAG} />

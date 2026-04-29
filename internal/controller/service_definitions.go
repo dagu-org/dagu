@@ -230,6 +230,9 @@ func (s *Service) Delete(ctx context.Context, name string) error {
 		return err
 	}
 	_ = os.RemoveAll(filepath.Join(s.stateDir, name))
+	if artifactDir, err := s.controllerArtifactDir(name); err == nil {
+		_ = os.RemoveAll(artifactDir)
+	}
 	return s.removeMemoryFile(ctx, name)
 }
 
@@ -315,7 +318,61 @@ func (s *Service) Rename(ctx context.Context, name string, req RenameRequest) er
 		return err
 	}
 
+	oldArtifactDir, err := s.controllerArtifactDir(name)
+	if err != nil {
+		if movedState {
+			_ = os.Rename(newStateDir, oldStateDir)
+		}
+		if reassignedSession {
+			_ = s.reassignSessionUser(ctx, state.SessionID, name)
+		}
+		return err
+	}
+	newArtifactDir, err := s.controllerArtifactDir(newName)
+	if err != nil {
+		if movedState {
+			_ = os.Rename(newStateDir, oldStateDir)
+		}
+		if reassignedSession {
+			_ = s.reassignSessionUser(ctx, state.SessionID, name)
+		}
+		return err
+	}
+	movedArtifacts := false
+	if _, err := os.Stat(oldArtifactDir); err == nil {
+		if err := os.MkdirAll(filepath.Dir(newArtifactDir), dirPerm); err != nil {
+			if movedState {
+				_ = os.Rename(newStateDir, oldStateDir)
+			}
+			if reassignedSession {
+				_ = s.reassignSessionUser(ctx, state.SessionID, name)
+			}
+			return err
+		}
+		if err := os.Rename(oldArtifactDir, newArtifactDir); err != nil {
+			if movedState {
+				_ = os.Rename(newStateDir, oldStateDir)
+			}
+			if reassignedSession {
+				_ = s.reassignSessionUser(ctx, state.SessionID, name)
+			}
+			return err
+		}
+		movedArtifacts = true
+	} else if !errors.Is(err, os.ErrNotExist) {
+		if movedState {
+			_ = os.Rename(newStateDir, oldStateDir)
+		}
+		if reassignedSession {
+			_ = s.reassignSessionUser(ctx, state.SessionID, name)
+		}
+		return err
+	}
+
 	if err := os.Remove(filepath.Clean(s.definitionPath(name))); err != nil {
+		if movedArtifacts {
+			_ = os.Rename(newArtifactDir, oldArtifactDir)
+		}
 		if movedState {
 			_ = os.Rename(newStateDir, oldStateDir)
 		}
@@ -429,6 +486,10 @@ func (s *Service) Detail(ctx context.Context, name string) (*Detail, error) {
 	if err != nil {
 		return nil, err
 	}
+	artifactDir, err := s.ensureControllerArtifactDir(def.Name)
+	if err != nil {
+		return nil, err
+	}
 	workflows, err := s.resolveManagedWorkflowSet(ctx, def.Workflows)
 	if err != nil {
 		return nil, err
@@ -443,13 +504,15 @@ func (s *Service) Detail(ctx context.Context, name string) (*Detail, error) {
 		}
 	}
 	return &Detail{
-		Definition:    def,
-		State:         state,
-		Workflows:     workflows,
-		TaskTemplates: append([]TaskTemplate(nil), state.TaskTemplates...),
-		CurrentRun:    currentRun,
-		RecentRuns:    recentRuns,
-		Messages:      messages,
+		Definition:         def,
+		State:              state,
+		Workflows:          workflows,
+		ArtifactDir:        artifactDir,
+		ArtifactsAvailable: hasArtifactEntries(artifactDir),
+		TaskTemplates:      append([]TaskTemplate(nil), state.TaskTemplates...),
+		CurrentRun:         currentRun,
+		RecentRuns:         recentRuns,
+		Messages:           messages,
 	}, nil
 }
 
@@ -533,6 +596,14 @@ func (s *Service) normalizeWorkflows(ctx context.Context, workflows *Workflows) 
 
 func hasWorkflows(workflows Workflows) bool {
 	return len(workflows.Names) > 0 || len(workflows.Labels) > 0
+}
+
+func hasArtifactEntries(dir string) bool {
+	if dir == "" {
+		return false
+	}
+	entries, err := os.ReadDir(dir)
+	return err == nil && len(entries) > 0
 }
 
 func normalizeLabels(labels *[]string) error {

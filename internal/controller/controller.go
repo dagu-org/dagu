@@ -366,6 +366,10 @@ func (s *Service) runtimeOptions(ctx context.Context, def *Definition, state *St
 	if err != nil {
 		return nil, err
 	}
+	artifactDir, err := s.ensureControllerArtifactDir(def.Name)
+	if err != nil {
+		return nil, err
+	}
 	var soul *agent.Soul
 	if def.Agent.Soul != "" && s.soulStore != nil {
 		loaded, err := s.soulStore.GetByID(ctx, def.Agent.Soul)
@@ -391,7 +395,7 @@ func (s *Service) runtimeOptions(ctx context.Context, def *Definition, state *St
 	return &agent.SessionRuntimeOptions{
 		Model:             def.Agent.Model,
 		AllowedTools:      allowedToolsForDefinition(def),
-		SystemPromptExtra: s.buildSystemPromptExtra(def, state, managedWorkflows),
+		SystemPromptExtra: s.buildSystemPromptExtra(def, state, managedWorkflows, artifactDir),
 		Soul:              soul,
 		AllowClearSoul:    def.Agent.Soul == "" && soul == nil,
 		ControllerName:    def.Name,
@@ -408,7 +412,7 @@ func allowedToolsForDefinition(_ *Definition) []string {
 	return append([]string(nil), controllerAllowedTools...)
 }
 
-func (s *Service) buildSystemPromptExtra(def *Definition, state *State, workflows []WorkflowInfo) string {
+func (s *Service) buildSystemPromptExtra(def *Definition, state *State, workflows []WorkflowInfo, artifactDir string) string {
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "You are controlling Controller %q.\n", def.Name)
 	if goal := strings.TrimSpace(def.Goal); goal != "" {
@@ -426,6 +430,7 @@ func (s *Service) buildSystemPromptExtra(def *Definition, state *State, workflow
 	}
 	fmt.Fprintf(&sb, "Trigger: %s\n", def.Trigger.Type)
 	fmt.Fprintf(&sb, "Controller spec path: %s\n", s.definitionPath(def.Name))
+	fmt.Fprintf(&sb, "Controller artifacts directory: %s\n", artifactDir)
 	if def.Trigger.Type == TriggerModeCron && len(def.Trigger.Schedules) > 0 {
 		sb.WriteString("Trigger schedules:\n")
 		for _, item := range def.Trigger.Schedules {
@@ -469,6 +474,8 @@ func (s *Service) buildSystemPromptExtra(def *Definition, state *State, workflow
 	sb.WriteString("- Use list_workflows to inspect only the workflows configured for this Controller.\n")
 	sb.WriteString("- Use register_workflow to add a created DAG name to this controller's workflows.names list. Do not edit the controller spec manually.\n")
 	sb.WriteString("- Run only workflows listed under Managed workflows.\n")
+	sb.WriteString("- Keep durable controller-owned outputs under the Controller artifacts directory.\n")
+	sb.WriteString("- When you create or improve workflows that should emit files, prefer configuring their top-level artifacts.dir to the Controller artifacts directory.\n")
 	sb.WriteString("- If none of the configured workflows fits the task, create a new workflow YAML in the DAGs directory with patch, register it with register_workflow, then run it.\n")
 	sb.WriteString("- Keep improving existing workflows with patch whenever the current implementation is incomplete, brittle, or incorrect.\n")
 	sb.WriteString("- Use patch only for workflow YAML; do not use it to make unrelated file changes.\n")

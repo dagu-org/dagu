@@ -25,9 +25,10 @@ import (
 var controllerNamePattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_]*$`)
 
 const (
-	definitionFilePerm = 0o600
-	stateFilePerm      = 0o600
-	dirPerm            = 0o750
+	definitionFilePerm         = 0o600
+	stateFilePerm              = 0o600
+	dirPerm                    = 0o750
+	controllerArtifactsDirName = "artifacts"
 )
 
 type Service struct {
@@ -157,6 +158,9 @@ func New(cfg *config.Config, dagStore exec.DAGStore, dagRunStore exec.DAGRunStor
 
 func validateName(name string) error {
 	if !controllerNamePattern.MatchString(name) {
+		return fmt.Errorf("invalid controller name %q", name)
+	}
+	if name == controllerArtifactsDirName {
 		return fmt.Errorf("invalid controller name %q", name)
 	}
 	return nil

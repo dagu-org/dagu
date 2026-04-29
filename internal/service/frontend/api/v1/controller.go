@@ -8,6 +8,7 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"github.com/dagucloud/dagu/api/v1"
 	"github.com/dagucloud/dagu/internal/agent"
@@ -60,6 +61,69 @@ func (a *API) GetController(ctx context.Context, request api.GetControllerReques
 	resp := toAPIControllerDetail(item)
 	resp.ControllerStatus = &controllerStatus
 	return api.GetController200JSONResponse(resp), nil
+}
+
+func (a *API) GetControllerArtifacts(ctx context.Context, request api.GetControllerArtifactsRequestObject) (api.GetControllerArtifactsResponseObject, error) {
+	archiveDir, err := a.getControllerArtifactDir(ctx, string(request.Name))
+	if err != nil {
+		return nil, err
+	}
+
+	items, err := listArtifactTree(archiveDir, artifactListRecursive(request.Params.Recursive))
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) || errors.Is(err, errArtifactUnavailable) {
+			return api.GetControllerArtifacts404JSONResponse{
+				Code:    api.ErrorCodeNotFound,
+				Message: "artifact directory not found for controller",
+			}, nil
+		}
+		return nil, err
+	}
+
+	return api.GetControllerArtifacts200JSONResponse{Items: items}, nil
+}
+
+func (a *API) GetControllerArtifactPreview(ctx context.Context, request api.GetControllerArtifactPreviewRequestObject) (api.GetControllerArtifactPreviewResponseObject, error) {
+	archiveDir, err := a.getControllerArtifactDir(ctx, string(request.Name))
+	if err != nil {
+		return nil, err
+	}
+
+	preview, err := buildArtifactPreview(archiveDir, string(request.Params.Path))
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) || errors.Is(err, errArtifactUnavailable) {
+			return api.GetControllerArtifactPreview404JSONResponse{
+				Code:    api.ErrorCodeNotFound,
+				Message: "artifact file not found for controller",
+			}, nil
+		}
+		return nil, err
+	}
+
+	return api.GetControllerArtifactPreview200JSONResponse(preview), nil
+}
+
+func (a *API) DownloadControllerArtifact(ctx context.Context, request api.DownloadControllerArtifactRequestObject) (api.DownloadControllerArtifactResponseObject, error) {
+	archiveDir, err := a.getControllerArtifactDir(ctx, string(request.Name))
+	if err != nil {
+		return nil, err
+	}
+
+	file, info, err := openArtifactFile(archiveDir, string(request.Params.Path))
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) || errors.Is(err, errArtifactUnavailable) {
+			return api.DownloadControllerArtifact404JSONResponse{
+				Code:    api.ErrorCodeNotFound,
+				Message: "artifact file not found for controller",
+			}, nil
+		}
+		return nil, err
+	}
+
+	return api.DownloadControllerArtifact200ApplicationoctetStreamResponse{
+		Body:          file,
+		ContentLength: info.Size(),
+	}, nil
 }
 
 func (a *API) GetControllerSpec(ctx context.Context, request api.GetControllerSpecRequestObject) (api.GetControllerSpecResponseObject, error) {
@@ -520,6 +584,23 @@ func (a *API) requireControllerExecute(ctx context.Context, name string) error {
 	return a.requireExecuteForWorkspace(ctx, workspaceName)
 }
 
+func (a *API) getControllerArtifactDir(ctx context.Context, name string) (string, error) {
+	if err := a.requireControllerService(); err != nil {
+		return "", err
+	}
+	detail, err := a.controllerService.Detail(ctx, name)
+	if err != nil {
+		return "", toControllerAPIError(err)
+	}
+	if err := a.requireWorkspaceVisible(ctx, controllerWorkspaceNameFromDetail(detail)); err != nil {
+		return "", err
+	}
+	if detail.ArtifactDir != "" {
+		return detail.ArtifactDir, nil
+	}
+	return filepath.Join(a.config.Paths.DataDir, "controller", "artifacts", name), nil
+}
+
 func (a *API) requireControllerSpecWrite(ctx context.Context, name, spec string) error {
 	currentWorkspaceName, err := a.controllerWorkspaceName(ctx, name)
 	if err == nil {
@@ -739,6 +820,11 @@ func toAPIControllerDetail(item *controller.Detail) api.ControllerDetailResponse
 		CurrentRun: toAPIControllerRunSummary(item.CurrentRun),
 		Definition: toAPIControllerDefinition(item.Definition),
 		State:      toAPIControllerState(item.Definition, item.State),
+		ArtifactsAvailable: func() *bool {
+			v := item.ArtifactsAvailable
+			return &v
+		}(),
+		ArtifactDir: ptrOf(item.ArtifactDir),
 	}
 	taskTemplates := toAPIControllerTaskTemplates(item.TaskTemplates)
 	resp.TaskTemplates = &taskTemplates

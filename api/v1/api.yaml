@@ -6270,6 +6270,122 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /controller/{name}/artifacts:
+    get:
+      summary: "List artifacts for a Controller"
+      description: "Lists files under the Controller artifact directory."
+      operationId: "getControllerArtifacts"
+      tags:
+        - "controller"
+      parameters:
+        - $ref: "#/components/parameters/ControllerName"
+        - $ref: "#/components/parameters/ArtifactRecursive"
+      responses:
+        "200":
+          description: "Controller artifact tree"
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ArtifactTreeNode"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Controller or artifact directory not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /controller/{name}/artifacts/preview:
+    get:
+      summary: "Preview a Controller artifact"
+      description: "Returns a preview for a single file from the Controller artifact directory."
+      operationId: "getControllerArtifactPreview"
+      tags:
+        - "controller"
+      parameters:
+        - $ref: "#/components/parameters/ControllerName"
+        - $ref: "#/components/parameters/ArtifactPath"
+      responses:
+        "200":
+          description: "Controller artifact preview"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtifactPreviewResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Controller or artifact file not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /controller/{name}/artifacts/download:
+    get:
+      summary: "Download a Controller artifact"
+      description: "Downloads a file from the Controller artifact directory."
+      operationId: "downloadControllerArtifact"
+      tags:
+        - "controller"
+      parameters:
+        - $ref: "#/components/parameters/ControllerName"
+        - $ref: "#/components/parameters/ArtifactPath"
+      responses:
+        "200":
+          description: "Artifact content"
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Controller or artifact file not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /controller/{name}/spec:
     get:
       summary: "Get controller raw spec"
@@ -13119,6 +13235,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ControllerWorkflowInfo"
+        artifactsAvailable:
+          type: boolean
+        artifactDir:
+          type: string
         taskTemplates:
           type: array
           items:

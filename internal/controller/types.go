@@ -300,13 +300,15 @@ type Summary struct {
 }
 
 type Detail struct {
-	Definition    *Definition     `json:"definition"`
-	State         *State          `json:"state"`
-	Workflows     []WorkflowInfo  `json:"workflows"`
-	TaskTemplates []TaskTemplate  `json:"taskTemplates,omitempty"`
-	CurrentRun    *RunSummary     `json:"currentRun,omitempty"`
-	RecentRuns    []RunSummary    `json:"recentRuns,omitempty"`
-	Messages      []agent.Message `json:"messages,omitempty"`
+	Definition         *Definition     `json:"definition"`
+	State              *State          `json:"state"`
+	Workflows          []WorkflowInfo  `json:"workflows"`
+	ArtifactDir        string          `json:"artifactDir,omitempty"`
+	ArtifactsAvailable bool            `json:"artifactsAvailable,omitempty"`
+	TaskTemplates      []TaskTemplate  `json:"taskTemplates,omitempty"`
+	CurrentRun         *RunSummary     `json:"currentRun,omitempty"`
+	RecentRuns         []RunSummary    `json:"recentRuns,omitempty"`
+	Messages           []agent.Message `json:"messages,omitempty"`
 }
 
 type Document struct {

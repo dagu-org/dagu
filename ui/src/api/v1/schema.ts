@@ -2536,6 +2536,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/controller/{name}/artifacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List artifacts for a Controller
+         * @description Lists files under the Controller artifact directory.
+         */
+        get: operations["getControllerArtifacts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/controller/{name}/artifacts/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview a Controller artifact
+         * @description Returns a preview for a single file from the Controller artifact directory.
+         */
+        get: operations["getControllerArtifactPreview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/controller/{name}/artifacts/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download a Controller artifact
+         * @description Downloads a file from the Controller artifact directory.
+         */
+        get: operations["downloadControllerArtifact"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/controller/{name}/spec": {
         parameters: {
             query?: never;
@@ -5591,6 +5651,8 @@ export interface components {
             definition: components["schemas"]["ControllerDefinition"];
             state: components["schemas"]["ControllerState"];
             workflows: components["schemas"]["ControllerWorkflowInfo"][];
+            artifactsAvailable?: boolean;
+            artifactDir?: string;
             taskTemplates?: components["schemas"]["ControllerTaskTemplate"][];
             currentRun?: components["schemas"]["ControllerRunSummary"];
             recentRuns?: components["schemas"]["ControllerRunSummary"][];
@@ -13585,6 +13647,167 @@ export interface operations {
                 };
             };
             /** @description Controller not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getControllerArtifacts: {
+        parameters: {
+            query?: {
+                /** @description Whether to recursively expand nested artifact directories */
+                recursive?: components["parameters"]["ArtifactRecursive"];
+            };
+            header?: never;
+            path: {
+                /** @description The Controller name */
+                name: components["parameters"]["ControllerName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Controller artifact tree */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ArtifactTreeNode"][];
+                    };
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Controller or artifact directory not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getControllerArtifactPreview: {
+        parameters: {
+            query: {
+                /** @description Relative artifact file path within the DAG-run artifact directory. Must not start with '/' or '\' or contain '..'. */
+                path: components["parameters"]["ArtifactPath"];
+            };
+            header?: never;
+            path: {
+                /** @description The Controller name */
+                name: components["parameters"]["ControllerName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Controller artifact preview */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtifactPreviewResponse"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Controller or artifact file not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    downloadControllerArtifact: {
+        parameters: {
+            query: {
+                /** @description Relative artifact file path within the DAG-run artifact directory. Must not start with '/' or '\' or contain '..'. */
+                path: components["parameters"]["ArtifactPath"];
+            };
+            header?: never;
+            path: {
+                /** @description The Controller name */
+                name: components["parameters"]["ControllerName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Artifact content */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Controller or artifact file not found */
             404: {
                 headers: {
                     [name: string]: unknown;

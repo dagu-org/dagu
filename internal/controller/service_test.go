@@ -5,6 +5,7 @@ package controller
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -106,6 +107,9 @@ func TestServiceListInitializesStateAndTaskSummary(t *testing.T) {
 	require.Equal(t, StateIdle, detail.State.State)
 	require.Empty(t, detail.State.Tasks)
 	require.Equal(t, []string{"build-app"}, workflowNames(detail.Workflows))
+	require.Equal(t, filepath.Join(svc.stateDir, "artifacts", "software_dev"), detail.ArtifactDir)
+	require.False(t, detail.ArtifactsAvailable)
+	require.DirExists(t, detail.ArtifactDir)
 }
 
 func TestServiceDetailUsesTopLevelWorkflows(t *testing.T) {
@@ -905,6 +909,9 @@ func TestServiceRenameMovesMemory(t *testing.T) {
 	require.NoError(t, err)
 	_, err = svc.SaveDocument(ctx, "software_dev", DocumentSoul, "# Soul\n\nBe precise.")
 	require.NoError(t, err)
+	detail, err := svc.Detail(ctx, "software_dev")
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(detail.ArtifactDir, "report.md"), []byte("# report"), 0o600))
 
 	err = svc.Rename(ctx, "software_dev", RenameRequest{NewName: "software_ops"})
 	require.NoError(t, err)
@@ -920,6 +927,8 @@ func TestServiceRenameMovesMemory(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, soul.Content, "Be precise.")
 	require.Contains(t, soul.Path, "/controller/software_ops/SOUL.md")
+	require.NoFileExists(t, filepath.Join(filepath.Dir(detail.ArtifactDir), "software_dev", "report.md"))
+	require.FileExists(t, filepath.Join(filepath.Dir(detail.ArtifactDir), "software_ops", "report.md"))
 	renamedSpec, err := svc.GetSpec(ctx, "software_ops")
 	require.NoError(t, err)
 	require.NotContains(t, renamedSpec, "cloned_from:")
@@ -976,6 +985,9 @@ func TestServiceDeleteRemovesMemory(t *testing.T) {
 	require.NoError(t, err)
 	_, err = svc.SaveDocument(ctx, "software_dev", DocumentSoul, "# Soul\n\nBe precise.")
 	require.NoError(t, err)
+	detail, err := svc.Detail(ctx, "software_dev")
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(detail.ArtifactDir, "report.md"), []byte("# report"), 0o600))
 
 	err = svc.Delete(ctx, "software_dev")
 	require.NoError(t, err)
@@ -990,6 +1002,7 @@ func TestServiceDeleteRemovesMemory(t *testing.T) {
 		require.NoError(t, loadErr)
 		require.Empty(t, soul)
 	}
+	require.NoDirExists(t, detail.ArtifactDir)
 }
 
 func TestServicePauseAndResumeTask(t *testing.T) {
@@ -1368,6 +1381,8 @@ func TestServiceRuntimeOptionsPromptRestrictsWorkflowExecutionToConfiguredList(t
 	require.Contains(t, opts.SystemPromptExtra, "If none of the configured workflows fits the task, create a new workflow YAML in the DAGs directory with patch, register it with register_workflow, then run it.")
 	require.Contains(t, opts.SystemPromptExtra, "Use register_workflow to add a created DAG name to this controller's workflows.names list. Do not edit the controller spec manually.")
 	require.Contains(t, opts.SystemPromptExtra, "Controller spec path:")
+	require.Contains(t, opts.SystemPromptExtra, "Controller artifacts directory: "+filepath.Join(svc.stateDir, "artifacts", "software_dev"))
+	require.Contains(t, opts.SystemPromptExtra, "prefer configuring their top-level artifacts.dir to the Controller artifacts directory")
 }
 
 func TestControllerRuntimeDefaultWorkingDirForDAGRun(t *testing.T) {
