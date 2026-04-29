@@ -171,7 +171,6 @@ func (oc *OutputCoordinator) setupExecutorIO(ctx context.Context, cmd executor.E
 			return fmt.Errorf("failed to create stderr pipe: %w", err)
 		}
 		oc.stderrOutputCaptured = false
-		oc.stderrOutputData = ""
 		if oc.maxOutputSize == 0 {
 			oc.maxOutputSize = maxOutputSize(ctx)
 		}

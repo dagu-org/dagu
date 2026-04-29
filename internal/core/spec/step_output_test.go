@@ -173,6 +173,40 @@ func TestBuildStepExecutorInfersNoopForStructuredOutput(t *testing.T) {
 	assert.Equal(t, "noop", result.ExecutorConfig.Type)
 }
 
+func TestBuildStepExecutorDoesNotInferNoopForStructuredStreamOutput(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		source string
+	}{
+		{name: "Stdout", source: core.StepOutputSourceStdout},
+		{name: "Stderr", source: core.StepOutputSourceStderr},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			s := &step{
+				Output: map[string]any{
+					"captured": map[string]any{"from": string(tt.source)},
+				},
+			}
+			result := &core.Step{
+				ExecutorConfig: core.ExecutorConfig{Config: make(map[string]any)},
+				StructuredOutput: map[string]core.StepOutputEntry{
+					"captured": {From: tt.source},
+				},
+			}
+
+			err := buildStepExecutor(testStepBuildContext(), s, result)
+			require.NoError(t, err)
+			assert.Empty(t, result.ExecutorConfig.Type)
+		})
+	}
+}
+
 func TestParseStructuredOutputEmpty(t *testing.T) {
 	t.Parallel()
 

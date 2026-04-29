@@ -1545,6 +1545,10 @@ func shouldInferNoopStep(s *step, result *core.Step) bool {
 	if result.ExecutorConfig.Type != "" || !result.HasStructuredOutput() {
 		return false
 	}
+	if result.UsesStructuredOutputSource(core.StepOutputSourceStdout) ||
+		result.UsesStructuredOutputSource(core.StepOutputSourceStderr) {
+		return false
+	}
 	if result.Container != nil || result.SubDAG != nil || result.Parallel != nil {
 		return false
 	}
