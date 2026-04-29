@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/dagucloud/dagu/internal/core"
+	exec1 "github.com/dagucloud/dagu/internal/core/exec"
 	"github.com/dagucloud/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -288,10 +289,11 @@ func TestStepScopedOutputAccess(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name           string
-		yaml           string
-		expectedStatus core.Status
-		expectedOutput map[string]any
+		name               string
+		yaml               string
+		expectedStatus     core.Status
+		expectedOutput     map[string]any
+		expectedStepOutput map[string]string
 	}{
 		{
 			name: "BasicOutputAccess",
@@ -470,16 +472,15 @@ steps:
   - id: consumer
     depends: [analyze]
     script: |
-      printf 'version=%s\nartifact=%s\npayload=%s' "${analyze.output.version}" "${analyze.output.artifact.url}" "${analyze.output}"
+      printf 'version=%s\nartifact=%s' "${analyze.output.version}" "${analyze.output.artifact.url}"
     output: RESULT
 `,
 			expectedStatus: core.Succeeded,
 			expectedOutput: map[string]any{
-				"RESULT": []test.Contains{
-					test.Contains("version=v1.2.3"),
-					test.Contains("artifact=https://example.test/release.tgz"),
-					test.Contains(`"version":"v1.2.3"`),
-				},
+				"RESULT": "version=v1.2.3\nartifact=https://example.test/release.tgz",
+			},
+			expectedStepOutput: map[string]string{
+				"analyze": `{"artifact":{"url":"https://example.test/release.tgz"},"version":"v1.2.3"}`,
 			},
 		},
 		{
@@ -503,18 +504,16 @@ steps:
   - id: consumer
     depends: [publish]
     script: |
-      printf 'version=%s\nlabel=%s\nartifact=%s\npayload=%s' "${publish.output.version}" "${publish.output.versionLabel}" "${publish.output.artifact.url}" "${publish.output}"
+      printf 'version=%s\nlabel=%s\nartifact=%s' "${publish.output.version}" "${publish.output.versionLabel}" "${publish.output.artifact.url}"
     output: RESULT
 `,
 			expectedStatus: core.Succeeded,
 			expectedOutput: map[string]any{
 				"BUILD_JSON": `{"version":"v1.2.3","artifact":{"url":"https://example.test/release.tgz"}}`,
-				"RESULT": []test.Contains{
-					test.Contains("version=v1.2.3"),
-					test.Contains("label=ver - v1.2.3"),
-					test.Contains("artifact=https://example.test/release.tgz"),
-					test.Contains(`"versionLabel":"ver - v1.2.3"`),
-				},
+				"RESULT":     "version=v1.2.3\nlabel=ver - v1.2.3\nartifact=https://example.test/release.tgz",
+			},
+			expectedStepOutput: map[string]string{
+				"publish": `{"artifact":{"url":"https://example.test/release.tgz"},"version":"v1.2.3","versionLabel":"ver - v1.2.3"}`,
 			},
 		},
 		{
@@ -570,8 +569,32 @@ steps:
 			if tc.expectedOutput != nil {
 				testDAG.AssertOutputs(t, tc.expectedOutput)
 			}
+
+			if tc.expectedStepOutput != nil {
+				status, statusErr := th.DAGRunMgr.GetLatestStatus(th.Context, testDAG.DAG)
+				require.NoError(t, statusErr)
+
+				for stepID, expected := range tc.expectedStepOutput {
+					node := findNodeByStepID(t, status.Nodes, stepID)
+					require.NotNil(t, node.OutputValue, "step %s should expose step-scoped output", stepID)
+					require.JSONEq(t, expected, *node.OutputValue)
+				}
+			}
 		})
 	}
+}
+
+func findNodeByStepID(t *testing.T, nodes []*exec1.Node, stepID string) *exec1.Node {
+	t.Helper()
+
+	for _, node := range nodes {
+		if node.Step.ID == stepID {
+			return node
+		}
+	}
+
+	t.Fatalf("step %s not found", stepID)
+	return nil
 }
 
 func TestStepIDErrorCases(t *testing.T) {
