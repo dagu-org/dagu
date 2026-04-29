@@ -30,7 +30,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/vault/api v1.22.0
 	github.com/itchyny/gojq v0.12.18
-	github.com/jackc/pgx/v5 v5.8.0
+	github.com/jackc/pgx/v5 v5.9.2
 	github.com/jedib0t/go-pretty/v6 v6.6.9
 	github.com/joho/godotenv v1.5.1
 	github.com/mholt/archives v0.1.5
