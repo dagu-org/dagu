@@ -16,7 +16,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/dagucloud/dagu/internal/autopilot"
+	"github.com/dagucloud/dagu/internal/controller"
 	"github.com/dagucloud/dagu/internal/cmn/config"
 	"github.com/dagucloud/dagu/internal/cmn/dirlock"
 	"github.com/dagucloud/dagu/internal/cmn/logger"
@@ -57,8 +57,8 @@ type Scheduler struct {
 	startupCancel       context.CancelFunc
 	lockHeld            atomic.Bool
 	clock               Clock // Clock function for getting current time
-	autopilotService    *autopilot.Service
-	autopilotController *exec.AutopilotControllerInfo
+	controllerService    *controller.Service
+	controllerStatus *exec.ControllerStatusInfo
 	eventCollector      *fileeventstore.Collector
 }
 
@@ -247,15 +247,15 @@ func (s *Scheduler) SetClock(clock Clock) {
 	}
 }
 
-// SetAutopilotService configures the Autopilot controller owned by the scheduler leader.
-func (s *Scheduler) SetAutopilotService(service *autopilot.Service) {
-	s.autopilotService = service
+// SetControllerService configures the Controller owned by the scheduler leader.
+func (s *Scheduler) SetControllerService(service *controller.Service) {
+	s.controllerService = service
 }
 
-// SetAutopilotController configures the published scheduler-side Autopilot
+// SetControllerStatus configures the published scheduler-side Controller
 // controller readiness.
-func (s *Scheduler) SetAutopilotController(info *exec.AutopilotControllerInfo) {
-	s.autopilotController = info
+func (s *Scheduler) SetControllerStatus(info *exec.ControllerStatusInfo) {
+	s.controllerStatus = info
 }
 
 // SetEventCollector configures the scheduler-owned collector loop.
@@ -473,7 +473,7 @@ func (s *Scheduler) Start(ctx context.Context) error {
 			Port:                s.registeredPort(),
 			Status:              exec.ServiceStatusInactive,
 			StartedAt:           time.Now(),
-			AutopilotController: s.autopilotController,
+			ControllerStatus: s.controllerStatus,
 		}
 		if err := s.serviceRegistry.Register(ctx, exec.ServiceNameScheduler, hostInfo); err != nil {
 			logger.Error(ctx, "Failed to register with service registry", tag.Error(err))
@@ -571,16 +571,16 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		s.entryReader.Start(ctx)
 	})
 
-	if s.autopilotService != nil {
+	if s.controllerService != nil {
 		wg.Go(func() {
-			err := s.autopilotService.Run(ctx)
+			err := s.controllerService.Run(ctx)
 			if ctx.Err() != nil || s.stopping() {
 				return
 			}
 			if err == nil {
-				err = errors.New("autopilot controller exited unexpectedly")
+				err = errors.New("controller controller exited unexpectedly")
 			}
-			logger.Error(ctx, "Autopilot controller stopped unexpectedly", tag.Error(err))
+			logger.Error(ctx, "Controller stopped unexpectedly", tag.Error(err))
 			s.Stop(ctx)
 		})
 	}
@@ -734,9 +734,9 @@ func (s *Scheduler) runTick(ctx context.Context, tickTime time.Time) {
 	for _, run := range s.planner.Plan(ctx, tickTime) {
 		s.dispatchRun(ctx, run)
 	}
-	if s.autopilotService != nil {
-		if err := s.autopilotService.HandleScheduleTick(ctx, tickTime); err != nil {
-			logger.Warn(ctx, "Autopilot schedule tick failed", tag.Error(err))
+	if s.controllerService != nil {
+		if err := s.controllerService.HandleScheduleTick(ctx, tickTime); err != nil {
+			logger.Warn(ctx, "Controller schedule tick failed", tag.Error(err))
 		}
 	}
 	s.planner.Advance(tickTime)

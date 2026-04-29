@@ -1264,13 +1264,13 @@ func TestAPI_GenerateAssistantMessage_UsesSessionDAGMemory(t *testing.T) {
 	assert.Contains(t, req.Messages[0].Content, "Remember the DAG-specific state")
 }
 
-func TestAPI_GenerateAssistantMessage_UsesSessionAutopilotMemory(t *testing.T) {
+func TestAPI_GenerateAssistantMessage_UsesSessionControllerMemory(t *testing.T) {
 	t.Parallel()
 
-	model := testModelConfig("autopilot-memory-model")
+	model := testModelConfig("controller-memory-model")
 	reqCh := make(chan *llm.ChatRequest, 1)
 	memoryStore := newMockMemoryStore()
-	require.NoError(t, memoryStore.SaveAutopilotMemory(context.Background(), "queue_worker", "Remember the service operating rules"))
+	require.NoError(t, memoryStore.SaveControllerMemory(context.Background(), "queue_worker", "Remember the service operating rules"))
 
 	configStore := newMockConfigStore(true)
 	configStore.config.DefaultModelID = model.ID
@@ -1285,11 +1285,11 @@ func TestAPI_GenerateAssistantMessage_UsesSessionAutopilotMemory(t *testing.T) {
 
 	user := UserIdentity{UserID: "telegram:123", Username: "telegram", Role: auth.RoleAdmin}
 	sessionID, err := api.CreateEmptySessionWithRuntime(context.Background(), user, "", false, &SessionRuntimeOptions{
-		AutopilotName: "queue_worker",
+		ControllerName: "queue_worker",
 	})
 	require.NoError(t, err)
 
-	msg, err := api.GenerateAssistantMessage(context.Background(), sessionID, user, "", "summarize the autopilot state")
+	msg, err := api.GenerateAssistantMessage(context.Background(), sessionID, user, "", "summarize the controller state")
 	require.NoError(t, err)
 	assert.Equal(t, "ok", msg.Content)
 
@@ -1297,7 +1297,7 @@ func TestAPI_GenerateAssistantMessage_UsesSessionAutopilotMemory(t *testing.T) {
 	require.Len(t, req.Messages, 2)
 	assert.Equal(t, llm.RoleSystem, req.Messages[0].Role)
 	assert.Contains(t, req.Messages[0].Content, "Remember the service operating rules")
-	assert.Contains(t, req.Messages[0].Content, "/tmp/mock-memory/autopilot/queue_worker/MEMORY.md")
+	assert.Contains(t, req.Messages[0].Content, "/tmp/mock-memory/controller/queue_worker/MEMORY.md")
 }
 
 func TestAPI_GenerateAssistantMessage_RetriesTransientFailure(t *testing.T) {

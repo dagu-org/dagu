@@ -133,7 +133,7 @@ type sessionRuntimeConfig struct {
 	modelCfg        *ModelConfig
 	workingDir      string
 	dagName         string
-	autopilotName   string
+	controllerName   string
 	title           string
 	safeMode        bool
 	soul            *Soul
@@ -151,9 +151,9 @@ type SessionRuntimeOptions struct {
 	SystemPromptExtra string
 	Soul              *Soul
 	AllowClearSoul    bool
-	AutopilotName     string
+	ControllerName     string
 	WorkingDir        string
-	AutopilotRuntime  AutopilotRuntime
+	ControllerRuntime  ControllerRuntime
 }
 
 // NewAPI creates a new API instance.
@@ -427,7 +427,7 @@ func (a *API) lookupSessionEventMetadata(id string) (model string, userID string
 }
 
 // persistNewSession saves a new session to the store if configured.
-func (a *API) persistNewSession(ctx context.Context, id, userID, dagName, autopilotName, model string, now time.Time) {
+func (a *API) persistNewSession(ctx context.Context, id, userID, dagName, controllerName, model string, now time.Time) {
 	if a.store == nil {
 		return
 	}
@@ -435,7 +435,7 @@ func (a *API) persistNewSession(ctx context.Context, id, userID, dagName, autopi
 		ID:            id,
 		UserID:        userID,
 		DAGName:       dagName,
-		AutopilotName: autopilotName,
+		ControllerName: controllerName,
 		Model:         model,
 		CreatedAt:     now,
 		UpdatedAt:     now,
@@ -463,7 +463,7 @@ func (a *API) persistSessionModel(ctx context.Context, mgr *SessionManager, mode
 	}
 }
 
-func (a *API) loadMemoryContent(ctx context.Context, dagName, autopilotName string) MemoryContent {
+func (a *API) loadMemoryContent(ctx context.Context, dagName, controllerName string) MemoryContent {
 	if a.memoryStore == nil {
 		return MemoryContent{}
 	}
@@ -478,11 +478,11 @@ func (a *API) loadMemoryContent(ctx context.Context, dagName, autopilotName stri
 			a.logger.Debug("failed to load DAG memory", "error", err, "dag_name", dagName)
 		}
 	}
-	var autopilotMemory string
-	if autopilotName != "" {
-		autopilotMemory, err = a.memoryStore.LoadAutopilotMemory(ctx, autopilotName)
+	var controllerMemory string
+	if controllerName != "" {
+		controllerMemory, err = a.memoryStore.LoadControllerMemory(ctx, controllerName)
 		if err != nil {
-			a.logger.Debug("failed to load autopilot memory", "error", err, "autopilot_name", autopilotName)
+			a.logger.Debug("failed to load controller memory", "error", err, "controller_name", controllerName)
 		}
 	}
 	readOnly := false
@@ -493,8 +493,8 @@ func (a *API) loadMemoryContent(ctx context.Context, dagName, autopilotName stri
 		GlobalMemory:    global,
 		DAGMemory:       dagMemory,
 		DAGName:         dagName,
-		AutopilotMemory: autopilotMemory,
-		AutopilotName:   autopilotName,
+		ControllerMemory: controllerMemory,
+		ControllerName:   controllerName,
 		MemoryDir:       a.memoryStore.MemoryDir(),
 		ReadOnly:        readOnly,
 	}
@@ -554,7 +554,7 @@ func (a *API) defaultSessionRuntime(ctx context.Context, dagName string, safeMod
 		modelCfg:        modelCfg,
 		workingDir:      runtimeWorkingDir(a.workingDir, runtimeOpts),
 		dagName:         dagName,
-		autopilotName:   "",
+		controllerName:   "",
 		safeMode:        safeMode,
 		soul:            a.loadSelectedSoul(ctx),
 		webSearch:       cloneWebSearchRequest(a.loadWebSearch(ctx)),
@@ -579,7 +579,7 @@ func (a *API) runtimeConfigForSession(ctx context.Context, mgr *SessionManager, 
 		modelCfg:        modelCfg,
 		workingDir:      mgr.workingDir,
 		dagName:         cmp.Or(overrideDAGName, mgr.dagName),
-		autopilotName:   mgr.autopilotName,
+		controllerName:   mgr.controllerName,
 		title:           mgr.title,
 		safeMode:        mgr.safeMode,
 		soul:            mgr.soul,
@@ -611,7 +611,7 @@ func (a *API) buildSessionManagerConfig(id string, user UserIdentity, cfg sessio
 		OutputCostPer1M:       cfg.outputCostPer1M,
 		MemoryStore:           a.memoryStore,
 		DAGName:               cfg.dagName,
-		AutopilotName:         cfg.autopilotName,
+		ControllerName:         cfg.controllerName,
 		SessionStore:          a.store,
 		Soul:                  cfg.soul,
 		WebSearch:             cfg.webSearch,
@@ -634,7 +634,7 @@ func (a *API) newManagedSession(ctx context.Context, id string, user UserIdentit
 	mgr := NewSessionManager(a.buildSessionManagerConfig(id, user, cfg))
 	mgr.registry = &sessionRegistry{sessions: &a.sessions, parent: mgr}
 
-	a.persistNewSession(ctx, id, user.UserID, cfg.dagName, cfg.autopilotName, cfg.modelID, now)
+	a.persistNewSession(ctx, id, user.UserID, cfg.dagName, cfg.controllerName, cfg.modelID, now)
 	a.sessions.Store(id, mgr)
 
 	return mgr
@@ -650,10 +650,10 @@ func (a *API) ensureSessionLoop(mgr *SessionManager, provider llm.Provider, cfg 
 	return mgr.ensureLoop(provider, cfg.modelID, cfg.resolvedModel)
 }
 
-func (a *API) buildSystemPrompt(ctx context.Context, role auth.Role, dagName, autopilotName string, soul *Soul) string {
+func (a *API) buildSystemPrompt(ctx context.Context, role auth.Role, dagName, controllerName string, soul *Soul) string {
 	return GenerateSystemPrompt(SystemPromptParams{
 		Env:    a.environment,
-		Memory: a.loadMemoryContent(ctx, dagName, autopilotName),
+		Memory: a.loadMemoryContent(ctx, dagName, controllerName),
 		Role:   role,
 		Soul:   soul,
 	})
@@ -980,11 +980,11 @@ func (a *API) reactivateSession(ctx context.Context, id string, user UserIdentit
 	}
 	var allowedTools []string
 	var systemPromptExtra string
-	var autopilotRuntime AutopilotRuntime
+	var controllerRuntime ControllerRuntime
 	if runtimeOpts != nil {
 		allowedTools = append([]string(nil), runtimeOpts.AllowedTools...)
 		systemPromptExtra = runtimeOpts.SystemPromptExtra
-		autopilotRuntime = runtimeOpts.AutopilotRuntime
+		controllerRuntime = runtimeOpts.ControllerRuntime
 	}
 
 	cfg := a.buildSessionManagerConfig(id, user, sessionRuntimeConfig{
@@ -992,12 +992,12 @@ func (a *API) reactivateSession(ctx context.Context, id string, user UserIdentit
 		workingDir: runtimeWorkingDir(a.workingDir, runtimeOpts),
 		title:      sess.Title,
 		dagName:    sess.DAGName,
-		autopilotName: cmp.Or(func() string {
+		controllerName: cmp.Or(func() string {
 			if runtimeOpts == nil {
 				return ""
 			}
-			return runtimeOpts.AutopilotName
-		}(), sess.AutopilotName),
+			return runtimeOpts.ControllerName
+		}(), sess.ControllerName),
 		safeMode:        true, // Default to safe mode for reactivated sessions
 		soul:            soul,
 		webSearch:       a.loadWebSearch(ctx),
@@ -1012,7 +1012,7 @@ func (a *API) reactivateSession(ctx context.Context, id string, user UserIdentit
 	cfg.Delegates = delegates
 	cfg.AllowedTools = allowedTools
 	cfg.SystemPromptExtra = systemPromptExtra
-	cfg.AutopilotRuntime = autopilotRuntime
+	cfg.ControllerRuntime = controllerRuntime
 
 	mgr := NewSessionManager(cfg)
 	if runtimeOpts != nil {
@@ -1260,8 +1260,8 @@ func (a *API) CreateEmptySessionWithRuntime(
 		if strings.TrimSpace(runtimeOpts.WorkingDir) != "" {
 			cfg.workingDir = strings.TrimSpace(runtimeOpts.WorkingDir)
 		}
-		if runtimeOpts.AutopilotName != "" {
-			cfg.autopilotName = runtimeOpts.AutopilotName
+		if runtimeOpts.ControllerName != "" {
+			cfg.controllerName = runtimeOpts.ControllerName
 		}
 	}
 
@@ -1309,7 +1309,7 @@ func (a *API) GenerateAssistantMessage(ctx context.Context, sessionID string, us
 		}
 	}
 
-	systemPrompt := a.buildSystemPrompt(ctx, user.Role, runtimeCfg.dagName, runtimeCfg.autopilotName, runtimeCfg.soul)
+	systemPrompt := a.buildSystemPrompt(ctx, user.Role, runtimeCfg.dagName, runtimeCfg.controllerName, runtimeCfg.soul)
 	resp, err := a.runOneShotPrompt(ctx, provider, runtimeCfg.resolvedModel, systemPrompt, prompt)
 	if err != nil {
 		return Message{}, err

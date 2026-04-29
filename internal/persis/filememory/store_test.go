@@ -157,14 +157,14 @@ func TestLoadDAGMemory(t *testing.T) {
 	})
 }
 
-func TestLoadAutopilotMemory(t *testing.T) {
+func TestLoadControllerMemory(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
 	t.Run("no file returns empty", func(t *testing.T) {
 		t.Parallel()
 		store := newTestStore(t)
-		content, err := store.LoadAutopilotMemory(ctx, "queue_worker")
+		content, err := store.LoadControllerMemory(ctx, "queue_worker")
 		require.NoError(t, err)
 		assert.Empty(t, content)
 	})
@@ -172,40 +172,23 @@ func TestLoadAutopilotMemory(t *testing.T) {
 	t.Run("reads existing file", func(t *testing.T) {
 		t.Parallel()
 		store := newTestStore(t)
-		expected := "# Autopilot Memory\n\nKeep the service concise."
-		autopilotDir := filepath.Join(store.baseDir, autopilotSubDir, "queue_worker")
-		require.NoError(t, os.MkdirAll(autopilotDir, 0750))
-		writeTestFile(t, filepath.Join(autopilotDir, memoryFileName), expected)
+		expected := "# Controller Memory\n\nKeep the service concise."
+		controllerDir := filepath.Join(store.baseDir, controllerSubDir, "queue_worker")
+		require.NoError(t, os.MkdirAll(controllerDir, 0750))
+		writeTestFile(t, filepath.Join(controllerDir, memoryFileName), expected)
 
-		content, err := store.LoadAutopilotMemory(ctx, "queue_worker")
+		content, err := store.LoadControllerMemory(ctx, "queue_worker")
 		require.NoError(t, err)
 		assert.Equal(t, expected, content)
 	})
 
-	t.Run("falls back to legacy automata directory", func(t *testing.T) {
-		t.Parallel()
-		store := newTestStore(t)
-		expected := "# Legacy Memory\n\nStill available after rename."
-		legacyDir := filepath.Join(store.baseDir, legacyAutopilotSubDir, "queue_worker")
-		require.NoError(t, os.MkdirAll(legacyDir, 0o750))
-		writeTestFile(t, filepath.Join(legacyDir, memoryFileName), expected)
-
-		content, err := store.LoadAutopilotMemory(ctx, "queue_worker")
-		require.NoError(t, err)
-		assert.Equal(t, expected, content)
-
-		path, err := store.AutopilotMemoryPath("queue_worker")
-		require.NoError(t, err)
-		assert.Equal(t, filepath.Join(legacyDir, memoryFileName), path)
-	})
-
-	t.Run("rejects invalid autopilot name", func(t *testing.T) {
+	t.Run("rejects invalid controller name", func(t *testing.T) {
 		t.Parallel()
 		store := newTestStore(t)
 
-		_, err := store.LoadAutopilotMemory(ctx, "queue-worker")
+		_, err := store.LoadControllerMemory(ctx, "queue-worker")
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid autopilotName")
+		assert.Contains(t, err.Error(), "invalid controllerName")
 	})
 }
 
@@ -271,31 +254,31 @@ func TestSaveDAGMemory(t *testing.T) {
 	})
 }
 
-func TestSaveAutopilotMemory(t *testing.T) {
+func TestSaveControllerMemory(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
 	t.Run("creates file and parent dirs", func(t *testing.T) {
 		t.Parallel()
 		store := newTestStore(t)
-		content := "# Autopilot Memory\n\nFollow the standing instruction."
-		require.NoError(t, store.SaveAutopilotMemory(ctx, "queue_worker", content))
+		content := "# Controller Memory\n\nFollow the standing instruction."
+		require.NoError(t, store.SaveControllerMemory(ctx, "queue_worker", content))
 
-		data, err := os.ReadFile(store.autopilotMemoryPath("queue_worker"))
+		data, err := os.ReadFile(store.controllerMemoryPath("queue_worker"))
 		require.NoError(t, err)
 		assert.Equal(t, content, string(data))
 	})
 
-	t.Run("rejects invalid autopilot name", func(t *testing.T) {
+	t.Run("rejects invalid controller name", func(t *testing.T) {
 		t.Parallel()
 		store := newTestStore(t)
-		err := store.SaveAutopilotMemory(ctx, "queue-worker", "bad")
+		err := store.SaveControllerMemory(ctx, "queue-worker", "bad")
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid autopilotName")
+		assert.Contains(t, err.Error(), "invalid controllerName")
 	})
 }
 
-func TestAutopilotDocuments(t *testing.T) {
+func TestControllerDocuments(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
@@ -303,42 +286,24 @@ func TestAutopilotDocuments(t *testing.T) {
 		t.Parallel()
 		store := newTestStore(t)
 		content := "# Soul\n\nBe precise."
-		require.NoError(t, store.SaveAutopilotDocument(ctx, "queue_worker", soulFileName, content))
+		require.NoError(t, store.SaveControllerDocument(ctx, "queue_worker", soulFileName, content))
 
-		loaded, err := store.LoadAutopilotDocument(ctx, "queue_worker", soulFileName)
+		loaded, err := store.LoadControllerDocument(ctx, "queue_worker", soulFileName)
 		require.NoError(t, err)
 		assert.Equal(t, content, loaded)
 
-		path, err := store.AutopilotDocumentPath("queue_worker", soulFileName)
+		path, err := store.ControllerDocumentPath("queue_worker", soulFileName)
 		require.NoError(t, err)
-		assert.Equal(t, filepath.Join(store.baseDir, autopilotSubDir, "queue_worker", soulFileName), path)
-	})
-
-	t.Run("preserves legacy document location when it already exists", func(t *testing.T) {
-		t.Parallel()
-		store := newTestStore(t)
-		legacyDir := filepath.Join(store.baseDir, legacyAutopilotSubDir, "queue_worker")
-		require.NoError(t, os.MkdirAll(legacyDir, 0o750))
-		writeTestFile(t, filepath.Join(legacyDir, soulFileName), "old")
-
-		require.NoError(t, store.SaveAutopilotDocument(ctx, "queue_worker", soulFileName, "new"))
-
-		path, err := store.AutopilotDocumentPath("queue_worker", soulFileName)
-		require.NoError(t, err)
-		assert.Equal(t, filepath.Join(legacyDir, soulFileName), path)
-
-		data, err := os.ReadFile(path)
-		require.NoError(t, err)
-		assert.Equal(t, "new", string(data))
+		assert.Equal(t, filepath.Join(store.baseDir, controllerSubDir, "queue_worker", soulFileName), path)
 	})
 
 	t.Run("rejects unsupported document", func(t *testing.T) {
 		t.Parallel()
 		store := newTestStore(t)
 
-		err := store.SaveAutopilotDocument(ctx, "queue_worker", "PROMPT.md", "bad")
+		err := store.SaveControllerDocument(ctx, "queue_worker", "PROMPT.md", "bad")
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid autopilot document")
+		assert.Contains(t, err.Error(), "invalid controller document")
 	})
 }
 
@@ -350,13 +315,13 @@ func TestMemoryDir(t *testing.T) {
 	assert.Equal(t, filepath.Join(dir, agentMemoryDir), store.MemoryDir())
 }
 
-func TestAutopilotMemoryPath(t *testing.T) {
+func TestControllerMemoryPath(t *testing.T) {
 	t.Parallel()
 
 	store := newTestStore(t)
-	path, err := store.AutopilotMemoryPath("queue_worker")
+	path, err := store.ControllerMemoryPath("queue_worker")
 	require.NoError(t, err)
-	assert.Equal(t, filepath.Join(store.baseDir, autopilotSubDir, "queue_worker", memoryFileName), path)
+	assert.Equal(t, filepath.Join(store.baseDir, controllerSubDir, "queue_worker", memoryFileName), path)
 }
 
 func TestListDAGMemories(t *testing.T) {
@@ -399,34 +364,34 @@ func TestListDAGMemories(t *testing.T) {
 	})
 }
 
-func TestDeleteAutopilotMemory(t *testing.T) {
+func TestDeleteControllerMemory(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
 	t.Run("removes file and directory", func(t *testing.T) {
 		t.Parallel()
 		store := newTestStore(t)
-		require.NoError(t, store.SaveAutopilotMemory(ctx, "queue_worker", "remember this"))
+		require.NoError(t, store.SaveControllerMemory(ctx, "queue_worker", "remember this"))
 
-		require.NoError(t, store.DeleteAutopilotMemory(ctx, "queue_worker"))
+		require.NoError(t, store.DeleteControllerMemory(ctx, "queue_worker"))
 
-		_, err := os.Stat(filepath.Join(store.baseDir, autopilotSubDir, "queue_worker"))
+		_, err := os.Stat(filepath.Join(store.baseDir, controllerSubDir, "queue_worker"))
 		assert.True(t, os.IsNotExist(err))
 	})
 
 	t.Run("keeps soul document", func(t *testing.T) {
 		t.Parallel()
 		store := newTestStore(t)
-		require.NoError(t, store.SaveAutopilotMemory(ctx, "queue_worker", "remember this"))
-		require.NoError(t, store.SaveAutopilotDocument(ctx, "queue_worker", soulFileName, "be precise"))
+		require.NoError(t, store.SaveControllerMemory(ctx, "queue_worker", "remember this"))
+		require.NoError(t, store.SaveControllerDocument(ctx, "queue_worker", soulFileName, "be precise"))
 
-		require.NoError(t, store.DeleteAutopilotMemory(ctx, "queue_worker"))
+		require.NoError(t, store.DeleteControllerMemory(ctx, "queue_worker"))
 
-		memory, err := store.LoadAutopilotMemory(ctx, "queue_worker")
+		memory, err := store.LoadControllerMemory(ctx, "queue_worker")
 		require.NoError(t, err)
 		assert.Empty(t, memory)
 
-		soul, err := store.LoadAutopilotDocument(ctx, "queue_worker", soulFileName)
+		soul, err := store.LoadControllerDocument(ctx, "queue_worker", soulFileName)
 		require.NoError(t, err)
 		assert.Equal(t, "be precise", soul)
 	})
@@ -585,12 +550,12 @@ func TestCacheInvalidation(t *testing.T) {
 		assert.False(t, found)
 	})
 
-	t.Run("missing autopilot memory returns empty with cache", func(t *testing.T) {
+	t.Run("missing controller memory returns empty with cache", func(t *testing.T) {
 		t.Parallel()
 		cache := fileutil.NewCache[string]("memory_test", 10, time.Hour)
 		store := newTestStoreWithOptions(t, WithFileCache(cache))
 
-		content, err := store.LoadAutopilotMemory(ctx, "queue_worker")
+		content, err := store.LoadControllerMemory(ctx, "queue_worker")
 		require.NoError(t, err)
 		assert.Empty(t, content)
 	})

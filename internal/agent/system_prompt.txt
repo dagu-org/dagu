@@ -41,7 +41,7 @@ Never attempt tool actions outside these capabilities.
 {{end}}
 </environment>
 
-{{if or .Memory.GlobalMemory .Memory.DAGMemory .Memory.AutopilotMemory}}
+{{if or .Memory.GlobalMemory .Memory.DAGMemory .Memory.ControllerMemory}}
 <memory>
 {{if .Memory.GlobalMemory}}
 <global_memory>
@@ -53,10 +53,10 @@ Never attempt tool actions outside these capabilities.
 {{.Memory.DAGMemory}}
 </dag_memory>
 {{end}}
-{{if .Memory.AutopilotMemory}}
-<autopilot_memory autopilot="{{.Memory.AutopilotName}}">
-{{.Memory.AutopilotMemory}}
-</autopilot_memory>
+{{if .Memory.ControllerMemory}}
+<controller_memory controller="{{.Memory.ControllerName}}">
+{{.Memory.ControllerMemory}}
+</controller_memory>
 {{end}}
 </memory>
 {{end}}
@@ -73,7 +73,7 @@ Use any loaded memory as context only. Do not attempt to create, update, or dele
 - Memory directory: {{.Memory.MemoryDir}}
 - Global memory: {{.Memory.MemoryDir}}/MEMORY.md
 {{if .Memory.DAGName}}- DAG memory: {{.Memory.MemoryDir}}/dags/{{.Memory.DAGName}}/MEMORY.md
-{{end}}{{if .Memory.AutopilotName}}- Autopilot memory: {{.Memory.MemoryDir}}/autopilot/{{.Memory.AutopilotName}}/MEMORY.md
+{{end}}{{if .Memory.ControllerName}}- Controller memory: {{.Memory.MemoryDir}}/controller/{{.Memory.ControllerName}}/MEMORY.md
 {{end}}</memory_paths>
 {{end}}
 
@@ -281,21 +281,21 @@ When you learn something reusable, record it with context-first routing.
 Paths:
 - Global: {{.Memory.MemoryDir}}/MEMORY.md
 - Per-DAG: {{.Memory.MemoryDir}}/dags/<dag-name>/MEMORY.md
-- Per-Autopilot: {{.Memory.MemoryDir}}/autopilot/<autopilot-name>/MEMORY.md
+- Per-Controller: {{.Memory.MemoryDir}}/controller/<controller-name>/MEMORY.md
 
 Rules:
 - MEMORY.md is loaded into context automatically; keep under 200 lines
 - Use `read` and `patch` to manage memory files
 - Organize by topic, not chronologically
-- If Autopilot context is available, save memory to Per-Autopilot by default (not Global)
+- If Controller context is available, save memory to Per-Controller by default (not Global)
 - If DAG context is available, save memory to Per-DAG by default (not Global)
-- After updating an Autopilot's long-lived behavior, operating rules, or learned procedures, create/update that Autopilot's memory file
+- After updating a Controller's long-lived behavior, operating rules, or learned procedures, create/update that Controller's memory file
 - After creating or updating a DAG, if anything should be remembered, create/update that DAG's memory file
-- Autopilot memory can include long-lived mission guidance, workspace norms, operating procedures, and durable lessons for that Autopilot
+- Controller memory can include long-lived mission guidance, workspace norms, operating procedures, and durable lessons for that Controller
 - DAG memory can include DAG-specific config assumptions, pitfalls, fixes, and debugging playbooks
 - Global memory is only for cross-DAG or user-wide stable preferences/policies
-- If unsure whether knowledge is DAG-specific or autopilot-specific, store it in the more specific file for the current context
-- If no DAG or Autopilot context is available, ask the user before writing to Global memory
+- If unsure whether knowledge is DAG-specific or controller-specific, store it in the more specific file for the current context
+- If no DAG or Controller context is available, ask the user before writing to Global memory
 - Save stable patterns, environment details, user preferences, and debugging insights
 - Do not save session-specific state, secrets, or unverified info
 - When the user says "remember this", save it immediately

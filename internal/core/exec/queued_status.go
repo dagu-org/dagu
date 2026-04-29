@@ -12,11 +12,11 @@ func IsQueuedCatchup(status *DAGRunStatus) bool {
 		status.TriggerType == core.TriggerTypeCatchUp
 }
 
-// IsQueuedAutopilot reports whether the queued status belongs to an Autopilot run.
-func IsQueuedAutopilot(status *DAGRunStatus) bool {
+// IsQueuedController reports whether the queued status belongs to a Controller run.
+func IsQueuedController(status *DAGRunStatus) bool {
 	return status != nil &&
 		status.Status == core.Queued &&
-		status.TriggerType == core.TriggerTypeAutopilot
+		status.TriggerType == core.TriggerTypeController
 }
 
 // PreservedQueueTriggerType returns the trigger type that must be preserved
@@ -26,8 +26,8 @@ func PreservedQueueTriggerType(status *DAGRunStatus) core.TriggerType {
 	if IsQueuedCatchup(status) {
 		return core.TriggerTypeCatchUp
 	}
-	if IsQueuedAutopilot(status) {
-		return core.TriggerTypeAutopilot
+	if IsQueuedController(status) {
+		return core.TriggerTypeController
 	}
 	return core.TriggerTypeUnknown
 }

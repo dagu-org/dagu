@@ -30,9 +30,9 @@ type ToolConfig struct {
 	// RemoteContextResolver provides access to remote CLI contexts for remote_agent tools.
 	// Nil means remote context tools are not available.
 	RemoteContextResolver RemoteContextResolver
-	// AutopilotRuntime provides Autopilot-specific workflow control tools.
-	// Nil means Autopilot tools are not available.
-	AutopilotRuntime AutopilotRuntime
+	// ControllerRuntime provides Controller-specific workflow control tools.
+	// Nil means Controller tools are not available.
+	ControllerRuntime ControllerRuntime
 }
 
 // toolRegistry holds all registered tools. Populated by init() calls.

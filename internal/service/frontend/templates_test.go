@@ -117,12 +117,12 @@ func TestDefaultFunctionsExposeInitialWorkspacesJSON(t *testing.T) {
 	assert.True(t, workspaces[0].UpdatedAt.Equal(updatedAt))
 }
 
-func TestDefaultFunctionsExposeAutopilotEnabled(t *testing.T) {
-	funcs := defaultFunctions(&funcsConfig{AutopilotEnabled: true})
-	autopilotEnabled, ok := funcs["autopilotEnabled"].(func() string)
+func TestDefaultFunctionsExposeControllerEnabled(t *testing.T) {
+	funcs := defaultFunctions(&funcsConfig{ControllerEnabled: true})
+	controllerEnabled, ok := funcs["controllerEnabled"].(func() string)
 	require.True(t, ok)
 
-	assert.Equal(t, "true", autopilotEnabled())
+	assert.Equal(t, "true", controllerEnabled())
 }
 
 func TestDefaultFunctionsExposeLicenseGraceEndsAt(t *testing.T) {

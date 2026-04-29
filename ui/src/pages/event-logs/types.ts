@@ -5,13 +5,13 @@ export type EventLogsResponse = components['schemas']['EventLogsResponse'];
 
 export type DateRangeMode = 'preset' | 'specific' | 'custom';
 export type SpecificPeriod = 'date' | 'month' | 'year';
-export type EventKindFilter = 'all' | 'dag_run' | 'autopilot' | 'llm_usage';
+export type EventKindFilter = 'all' | 'dag_run' | 'controller' | 'llm_usage';
 
 export type EventLogFilters = {
   kind: EventKindFilter;
   type: string;
   dagName: string;
-  autopilotName: string;
+  controllerName: string;
   dagRunId: string;
   attemptId: string;
   fromDate?: string;
@@ -30,7 +30,7 @@ export type EventLogQueryParams = {
   paginationMode: components['parameters']['EventLogPaginationMode'];
   type?: string;
   dagName?: string;
-  autopilotName?: string;
+  controllerName?: string;
   dagRunId?: string;
   attemptId?: string;
   startTime?: string;

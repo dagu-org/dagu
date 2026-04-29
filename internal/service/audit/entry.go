@@ -22,7 +22,7 @@ const (
 	CategoryWebhook    Category = "webhook"
 	CategoryGitSync    Category = "git_sync"
 	CategoryAgent      Category = "agent"
-	CategoryAutopilot  Category = "autopilot"
+	CategoryController  Category = "controller"
 	CategorySystem     Category = "system"
 	CategoryRemoteNode Category = "remote_node"
 	CategoryWorkspace  Category = "workspace"

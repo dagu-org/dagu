@@ -51,12 +51,12 @@ func TestListEventLogsBuildsFilterAndMapsResponse(t *testing.T) {
 					SchemaVersion:    eventstore.SchemaVersion,
 					OccurredAt:       startTime.Add(3 * time.Hour),
 					RecordedAt:       startTime.Add(3*time.Hour + time.Minute),
-					Kind:             eventstore.KindAutopilot,
-					Type:             eventstore.TypeAutopilotNeedsInput,
+					Kind:             eventstore.KindController,
+					Type:             eventstore.TypeControllerNeedsInput,
 					SourceService:    eventstore.SourceServiceScheduler,
-					AutopilotName:    "service_ops",
-					AutopilotKind:    "service",
-					AutopilotCycleID: "cycle-1",
+					ControllerName:    "service_ops",
+					ControllerKind:    "service",
+					ControllerCycleID: "cycle-1",
 					Status:           "waiting",
 				},
 			},
@@ -128,12 +128,12 @@ func TestListEventLogsBuildsFilterAndMapsResponse(t *testing.T) {
 	assert.Equal(t, "dag.run.failed", okResp.Entries[0].Type)
 	require.NotNil(t, okResp.Entries[0].Data)
 	assert.Equal(t, "boom", (*okResp.Entries[0].Data)["reason"])
-	require.NotNil(t, okResp.Entries[1].AutopilotName)
-	assert.Equal(t, "service_ops", *okResp.Entries[1].AutopilotName)
-	require.NotNil(t, okResp.Entries[1].AutopilotKind)
-	assert.Equal(t, "service", *okResp.Entries[1].AutopilotKind)
-	require.NotNil(t, okResp.Entries[1].AutopilotCycleId)
-	assert.Equal(t, "cycle-1", *okResp.Entries[1].AutopilotCycleId)
+	require.NotNil(t, okResp.Entries[1].ControllerName)
+	assert.Equal(t, "service_ops", *okResp.Entries[1].ControllerName)
+	require.NotNil(t, okResp.Entries[1].ControllerKind)
+	assert.Equal(t, "service", *okResp.Entries[1].ControllerKind)
+	require.NotNil(t, okResp.Entries[1].ControllerCycleId)
+	assert.Equal(t, "cycle-1", *okResp.Entries[1].ControllerCycleId)
 	assert.Nil(t, okResp.Total)
 }
 
@@ -173,7 +173,7 @@ func TestListEventLogsSupportsOffsetCompatibilityPagination(t *testing.T) {
 	assert.Equal(t, total, *okResp.Total)
 }
 
-func TestListEventLogsBuildsAutopilotFilter(t *testing.T) {
+func TestListEventLogsBuildsControllerFilter(t *testing.T) {
 	t.Parallel()
 
 	store := &mockEventStore{
@@ -187,23 +187,23 @@ func TestListEventLogsBuildsAutopilotFilter(t *testing.T) {
 		frontendapi.WithEventService(eventstore.New(store)),
 	)
 
-	kind := "autopilot"
-	eventType := "autopilot.error"
-	autopilotName := "service_ops"
+	kind := "controller"
+	eventType := "controller.error"
+	controllerName := "service_ops"
 	resp, err := api.ListEventLogs(context.Background(), apigen.ListEventLogsRequestObject{
 		Params: apigen.ListEventLogsParams{
 			Kind:          &kind,
 			Type:          &eventType,
-			AutopilotName: &autopilotName,
+			ControllerName: &controllerName,
 		},
 	})
 	require.NoError(t, err)
 	_, ok := resp.(apigen.ListEventLogs200JSONResponse)
 	require.True(t, ok)
 	assert.Equal(t, eventstore.QueryFilter{
-		Kind:           eventstore.KindAutopilot,
-		Type:           eventstore.TypeAutopilotError,
-		AutopilotName:  autopilotName,
+		Kind:           eventstore.KindController,
+		Type:           eventstore.TypeControllerError,
+		ControllerName:  controllerName,
 		Limit:          50,
 		PaginationMode: eventstore.QueryPaginationModeOffset,
 	}, store.lastFilter)

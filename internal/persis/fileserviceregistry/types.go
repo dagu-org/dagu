@@ -22,7 +22,7 @@ type instanceInfo struct {
 	PID                 int                           `json:"pid"`
 	Status              exec.ServiceStatus            `json:"status"`
 	StartedAt           time.Time                     `json:"startedAt"`
-	AutopilotController *exec.AutopilotControllerInfo `json:"autopilotController,omitempty"`
+	ControllerStatus *exec.ControllerStatusInfo `json:"controllerStatus,omitempty"`
 }
 
 // instanceFilePath returns the file path for an instance

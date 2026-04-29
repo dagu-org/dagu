@@ -20,7 +20,7 @@ import (
 
 	"github.com/dagucloud/dagu/internal/agent"
 	"github.com/dagucloud/dagu/internal/agentoauth"
-	"github.com/dagucloud/dagu/internal/autopilot"
+	"github.com/dagucloud/dagu/internal/controller"
 	"github.com/dagucloud/dagu/internal/clicontext"
 	"github.com/dagucloud/dagu/internal/cmn/config"
 	"github.com/dagucloud/dagu/internal/cmn/crypto"
@@ -681,33 +681,33 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 		}
 	}
 	sched.SetDAGRunLeaseStore(c.DAGRunLeaseStore)
-	autopilotEnabled, err := c.autopilotEnabled()
+	controllerEnabled, err := c.controllerEnabled()
 	if err != nil {
-		return nil, fmt.Errorf("failed to determine autopilot enablement: %w", err)
+		return nil, fmt.Errorf("failed to determine controller enablement: %w", err)
 	}
-	if autopilotEnabled {
-		autopilotService, err := c.newSchedulerAutopilotService(dr, schedulerRunStore, schedulerRunMgr, coordinatorCli)
+	if controllerEnabled {
+		controllerService, err := c.newSchedulerControllerService(dr, schedulerRunStore, schedulerRunMgr, coordinatorCli)
 		if err != nil {
-			return nil, fmt.Errorf("failed to initialize autopilot service for scheduler: %w", err)
+			return nil, fmt.Errorf("failed to initialize controller service for scheduler: %w", err)
 		}
-		if err := autopilotService.ValidateController(); err != nil {
-			return nil, fmt.Errorf("invalid autopilot controller configuration: %w", err)
+		if err := controllerService.ValidateController(); err != nil {
+			return nil, fmt.Errorf("invalid controller controller configuration: %w", err)
 		}
-		sched.SetAutopilotService(autopilotService)
-		sched.SetAutopilotController(&exec.AutopilotControllerInfo{
-			State: exec.AutopilotControllerStateReady,
+		sched.SetControllerService(controllerService)
+		sched.SetControllerStatus(&exec.ControllerStatusInfo{
+			State: exec.ControllerStatusStateReady,
 		})
 	} else {
-		sched.SetAutopilotController(&exec.AutopilotControllerInfo{
-			State:   exec.AutopilotControllerStateDisabled,
-			Message: "Autopilot is disabled in agent settings",
+		sched.SetControllerStatus(&exec.ControllerStatusInfo{
+			State:   exec.ControllerStatusStateDisabled,
+			Message: "Controller is disabled in agent settings",
 		})
 	}
 	sched.SetDispatchTaskStore(c.DispatchTaskStore)
 	return sched, nil
 }
 
-func (c *Context) autopilotEnabled() (bool, error) {
+func (c *Context) controllerEnabled() (bool, error) {
 	store, err := fileagentconfig.New(c.Config.Paths.DataDir)
 	if err != nil {
 		return false, err
@@ -715,12 +715,12 @@ func (c *Context) autopilotEnabled() (bool, error) {
 	return store.IsEnabled(c.Context), nil
 }
 
-func (c *Context) newSchedulerAutopilotService(
+func (c *Context) newSchedulerControllerService(
 	dagStore exec.DAGStore,
 	dagRunStore exec.DAGRunStore,
 	dagRunMgr runtime.Manager,
 	coordinatorCli coordinator.Client,
-) (*autopilot.Service, error) {
+) (*controller.Service, error) {
 	agentConfigStore, err := fileagentconfig.New(c.Config.Paths.DataDir)
 	if err != nil {
 		return nil, err
@@ -754,23 +754,23 @@ func (c *Context) newSchedulerAutopilotService(
 		memoryStore,
 		oauthManager,
 	)
-	return autopilot.New(
+	return controller.New(
 		c.Config,
 		dagStore,
 		dagRunStore,
-		autopilot.WithSessionStore(sessionStore),
-		autopilot.WithMemoryStore(memoryStore),
-		autopilot.WithDAGRunController(&dagRunMgr),
-		autopilot.WithAgentAPI(agentAPI),
-		autopilot.WithSoulStore(soulStore),
-		autopilot.WithCoordinatorClient(coordinatorCli),
-		autopilot.WithSubCmdBuilder(runtime.NewSubCmdBuilder(c.Config)),
-		autopilot.WithEventService(c.EventService),
-		autopilot.WithEventSource(eventstore.Source{
+		controller.WithSessionStore(sessionStore),
+		controller.WithMemoryStore(memoryStore),
+		controller.WithDAGRunController(&dagRunMgr),
+		controller.WithAgentAPI(agentAPI),
+		controller.WithSoulStore(soulStore),
+		controller.WithCoordinatorClient(coordinatorCli),
+		controller.WithSubCmdBuilder(runtime.NewSubCmdBuilder(c.Config)),
+		controller.WithEventService(c.EventService),
+		controller.WithEventSource(eventstore.Source{
 			Service:  eventstore.SourceServiceScheduler,
 			Instance: c.EventSourceInstance,
 		}),
-		autopilot.WithLogger(slog.Default()),
+		controller.WithLogger(slog.Default()),
 	), nil
 }
 

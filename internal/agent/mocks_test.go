@@ -362,13 +362,13 @@ var _ SessionStore = (*mockSessionStore)(nil)
 type mockMemoryStore struct {
 	global    string
 	dag       map[string]string
-	autopilot map[string]string
+	controller map[string]string
 }
 
 func newMockMemoryStore() *mockMemoryStore {
 	return &mockMemoryStore{
 		dag:       make(map[string]string),
-		autopilot: make(map[string]string),
+		controller: make(map[string]string),
 	}
 }
 
@@ -385,8 +385,8 @@ func (m *mockMemoryStore) SaveGlobalMemory(_ context.Context, content string) er
 	return nil
 }
 
-func (m *mockMemoryStore) LoadAutopilotMemory(_ context.Context, autopilotName string) (string, error) {
-	return m.autopilot[autopilotName], nil
+func (m *mockMemoryStore) LoadControllerMemory(_ context.Context, controllerName string) (string, error) {
+	return m.controller[controllerName], nil
 }
 
 func (m *mockMemoryStore) SaveDAGMemory(_ context.Context, dagName string, content string) error {
@@ -394,8 +394,8 @@ func (m *mockMemoryStore) SaveDAGMemory(_ context.Context, dagName string, conte
 	return nil
 }
 
-func (m *mockMemoryStore) SaveAutopilotMemory(_ context.Context, autopilotName string, content string) error {
-	m.autopilot[autopilotName] = content
+func (m *mockMemoryStore) SaveControllerMemory(_ context.Context, controllerName string, content string) error {
+	m.controller[controllerName] = content
 	return nil
 }
 
@@ -403,8 +403,8 @@ func (m *mockMemoryStore) MemoryDir() string {
 	return "/tmp/mock-memory"
 }
 
-func (m *mockMemoryStore) AutopilotMemoryPath(autopilotName string) (string, error) {
-	return "/tmp/mock-memory/autopilot/" + autopilotName + "/MEMORY.md", nil
+func (m *mockMemoryStore) ControllerMemoryPath(controllerName string) (string, error) {
+	return "/tmp/mock-memory/controller/" + controllerName + "/MEMORY.md", nil
 }
 
 func (m *mockMemoryStore) ListDAGMemories(_ context.Context) ([]string, error) {
@@ -425,8 +425,8 @@ func (m *mockMemoryStore) DeleteDAGMemory(_ context.Context, dagName string) err
 	return nil
 }
 
-func (m *mockMemoryStore) DeleteAutopilotMemory(_ context.Context, autopilotName string) error {
-	delete(m.autopilot, autopilotName)
+func (m *mockMemoryStore) DeleteControllerMemory(_ context.Context, controllerName string) error {
+	delete(m.controller, controllerName)
 	return nil
 }
 

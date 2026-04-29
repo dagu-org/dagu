@@ -153,8 +153,8 @@ type MemoryContent struct {
 	GlobalMemory    string // Contents of global MEMORY.md (truncated)
 	DAGMemory       string // Contents of per-DAG MEMORY.md (truncated)
 	DAGName         string // Name of the DAG (empty if no DAG context)
-	AutopilotMemory string // Contents of per-Autopilot MEMORY.md (truncated)
-	AutopilotName   string // Name of the Autopilot (empty if no Autopilot context)
+	ControllerMemory string // Contents of per-Controller MEMORY.md (truncated)
+	ControllerName   string // Name of the Controller (empty if no Controller context)
 	MemoryDir       string // Root memory directory path
 	ReadOnly        bool   // Memory is execution-scoped read-only context
 }

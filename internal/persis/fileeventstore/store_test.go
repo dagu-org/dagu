@@ -186,41 +186,41 @@ func TestStoreQueryReadsLargeCommittedEventLine(t *testing.T) {
 	assert.Empty(t, result.NextCursor)
 }
 
-func TestStoreQueryFiltersByAutopilotName(t *testing.T) {
+func TestStoreQueryFiltersByControllerName(t *testing.T) {
 	t.Parallel()
 
 	store, err := New(t.TempDir())
 	require.NoError(t, err)
 
-	autopilotEvent := &eventstore.Event{
-		ID:               "evt-autopilot-1",
+	controllerEvent := &eventstore.Event{
+		ID:               "evt-controller-1",
 		SchemaVersion:    eventstore.SchemaVersion,
 		OccurredAt:       time.Date(2026, 4, 1, 10, 0, 0, 0, time.UTC),
 		RecordedAt:       time.Date(2026, 4, 1, 10, 0, 1, 0, time.UTC),
-		Kind:             eventstore.KindAutopilot,
-		Type:             eventstore.TypeAutopilotError,
+		Kind:             eventstore.KindController,
+		Type:             eventstore.TypeControllerError,
 		SourceService:    eventstore.SourceServiceScheduler,
-		AutopilotName:    "service_ops",
-		AutopilotKind:    "service",
-		AutopilotCycleID: "cycle-1",
+		ControllerName:    "service_ops",
+		ControllerKind:    "service",
+		ControllerCycleID: "cycle-1",
 		Status:           "running",
 	}
-	otherEvent := *autopilotEvent
-	otherEvent.ID = "evt-autopilot-2"
-	otherEvent.AutopilotName = "workflow_ops"
+	otherEvent := *controllerEvent
+	otherEvent.ID = "evt-controller-2"
+	otherEvent.ControllerName = "workflow_ops"
 
-	writeCommittedEvents(t, store.baseDir, autopilotEvent.OccurredAt, [][]byte{
-		mustMarshalEvent(t, autopilotEvent),
+	writeCommittedEvents(t, store.baseDir, controllerEvent.OccurredAt, [][]byte{
+		mustMarshalEvent(t, controllerEvent),
 		mustMarshalEvent(t, &otherEvent),
 	})
 
 	result, err := store.Query(context.Background(), eventstore.QueryFilter{
-		Kind:          eventstore.KindAutopilot,
-		AutopilotName: "service_ops",
+		Kind:          eventstore.KindController,
+		ControllerName: "service_ops",
 	})
 	require.NoError(t, err)
 	require.Len(t, result.Entries, 1)
-	assert.Equal(t, "evt-autopilot-1", result.Entries[0].ID)
+	assert.Equal(t, "evt-controller-1", result.Entries[0].ID)
 }
 
 func TestStoreQueryRejectsInvalidCursor(t *testing.T) {

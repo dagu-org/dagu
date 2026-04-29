@@ -1,38 +1,35 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { History } from 'lucide-react';
-import { AutopilotSwarmIcon } from '@/components/icons/AutopilotSwarmIcon';
+import { ControllerSwarmIcon } from '@/components/icons/ControllerSwarmIcon';
 import { useCockpitState } from '@/features/cockpit/hooks/useCockpitState';
 import { CockpitToolbar } from '@/features/cockpit/components/CockpitToolbar';
 import { DateKanbanList } from '@/features/cockpit/components/DateKanbanList';
-import { AutopilotCockpit } from '@/features/cockpit/components/AutopilotCockpit';
+import { ControllerCockpit } from '@/features/cockpit/components/ControllerCockpit';
 import { ToggleButton, ToggleGroup } from '@/components/ui/toggle-group';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useConfig } from '@/contexts/ConfigContext';
 
 const COCKPIT_MODE_STORAGE_KEY = 'dagu_cockpit_mode';
-type CockpitMode = 'runs' | 'autopilot';
+type CockpitMode = 'runs' | 'controller';
 
 export default function CockpitPage(): React.ReactElement {
   const { setTitle } = React.useContext(AppBarContext);
   const config = useConfig();
   const [searchParams, setSearchParams] = useSearchParams();
-  const autopilotFeatureEnabled = config.agentEnabled && config.autopilotEnabled;
-  const legacyRequestedAutopilotName = searchParams.get('automata') || '';
-  const requestedAutopilotName =
-    searchParams.get('autopilot') || legacyRequestedAutopilotName;
+  const controllerFeatureEnabled =
+    config.agentEnabled && config.controllerEnabled;
+  const requestedControllerName = searchParams.get('controller') || '';
   const requestedMode = searchParams.get('mode');
-  const autopilotRequested =
-    requestedMode === 'autopilot' ||
-    requestedMode === 'automata' ||
-    !!requestedAutopilotName;
+  const controllerRequested =
+    requestedMode === 'controller' || !!requestedControllerName;
   const [isTemplateSelectorOpen, setIsTemplateSelectorOpen] = useState(false);
   const [mode, setMode] = useState<CockpitMode>(() => {
-    if (autopilotRequested) {
-      return 'autopilot';
+    if (controllerRequested) {
+      return 'controller';
     }
     const stored = localStorage.getItem(COCKPIT_MODE_STORAGE_KEY);
-    return stored === 'autopilot' ? 'autopilot' : 'runs';
+    return stored === 'controller' ? 'controller' : 'runs';
   });
   const { selectedWorkspace, workspaceKey, selectedTemplate, selectTemplate } =
     useCockpitState();
@@ -42,54 +39,32 @@ export default function CockpitPage(): React.ReactElement {
   }, [setTitle]);
 
   useEffect(() => {
-    if (requestedMode !== 'automata' && !legacyRequestedAutopilotName) {
-      return;
-    }
-    const nextParams = new URLSearchParams(searchParams);
-    if (requestedMode === 'automata') {
-      nextParams.set('mode', 'autopilot');
-    }
-    if (legacyRequestedAutopilotName && !searchParams.get('autopilot')) {
-      nextParams.set('autopilot', legacyRequestedAutopilotName);
-    }
-    nextParams.delete('automata');
-    setSearchParams(nextParams, { replace: true });
-  }, [
-    legacyRequestedAutopilotName,
-    requestedMode,
-    searchParams,
-    setSearchParams,
-  ]);
-
-  useEffect(() => {
-    if (!autopilotFeatureEnabled && mode !== 'runs') {
+    if (!controllerFeatureEnabled && mode !== 'runs') {
       setMode('runs');
       localStorage.setItem(COCKPIT_MODE_STORAGE_KEY, 'runs');
     }
-  }, [autopilotFeatureEnabled, mode]);
+  }, [controllerFeatureEnabled, mode]);
 
   useEffect(() => {
-    if (autopilotFeatureEnabled && autopilotRequested) {
-      setMode('autopilot');
-      localStorage.setItem(COCKPIT_MODE_STORAGE_KEY, 'autopilot');
+    if (controllerFeatureEnabled && controllerRequested) {
+      setMode('controller');
+      localStorage.setItem(COCKPIT_MODE_STORAGE_KEY, 'controller');
     }
-  }, [autopilotFeatureEnabled, autopilotRequested]);
+  }, [controllerFeatureEnabled, controllerRequested]);
 
   const effectiveMode: CockpitMode =
-    autopilotFeatureEnabled && mode === 'autopilot' ? 'autopilot' : 'runs';
+    controllerFeatureEnabled && mode === 'controller' ? 'controller' : 'runs';
 
   const handleModeChange = (nextMode: CockpitMode) => {
-    const resolvedMode = autopilotFeatureEnabled ? nextMode : 'runs';
+    const resolvedMode = controllerFeatureEnabled ? nextMode : 'runs';
     setMode(resolvedMode);
     localStorage.setItem(COCKPIT_MODE_STORAGE_KEY, resolvedMode);
     const nextParams = new URLSearchParams(searchParams);
-    if (resolvedMode === 'autopilot') {
-      nextParams.set('mode', 'autopilot');
-      nextParams.delete('automata');
+    if (resolvedMode === 'controller') {
+      nextParams.set('mode', 'controller');
     } else {
       nextParams.delete('mode');
-      nextParams.delete('autopilot');
-      nextParams.delete('automata');
+      nextParams.delete('controller');
     }
     setSearchParams(nextParams, { replace: true });
     if (resolvedMode !== 'runs') {
@@ -98,15 +73,14 @@ export default function CockpitPage(): React.ReactElement {
     }
   };
 
-  const handleAutopilotSelectionChange = React.useCallback(
+  const handleControllerSelectionChange = React.useCallback(
     (name: string | null) => {
       const nextParams = new URLSearchParams(searchParams);
-      nextParams.set('mode', 'autopilot');
-      nextParams.delete('automata');
+      nextParams.set('mode', 'controller');
       if (name) {
-        nextParams.set('autopilot', name);
+        nextParams.set('controller', name);
       } else {
-        nextParams.delete('autopilot');
+        nextParams.delete('controller');
       }
       setSearchParams(nextParams, { replace: true });
     },
@@ -124,10 +98,10 @@ export default function CockpitPage(): React.ReactElement {
           <div className="text-sm text-muted-foreground">
             {effectiveMode === 'runs'
               ? 'Track workspace DAG execution by day.'
-              : 'Monitor Autopilot lifecycle and workspace activity.'}
+              : 'Monitor Controller lifecycle and workspace activity.'}
           </div>
         </div>
-        {autopilotFeatureEnabled ? (
+        {controllerFeatureEnabled ? (
           <ToggleGroup aria-label="Cockpit mode">
             <ToggleButton
               value="runs"
@@ -140,16 +114,16 @@ export default function CockpitPage(): React.ReactElement {
               DAG Runs
             </ToggleButton>
             <ToggleButton
-              value="autopilot"
+              value="controller"
               groupValue={effectiveMode}
-              onClick={() => handleModeChange('autopilot')}
-              aria-label="Autopilot cockpit"
+              onClick={() => handleModeChange('controller')}
+              aria-label="Controller cockpit"
               className="h-8 px-3"
             >
               <span className="mr-1.5">
-                <AutopilotSwarmIcon size={16} />
+                <ControllerSwarmIcon size={16} />
               </span>
-              Autopilot
+              Controller
             </ToggleButton>
           </ToggleGroup>
         ) : null}
@@ -168,10 +142,10 @@ export default function CockpitPage(): React.ReactElement {
           suspendLoadMore={suspendBackgroundLoading}
         />
       ) : (
-        <AutopilotCockpit
+        <ControllerCockpit
           selectedWorkspace={selectedWorkspace}
-          initialAutopilotName={requestedAutopilotName}
-          onAutopilotSelectionChange={handleAutopilotSelectionChange}
+          initialControllerName={requestedControllerName}
+          onControllerSelectionChange={handleControllerSelectionChange}
         />
       )}
     </div>

@@ -33,7 +33,7 @@ func parseTriggerTypeParam(ctx *Context) (core.TriggerType, error) {
 	triggerType := core.ParseTriggerType(triggerTypeStr)
 	if triggerType == core.TriggerTypeUnknown {
 		return core.TriggerTypeUnknown, fmt.Errorf(
-			"invalid trigger-type %q: must be one of scheduler, manual, webhook, subdag, retry, catchup, autopilot",
+			"invalid trigger-type %q: must be one of scheduler, manual, webhook, subdag, retry, catchup, controller",
 			triggerTypeStr,
 		)
 	}

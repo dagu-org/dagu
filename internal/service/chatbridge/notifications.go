@@ -49,7 +49,7 @@ type NotificationEvent struct {
 	Kind       eventstore.EventKind                      `json:"kind"`
 	Type       eventstore.EventType                      `json:"type,omitempty"`
 	DAGRun     *exec.DAGRunStatus                        `json:"dagRun,omitempty"`
-	Autopilot  *eventstore.NotificationAutopilotSnapshot `json:"autopilot,omitempty"`
+	Controller  *eventstore.NotificationControllerSnapshot `json:"controller,omitempty"`
 	ObservedAt time.Time                                 `json:"observedAt"`
 }
 
@@ -74,8 +74,8 @@ func notificationEventKind(event NotificationEvent) eventstore.EventKind {
 	if event.DAGRun != nil {
 		return eventstore.KindDAGRun
 	}
-	if event.Autopilot != nil {
-		return eventstore.KindAutopilot
+	if event.Controller != nil {
+		return eventstore.KindController
 	}
 	return ""
 }
@@ -111,14 +111,14 @@ func NotificationClassForEvent(event NotificationEvent) (NotificationClass, bool
 			return NotificationClassUrgent, true
 		case eventstore.TypeDAGRunSucceeded:
 			return NotificationClassSuccessDigest, true
-		case eventstore.TypeDAGRunUpdated, eventstore.TypeAutopilotNeedsInput, eventstore.TypeAutopilotError, eventstore.TypeAutopilotFinished, eventstore.TypeLLMUsageRecorded:
+		case eventstore.TypeDAGRunUpdated, eventstore.TypeControllerNeedsInput, eventstore.TypeControllerError, eventstore.TypeControllerFinished, eventstore.TypeLLMUsageRecorded:
 			return NotificationClassUnknown, false
 		default:
 			return NotificationClassForStatus(dagRun.Status)
 		}
-	case eventstore.KindAutopilot:
+	case eventstore.KindController:
 		switch event.Type {
-		case eventstore.TypeAutopilotNeedsInput, eventstore.TypeAutopilotError, eventstore.TypeAutopilotFinished:
+		case eventstore.TypeControllerNeedsInput, eventstore.TypeControllerError, eventstore.TypeControllerFinished:
 			return NotificationClassUrgent, true
 		case eventstore.TypeDAGRunQueued, eventstore.TypeDAGRunRunning, eventstore.TypeDAGRunUpdated, eventstore.TypeDAGRunWaiting, eventstore.TypeDAGRunSucceeded, eventstore.TypeDAGRunFailed, eventstore.TypeDAGRunAborted, eventstore.TypeDAGRunRejected, eventstore.TypeLLMUsageRecorded:
 			return NotificationClassUnknown, false
@@ -156,11 +156,11 @@ func NotificationSeenKeyForEvent(event NotificationEvent) string {
 	switch notificationEventKind(event) {
 	case eventstore.KindDAGRun:
 		return NotificationSeenKey(notificationDAGRun(event))
-	case eventstore.KindAutopilot:
-		if event.Autopilot == nil {
+	case eventstore.KindController:
+		if event.Controller == nil {
 			return ""
 		}
-		return "autopilot:" + string(event.Type) + ":" + event.Autopilot.Name + ":" + event.Autopilot.CycleID
+		return "controller:" + string(event.Type) + ":" + event.Controller.Name + ":" + event.Controller.CycleID
 	case eventstore.KindLLMUsage:
 		return ""
 	default:
@@ -177,8 +177,8 @@ func NotificationGroupKey(event NotificationEvent) string {
 			return ""
 		}
 		return "dag:" + NotificationRunKey(dagRun)
-	case eventstore.KindAutopilot:
-		return "autopilot:" + NotificationSeenKeyForEvent(event)
+	case eventstore.KindController:
+		return "controller:" + NotificationSeenKeyForEvent(event)
 	case eventstore.KindLLMUsage:
 		return ""
 	default:
@@ -216,8 +216,8 @@ func BuildNotificationPrompt(event NotificationEvent) string {
 	switch notificationEventKind(event) {
 	case eventstore.KindDAGRun:
 		return buildDAGNotificationPrompt(notificationDAGRun(event))
-	case eventstore.KindAutopilot:
-		return buildAutopilotNotificationPrompt(event)
+	case eventstore.KindController:
+		return buildControllerNotificationPrompt(event)
 	case eventstore.KindLLMUsage:
 		return ""
 	default:
@@ -249,11 +249,11 @@ func NotificationEventFromStoredEvent(event *eventstore.Event) (NotificationEven
 		}
 		notification.DAGRun = payload.DAGRun.DAGRunStatus()
 		notification.Key = NotificationSeenKey(notification.DAGRun)
-	case eventstore.KindAutopilot:
-		if payload.Autopilot == nil {
-			return NotificationEvent{}, fmt.Errorf("autopilot notification snapshot is missing")
+	case eventstore.KindController:
+		if payload.Controller == nil {
+			return NotificationEvent{}, fmt.Errorf("controller notification snapshot is missing")
 		}
-		notification.Autopilot = payload.Autopilot
+		notification.Controller = payload.Controller
 		notification.Key = event.ID
 	case eventstore.KindLLMUsage:
 		return NotificationEvent{}, fmt.Errorf("unsupported notification kind %q", payload.Kind)
@@ -308,22 +308,22 @@ DAG Run ID: %s`, intro, status.Name, status.Status.String(), status.DAGRunID)
 	return prompt.String()
 }
 
-func buildAutopilotNotificationPrompt(event NotificationEvent) string {
-	if event.Autopilot == nil {
+func buildControllerNotificationPrompt(event NotificationEvent) string {
+	if event.Controller == nil {
 		return ""
 	}
 
-	snapshot := event.Autopilot
-	intro := "An autopilot generated an urgent runtime event. Please write a brief, helpful notification message for the user. Keep it concise (2-4 sentences). Include the key facts and any immediate action."
-	if event.Type == eventstore.TypeAutopilotNeedsInput {
-		intro = "An autopilot needs human input. Please write a brief, urgent notification message for the user. Explain what needs input and what question they need to answer. Keep it concise (2-4 sentences)."
+	snapshot := event.Controller
+	intro := "An controller generated an urgent runtime event. Please write a brief, helpful notification message for the user. Keep it concise (2-4 sentences). Include the key facts and any immediate action."
+	if event.Type == eventstore.TypeControllerNeedsInput {
+		intro = "An controller needs human input. Please write a brief, urgent notification message for the user. Explain what needs input and what question they need to answer. Keep it concise (2-4 sentences)."
 	}
 
 	var prompt strings.Builder
 	fmt.Fprintf(&prompt, `%s
 
-Autopilot Name: %s
-Autopilot Kind: %s
+Controller Name: %s
+Controller Kind: %s
 Event Type: %s`, intro, snapshot.Name, snapshot.Kind, event.Type)
 
 	if snapshot.CycleID != "" {
@@ -376,11 +376,11 @@ func notificationSubjectName(event NotificationEvent) string {
 			return ""
 		}
 		return dagRun.Name
-	case eventstore.KindAutopilot:
-		if event.Autopilot == nil {
+	case eventstore.KindController:
+		if event.Controller == nil {
 			return ""
 		}
-		return event.Autopilot.Name
+		return event.Controller.Name
 	case eventstore.KindLLMUsage:
 		return ""
 	default:
@@ -400,13 +400,13 @@ func notificationStatusLabel(event NotificationEvent) string {
 			return string(event.Type)
 		}
 		return dagRun.Status.String()
-	case eventstore.KindAutopilot:
+	case eventstore.KindController:
 		switch event.Type {
-		case eventstore.TypeAutopilotNeedsInput:
+		case eventstore.TypeControllerNeedsInput:
 			return "needs_input"
-		case eventstore.TypeAutopilotError:
+		case eventstore.TypeControllerError:
 			return "error"
-		case eventstore.TypeAutopilotFinished:
+		case eventstore.TypeControllerFinished:
 			return "finished"
 		case eventstore.TypeDAGRunQueued, eventstore.TypeDAGRunRunning, eventstore.TypeDAGRunUpdated, eventstore.TypeDAGRunWaiting, eventstore.TypeDAGRunSucceeded, eventstore.TypeDAGRunFailed, eventstore.TypeDAGRunAborted, eventstore.TypeDAGRunRejected, eventstore.TypeLLMUsageRecorded:
 			return string(event.Type)
@@ -465,9 +465,9 @@ func cloneNotificationEvent(event NotificationEvent) NotificationEvent {
 		ObservedAt: event.ObservedAt,
 		DAGRun:     cloneNotificationStatus(notificationDAGRun(event)),
 	}
-	if event.Autopilot != nil {
-		snapshot := *event.Autopilot
-		cloned.Autopilot = &snapshot
+	if event.Controller != nil {
+		snapshot := *event.Controller
+		cloned.Controller = &snapshot
 	}
 	return cloned
 }
@@ -516,13 +516,13 @@ func notificationTextEmoji(event NotificationEvent) string {
 			return "\u2139\uFE0F"
 		}
 		return notificationEmoji(dagRun.Status)
-	case eventstore.KindAutopilot:
+	case eventstore.KindController:
 		switch event.Type {
-		case eventstore.TypeAutopilotFinished:
+		case eventstore.TypeControllerFinished:
 			return "\u2705"
-		case eventstore.TypeAutopilotNeedsInput:
+		case eventstore.TypeControllerNeedsInput:
 			return "\u23F3"
-		case eventstore.TypeAutopilotError:
+		case eventstore.TypeControllerError:
 			return "\u274C"
 		case eventstore.TypeDAGRunQueued, eventstore.TypeDAGRunRunning, eventstore.TypeDAGRunUpdated, eventstore.TypeDAGRunWaiting, eventstore.TypeDAGRunSucceeded, eventstore.TypeDAGRunFailed, eventstore.TypeDAGRunAborted, eventstore.TypeDAGRunRejected, eventstore.TypeLLMUsageRecorded:
 			return "\u2139\uFE0F"

@@ -253,14 +253,14 @@ func TestNewDAGRunEventDeepClonesData(t *testing.T) {
 	assert.Equal(t, "fetch", event.Data["steps"].([]any)[0].(map[string]any)["name"])
 }
 
-func TestNewAutopilotEventEmbedsNotificationSnapshot(t *testing.T) {
+func TestNewControllerEventEmbedsNotificationSnapshot(t *testing.T) {
 	t.Parallel()
 
-	event := NewAutopilotEvent(
+	event := NewControllerEvent(
 		Source{Service: SourceServiceScheduler, Instance: "sched-1"},
-		TypeAutopilotNeedsInput,
-		AutopilotEventID(TypeAutopilotNeedsInput, "service_ops", "prompt-1"),
-		AutopilotEventInput{
+		TypeControllerNeedsInput,
+		ControllerEventID(TypeControllerNeedsInput, "service_ops", "prompt-1"),
+		ControllerEventInput{
 			Name:                   "service_ops",
 			Kind:                   "service",
 			CycleID:                "cycle-1",
@@ -276,45 +276,45 @@ func TestNewAutopilotEventEmbedsNotificationSnapshot(t *testing.T) {
 		map[string]any{"severity": "urgent"},
 	)
 	require.NotNil(t, event)
-	assert.Equal(t, KindAutopilot, event.Kind)
-	assert.Equal(t, "service_ops", event.AutopilotName)
-	assert.Equal(t, "service", event.AutopilotKind)
-	assert.Equal(t, "cycle-1", event.AutopilotCycleID)
+	assert.Equal(t, KindController, event.Kind)
+	assert.Equal(t, "service_ops", event.ControllerName)
+	assert.Equal(t, "service", event.ControllerKind)
+	assert.Equal(t, "cycle-1", event.ControllerCycleID)
 	assert.Equal(t, "urgent", event.Data["severity"])
 
-	snapshot, err := NotificationAutopilotFromEvent(event)
+	snapshot, err := NotificationControllerFromEvent(event)
 	require.NoError(t, err)
 	require.NotNil(t, snapshot)
 	assert.Equal(t, "service_ops", snapshot.Name)
 	assert.Equal(t, "service", snapshot.Kind)
 	assert.Equal(t, "cycle-1", snapshot.CycleID)
-	assert.Equal(t, TypeAutopilotNeedsInput, snapshot.EventType)
+	assert.Equal(t, TypeControllerNeedsInput, snapshot.EventType)
 	assert.Equal(t, "Approve deployment?", snapshot.PromptQuestion)
 	assert.Equal(t, "Review the release checklist", snapshot.CurrentTaskDescription)
 }
 
-func TestEventUnmarshalNormalizesLegacyAutomataFields(t *testing.T) {
+func TestEventUnmarshalPreservesControllerFields(t *testing.T) {
 	t.Parallel()
 
 	var event Event
 	err := json.Unmarshal([]byte(`{
-  "id": "evt-legacy",
+  "id": "evt-controller",
   "schema_version": 1,
   "occurred_at": "2026-04-01T10:00:00Z",
   "recorded_at": "2026-04-01T10:00:01Z",
-  "kind": "automata",
-  "type": "automata.error",
+  "kind": "controller",
+  "type": "controller.error",
   "source_service": "scheduler",
-  "automata_name": "service_ops",
-  "automata_kind": "service",
-  "automata_cycle_id": "cycle-7"
+  "controller_name": "service_ops",
+  "controller_kind": "service",
+  "controller_cycle_id": "cycle-7"
 }`), &event)
 	require.NoError(t, err)
-	assert.Equal(t, KindAutopilot, event.Kind)
-	assert.Equal(t, TypeAutopilotError, event.Type)
-	assert.Equal(t, "service_ops", event.AutopilotName)
-	assert.Equal(t, "service", event.AutopilotKind)
-	assert.Equal(t, "cycle-7", event.AutopilotCycleID)
+	assert.Equal(t, KindController, event.Kind)
+	assert.Equal(t, TypeControllerError, event.Type)
+	assert.Equal(t, "service_ops", event.ControllerName)
+	assert.Equal(t, "service", event.ControllerKind)
+	assert.Equal(t, "cycle-7", event.ControllerCycleID)
 }
 
 func TestNotificationStatusFromEventRejectsInvalidSnapshot(t *testing.T) {
@@ -337,19 +337,19 @@ func TestNotificationStatusFromEventRejectsInvalidSnapshot(t *testing.T) {
 	assert.ErrorContains(t, err, "missing dag_run_id")
 }
 
-func TestNotificationAutopilotFromEventRejectsInvalidSnapshot(t *testing.T) {
+func TestNotificationControllerFromEventRejectsInvalidSnapshot(t *testing.T) {
 	t.Parallel()
 
-	snapshot, err := NotificationAutopilotFromEvent(&Event{
+	snapshot, err := NotificationControllerFromEvent(&Event{
 		ID:            "evt-1",
 		SchemaVersion: SchemaVersion,
 		OccurredAt:    time.Now().UTC(),
 		RecordedAt:    time.Now().UTC(),
-		Kind:          KindAutopilot,
-		Type:          TypeAutopilotNeedsInput,
+		Kind:          KindController,
+		Type:          TypeControllerNeedsInput,
 		SourceService: SourceServiceServer,
 		Data: map[string]any{
-			notificationAutopilotSnapshotDataKey: map[string]any{},
+			notificationControllerSnapshotDataKey: map[string]any{},
 		},
 	})
 	require.Error(t, err)

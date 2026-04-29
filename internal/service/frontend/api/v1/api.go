@@ -18,7 +18,7 @@ import (
 	"github.com/dagucloud/dagu/internal/agent"
 	"github.com/dagucloud/dagu/internal/agentoauth"
 	"github.com/dagucloud/dagu/internal/auth"
-	"github.com/dagucloud/dagu/internal/autopilot"
+	"github.com/dagucloud/dagu/internal/controller"
 	"github.com/dagucloud/dagu/internal/cmn/config"
 	"github.com/dagucloud/dagu/internal/cmn/eval"
 	"github.com/dagucloud/dagu/internal/cmn/logger"
@@ -83,7 +83,7 @@ type API struct {
 	licenseManager       *license.Manager
 	workspaceStore       workspace.Store
 	leaseStaleThreshold  time.Duration
-	autopilotService     *autopilot.Service
+	controllerService     *controller.Service
 	schedulerStateStore  scheduler.WatermarkStore
 	dagMutationNotifier  func(fileName string)
 }
@@ -288,10 +288,10 @@ func WithAgentAPI(a *agent.API) APIOption {
 	}
 }
 
-// WithAutopilotService returns an APIOption that sets the Autopilot service instance.
-func WithAutopilotService(service *autopilot.Service) APIOption {
+// WithControllerService returns an APIOption that sets the Controller service instance.
+func WithControllerService(service *controller.Service) APIOption {
 	return func(api *API) {
-		api.autopilotService = service
+		api.controllerService = service
 	}
 }
 

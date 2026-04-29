@@ -59,7 +59,7 @@ const testConfig: Config = {
   oidcButtonLabel: '',
   terminalEnabled: true,
   gitSyncEnabled: false,
-  autopilotEnabled: false,
+  controllerEnabled: false,
   agentEnabled: true,
   updateAvailable: false,
   latestVersion: '',

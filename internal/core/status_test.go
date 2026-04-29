@@ -5,10 +5,10 @@ package core
 
 import "testing"
 
-func TestParseTriggerTypeAcceptsLegacyAutomata(t *testing.T) {
+func TestParseTriggerTypeController(t *testing.T) {
 	t.Parallel()
 
-	if got := ParseTriggerType("automata"); got != TriggerTypeAutopilot {
-		t.Fatalf("ParseTriggerType(automata) = %v, want %v", got, TriggerTypeAutopilot)
+	if got := ParseTriggerType("controller"); got != TriggerTypeController {
+		t.Fatalf("ParseTriggerType(controller) = %v, want %v", got, TriggerTypeController)
 	}
 }

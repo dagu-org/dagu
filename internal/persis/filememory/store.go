@@ -19,25 +19,24 @@ import (
 
 // Verify Store implements agent.MemoryStore at compile time.
 var (
-	_ agent.MemoryStore            = (*Store)(nil)
-	_ agent.AutopilotDocumentStore = (*Store)(nil)
+	_ agent.MemoryStore             = (*Store)(nil)
+	_ agent.ControllerDocumentStore = (*Store)(nil)
 )
 
 const (
-	agentMemoryDir        = "memory"
-	dagSubDir             = "dags"
-	autopilotSubDir       = "autopilot"
-	legacyAutopilotSubDir = "automata"
-	memoryFileName        = "MEMORY.md"
-	soulFileName          = "SOUL.md"
-	maxLines              = 200
-	dirPermissions        = 0750
-	filePermissions       = 0600
+	agentMemoryDir   = "memory"
+	dagSubDir        = "dags"
+	controllerSubDir = "controller"
+	memoryFileName   = "MEMORY.md"
+	soulFileName     = "SOUL.md"
+	maxLines         = 200
+	dirPermissions   = 0750
+	filePermissions  = 0600
 )
 
-var autopilotNamePattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_]*$`)
+var controllerNamePattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_]*$`)
 
-var autopilotDocumentNames = map[string]struct{}{
+var controllerDocumentNames = map[string]struct{}{
 	memoryFileName: {},
 	soulFileName:   {},
 }
@@ -110,16 +109,16 @@ func (s *Store) LoadDAGMemory(_ context.Context, dagName string) (string, error)
 	return s.readMemoryFile(path)
 }
 
-// LoadAutopilotMemory reads the MEMORY.md for a specific Autopilot, truncated to maxLines.
+// LoadControllerMemory reads the MEMORY.md for a specific Controller, truncated to maxLines.
 // Returns empty string if the file does not exist.
-func (s *Store) LoadAutopilotMemory(ctx context.Context, autopilotName string) (string, error) {
-	return s.LoadAutopilotDocument(ctx, autopilotName, memoryFileName)
+func (s *Store) LoadControllerMemory(ctx context.Context, controllerName string) (string, error) {
+	return s.LoadControllerDocument(ctx, controllerName, memoryFileName)
 }
 
-// LoadAutopilotDocument reads an allowed Autopilot document, truncated to maxLines.
+// LoadControllerDocument reads an allowed Controller document, truncated to maxLines.
 // Returns empty string if the file does not exist.
-func (s *Store) LoadAutopilotDocument(_ context.Context, autopilotName, document string) (string, error) {
-	path, err := s.AutopilotDocumentPath(autopilotName, document)
+func (s *Store) LoadControllerDocument(_ context.Context, controllerName, document string) (string, error) {
+	path, err := s.ControllerDocumentPath(controllerName, document)
 	if err != nil {
 		return "", err
 	}
@@ -172,14 +171,14 @@ func (s *Store) SaveDAGMemory(_ context.Context, dagName string, content string)
 	return nil
 }
 
-// SaveAutopilotMemory writes content to an Autopilot-specific MEMORY.md atomically.
-func (s *Store) SaveAutopilotMemory(ctx context.Context, autopilotName string, content string) error {
-	return s.SaveAutopilotDocument(ctx, autopilotName, memoryFileName, content)
+// SaveControllerMemory writes content to a Controller-specific MEMORY.md atomically.
+func (s *Store) SaveControllerMemory(ctx context.Context, controllerName string, content string) error {
+	return s.SaveControllerDocument(ctx, controllerName, memoryFileName, content)
 }
 
-// SaveAutopilotDocument writes an allowed Autopilot document atomically.
-func (s *Store) SaveAutopilotDocument(_ context.Context, autopilotName, document, content string) error {
-	path, err := s.AutopilotDocumentPath(autopilotName, document)
+// SaveControllerDocument writes an allowed Controller document atomically.
+func (s *Store) SaveControllerDocument(_ context.Context, controllerName, document, content string) error {
+	path, err := s.ControllerDocumentPath(controllerName, document)
 	if err != nil {
 		return err
 	}
@@ -188,7 +187,7 @@ func (s *Store) SaveAutopilotDocument(_ context.Context, autopilotName, document
 	defer s.mu.Unlock()
 
 	if err := os.MkdirAll(filepath.Dir(path), dirPermissions); err != nil {
-		return fmt.Errorf("filememory: failed to create autopilot document directory: %w", err)
+		return fmt.Errorf("filememory: failed to create controller document directory: %w", err)
 	}
 
 	if err := fileutil.WriteFileAtomic(path, []byte(content), filePermissions); err != nil {
@@ -205,20 +204,20 @@ func (s *Store) MemoryDir() string {
 	return s.baseDir
 }
 
-// AutopilotMemoryPath returns the resolved path to an Autopilot-specific MEMORY.md.
-func (s *Store) AutopilotMemoryPath(autopilotName string) (string, error) {
-	return s.AutopilotDocumentPath(autopilotName, memoryFileName)
+// ControllerMemoryPath returns the resolved path to a Controller-specific MEMORY.md.
+func (s *Store) ControllerMemoryPath(controllerName string) (string, error) {
+	return s.ControllerDocumentPath(controllerName, memoryFileName)
 }
 
-// AutopilotDocumentPath returns the resolved path to an allowed Autopilot document.
-func (s *Store) AutopilotDocumentPath(autopilotName, document string) (string, error) {
-	if err := s.validateAutopilotName(autopilotName); err != nil {
+// ControllerDocumentPath returns the resolved path to an allowed Controller document.
+func (s *Store) ControllerDocumentPath(controllerName, document string) (string, error) {
+	if err := s.validateControllerName(controllerName); err != nil {
 		return "", err
 	}
-	if err := validateAutopilotDocumentName(document); err != nil {
+	if err := validateControllerDocumentName(document); err != nil {
 		return "", err
 	}
-	return s.resolveAutopilotDocumentPath(autopilotName, document), nil
+	return s.resolveControllerDocumentPath(controllerName, document), nil
 }
 
 // ListDAGMemories returns the names of all DAGs that have memory files.
@@ -286,15 +285,15 @@ func (s *Store) DeleteDAGMemory(_ context.Context, dagName string) error {
 	return nil
 }
 
-// DeleteAutopilotMemory removes an Autopilot-specific MEMORY.md file.
-func (s *Store) DeleteAutopilotMemory(ctx context.Context, autopilotName string) error {
-	return s.DeleteAutopilotDocument(ctx, autopilotName, memoryFileName)
+// DeleteControllerMemory removes a Controller-specific MEMORY.md file.
+func (s *Store) DeleteControllerMemory(ctx context.Context, controllerName string) error {
+	return s.DeleteControllerDocument(ctx, controllerName, memoryFileName)
 }
 
-// DeleteAutopilotDocument removes an allowed Autopilot document and removes the
-// containing Autopilot document directory when it becomes empty.
-func (s *Store) DeleteAutopilotDocument(_ context.Context, autopilotName, document string) error {
-	path, err := s.AutopilotDocumentPath(autopilotName, document)
+// DeleteControllerDocument removes an allowed Controller document and removes the
+// containing Controller document directory when it becomes empty.
+func (s *Store) DeleteControllerDocument(_ context.Context, controllerName, document string) error {
+	path, err := s.ControllerDocumentPath(controllerName, document)
 	if err != nil {
 		return err
 	}
@@ -304,13 +303,13 @@ func (s *Store) DeleteAutopilotDocument(_ context.Context, autopilotName, docume
 
 	err = os.Remove(path)
 	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("filememory: failed to delete autopilot document: %w", err)
+		return fmt.Errorf("filememory: failed to delete controller document: %w", err)
 	}
 	if s.fileCache != nil {
 		s.fileCache.Invalidate(path)
 	}
 	if err := removeEmptyDir(filepath.Dir(path)); err != nil {
-		return fmt.Errorf("filememory: failed to remove empty autopilot document directory: %w", err)
+		return fmt.Errorf("filememory: failed to remove empty controller document directory: %w", err)
 	}
 	return nil
 }
@@ -363,29 +362,17 @@ func (s *Store) dagMemoryPath(dagName string) string {
 	return filepath.Join(s.baseDir, dagSubDir, dagName, memoryFileName)
 }
 
-// autopilotMemoryPath returns the path to an Autopilot-specific MEMORY.md.
-func (s *Store) autopilotMemoryPath(autopilotName string) string {
-	return s.autopilotDocumentPath(autopilotName, memoryFileName)
+// controllerMemoryPath returns the path to a Controller-specific MEMORY.md.
+func (s *Store) controllerMemoryPath(controllerName string) string {
+	return s.controllerDocumentPath(controllerName, memoryFileName)
 }
 
-func (s *Store) autopilotDocumentPath(autopilotName, document string) string {
-	return filepath.Join(s.baseDir, autopilotSubDir, autopilotName, document)
+func (s *Store) controllerDocumentPath(controllerName, document string) string {
+	return filepath.Join(s.baseDir, controllerSubDir, controllerName, document)
 }
 
-func (s *Store) legacyAutopilotDocumentPath(autopilotName, document string) string {
-	return filepath.Join(s.baseDir, legacyAutopilotSubDir, autopilotName, document)
-}
-
-func (s *Store) resolveAutopilotDocumentPath(autopilotName, document string) string {
-	newPath := s.autopilotDocumentPath(autopilotName, document)
-	if pathExists(newPath) {
-		return newPath
-	}
-	legacyPath := s.legacyAutopilotDocumentPath(autopilotName, document)
-	if pathExists(legacyPath) || pathExists(filepath.Dir(legacyPath)) {
-		return legacyPath
-	}
-	return newPath
+func (s *Store) resolveControllerDocumentPath(controllerName, document string) string {
+	return s.controllerDocumentPath(controllerName, document)
 }
 
 // validateDAGName checks that the DAG name is safe and doesn't escape the base directory.
@@ -408,21 +395,21 @@ func (s *Store) validateDAGName(dagName string) error {
 	return nil
 }
 
-func (s *Store) validateAutopilotName(autopilotName string) error {
-	if autopilotName == "" {
-		return errors.New("filememory: autopilotName cannot be empty")
+func (s *Store) validateControllerName(controllerName string) error {
+	if controllerName == "" {
+		return errors.New("filememory: controllerName cannot be empty")
 	}
-	if !autopilotNamePattern.MatchString(autopilotName) {
-		return fmt.Errorf("filememory: invalid autopilotName %q", autopilotName)
+	if !controllerNamePattern.MatchString(controllerName) {
+		return fmt.Errorf("filememory: invalid controllerName %q", controllerName)
 	}
 	return nil
 }
 
-func validateAutopilotDocumentName(document string) error {
-	if _, ok := autopilotDocumentNames[document]; ok {
+func validateControllerDocumentName(document string) error {
+	if _, ok := controllerDocumentNames[document]; ok {
 		return nil
 	}
-	return fmt.Errorf("filememory: invalid autopilot document %q", document)
+	return fmt.Errorf("filememory: invalid controller document %q", document)
 }
 
 func removeEmptyDir(path string) error {

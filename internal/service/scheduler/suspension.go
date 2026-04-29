@@ -18,7 +18,7 @@ func isSchedulerManagedTriggerType(triggerType core.TriggerType) bool {
 		core.TriggerTypeManual,
 		core.TriggerTypeWebhook,
 		core.TriggerTypeSubDAG,
-		core.TriggerTypeAutopilot:
+		core.TriggerTypeController:
 		return false
 	}
 	return false

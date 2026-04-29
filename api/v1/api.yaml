@@ -49,8 +49,8 @@ tags:
     description: "Git synchronization operations for DAGs"
   - name: "agent"
     description: "AI Agent configuration operations (admin only)"
-  - name: "autopilot"
-    description: "Autopilot workflow management operations"
+  - name: "controller"
+    description: "Controller workflow management operations"
   - name: "docs"
     description: "Document management operations"
   - name: "remote-nodes"
@@ -4384,13 +4384,13 @@ paths:
         - $ref: "#/components/parameters/RemoteNode"
         - name: kind
           in: query
-          description: "Filter by event kind (e.g., dag_run, autopilot, llm_usage)"
+          description: "Filter by event kind (e.g., dag_run, controller, llm_usage)"
           required: false
           schema:
             type: string
         - name: type
           in: query
-          description: "Filter by event type (e.g., dag.run.failed, autopilot.needs_input, llm.usage.recorded)"
+          description: "Filter by event type (e.g., dag.run.failed, controller.needs_input, llm.usage.recorded)"
           required: false
           schema:
             type: string
@@ -4412,9 +4412,9 @@ paths:
           required: false
           schema:
             type: string
-        - name: autopilotName
+        - name: controllerName
           in: query
-          description: "Filter by autopilot name"
+          description: "Filter by controller name"
           required: false
           schema:
             type: string
@@ -6173,20 +6173,20 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /autopilot:
+  /controller:
     get:
-      summary: "List autopilot"
-      description: "Returns all Autopilot definitions with current lifecycle and display state."
-      operationId: "listAutopilot"
+      summary: "List controller"
+      description: "Returns all Controller definitions with current lifecycle and display state."
+      operationId: "listController"
       tags:
-        - "autopilot"
+        - "controller"
       responses:
         "200":
-          description: "List of autopilot"
+          description: "List of controller"
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AutopilotListResponse"
+                $ref: "#/components/schemas/ControllerListResponse"
         "401":
           description: "Not authenticated"
           content:
@@ -6200,22 +6200,22 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /autopilot/{name}:
+  /controller/{name}:
     get:
-      summary: "Get autopilot detail"
-      description: "Returns Autopilot detail including definition, runtime state, transcript, and recent runs."
-      operationId: "getAutopilot"
+      summary: "Get controller detail"
+      description: "Returns Controller detail including definition, runtime state, transcript, and recent runs."
+      operationId: "getController"
       tags:
-        - "autopilot"
+        - "controller"
       parameters:
-        - $ref: "#/components/parameters/AutopilotName"
+        - $ref: "#/components/parameters/ControllerName"
       responses:
         "200":
-          description: "Autopilot detail"
+          description: "Controller detail"
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AutopilotDetailResponse"
+                $ref: "#/components/schemas/ControllerDetailResponse"
         "401":
           description: "Not authenticated"
           content:
@@ -6223,7 +6223,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "404":
-          description: "Autopilot not found"
+          description: "Controller not found"
           content:
             application/json:
               schema:
@@ -6235,16 +6235,16 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
     delete:
-      summary: "Delete autopilot"
-      description: "Deletes an Autopilot definition and its runtime state."
-      operationId: "deleteAutopilot"
+      summary: "Delete controller"
+      description: "Deletes a Controller definition and its runtime state."
+      operationId: "deleteController"
       tags:
-        - "autopilot"
+        - "controller"
       parameters:
-        - $ref: "#/components/parameters/AutopilotName"
+        - $ref: "#/components/parameters/ControllerName"
       responses:
         "204":
-          description: "Autopilot deleted"
+          description: "Controller deleted"
         "401":
           description: "Not authenticated"
           content:
@@ -6258,7 +6258,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "404":
-          description: "Autopilot not found"
+          description: "Controller not found"
           content:
             application/json:
               schema:
@@ -6270,22 +6270,22 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /autopilot/{name}/spec:
+  /controller/{name}/spec:
     get:
-      summary: "Get autopilot raw spec"
-      description: "Returns the raw YAML specification for an Autopilot."
-      operationId: "getAutopilotSpec"
+      summary: "Get controller raw spec"
+      description: "Returns the raw YAML specification for a Controller."
+      operationId: "getControllerSpec"
       tags:
-        - "autopilot"
+        - "controller"
       parameters:
-        - $ref: "#/components/parameters/AutopilotName"
+        - $ref: "#/components/parameters/ControllerName"
       responses:
         "200":
-          description: "Autopilot raw spec"
+          description: "Controller raw spec"
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AutopilotSpecResponse"
+                $ref: "#/components/schemas/ControllerSpecResponse"
         "401":
           description: "Not authenticated"
           content:
@@ -6293,7 +6293,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "404":
-          description: "Autopilot not found"
+          description: "Controller not found"
           content:
             application/json:
               schema:
@@ -6305,22 +6305,22 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
     put:
-      summary: "Create or update autopilot spec"
-      description: "Creates or updates an Autopilot definition from a raw YAML spec."
-      operationId: "putAutopilotSpec"
+      summary: "Create or update controller spec"
+      description: "Creates or updates a Controller definition from a raw YAML spec."
+      operationId: "putControllerSpec"
       tags:
-        - "autopilot"
+        - "controller"
       parameters:
-        - $ref: "#/components/parameters/AutopilotName"
+        - $ref: "#/components/parameters/ControllerName"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/AutopilotSpecUpsertRequest"
+              $ref: "#/components/schemas/ControllerSpecUpsertRequest"
       responses:
         "204":
-          description: "Autopilot spec saved"
+          description: "Controller spec saved"
         "400":
           description: "Invalid request"
           content:
@@ -6340,7 +6340,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "409":
-          description: "Autopilot controller is not ready"
+          description: "Controller is not ready"
           content:
             application/json:
               schema:
@@ -6352,23 +6352,23 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /autopilot/{name}/documents/{document}:
+  /controller/{name}/documents/{document}:
     get:
-      summary: "Get autopilot document"
-      description: "Returns an Autopilot-specific document content and resolved path. Supported documents are MEMORY.md and SOUL.md."
-      operationId: "getAutopilotDocument"
+      summary: "Get controller document"
+      description: "Returns a Controller-specific document content and resolved path. Supported documents are MEMORY.md and SOUL.md."
+      operationId: "getControllerDocument"
       tags:
-        - "autopilot"
+        - "controller"
       parameters:
-        - $ref: "#/components/parameters/AutopilotName"
-        - $ref: "#/components/parameters/AutopilotDocument"
+        - $ref: "#/components/parameters/ControllerName"
+        - $ref: "#/components/parameters/ControllerDocument"
       responses:
         "200":
-          description: "Autopilot document"
+          description: "Controller document"
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AutopilotDocumentResponse"
+                $ref: "#/components/schemas/ControllerDocumentResponse"
         "401":
           description: "Not authenticated"
           content:
@@ -6376,7 +6376,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "404":
-          description: "Autopilot not found"
+          description: "Controller not found"
           content:
             application/json:
               schema:
@@ -6388,14 +6388,14 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
     put:
-      summary: "Update autopilot document"
-      description: "Creates or updates an Autopilot-specific document. Supported documents are MEMORY.md and SOUL.md."
-      operationId: "updateAutopilotDocument"
+      summary: "Update controller document"
+      description: "Creates or updates a Controller-specific document. Supported documents are MEMORY.md and SOUL.md."
+      operationId: "updateControllerDocument"
       tags:
-        - "autopilot"
+        - "controller"
       parameters:
-        - $ref: "#/components/parameters/AutopilotName"
-        - $ref: "#/components/parameters/AutopilotDocument"
+        - $ref: "#/components/parameters/ControllerName"
+        - $ref: "#/components/parameters/ControllerDocument"
       requestBody:
         required: true
         content:
@@ -6404,11 +6404,11 @@ paths:
               $ref: "#/components/schemas/UpdateAgentMemoryRequest"
       responses:
         "200":
-          description: "Autopilot document saved"
+          description: "Controller document saved"
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AutopilotDocumentResponse"
+                $ref: "#/components/schemas/ControllerDocumentResponse"
         "400":
           description: "Invalid request"
           content:
@@ -6428,7 +6428,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "404":
-          description: "Autopilot not found"
+          description: "Controller not found"
           content:
             application/json:
               schema:
@@ -6440,17 +6440,17 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
     delete:
-      summary: "Clear autopilot document"
-      description: "Deletes an Autopilot-specific document. Supported documents are MEMORY.md and SOUL.md."
-      operationId: "deleteAutopilotDocument"
+      summary: "Clear controller document"
+      description: "Deletes a Controller-specific document. Supported documents are MEMORY.md and SOUL.md."
+      operationId: "deleteControllerDocument"
       tags:
-        - "autopilot"
+        - "controller"
       parameters:
-        - $ref: "#/components/parameters/AutopilotName"
-        - $ref: "#/components/parameters/AutopilotDocument"
+        - $ref: "#/components/parameters/ControllerName"
+        - $ref: "#/components/parameters/ControllerDocument"
       responses:
         "204":
-          description: "Autopilot document cleared"
+          description: "Controller document cleared"
         "401":
           description: "Not authenticated"
           content:
@@ -6464,7 +6464,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "404":
-          description: "Autopilot not found"
+          description: "Controller not found"
           content:
             application/json:
               schema:
@@ -6476,22 +6476,22 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /autopilot/{name}/memory/reflect:
+  /controller/{name}/memory/reflect:
     post:
-      summary: "Reflect autopilot memory"
-      description: "Generates a proposed MEMORY.md update from the Autopilot's current session transcript. The proposal is not saved automatically."
-      operationId: "reflectAutopilotMemory"
+      summary: "Reflect controller memory"
+      description: "Generates a proposed MEMORY.md update from the Controller's current session transcript. The proposal is not saved automatically."
+      operationId: "reflectControllerMemory"
       tags:
-        - "autopilot"
+        - "controller"
       parameters:
-        - $ref: "#/components/parameters/AutopilotName"
+        - $ref: "#/components/parameters/ControllerName"
       responses:
         "200":
-          description: "Autopilot memory reflection proposal"
+          description: "Controller memory reflection proposal"
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AutopilotMemoryReflectionResponse"
+                $ref: "#/components/schemas/ControllerMemoryReflectionResponse"
         "400":
           description: "Invalid request"
           content:
@@ -6511,7 +6511,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "404":
-          description: "Autopilot or agent feature not found"
+          description: "Controller or agent feature not found"
           content:
             application/json:
               schema:
@@ -6523,24 +6523,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /autopilot/{name}/start:
+  /controller/{name}/start:
     post:
-      summary: "Start autopilot task"
-      description: "Starts an Autopilot task cycle."
-      operationId: "startAutopilot"
+      summary: "Start controller task"
+      description: "Starts a Controller task cycle."
+      operationId: "startController"
       tags:
-        - "autopilot"
+        - "controller"
       parameters:
-        - $ref: "#/components/parameters/AutopilotName"
+        - $ref: "#/components/parameters/ControllerName"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/AutopilotStartRequest"
+              $ref: "#/components/schemas/ControllerStartRequest"
       responses:
         "204":
-          description: "Autopilot started"
+          description: "Controller started"
         "400":
           description: "Invalid request"
           content:
@@ -6560,7 +6560,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "409":
-          description: "Autopilot controller is not ready"
+          description: "Controller is not ready"
           content:
             application/json:
               schema:
@@ -6572,18 +6572,18 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /autopilot/{name}/pause:
+  /controller/{name}/pause:
     post:
-      summary: "Pause autopilot"
-      description: "Pauses Autopilot orchestration without deleting the active task."
-      operationId: "pauseAutopilot"
+      summary: "Pause controller"
+      description: "Pauses Controller orchestration without deleting the active task."
+      operationId: "pauseController"
       tags:
-        - "autopilot"
+        - "controller"
       parameters:
-        - $ref: "#/components/parameters/AutopilotName"
+        - $ref: "#/components/parameters/ControllerName"
       responses:
         "204":
-          description: "Autopilot paused"
+          description: "Controller paused"
         "400":
           description: "Invalid request"
           content:
@@ -6603,7 +6603,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "409":
-          description: "Autopilot controller is not ready"
+          description: "Controller is not ready"
           content:
             application/json:
               schema:
@@ -6615,18 +6615,18 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /autopilot/{name}/resume:
+  /controller/{name}/resume:
     post:
-      summary: "Resume autopilot"
-      description: "Resumes a paused Autopilot."
-      operationId: "resumeAutopilot"
+      summary: "Resume controller"
+      description: "Resumes a paused Controller."
+      operationId: "resumeController"
       tags:
-        - "autopilot"
+        - "controller"
       parameters:
-        - $ref: "#/components/parameters/AutopilotName"
+        - $ref: "#/components/parameters/ControllerName"
       responses:
         "204":
-          description: "Autopilot resumed"
+          description: "Controller resumed"
         "400":
           description: "Invalid request"
           content:
@@ -6646,7 +6646,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "409":
-          description: "Autopilot controller is not ready"
+          description: "Controller is not ready"
           content:
             application/json:
               schema:
@@ -6658,21 +6658,21 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /autopilot/{name}/message:
+  /controller/{name}/message:
     post:
-      summary: "Send operator message to autopilot"
-      description: "Adds an operator message to the current Autopilot task."
-      operationId: "messageAutopilot"
+      summary: "Send operator message to controller"
+      description: "Adds an operator message to the current Controller task."
+      operationId: "messageController"
       tags:
-        - "autopilot"
+        - "controller"
       parameters:
-        - $ref: "#/components/parameters/AutopilotName"
+        - $ref: "#/components/parameters/ControllerName"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/AutopilotOperatorMessageRequest"
+              $ref: "#/components/schemas/ControllerOperatorMessageRequest"
       responses:
         "204":
           description: "Operator message accepted"
@@ -6695,7 +6695,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "409":
-          description: "Autopilot controller is not ready"
+          description: "Controller is not ready"
           content:
             application/json:
               schema:
@@ -6707,28 +6707,28 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /autopilot/{name}/tasks:
+  /controller/{name}/tasks:
     post:
-      summary: "Create autopilot task"
-      description: "Creates a new persistent task template for an Autopilot."
-      operationId: "createAutopilotTask"
+      summary: "Create controller task"
+      description: "Creates a new persistent task template for a Controller."
+      operationId: "createControllerTask"
       tags:
-        - "autopilot"
+        - "controller"
       parameters:
-        - $ref: "#/components/parameters/AutopilotName"
+        - $ref: "#/components/parameters/ControllerName"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/AutopilotTaskCreateRequest"
+              $ref: "#/components/schemas/ControllerTaskCreateRequest"
       responses:
         "200":
-          description: "Autopilot task created"
+          description: "Controller task created"
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AutopilotTask"
+                $ref: "#/components/schemas/ControllerTask"
         "400":
           description: "Invalid request"
           content:
@@ -6754,24 +6754,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /autopilot/{name}/tasks/reorder:
+  /controller/{name}/tasks/reorder:
     post:
-      summary: "Reorder autopilot tasks"
-      description: "Reorders the persistent task templates for an Autopilot."
-      operationId: "reorderAutopilotTasks"
+      summary: "Reorder controller tasks"
+      description: "Reorders the persistent task templates for a Controller."
+      operationId: "reorderControllerTasks"
       tags:
-        - "autopilot"
+        - "controller"
       parameters:
-        - $ref: "#/components/parameters/AutopilotName"
+        - $ref: "#/components/parameters/ControllerName"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/AutopilotTaskReorderRequest"
+              $ref: "#/components/schemas/ControllerTaskReorderRequest"
       responses:
         "204":
-          description: "Autopilot tasks reordered"
+          description: "Controller tasks reordered"
         "400":
           description: "Invalid request"
           content:
@@ -6797,15 +6797,15 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /autopilot/{name}/tasks/{taskId}:
+  /controller/{name}/tasks/{taskId}:
     patch:
-      summary: "Update autopilot task"
-      description: "Updates an Autopilot task template description and, when requested, the current cycle task state."
-      operationId: "updateAutopilotTask"
+      summary: "Update controller task"
+      description: "Updates a Controller task template description and, when requested, the current cycle task state."
+      operationId: "updateControllerTask"
       tags:
-        - "autopilot"
+        - "controller"
       parameters:
-        - $ref: "#/components/parameters/AutopilotName"
+        - $ref: "#/components/parameters/ControllerName"
         - name: "taskId"
           in: "path"
           required: true
@@ -6816,14 +6816,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/AutopilotTaskUpdateRequest"
+              $ref: "#/components/schemas/ControllerTaskUpdateRequest"
       responses:
         "200":
-          description: "Autopilot task updated"
+          description: "Controller task updated"
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AutopilotTask"
+                $ref: "#/components/schemas/ControllerTask"
         "400":
           description: "Invalid request"
           content:
@@ -6849,13 +6849,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
     delete:
-      summary: "Delete autopilot task"
-      description: "Deletes a persistent task template from an Autopilot."
-      operationId: "deleteAutopilotTask"
+      summary: "Delete controller task"
+      description: "Deletes a persistent task template from a Controller."
+      operationId: "deleteControllerTask"
       tags:
-        - "autopilot"
+        - "controller"
       parameters:
-        - $ref: "#/components/parameters/AutopilotName"
+        - $ref: "#/components/parameters/ControllerName"
         - name: "taskId"
           in: "path"
           required: true
@@ -6863,7 +6863,7 @@ paths:
             type: string
       responses:
         "204":
-          description: "Autopilot task deleted"
+          description: "Controller task deleted"
         "400":
           description: "Invalid request"
           content:
@@ -6889,15 +6889,15 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /autopilot/{name}/response:
+  /controller/{name}/response:
     post:
-      summary: "Respond to autopilot prompt"
-      description: "Submits a human response for an Autopilot prompt."
-      operationId: "respondAutopilot"
+      summary: "Respond to controller prompt"
+      description: "Submits a human response for a Controller prompt."
+      operationId: "respondController"
       tags:
-        - "autopilot"
+        - "controller"
       parameters:
-        - $ref: "#/components/parameters/AutopilotName"
+        - $ref: "#/components/parameters/ControllerName"
       requestBody:
         required: true
         content:
@@ -6932,24 +6932,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /autopilot/{name}/rename:
+  /controller/{name}/rename:
     post:
-      summary: "Rename autopilot"
-      description: "Renames an Autopilot definition and preserves its runtime transcript."
-      operationId: "renameAutopilot"
+      summary: "Rename controller"
+      description: "Renames a Controller definition and preserves its runtime transcript."
+      operationId: "renameController"
       tags:
-        - "autopilot"
+        - "controller"
       parameters:
-        - $ref: "#/components/parameters/AutopilotName"
+        - $ref: "#/components/parameters/ControllerName"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/AutopilotRenameRequest"
+              $ref: "#/components/schemas/ControllerRenameRequest"
       responses:
         "204":
-          description: "Autopilot renamed"
+          description: "Controller renamed"
         "400":
           description: "Invalid request"
           content:
@@ -6969,13 +6969,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "404":
-          description: "Autopilot not found"
+          description: "Controller not found"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "409":
-          description: "Autopilot controller is not ready"
+          description: "Controller is not ready"
           content:
             application/json:
               schema:
@@ -6987,24 +6987,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /autopilot/{name}/duplicate:
+  /controller/{name}/duplicate:
     post:
-      summary: "Duplicate autopilot"
-      description: "Creates a new Autopilot definition by copying an existing one."
-      operationId: "duplicateAutopilot"
+      summary: "Duplicate controller"
+      description: "Creates a new Controller definition by copying an existing one."
+      operationId: "duplicateController"
       tags:
-        - "autopilot"
+        - "controller"
       parameters:
-        - $ref: "#/components/parameters/AutopilotName"
+        - $ref: "#/components/parameters/ControllerName"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/AutopilotDuplicateRequest"
+              $ref: "#/components/schemas/ControllerDuplicateRequest"
       responses:
         "204":
-          description: "Autopilot duplicated"
+          description: "Controller duplicated"
         "400":
           description: "Invalid request"
           content:
@@ -7024,7 +7024,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "404":
-          description: "Autopilot not found"
+          description: "Controller not found"
           content:
             application/json:
               schema:
@@ -7036,18 +7036,18 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /autopilot/{name}/reset:
+  /controller/{name}/reset:
     post:
-      summary: "Reset autopilot state"
-      description: "Resets Autopilot runtime state back to idle while keeping the definition."
-      operationId: "resetAutopilot"
+      summary: "Reset controller state"
+      description: "Resets Controller runtime state back to idle while keeping the definition."
+      operationId: "resetController"
       tags:
-        - "autopilot"
+        - "controller"
       parameters:
-        - $ref: "#/components/parameters/AutopilotName"
+        - $ref: "#/components/parameters/ControllerName"
       responses:
         "204":
-          description: "Autopilot state reset"
+          description: "Controller state reset"
         "400":
           description: "Invalid request"
           content:
@@ -7067,7 +7067,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "404":
-          description: "Autopilot not found"
+          description: "Controller not found"
           content:
             application/json:
               schema:
@@ -8457,22 +8457,22 @@ components:
       schema:
         type: string
 
-    AutopilotName:
+    ControllerName:
       name: name
       in: path
       required: true
-      description: "The Autopilot name"
+      description: "The Controller name"
       schema:
         type: string
         minLength: 1
 
-    AutopilotDocument:
+    ControllerDocument:
       name: document
       in: path
       required: true
-      description: "Autopilot document file name"
+      description: "Controller document file name"
       schema:
-        $ref: "#/components/schemas/AutopilotDocument"
+        $ref: "#/components/schemas/ControllerDocument"
 
   schemas:
     Tags:
@@ -8561,10 +8561,10 @@ components:
           description: "When the event was recorded by the producer"
         kind:
           type: string
-          description: "High-level event kind (e.g., dag_run, autopilot, llm_usage)"
+          description: "High-level event kind (e.g., dag_run, controller, llm_usage)"
         type:
           type: string
-          description: "Specific event type (e.g., dag.run.failed, autopilot.error)"
+          description: "Specific event type (e.g., dag.run.failed, controller.error)"
         sourceService:
           type: string
           description: "Service that produced the event"
@@ -8580,15 +8580,15 @@ components:
         attemptId:
           type: string
           description: "Attempt ID for DAG-run events"
-        autopilotName:
+        controllerName:
           type: string
-          description: "Autopilot name for autopilot events"
-        autopilotKind:
+          description: "Controller name for controller events"
+        controllerKind:
           type: string
-          description: "Autopilot kind for autopilot events"
-        autopilotCycleId:
+          description: "Controller kind for controller events"
+        controllerCycleId:
           type: string
-          description: "Autopilot cycle ID for autopilot events"
+          description: "Controller cycle ID for controller events"
         sessionId:
           type: string
           description: "Session ID for LLM usage events"
@@ -9335,7 +9335,7 @@ components:
       type: string
       description: "How the DAG-run was initiated"
       enum:
-        - "autopilot"
+        - "controller"
         - "unknown"
         - "scheduler"
         - "manual"
@@ -9415,8 +9415,8 @@ components:
           type: string
           enum: ["active", "inactive", "unknown"]
           description: "Scheduler status (active = holds lock and scheduling)"
-        autopilotController:
-          $ref: "#/components/schemas/AutopilotControllerStatus"
+        controllerStatus:
+          $ref: "#/components/schemas/ControllerStatus"
         startedAt:
           type: string
           description: "RFC3339 timestamp when scheduler started"
@@ -9427,9 +9427,9 @@ components:
         - status
         - startedAt
 
-    AutopilotControllerStatus:
+    ControllerStatus:
       type: object
-      description: "Scheduler-owned Autopilot controller readiness"
+      description: "Scheduler-owned Controller readiness"
       required:
         - state
       properties:
@@ -12232,39 +12232,39 @@ components:
         content:
           type: string
 
-    AutopilotDocument:
+    ControllerDocument:
       type: string
-      description: "Autopilot document file name"
+      description: "Controller document file name"
       enum:
         - MEMORY.md
         - SOUL.md
 
-    AutopilotDocumentResponse:
+    ControllerDocumentResponse:
       type: object
       required:
         - name
         - document
         - content
         - path
-      description: "Autopilot-specific document content"
+      description: "Controller-specific document content"
       properties:
         name:
           type: string
         document:
-          $ref: "#/components/schemas/AutopilotDocument"
+          $ref: "#/components/schemas/ControllerDocument"
         content:
           type: string
         path:
           type: string
 
-    AutopilotMemoryReflectionResponse:
+    ControllerMemoryReflectionResponse:
       type: object
       required:
         - name
         - currentContent
         - proposedContent
         - rationale
-      description: "Generated Autopilot MEMORY.md update proposal"
+      description: "Generated Controller MEMORY.md update proposal"
       properties:
         name:
           type: string
@@ -12675,9 +12675,9 @@ components:
         status:
           type: string
 
-    AutopilotLifecycleState:
+    ControllerLifecycleState:
       type: string
-      description: "Autopilot lifecycle state"
+      description: "Controller lifecycle state"
       enum:
         - idle
         - running
@@ -12685,30 +12685,30 @@ components:
         - paused
         - finished
 
-    AutopilotKind:
+    ControllerKind:
       type: string
-      description: "Compatibility Autopilot kind. Runtime behavior is configured through explicit fields such as resetOnFinish."
+      description: "Compatibility Controller kind. Runtime behavior is configured through explicit fields such as resetOnFinish."
       enum:
         - workflow
         - service
 
-    AutopilotDisplayStatus:
+    ControllerDisplayStatus:
       type: string
-      description: "User-facing Autopilot status"
+      description: "User-facing Controller status"
       enum:
         - idle
         - running
         - paused
         - finished
 
-    AutopilotWaitingReason:
+    ControllerWaitingReason:
       type: string
-      description: "Why an Autopilot is waiting"
+      description: "Why a Controller is waiting"
       enum:
         - human_input
         - dag_wait
 
-    AutopilotAllowedDAGs:
+    ControllerAllowedDAGs:
       type: object
       description: "Allowlisted DAG names and tags"
       properties:
@@ -12721,16 +12721,16 @@ components:
           items:
             type: string
 
-    AutopilotTaskState:
+    ControllerTaskState:
       type: string
       description: "Checklist task state"
       enum:
         - open
         - done
 
-    AutopilotTask:
+    ControllerTask:
       type: object
-      description: "Runtime current-cycle task for an Autopilot"
+      description: "Runtime current-cycle task for a Controller"
       required:
         - id
         - description
@@ -12741,7 +12741,7 @@ components:
         description:
           type: string
         state:
-          $ref: "#/components/schemas/AutopilotTaskState"
+          $ref: "#/components/schemas/ControllerTaskState"
         createdAt:
           type: string
           format: date-time
@@ -12758,9 +12758,9 @@ components:
         doneBy:
           type: string
 
-    AutopilotTaskTemplate:
+    ControllerTaskTemplate:
       type: object
-      description: "Persistent task template for an Autopilot"
+      description: "Persistent task template for a Controller"
       required:
         - id
         - description
@@ -12780,9 +12780,9 @@ components:
         updatedBy:
           type: string
 
-    AutopilotAgentConfig:
+    ControllerAgentConfig:
       type: object
-      description: "Agent runtime configuration for an Autopilot definition"
+      description: "Agent runtime configuration for a Controller definition"
       properties:
         model:
           type: string
@@ -12791,9 +12791,9 @@ components:
         safeMode:
           type: boolean
 
-    AutopilotDefinition:
+    ControllerDefinition:
       type: object
-      description: "Autopilot definition"
+      description: "Controller definition"
       required:
         - name
         - kind
@@ -12801,7 +12801,7 @@ components:
         name:
           type: string
         kind:
-          $ref: "#/components/schemas/AutopilotKind"
+          $ref: "#/components/schemas/ControllerKind"
         nickname:
           type: string
         iconUrl:
@@ -12825,15 +12825,15 @@ components:
           items:
             type: string
         allowedDAGs:
-          $ref: "#/components/schemas/AutopilotAllowedDAGs"
+          $ref: "#/components/schemas/ControllerAllowedDAGs"
         agent:
-          $ref: "#/components/schemas/AutopilotAgentConfig"
+          $ref: "#/components/schemas/ControllerAgentConfig"
         disabled:
           type: boolean
 
-    AutopilotPrompt:
+    ControllerPrompt:
       type: object
-      description: "Pending human prompt for an Autopilot"
+      description: "Pending human prompt for a Controller"
       required:
         - id
         - question
@@ -12855,9 +12855,9 @@ components:
           type: string
           format: date-time
 
-    AutopilotPromptResponse:
+    ControllerPromptResponse:
       type: object
-      description: "Recorded human response for an Autopilot prompt"
+      description: "Recorded human response for a Controller prompt"
       required:
         - promptId
         - respondedAt
@@ -12874,9 +12874,9 @@ components:
           type: string
           format: date-time
 
-    AutopilotPendingTurnMessage:
+    ControllerPendingTurnMessage:
       type: object
-      description: "Queued message to be delivered on the next Autopilot turn"
+      description: "Queued message to be delivered on the next Controller turn"
       required:
         - id
         - kind
@@ -12893,7 +12893,7 @@ components:
           type: string
           format: date-time
 
-    AutopilotRunRef:
+    ControllerRunRef:
       type: object
       description: "Reference to a tracked child DAG run"
       required:
@@ -12905,9 +12905,9 @@ components:
         id:
           type: string
 
-    AutopilotRunSummary:
+    ControllerRunSummary:
       type: object
-      description: "Summary of a child DAG run launched by an Autopilot"
+      description: "Summary of a child DAG run launched by a Controller"
       required:
         - name
         - dagRunId
@@ -12931,9 +12931,9 @@ components:
         error:
           type: string
 
-    AutopilotAllowedDAGInfo:
+    ControllerAllowedDAGInfo:
       type: object
-      description: "Resolved DAG allowed in the current Autopilot"
+      description: "Resolved DAG allowed in the current Controller"
       required:
         - name
       properties:
@@ -12946,16 +12946,16 @@ components:
           items:
             type: string
 
-    AutopilotState:
+    ControllerState:
       type: object
-      description: "Current runtime state for an Autopilot"
+      description: "Current runtime state for a Controller"
       required:
         - state
       properties:
         state:
-          $ref: "#/components/schemas/AutopilotLifecycleState"
+          $ref: "#/components/schemas/ControllerLifecycleState"
         displayStatus:
-          $ref: "#/components/schemas/AutopilotDisplayStatus"
+          $ref: "#/components/schemas/ControllerDisplayStatus"
         busy:
           type: boolean
         needsInput:
@@ -12975,25 +12975,25 @@ components:
         tasks:
           type: array
           items:
-            $ref: "#/components/schemas/AutopilotTask"
+            $ref: "#/components/schemas/ControllerTask"
         sessionId:
           type: string
         currentRunRef:
-          $ref: "#/components/schemas/AutopilotRunRef"
+          $ref: "#/components/schemas/ControllerRunRef"
         lastRunRef:
-          $ref: "#/components/schemas/AutopilotRunRef"
+          $ref: "#/components/schemas/ControllerRunRef"
         currentCycleId:
           type: string
         waitingReason:
-          $ref: "#/components/schemas/AutopilotWaitingReason"
+          $ref: "#/components/schemas/ControllerWaitingReason"
         pendingPrompt:
-          $ref: "#/components/schemas/AutopilotPrompt"
+          $ref: "#/components/schemas/ControllerPrompt"
         pendingResponse:
-          $ref: "#/components/schemas/AutopilotPromptResponse"
+          $ref: "#/components/schemas/ControllerPromptResponse"
         pendingTurnMessages:
           type: array
           items:
-            $ref: "#/components/schemas/AutopilotPendingTurnMessage"
+            $ref: "#/components/schemas/ControllerPendingTurnMessage"
         startRequestedAt:
           type: string
           format: date-time
@@ -13019,9 +13019,9 @@ components:
         lastError:
           type: string
 
-    AutopilotSummary:
+    ControllerSummary:
       type: object
-      description: "Summary row for an Autopilot"
+      description: "Summary row for a Controller"
       required:
         - name
         - kind
@@ -13030,7 +13030,7 @@ components:
         name:
           type: string
         kind:
-          $ref: "#/components/schemas/AutopilotKind"
+          $ref: "#/components/schemas/ControllerKind"
         nickname:
           type: string
         iconUrl:
@@ -13050,9 +13050,9 @@ components:
         instruction:
           type: string
         state:
-          $ref: "#/components/schemas/AutopilotLifecycleState"
+          $ref: "#/components/schemas/ControllerLifecycleState"
         displayStatus:
-          $ref: "#/components/schemas/AutopilotDisplayStatus"
+          $ref: "#/components/schemas/ControllerDisplayStatus"
         busy:
           type: boolean
         needsInput:
@@ -13060,7 +13060,7 @@ components:
         disabled:
           type: boolean
         currentRun:
-          $ref: "#/components/schemas/AutopilotRunSummary"
+          $ref: "#/components/schemas/ControllerRunSummary"
         openTaskCount:
           type: integer
         doneTaskCount:
@@ -13070,99 +13070,99 @@ components:
         lastUpdatedAt:
           type: string
           format: date-time
-        autopilotController:
-          $ref: "#/components/schemas/AutopilotControllerStatus"
+        controllerStatus:
+          $ref: "#/components/schemas/ControllerStatus"
 
-    AutopilotListResponse:
+    ControllerListResponse:
       type: object
-      description: "List of Autopilot"
+      description: "List of Controller"
       required:
-        - autopilot
+        - controller
       properties:
-        autopilot:
+        controller:
           type: array
           items:
-            $ref: "#/components/schemas/AutopilotSummary"
+            $ref: "#/components/schemas/ControllerSummary"
 
-    AutopilotDetailResponse:
+    ControllerDetailResponse:
       type: object
-      description: "Autopilot detail response"
+      description: "Controller detail response"
       required:
         - definition
         - state
         - allowedDags
       properties:
         definition:
-          $ref: "#/components/schemas/AutopilotDefinition"
+          $ref: "#/components/schemas/ControllerDefinition"
         state:
-          $ref: "#/components/schemas/AutopilotState"
+          $ref: "#/components/schemas/ControllerState"
         allowedDags:
           type: array
           items:
-            $ref: "#/components/schemas/AutopilotAllowedDAGInfo"
+            $ref: "#/components/schemas/ControllerAllowedDAGInfo"
         taskTemplates:
           type: array
           items:
-            $ref: "#/components/schemas/AutopilotTaskTemplate"
+            $ref: "#/components/schemas/ControllerTaskTemplate"
         currentRun:
-          $ref: "#/components/schemas/AutopilotRunSummary"
+          $ref: "#/components/schemas/ControllerRunSummary"
         recentRuns:
           type: array
           items:
-            $ref: "#/components/schemas/AutopilotRunSummary"
+            $ref: "#/components/schemas/ControllerRunSummary"
         messages:
           type: array
           items:
             $ref: "#/components/schemas/AgentMessage"
-        autopilotController:
-          $ref: "#/components/schemas/AutopilotControllerStatus"
+        controllerStatus:
+          $ref: "#/components/schemas/ControllerStatus"
 
-    AutopilotSpecResponse:
+    ControllerSpecResponse:
       type: object
-      description: "Raw Autopilot YAML spec"
+      description: "Raw Controller YAML spec"
       required:
         - spec
       properties:
         spec:
           type: string
 
-    AutopilotSpecUpsertRequest:
+    ControllerSpecUpsertRequest:
       type: object
-      description: "Request body for creating or updating an Autopilot from raw YAML"
+      description: "Request body for creating or updating a Controller from raw YAML"
       required:
         - spec
       properties:
         spec:
           type: string
 
-    AutopilotStartRequest:
+    ControllerStartRequest:
       type: object
-      description: "Request body for starting an Autopilot task"
+      description: "Request body for starting a Controller task"
       properties:
         instruction:
           type: string
 
-    AutopilotTaskCreateRequest:
+    ControllerTaskCreateRequest:
       type: object
-      description: "Request body for creating an Autopilot checklist task"
+      description: "Request body for creating a Controller checklist task"
       required:
         - description
       properties:
         description:
           type: string
 
-    AutopilotTaskUpdateRequest:
+    ControllerTaskUpdateRequest:
       type: object
-      description: "Request body for updating an Autopilot checklist task"
+      description: "Request body for updating a Controller checklist task"
       properties:
         description:
           type: string
         done:
           type: boolean
 
-    AutopilotTaskReorderRequest:
+    ControllerTaskReorderRequest:
       type: object
-      description: "Request body for reordering Autopilot checklist tasks"
+      description: "Request body for reordering Controller checklist tasks"
       required:
         - taskIds
       properties:
@@ -13171,7 +13171,7 @@ components:
           items:
             type: string
 
-    AutopilotOperatorMessageRequest:
+    ControllerOperatorMessageRequest:
       type: object
       description: "Request body for an operator message"
       required:
@@ -13180,18 +13180,18 @@ components:
         message:
           type: string
 
-    AutopilotRenameRequest:
+    ControllerRenameRequest:
       type: object
-      description: "Request body for renaming an Autopilot"
+      description: "Request body for renaming a Controller"
       required:
         - newName
       properties:
         newName:
           type: string
 
-    AutopilotDuplicateRequest:
+    ControllerDuplicateRequest:
       type: object
-      description: "Request body for duplicating an Autopilot"
+      description: "Request body for duplicating a Controller"
       required:
         - newName
       properties:

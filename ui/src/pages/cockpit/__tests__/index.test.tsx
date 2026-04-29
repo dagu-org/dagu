@@ -29,8 +29,8 @@ vi.mock('@/features/cockpit/components/DateKanbanList', () => ({
   DateKanbanList: () => <div data-testid="dag-runs-cockpit" />,
 }));
 
-vi.mock('@/features/cockpit/components/AutopilotCockpit', () => ({
-  AutopilotCockpit: () => <div data-testid="autopilot-cockpit" />,
+vi.mock('@/features/cockpit/components/ControllerCockpit', () => ({
+  ControllerCockpit: () => <div data-testid="controller-cockpit" />,
 }));
 
 function makeConfig(overrides: Partial<Config> = {}): Config {
@@ -51,7 +51,7 @@ function makeConfig(overrides: Partial<Config> = {}): Config {
     oidcButtonLabel: '',
     terminalEnabled: false,
     gitSyncEnabled: false,
-    autopilotEnabled: false,
+    controllerEnabled: false,
     agentEnabled: true,
     updateAvailable: false,
     latestVersion: '',
@@ -114,38 +114,29 @@ describe('CockpitPage', () => {
     localStorage.clear();
   });
 
-  it('hides the Autopilot mode switch when Autopilot UI is disabled', () => {
-    renderPage(makeConfig({ autopilotEnabled: false }));
+  it('hides the Controller mode switch when Controller UI is disabled', () => {
+    renderPage(makeConfig({ controllerEnabled: false }));
 
     expect(
-      screen.queryByRole('button', { name: 'Autopilot cockpit' })
+      screen.queryByRole('button', { name: 'Controller cockpit' })
     ).not.toBeInTheDocument();
     expect(screen.getByTestId('dag-runs-cockpit')).toBeInTheDocument();
   });
 
-  it('shows the Autopilot mode switch when Autopilot UI is enabled', () => {
-    renderPage(makeConfig({ autopilotEnabled: true }));
+  it('shows the Controller mode switch when Controller UI is enabled', () => {
+    renderPage(makeConfig({ controllerEnabled: true }));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Autopilot cockpit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Controller cockpit' }));
 
-    expect(screen.getByTestId('autopilot-cockpit')).toBeInTheDocument();
+    expect(screen.getByTestId('controller-cockpit')).toBeInTheDocument();
   });
 
-  it('opens Autopilot mode from query params', () => {
+  it('opens Controller mode from query params', () => {
     renderPage(
-      makeConfig({ autopilotEnabled: true }),
-      '/cockpit?mode=autopilot&autopilot=builder'
+      makeConfig({ controllerEnabled: true }),
+      '/cockpit?mode=controller&controller=builder'
     );
 
-    expect(screen.getByTestId('autopilot-cockpit')).toBeInTheDocument();
-  });
-
-  it('opens Autopilot mode from legacy Automata query params', () => {
-    renderPage(
-      makeConfig({ autopilotEnabled: true }),
-      '/cockpit?mode=automata&automata=builder'
-    );
-
-    expect(screen.getByTestId('autopilot-cockpit')).toBeInTheDocument();
+    expect(screen.getByTestId('controller-cockpit')).toBeInTheDocument();
   });
 });

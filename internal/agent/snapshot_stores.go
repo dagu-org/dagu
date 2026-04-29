@@ -208,9 +208,9 @@ func (s *snapshotMemoryStore) LoadDAGMemory(_ context.Context, dagName string) (
 	return s.perDAG[dagName], nil
 }
 
-func (s *snapshotMemoryStore) LoadAutopilotMemory(_ context.Context, autopilotName string) (string, error) {
-	if strings.TrimSpace(autopilotName) == "" {
-		return "", fmt.Errorf("snapshot memory store: autopilotName cannot be empty")
+func (s *snapshotMemoryStore) LoadControllerMemory(_ context.Context, controllerName string) (string, error) {
+	if strings.TrimSpace(controllerName) == "" {
+		return "", fmt.Errorf("snapshot memory store: controllerName cannot be empty")
 	}
 	return "", nil
 }
@@ -223,7 +223,7 @@ func (s *snapshotMemoryStore) SaveDAGMemory(_ context.Context, _ string, _ strin
 	return ErrSnapshotStoreReadOnly
 }
 
-func (s *snapshotMemoryStore) SaveAutopilotMemory(_ context.Context, _ string, _ string) error {
+func (s *snapshotMemoryStore) SaveControllerMemory(_ context.Context, _ string, _ string) error {
 	return ErrSnapshotStoreReadOnly
 }
 
@@ -231,9 +231,9 @@ func (s *snapshotMemoryStore) MemoryDir() string {
 	return ""
 }
 
-func (s *snapshotMemoryStore) AutopilotMemoryPath(autopilotName string) (string, error) {
-	if strings.TrimSpace(autopilotName) == "" {
-		return "", fmt.Errorf("snapshot memory store: autopilotName cannot be empty")
+func (s *snapshotMemoryStore) ControllerMemoryPath(controllerName string) (string, error) {
+	if strings.TrimSpace(controllerName) == "" {
+		return "", fmt.Errorf("snapshot memory store: controllerName cannot be empty")
 	}
 	return "", nil
 }
@@ -255,7 +255,7 @@ func (s *snapshotMemoryStore) DeleteDAGMemory(_ context.Context, _ string) error
 	return ErrSnapshotStoreReadOnly
 }
 
-func (s *snapshotMemoryStore) DeleteAutopilotMemory(_ context.Context, _ string) error {
+func (s *snapshotMemoryStore) DeleteControllerMemory(_ context.Context, _ string) error {
 	return ErrSnapshotStoreReadOnly
 }
 

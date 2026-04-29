@@ -182,8 +182,8 @@ func formatSingleNotification(event NotificationEvent) string {
 	switch notificationEventKind(event) {
 	case eventstore.KindDAGRun:
 		return formatSingleDAGNotification(notificationDAGRun(event))
-	case eventstore.KindAutopilot:
-		return formatSingleAutopilotNotification(event)
+	case eventstore.KindController:
+		return formatSingleControllerNotification(event)
 	case eventstore.KindLLMUsage:
 		return "Update."
 	default:
@@ -231,8 +231,8 @@ func notificationGroupDetail(group notificationGroup) string {
 		default:
 			return ""
 		}
-	case eventstore.KindAutopilot:
-		return autopilotNotificationDetail(group.Sample)
+	case eventstore.KindController:
+		return controllerNotificationDetail(group.Sample)
 	case eventstore.KindLLMUsage:
 		return ""
 	default:
@@ -240,55 +240,55 @@ func notificationGroupDetail(group notificationGroup) string {
 	}
 }
 
-func formatSingleAutopilotNotification(event NotificationEvent) string {
-	if event.Autopilot == nil {
-		return "Autopilot update."
+func formatSingleControllerNotification(event NotificationEvent) string {
+	if event.Controller == nil {
+		return "Controller update."
 	}
 	var b strings.Builder
-	snapshot := event.Autopilot
+	snapshot := event.Controller
 
 	switch event.Type {
-	case eventstore.TypeAutopilotNeedsInput:
-		fmt.Fprintf(&b, "%s Autopilot `%s` needs input.", notificationTextEmoji(event), snapshot.Name)
-		if detail := autopilotNotificationDetail(event); detail != "" {
+	case eventstore.TypeControllerNeedsInput:
+		fmt.Fprintf(&b, "%s Controller `%s` needs input.", notificationTextEmoji(event), snapshot.Name)
+		if detail := controllerNotificationDetail(event); detail != "" {
 			fmt.Fprintf(&b, "\n%s", detail)
 		}
-	case eventstore.TypeAutopilotError:
-		fmt.Fprintf(&b, "%s Autopilot `%s` hit an error.", notificationTextEmoji(event), snapshot.Name)
-		if detail := autopilotNotificationDetail(event); detail != "" {
+	case eventstore.TypeControllerError:
+		fmt.Fprintf(&b, "%s Controller `%s` hit an error.", notificationTextEmoji(event), snapshot.Name)
+		if detail := controllerNotificationDetail(event); detail != "" {
 			fmt.Fprintf(&b, "\n%s", detail)
 		}
-	case eventstore.TypeAutopilotFinished:
-		fmt.Fprintf(&b, "%s Autopilot `%s` finished.", notificationTextEmoji(event), snapshot.Name)
-		if detail := autopilotNotificationDetail(event); detail != "" {
+	case eventstore.TypeControllerFinished:
+		fmt.Fprintf(&b, "%s Controller `%s` finished.", notificationTextEmoji(event), snapshot.Name)
+		if detail := controllerNotificationDetail(event); detail != "" {
 			fmt.Fprintf(&b, "\n%s", detail)
 		}
 	case eventstore.TypeDAGRunQueued, eventstore.TypeDAGRunRunning, eventstore.TypeDAGRunUpdated, eventstore.TypeDAGRunWaiting, eventstore.TypeDAGRunSucceeded, eventstore.TypeDAGRunFailed, eventstore.TypeDAGRunAborted, eventstore.TypeDAGRunRejected, eventstore.TypeLLMUsageRecorded:
-		fmt.Fprintf(&b, "%s Autopilot `%s` event: %s.", notificationTextEmoji(event), snapshot.Name, event.Type)
+		fmt.Fprintf(&b, "%s Controller `%s` event: %s.", notificationTextEmoji(event), snapshot.Name, event.Type)
 	default:
-		fmt.Fprintf(&b, "%s Autopilot `%s` event: %s.", notificationTextEmoji(event), snapshot.Name, event.Type)
+		fmt.Fprintf(&b, "%s Controller `%s` event: %s.", notificationTextEmoji(event), snapshot.Name, event.Type)
 	}
 
 	return b.String()
 }
 
-func autopilotNotificationDetail(event NotificationEvent) string {
-	if event.Autopilot == nil {
+func controllerNotificationDetail(event NotificationEvent) string {
+	if event.Controller == nil {
 		return ""
 	}
-	snapshot := event.Autopilot
+	snapshot := event.Controller
 	switch event.Type {
-	case eventstore.TypeAutopilotNeedsInput:
+	case eventstore.TypeControllerNeedsInput:
 		if question := trimNotificationDetail(snapshot.PromptQuestion); question != "" {
 			return "Prompt: " + question
 		}
-		return "Action is required to continue the autopilot."
-	case eventstore.TypeAutopilotError:
+		return "Action is required to continue the controller."
+	case eventstore.TypeControllerError:
 		if detail := trimNotificationDetail(snapshot.Error); detail != "" {
 			return "Latest error: " + detail
 		}
 		return ""
-	case eventstore.TypeAutopilotFinished:
+	case eventstore.TypeControllerFinished:
 		if detail := trimNotificationDetail(snapshot.Summary); detail != "" {
 			return detail
 		}

@@ -393,7 +393,7 @@ type UI struct {
 	NavbarTitle           string
 	MaxDashboardPageLimit int
 	DAGs                  DAGsConfig
-	Autopilot             AutopilotUIConfig
+	Controller             ControllerUIConfig
 }
 
 // DAGsConfig holds DAG list page configuration.
@@ -402,8 +402,8 @@ type DAGsConfig struct {
 	SortOrder string
 }
 
-// AutopilotUIConfig holds Autopilot UI feature visibility settings.
-type AutopilotUIConfig struct {
+// ControllerUIConfig holds Controller UI feature visibility settings.
+type ControllerUIConfig struct {
 	Enabled bool
 }
 

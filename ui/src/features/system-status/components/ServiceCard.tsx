@@ -8,7 +8,7 @@ interface ServiceInstance {
   status: 'active' | 'inactive' | 'unknown';
   startedAt: string;
   port?: number;
-  autopilotController?: {
+  controllerStatus?: {
     state: 'ready' | 'disabled' | 'unavailable' | 'unknown';
     message?: string;
   };
@@ -92,21 +92,21 @@ function ServiceCard({
             </span>
 
             <div className="ml-auto flex items-center gap-3">
-              {instance.autopilotController ? (
+              {instance.controllerStatus ? (
                 <span
                   className={cn(
                     'rounded-full px-2 py-0.5 text-[11px] font-medium',
-                    instance.autopilotController.state === 'ready'
+                    instance.controllerStatus.state === 'ready'
                       ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-200'
-                      : instance.autopilotController.state === 'disabled'
+                      : instance.controllerStatus.state === 'disabled'
                         ? 'bg-slate-200 text-slate-900 dark:bg-slate-800 dark:text-slate-200'
-                        : instance.autopilotController.state === 'unavailable'
+                        : instance.controllerStatus.state === 'unavailable'
                           ? 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200'
                           : 'bg-muted text-muted-foreground'
                   )}
-                  title={instance.autopilotController.message}
+                  title={instance.controllerStatus.message}
                 >
-                  autopilot {instance.autopilotController.state}
+                  controller {instance.controllerStatus.state}
                 </span>
               ) : null}
 

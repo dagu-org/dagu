@@ -43,11 +43,11 @@ function getEventVariant(type: string) {
       return 'warning';
     case 'dag.run.rejected':
       return 'warning';
-    case 'autopilot.finished':
+    case 'controller.finished':
       return 'success';
-    case 'autopilot.error':
+    case 'controller.error':
       return 'error';
-    case 'autopilot.needs_input':
+    case 'controller.needs_input':
       return 'warning';
     default:
       return 'default';

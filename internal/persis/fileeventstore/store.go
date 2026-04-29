@@ -376,13 +376,13 @@ func matchesFilter(event *eventstore.Event, filter eventstore.QueryFilter) bool 
 	if filter.AttemptID != "" && event.AttemptID != filter.AttemptID {
 		return false
 	}
-	if filter.AutopilotName != "" && event.AutopilotName != filter.AutopilotName {
+	if filter.ControllerName != "" && event.ControllerName != filter.ControllerName {
 		return false
 	}
-	if filter.AutopilotKind != "" && event.AutopilotKind != filter.AutopilotKind {
+	if filter.ControllerKind != "" && event.ControllerKind != filter.ControllerKind {
 		return false
 	}
-	if filter.AutopilotCycleID != "" && event.AutopilotCycleID != filter.AutopilotCycleID {
+	if filter.ControllerCycleID != "" && event.ControllerCycleID != filter.ControllerCycleID {
 		return false
 	}
 	if filter.SessionID != "" && event.SessionID != filter.SessionID {

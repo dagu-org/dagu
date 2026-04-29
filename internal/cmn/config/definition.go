@@ -234,7 +234,7 @@ type UIDef struct {
 	NavbarTitle           string          `mapstructure:"navbar_title"`
 	MaxDashboardPageLimit int             `mapstructure:"max_dashboard_page_limit"`
 	DAGs                  *DAGListDef     `mapstructure:"dags"`
-	Autopilot             *AutopilotUIDef `mapstructure:"autopilot"`
+	Controller             *ControllerUIDef `mapstructure:"controller"`
 }
 
 // DAGListDef configures the DAGs list page.
@@ -243,8 +243,8 @@ type DAGListDef struct {
 	SortOrder string `mapstructure:"sort_order"`
 }
 
-// AutopilotUIDef configures the Autopilot UI surface.
-type AutopilotUIDef struct {
+// ControllerUIDef configures the Controller UI surface.
+type ControllerUIDef struct {
 	Enabled *bool `mapstructure:"enabled"`
 }
 

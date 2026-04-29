@@ -26,19 +26,12 @@ const SchemaVersion = 1
 
 var ErrInvalidQueryCursor = errors.New("eventstore: invalid query cursor")
 
-const (
-	legacyKindAutomata           EventKind = "automata"
-	legacyTypeAutomataNeedsInput EventType = "automata.needs_input"
-	legacyTypeAutomataError      EventType = "automata.error"
-	legacyTypeAutomataFinished   EventType = "automata.finished"
-)
-
 type EventKind string
 
 const (
-	KindDAGRun    EventKind = "dag_run"
-	KindAutopilot EventKind = "autopilot"
-	KindLLMUsage  EventKind = "llm_usage"
+	KindDAGRun     EventKind = "dag_run"
+	KindController EventKind = "controller"
+	KindLLMUsage   EventKind = "llm_usage"
 )
 
 type EventType string
@@ -53,9 +46,9 @@ const (
 	TypeDAGRunAborted   EventType = "dag.run.aborted"
 	TypeDAGRunRejected  EventType = "dag.run.rejected"
 
-	TypeAutopilotNeedsInput EventType = "autopilot.needs_input"
-	TypeAutopilotError      EventType = "autopilot.error"
-	TypeAutopilotFinished   EventType = "autopilot.finished"
+	TypeControllerNeedsInput EventType = "controller.needs_input"
+	TypeControllerError      EventType = "controller.error"
+	TypeControllerFinished   EventType = "controller.finished"
 
 	TypeLLMUsageRecorded EventType = "llm.usage.recorded"
 )
@@ -85,9 +78,9 @@ type Event struct {
 	DAGName          string         `json:"dag_name,omitempty"`
 	DAGRunID         string         `json:"dag_run_id,omitempty"`
 	AttemptID        string         `json:"attempt_id,omitempty"`
-	AutopilotName    string         `json:"autopilot_name,omitempty"`
-	AutopilotKind    string         `json:"autopilot_kind,omitempty"`
-	AutopilotCycleID string         `json:"autopilot_cycle_id,omitempty"`
+	ControllerName   string         `json:"controller_name,omitempty"`
+	ControllerKind   string         `json:"controller_kind,omitempty"`
+	ControllerCycleID string        `json:"controller_cycle_id,omitempty"`
 	SessionID        string         `json:"session_id,omitempty"`
 	UserID           string         `json:"user_id,omitempty"`
 	Model            string         `json:"model,omitempty"`
@@ -106,13 +99,10 @@ type eventJSONAlias struct {
 	SourceInstance   string         `json:"source_instance,omitempty"`
 	DAGName          string         `json:"dag_name,omitempty"`
 	DAGRunID         string         `json:"dag_run_id,omitempty"`
-	AttemptID        string         `json:"attempt_id,omitempty"`
-	AutopilotName    string         `json:"autopilot_name,omitempty"`
-	LegacyName       string         `json:"automata_name,omitempty"`
-	AutopilotKind    string         `json:"autopilot_kind,omitempty"`
-	LegacyKind       string         `json:"automata_kind,omitempty"`
-	AutopilotCycleID string         `json:"autopilot_cycle_id,omitempty"`
-	LegacyCycleID    string         `json:"automata_cycle_id,omitempty"`
+	AttemptID         string         `json:"attempt_id,omitempty"`
+	ControllerName    string         `json:"controller_name,omitempty"`
+	ControllerKind    string         `json:"controller_kind,omitempty"`
+	ControllerCycleID string         `json:"controller_cycle_id,omitempty"`
 	SessionID        string         `json:"session_id,omitempty"`
 	UserID           string         `json:"user_id,omitempty"`
 	Model            string         `json:"model,omitempty"`
@@ -136,9 +126,9 @@ func (e *Event) UnmarshalJSON(data []byte) error {
 	e.DAGName = aux.DAGName
 	e.DAGRunID = aux.DAGRunID
 	e.AttemptID = aux.AttemptID
-	e.AutopilotName = firstNonEmpty(aux.AutopilotName, aux.LegacyName)
-	e.AutopilotKind = firstNonEmpty(aux.AutopilotKind, aux.LegacyKind)
-	e.AutopilotCycleID = firstNonEmpty(aux.AutopilotCycleID, aux.LegacyCycleID)
+	e.ControllerName = aux.ControllerName
+	e.ControllerKind = aux.ControllerKind
+	e.ControllerCycleID = aux.ControllerCycleID
 	e.SessionID = aux.SessionID
 	e.UserID = aux.UserID
 	e.Model = aux.Model
@@ -151,18 +141,6 @@ func (e *Event) UnmarshalJSON(data []byte) error {
 func (e *Event) Normalize() {
 	if e == nil {
 		return
-	}
-	switch e.Kind {
-	case legacyKindAutomata:
-		e.Kind = KindAutopilot
-	}
-	switch e.Type {
-	case legacyTypeAutomataNeedsInput:
-		e.Type = TypeAutopilotNeedsInput
-	case legacyTypeAutomataError:
-		e.Type = TypeAutopilotError
-	case legacyTypeAutomataFinished:
-		e.Type = TypeAutopilotFinished
 	}
 	if !e.RecordedAt.IsZero() {
 		e.RecordedAt = e.RecordedAt.UTC()
@@ -224,9 +202,9 @@ type QueryFilter struct {
 	DAGName          string
 	DAGRunID         string
 	AttemptID        string
-	AutopilotName    string
-	AutopilotKind    string
-	AutopilotCycleID string
+	ControllerName    string
+	ControllerKind    string
+	ControllerCycleID string
 	SessionID        string
 	UserID           string
 	Model            string
@@ -305,11 +283,11 @@ func DAGRunEventID(eventType EventType, dagName, dagRunID, attemptID string) str
 	return "dag_" + stableID(string(eventType), dagName, dagRunID, attemptID)
 }
 
-func AutopilotEventID(eventType EventType, autopilotName string, identityParts ...string) string {
+func ControllerEventID(eventType EventType, controllerName string, identityParts ...string) string {
 	parts := make([]string, 0, len(identityParts)+2)
-	parts = append(parts, string(eventType), autopilotName)
+	parts = append(parts, string(eventType), controllerName)
 	parts = append(parts, identityParts...)
-	return "autopilot_" + stableID(parts...)
+	return "controller_" + stableID(parts...)
 }
 
 func DAGRunUpdateEventID(dagName, dagRunID, attemptID string, recordedAt time.Time) string {
@@ -368,7 +346,7 @@ func NewDAGRunEvent(source Source, eventType EventType, status *exec.DAGRunStatu
 	return event
 }
 
-type AutopilotEventInput struct {
+type ControllerEventInput struct {
 	Name                   string
 	Kind                   string
 	CycleID                string
@@ -384,30 +362,30 @@ type AutopilotEventInput struct {
 	DoneTaskCount          int
 }
 
-func NewAutopilotEvent(source Source, eventType EventType, id string, input AutopilotEventInput, data map[string]any) *Event {
+func NewControllerEvent(source Source, eventType EventType, id string, input ControllerEventInput, data map[string]any) *Event {
 	if strings.TrimSpace(input.Name) == "" || strings.TrimSpace(id) == "" {
 		return nil
 	}
 	source = normalizeSource(source)
 	data = cloneData(data)
-	if snapshot := newNotificationAutopilotSnapshot(eventType, input); snapshot != nil {
+	if snapshot := newNotificationControllerSnapshot(eventType, input); snapshot != nil {
 		if data == nil {
 			data = make(map[string]any, 1)
 		}
-		data[notificationAutopilotSnapshotDataKey] = snapshot
+		data[notificationControllerSnapshotDataKey] = snapshot
 	}
 	event := &Event{
 		ID:               id,
 		SchemaVersion:    SchemaVersion,
-		OccurredAt:       autopilotOccurredAt(input),
+		OccurredAt:       controllerOccurredAt(input),
 		RecordedAt:       time.Now().UTC(),
-		Kind:             KindAutopilot,
+		Kind:             KindController,
 		Type:             eventType,
 		SourceService:    source.Service,
 		SourceInstance:   source.Instance,
-		AutopilotName:    input.Name,
-		AutopilotKind:    input.Kind,
-		AutopilotCycleID: input.CycleID,
+		ControllerName:    input.Name,
+		ControllerKind:    input.Kind,
+		ControllerCycleID: input.CycleID,
 		SessionID:        input.SessionID,
 		Status:           input.Status,
 		Data:             data,
@@ -495,7 +473,7 @@ func normalizeSource(source Source) Source {
 	return source
 }
 
-func autopilotOccurredAt(input AutopilotEventInput) time.Time {
+func controllerOccurredAt(input ControllerEventInput) time.Time {
 	if !input.OccurredAt.IsZero() {
 		return input.OccurredAt.UTC()
 	}
@@ -532,7 +510,7 @@ func dagRunOccurredAt(status *exec.DAGRunStatus, eventType EventType) time.Time 
 		}
 	case TypeLLMUsageRecorded:
 		// This builder is only used for DAG-run events, but fall back safely.
-	case TypeAutopilotNeedsInput, TypeAutopilotError, TypeAutopilotFinished:
+	case TypeControllerNeedsInput, TypeControllerError, TypeControllerFinished:
 		// This builder is only used for DAG-run events, but fall back safely.
 	}
 	if status.CreatedAt > 0 {

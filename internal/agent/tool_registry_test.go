@@ -22,33 +22,33 @@ func (r *testRemoteContextResolver) ListRemoteContexts(_ context.Context) ([]Rem
 	return nil, nil
 }
 
-type testAutopilotRuntime struct{}
+type testControllerRuntime struct{}
 
-func (r *testAutopilotRuntime) ListTasks(_ context.Context) ([]AutopilotTask, error) {
-	return []AutopilotTask{{ID: "task-1", Description: "Investigate failure", State: "open"}}, nil
+func (r *testControllerRuntime) ListTasks(_ context.Context) ([]ControllerTask, error) {
+	return []ControllerTask{{ID: "task-1", Description: "Investigate failure", State: "open"}}, nil
 }
 
-func (r *testAutopilotRuntime) ListAllowedDAGs(_ context.Context) ([]AutopilotAllowedDAG, error) {
-	return []AutopilotAllowedDAG{{Name: "example"}}, nil
+func (r *testControllerRuntime) ListAllowedDAGs(_ context.Context) ([]ControllerAllowedDAG, error) {
+	return []ControllerAllowedDAG{{Name: "example"}}, nil
 }
 
-func (r *testAutopilotRuntime) RunAllowedDAG(_ context.Context, input AutopilotRunDAGInput) (AutopilotRunDAGResult, error) {
-	return AutopilotRunDAGResult{DAGName: input.DAGName, DAGRunID: "run-1"}, nil
+func (r *testControllerRuntime) RunAllowedDAG(_ context.Context, input ControllerRunDAGInput) (ControllerRunDAGResult, error) {
+	return ControllerRunDAGResult{DAGName: input.DAGName, DAGRunID: "run-1"}, nil
 }
 
-func (r *testAutopilotRuntime) RetryCurrentRun(_ context.Context) (AutopilotRunDAGResult, error) {
-	return AutopilotRunDAGResult{DAGName: "example", DAGRunID: "run-2"}, nil
+func (r *testControllerRuntime) RetryCurrentRun(_ context.Context) (ControllerRunDAGResult, error) {
+	return ControllerRunDAGResult{DAGName: "example", DAGRunID: "run-2"}, nil
 }
 
-func (r *testAutopilotRuntime) SetTaskDone(_ context.Context, _ string, _ bool) error {
+func (r *testControllerRuntime) SetTaskDone(_ context.Context, _ string, _ bool) error {
 	return nil
 }
 
-func (r *testAutopilotRuntime) RequestHumanInput(_ context.Context, _ AutopilotHumanPrompt) error {
+func (r *testControllerRuntime) RequestHumanInput(_ context.Context, _ ControllerHumanPrompt) error {
 	return nil
 }
 
-func (r *testAutopilotRuntime) Finish(_ context.Context, _ string) error {
+func (r *testControllerRuntime) Finish(_ context.Context, _ string) error {
 	return nil
 }
 
@@ -60,9 +60,9 @@ func TestRegisteredTools_ContainsAllExpected(t *testing.T) {
 		"navigate", "ask_user",
 		"delegate",
 		"remote_agent", "list_contexts",
-		"list_autopilot_tasks",
-		"list_allowed_dags", "run_allowed_dag", "retry_autopilot_run",
-		"set_autopilot_task_done", "request_human_input", "finish_autopilot",
+		"list_controller_tasks",
+		"list_allowed_dags", "run_allowed_dag", "retry_controller_run",
+		"set_controller_task_done", "request_human_input", "finish_controller",
 	}
 
 	regs := RegisteredTools()
@@ -119,7 +119,7 @@ func TestRegisteredTools_FactoriesProduceValidTools(t *testing.T) {
 	cfg := ToolConfig{
 		DAGsDir:               "/tmp/test-dags",
 		RemoteContextResolver: &testRemoteContextResolver{},
-		AutopilotRuntime:      &testAutopilotRuntime{},
+		ControllerRuntime:      &testControllerRuntime{},
 	}
 	for _, reg := range RegisteredTools() {
 		t.Run(reg.Name, func(t *testing.T) {
@@ -141,7 +141,7 @@ func TestCreateTools_UsesRegistry(t *testing.T) {
 	tools := CreateTools(ToolConfig{
 		DAGsDir:               "/tmp/dags",
 		RemoteContextResolver: &testRemoteContextResolver{},
-		AutopilotRuntime:      &testAutopilotRuntime{},
+		ControllerRuntime:      &testControllerRuntime{},
 	})
 	regs := RegisteredTools()
 

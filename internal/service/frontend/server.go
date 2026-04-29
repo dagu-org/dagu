@@ -34,7 +34,7 @@ import (
 	"github.com/dagucloud/dagu/internal/agentoauth"
 	authmodel "github.com/dagucloud/dagu/internal/auth"
 	"github.com/dagucloud/dagu/internal/auth/tokensecret"
-	"github.com/dagucloud/dagu/internal/autopilot"
+	"github.com/dagucloud/dagu/internal/controller"
 	"github.com/dagucloud/dagu/internal/cmn/backoff"
 	"github.com/dagucloud/dagu/internal/cmn/config"
 	"github.com/dagucloud/dagu/internal/cmn/crypto"
@@ -403,23 +403,23 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		}
 	}
 
-	autopilotSessionStore, err := filesession.New(cfg.Paths.SessionsDir, filesession.WithMaxPerUser(cfg.Server.Session.MaxPerUser))
+	controllerSessionStore, err := filesession.New(cfg.Paths.SessionsDir, filesession.WithMaxPerUser(cfg.Server.Session.MaxPerUser))
 	if err != nil {
-		logger.Warn(ctx, "Failed to create autopilot session store", tag.Error(err))
+		logger.Warn(ctx, "Failed to create controller session store", tag.Error(err))
 	}
-	autopilotService := autopilot.New(
+	controllerService := controller.New(
 		cfg,
 		dr,
 		drs,
-		autopilot.WithDAGRunController(&drm),
-		autopilot.WithCoordinatorClient(cc),
-		autopilot.WithSessionStore(autopilotSessionStore),
-		autopilot.WithMemoryStore(memoryStore),
-		autopilot.WithEventService(eventSvc),
-		autopilot.WithEventSource(eventstore.Source{
+		controller.WithDAGRunController(&drm),
+		controller.WithCoordinatorClient(cc),
+		controller.WithSessionStore(controllerSessionStore),
+		controller.WithMemoryStore(memoryStore),
+		controller.WithEventService(eventSvc),
+		controller.WithEventSource(eventstore.Source{
 			Service: eventstore.SourceServiceServer,
 		}),
-		autopilot.WithLogger(slog.Default()),
+		controller.WithLogger(slog.Default()),
 	)
 
 	// Note: SSO/OIDC gating is applied after opts are processed (see below)
@@ -453,7 +453,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 			OIDCEnabled:           oidcEnabled,
 			OIDCButtonLabel:       oidcButtonLabel,
 			TerminalEnabled:       cfg.Server.Terminal.Enabled && authSvc != nil,
-			AutopilotEnabled:      cfg.UI.Autopilot.Enabled,
+			ControllerEnabled:      cfg.UI.Controller.Enabled,
 			GitSyncEnabled:        cfg.GitSync.Enabled,
 			WorkspaceStore:        wsStore,
 			SetupRequiredChecker:  &setupChecker{authSvc: authSvc, fallback: setupRequired},
@@ -507,7 +507,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	}
 
 	allAPIOptions := append(apiOpts, srv.tunnelAPIOpts...)
-	allAPIOptions = append(allAPIOptions, apiv1.WithAutopilotService(autopilotService))
+	allAPIOptions = append(allAPIOptions, apiv1.WithControllerService(controllerService))
 	if srv.agentConfigStore != nil {
 		allAPIOptions = append(allAPIOptions, apiv1.WithAgentConfigStore(srv.agentConfigStore))
 	}

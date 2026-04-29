@@ -60,8 +60,8 @@ func (a *API) GetSchedulerStatus(ctx context.Context, _ api.GetSchedulerStatusRe
 		}
 
 		schedulers = append(schedulers, api.SchedulerInstance{
-			AutopilotController: func() *api.AutopilotControllerStatus {
-				controller := toAPIAutopilotControllerStatus(normalizeAutopilotController(member.AutopilotController))
+			ControllerStatus: func() *api.ControllerStatus {
+				controller := toAPIControllerStatus(normalizeControllerStatus(member.ControllerStatus))
 				return &controller
 			}(),
 			InstanceId: member.ID,

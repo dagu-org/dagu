@@ -142,7 +142,7 @@ func (f *finder) processInstanceFile(ctx context.Context, path string) *exec.Hos
 		Port:                instance.Port,
 		Status:              instance.Status,
 		StartedAt:           instance.StartedAt,
-		AutopilotController: instance.AutopilotController,
+		ControllerStatus: instance.ControllerStatus,
 	}
 }
 

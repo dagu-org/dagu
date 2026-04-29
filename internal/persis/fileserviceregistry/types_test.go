@@ -22,8 +22,8 @@ func TestWriteReadInstanceFile(t *testing.T) {
 		Port:   8080,
 		Status: exec.ServiceStatusActive,
 		PID:    1234,
-		AutopilotController: &exec.AutopilotControllerInfo{
-			State:   exec.AutopilotControllerStateReady,
+		ControllerStatus: &exec.ControllerStatusInfo{
+			State:   exec.ControllerStatusStateReady,
 			Message: "controller is ready",
 		},
 	}
@@ -44,9 +44,9 @@ func TestWriteReadInstanceFile(t *testing.T) {
 	assert.Equal(t, original.ID, read.ID)
 	assert.Equal(t, original.Host, read.Host)
 	assert.Equal(t, original.PID, read.PID)
-	require.NotNil(t, read.AutopilotController)
-	assert.Equal(t, original.AutopilotController.State, read.AutopilotController.State)
-	assert.Equal(t, original.AutopilotController.Message, read.AutopilotController.Message)
+	require.NotNil(t, read.ControllerStatus)
+	assert.Equal(t, original.ControllerStatus.State, read.ControllerStatus.State)
+	assert.Equal(t, original.ControllerStatus.Message, read.ControllerStatus.Message)
 }
 
 func TestWriteInstanceFile_CreatesDirectory(t *testing.T) {

@@ -62,20 +62,20 @@ func (s ServiceStatus) String() string {
 	}
 }
 
-// AutopilotControllerState represents the readiness of the scheduler-owned
-// Autopilot controller.
-type AutopilotControllerState string
+// ControllerStatusState represents the readiness of the scheduler-owned
+// Controller.
+type ControllerStatusState string
 
 const (
-	AutopilotControllerStateReady       AutopilotControllerState = "ready"
-	AutopilotControllerStateDisabled    AutopilotControllerState = "disabled"
-	AutopilotControllerStateUnavailable AutopilotControllerState = "unavailable"
-	AutopilotControllerStateUnknown     AutopilotControllerState = "unknown"
+	ControllerStatusStateReady       ControllerStatusState = "ready"
+	ControllerStatusStateDisabled    ControllerStatusState = "disabled"
+	ControllerStatusStateUnavailable ControllerStatusState = "unavailable"
+	ControllerStatusStateUnknown     ControllerStatusState = "unknown"
 )
 
-// AutopilotControllerInfo describes scheduler-owned Autopilot controller state.
-type AutopilotControllerInfo struct {
-	State   AutopilotControllerState `json:"state"`
+// ControllerStatusInfo describes scheduler-owned Controller state.
+type ControllerStatusInfo struct {
+	State   ControllerStatusState `json:"state"`
 	Message string                   `json:"message,omitempty"`
 }
 
@@ -91,7 +91,7 @@ type HostInfo struct {
 	Status ServiceStatus
 	// StartedAt is when the service instance was started
 	StartedAt time.Time
-	// AutopilotController describes scheduler-side Autopilot readiness when the
+	// ControllerStatus describes scheduler-side Controller readiness when the
 	// service is a scheduler. Nil means the publisher did not provide it.
-	AutopilotController *AutopilotControllerInfo
+	ControllerStatus *ControllerStatusInfo
 }

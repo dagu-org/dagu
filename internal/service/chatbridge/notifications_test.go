@@ -125,15 +125,15 @@ func TestNotificationBatcher_AbortedEventsUseUrgentClass(t *testing.T) {
 	assert.Contains(t, FormatNotificationBatch(ready.Batch), "aborted")
 }
 
-func TestAutopilotUpdatedEventUsesGenericFallbacks(t *testing.T) {
+func TestControllerUpdatedEventUsesGenericFallbacks(t *testing.T) {
 	t.Parallel()
 
 	event := NotificationEvent{
-		Kind: eventstore.KindAutopilot,
+		Kind: eventstore.KindController,
 		Type: eventstore.TypeDAGRunUpdated,
-		Autopilot: &eventstore.NotificationAutopilotSnapshot{
+		Controller: &eventstore.NotificationControllerSnapshot{
 			Name:      "planner",
-			EventType: eventstore.TypeAutopilotFinished,
+			EventType: eventstore.TypeControllerFinished,
 		},
 		ObservedAt: time.Now().UTC(),
 	}
@@ -142,9 +142,9 @@ func TestAutopilotUpdatedEventUsesGenericFallbacks(t *testing.T) {
 	assert.False(t, ok)
 	assert.Equal(t, NotificationClassUnknown, class)
 	assert.Equal(t, string(eventstore.TypeDAGRunUpdated), notificationStatusLabel(event))
-	assert.Equal(t, "", autopilotNotificationDetail(event))
+	assert.Equal(t, "", controllerNotificationDetail(event))
 	assert.Equal(t, "\u2139\uFE0F", notificationTextEmoji(event))
-	assert.Equal(t, "\u2139\uFE0F Autopilot `planner` event: dag.run.updated.", formatSingleAutopilotNotification(event))
+	assert.Equal(t, "\u2139\uFE0F Controller `planner` event: dag.run.updated.", formatSingleControllerNotification(event))
 }
 
 func TestNotificationBatcher_DrainAndStopReturnsPendingBatchesOrderedAndStopsFlushes(t *testing.T) {

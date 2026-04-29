@@ -47,8 +47,8 @@ type MemoryStore interface {
 	// LoadDAGMemory reads the MEMORY.md for a specific DAG, truncated to maxLines.
 	LoadDAGMemory(ctx context.Context, dagName string) (string, error)
 
-	// LoadAutopilotMemory reads the MEMORY.md for a specific Autopilot, truncated to maxLines.
-	LoadAutopilotMemory(ctx context.Context, autopilotName string) (string, error)
+	// LoadControllerMemory reads the MEMORY.md for a specific Controller, truncated to maxLines.
+	LoadControllerMemory(ctx context.Context, controllerName string) (string, error)
 
 	// SaveGlobalMemory writes content to the global MEMORY.md.
 	SaveGlobalMemory(ctx context.Context, content string) error
@@ -56,14 +56,14 @@ type MemoryStore interface {
 	// SaveDAGMemory writes content to a DAG-specific MEMORY.md.
 	SaveDAGMemory(ctx context.Context, dagName string, content string) error
 
-	// SaveAutopilotMemory writes content to an Autopilot-specific MEMORY.md.
-	SaveAutopilotMemory(ctx context.Context, autopilotName string, content string) error
+	// SaveControllerMemory writes content to a Controller-specific MEMORY.md.
+	SaveControllerMemory(ctx context.Context, controllerName string, content string) error
 
 	// MemoryDir returns the root memory directory path.
 	MemoryDir() string
 
-	// AutopilotMemoryPath returns the resolved path to an Autopilot-specific MEMORY.md.
-	AutopilotMemoryPath(autopilotName string) (string, error)
+	// ControllerMemoryPath returns the resolved path to a Controller-specific MEMORY.md.
+	ControllerMemoryPath(controllerName string) (string, error)
 
 	// ListDAGMemories returns the names of all DAGs that have memory files.
 	ListDAGMemories(ctx context.Context) ([]string, error)
@@ -74,16 +74,16 @@ type MemoryStore interface {
 	// DeleteDAGMemory removes a DAG-specific MEMORY.md file.
 	DeleteDAGMemory(ctx context.Context, dagName string) error
 
-	// DeleteAutopilotMemory removes an Autopilot-specific MEMORY.md file.
-	DeleteAutopilotMemory(ctx context.Context, autopilotName string) error
+	// DeleteControllerMemory removes a Controller-specific MEMORY.md file.
+	DeleteControllerMemory(ctx context.Context, controllerName string) error
 }
 
-// AutopilotDocumentStore provides access to per-Autopilot document files.
-type AutopilotDocumentStore interface {
-	LoadAutopilotDocument(ctx context.Context, autopilotName, document string) (string, error)
-	SaveAutopilotDocument(ctx context.Context, autopilotName, document, content string) error
-	DeleteAutopilotDocument(ctx context.Context, autopilotName, document string) error
-	AutopilotDocumentPath(autopilotName, document string) (string, error)
+// ControllerDocumentStore provides access to per-Controller document files.
+type ControllerDocumentStore interface {
+	LoadControllerDocument(ctx context.Context, controllerName, document string) (string, error)
+	SaveControllerDocument(ctx context.Context, controllerName, document, content string) error
+	DeleteControllerDocument(ctx context.Context, controllerName, document string) error
+	ControllerDocumentPath(controllerName, document string) (string, error)
 }
 
 // DAGMetadataStore resolves DAG metadata used by the agent API.

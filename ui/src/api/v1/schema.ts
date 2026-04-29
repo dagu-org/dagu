@@ -2492,7 +2492,7 @@ export interface paths {
         patch: operations["updateAgentSoul"];
         trace?: never;
     };
-    "/autopilot": {
+    "/controller": {
         parameters: {
             query?: never;
             header?: never;
@@ -2500,10 +2500,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List autopilot
-         * @description Returns all Autopilot definitions with current lifecycle and display state.
+         * List controller
+         * @description Returns all Controller definitions with current lifecycle and display state.
          */
-        get: operations["listAutopilot"];
+        get: operations["listController"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2512,7 +2512,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/autopilot/{name}": {
+    "/controller/{name}": {
         parameters: {
             query?: never;
             header?: never;
@@ -2520,23 +2520,23 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get autopilot detail
-         * @description Returns Autopilot detail including definition, runtime state, transcript, and recent runs.
+         * Get controller detail
+         * @description Returns Controller detail including definition, runtime state, transcript, and recent runs.
          */
-        get: operations["getAutopilot"];
+        get: operations["getController"];
         put?: never;
         post?: never;
         /**
-         * Delete autopilot
-         * @description Deletes an Autopilot definition and its runtime state.
+         * Delete controller
+         * @description Deletes a Controller definition and its runtime state.
          */
-        delete: operations["deleteAutopilot"];
+        delete: operations["deleteController"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/autopilot/{name}/spec": {
+    "/controller/{name}/spec": {
         parameters: {
             query?: never;
             header?: never;
@@ -2544,15 +2544,15 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get autopilot raw spec
-         * @description Returns the raw YAML specification for an Autopilot.
+         * Get controller raw spec
+         * @description Returns the raw YAML specification for a Controller.
          */
-        get: operations["getAutopilotSpec"];
+        get: operations["getControllerSpec"];
         /**
-         * Create or update autopilot spec
-         * @description Creates or updates an Autopilot definition from a raw YAML spec.
+         * Create or update controller spec
+         * @description Creates or updates a Controller definition from a raw YAML spec.
          */
-        put: operations["putAutopilotSpec"];
+        put: operations["putControllerSpec"];
         post?: never;
         delete?: never;
         options?: never;
@@ -2560,7 +2560,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/autopilot/{name}/documents/{document}": {
+    "/controller/{name}/documents/{document}": {
         parameters: {
             query?: never;
             header?: never;
@@ -2568,27 +2568,27 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get autopilot document
-         * @description Returns an Autopilot-specific document content and resolved path. Supported documents are MEMORY.md and SOUL.md.
+         * Get controller document
+         * @description Returns a Controller-specific document content and resolved path. Supported documents are MEMORY.md and SOUL.md.
          */
-        get: operations["getAutopilotDocument"];
+        get: operations["getControllerDocument"];
         /**
-         * Update autopilot document
-         * @description Creates or updates an Autopilot-specific document. Supported documents are MEMORY.md and SOUL.md.
+         * Update controller document
+         * @description Creates or updates a Controller-specific document. Supported documents are MEMORY.md and SOUL.md.
          */
-        put: operations["updateAutopilotDocument"];
+        put: operations["updateControllerDocument"];
         post?: never;
         /**
-         * Clear autopilot document
-         * @description Deletes an Autopilot-specific document. Supported documents are MEMORY.md and SOUL.md.
+         * Clear controller document
+         * @description Deletes a Controller-specific document. Supported documents are MEMORY.md and SOUL.md.
          */
-        delete: operations["deleteAutopilotDocument"];
+        delete: operations["deleteControllerDocument"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/autopilot/{name}/memory/reflect": {
+    "/controller/{name}/memory/reflect": {
         parameters: {
             query?: never;
             header?: never;
@@ -2598,17 +2598,17 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Reflect autopilot memory
-         * @description Generates a proposed MEMORY.md update from the Autopilot's current session transcript. The proposal is not saved automatically.
+         * Reflect controller memory
+         * @description Generates a proposed MEMORY.md update from the Controller's current session transcript. The proposal is not saved automatically.
          */
-        post: operations["reflectAutopilotMemory"];
+        post: operations["reflectControllerMemory"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/autopilot/{name}/start": {
+    "/controller/{name}/start": {
         parameters: {
             query?: never;
             header?: never;
@@ -2618,17 +2618,17 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Start autopilot task
-         * @description Starts an Autopilot task cycle.
+         * Start controller task
+         * @description Starts a Controller task cycle.
          */
-        post: operations["startAutopilot"];
+        post: operations["startController"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/autopilot/{name}/pause": {
+    "/controller/{name}/pause": {
         parameters: {
             query?: never;
             header?: never;
@@ -2638,17 +2638,17 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Pause autopilot
-         * @description Pauses Autopilot orchestration without deleting the active task.
+         * Pause controller
+         * @description Pauses Controller orchestration without deleting the active task.
          */
-        post: operations["pauseAutopilot"];
+        post: operations["pauseController"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/autopilot/{name}/resume": {
+    "/controller/{name}/resume": {
         parameters: {
             query?: never;
             header?: never;
@@ -2658,17 +2658,17 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Resume autopilot
-         * @description Resumes a paused Autopilot.
+         * Resume controller
+         * @description Resumes a paused Controller.
          */
-        post: operations["resumeAutopilot"];
+        post: operations["resumeController"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/autopilot/{name}/message": {
+    "/controller/{name}/message": {
         parameters: {
             query?: never;
             header?: never;
@@ -2678,17 +2678,17 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Send operator message to autopilot
-         * @description Adds an operator message to the current Autopilot task.
+         * Send operator message to controller
+         * @description Adds an operator message to the current Controller task.
          */
-        post: operations["messageAutopilot"];
+        post: operations["messageController"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/autopilot/{name}/tasks": {
+    "/controller/{name}/tasks": {
         parameters: {
             query?: never;
             header?: never;
@@ -2698,17 +2698,17 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Create autopilot task
-         * @description Creates a new persistent task template for an Autopilot.
+         * Create controller task
+         * @description Creates a new persistent task template for a Controller.
          */
-        post: operations["createAutopilotTask"];
+        post: operations["createControllerTask"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/autopilot/{name}/tasks/reorder": {
+    "/controller/{name}/tasks/reorder": {
         parameters: {
             query?: never;
             header?: never;
@@ -2718,17 +2718,17 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Reorder autopilot tasks
-         * @description Reorders the persistent task templates for an Autopilot.
+         * Reorder controller tasks
+         * @description Reorders the persistent task templates for a Controller.
          */
-        post: operations["reorderAutopilotTasks"];
+        post: operations["reorderControllerTasks"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/autopilot/{name}/tasks/{taskId}": {
+    "/controller/{name}/tasks/{taskId}": {
         parameters: {
             query?: never;
             header?: never;
@@ -2739,20 +2739,20 @@ export interface paths {
         put?: never;
         post?: never;
         /**
-         * Delete autopilot task
-         * @description Deletes a persistent task template from an Autopilot.
+         * Delete controller task
+         * @description Deletes a persistent task template from a Controller.
          */
-        delete: operations["deleteAutopilotTask"];
+        delete: operations["deleteControllerTask"];
         options?: never;
         head?: never;
         /**
-         * Update autopilot task
-         * @description Updates an Autopilot task template description and, when requested, the current cycle task state.
+         * Update controller task
+         * @description Updates a Controller task template description and, when requested, the current cycle task state.
          */
-        patch: operations["updateAutopilotTask"];
+        patch: operations["updateControllerTask"];
         trace?: never;
     };
-    "/autopilot/{name}/response": {
+    "/controller/{name}/response": {
         parameters: {
             query?: never;
             header?: never;
@@ -2762,17 +2762,17 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Respond to autopilot prompt
-         * @description Submits a human response for an Autopilot prompt.
+         * Respond to controller prompt
+         * @description Submits a human response for a Controller prompt.
          */
-        post: operations["respondAutopilot"];
+        post: operations["respondController"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/autopilot/{name}/rename": {
+    "/controller/{name}/rename": {
         parameters: {
             query?: never;
             header?: never;
@@ -2782,17 +2782,17 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Rename autopilot
-         * @description Renames an Autopilot definition and preserves its runtime transcript.
+         * Rename controller
+         * @description Renames a Controller definition and preserves its runtime transcript.
          */
-        post: operations["renameAutopilot"];
+        post: operations["renameController"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/autopilot/{name}/duplicate": {
+    "/controller/{name}/duplicate": {
         parameters: {
             query?: never;
             header?: never;
@@ -2802,17 +2802,17 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Duplicate autopilot
-         * @description Creates a new Autopilot definition by copying an existing one.
+         * Duplicate controller
+         * @description Creates a new Controller definition by copying an existing one.
          */
-        post: operations["duplicateAutopilot"];
+        post: operations["duplicateController"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/autopilot/{name}/reset": {
+    "/controller/{name}/reset": {
         parameters: {
             query?: never;
             header?: never;
@@ -2822,10 +2822,10 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Reset autopilot state
-         * @description Resets Autopilot runtime state back to idle while keeping the definition.
+         * Reset controller state
+         * @description Resets Controller runtime state back to idle while keeping the definition.
          */
-        post: operations["resetAutopilot"];
+        post: operations["resetController"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3253,9 +3253,9 @@ export interface components {
              * @description When the event was recorded by the producer
              */
             recordedAt: string;
-            /** @description High-level event kind (e.g., dag_run, autopilot, llm_usage) */
+            /** @description High-level event kind (e.g., dag_run, controller, llm_usage) */
             kind: string;
-            /** @description Specific event type (e.g., dag.run.failed, autopilot.error) */
+            /** @description Specific event type (e.g., dag.run.failed, controller.error) */
             type: string;
             /** @description Service that produced the event */
             sourceService: string;
@@ -3267,12 +3267,12 @@ export interface components {
             dagRunId?: string;
             /** @description Attempt ID for DAG-run events */
             attemptId?: string;
-            /** @description Autopilot name for autopilot events */
-            autopilotName?: string;
-            /** @description Autopilot kind for autopilot events */
-            autopilotKind?: string;
-            /** @description Autopilot cycle ID for autopilot events */
-            autopilotCycleId?: string;
+            /** @description Controller name for controller events */
+            controllerName?: string;
+            /** @description Controller kind for controller events */
+            controllerKind?: string;
+            /** @description Controller cycle ID for controller events */
+            controllerCycleId?: string;
             /** @description Session ID for LLM usage events */
             sessionId?: string;
             /** @description User ID associated with the event */
@@ -3730,14 +3730,14 @@ export interface components {
              * @enum {string}
              */
             status: SchedulerInstanceStatus;
-            autopilotController?: components["schemas"]["AutopilotControllerStatus"];
+            controllerStatus?: components["schemas"]["ControllerStatus"];
             /** @description RFC3339 timestamp when scheduler started */
             startedAt: string;
         };
-        /** @description Scheduler-owned Autopilot controller readiness */
-        AutopilotControllerStatus: {
+        /** @description Scheduler-owned Controller readiness */
+        ControllerStatus: {
             /** @enum {string} */
-            state: AutopilotControllerStatusState;
+            state: ControllerStatusState;
             message?: string;
         };
         /** @description Response containing status of all coordinator instances */
@@ -5189,19 +5189,19 @@ export interface components {
             content: string;
         };
         /**
-         * @description Autopilot document file name
+         * @description Controller document file name
          * @enum {string}
          */
-        AutopilotDocument: AutopilotDocument;
-        /** @description Autopilot-specific document content */
-        AutopilotDocumentResponse: {
+        ControllerDocument: ControllerDocument;
+        /** @description Controller-specific document content */
+        ControllerDocumentResponse: {
             name: string;
-            document: components["schemas"]["AutopilotDocument"];
+            document: components["schemas"]["ControllerDocument"];
             content: string;
             path: string;
         };
-        /** @description Generated Autopilot MEMORY.md update proposal */
-        AutopilotMemoryReflectionResponse: {
+        /** @description Generated Controller MEMORY.md update proposal */
+        ControllerMemoryReflectionResponse: {
             name: string;
             /** @description Current MEMORY.md content before applying the reflection */
             currentContent: string;
@@ -5382,27 +5382,27 @@ export interface components {
             status: string;
         };
         /**
-         * @description Autopilot lifecycle state
+         * @description Controller lifecycle state
          * @enum {string}
          */
-        AutopilotLifecycleState: AutopilotLifecycleState;
+        ControllerLifecycleState: ControllerLifecycleState;
         /**
-         * @description Compatibility Autopilot kind. Runtime behavior is configured through explicit fields such as resetOnFinish.
+         * @description Compatibility Controller kind. Runtime behavior is configured through explicit fields such as resetOnFinish.
          * @enum {string}
          */
-        AutopilotKind: AutopilotKind;
+        ControllerKind: ControllerKind;
         /**
-         * @description User-facing Autopilot status
+         * @description User-facing Controller status
          * @enum {string}
          */
-        AutopilotDisplayStatus: AutopilotDisplayStatus;
+        ControllerDisplayStatus: ControllerDisplayStatus;
         /**
-         * @description Why an Autopilot is waiting
+         * @description Why a Controller is waiting
          * @enum {string}
          */
-        AutopilotWaitingReason: AutopilotWaitingReason;
+        ControllerWaitingReason: ControllerWaitingReason;
         /** @description Allowlisted DAG names and tags */
-        AutopilotAllowedDAGs: {
+        ControllerAllowedDAGs: {
             names?: string[];
             tags?: string[];
         };
@@ -5410,12 +5410,12 @@ export interface components {
          * @description Checklist task state
          * @enum {string}
          */
-        AutopilotTaskState: AutopilotTaskState;
-        /** @description Runtime current-cycle task for an Autopilot */
-        AutopilotTask: {
+        ControllerTaskState: ControllerTaskState;
+        /** @description Runtime current-cycle task for a Controller */
+        ControllerTask: {
             id: string;
             description: string;
-            state: components["schemas"]["AutopilotTaskState"];
+            state: components["schemas"]["ControllerTaskState"];
             /** Format: date-time */
             createdAt?: string;
             createdBy?: string;
@@ -5426,8 +5426,8 @@ export interface components {
             doneAt?: string;
             doneBy?: string;
         };
-        /** @description Persistent task template for an Autopilot */
-        AutopilotTaskTemplate: {
+        /** @description Persistent task template for a Controller */
+        ControllerTaskTemplate: {
             id: string;
             description: string;
             /** Format: date-time */
@@ -5437,16 +5437,16 @@ export interface components {
             updatedAt?: string;
             updatedBy?: string;
         };
-        /** @description Agent runtime configuration for an Autopilot definition */
-        AutopilotAgentConfig: {
+        /** @description Agent runtime configuration for a Controller definition */
+        ControllerAgentConfig: {
             model?: string;
             soul?: string;
             safeMode?: boolean;
         };
-        /** @description Autopilot definition */
-        AutopilotDefinition: {
+        /** @description Controller definition */
+        ControllerDefinition: {
             name: string;
-            kind: components["schemas"]["AutopilotKind"];
+            kind: components["schemas"]["ControllerKind"];
             nickname?: string;
             iconUrl?: string;
             description?: string;
@@ -5456,12 +5456,12 @@ export interface components {
             resetOnFinish?: boolean;
             schedule?: string[];
             tags?: string[];
-            allowedDAGs?: components["schemas"]["AutopilotAllowedDAGs"];
-            agent?: components["schemas"]["AutopilotAgentConfig"];
+            allowedDAGs?: components["schemas"]["ControllerAllowedDAGs"];
+            agent?: components["schemas"]["ControllerAgentConfig"];
             disabled?: boolean;
         };
-        /** @description Pending human prompt for an Autopilot */
-        AutopilotPrompt: {
+        /** @description Pending human prompt for a Controller */
+        ControllerPrompt: {
             id: string;
             question: string;
             options?: components["schemas"]["AgentUserPromptOption"][];
@@ -5470,16 +5470,16 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
         };
-        /** @description Recorded human response for an Autopilot prompt */
-        AutopilotPromptResponse: {
+        /** @description Recorded human response for a Controller prompt */
+        ControllerPromptResponse: {
             promptId: string;
             selectedOptionIds?: string[];
             freeTextResponse?: string;
             /** Format: date-time */
             respondedAt: string;
         };
-        /** @description Queued message to be delivered on the next Autopilot turn */
-        AutopilotPendingTurnMessage: {
+        /** @description Queued message to be delivered on the next Controller turn */
+        ControllerPendingTurnMessage: {
             id: string;
             kind: string;
             message: string;
@@ -5487,12 +5487,12 @@ export interface components {
             createdAt: string;
         };
         /** @description Reference to a tracked child DAG run */
-        AutopilotRunRef: {
+        ControllerRunRef: {
             name: string;
             id: string;
         };
-        /** @description Summary of a child DAG run launched by an Autopilot */
-        AutopilotRunSummary: {
+        /** @description Summary of a child DAG run launched by a Controller */
+        ControllerRunSummary: {
             name: string;
             dagRunId: string;
             status: components["schemas"]["StatusLabel"];
@@ -5503,16 +5503,16 @@ export interface components {
             createdAt?: string;
             error?: string;
         };
-        /** @description Resolved DAG allowed in the current Autopilot */
-        AutopilotAllowedDAGInfo: {
+        /** @description Resolved DAG allowed in the current Controller */
+        ControllerAllowedDAGInfo: {
             name: string;
             description?: string;
             tags?: string[];
         };
-        /** @description Current runtime state for an Autopilot */
-        AutopilotState: {
-            state: components["schemas"]["AutopilotLifecycleState"];
-            displayStatus?: components["schemas"]["AutopilotDisplayStatus"];
+        /** @description Current runtime state for a Controller */
+        ControllerState: {
+            state: components["schemas"]["ControllerLifecycleState"];
+            displayStatus?: components["schemas"]["ControllerDisplayStatus"];
             busy?: boolean;
             needsInput?: boolean;
             instruction?: string;
@@ -5522,15 +5522,15 @@ export interface components {
             /** Format: date-time */
             activatedAt?: string;
             activatedBy?: string;
-            tasks?: components["schemas"]["AutopilotTask"][];
+            tasks?: components["schemas"]["ControllerTask"][];
             sessionId?: string;
-            currentRunRef?: components["schemas"]["AutopilotRunRef"];
-            lastRunRef?: components["schemas"]["AutopilotRunRef"];
+            currentRunRef?: components["schemas"]["ControllerRunRef"];
+            lastRunRef?: components["schemas"]["ControllerRunRef"];
             currentCycleId?: string;
-            waitingReason?: components["schemas"]["AutopilotWaitingReason"];
-            pendingPrompt?: components["schemas"]["AutopilotPrompt"];
-            pendingResponse?: components["schemas"]["AutopilotPromptResponse"];
-            pendingTurnMessages?: components["schemas"]["AutopilotPendingTurnMessage"][];
+            waitingReason?: components["schemas"]["ControllerWaitingReason"];
+            pendingPrompt?: components["schemas"]["ControllerPrompt"];
+            pendingResponse?: components["schemas"]["ControllerPromptResponse"];
+            pendingTurnMessages?: components["schemas"]["ControllerPendingTurnMessage"][];
             /** Format: date-time */
             startRequestedAt?: string;
             /** Format: date-time */
@@ -5547,10 +5547,10 @@ export interface components {
             lastSummary?: string;
             lastError?: string;
         };
-        /** @description Summary row for an Autopilot */
-        AutopilotSummary: {
+        /** @description Summary row for a Controller */
+        ControllerSummary: {
             name: string;
-            kind: components["schemas"]["AutopilotKind"];
+            kind: components["schemas"]["ControllerKind"];
             nickname?: string;
             iconUrl?: string;
             description?: string;
@@ -5559,69 +5559,69 @@ export interface components {
             resetOnFinish?: boolean;
             tags?: string[];
             instruction?: string;
-            state: components["schemas"]["AutopilotLifecycleState"];
-            displayStatus?: components["schemas"]["AutopilotDisplayStatus"];
+            state: components["schemas"]["ControllerLifecycleState"];
+            displayStatus?: components["schemas"]["ControllerDisplayStatus"];
             busy?: boolean;
             needsInput?: boolean;
             disabled?: boolean;
-            currentRun?: components["schemas"]["AutopilotRunSummary"];
+            currentRun?: components["schemas"]["ControllerRunSummary"];
             openTaskCount?: number;
             doneTaskCount?: number;
             nextTaskDescription?: string;
             /** Format: date-time */
             lastUpdatedAt?: string;
-            autopilotController?: components["schemas"]["AutopilotControllerStatus"];
+            controllerStatus?: components["schemas"]["ControllerStatus"];
         };
-        /** @description List of Autopilot */
-        AutopilotListResponse: {
-            autopilot: components["schemas"]["AutopilotSummary"][];
+        /** @description List of Controller */
+        ControllerListResponse: {
+            controller: components["schemas"]["ControllerSummary"][];
         };
-        /** @description Autopilot detail response */
-        AutopilotDetailResponse: {
-            definition: components["schemas"]["AutopilotDefinition"];
-            state: components["schemas"]["AutopilotState"];
-            allowedDags: components["schemas"]["AutopilotAllowedDAGInfo"][];
-            taskTemplates?: components["schemas"]["AutopilotTaskTemplate"][];
-            currentRun?: components["schemas"]["AutopilotRunSummary"];
-            recentRuns?: components["schemas"]["AutopilotRunSummary"][];
+        /** @description Controller detail response */
+        ControllerDetailResponse: {
+            definition: components["schemas"]["ControllerDefinition"];
+            state: components["schemas"]["ControllerState"];
+            allowedDags: components["schemas"]["ControllerAllowedDAGInfo"][];
+            taskTemplates?: components["schemas"]["ControllerTaskTemplate"][];
+            currentRun?: components["schemas"]["ControllerRunSummary"];
+            recentRuns?: components["schemas"]["ControllerRunSummary"][];
             messages?: components["schemas"]["AgentMessage"][];
-            autopilotController?: components["schemas"]["AutopilotControllerStatus"];
+            controllerStatus?: components["schemas"]["ControllerStatus"];
         };
-        /** @description Raw Autopilot YAML spec */
-        AutopilotSpecResponse: {
+        /** @description Raw Controller YAML spec */
+        ControllerSpecResponse: {
             spec: string;
         };
-        /** @description Request body for creating or updating an Autopilot from raw YAML */
-        AutopilotSpecUpsertRequest: {
+        /** @description Request body for creating or updating a Controller from raw YAML */
+        ControllerSpecUpsertRequest: {
             spec: string;
         };
-        /** @description Request body for starting an Autopilot task */
-        AutopilotStartRequest: {
+        /** @description Request body for starting a Controller task */
+        ControllerStartRequest: {
             instruction?: string;
         };
-        /** @description Request body for creating an Autopilot checklist task */
-        AutopilotTaskCreateRequest: {
+        /** @description Request body for creating a Controller checklist task */
+        ControllerTaskCreateRequest: {
             description: string;
         };
-        /** @description Request body for updating an Autopilot checklist task */
-        AutopilotTaskUpdateRequest: {
+        /** @description Request body for updating a Controller checklist task */
+        ControllerTaskUpdateRequest: {
             description?: string;
             done?: boolean;
         };
-        /** @description Request body for reordering Autopilot checklist tasks */
-        AutopilotTaskReorderRequest: {
+        /** @description Request body for reordering Controller checklist tasks */
+        ControllerTaskReorderRequest: {
             taskIds: string[];
         };
         /** @description Request body for an operator message */
-        AutopilotOperatorMessageRequest: {
+        ControllerOperatorMessageRequest: {
             message: string;
         };
-        /** @description Request body for renaming an Autopilot */
-        AutopilotRenameRequest: {
+        /** @description Request body for renaming a Controller */
+        ControllerRenameRequest: {
             newName: string;
         };
-        /** @description Request body for duplicating an Autopilot */
-        AutopilotDuplicateRequest: {
+        /** @description Request body for duplicating a Controller */
+        ControllerDuplicateRequest: {
             newName: string;
         };
         CreateRemoteNodeRequest: {
@@ -5791,10 +5791,10 @@ export interface components {
         SoulId: string;
         /** @description The unique identifier of the remote node */
         RemoteNodeId: string;
-        /** @description The Autopilot name */
-        AutopilotName: string;
-        /** @description Autopilot document file name */
-        AutopilotDocument: components["schemas"]["AutopilotDocument"];
+        /** @description The Controller name */
+        ControllerName: string;
+        /** @description Controller document file name */
+        ControllerDocument: components["schemas"]["ControllerDocument"];
     };
     requestBodies: never;
     headers: never;
@@ -11127,9 +11127,9 @@ export interface operations {
             query?: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description Filter by event kind (e.g., dag_run, autopilot, llm_usage) */
+                /** @description Filter by event kind (e.g., dag_run, controller, llm_usage) */
                 kind?: string;
-                /** @description Filter by event type (e.g., dag.run.failed, autopilot.needs_input, llm.usage.recorded) */
+                /** @description Filter by event type (e.g., dag.run.failed, controller.needs_input, llm.usage.recorded) */
                 type?: string;
                 /** @description Filter by DAG name */
                 dagName?: string;
@@ -11137,8 +11137,8 @@ export interface operations {
                 dagRunId?: string;
                 /** @description Filter by attempt ID */
                 attemptId?: string;
-                /** @description Filter by autopilot name */
-                autopilotName?: string;
+                /** @description Filter by controller name */
+                controllerName?: string;
                 /** @description Filter by session ID */
                 sessionId?: string;
                 /** @description Filter by user ID */
@@ -13449,7 +13449,7 @@ export interface operations {
             };
         };
     };
-    listAutopilot: {
+    listController: {
         parameters: {
             query?: never;
             header?: never;
@@ -13458,13 +13458,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description List of autopilot */
+            /** @description List of controller */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AutopilotListResponse"];
+                    "application/json": components["schemas"]["ControllerListResponse"];
                 };
             };
             /** @description Not authenticated */
@@ -13487,25 +13487,25 @@ export interface operations {
             };
         };
     };
-    getAutopilot: {
+    getController: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Autopilot name */
-                name: components["parameters"]["AutopilotName"];
+                /** @description The Controller name */
+                name: components["parameters"]["ControllerName"];
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Autopilot detail */
+            /** @description Controller detail */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AutopilotDetailResponse"];
+                    "application/json": components["schemas"]["ControllerDetailResponse"];
                 };
             };
             /** @description Not authenticated */
@@ -13517,7 +13517,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Autopilot not found */
+            /** @description Controller not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -13537,19 +13537,19 @@ export interface operations {
             };
         };
     };
-    deleteAutopilot: {
+    deleteController: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Autopilot name */
-                name: components["parameters"]["AutopilotName"];
+                /** @description The Controller name */
+                name: components["parameters"]["ControllerName"];
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Autopilot deleted */
+            /** @description Controller deleted */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -13574,7 +13574,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Autopilot not found */
+            /** @description Controller not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -13594,25 +13594,25 @@ export interface operations {
             };
         };
     };
-    getAutopilotSpec: {
+    getControllerSpec: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Autopilot name */
-                name: components["parameters"]["AutopilotName"];
+                /** @description The Controller name */
+                name: components["parameters"]["ControllerName"];
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Autopilot raw spec */
+            /** @description Controller raw spec */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AutopilotSpecResponse"];
+                    "application/json": components["schemas"]["ControllerSpecResponse"];
                 };
             };
             /** @description Not authenticated */
@@ -13624,7 +13624,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Autopilot not found */
+            /** @description Controller not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -13644,23 +13644,23 @@ export interface operations {
             };
         };
     };
-    putAutopilotSpec: {
+    putControllerSpec: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Autopilot name */
-                name: components["parameters"]["AutopilotName"];
+                /** @description The Controller name */
+                name: components["parameters"]["ControllerName"];
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AutopilotSpecUpsertRequest"];
+                "application/json": components["schemas"]["ControllerSpecUpsertRequest"];
             };
         };
         responses: {
-            /** @description Autopilot spec saved */
+            /** @description Controller spec saved */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -13694,7 +13694,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Autopilot controller is not ready */
+            /** @description Controller is not ready */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -13714,27 +13714,27 @@ export interface operations {
             };
         };
     };
-    getAutopilotDocument: {
+    getControllerDocument: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Autopilot name */
-                name: components["parameters"]["AutopilotName"];
-                /** @description Autopilot document file name */
-                document: components["parameters"]["AutopilotDocument"];
+                /** @description The Controller name */
+                name: components["parameters"]["ControllerName"];
+                /** @description Controller document file name */
+                document: components["parameters"]["ControllerDocument"];
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Autopilot document */
+            /** @description Controller document */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AutopilotDocumentResponse"];
+                    "application/json": components["schemas"]["ControllerDocumentResponse"];
                 };
             };
             /** @description Not authenticated */
@@ -13746,7 +13746,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Autopilot not found */
+            /** @description Controller not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -13766,15 +13766,15 @@ export interface operations {
             };
         };
     };
-    updateAutopilotDocument: {
+    updateControllerDocument: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Autopilot name */
-                name: components["parameters"]["AutopilotName"];
-                /** @description Autopilot document file name */
-                document: components["parameters"]["AutopilotDocument"];
+                /** @description The Controller name */
+                name: components["parameters"]["ControllerName"];
+                /** @description Controller document file name */
+                document: components["parameters"]["ControllerDocument"];
             };
             cookie?: never;
         };
@@ -13784,13 +13784,13 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Autopilot document saved */
+            /** @description Controller document saved */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AutopilotDocumentResponse"];
+                    "application/json": components["schemas"]["ControllerDocumentResponse"];
                 };
             };
             /** @description Invalid request */
@@ -13820,7 +13820,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Autopilot not found */
+            /** @description Controller not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -13840,21 +13840,21 @@ export interface operations {
             };
         };
     };
-    deleteAutopilotDocument: {
+    deleteControllerDocument: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Autopilot name */
-                name: components["parameters"]["AutopilotName"];
-                /** @description Autopilot document file name */
-                document: components["parameters"]["AutopilotDocument"];
+                /** @description The Controller name */
+                name: components["parameters"]["ControllerName"];
+                /** @description Controller document file name */
+                document: components["parameters"]["ControllerDocument"];
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Autopilot document cleared */
+            /** @description Controller document cleared */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -13879,7 +13879,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Autopilot not found */
+            /** @description Controller not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -13899,25 +13899,25 @@ export interface operations {
             };
         };
     };
-    reflectAutopilotMemory: {
+    reflectControllerMemory: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Autopilot name */
-                name: components["parameters"]["AutopilotName"];
+                /** @description The Controller name */
+                name: components["parameters"]["ControllerName"];
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Autopilot memory reflection proposal */
+            /** @description Controller memory reflection proposal */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AutopilotMemoryReflectionResponse"];
+                    "application/json": components["schemas"]["ControllerMemoryReflectionResponse"];
                 };
             };
             /** @description Invalid request */
@@ -13947,7 +13947,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Autopilot or agent feature not found */
+            /** @description Controller or agent feature not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -13967,23 +13967,23 @@ export interface operations {
             };
         };
     };
-    startAutopilot: {
+    startController: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Autopilot name */
-                name: components["parameters"]["AutopilotName"];
+                /** @description The Controller name */
+                name: components["parameters"]["ControllerName"];
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AutopilotStartRequest"];
+                "application/json": components["schemas"]["ControllerStartRequest"];
             };
         };
         responses: {
-            /** @description Autopilot started */
+            /** @description Controller started */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -14017,7 +14017,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Autopilot controller is not ready */
+            /** @description Controller is not ready */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -14037,19 +14037,19 @@ export interface operations {
             };
         };
     };
-    pauseAutopilot: {
+    pauseController: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Autopilot name */
-                name: components["parameters"]["AutopilotName"];
+                /** @description The Controller name */
+                name: components["parameters"]["ControllerName"];
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Autopilot paused */
+            /** @description Controller paused */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -14083,7 +14083,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Autopilot controller is not ready */
+            /** @description Controller is not ready */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -14103,19 +14103,19 @@ export interface operations {
             };
         };
     };
-    resumeAutopilot: {
+    resumeController: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Autopilot name */
-                name: components["parameters"]["AutopilotName"];
+                /** @description The Controller name */
+                name: components["parameters"]["ControllerName"];
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Autopilot resumed */
+            /** @description Controller resumed */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -14149,7 +14149,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Autopilot controller is not ready */
+            /** @description Controller is not ready */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -14169,19 +14169,19 @@ export interface operations {
             };
         };
     };
-    messageAutopilot: {
+    messageController: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Autopilot name */
-                name: components["parameters"]["AutopilotName"];
+                /** @description The Controller name */
+                name: components["parameters"]["ControllerName"];
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AutopilotOperatorMessageRequest"];
+                "application/json": components["schemas"]["ControllerOperatorMessageRequest"];
             };
         };
         responses: {
@@ -14219,7 +14219,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Autopilot controller is not ready */
+            /** @description Controller is not ready */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -14239,29 +14239,29 @@ export interface operations {
             };
         };
     };
-    createAutopilotTask: {
+    createControllerTask: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Autopilot name */
-                name: components["parameters"]["AutopilotName"];
+                /** @description The Controller name */
+                name: components["parameters"]["ControllerName"];
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AutopilotTaskCreateRequest"];
+                "application/json": components["schemas"]["ControllerTaskCreateRequest"];
             };
         };
         responses: {
-            /** @description Autopilot task created */
+            /** @description Controller task created */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AutopilotTask"];
+                    "application/json": components["schemas"]["ControllerTask"];
                 };
             };
             /** @description Invalid request */
@@ -14302,23 +14302,23 @@ export interface operations {
             };
         };
     };
-    reorderAutopilotTasks: {
+    reorderControllerTasks: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Autopilot name */
-                name: components["parameters"]["AutopilotName"];
+                /** @description The Controller name */
+                name: components["parameters"]["ControllerName"];
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AutopilotTaskReorderRequest"];
+                "application/json": components["schemas"]["ControllerTaskReorderRequest"];
             };
         };
         responses: {
-            /** @description Autopilot tasks reordered */
+            /** @description Controller tasks reordered */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -14363,20 +14363,20 @@ export interface operations {
             };
         };
     };
-    deleteAutopilotTask: {
+    deleteControllerTask: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Autopilot name */
-                name: components["parameters"]["AutopilotName"];
+                /** @description The Controller name */
+                name: components["parameters"]["ControllerName"];
                 taskId: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Autopilot task deleted */
+            /** @description Controller task deleted */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -14421,30 +14421,30 @@ export interface operations {
             };
         };
     };
-    updateAutopilotTask: {
+    updateControllerTask: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Autopilot name */
-                name: components["parameters"]["AutopilotName"];
+                /** @description The Controller name */
+                name: components["parameters"]["ControllerName"];
                 taskId: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AutopilotTaskUpdateRequest"];
+                "application/json": components["schemas"]["ControllerTaskUpdateRequest"];
             };
         };
         responses: {
-            /** @description Autopilot task updated */
+            /** @description Controller task updated */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AutopilotTask"];
+                    "application/json": components["schemas"]["ControllerTask"];
                 };
             };
             /** @description Invalid request */
@@ -14485,13 +14485,13 @@ export interface operations {
             };
         };
     };
-    respondAutopilot: {
+    respondController: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Autopilot name */
-                name: components["parameters"]["AutopilotName"];
+                /** @description The Controller name */
+                name: components["parameters"]["ControllerName"];
             };
             cookie?: never;
         };
@@ -14546,23 +14546,23 @@ export interface operations {
             };
         };
     };
-    renameAutopilot: {
+    renameController: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Autopilot name */
-                name: components["parameters"]["AutopilotName"];
+                /** @description The Controller name */
+                name: components["parameters"]["ControllerName"];
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AutopilotRenameRequest"];
+                "application/json": components["schemas"]["ControllerRenameRequest"];
             };
         };
         responses: {
-            /** @description Autopilot renamed */
+            /** @description Controller renamed */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -14596,7 +14596,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Autopilot not found */
+            /** @description Controller not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -14605,7 +14605,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Autopilot controller is not ready */
+            /** @description Controller is not ready */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -14625,23 +14625,23 @@ export interface operations {
             };
         };
     };
-    duplicateAutopilot: {
+    duplicateController: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Autopilot name */
-                name: components["parameters"]["AutopilotName"];
+                /** @description The Controller name */
+                name: components["parameters"]["ControllerName"];
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AutopilotDuplicateRequest"];
+                "application/json": components["schemas"]["ControllerDuplicateRequest"];
             };
         };
         responses: {
-            /** @description Autopilot duplicated */
+            /** @description Controller duplicated */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -14675,7 +14675,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Autopilot not found */
+            /** @description Controller not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -14695,19 +14695,19 @@ export interface operations {
             };
         };
     };
-    resetAutopilot: {
+    resetController: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description The Autopilot name */
-                name: components["parameters"]["AutopilotName"];
+                /** @description The Controller name */
+                name: components["parameters"]["ControllerName"];
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Autopilot state reset */
+            /** @description Controller state reset */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -14741,7 +14741,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Autopilot not found */
+            /** @description Controller not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -16150,7 +16150,7 @@ export enum StatusLabel {
     rejected = "rejected"
 }
 export enum TriggerType {
-    autopilot = "autopilot",
+    controller = "controller",
     unknown = "unknown",
     scheduler = "scheduler",
     manual = "manual",
@@ -16188,7 +16188,7 @@ export enum SchedulerInstanceStatus {
     inactive = "inactive",
     unknown = "unknown"
 }
-export enum AutopilotControllerStatusState {
+export enum ControllerStatusState {
     ready = "ready",
     disabled = "disabled",
     unavailable = "unavailable",
@@ -16350,7 +16350,7 @@ export enum ModelPresetThinkingEffort {
     high = "high",
     xhigh = "xhigh"
 }
-export enum AutopilotDocument {
+export enum ControllerDocument {
     MEMORY_md = "MEMORY.md",
     SOUL_md = "SOUL.md"
 }
@@ -16369,28 +16369,28 @@ export enum AgentDelegateSnapshotStatus {
     running = "running",
     completed = "completed"
 }
-export enum AutopilotLifecycleState {
+export enum ControllerLifecycleState {
     idle = "idle",
     running = "running",
     waiting = "waiting",
     paused = "paused",
     finished = "finished"
 }
-export enum AutopilotKind {
+export enum ControllerKind {
     workflow = "workflow",
     service = "service"
 }
-export enum AutopilotDisplayStatus {
+export enum ControllerDisplayStatus {
     idle = "idle",
     running = "running",
     paused = "paused",
     finished = "finished"
 }
-export enum AutopilotWaitingReason {
+export enum ControllerWaitingReason {
     human_input = "human_input",
     dag_wait = "dag_wait"
 }
-export enum AutopilotTaskState {
+export enum ControllerTaskState {
     open = "open",
     done = "done"
 }

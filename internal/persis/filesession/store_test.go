@@ -117,7 +117,7 @@ func TestNew_WithExistingSessions(t *testing.T) {
 	assert.Equal(t, "sess1", retrieved.ID)
 }
 
-func TestNew_LoadsLegacyAutomataName(t *testing.T) {
+func TestNew_LoadsControllerName(t *testing.T) {
 	t.Parallel()
 
 	baseDir := t.TempDir()
@@ -126,7 +126,7 @@ func TestNew_LoadsLegacyAutomataName(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(userDir, "sess1.json"), []byte(`{
   "id": "sess1",
   "user_id": "user1",
-  "automata_name": "legacy_ops",
+  "controller_name": "service_ops",
   "created_at": "2026-04-29T00:00:00Z",
   "updated_at": "2026-04-29T00:00:00Z",
   "messages": []
@@ -137,7 +137,7 @@ func TestNew_LoadsLegacyAutomataName(t *testing.T) {
 
 	sess, err := store.GetSession(context.Background(), "sess1")
 	require.NoError(t, err)
-	assert.Equal(t, "legacy_ops", sess.AutopilotName)
+	assert.Equal(t, "service_ops", sess.ControllerName)
 }
 
 func TestValidateSession(t *testing.T) {
@@ -612,7 +612,7 @@ func TestStore_GetMessages_DiscoversSessionCreatedByAnotherStore(t *testing.T) {
 	writer, err := New(baseDir)
 	require.NoError(t, err)
 
-	require.NoError(t, writer.CreateSession(ctx, createTestSession("sess1", "__autopilot__:Zenith")))
+	require.NoError(t, writer.CreateSession(ctx, createTestSession("sess1", "__controller__:Zenith")))
 	require.NoError(t, writer.AddMessage(ctx, "sess1", createTestMessage("msg1", "hello from scheduler", 1, agent.MessageTypeUser)))
 
 	msgs, err := reader.GetMessages(ctx, "sess1")

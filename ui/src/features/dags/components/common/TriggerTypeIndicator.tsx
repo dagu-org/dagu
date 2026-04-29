@@ -2,7 +2,7 @@ import { TriggerType } from '@/api/v1/schema';
 import type { ReactElement } from 'react';
 
 export const triggerTypeLabels: Record<TriggerType, string> = {
-  autopilot: 'Autopilot',
+  controller: 'Controller',
   scheduler: 'Scheduled',
   manual: 'Manual',
   webhook: 'Webhook',

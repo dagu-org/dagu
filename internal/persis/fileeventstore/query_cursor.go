@@ -70,9 +70,9 @@ func queryFilterHash(filter eventstore.QueryFilter) string {
 		DAGName          string `json:"dag_name,omitempty"`
 		DAGRunID         string `json:"dag_run_id,omitempty"`
 		AttemptID        string `json:"attempt_id,omitempty"`
-		AutopilotName    string `json:"autopilot_name,omitempty"`
-		AutopilotKind    string `json:"autopilot_kind,omitempty"`
-		AutopilotCycleID string `json:"autopilot_cycle_id,omitempty"`
+		ControllerName    string `json:"controller_name,omitempty"`
+		ControllerKind    string `json:"controller_kind,omitempty"`
+		ControllerCycleID string `json:"controller_cycle_id,omitempty"`
 		SessionID        string `json:"session_id,omitempty"`
 		UserID           string `json:"user_id,omitempty"`
 		Model            string `json:"model,omitempty"`
@@ -85,9 +85,9 @@ func queryFilterHash(filter eventstore.QueryFilter) string {
 		DAGName:          filter.DAGName,
 		DAGRunID:         filter.DAGRunID,
 		AttemptID:        filter.AttemptID,
-		AutopilotName:    filter.AutopilotName,
-		AutopilotKind:    filter.AutopilotKind,
-		AutopilotCycleID: filter.AutopilotCycleID,
+		ControllerName:    filter.ControllerName,
+		ControllerKind:    filter.ControllerKind,
+		ControllerCycleID: filter.ControllerCycleID,
 		SessionID:        filter.SessionID,
 		UserID:           filter.UserID,
 		Model:            filter.Model,

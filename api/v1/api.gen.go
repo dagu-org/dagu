@@ -82,53 +82,53 @@ const (
 	ArtifactPreviewKindText     ArtifactPreviewKind = "text"
 )
 
-// Defines values for AutopilotControllerStatusState.
+// Defines values for ControllerStatusState.
 const (
-	AutopilotControllerStatusStateDisabled    AutopilotControllerStatusState = "disabled"
-	AutopilotControllerStatusStateReady       AutopilotControllerStatusState = "ready"
-	AutopilotControllerStatusStateUnavailable AutopilotControllerStatusState = "unavailable"
-	AutopilotControllerStatusStateUnknown     AutopilotControllerStatusState = "unknown"
+	ControllerStatusStateDisabled    ControllerStatusState = "disabled"
+	ControllerStatusStateReady       ControllerStatusState = "ready"
+	ControllerStatusStateUnavailable ControllerStatusState = "unavailable"
+	ControllerStatusStateUnknown     ControllerStatusState = "unknown"
 )
 
-// Defines values for AutopilotDisplayStatus.
+// Defines values for ControllerDisplayStatus.
 const (
-	AutopilotDisplayStatusFinished AutopilotDisplayStatus = "finished"
-	AutopilotDisplayStatusIdle     AutopilotDisplayStatus = "idle"
-	AutopilotDisplayStatusPaused   AutopilotDisplayStatus = "paused"
-	AutopilotDisplayStatusRunning  AutopilotDisplayStatus = "running"
+	ControllerDisplayStatusFinished ControllerDisplayStatus = "finished"
+	ControllerDisplayStatusIdle     ControllerDisplayStatus = "idle"
+	ControllerDisplayStatusPaused   ControllerDisplayStatus = "paused"
+	ControllerDisplayStatusRunning  ControllerDisplayStatus = "running"
 )
 
-// Defines values for AutopilotDocument.
+// Defines values for ControllerDocument.
 const (
-	AutopilotDocumentMEMORYMd AutopilotDocument = "MEMORY.md"
-	AutopilotDocumentSOULMd   AutopilotDocument = "SOUL.md"
+	ControllerDocumentMEMORYMd ControllerDocument = "MEMORY.md"
+	ControllerDocumentSOULMd   ControllerDocument = "SOUL.md"
 )
 
-// Defines values for AutopilotKind.
+// Defines values for ControllerKind.
 const (
-	AutopilotKindService  AutopilotKind = "service"
-	AutopilotKindWorkflow AutopilotKind = "workflow"
+	ControllerKindService  ControllerKind = "service"
+	ControllerKindWorkflow ControllerKind = "workflow"
 )
 
-// Defines values for AutopilotLifecycleState.
+// Defines values for ControllerLifecycleState.
 const (
-	AutopilotLifecycleStateFinished AutopilotLifecycleState = "finished"
-	AutopilotLifecycleStateIdle     AutopilotLifecycleState = "idle"
-	AutopilotLifecycleStatePaused   AutopilotLifecycleState = "paused"
-	AutopilotLifecycleStateRunning  AutopilotLifecycleState = "running"
-	AutopilotLifecycleStateWaiting  AutopilotLifecycleState = "waiting"
+	ControllerLifecycleStateFinished ControllerLifecycleState = "finished"
+	ControllerLifecycleStateIdle     ControllerLifecycleState = "idle"
+	ControllerLifecycleStatePaused   ControllerLifecycleState = "paused"
+	ControllerLifecycleStateRunning  ControllerLifecycleState = "running"
+	ControllerLifecycleStateWaiting  ControllerLifecycleState = "waiting"
 )
 
-// Defines values for AutopilotTaskState.
+// Defines values for ControllerTaskState.
 const (
-	AutopilotTaskStateDone AutopilotTaskState = "done"
-	AutopilotTaskStateOpen AutopilotTaskState = "open"
+	ControllerTaskStateDone ControllerTaskState = "done"
+	ControllerTaskStateOpen ControllerTaskState = "open"
 )
 
-// Defines values for AutopilotWaitingReason.
+// Defines values for ControllerWaitingReason.
 const (
-	AutopilotWaitingReasonDagWait    AutopilotWaitingReason = "dag_wait"
-	AutopilotWaitingReasonHumanInput AutopilotWaitingReason = "human_input"
+	ControllerWaitingReasonDagWait    ControllerWaitingReason = "dag_wait"
+	ControllerWaitingReasonHumanInput ControllerWaitingReason = "human_input"
 )
 
 // Defines values for ChatMessageRole.
@@ -381,7 +381,7 @@ const (
 
 // Defines values for TriggerType.
 const (
-	TriggerTypeAutopilot TriggerType = "autopilot"
+	TriggerTypeController TriggerType = "controller"
 	TriggerTypeCatchup   TriggerType = "catchup"
 	TriggerTypeManual    TriggerType = "manual"
 	TriggerTypeRetry     TriggerType = "retry"
@@ -970,50 +970,50 @@ type AuditLogsResponse struct {
 	Total int `json:"total"`
 }
 
-// AutopilotAgentConfig Agent runtime configuration for an Autopilot definition
-type AutopilotAgentConfig struct {
+// ControllerAgentConfig Agent runtime configuration for a Controller definition
+type ControllerAgentConfig struct {
 	Model    *string `json:"model,omitempty"`
 	SafeMode *bool   `json:"safeMode,omitempty"`
 	Soul     *string `json:"soul,omitempty"`
 }
 
-// AutopilotAllowedDAGInfo Resolved DAG allowed in the current Autopilot
-type AutopilotAllowedDAGInfo struct {
+// ControllerAllowedDAGInfo Resolved DAG allowed in the current Controller
+type ControllerAllowedDAGInfo struct {
 	Description *string   `json:"description,omitempty"`
 	Name        string    `json:"name"`
 	Tags        *[]string `json:"tags,omitempty"`
 }
 
-// AutopilotAllowedDAGs Allowlisted DAG names and tags
-type AutopilotAllowedDAGs struct {
+// ControllerAllowedDAGs Allowlisted DAG names and tags
+type ControllerAllowedDAGs struct {
 	Names *[]string `json:"names,omitempty"`
 	Tags  *[]string `json:"tags,omitempty"`
 }
 
-// AutopilotControllerStatus Scheduler-owned Autopilot controller readiness
-type AutopilotControllerStatus struct {
+// ControllerStatus Scheduler-owned Controller readiness
+type ControllerStatus struct {
 	Message *string                        `json:"message,omitempty"`
-	State   AutopilotControllerStatusState `json:"state"`
+	State   ControllerStatusState `json:"state"`
 }
 
-// AutopilotControllerStatusState defines model for AutopilotControllerStatus.State.
-type AutopilotControllerStatusState string
+// ControllerStatusState defines model for ControllerStatus.State.
+type ControllerStatusState string
 
-// AutopilotDefinition Autopilot definition
-type AutopilotDefinition struct {
-	// Agent Agent runtime configuration for an Autopilot definition
-	Agent *AutopilotAgentConfig `json:"agent,omitempty"`
+// ControllerDefinition Controller definition
+type ControllerDefinition struct {
+	// Agent Agent runtime configuration for a Controller definition
+	Agent *ControllerAgentConfig `json:"agent,omitempty"`
 
 	// AllowedDAGs Allowlisted DAG names and tags
-	AllowedDAGs *AutopilotAllowedDAGs `json:"allowedDAGs,omitempty"`
+	AllowedDAGs *ControllerAllowedDAGs `json:"allowedDAGs,omitempty"`
 	ClonedFrom  *string               `json:"clonedFrom,omitempty"`
 	Description *string               `json:"description,omitempty"`
 	Disabled    *bool                 `json:"disabled,omitempty"`
 	Goal        *string               `json:"goal,omitempty"`
 	IconUrl     *string               `json:"iconUrl,omitempty"`
 
-	// Kind Compatibility Autopilot kind. Runtime behavior is configured through explicit fields such as resetOnFinish.
-	Kind                AutopilotKind `json:"kind"`
+	// Kind Compatibility Controller kind. Runtime behavior is configured through explicit fields such as resetOnFinish.
+	Kind                ControllerKind `json:"kind"`
 	Name                string        `json:"name"`
 	Nickname            *string       `json:"nickname,omitempty"`
 	ResetOnFinish       *bool         `json:"resetOnFinish,omitempty"`
@@ -1022,60 +1022,60 @@ type AutopilotDefinition struct {
 	Tags                *[]string     `json:"tags,omitempty"`
 }
 
-// AutopilotDetailResponse Autopilot detail response
-type AutopilotDetailResponse struct {
-	AllowedDags []AutopilotAllowedDAGInfo `json:"allowedDags"`
+// ControllerDetailResponse Controller detail response
+type ControllerDetailResponse struct {
+	AllowedDags []ControllerAllowedDAGInfo `json:"allowedDags"`
 
-	// AutopilotController Scheduler-owned Autopilot controller readiness
-	AutopilotController *AutopilotControllerStatus `json:"autopilotController,omitempty"`
+	// ControllerStatus Scheduler-owned Controller readiness
+	ControllerStatus *ControllerStatus `json:"controllerStatus,omitempty"`
 
-	// CurrentRun Summary of a child DAG run launched by an Autopilot
-	CurrentRun *AutopilotRunSummary `json:"currentRun,omitempty"`
+	// CurrentRun Summary of a child DAG run launched by a Controller
+	CurrentRun *ControllerRunSummary `json:"currentRun,omitempty"`
 
-	// Definition Autopilot definition
-	Definition AutopilotDefinition    `json:"definition"`
+	// Definition Controller definition
+	Definition ControllerDefinition    `json:"definition"`
 	Messages   *[]AgentMessage        `json:"messages,omitempty"`
-	RecentRuns *[]AutopilotRunSummary `json:"recentRuns,omitempty"`
+	RecentRuns *[]ControllerRunSummary `json:"recentRuns,omitempty"`
 
-	// State Current runtime state for an Autopilot
-	State         AutopilotState           `json:"state"`
-	TaskTemplates *[]AutopilotTaskTemplate `json:"taskTemplates,omitempty"`
+	// State Current runtime state for a Controller
+	State         ControllerState           `json:"state"`
+	TaskTemplates *[]ControllerTaskTemplate `json:"taskTemplates,omitempty"`
 }
 
-// AutopilotDisplayStatus User-facing Autopilot status
-type AutopilotDisplayStatus string
+// ControllerDisplayStatus User-facing Controller status
+type ControllerDisplayStatus string
 
-// AutopilotDocument Autopilot document file name
-type AutopilotDocument string
+// ControllerDocument Controller document file name
+type ControllerDocument string
 
-// AutopilotDocumentResponse Autopilot-specific document content
-type AutopilotDocumentResponse struct {
+// ControllerDocumentResponse Controller-specific document content
+type ControllerDocumentResponse struct {
 	Content string `json:"content"`
 
-	// Document Autopilot document file name
-	Document AutopilotDocument `json:"document"`
+	// Document Controller document file name
+	Document ControllerDocument `json:"document"`
 	Name     string            `json:"name"`
 	Path     string            `json:"path"`
 }
 
-// AutopilotDuplicateRequest Request body for duplicating an Autopilot
-type AutopilotDuplicateRequest struct {
+// ControllerDuplicateRequest Request body for duplicating a Controller
+type ControllerDuplicateRequest struct {
 	NewName string `json:"newName"`
 }
 
-// AutopilotKind Compatibility Autopilot kind. Runtime behavior is configured through explicit fields such as resetOnFinish.
-type AutopilotKind string
+// ControllerKind Compatibility Controller kind. Runtime behavior is configured through explicit fields such as resetOnFinish.
+type ControllerKind string
 
-// AutopilotLifecycleState Autopilot lifecycle state
-type AutopilotLifecycleState string
+// ControllerLifecycleState Controller lifecycle state
+type ControllerLifecycleState string
 
-// AutopilotListResponse List of Autopilot
-type AutopilotListResponse struct {
-	Autopilot []AutopilotSummary `json:"autopilot"`
+// ControllerListResponse List of Controller
+type ControllerListResponse struct {
+	Controller []ControllerSummary `json:"controller"`
 }
 
-// AutopilotMemoryReflectionResponse Generated Autopilot MEMORY.md update proposal
-type AutopilotMemoryReflectionResponse struct {
+// ControllerMemoryReflectionResponse Generated Controller MEMORY.md update proposal
+type ControllerMemoryReflectionResponse struct {
 	// CurrentContent Current MEMORY.md content before applying the reflection
 	CurrentContent string `json:"currentContent"`
 	Name           string `json:"name"`
@@ -1087,21 +1087,21 @@ type AutopilotMemoryReflectionResponse struct {
 	Rationale string `json:"rationale"`
 }
 
-// AutopilotOperatorMessageRequest Request body for an operator message
-type AutopilotOperatorMessageRequest struct {
+// ControllerOperatorMessageRequest Request body for an operator message
+type ControllerOperatorMessageRequest struct {
 	Message string `json:"message"`
 }
 
-// AutopilotPendingTurnMessage Queued message to be delivered on the next Autopilot turn
-type AutopilotPendingTurnMessage struct {
+// ControllerPendingTurnMessage Queued message to be delivered on the next Controller turn
+type ControllerPendingTurnMessage struct {
 	CreatedAt time.Time `json:"createdAt"`
 	Id        string    `json:"id"`
 	Kind      string    `json:"kind"`
 	Message   string    `json:"message"`
 }
 
-// AutopilotPrompt Pending human prompt for an Autopilot
-type AutopilotPrompt struct {
+// ControllerPrompt Pending human prompt for a Controller
+type ControllerPrompt struct {
 	AllowFreeText       *bool                    `json:"allowFreeText,omitempty"`
 	CreatedAt           time.Time                `json:"createdAt"`
 	FreeTextPlaceholder *string                  `json:"freeTextPlaceholder,omitempty"`
@@ -1110,27 +1110,27 @@ type AutopilotPrompt struct {
 	Question            string                   `json:"question"`
 }
 
-// AutopilotPromptResponse Recorded human response for an Autopilot prompt
-type AutopilotPromptResponse struct {
+// ControllerPromptResponse Recorded human response for a Controller prompt
+type ControllerPromptResponse struct {
 	FreeTextResponse  *string   `json:"freeTextResponse,omitempty"`
 	PromptId          string    `json:"promptId"`
 	RespondedAt       time.Time `json:"respondedAt"`
 	SelectedOptionIds *[]string `json:"selectedOptionIds,omitempty"`
 }
 
-// AutopilotRenameRequest Request body for renaming an Autopilot
-type AutopilotRenameRequest struct {
+// ControllerRenameRequest Request body for renaming a Controller
+type ControllerRenameRequest struct {
 	NewName string `json:"newName"`
 }
 
-// AutopilotRunRef Reference to a tracked child DAG run
-type AutopilotRunRef struct {
+// ControllerRunRef Reference to a tracked child DAG run
+type ControllerRunRef struct {
 	Id   string `json:"id"`
 	Name string `json:"name"`
 }
 
-// AutopilotRunSummary Summary of a child DAG run launched by an Autopilot
-type AutopilotRunSummary struct {
+// ControllerRunSummary Summary of a child DAG run launched by a Controller
+type ControllerRunSummary struct {
 	CreatedAt  *time.Time `json:"createdAt,omitempty"`
 	DagRunId   string     `json:"dagRunId"`
 	Error      *string    `json:"error,omitempty"`
@@ -1145,33 +1145,33 @@ type AutopilotRunSummary struct {
 	TriggerType *TriggerType `json:"triggerType,omitempty"`
 }
 
-// AutopilotSpecResponse Raw Autopilot YAML spec
-type AutopilotSpecResponse struct {
+// ControllerSpecResponse Raw Controller YAML spec
+type ControllerSpecResponse struct {
 	Spec string `json:"spec"`
 }
 
-// AutopilotSpecUpsertRequest Request body for creating or updating an Autopilot from raw YAML
-type AutopilotSpecUpsertRequest struct {
+// ControllerSpecUpsertRequest Request body for creating or updating a Controller from raw YAML
+type ControllerSpecUpsertRequest struct {
 	Spec string `json:"spec"`
 }
 
-// AutopilotStartRequest Request body for starting an Autopilot task
-type AutopilotStartRequest struct {
+// ControllerStartRequest Request body for starting a Controller task
+type ControllerStartRequest struct {
 	Instruction *string `json:"instruction,omitempty"`
 }
 
-// AutopilotState Current runtime state for an Autopilot
-type AutopilotState struct {
+// ControllerState Current runtime state for a Controller
+type ControllerState struct {
 	ActivatedAt    *time.Time `json:"activatedAt,omitempty"`
 	ActivatedBy    *string    `json:"activatedBy,omitempty"`
 	Busy           *bool      `json:"busy,omitempty"`
 	CurrentCycleId *string    `json:"currentCycleId,omitempty"`
 
 	// CurrentRunRef Reference to a tracked child DAG run
-	CurrentRunRef *AutopilotRunRef `json:"currentRunRef,omitempty"`
+	CurrentRunRef *ControllerRunRef `json:"currentRunRef,omitempty"`
 
-	// DisplayStatus User-facing Autopilot status
-	DisplayStatus        *AutopilotDisplayStatus `json:"displayStatus,omitempty"`
+	// DisplayStatus User-facing Controller status
+	DisplayStatus        *ControllerDisplayStatus `json:"displayStatus,omitempty"`
 	FinishedAt           *time.Time              `json:"finishedAt,omitempty"`
 	Instruction          *string                 `json:"instruction,omitempty"`
 	InstructionUpdatedAt *time.Time              `json:"instructionUpdatedAt,omitempty"`
@@ -1179,7 +1179,7 @@ type AutopilotState struct {
 	LastError            *string                 `json:"lastError,omitempty"`
 
 	// LastRunRef Reference to a tracked child DAG run
-	LastRunRef         *AutopilotRunRef `json:"lastRunRef,omitempty"`
+	LastRunRef         *ControllerRunRef `json:"lastRunRef,omitempty"`
 	LastScheduleMinute *time.Time       `json:"lastScheduleMinute,omitempty"`
 	LastSummary        *string          `json:"lastSummary,omitempty"`
 	LastTriggeredAt    *time.Time       `json:"lastTriggeredAt,omitempty"`
@@ -1188,44 +1188,44 @@ type AutopilotState struct {
 	PausedAt           *time.Time       `json:"pausedAt,omitempty"`
 	PausedBy           *string          `json:"pausedBy,omitempty"`
 
-	// PendingPrompt Pending human prompt for an Autopilot
-	PendingPrompt *AutopilotPrompt `json:"pendingPrompt,omitempty"`
+	// PendingPrompt Pending human prompt for a Controller
+	PendingPrompt *ControllerPrompt `json:"pendingPrompt,omitempty"`
 
-	// PendingResponse Recorded human response for an Autopilot prompt
-	PendingResponse     *AutopilotPromptResponse       `json:"pendingResponse,omitempty"`
-	PendingTurnMessages *[]AutopilotPendingTurnMessage `json:"pendingTurnMessages,omitempty"`
+	// PendingResponse Recorded human response for a Controller prompt
+	PendingResponse     *ControllerPromptResponse       `json:"pendingResponse,omitempty"`
+	PendingTurnMessages *[]ControllerPendingTurnMessage `json:"pendingTurnMessages,omitempty"`
 	SessionId           *string                        `json:"sessionId,omitempty"`
 	StartRequestedAt    *time.Time                     `json:"startRequestedAt,omitempty"`
 
-	// State Autopilot lifecycle state
-	State AutopilotLifecycleState `json:"state"`
-	Tasks *[]AutopilotTask        `json:"tasks,omitempty"`
+	// State Controller lifecycle state
+	State ControllerLifecycleState `json:"state"`
+	Tasks *[]ControllerTask        `json:"tasks,omitempty"`
 
-	// WaitingReason Why an Autopilot is waiting
-	WaitingReason *AutopilotWaitingReason `json:"waitingReason,omitempty"`
+	// WaitingReason Why a Controller is waiting
+	WaitingReason *ControllerWaitingReason `json:"waitingReason,omitempty"`
 }
 
-// AutopilotSummary Summary row for an Autopilot
-type AutopilotSummary struct {
-	// AutopilotController Scheduler-owned Autopilot controller readiness
-	AutopilotController *AutopilotControllerStatus `json:"autopilotController,omitempty"`
+// ControllerSummary Summary row for a Controller
+type ControllerSummary struct {
+	// ControllerStatus Scheduler-owned Controller readiness
+	ControllerStatus *ControllerStatus `json:"controllerStatus,omitempty"`
 	Busy                *bool                      `json:"busy,omitempty"`
 	ClonedFrom          *string                    `json:"clonedFrom,omitempty"`
 
-	// CurrentRun Summary of a child DAG run launched by an Autopilot
-	CurrentRun  *AutopilotRunSummary `json:"currentRun,omitempty"`
+	// CurrentRun Summary of a child DAG run launched by a Controller
+	CurrentRun  *ControllerRunSummary `json:"currentRun,omitempty"`
 	Description *string              `json:"description,omitempty"`
 	Disabled    *bool                `json:"disabled,omitempty"`
 
-	// DisplayStatus User-facing Autopilot status
-	DisplayStatus *AutopilotDisplayStatus `json:"displayStatus,omitempty"`
+	// DisplayStatus User-facing Controller status
+	DisplayStatus *ControllerDisplayStatus `json:"displayStatus,omitempty"`
 	DoneTaskCount *int                    `json:"doneTaskCount,omitempty"`
 	Goal          *string                 `json:"goal,omitempty"`
 	IconUrl       *string                 `json:"iconUrl,omitempty"`
 	Instruction   *string                 `json:"instruction,omitempty"`
 
-	// Kind Compatibility Autopilot kind. Runtime behavior is configured through explicit fields such as resetOnFinish.
-	Kind                AutopilotKind `json:"kind"`
+	// Kind Compatibility Controller kind. Runtime behavior is configured through explicit fields such as resetOnFinish.
+	Kind                ControllerKind `json:"kind"`
 	LastUpdatedAt       *time.Time    `json:"lastUpdatedAt,omitempty"`
 	Name                string        `json:"name"`
 	NeedsInput          *bool         `json:"needsInput,omitempty"`
@@ -1234,13 +1234,13 @@ type AutopilotSummary struct {
 	OpenTaskCount       *int          `json:"openTaskCount,omitempty"`
 	ResetOnFinish       *bool         `json:"resetOnFinish,omitempty"`
 
-	// State Autopilot lifecycle state
-	State AutopilotLifecycleState `json:"state"`
+	// State Controller lifecycle state
+	State ControllerLifecycleState `json:"state"`
 	Tags  *[]string               `json:"tags,omitempty"`
 }
 
-// AutopilotTask Runtime current-cycle task for an Autopilot
-type AutopilotTask struct {
+// ControllerTask Runtime current-cycle task for a Controller
+type ControllerTask struct {
 	CreatedAt   *time.Time `json:"createdAt,omitempty"`
 	CreatedBy   *string    `json:"createdBy,omitempty"`
 	Description string     `json:"description"`
@@ -1249,26 +1249,26 @@ type AutopilotTask struct {
 	Id          string     `json:"id"`
 
 	// State Checklist task state
-	State     AutopilotTaskState `json:"state"`
+	State     ControllerTaskState `json:"state"`
 	UpdatedAt *time.Time         `json:"updatedAt,omitempty"`
 	UpdatedBy *string            `json:"updatedBy,omitempty"`
 }
 
-// AutopilotTaskCreateRequest Request body for creating an Autopilot checklist task
-type AutopilotTaskCreateRequest struct {
+// ControllerTaskCreateRequest Request body for creating a Controller checklist task
+type ControllerTaskCreateRequest struct {
 	Description string `json:"description"`
 }
 
-// AutopilotTaskReorderRequest Request body for reordering Autopilot checklist tasks
-type AutopilotTaskReorderRequest struct {
+// ControllerTaskReorderRequest Request body for reordering Controller checklist tasks
+type ControllerTaskReorderRequest struct {
 	TaskIds []string `json:"taskIds"`
 }
 
-// AutopilotTaskState Checklist task state
-type AutopilotTaskState string
+// ControllerTaskState Checklist task state
+type ControllerTaskState string
 
-// AutopilotTaskTemplate Persistent task template for an Autopilot
-type AutopilotTaskTemplate struct {
+// ControllerTaskTemplate Persistent task template for a Controller
+type ControllerTaskTemplate struct {
 	CreatedAt   *time.Time `json:"createdAt,omitempty"`
 	CreatedBy   *string    `json:"createdBy,omitempty"`
 	Description string     `json:"description"`
@@ -1277,14 +1277,14 @@ type AutopilotTaskTemplate struct {
 	UpdatedBy   *string    `json:"updatedBy,omitempty"`
 }
 
-// AutopilotTaskUpdateRequest Request body for updating an Autopilot checklist task
-type AutopilotTaskUpdateRequest struct {
+// ControllerTaskUpdateRequest Request body for updating a Controller checklist task
+type ControllerTaskUpdateRequest struct {
 	Description *string `json:"description,omitempty"`
 	Done        *bool   `json:"done,omitempty"`
 }
 
-// AutopilotWaitingReason Why an Autopilot is waiting
-type AutopilotWaitingReason string
+// ControllerWaitingReason Why a Controller is waiting
+type ControllerWaitingReason string
 
 // ChangePasswordRequest Request body for changing password
 type ChangePasswordRequest struct {
@@ -2100,14 +2100,14 @@ type EventLogEntry struct {
 	// AttemptId Attempt ID for DAG-run events
 	AttemptId *string `json:"attemptId,omitempty"`
 
-	// AutopilotCycleId Autopilot cycle ID for autopilot events
-	AutopilotCycleId *string `json:"autopilotCycleId,omitempty"`
+	// ControllerCycleId Controller cycle ID for controller events
+	ControllerCycleId *string `json:"controllerCycleId,omitempty"`
 
-	// AutopilotKind Autopilot kind for autopilot events
-	AutopilotKind *string `json:"autopilotKind,omitempty"`
+	// ControllerKind Controller kind for controller events
+	ControllerKind *string `json:"controllerKind,omitempty"`
 
-	// AutopilotName Autopilot name for autopilot events
-	AutopilotName *string `json:"autopilotName,omitempty"`
+	// ControllerName Controller name for controller events
+	ControllerName *string `json:"controllerName,omitempty"`
 
 	// DagName DAG name for DAG-run events
 	DagName *string `json:"dagName,omitempty"`
@@ -2121,7 +2121,7 @@ type EventLogEntry struct {
 	// Id Unique identifier for this event
 	Id string `json:"id"`
 
-	// Kind High-level event kind (e.g., dag_run, autopilot, llm_usage)
+	// Kind High-level event kind (e.g., dag_run, controller, llm_usage)
 	Kind string `json:"kind"`
 
 	// Model Model name associated with the event
@@ -2148,7 +2148,7 @@ type EventLogEntry struct {
 	// Status Status associated with the event when applicable
 	Status *string `json:"status,omitempty"`
 
-	// Type Specific event type (e.g., dag.run.failed, autopilot.error)
+	// Type Specific event type (e.g., dag.run.failed, controller.error)
 	Type string `json:"type"`
 
 	// UserId User ID associated with the event
@@ -2803,8 +2803,8 @@ type ScheduleKind string
 
 // SchedulerInstance Scheduler instance status information
 type SchedulerInstance struct {
-	// AutopilotController Scheduler-owned Autopilot controller readiness
-	AutopilotController *AutopilotControllerStatus `json:"autopilotController,omitempty"`
+	// ControllerStatus Scheduler-owned Controller readiness
+	ControllerStatus *ControllerStatus `json:"controllerStatus,omitempty"`
 
 	// Host Hostname where scheduler is running
 	Host string `json:"host"`
@@ -3767,8 +3767,8 @@ type ArtifactRecursive = bool
 // AuditLogLimit defines model for AuditLogLimit.
 type AuditLogLimit = int
 
-// AutopilotName defines model for AutopilotName.
-type AutopilotName = string
+// ControllerName defines model for ControllerName.
+type ControllerName = string
 
 // DAGRunConcreteId defines model for DAGRunConcreteId.
 type DAGRunConcreteId = string
@@ -4857,10 +4857,10 @@ type ListEventLogsParams struct {
 	// RemoteNode name of the remote node
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 
-	// Kind Filter by event kind (e.g., dag_run, autopilot, llm_usage)
+	// Kind Filter by event kind (e.g., dag_run, controller, llm_usage)
 	Kind *string `form:"kind,omitempty" json:"kind,omitempty"`
 
-	// Type Filter by event type (e.g., dag.run.failed, autopilot.needs_input, llm.usage.recorded)
+	// Type Filter by event type (e.g., dag.run.failed, controller.needs_input, llm.usage.recorded)
 	Type *string `form:"type,omitempty" json:"type,omitempty"`
 
 	// DagName Filter by DAG name
@@ -4872,8 +4872,8 @@ type ListEventLogsParams struct {
 	// AttemptId Filter by attempt ID
 	AttemptId *string `form:"attemptId,omitempty" json:"attemptId,omitempty"`
 
-	// AutopilotName Filter by autopilot name
-	AutopilotName *string `form:"autopilotName,omitempty" json:"autopilotName,omitempty"`
+	// ControllerName Filter by controller name
+	ControllerName *string `form:"controllerName,omitempty" json:"controllerName,omitempty"`
 
 	// SessionId Filter by session ID
 	SessionId *string `form:"sessionId,omitempty" json:"sessionId,omitempty"`
@@ -5458,35 +5458,35 @@ type LoginJSONRequestBody = LoginRequest
 // SetupJSONRequestBody defines body for Setup for application/json ContentType.
 type SetupJSONRequestBody = SetupRequest
 
-// UpdateAutopilotDocumentJSONRequestBody defines body for UpdateAutopilotDocument for application/json ContentType.
-type UpdateAutopilotDocumentJSONRequestBody = UpdateAgentMemoryRequest
+// UpdateControllerDocumentJSONRequestBody defines body for UpdateControllerDocument for application/json ContentType.
+type UpdateControllerDocumentJSONRequestBody = UpdateAgentMemoryRequest
 
-// DuplicateAutopilotJSONRequestBody defines body for DuplicateAutopilot for application/json ContentType.
-type DuplicateAutopilotJSONRequestBody = AutopilotDuplicateRequest
+// DuplicateControllerJSONRequestBody defines body for DuplicateController for application/json ContentType.
+type DuplicateControllerJSONRequestBody = ControllerDuplicateRequest
 
-// MessageAutopilotJSONRequestBody defines body for MessageAutopilot for application/json ContentType.
-type MessageAutopilotJSONRequestBody = AutopilotOperatorMessageRequest
+// MessageControllerJSONRequestBody defines body for MessageController for application/json ContentType.
+type MessageControllerJSONRequestBody = ControllerOperatorMessageRequest
 
-// RenameAutopilotJSONRequestBody defines body for RenameAutopilot for application/json ContentType.
-type RenameAutopilotJSONRequestBody = AutopilotRenameRequest
+// RenameControllerJSONRequestBody defines body for RenameController for application/json ContentType.
+type RenameControllerJSONRequestBody = ControllerRenameRequest
 
-// RespondAutopilotJSONRequestBody defines body for RespondAutopilot for application/json ContentType.
-type RespondAutopilotJSONRequestBody = AgentUserPromptResponse
+// RespondControllerJSONRequestBody defines body for RespondController for application/json ContentType.
+type RespondControllerJSONRequestBody = AgentUserPromptResponse
 
-// PutAutopilotSpecJSONRequestBody defines body for PutAutopilotSpec for application/json ContentType.
-type PutAutopilotSpecJSONRequestBody = AutopilotSpecUpsertRequest
+// PutControllerSpecJSONRequestBody defines body for PutControllerSpec for application/json ContentType.
+type PutControllerSpecJSONRequestBody = ControllerSpecUpsertRequest
 
-// StartAutopilotJSONRequestBody defines body for StartAutopilot for application/json ContentType.
-type StartAutopilotJSONRequestBody = AutopilotStartRequest
+// StartControllerJSONRequestBody defines body for StartController for application/json ContentType.
+type StartControllerJSONRequestBody = ControllerStartRequest
 
-// CreateAutopilotTaskJSONRequestBody defines body for CreateAutopilotTask for application/json ContentType.
-type CreateAutopilotTaskJSONRequestBody = AutopilotTaskCreateRequest
+// CreateControllerTaskJSONRequestBody defines body for CreateControllerTask for application/json ContentType.
+type CreateControllerTaskJSONRequestBody = ControllerTaskCreateRequest
 
-// ReorderAutopilotTasksJSONRequestBody defines body for ReorderAutopilotTasks for application/json ContentType.
-type ReorderAutopilotTasksJSONRequestBody = AutopilotTaskReorderRequest
+// ReorderControllerTasksJSONRequestBody defines body for ReorderControllerTasks for application/json ContentType.
+type ReorderControllerTasksJSONRequestBody = ControllerTaskReorderRequest
 
-// UpdateAutopilotTaskJSONRequestBody defines body for UpdateAutopilotTask for application/json ContentType.
-type UpdateAutopilotTaskJSONRequestBody = AutopilotTaskUpdateRequest
+// UpdateControllerTaskJSONRequestBody defines body for UpdateControllerTask for application/json ContentType.
+type UpdateControllerTaskJSONRequestBody = ControllerTaskUpdateRequest
 
 // ExecuteDAGRunFromSpecJSONRequestBody defines body for ExecuteDAGRunFromSpec for application/json ContentType.
 type ExecuteDAGRunFromSpecJSONRequestBody ExecuteDAGRunFromSpecJSONBody
@@ -6063,69 +6063,69 @@ type ServerInterface interface {
 	// Create initial admin account
 	// (POST /auth/setup)
 	Setup(w http.ResponseWriter, r *http.Request, params SetupParams)
-	// List autopilot
-	// (GET /autopilot)
-	ListAutopilot(w http.ResponseWriter, r *http.Request)
-	// Delete autopilot
-	// (DELETE /autopilot/{name})
-	DeleteAutopilot(w http.ResponseWriter, r *http.Request, name AutopilotName)
-	// Get autopilot detail
-	// (GET /autopilot/{name})
-	GetAutopilot(w http.ResponseWriter, r *http.Request, name AutopilotName)
-	// Clear autopilot document
-	// (DELETE /autopilot/{name}/documents/{document})
-	DeleteAutopilotDocument(w http.ResponseWriter, r *http.Request, name AutopilotName, document AutopilotDocument)
-	// Get autopilot document
-	// (GET /autopilot/{name}/documents/{document})
-	GetAutopilotDocument(w http.ResponseWriter, r *http.Request, name AutopilotName, document AutopilotDocument)
-	// Update autopilot document
-	// (PUT /autopilot/{name}/documents/{document})
-	UpdateAutopilotDocument(w http.ResponseWriter, r *http.Request, name AutopilotName, document AutopilotDocument)
-	// Duplicate autopilot
-	// (POST /autopilot/{name}/duplicate)
-	DuplicateAutopilot(w http.ResponseWriter, r *http.Request, name AutopilotName)
-	// Reflect autopilot memory
-	// (POST /autopilot/{name}/memory/reflect)
-	ReflectAutopilotMemory(w http.ResponseWriter, r *http.Request, name AutopilotName)
-	// Send operator message to autopilot
-	// (POST /autopilot/{name}/message)
-	MessageAutopilot(w http.ResponseWriter, r *http.Request, name AutopilotName)
-	// Pause autopilot
-	// (POST /autopilot/{name}/pause)
-	PauseAutopilot(w http.ResponseWriter, r *http.Request, name AutopilotName)
-	// Rename autopilot
-	// (POST /autopilot/{name}/rename)
-	RenameAutopilot(w http.ResponseWriter, r *http.Request, name AutopilotName)
-	// Reset autopilot state
-	// (POST /autopilot/{name}/reset)
-	ResetAutopilot(w http.ResponseWriter, r *http.Request, name AutopilotName)
-	// Respond to autopilot prompt
-	// (POST /autopilot/{name}/response)
-	RespondAutopilot(w http.ResponseWriter, r *http.Request, name AutopilotName)
-	// Resume autopilot
-	// (POST /autopilot/{name}/resume)
-	ResumeAutopilot(w http.ResponseWriter, r *http.Request, name AutopilotName)
-	// Get autopilot raw spec
-	// (GET /autopilot/{name}/spec)
-	GetAutopilotSpec(w http.ResponseWriter, r *http.Request, name AutopilotName)
-	// Create or update autopilot spec
-	// (PUT /autopilot/{name}/spec)
-	PutAutopilotSpec(w http.ResponseWriter, r *http.Request, name AutopilotName)
-	// Start autopilot task
-	// (POST /autopilot/{name}/start)
-	StartAutopilot(w http.ResponseWriter, r *http.Request, name AutopilotName)
-	// Create autopilot task
-	// (POST /autopilot/{name}/tasks)
-	CreateAutopilotTask(w http.ResponseWriter, r *http.Request, name AutopilotName)
-	// Reorder autopilot tasks
-	// (POST /autopilot/{name}/tasks/reorder)
-	ReorderAutopilotTasks(w http.ResponseWriter, r *http.Request, name AutopilotName)
-	// Delete autopilot task
-	// (DELETE /autopilot/{name}/tasks/{taskId})
-	DeleteAutopilotTask(w http.ResponseWriter, r *http.Request, name AutopilotName, taskId string)
-	// Update autopilot task
-	// (PATCH /autopilot/{name}/tasks/{taskId})
-	UpdateAutopilotTask(w http.ResponseWriter, r *http.Request, name AutopilotName, taskId string)
+	// List controller
+	// (GET /controller)
+	ListController(w http.ResponseWriter, r *http.Request)
+	// Delete controller
+	// (DELETE /controller/{name})
+	DeleteController(w http.ResponseWriter, r *http.Request, name ControllerName)
+	// Get controller detail
+	// (GET /controller/{name})
+	GetController(w http.ResponseWriter, r *http.Request, name ControllerName)
+	// Clear controller document
+	// (DELETE /controller/{name}/documents/{document})
+	DeleteControllerDocument(w http.ResponseWriter, r *http.Request, name ControllerName, document ControllerDocument)
+	// Get controller document
+	// (GET /controller/{name}/documents/{document})
+	GetControllerDocument(w http.ResponseWriter, r *http.Request, name ControllerName, document ControllerDocument)
+	// Update controller document
+	// (PUT /controller/{name}/documents/{document})
+	UpdateControllerDocument(w http.ResponseWriter, r *http.Request, name ControllerName, document ControllerDocument)
+	// Duplicate controller
+	// (POST /controller/{name}/duplicate)
+	DuplicateController(w http.ResponseWriter, r *http.Request, name ControllerName)
+	// Reflect controller memory
+	// (POST /controller/{name}/memory/reflect)
+	ReflectControllerMemory(w http.ResponseWriter, r *http.Request, name ControllerName)
+	// Send operator message to controller
+	// (POST /controller/{name}/message)
+	MessageController(w http.ResponseWriter, r *http.Request, name ControllerName)
+	// Pause controller
+	// (POST /controller/{name}/pause)
+	PauseController(w http.ResponseWriter, r *http.Request, name ControllerName)
+	// Rename controller
+	// (POST /controller/{name}/rename)
+	RenameController(w http.ResponseWriter, r *http.Request, name ControllerName)
+	// Reset controller state
+	// (POST /controller/{name}/reset)
+	ResetController(w http.ResponseWriter, r *http.Request, name ControllerName)
+	// Respond to controller prompt
+	// (POST /controller/{name}/response)
+	RespondController(w http.ResponseWriter, r *http.Request, name ControllerName)
+	// Resume controller
+	// (POST /controller/{name}/resume)
+	ResumeController(w http.ResponseWriter, r *http.Request, name ControllerName)
+	// Get controller raw spec
+	// (GET /controller/{name}/spec)
+	GetControllerSpec(w http.ResponseWriter, r *http.Request, name ControllerName)
+	// Create or update controller spec
+	// (PUT /controller/{name}/spec)
+	PutControllerSpec(w http.ResponseWriter, r *http.Request, name ControllerName)
+	// Start controller task
+	// (POST /controller/{name}/start)
+	StartController(w http.ResponseWriter, r *http.Request, name ControllerName)
+	// Create controller task
+	// (POST /controller/{name}/tasks)
+	CreateControllerTask(w http.ResponseWriter, r *http.Request, name ControllerName)
+	// Reorder controller tasks
+	// (POST /controller/{name}/tasks/reorder)
+	ReorderControllerTasks(w http.ResponseWriter, r *http.Request, name ControllerName)
+	// Delete controller task
+	// (DELETE /controller/{name}/tasks/{taskId})
+	DeleteControllerTask(w http.ResponseWriter, r *http.Request, name ControllerName, taskId string)
+	// Update controller task
+	// (PATCH /controller/{name}/tasks/{taskId})
+	UpdateControllerTask(w http.ResponseWriter, r *http.Request, name ControllerName, taskId string)
 	// List all DAG-runs
 	// (GET /dag-runs)
 	ListDAGRuns(w http.ResponseWriter, r *http.Request, params ListDAGRunsParams)
@@ -6690,129 +6690,129 @@ func (_ Unimplemented) Setup(w http.ResponseWriter, r *http.Request, params Setu
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// List autopilot
-// (GET /autopilot)
-func (_ Unimplemented) ListAutopilot(w http.ResponseWriter, r *http.Request) {
+// List controller
+// (GET /controller)
+func (_ Unimplemented) ListController(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Delete autopilot
-// (DELETE /autopilot/{name})
-func (_ Unimplemented) DeleteAutopilot(w http.ResponseWriter, r *http.Request, name AutopilotName) {
+// Delete controller
+// (DELETE /controller/{name})
+func (_ Unimplemented) DeleteController(w http.ResponseWriter, r *http.Request, name ControllerName) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Get autopilot detail
-// (GET /autopilot/{name})
-func (_ Unimplemented) GetAutopilot(w http.ResponseWriter, r *http.Request, name AutopilotName) {
+// Get controller detail
+// (GET /controller/{name})
+func (_ Unimplemented) GetController(w http.ResponseWriter, r *http.Request, name ControllerName) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Clear autopilot document
-// (DELETE /autopilot/{name}/documents/{document})
-func (_ Unimplemented) DeleteAutopilotDocument(w http.ResponseWriter, r *http.Request, name AutopilotName, document AutopilotDocument) {
+// Clear controller document
+// (DELETE /controller/{name}/documents/{document})
+func (_ Unimplemented) DeleteControllerDocument(w http.ResponseWriter, r *http.Request, name ControllerName, document ControllerDocument) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Get autopilot document
-// (GET /autopilot/{name}/documents/{document})
-func (_ Unimplemented) GetAutopilotDocument(w http.ResponseWriter, r *http.Request, name AutopilotName, document AutopilotDocument) {
+// Get controller document
+// (GET /controller/{name}/documents/{document})
+func (_ Unimplemented) GetControllerDocument(w http.ResponseWriter, r *http.Request, name ControllerName, document ControllerDocument) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Update autopilot document
-// (PUT /autopilot/{name}/documents/{document})
-func (_ Unimplemented) UpdateAutopilotDocument(w http.ResponseWriter, r *http.Request, name AutopilotName, document AutopilotDocument) {
+// Update controller document
+// (PUT /controller/{name}/documents/{document})
+func (_ Unimplemented) UpdateControllerDocument(w http.ResponseWriter, r *http.Request, name ControllerName, document ControllerDocument) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Duplicate autopilot
-// (POST /autopilot/{name}/duplicate)
-func (_ Unimplemented) DuplicateAutopilot(w http.ResponseWriter, r *http.Request, name AutopilotName) {
+// Duplicate controller
+// (POST /controller/{name}/duplicate)
+func (_ Unimplemented) DuplicateController(w http.ResponseWriter, r *http.Request, name ControllerName) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Reflect autopilot memory
-// (POST /autopilot/{name}/memory/reflect)
-func (_ Unimplemented) ReflectAutopilotMemory(w http.ResponseWriter, r *http.Request, name AutopilotName) {
+// Reflect controller memory
+// (POST /controller/{name}/memory/reflect)
+func (_ Unimplemented) ReflectControllerMemory(w http.ResponseWriter, r *http.Request, name ControllerName) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Send operator message to autopilot
-// (POST /autopilot/{name}/message)
-func (_ Unimplemented) MessageAutopilot(w http.ResponseWriter, r *http.Request, name AutopilotName) {
+// Send operator message to controller
+// (POST /controller/{name}/message)
+func (_ Unimplemented) MessageController(w http.ResponseWriter, r *http.Request, name ControllerName) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Pause autopilot
-// (POST /autopilot/{name}/pause)
-func (_ Unimplemented) PauseAutopilot(w http.ResponseWriter, r *http.Request, name AutopilotName) {
+// Pause controller
+// (POST /controller/{name}/pause)
+func (_ Unimplemented) PauseController(w http.ResponseWriter, r *http.Request, name ControllerName) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Rename autopilot
-// (POST /autopilot/{name}/rename)
-func (_ Unimplemented) RenameAutopilot(w http.ResponseWriter, r *http.Request, name AutopilotName) {
+// Rename controller
+// (POST /controller/{name}/rename)
+func (_ Unimplemented) RenameController(w http.ResponseWriter, r *http.Request, name ControllerName) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Reset autopilot state
-// (POST /autopilot/{name}/reset)
-func (_ Unimplemented) ResetAutopilot(w http.ResponseWriter, r *http.Request, name AutopilotName) {
+// Reset controller state
+// (POST /controller/{name}/reset)
+func (_ Unimplemented) ResetController(w http.ResponseWriter, r *http.Request, name ControllerName) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Respond to autopilot prompt
-// (POST /autopilot/{name}/response)
-func (_ Unimplemented) RespondAutopilot(w http.ResponseWriter, r *http.Request, name AutopilotName) {
+// Respond to controller prompt
+// (POST /controller/{name}/response)
+func (_ Unimplemented) RespondController(w http.ResponseWriter, r *http.Request, name ControllerName) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Resume autopilot
-// (POST /autopilot/{name}/resume)
-func (_ Unimplemented) ResumeAutopilot(w http.ResponseWriter, r *http.Request, name AutopilotName) {
+// Resume controller
+// (POST /controller/{name}/resume)
+func (_ Unimplemented) ResumeController(w http.ResponseWriter, r *http.Request, name ControllerName) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Get autopilot raw spec
-// (GET /autopilot/{name}/spec)
-func (_ Unimplemented) GetAutopilotSpec(w http.ResponseWriter, r *http.Request, name AutopilotName) {
+// Get controller raw spec
+// (GET /controller/{name}/spec)
+func (_ Unimplemented) GetControllerSpec(w http.ResponseWriter, r *http.Request, name ControllerName) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Create or update autopilot spec
-// (PUT /autopilot/{name}/spec)
-func (_ Unimplemented) PutAutopilotSpec(w http.ResponseWriter, r *http.Request, name AutopilotName) {
+// Create or update controller spec
+// (PUT /controller/{name}/spec)
+func (_ Unimplemented) PutControllerSpec(w http.ResponseWriter, r *http.Request, name ControllerName) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Start autopilot task
-// (POST /autopilot/{name}/start)
-func (_ Unimplemented) StartAutopilot(w http.ResponseWriter, r *http.Request, name AutopilotName) {
+// Start controller task
+// (POST /controller/{name}/start)
+func (_ Unimplemented) StartController(w http.ResponseWriter, r *http.Request, name ControllerName) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Create autopilot task
-// (POST /autopilot/{name}/tasks)
-func (_ Unimplemented) CreateAutopilotTask(w http.ResponseWriter, r *http.Request, name AutopilotName) {
+// Create controller task
+// (POST /controller/{name}/tasks)
+func (_ Unimplemented) CreateControllerTask(w http.ResponseWriter, r *http.Request, name ControllerName) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Reorder autopilot tasks
-// (POST /autopilot/{name}/tasks/reorder)
-func (_ Unimplemented) ReorderAutopilotTasks(w http.ResponseWriter, r *http.Request, name AutopilotName) {
+// Reorder controller tasks
+// (POST /controller/{name}/tasks/reorder)
+func (_ Unimplemented) ReorderControllerTasks(w http.ResponseWriter, r *http.Request, name ControllerName) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Delete autopilot task
-// (DELETE /autopilot/{name}/tasks/{taskId})
-func (_ Unimplemented) DeleteAutopilotTask(w http.ResponseWriter, r *http.Request, name AutopilotName, taskId string) {
+// Delete controller task
+// (DELETE /controller/{name}/tasks/{taskId})
+func (_ Unimplemented) DeleteControllerTask(w http.ResponseWriter, r *http.Request, name ControllerName, taskId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Update autopilot task
-// (PATCH /autopilot/{name}/tasks/{taskId})
-func (_ Unimplemented) UpdateAutopilotTask(w http.ResponseWriter, r *http.Request, name AutopilotName, taskId string) {
+// Update controller task
+// (PATCH /controller/{name}/tasks/{taskId})
+func (_ Unimplemented) UpdateControllerTask(w http.ResponseWriter, r *http.Request, name ControllerName, taskId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -8322,8 +8322,8 @@ func (siw *ServerInterfaceWrapper) Setup(w http.ResponseWriter, r *http.Request)
 	handler.ServeHTTP(w, r)
 }
 
-// ListAutopilot operation middleware
-func (siw *ServerInterfaceWrapper) ListAutopilot(w http.ResponseWriter, r *http.Request) {
+// ListController operation middleware
+func (siw *ServerInterfaceWrapper) ListController(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
@@ -8334,7 +8334,7 @@ func (siw *ServerInterfaceWrapper) ListAutopilot(w http.ResponseWriter, r *http.
 	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListAutopilot(w, r)
+		siw.Handler.ListController(w, r)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -8344,13 +8344,13 @@ func (siw *ServerInterfaceWrapper) ListAutopilot(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
-// DeleteAutopilot operation middleware
-func (siw *ServerInterfaceWrapper) DeleteAutopilot(w http.ResponseWriter, r *http.Request) {
+// DeleteController operation middleware
+func (siw *ServerInterfaceWrapper) DeleteController(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
 	// ------------- Path parameter "name" -------------
-	var name AutopilotName
+	var name ControllerName
 
 	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
@@ -8367,7 +8367,7 @@ func (siw *ServerInterfaceWrapper) DeleteAutopilot(w http.ResponseWriter, r *htt
 	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeleteAutopilot(w, r, name)
+		siw.Handler.DeleteController(w, r, name)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -8377,13 +8377,13 @@ func (siw *ServerInterfaceWrapper) DeleteAutopilot(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r)
 }
 
-// GetAutopilot operation middleware
-func (siw *ServerInterfaceWrapper) GetAutopilot(w http.ResponseWriter, r *http.Request) {
+// GetController operation middleware
+func (siw *ServerInterfaceWrapper) GetController(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
 	// ------------- Path parameter "name" -------------
-	var name AutopilotName
+	var name ControllerName
 
 	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
@@ -8400,7 +8400,7 @@ func (siw *ServerInterfaceWrapper) GetAutopilot(w http.ResponseWriter, r *http.R
 	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetAutopilot(w, r, name)
+		siw.Handler.GetController(w, r, name)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -8410,13 +8410,13 @@ func (siw *ServerInterfaceWrapper) GetAutopilot(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
-// DeleteAutopilotDocument operation middleware
-func (siw *ServerInterfaceWrapper) DeleteAutopilotDocument(w http.ResponseWriter, r *http.Request) {
+// DeleteControllerDocument operation middleware
+func (siw *ServerInterfaceWrapper) DeleteControllerDocument(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
 	// ------------- Path parameter "name" -------------
-	var name AutopilotName
+	var name ControllerName
 
 	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
@@ -8425,7 +8425,7 @@ func (siw *ServerInterfaceWrapper) DeleteAutopilotDocument(w http.ResponseWriter
 	}
 
 	// ------------- Path parameter "document" -------------
-	var document AutopilotDocument
+	var document ControllerDocument
 
 	err = runtime.BindStyledParameterWithOptions("simple", "document", chi.URLParam(r, "document"), &document, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
@@ -8442,7 +8442,7 @@ func (siw *ServerInterfaceWrapper) DeleteAutopilotDocument(w http.ResponseWriter
 	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeleteAutopilotDocument(w, r, name, document)
+		siw.Handler.DeleteControllerDocument(w, r, name, document)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -8452,13 +8452,13 @@ func (siw *ServerInterfaceWrapper) DeleteAutopilotDocument(w http.ResponseWriter
 	handler.ServeHTTP(w, r)
 }
 
-// GetAutopilotDocument operation middleware
-func (siw *ServerInterfaceWrapper) GetAutopilotDocument(w http.ResponseWriter, r *http.Request) {
+// GetControllerDocument operation middleware
+func (siw *ServerInterfaceWrapper) GetControllerDocument(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
 	// ------------- Path parameter "name" -------------
-	var name AutopilotName
+	var name ControllerName
 
 	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
@@ -8467,7 +8467,7 @@ func (siw *ServerInterfaceWrapper) GetAutopilotDocument(w http.ResponseWriter, r
 	}
 
 	// ------------- Path parameter "document" -------------
-	var document AutopilotDocument
+	var document ControllerDocument
 
 	err = runtime.BindStyledParameterWithOptions("simple", "document", chi.URLParam(r, "document"), &document, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
@@ -8484,7 +8484,7 @@ func (siw *ServerInterfaceWrapper) GetAutopilotDocument(w http.ResponseWriter, r
 	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetAutopilotDocument(w, r, name, document)
+		siw.Handler.GetControllerDocument(w, r, name, document)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -8494,13 +8494,13 @@ func (siw *ServerInterfaceWrapper) GetAutopilotDocument(w http.ResponseWriter, r
 	handler.ServeHTTP(w, r)
 }
 
-// UpdateAutopilotDocument operation middleware
-func (siw *ServerInterfaceWrapper) UpdateAutopilotDocument(w http.ResponseWriter, r *http.Request) {
+// UpdateControllerDocument operation middleware
+func (siw *ServerInterfaceWrapper) UpdateControllerDocument(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
 	// ------------- Path parameter "name" -------------
-	var name AutopilotName
+	var name ControllerName
 
 	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
@@ -8509,7 +8509,7 @@ func (siw *ServerInterfaceWrapper) UpdateAutopilotDocument(w http.ResponseWriter
 	}
 
 	// ------------- Path parameter "document" -------------
-	var document AutopilotDocument
+	var document ControllerDocument
 
 	err = runtime.BindStyledParameterWithOptions("simple", "document", chi.URLParam(r, "document"), &document, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
@@ -8526,7 +8526,7 @@ func (siw *ServerInterfaceWrapper) UpdateAutopilotDocument(w http.ResponseWriter
 	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.UpdateAutopilotDocument(w, r, name, document)
+		siw.Handler.UpdateControllerDocument(w, r, name, document)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -8536,13 +8536,13 @@ func (siw *ServerInterfaceWrapper) UpdateAutopilotDocument(w http.ResponseWriter
 	handler.ServeHTTP(w, r)
 }
 
-// DuplicateAutopilot operation middleware
-func (siw *ServerInterfaceWrapper) DuplicateAutopilot(w http.ResponseWriter, r *http.Request) {
+// DuplicateController operation middleware
+func (siw *ServerInterfaceWrapper) DuplicateController(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
 	// ------------- Path parameter "name" -------------
-	var name AutopilotName
+	var name ControllerName
 
 	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
@@ -8559,7 +8559,7 @@ func (siw *ServerInterfaceWrapper) DuplicateAutopilot(w http.ResponseWriter, r *
 	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DuplicateAutopilot(w, r, name)
+		siw.Handler.DuplicateController(w, r, name)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -8569,13 +8569,13 @@ func (siw *ServerInterfaceWrapper) DuplicateAutopilot(w http.ResponseWriter, r *
 	handler.ServeHTTP(w, r)
 }
 
-// ReflectAutopilotMemory operation middleware
-func (siw *ServerInterfaceWrapper) ReflectAutopilotMemory(w http.ResponseWriter, r *http.Request) {
+// ReflectControllerMemory operation middleware
+func (siw *ServerInterfaceWrapper) ReflectControllerMemory(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
 	// ------------- Path parameter "name" -------------
-	var name AutopilotName
+	var name ControllerName
 
 	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
@@ -8592,7 +8592,7 @@ func (siw *ServerInterfaceWrapper) ReflectAutopilotMemory(w http.ResponseWriter,
 	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ReflectAutopilotMemory(w, r, name)
+		siw.Handler.ReflectControllerMemory(w, r, name)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -8602,13 +8602,13 @@ func (siw *ServerInterfaceWrapper) ReflectAutopilotMemory(w http.ResponseWriter,
 	handler.ServeHTTP(w, r)
 }
 
-// MessageAutopilot operation middleware
-func (siw *ServerInterfaceWrapper) MessageAutopilot(w http.ResponseWriter, r *http.Request) {
+// MessageController operation middleware
+func (siw *ServerInterfaceWrapper) MessageController(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
 	// ------------- Path parameter "name" -------------
-	var name AutopilotName
+	var name ControllerName
 
 	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
@@ -8625,7 +8625,7 @@ func (siw *ServerInterfaceWrapper) MessageAutopilot(w http.ResponseWriter, r *ht
 	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.MessageAutopilot(w, r, name)
+		siw.Handler.MessageController(w, r, name)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -8635,13 +8635,13 @@ func (siw *ServerInterfaceWrapper) MessageAutopilot(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
-// PauseAutopilot operation middleware
-func (siw *ServerInterfaceWrapper) PauseAutopilot(w http.ResponseWriter, r *http.Request) {
+// PauseController operation middleware
+func (siw *ServerInterfaceWrapper) PauseController(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
 	// ------------- Path parameter "name" -------------
-	var name AutopilotName
+	var name ControllerName
 
 	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
@@ -8658,7 +8658,7 @@ func (siw *ServerInterfaceWrapper) PauseAutopilot(w http.ResponseWriter, r *http
 	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PauseAutopilot(w, r, name)
+		siw.Handler.PauseController(w, r, name)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -8668,13 +8668,13 @@ func (siw *ServerInterfaceWrapper) PauseAutopilot(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
-// RenameAutopilot operation middleware
-func (siw *ServerInterfaceWrapper) RenameAutopilot(w http.ResponseWriter, r *http.Request) {
+// RenameController operation middleware
+func (siw *ServerInterfaceWrapper) RenameController(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
 	// ------------- Path parameter "name" -------------
-	var name AutopilotName
+	var name ControllerName
 
 	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
@@ -8691,7 +8691,7 @@ func (siw *ServerInterfaceWrapper) RenameAutopilot(w http.ResponseWriter, r *htt
 	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.RenameAutopilot(w, r, name)
+		siw.Handler.RenameController(w, r, name)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -8701,13 +8701,13 @@ func (siw *ServerInterfaceWrapper) RenameAutopilot(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r)
 }
 
-// ResetAutopilot operation middleware
-func (siw *ServerInterfaceWrapper) ResetAutopilot(w http.ResponseWriter, r *http.Request) {
+// ResetController operation middleware
+func (siw *ServerInterfaceWrapper) ResetController(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
 	// ------------- Path parameter "name" -------------
-	var name AutopilotName
+	var name ControllerName
 
 	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
@@ -8724,7 +8724,7 @@ func (siw *ServerInterfaceWrapper) ResetAutopilot(w http.ResponseWriter, r *http
 	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ResetAutopilot(w, r, name)
+		siw.Handler.ResetController(w, r, name)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -8734,13 +8734,13 @@ func (siw *ServerInterfaceWrapper) ResetAutopilot(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
-// RespondAutopilot operation middleware
-func (siw *ServerInterfaceWrapper) RespondAutopilot(w http.ResponseWriter, r *http.Request) {
+// RespondController operation middleware
+func (siw *ServerInterfaceWrapper) RespondController(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
 	// ------------- Path parameter "name" -------------
-	var name AutopilotName
+	var name ControllerName
 
 	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
@@ -8757,7 +8757,7 @@ func (siw *ServerInterfaceWrapper) RespondAutopilot(w http.ResponseWriter, r *ht
 	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.RespondAutopilot(w, r, name)
+		siw.Handler.RespondController(w, r, name)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -8767,13 +8767,13 @@ func (siw *ServerInterfaceWrapper) RespondAutopilot(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
-// ResumeAutopilot operation middleware
-func (siw *ServerInterfaceWrapper) ResumeAutopilot(w http.ResponseWriter, r *http.Request) {
+// ResumeController operation middleware
+func (siw *ServerInterfaceWrapper) ResumeController(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
 	// ------------- Path parameter "name" -------------
-	var name AutopilotName
+	var name ControllerName
 
 	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
@@ -8790,7 +8790,7 @@ func (siw *ServerInterfaceWrapper) ResumeAutopilot(w http.ResponseWriter, r *htt
 	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ResumeAutopilot(w, r, name)
+		siw.Handler.ResumeController(w, r, name)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -8800,13 +8800,13 @@ func (siw *ServerInterfaceWrapper) ResumeAutopilot(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r)
 }
 
-// GetAutopilotSpec operation middleware
-func (siw *ServerInterfaceWrapper) GetAutopilotSpec(w http.ResponseWriter, r *http.Request) {
+// GetControllerSpec operation middleware
+func (siw *ServerInterfaceWrapper) GetControllerSpec(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
 	// ------------- Path parameter "name" -------------
-	var name AutopilotName
+	var name ControllerName
 
 	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
@@ -8823,7 +8823,7 @@ func (siw *ServerInterfaceWrapper) GetAutopilotSpec(w http.ResponseWriter, r *ht
 	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetAutopilotSpec(w, r, name)
+		siw.Handler.GetControllerSpec(w, r, name)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -8833,13 +8833,13 @@ func (siw *ServerInterfaceWrapper) GetAutopilotSpec(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
-// PutAutopilotSpec operation middleware
-func (siw *ServerInterfaceWrapper) PutAutopilotSpec(w http.ResponseWriter, r *http.Request) {
+// PutControllerSpec operation middleware
+func (siw *ServerInterfaceWrapper) PutControllerSpec(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
 	// ------------- Path parameter "name" -------------
-	var name AutopilotName
+	var name ControllerName
 
 	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
@@ -8856,7 +8856,7 @@ func (siw *ServerInterfaceWrapper) PutAutopilotSpec(w http.ResponseWriter, r *ht
 	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PutAutopilotSpec(w, r, name)
+		siw.Handler.PutControllerSpec(w, r, name)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -8866,13 +8866,13 @@ func (siw *ServerInterfaceWrapper) PutAutopilotSpec(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
-// StartAutopilot operation middleware
-func (siw *ServerInterfaceWrapper) StartAutopilot(w http.ResponseWriter, r *http.Request) {
+// StartController operation middleware
+func (siw *ServerInterfaceWrapper) StartController(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
 	// ------------- Path parameter "name" -------------
-	var name AutopilotName
+	var name ControllerName
 
 	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
@@ -8889,7 +8889,7 @@ func (siw *ServerInterfaceWrapper) StartAutopilot(w http.ResponseWriter, r *http
 	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.StartAutopilot(w, r, name)
+		siw.Handler.StartController(w, r, name)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -8899,13 +8899,13 @@ func (siw *ServerInterfaceWrapper) StartAutopilot(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
-// CreateAutopilotTask operation middleware
-func (siw *ServerInterfaceWrapper) CreateAutopilotTask(w http.ResponseWriter, r *http.Request) {
+// CreateControllerTask operation middleware
+func (siw *ServerInterfaceWrapper) CreateControllerTask(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
 	// ------------- Path parameter "name" -------------
-	var name AutopilotName
+	var name ControllerName
 
 	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
@@ -8922,7 +8922,7 @@ func (siw *ServerInterfaceWrapper) CreateAutopilotTask(w http.ResponseWriter, r 
 	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateAutopilotTask(w, r, name)
+		siw.Handler.CreateControllerTask(w, r, name)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -8932,13 +8932,13 @@ func (siw *ServerInterfaceWrapper) CreateAutopilotTask(w http.ResponseWriter, r 
 	handler.ServeHTTP(w, r)
 }
 
-// ReorderAutopilotTasks operation middleware
-func (siw *ServerInterfaceWrapper) ReorderAutopilotTasks(w http.ResponseWriter, r *http.Request) {
+// ReorderControllerTasks operation middleware
+func (siw *ServerInterfaceWrapper) ReorderControllerTasks(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
 	// ------------- Path parameter "name" -------------
-	var name AutopilotName
+	var name ControllerName
 
 	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
@@ -8955,7 +8955,7 @@ func (siw *ServerInterfaceWrapper) ReorderAutopilotTasks(w http.ResponseWriter, 
 	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ReorderAutopilotTasks(w, r, name)
+		siw.Handler.ReorderControllerTasks(w, r, name)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -8965,13 +8965,13 @@ func (siw *ServerInterfaceWrapper) ReorderAutopilotTasks(w http.ResponseWriter, 
 	handler.ServeHTTP(w, r)
 }
 
-// DeleteAutopilotTask operation middleware
-func (siw *ServerInterfaceWrapper) DeleteAutopilotTask(w http.ResponseWriter, r *http.Request) {
+// DeleteControllerTask operation middleware
+func (siw *ServerInterfaceWrapper) DeleteControllerTask(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
 	// ------------- Path parameter "name" -------------
-	var name AutopilotName
+	var name ControllerName
 
 	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
@@ -8997,7 +8997,7 @@ func (siw *ServerInterfaceWrapper) DeleteAutopilotTask(w http.ResponseWriter, r 
 	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeleteAutopilotTask(w, r, name, taskId)
+		siw.Handler.DeleteControllerTask(w, r, name, taskId)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -9007,13 +9007,13 @@ func (siw *ServerInterfaceWrapper) DeleteAutopilotTask(w http.ResponseWriter, r 
 	handler.ServeHTTP(w, r)
 }
 
-// UpdateAutopilotTask operation middleware
-func (siw *ServerInterfaceWrapper) UpdateAutopilotTask(w http.ResponseWriter, r *http.Request) {
+// UpdateControllerTask operation middleware
+func (siw *ServerInterfaceWrapper) UpdateControllerTask(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
 	// ------------- Path parameter "name" -------------
-	var name AutopilotName
+	var name ControllerName
 
 	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
@@ -9039,7 +9039,7 @@ func (siw *ServerInterfaceWrapper) UpdateAutopilotTask(w http.ResponseWriter, r 
 	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.UpdateAutopilotTask(w, r, name, taskId)
+		siw.Handler.UpdateControllerTask(w, r, name, taskId)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -13552,11 +13552,11 @@ func (siw *ServerInterfaceWrapper) ListEventLogs(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// ------------- Optional query parameter "autopilotName" -------------
+	// ------------- Optional query parameter "controllerName" -------------
 
-	err = runtime.BindQueryParameter("form", true, false, "autopilotName", r.URL.Query(), &params.AutopilotName)
+	err = runtime.BindQueryParameter("form", true, false, "controllerName", r.URL.Query(), &params.ControllerName)
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "autopilotName", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "controllerName", Err: err})
 		return
 	}
 
@@ -16946,67 +16946,67 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/auth/setup", wrapper.Setup)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/autopilot", wrapper.ListAutopilot)
+		r.Get(options.BaseURL+"/controller", wrapper.ListController)
 	})
 	r.Group(func(r chi.Router) {
-		r.Delete(options.BaseURL+"/autopilot/{name}", wrapper.DeleteAutopilot)
+		r.Delete(options.BaseURL+"/controller/{name}", wrapper.DeleteController)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/autopilot/{name}", wrapper.GetAutopilot)
+		r.Get(options.BaseURL+"/controller/{name}", wrapper.GetController)
 	})
 	r.Group(func(r chi.Router) {
-		r.Delete(options.BaseURL+"/autopilot/{name}/documents/{document}", wrapper.DeleteAutopilotDocument)
+		r.Delete(options.BaseURL+"/controller/{name}/documents/{document}", wrapper.DeleteControllerDocument)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/autopilot/{name}/documents/{document}", wrapper.GetAutopilotDocument)
+		r.Get(options.BaseURL+"/controller/{name}/documents/{document}", wrapper.GetControllerDocument)
 	})
 	r.Group(func(r chi.Router) {
-		r.Put(options.BaseURL+"/autopilot/{name}/documents/{document}", wrapper.UpdateAutopilotDocument)
+		r.Put(options.BaseURL+"/controller/{name}/documents/{document}", wrapper.UpdateControllerDocument)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/autopilot/{name}/duplicate", wrapper.DuplicateAutopilot)
+		r.Post(options.BaseURL+"/controller/{name}/duplicate", wrapper.DuplicateController)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/autopilot/{name}/memory/reflect", wrapper.ReflectAutopilotMemory)
+		r.Post(options.BaseURL+"/controller/{name}/memory/reflect", wrapper.ReflectControllerMemory)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/autopilot/{name}/message", wrapper.MessageAutopilot)
+		r.Post(options.BaseURL+"/controller/{name}/message", wrapper.MessageController)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/autopilot/{name}/pause", wrapper.PauseAutopilot)
+		r.Post(options.BaseURL+"/controller/{name}/pause", wrapper.PauseController)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/autopilot/{name}/rename", wrapper.RenameAutopilot)
+		r.Post(options.BaseURL+"/controller/{name}/rename", wrapper.RenameController)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/autopilot/{name}/reset", wrapper.ResetAutopilot)
+		r.Post(options.BaseURL+"/controller/{name}/reset", wrapper.ResetController)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/autopilot/{name}/response", wrapper.RespondAutopilot)
+		r.Post(options.BaseURL+"/controller/{name}/response", wrapper.RespondController)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/autopilot/{name}/resume", wrapper.ResumeAutopilot)
+		r.Post(options.BaseURL+"/controller/{name}/resume", wrapper.ResumeController)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/autopilot/{name}/spec", wrapper.GetAutopilotSpec)
+		r.Get(options.BaseURL+"/controller/{name}/spec", wrapper.GetControllerSpec)
 	})
 	r.Group(func(r chi.Router) {
-		r.Put(options.BaseURL+"/autopilot/{name}/spec", wrapper.PutAutopilotSpec)
+		r.Put(options.BaseURL+"/controller/{name}/spec", wrapper.PutControllerSpec)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/autopilot/{name}/start", wrapper.StartAutopilot)
+		r.Post(options.BaseURL+"/controller/{name}/start", wrapper.StartController)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/autopilot/{name}/tasks", wrapper.CreateAutopilotTask)
+		r.Post(options.BaseURL+"/controller/{name}/tasks", wrapper.CreateControllerTask)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/autopilot/{name}/tasks/reorder", wrapper.ReorderAutopilotTasks)
+		r.Post(options.BaseURL+"/controller/{name}/tasks/reorder", wrapper.ReorderControllerTasks)
 	})
 	r.Group(func(r chi.Router) {
-		r.Delete(options.BaseURL+"/autopilot/{name}/tasks/{taskId}", wrapper.DeleteAutopilotTask)
+		r.Delete(options.BaseURL+"/controller/{name}/tasks/{taskId}", wrapper.DeleteControllerTask)
 	})
 	r.Group(func(r chi.Router) {
-		r.Patch(options.BaseURL+"/autopilot/{name}/tasks/{taskId}", wrapper.UpdateAutopilotTask)
+		r.Patch(options.BaseURL+"/controller/{name}/tasks/{taskId}", wrapper.UpdateControllerTask)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/dag-runs", wrapper.ListDAGRuns)
@@ -18313,1231 +18313,1231 @@ func (response SetupdefaultJSONResponse) VisitSetupResponse(w http.ResponseWrite
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type ListAutopilotRequestObject struct {
+type ListControllerRequestObject struct {
 }
 
-type ListAutopilotResponseObject interface {
-	VisitListAutopilotResponse(w http.ResponseWriter) error
+type ListControllerResponseObject interface {
+	VisitListControllerResponse(w http.ResponseWriter) error
 }
 
-type ListAutopilot200JSONResponse AutopilotListResponse
+type ListController200JSONResponse ControllerListResponse
 
-func (response ListAutopilot200JSONResponse) VisitListAutopilotResponse(w http.ResponseWriter) error {
+func (response ListController200JSONResponse) VisitListControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type ListAutopilot401JSONResponse Error
+type ListController401JSONResponse Error
 
-func (response ListAutopilot401JSONResponse) VisitListAutopilotResponse(w http.ResponseWriter) error {
+func (response ListController401JSONResponse) VisitListControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type ListAutopilotdefaultJSONResponse struct {
+type ListControllerdefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response ListAutopilotdefaultJSONResponse) VisitListAutopilotResponse(w http.ResponseWriter) error {
+func (response ListControllerdefaultJSONResponse) VisitListControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type DeleteAutopilotRequestObject struct {
-	Name AutopilotName `json:"name"`
+type DeleteControllerRequestObject struct {
+	Name ControllerName `json:"name"`
 }
 
-type DeleteAutopilotResponseObject interface {
-	VisitDeleteAutopilotResponse(w http.ResponseWriter) error
+type DeleteControllerResponseObject interface {
+	VisitDeleteControllerResponse(w http.ResponseWriter) error
 }
 
-type DeleteAutopilot204Response struct {
+type DeleteController204Response struct {
 }
 
-func (response DeleteAutopilot204Response) VisitDeleteAutopilotResponse(w http.ResponseWriter) error {
+func (response DeleteController204Response) VisitDeleteControllerResponse(w http.ResponseWriter) error {
 	w.WriteHeader(204)
 	return nil
 }
 
-type DeleteAutopilot401JSONResponse Error
+type DeleteController401JSONResponse Error
 
-func (response DeleteAutopilot401JSONResponse) VisitDeleteAutopilotResponse(w http.ResponseWriter) error {
+func (response DeleteController401JSONResponse) VisitDeleteControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type DeleteAutopilot403JSONResponse Error
+type DeleteController403JSONResponse Error
 
-func (response DeleteAutopilot403JSONResponse) VisitDeleteAutopilotResponse(w http.ResponseWriter) error {
+func (response DeleteController403JSONResponse) VisitDeleteControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(403)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type DeleteAutopilot404JSONResponse Error
+type DeleteController404JSONResponse Error
 
-func (response DeleteAutopilot404JSONResponse) VisitDeleteAutopilotResponse(w http.ResponseWriter) error {
+func (response DeleteController404JSONResponse) VisitDeleteControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type DeleteAutopilotdefaultJSONResponse struct {
+type DeleteControllerdefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response DeleteAutopilotdefaultJSONResponse) VisitDeleteAutopilotResponse(w http.ResponseWriter) error {
+func (response DeleteControllerdefaultJSONResponse) VisitDeleteControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type GetAutopilotRequestObject struct {
-	Name AutopilotName `json:"name"`
+type GetControllerRequestObject struct {
+	Name ControllerName `json:"name"`
 }
 
-type GetAutopilotResponseObject interface {
-	VisitGetAutopilotResponse(w http.ResponseWriter) error
+type GetControllerResponseObject interface {
+	VisitGetControllerResponse(w http.ResponseWriter) error
 }
 
-type GetAutopilot200JSONResponse AutopilotDetailResponse
+type GetController200JSONResponse ControllerDetailResponse
 
-func (response GetAutopilot200JSONResponse) VisitGetAutopilotResponse(w http.ResponseWriter) error {
+func (response GetController200JSONResponse) VisitGetControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type GetAutopilot401JSONResponse Error
+type GetController401JSONResponse Error
 
-func (response GetAutopilot401JSONResponse) VisitGetAutopilotResponse(w http.ResponseWriter) error {
+func (response GetController401JSONResponse) VisitGetControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type GetAutopilot404JSONResponse Error
+type GetController404JSONResponse Error
 
-func (response GetAutopilot404JSONResponse) VisitGetAutopilotResponse(w http.ResponseWriter) error {
+func (response GetController404JSONResponse) VisitGetControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type GetAutopilotdefaultJSONResponse struct {
+type GetControllerdefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response GetAutopilotdefaultJSONResponse) VisitGetAutopilotResponse(w http.ResponseWriter) error {
+func (response GetControllerdefaultJSONResponse) VisitGetControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type DeleteAutopilotDocumentRequestObject struct {
-	Name     AutopilotName     `json:"name"`
-	Document AutopilotDocument `json:"document"`
+type DeleteControllerDocumentRequestObject struct {
+	Name     ControllerName     `json:"name"`
+	Document ControllerDocument `json:"document"`
 }
 
-type DeleteAutopilotDocumentResponseObject interface {
-	VisitDeleteAutopilotDocumentResponse(w http.ResponseWriter) error
+type DeleteControllerDocumentResponseObject interface {
+	VisitDeleteControllerDocumentResponse(w http.ResponseWriter) error
 }
 
-type DeleteAutopilotDocument204Response struct {
+type DeleteControllerDocument204Response struct {
 }
 
-func (response DeleteAutopilotDocument204Response) VisitDeleteAutopilotDocumentResponse(w http.ResponseWriter) error {
+func (response DeleteControllerDocument204Response) VisitDeleteControllerDocumentResponse(w http.ResponseWriter) error {
 	w.WriteHeader(204)
 	return nil
 }
 
-type DeleteAutopilotDocument401JSONResponse Error
+type DeleteControllerDocument401JSONResponse Error
 
-func (response DeleteAutopilotDocument401JSONResponse) VisitDeleteAutopilotDocumentResponse(w http.ResponseWriter) error {
+func (response DeleteControllerDocument401JSONResponse) VisitDeleteControllerDocumentResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type DeleteAutopilotDocument403JSONResponse Error
+type DeleteControllerDocument403JSONResponse Error
 
-func (response DeleteAutopilotDocument403JSONResponse) VisitDeleteAutopilotDocumentResponse(w http.ResponseWriter) error {
+func (response DeleteControllerDocument403JSONResponse) VisitDeleteControllerDocumentResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(403)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type DeleteAutopilotDocument404JSONResponse Error
+type DeleteControllerDocument404JSONResponse Error
 
-func (response DeleteAutopilotDocument404JSONResponse) VisitDeleteAutopilotDocumentResponse(w http.ResponseWriter) error {
+func (response DeleteControllerDocument404JSONResponse) VisitDeleteControllerDocumentResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type DeleteAutopilotDocumentdefaultJSONResponse struct {
+type DeleteControllerDocumentdefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response DeleteAutopilotDocumentdefaultJSONResponse) VisitDeleteAutopilotDocumentResponse(w http.ResponseWriter) error {
+func (response DeleteControllerDocumentdefaultJSONResponse) VisitDeleteControllerDocumentResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type GetAutopilotDocumentRequestObject struct {
-	Name     AutopilotName     `json:"name"`
-	Document AutopilotDocument `json:"document"`
+type GetControllerDocumentRequestObject struct {
+	Name     ControllerName     `json:"name"`
+	Document ControllerDocument `json:"document"`
 }
 
-type GetAutopilotDocumentResponseObject interface {
-	VisitGetAutopilotDocumentResponse(w http.ResponseWriter) error
+type GetControllerDocumentResponseObject interface {
+	VisitGetControllerDocumentResponse(w http.ResponseWriter) error
 }
 
-type GetAutopilotDocument200JSONResponse AutopilotDocumentResponse
+type GetControllerDocument200JSONResponse ControllerDocumentResponse
 
-func (response GetAutopilotDocument200JSONResponse) VisitGetAutopilotDocumentResponse(w http.ResponseWriter) error {
+func (response GetControllerDocument200JSONResponse) VisitGetControllerDocumentResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type GetAutopilotDocument401JSONResponse Error
+type GetControllerDocument401JSONResponse Error
 
-func (response GetAutopilotDocument401JSONResponse) VisitGetAutopilotDocumentResponse(w http.ResponseWriter) error {
+func (response GetControllerDocument401JSONResponse) VisitGetControllerDocumentResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type GetAutopilotDocument404JSONResponse Error
+type GetControllerDocument404JSONResponse Error
 
-func (response GetAutopilotDocument404JSONResponse) VisitGetAutopilotDocumentResponse(w http.ResponseWriter) error {
+func (response GetControllerDocument404JSONResponse) VisitGetControllerDocumentResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type GetAutopilotDocumentdefaultJSONResponse struct {
+type GetControllerDocumentdefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response GetAutopilotDocumentdefaultJSONResponse) VisitGetAutopilotDocumentResponse(w http.ResponseWriter) error {
+func (response GetControllerDocumentdefaultJSONResponse) VisitGetControllerDocumentResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type UpdateAutopilotDocumentRequestObject struct {
-	Name     AutopilotName     `json:"name"`
-	Document AutopilotDocument `json:"document"`
-	Body     *UpdateAutopilotDocumentJSONRequestBody
+type UpdateControllerDocumentRequestObject struct {
+	Name     ControllerName     `json:"name"`
+	Document ControllerDocument `json:"document"`
+	Body     *UpdateControllerDocumentJSONRequestBody
 }
 
-type UpdateAutopilotDocumentResponseObject interface {
-	VisitUpdateAutopilotDocumentResponse(w http.ResponseWriter) error
+type UpdateControllerDocumentResponseObject interface {
+	VisitUpdateControllerDocumentResponse(w http.ResponseWriter) error
 }
 
-type UpdateAutopilotDocument200JSONResponse AutopilotDocumentResponse
+type UpdateControllerDocument200JSONResponse ControllerDocumentResponse
 
-func (response UpdateAutopilotDocument200JSONResponse) VisitUpdateAutopilotDocumentResponse(w http.ResponseWriter) error {
+func (response UpdateControllerDocument200JSONResponse) VisitUpdateControllerDocumentResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type UpdateAutopilotDocument400JSONResponse Error
+type UpdateControllerDocument400JSONResponse Error
 
-func (response UpdateAutopilotDocument400JSONResponse) VisitUpdateAutopilotDocumentResponse(w http.ResponseWriter) error {
+func (response UpdateControllerDocument400JSONResponse) VisitUpdateControllerDocumentResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(400)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type UpdateAutopilotDocument401JSONResponse Error
+type UpdateControllerDocument401JSONResponse Error
 
-func (response UpdateAutopilotDocument401JSONResponse) VisitUpdateAutopilotDocumentResponse(w http.ResponseWriter) error {
+func (response UpdateControllerDocument401JSONResponse) VisitUpdateControllerDocumentResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type UpdateAutopilotDocument403JSONResponse Error
+type UpdateControllerDocument403JSONResponse Error
 
-func (response UpdateAutopilotDocument403JSONResponse) VisitUpdateAutopilotDocumentResponse(w http.ResponseWriter) error {
+func (response UpdateControllerDocument403JSONResponse) VisitUpdateControllerDocumentResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(403)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type UpdateAutopilotDocument404JSONResponse Error
+type UpdateControllerDocument404JSONResponse Error
 
-func (response UpdateAutopilotDocument404JSONResponse) VisitUpdateAutopilotDocumentResponse(w http.ResponseWriter) error {
+func (response UpdateControllerDocument404JSONResponse) VisitUpdateControllerDocumentResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type UpdateAutopilotDocumentdefaultJSONResponse struct {
+type UpdateControllerDocumentdefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response UpdateAutopilotDocumentdefaultJSONResponse) VisitUpdateAutopilotDocumentResponse(w http.ResponseWriter) error {
+func (response UpdateControllerDocumentdefaultJSONResponse) VisitUpdateControllerDocumentResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type DuplicateAutopilotRequestObject struct {
-	Name AutopilotName `json:"name"`
-	Body *DuplicateAutopilotJSONRequestBody
+type DuplicateControllerRequestObject struct {
+	Name ControllerName `json:"name"`
+	Body *DuplicateControllerJSONRequestBody
 }
 
-type DuplicateAutopilotResponseObject interface {
-	VisitDuplicateAutopilotResponse(w http.ResponseWriter) error
+type DuplicateControllerResponseObject interface {
+	VisitDuplicateControllerResponse(w http.ResponseWriter) error
 }
 
-type DuplicateAutopilot204Response struct {
+type DuplicateController204Response struct {
 }
 
-func (response DuplicateAutopilot204Response) VisitDuplicateAutopilotResponse(w http.ResponseWriter) error {
+func (response DuplicateController204Response) VisitDuplicateControllerResponse(w http.ResponseWriter) error {
 	w.WriteHeader(204)
 	return nil
 }
 
-type DuplicateAutopilot400JSONResponse Error
+type DuplicateController400JSONResponse Error
 
-func (response DuplicateAutopilot400JSONResponse) VisitDuplicateAutopilotResponse(w http.ResponseWriter) error {
+func (response DuplicateController400JSONResponse) VisitDuplicateControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(400)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type DuplicateAutopilot401JSONResponse Error
+type DuplicateController401JSONResponse Error
 
-func (response DuplicateAutopilot401JSONResponse) VisitDuplicateAutopilotResponse(w http.ResponseWriter) error {
+func (response DuplicateController401JSONResponse) VisitDuplicateControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type DuplicateAutopilot403JSONResponse Error
+type DuplicateController403JSONResponse Error
 
-func (response DuplicateAutopilot403JSONResponse) VisitDuplicateAutopilotResponse(w http.ResponseWriter) error {
+func (response DuplicateController403JSONResponse) VisitDuplicateControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(403)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type DuplicateAutopilot404JSONResponse Error
+type DuplicateController404JSONResponse Error
 
-func (response DuplicateAutopilot404JSONResponse) VisitDuplicateAutopilotResponse(w http.ResponseWriter) error {
+func (response DuplicateController404JSONResponse) VisitDuplicateControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type DuplicateAutopilotdefaultJSONResponse struct {
+type DuplicateControllerdefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response DuplicateAutopilotdefaultJSONResponse) VisitDuplicateAutopilotResponse(w http.ResponseWriter) error {
+func (response DuplicateControllerdefaultJSONResponse) VisitDuplicateControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type ReflectAutopilotMemoryRequestObject struct {
-	Name AutopilotName `json:"name"`
+type ReflectControllerMemoryRequestObject struct {
+	Name ControllerName `json:"name"`
 }
 
-type ReflectAutopilotMemoryResponseObject interface {
-	VisitReflectAutopilotMemoryResponse(w http.ResponseWriter) error
+type ReflectControllerMemoryResponseObject interface {
+	VisitReflectControllerMemoryResponse(w http.ResponseWriter) error
 }
 
-type ReflectAutopilotMemory200JSONResponse AutopilotMemoryReflectionResponse
+type ReflectControllerMemory200JSONResponse ControllerMemoryReflectionResponse
 
-func (response ReflectAutopilotMemory200JSONResponse) VisitReflectAutopilotMemoryResponse(w http.ResponseWriter) error {
+func (response ReflectControllerMemory200JSONResponse) VisitReflectControllerMemoryResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type ReflectAutopilotMemory400JSONResponse Error
+type ReflectControllerMemory400JSONResponse Error
 
-func (response ReflectAutopilotMemory400JSONResponse) VisitReflectAutopilotMemoryResponse(w http.ResponseWriter) error {
+func (response ReflectControllerMemory400JSONResponse) VisitReflectControllerMemoryResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(400)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type ReflectAutopilotMemory401JSONResponse Error
+type ReflectControllerMemory401JSONResponse Error
 
-func (response ReflectAutopilotMemory401JSONResponse) VisitReflectAutopilotMemoryResponse(w http.ResponseWriter) error {
+func (response ReflectControllerMemory401JSONResponse) VisitReflectControllerMemoryResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type ReflectAutopilotMemory403JSONResponse Error
+type ReflectControllerMemory403JSONResponse Error
 
-func (response ReflectAutopilotMemory403JSONResponse) VisitReflectAutopilotMemoryResponse(w http.ResponseWriter) error {
+func (response ReflectControllerMemory403JSONResponse) VisitReflectControllerMemoryResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(403)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type ReflectAutopilotMemory404JSONResponse Error
+type ReflectControllerMemory404JSONResponse Error
 
-func (response ReflectAutopilotMemory404JSONResponse) VisitReflectAutopilotMemoryResponse(w http.ResponseWriter) error {
+func (response ReflectControllerMemory404JSONResponse) VisitReflectControllerMemoryResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type ReflectAutopilotMemorydefaultJSONResponse struct {
+type ReflectControllerMemorydefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response ReflectAutopilotMemorydefaultJSONResponse) VisitReflectAutopilotMemoryResponse(w http.ResponseWriter) error {
+func (response ReflectControllerMemorydefaultJSONResponse) VisitReflectControllerMemoryResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type MessageAutopilotRequestObject struct {
-	Name AutopilotName `json:"name"`
-	Body *MessageAutopilotJSONRequestBody
+type MessageControllerRequestObject struct {
+	Name ControllerName `json:"name"`
+	Body *MessageControllerJSONRequestBody
 }
 
-type MessageAutopilotResponseObject interface {
-	VisitMessageAutopilotResponse(w http.ResponseWriter) error
+type MessageControllerResponseObject interface {
+	VisitMessageControllerResponse(w http.ResponseWriter) error
 }
 
-type MessageAutopilot204Response struct {
+type MessageController204Response struct {
 }
 
-func (response MessageAutopilot204Response) VisitMessageAutopilotResponse(w http.ResponseWriter) error {
+func (response MessageController204Response) VisitMessageControllerResponse(w http.ResponseWriter) error {
 	w.WriteHeader(204)
 	return nil
 }
 
-type MessageAutopilot400JSONResponse Error
+type MessageController400JSONResponse Error
 
-func (response MessageAutopilot400JSONResponse) VisitMessageAutopilotResponse(w http.ResponseWriter) error {
+func (response MessageController400JSONResponse) VisitMessageControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(400)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type MessageAutopilot401JSONResponse Error
+type MessageController401JSONResponse Error
 
-func (response MessageAutopilot401JSONResponse) VisitMessageAutopilotResponse(w http.ResponseWriter) error {
+func (response MessageController401JSONResponse) VisitMessageControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type MessageAutopilot403JSONResponse Error
+type MessageController403JSONResponse Error
 
-func (response MessageAutopilot403JSONResponse) VisitMessageAutopilotResponse(w http.ResponseWriter) error {
+func (response MessageController403JSONResponse) VisitMessageControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(403)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type MessageAutopilot409JSONResponse Error
+type MessageController409JSONResponse Error
 
-func (response MessageAutopilot409JSONResponse) VisitMessageAutopilotResponse(w http.ResponseWriter) error {
+func (response MessageController409JSONResponse) VisitMessageControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(409)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type MessageAutopilotdefaultJSONResponse struct {
+type MessageControllerdefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response MessageAutopilotdefaultJSONResponse) VisitMessageAutopilotResponse(w http.ResponseWriter) error {
+func (response MessageControllerdefaultJSONResponse) VisitMessageControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type PauseAutopilotRequestObject struct {
-	Name AutopilotName `json:"name"`
+type PauseControllerRequestObject struct {
+	Name ControllerName `json:"name"`
 }
 
-type PauseAutopilotResponseObject interface {
-	VisitPauseAutopilotResponse(w http.ResponseWriter) error
+type PauseControllerResponseObject interface {
+	VisitPauseControllerResponse(w http.ResponseWriter) error
 }
 
-type PauseAutopilot204Response struct {
+type PauseController204Response struct {
 }
 
-func (response PauseAutopilot204Response) VisitPauseAutopilotResponse(w http.ResponseWriter) error {
+func (response PauseController204Response) VisitPauseControllerResponse(w http.ResponseWriter) error {
 	w.WriteHeader(204)
 	return nil
 }
 
-type PauseAutopilot400JSONResponse Error
+type PauseController400JSONResponse Error
 
-func (response PauseAutopilot400JSONResponse) VisitPauseAutopilotResponse(w http.ResponseWriter) error {
+func (response PauseController400JSONResponse) VisitPauseControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(400)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type PauseAutopilot401JSONResponse Error
+type PauseController401JSONResponse Error
 
-func (response PauseAutopilot401JSONResponse) VisitPauseAutopilotResponse(w http.ResponseWriter) error {
+func (response PauseController401JSONResponse) VisitPauseControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type PauseAutopilot403JSONResponse Error
+type PauseController403JSONResponse Error
 
-func (response PauseAutopilot403JSONResponse) VisitPauseAutopilotResponse(w http.ResponseWriter) error {
+func (response PauseController403JSONResponse) VisitPauseControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(403)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type PauseAutopilot409JSONResponse Error
+type PauseController409JSONResponse Error
 
-func (response PauseAutopilot409JSONResponse) VisitPauseAutopilotResponse(w http.ResponseWriter) error {
+func (response PauseController409JSONResponse) VisitPauseControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(409)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type PauseAutopilotdefaultJSONResponse struct {
+type PauseControllerdefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response PauseAutopilotdefaultJSONResponse) VisitPauseAutopilotResponse(w http.ResponseWriter) error {
+func (response PauseControllerdefaultJSONResponse) VisitPauseControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type RenameAutopilotRequestObject struct {
-	Name AutopilotName `json:"name"`
-	Body *RenameAutopilotJSONRequestBody
+type RenameControllerRequestObject struct {
+	Name ControllerName `json:"name"`
+	Body *RenameControllerJSONRequestBody
 }
 
-type RenameAutopilotResponseObject interface {
-	VisitRenameAutopilotResponse(w http.ResponseWriter) error
+type RenameControllerResponseObject interface {
+	VisitRenameControllerResponse(w http.ResponseWriter) error
 }
 
-type RenameAutopilot204Response struct {
+type RenameController204Response struct {
 }
 
-func (response RenameAutopilot204Response) VisitRenameAutopilotResponse(w http.ResponseWriter) error {
+func (response RenameController204Response) VisitRenameControllerResponse(w http.ResponseWriter) error {
 	w.WriteHeader(204)
 	return nil
 }
 
-type RenameAutopilot400JSONResponse Error
+type RenameController400JSONResponse Error
 
-func (response RenameAutopilot400JSONResponse) VisitRenameAutopilotResponse(w http.ResponseWriter) error {
+func (response RenameController400JSONResponse) VisitRenameControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(400)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type RenameAutopilot401JSONResponse Error
+type RenameController401JSONResponse Error
 
-func (response RenameAutopilot401JSONResponse) VisitRenameAutopilotResponse(w http.ResponseWriter) error {
+func (response RenameController401JSONResponse) VisitRenameControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type RenameAutopilot403JSONResponse Error
+type RenameController403JSONResponse Error
 
-func (response RenameAutopilot403JSONResponse) VisitRenameAutopilotResponse(w http.ResponseWriter) error {
+func (response RenameController403JSONResponse) VisitRenameControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(403)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type RenameAutopilot404JSONResponse Error
+type RenameController404JSONResponse Error
 
-func (response RenameAutopilot404JSONResponse) VisitRenameAutopilotResponse(w http.ResponseWriter) error {
+func (response RenameController404JSONResponse) VisitRenameControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type RenameAutopilot409JSONResponse Error
+type RenameController409JSONResponse Error
 
-func (response RenameAutopilot409JSONResponse) VisitRenameAutopilotResponse(w http.ResponseWriter) error {
+func (response RenameController409JSONResponse) VisitRenameControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(409)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type RenameAutopilotdefaultJSONResponse struct {
+type RenameControllerdefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response RenameAutopilotdefaultJSONResponse) VisitRenameAutopilotResponse(w http.ResponseWriter) error {
+func (response RenameControllerdefaultJSONResponse) VisitRenameControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type ResetAutopilotRequestObject struct {
-	Name AutopilotName `json:"name"`
+type ResetControllerRequestObject struct {
+	Name ControllerName `json:"name"`
 }
 
-type ResetAutopilotResponseObject interface {
-	VisitResetAutopilotResponse(w http.ResponseWriter) error
+type ResetControllerResponseObject interface {
+	VisitResetControllerResponse(w http.ResponseWriter) error
 }
 
-type ResetAutopilot204Response struct {
+type ResetController204Response struct {
 }
 
-func (response ResetAutopilot204Response) VisitResetAutopilotResponse(w http.ResponseWriter) error {
+func (response ResetController204Response) VisitResetControllerResponse(w http.ResponseWriter) error {
 	w.WriteHeader(204)
 	return nil
 }
 
-type ResetAutopilot400JSONResponse Error
+type ResetController400JSONResponse Error
 
-func (response ResetAutopilot400JSONResponse) VisitResetAutopilotResponse(w http.ResponseWriter) error {
+func (response ResetController400JSONResponse) VisitResetControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(400)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type ResetAutopilot401JSONResponse Error
+type ResetController401JSONResponse Error
 
-func (response ResetAutopilot401JSONResponse) VisitResetAutopilotResponse(w http.ResponseWriter) error {
+func (response ResetController401JSONResponse) VisitResetControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type ResetAutopilot403JSONResponse Error
+type ResetController403JSONResponse Error
 
-func (response ResetAutopilot403JSONResponse) VisitResetAutopilotResponse(w http.ResponseWriter) error {
+func (response ResetController403JSONResponse) VisitResetControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(403)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type ResetAutopilot404JSONResponse Error
+type ResetController404JSONResponse Error
 
-func (response ResetAutopilot404JSONResponse) VisitResetAutopilotResponse(w http.ResponseWriter) error {
+func (response ResetController404JSONResponse) VisitResetControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type ResetAutopilotdefaultJSONResponse struct {
+type ResetControllerdefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response ResetAutopilotdefaultJSONResponse) VisitResetAutopilotResponse(w http.ResponseWriter) error {
+func (response ResetControllerdefaultJSONResponse) VisitResetControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type RespondAutopilotRequestObject struct {
-	Name AutopilotName `json:"name"`
-	Body *RespondAutopilotJSONRequestBody
+type RespondControllerRequestObject struct {
+	Name ControllerName `json:"name"`
+	Body *RespondControllerJSONRequestBody
 }
 
-type RespondAutopilotResponseObject interface {
-	VisitRespondAutopilotResponse(w http.ResponseWriter) error
+type RespondControllerResponseObject interface {
+	VisitRespondControllerResponse(w http.ResponseWriter) error
 }
 
-type RespondAutopilot204Response struct {
+type RespondController204Response struct {
 }
 
-func (response RespondAutopilot204Response) VisitRespondAutopilotResponse(w http.ResponseWriter) error {
+func (response RespondController204Response) VisitRespondControllerResponse(w http.ResponseWriter) error {
 	w.WriteHeader(204)
 	return nil
 }
 
-type RespondAutopilot400JSONResponse Error
+type RespondController400JSONResponse Error
 
-func (response RespondAutopilot400JSONResponse) VisitRespondAutopilotResponse(w http.ResponseWriter) error {
+func (response RespondController400JSONResponse) VisitRespondControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(400)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type RespondAutopilot401JSONResponse Error
+type RespondController401JSONResponse Error
 
-func (response RespondAutopilot401JSONResponse) VisitRespondAutopilotResponse(w http.ResponseWriter) error {
+func (response RespondController401JSONResponse) VisitRespondControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type RespondAutopilot403JSONResponse Error
+type RespondController403JSONResponse Error
 
-func (response RespondAutopilot403JSONResponse) VisitRespondAutopilotResponse(w http.ResponseWriter) error {
+func (response RespondController403JSONResponse) VisitRespondControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(403)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type RespondAutopilotdefaultJSONResponse struct {
+type RespondControllerdefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response RespondAutopilotdefaultJSONResponse) VisitRespondAutopilotResponse(w http.ResponseWriter) error {
+func (response RespondControllerdefaultJSONResponse) VisitRespondControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type ResumeAutopilotRequestObject struct {
-	Name AutopilotName `json:"name"`
+type ResumeControllerRequestObject struct {
+	Name ControllerName `json:"name"`
 }
 
-type ResumeAutopilotResponseObject interface {
-	VisitResumeAutopilotResponse(w http.ResponseWriter) error
+type ResumeControllerResponseObject interface {
+	VisitResumeControllerResponse(w http.ResponseWriter) error
 }
 
-type ResumeAutopilot204Response struct {
+type ResumeController204Response struct {
 }
 
-func (response ResumeAutopilot204Response) VisitResumeAutopilotResponse(w http.ResponseWriter) error {
+func (response ResumeController204Response) VisitResumeControllerResponse(w http.ResponseWriter) error {
 	w.WriteHeader(204)
 	return nil
 }
 
-type ResumeAutopilot400JSONResponse Error
+type ResumeController400JSONResponse Error
 
-func (response ResumeAutopilot400JSONResponse) VisitResumeAutopilotResponse(w http.ResponseWriter) error {
+func (response ResumeController400JSONResponse) VisitResumeControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(400)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type ResumeAutopilot401JSONResponse Error
+type ResumeController401JSONResponse Error
 
-func (response ResumeAutopilot401JSONResponse) VisitResumeAutopilotResponse(w http.ResponseWriter) error {
+func (response ResumeController401JSONResponse) VisitResumeControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type ResumeAutopilot403JSONResponse Error
+type ResumeController403JSONResponse Error
 
-func (response ResumeAutopilot403JSONResponse) VisitResumeAutopilotResponse(w http.ResponseWriter) error {
+func (response ResumeController403JSONResponse) VisitResumeControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(403)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type ResumeAutopilot409JSONResponse Error
+type ResumeController409JSONResponse Error
 
-func (response ResumeAutopilot409JSONResponse) VisitResumeAutopilotResponse(w http.ResponseWriter) error {
+func (response ResumeController409JSONResponse) VisitResumeControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(409)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type ResumeAutopilotdefaultJSONResponse struct {
+type ResumeControllerdefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response ResumeAutopilotdefaultJSONResponse) VisitResumeAutopilotResponse(w http.ResponseWriter) error {
+func (response ResumeControllerdefaultJSONResponse) VisitResumeControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type GetAutopilotSpecRequestObject struct {
-	Name AutopilotName `json:"name"`
+type GetControllerSpecRequestObject struct {
+	Name ControllerName `json:"name"`
 }
 
-type GetAutopilotSpecResponseObject interface {
-	VisitGetAutopilotSpecResponse(w http.ResponseWriter) error
+type GetControllerSpecResponseObject interface {
+	VisitGetControllerSpecResponse(w http.ResponseWriter) error
 }
 
-type GetAutopilotSpec200JSONResponse AutopilotSpecResponse
+type GetControllerSpec200JSONResponse ControllerSpecResponse
 
-func (response GetAutopilotSpec200JSONResponse) VisitGetAutopilotSpecResponse(w http.ResponseWriter) error {
+func (response GetControllerSpec200JSONResponse) VisitGetControllerSpecResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type GetAutopilotSpec401JSONResponse Error
+type GetControllerSpec401JSONResponse Error
 
-func (response GetAutopilotSpec401JSONResponse) VisitGetAutopilotSpecResponse(w http.ResponseWriter) error {
+func (response GetControllerSpec401JSONResponse) VisitGetControllerSpecResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type GetAutopilotSpec404JSONResponse Error
+type GetControllerSpec404JSONResponse Error
 
-func (response GetAutopilotSpec404JSONResponse) VisitGetAutopilotSpecResponse(w http.ResponseWriter) error {
+func (response GetControllerSpec404JSONResponse) VisitGetControllerSpecResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type GetAutopilotSpecdefaultJSONResponse struct {
+type GetControllerSpecdefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response GetAutopilotSpecdefaultJSONResponse) VisitGetAutopilotSpecResponse(w http.ResponseWriter) error {
+func (response GetControllerSpecdefaultJSONResponse) VisitGetControllerSpecResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type PutAutopilotSpecRequestObject struct {
-	Name AutopilotName `json:"name"`
-	Body *PutAutopilotSpecJSONRequestBody
+type PutControllerSpecRequestObject struct {
+	Name ControllerName `json:"name"`
+	Body *PutControllerSpecJSONRequestBody
 }
 
-type PutAutopilotSpecResponseObject interface {
-	VisitPutAutopilotSpecResponse(w http.ResponseWriter) error
+type PutControllerSpecResponseObject interface {
+	VisitPutControllerSpecResponse(w http.ResponseWriter) error
 }
 
-type PutAutopilotSpec204Response struct {
+type PutControllerSpec204Response struct {
 }
 
-func (response PutAutopilotSpec204Response) VisitPutAutopilotSpecResponse(w http.ResponseWriter) error {
+func (response PutControllerSpec204Response) VisitPutControllerSpecResponse(w http.ResponseWriter) error {
 	w.WriteHeader(204)
 	return nil
 }
 
-type PutAutopilotSpec400JSONResponse Error
+type PutControllerSpec400JSONResponse Error
 
-func (response PutAutopilotSpec400JSONResponse) VisitPutAutopilotSpecResponse(w http.ResponseWriter) error {
+func (response PutControllerSpec400JSONResponse) VisitPutControllerSpecResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(400)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type PutAutopilotSpec401JSONResponse Error
+type PutControllerSpec401JSONResponse Error
 
-func (response PutAutopilotSpec401JSONResponse) VisitPutAutopilotSpecResponse(w http.ResponseWriter) error {
+func (response PutControllerSpec401JSONResponse) VisitPutControllerSpecResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type PutAutopilotSpec403JSONResponse Error
+type PutControllerSpec403JSONResponse Error
 
-func (response PutAutopilotSpec403JSONResponse) VisitPutAutopilotSpecResponse(w http.ResponseWriter) error {
+func (response PutControllerSpec403JSONResponse) VisitPutControllerSpecResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(403)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type PutAutopilotSpec409JSONResponse Error
+type PutControllerSpec409JSONResponse Error
 
-func (response PutAutopilotSpec409JSONResponse) VisitPutAutopilotSpecResponse(w http.ResponseWriter) error {
+func (response PutControllerSpec409JSONResponse) VisitPutControllerSpecResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(409)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type PutAutopilotSpecdefaultJSONResponse struct {
+type PutControllerSpecdefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response PutAutopilotSpecdefaultJSONResponse) VisitPutAutopilotSpecResponse(w http.ResponseWriter) error {
+func (response PutControllerSpecdefaultJSONResponse) VisitPutControllerSpecResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type StartAutopilotRequestObject struct {
-	Name AutopilotName `json:"name"`
-	Body *StartAutopilotJSONRequestBody
+type StartControllerRequestObject struct {
+	Name ControllerName `json:"name"`
+	Body *StartControllerJSONRequestBody
 }
 
-type StartAutopilotResponseObject interface {
-	VisitStartAutopilotResponse(w http.ResponseWriter) error
+type StartControllerResponseObject interface {
+	VisitStartControllerResponse(w http.ResponseWriter) error
 }
 
-type StartAutopilot204Response struct {
+type StartController204Response struct {
 }
 
-func (response StartAutopilot204Response) VisitStartAutopilotResponse(w http.ResponseWriter) error {
+func (response StartController204Response) VisitStartControllerResponse(w http.ResponseWriter) error {
 	w.WriteHeader(204)
 	return nil
 }
 
-type StartAutopilot400JSONResponse Error
+type StartController400JSONResponse Error
 
-func (response StartAutopilot400JSONResponse) VisitStartAutopilotResponse(w http.ResponseWriter) error {
+func (response StartController400JSONResponse) VisitStartControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(400)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type StartAutopilot401JSONResponse Error
+type StartController401JSONResponse Error
 
-func (response StartAutopilot401JSONResponse) VisitStartAutopilotResponse(w http.ResponseWriter) error {
+func (response StartController401JSONResponse) VisitStartControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type StartAutopilot403JSONResponse Error
+type StartController403JSONResponse Error
 
-func (response StartAutopilot403JSONResponse) VisitStartAutopilotResponse(w http.ResponseWriter) error {
+func (response StartController403JSONResponse) VisitStartControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(403)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type StartAutopilot409JSONResponse Error
+type StartController409JSONResponse Error
 
-func (response StartAutopilot409JSONResponse) VisitStartAutopilotResponse(w http.ResponseWriter) error {
+func (response StartController409JSONResponse) VisitStartControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(409)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type StartAutopilotdefaultJSONResponse struct {
+type StartControllerdefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response StartAutopilotdefaultJSONResponse) VisitStartAutopilotResponse(w http.ResponseWriter) error {
+func (response StartControllerdefaultJSONResponse) VisitStartControllerResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type CreateAutopilotTaskRequestObject struct {
-	Name AutopilotName `json:"name"`
-	Body *CreateAutopilotTaskJSONRequestBody
+type CreateControllerTaskRequestObject struct {
+	Name ControllerName `json:"name"`
+	Body *CreateControllerTaskJSONRequestBody
 }
 
-type CreateAutopilotTaskResponseObject interface {
-	VisitCreateAutopilotTaskResponse(w http.ResponseWriter) error
+type CreateControllerTaskResponseObject interface {
+	VisitCreateControllerTaskResponse(w http.ResponseWriter) error
 }
 
-type CreateAutopilotTask200JSONResponse AutopilotTask
+type CreateControllerTask200JSONResponse ControllerTask
 
-func (response CreateAutopilotTask200JSONResponse) VisitCreateAutopilotTaskResponse(w http.ResponseWriter) error {
+func (response CreateControllerTask200JSONResponse) VisitCreateControllerTaskResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type CreateAutopilotTask400JSONResponse Error
+type CreateControllerTask400JSONResponse Error
 
-func (response CreateAutopilotTask400JSONResponse) VisitCreateAutopilotTaskResponse(w http.ResponseWriter) error {
+func (response CreateControllerTask400JSONResponse) VisitCreateControllerTaskResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(400)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type CreateAutopilotTask401JSONResponse Error
+type CreateControllerTask401JSONResponse Error
 
-func (response CreateAutopilotTask401JSONResponse) VisitCreateAutopilotTaskResponse(w http.ResponseWriter) error {
+func (response CreateControllerTask401JSONResponse) VisitCreateControllerTaskResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type CreateAutopilotTask403JSONResponse Error
+type CreateControllerTask403JSONResponse Error
 
-func (response CreateAutopilotTask403JSONResponse) VisitCreateAutopilotTaskResponse(w http.ResponseWriter) error {
+func (response CreateControllerTask403JSONResponse) VisitCreateControllerTaskResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(403)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type CreateAutopilotTaskdefaultJSONResponse struct {
+type CreateControllerTaskdefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response CreateAutopilotTaskdefaultJSONResponse) VisitCreateAutopilotTaskResponse(w http.ResponseWriter) error {
+func (response CreateControllerTaskdefaultJSONResponse) VisitCreateControllerTaskResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type ReorderAutopilotTasksRequestObject struct {
-	Name AutopilotName `json:"name"`
-	Body *ReorderAutopilotTasksJSONRequestBody
+type ReorderControllerTasksRequestObject struct {
+	Name ControllerName `json:"name"`
+	Body *ReorderControllerTasksJSONRequestBody
 }
 
-type ReorderAutopilotTasksResponseObject interface {
-	VisitReorderAutopilotTasksResponse(w http.ResponseWriter) error
+type ReorderControllerTasksResponseObject interface {
+	VisitReorderControllerTasksResponse(w http.ResponseWriter) error
 }
 
-type ReorderAutopilotTasks204Response struct {
+type ReorderControllerTasks204Response struct {
 }
 
-func (response ReorderAutopilotTasks204Response) VisitReorderAutopilotTasksResponse(w http.ResponseWriter) error {
+func (response ReorderControllerTasks204Response) VisitReorderControllerTasksResponse(w http.ResponseWriter) error {
 	w.WriteHeader(204)
 	return nil
 }
 
-type ReorderAutopilotTasks400JSONResponse Error
+type ReorderControllerTasks400JSONResponse Error
 
-func (response ReorderAutopilotTasks400JSONResponse) VisitReorderAutopilotTasksResponse(w http.ResponseWriter) error {
+func (response ReorderControllerTasks400JSONResponse) VisitReorderControllerTasksResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(400)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type ReorderAutopilotTasks401JSONResponse Error
+type ReorderControllerTasks401JSONResponse Error
 
-func (response ReorderAutopilotTasks401JSONResponse) VisitReorderAutopilotTasksResponse(w http.ResponseWriter) error {
+func (response ReorderControllerTasks401JSONResponse) VisitReorderControllerTasksResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type ReorderAutopilotTasks403JSONResponse Error
+type ReorderControllerTasks403JSONResponse Error
 
-func (response ReorderAutopilotTasks403JSONResponse) VisitReorderAutopilotTasksResponse(w http.ResponseWriter) error {
+func (response ReorderControllerTasks403JSONResponse) VisitReorderControllerTasksResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(403)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type ReorderAutopilotTasksdefaultJSONResponse struct {
+type ReorderControllerTasksdefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response ReorderAutopilotTasksdefaultJSONResponse) VisitReorderAutopilotTasksResponse(w http.ResponseWriter) error {
+func (response ReorderControllerTasksdefaultJSONResponse) VisitReorderControllerTasksResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type DeleteAutopilotTaskRequestObject struct {
-	Name   AutopilotName `json:"name"`
+type DeleteControllerTaskRequestObject struct {
+	Name   ControllerName `json:"name"`
 	TaskId string        `json:"taskId"`
 }
 
-type DeleteAutopilotTaskResponseObject interface {
-	VisitDeleteAutopilotTaskResponse(w http.ResponseWriter) error
+type DeleteControllerTaskResponseObject interface {
+	VisitDeleteControllerTaskResponse(w http.ResponseWriter) error
 }
 
-type DeleteAutopilotTask204Response struct {
+type DeleteControllerTask204Response struct {
 }
 
-func (response DeleteAutopilotTask204Response) VisitDeleteAutopilotTaskResponse(w http.ResponseWriter) error {
+func (response DeleteControllerTask204Response) VisitDeleteControllerTaskResponse(w http.ResponseWriter) error {
 	w.WriteHeader(204)
 	return nil
 }
 
-type DeleteAutopilotTask400JSONResponse Error
+type DeleteControllerTask400JSONResponse Error
 
-func (response DeleteAutopilotTask400JSONResponse) VisitDeleteAutopilotTaskResponse(w http.ResponseWriter) error {
+func (response DeleteControllerTask400JSONResponse) VisitDeleteControllerTaskResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(400)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type DeleteAutopilotTask401JSONResponse Error
+type DeleteControllerTask401JSONResponse Error
 
-func (response DeleteAutopilotTask401JSONResponse) VisitDeleteAutopilotTaskResponse(w http.ResponseWriter) error {
+func (response DeleteControllerTask401JSONResponse) VisitDeleteControllerTaskResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type DeleteAutopilotTask403JSONResponse Error
+type DeleteControllerTask403JSONResponse Error
 
-func (response DeleteAutopilotTask403JSONResponse) VisitDeleteAutopilotTaskResponse(w http.ResponseWriter) error {
+func (response DeleteControllerTask403JSONResponse) VisitDeleteControllerTaskResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(403)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type DeleteAutopilotTaskdefaultJSONResponse struct {
+type DeleteControllerTaskdefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response DeleteAutopilotTaskdefaultJSONResponse) VisitDeleteAutopilotTaskResponse(w http.ResponseWriter) error {
+func (response DeleteControllerTaskdefaultJSONResponse) VisitDeleteControllerTaskResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type UpdateAutopilotTaskRequestObject struct {
-	Name   AutopilotName `json:"name"`
+type UpdateControllerTaskRequestObject struct {
+	Name   ControllerName `json:"name"`
 	TaskId string        `json:"taskId"`
-	Body   *UpdateAutopilotTaskJSONRequestBody
+	Body   *UpdateControllerTaskJSONRequestBody
 }
 
-type UpdateAutopilotTaskResponseObject interface {
-	VisitUpdateAutopilotTaskResponse(w http.ResponseWriter) error
+type UpdateControllerTaskResponseObject interface {
+	VisitUpdateControllerTaskResponse(w http.ResponseWriter) error
 }
 
-type UpdateAutopilotTask200JSONResponse AutopilotTask
+type UpdateControllerTask200JSONResponse ControllerTask
 
-func (response UpdateAutopilotTask200JSONResponse) VisitUpdateAutopilotTaskResponse(w http.ResponseWriter) error {
+func (response UpdateControllerTask200JSONResponse) VisitUpdateControllerTaskResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type UpdateAutopilotTask400JSONResponse Error
+type UpdateControllerTask400JSONResponse Error
 
-func (response UpdateAutopilotTask400JSONResponse) VisitUpdateAutopilotTaskResponse(w http.ResponseWriter) error {
+func (response UpdateControllerTask400JSONResponse) VisitUpdateControllerTaskResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(400)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type UpdateAutopilotTask401JSONResponse Error
+type UpdateControllerTask401JSONResponse Error
 
-func (response UpdateAutopilotTask401JSONResponse) VisitUpdateAutopilotTaskResponse(w http.ResponseWriter) error {
+func (response UpdateControllerTask401JSONResponse) VisitUpdateControllerTaskResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type UpdateAutopilotTask403JSONResponse Error
+type UpdateControllerTask403JSONResponse Error
 
-func (response UpdateAutopilotTask403JSONResponse) VisitUpdateAutopilotTaskResponse(w http.ResponseWriter) error {
+func (response UpdateControllerTask403JSONResponse) VisitUpdateControllerTaskResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(403)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type UpdateAutopilotTaskdefaultJSONResponse struct {
+type UpdateControllerTaskdefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response UpdateAutopilotTaskdefaultJSONResponse) VisitUpdateAutopilotTaskResponse(w http.ResponseWriter) error {
+func (response UpdateControllerTaskdefaultJSONResponse) VisitUpdateControllerTaskResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
@@ -26455,69 +26455,69 @@ type StrictServerInterface interface {
 	// Create initial admin account
 	// (POST /auth/setup)
 	Setup(ctx context.Context, request SetupRequestObject) (SetupResponseObject, error)
-	// List autopilot
-	// (GET /autopilot)
-	ListAutopilot(ctx context.Context, request ListAutopilotRequestObject) (ListAutopilotResponseObject, error)
-	// Delete autopilot
-	// (DELETE /autopilot/{name})
-	DeleteAutopilot(ctx context.Context, request DeleteAutopilotRequestObject) (DeleteAutopilotResponseObject, error)
-	// Get autopilot detail
-	// (GET /autopilot/{name})
-	GetAutopilot(ctx context.Context, request GetAutopilotRequestObject) (GetAutopilotResponseObject, error)
-	// Clear autopilot document
-	// (DELETE /autopilot/{name}/documents/{document})
-	DeleteAutopilotDocument(ctx context.Context, request DeleteAutopilotDocumentRequestObject) (DeleteAutopilotDocumentResponseObject, error)
-	// Get autopilot document
-	// (GET /autopilot/{name}/documents/{document})
-	GetAutopilotDocument(ctx context.Context, request GetAutopilotDocumentRequestObject) (GetAutopilotDocumentResponseObject, error)
-	// Update autopilot document
-	// (PUT /autopilot/{name}/documents/{document})
-	UpdateAutopilotDocument(ctx context.Context, request UpdateAutopilotDocumentRequestObject) (UpdateAutopilotDocumentResponseObject, error)
-	// Duplicate autopilot
-	// (POST /autopilot/{name}/duplicate)
-	DuplicateAutopilot(ctx context.Context, request DuplicateAutopilotRequestObject) (DuplicateAutopilotResponseObject, error)
-	// Reflect autopilot memory
-	// (POST /autopilot/{name}/memory/reflect)
-	ReflectAutopilotMemory(ctx context.Context, request ReflectAutopilotMemoryRequestObject) (ReflectAutopilotMemoryResponseObject, error)
-	// Send operator message to autopilot
-	// (POST /autopilot/{name}/message)
-	MessageAutopilot(ctx context.Context, request MessageAutopilotRequestObject) (MessageAutopilotResponseObject, error)
-	// Pause autopilot
-	// (POST /autopilot/{name}/pause)
-	PauseAutopilot(ctx context.Context, request PauseAutopilotRequestObject) (PauseAutopilotResponseObject, error)
-	// Rename autopilot
-	// (POST /autopilot/{name}/rename)
-	RenameAutopilot(ctx context.Context, request RenameAutopilotRequestObject) (RenameAutopilotResponseObject, error)
-	// Reset autopilot state
-	// (POST /autopilot/{name}/reset)
-	ResetAutopilot(ctx context.Context, request ResetAutopilotRequestObject) (ResetAutopilotResponseObject, error)
-	// Respond to autopilot prompt
-	// (POST /autopilot/{name}/response)
-	RespondAutopilot(ctx context.Context, request RespondAutopilotRequestObject) (RespondAutopilotResponseObject, error)
-	// Resume autopilot
-	// (POST /autopilot/{name}/resume)
-	ResumeAutopilot(ctx context.Context, request ResumeAutopilotRequestObject) (ResumeAutopilotResponseObject, error)
-	// Get autopilot raw spec
-	// (GET /autopilot/{name}/spec)
-	GetAutopilotSpec(ctx context.Context, request GetAutopilotSpecRequestObject) (GetAutopilotSpecResponseObject, error)
-	// Create or update autopilot spec
-	// (PUT /autopilot/{name}/spec)
-	PutAutopilotSpec(ctx context.Context, request PutAutopilotSpecRequestObject) (PutAutopilotSpecResponseObject, error)
-	// Start autopilot task
-	// (POST /autopilot/{name}/start)
-	StartAutopilot(ctx context.Context, request StartAutopilotRequestObject) (StartAutopilotResponseObject, error)
-	// Create autopilot task
-	// (POST /autopilot/{name}/tasks)
-	CreateAutopilotTask(ctx context.Context, request CreateAutopilotTaskRequestObject) (CreateAutopilotTaskResponseObject, error)
-	// Reorder autopilot tasks
-	// (POST /autopilot/{name}/tasks/reorder)
-	ReorderAutopilotTasks(ctx context.Context, request ReorderAutopilotTasksRequestObject) (ReorderAutopilotTasksResponseObject, error)
-	// Delete autopilot task
-	// (DELETE /autopilot/{name}/tasks/{taskId})
-	DeleteAutopilotTask(ctx context.Context, request DeleteAutopilotTaskRequestObject) (DeleteAutopilotTaskResponseObject, error)
-	// Update autopilot task
-	// (PATCH /autopilot/{name}/tasks/{taskId})
-	UpdateAutopilotTask(ctx context.Context, request UpdateAutopilotTaskRequestObject) (UpdateAutopilotTaskResponseObject, error)
+	// List controller
+	// (GET /controller)
+	ListController(ctx context.Context, request ListControllerRequestObject) (ListControllerResponseObject, error)
+	// Delete controller
+	// (DELETE /controller/{name})
+	DeleteController(ctx context.Context, request DeleteControllerRequestObject) (DeleteControllerResponseObject, error)
+	// Get controller detail
+	// (GET /controller/{name})
+	GetController(ctx context.Context, request GetControllerRequestObject) (GetControllerResponseObject, error)
+	// Clear controller document
+	// (DELETE /controller/{name}/documents/{document})
+	DeleteControllerDocument(ctx context.Context, request DeleteControllerDocumentRequestObject) (DeleteControllerDocumentResponseObject, error)
+	// Get controller document
+	// (GET /controller/{name}/documents/{document})
+	GetControllerDocument(ctx context.Context, request GetControllerDocumentRequestObject) (GetControllerDocumentResponseObject, error)
+	// Update controller document
+	// (PUT /controller/{name}/documents/{document})
+	UpdateControllerDocument(ctx context.Context, request UpdateControllerDocumentRequestObject) (UpdateControllerDocumentResponseObject, error)
+	// Duplicate controller
+	// (POST /controller/{name}/duplicate)
+	DuplicateController(ctx context.Context, request DuplicateControllerRequestObject) (DuplicateControllerResponseObject, error)
+	// Reflect controller memory
+	// (POST /controller/{name}/memory/reflect)
+	ReflectControllerMemory(ctx context.Context, request ReflectControllerMemoryRequestObject) (ReflectControllerMemoryResponseObject, error)
+	// Send operator message to controller
+	// (POST /controller/{name}/message)
+	MessageController(ctx context.Context, request MessageControllerRequestObject) (MessageControllerResponseObject, error)
+	// Pause controller
+	// (POST /controller/{name}/pause)
+	PauseController(ctx context.Context, request PauseControllerRequestObject) (PauseControllerResponseObject, error)
+	// Rename controller
+	// (POST /controller/{name}/rename)
+	RenameController(ctx context.Context, request RenameControllerRequestObject) (RenameControllerResponseObject, error)
+	// Reset controller state
+	// (POST /controller/{name}/reset)
+	ResetController(ctx context.Context, request ResetControllerRequestObject) (ResetControllerResponseObject, error)
+	// Respond to controller prompt
+	// (POST /controller/{name}/response)
+	RespondController(ctx context.Context, request RespondControllerRequestObject) (RespondControllerResponseObject, error)
+	// Resume controller
+	// (POST /controller/{name}/resume)
+	ResumeController(ctx context.Context, request ResumeControllerRequestObject) (ResumeControllerResponseObject, error)
+	// Get controller raw spec
+	// (GET /controller/{name}/spec)
+	GetControllerSpec(ctx context.Context, request GetControllerSpecRequestObject) (GetControllerSpecResponseObject, error)
+	// Create or update controller spec
+	// (PUT /controller/{name}/spec)
+	PutControllerSpec(ctx context.Context, request PutControllerSpecRequestObject) (PutControllerSpecResponseObject, error)
+	// Start controller task
+	// (POST /controller/{name}/start)
+	StartController(ctx context.Context, request StartControllerRequestObject) (StartControllerResponseObject, error)
+	// Create controller task
+	// (POST /controller/{name}/tasks)
+	CreateControllerTask(ctx context.Context, request CreateControllerTaskRequestObject) (CreateControllerTaskResponseObject, error)
+	// Reorder controller tasks
+	// (POST /controller/{name}/tasks/reorder)
+	ReorderControllerTasks(ctx context.Context, request ReorderControllerTasksRequestObject) (ReorderControllerTasksResponseObject, error)
+	// Delete controller task
+	// (DELETE /controller/{name}/tasks/{taskId})
+	DeleteControllerTask(ctx context.Context, request DeleteControllerTaskRequestObject) (DeleteControllerTaskResponseObject, error)
+	// Update controller task
+	// (PATCH /controller/{name}/tasks/{taskId})
+	UpdateControllerTask(ctx context.Context, request UpdateControllerTaskRequestObject) (UpdateControllerTaskResponseObject, error)
 	// List all DAG-runs
 	// (GET /dag-runs)
 	ListDAGRuns(ctx context.Context, request ListDAGRunsRequestObject) (ListDAGRunsResponseObject, error)
@@ -27477,23 +27477,23 @@ func (sh *strictHandler) Setup(w http.ResponseWriter, r *http.Request, params Se
 	}
 }
 
-// ListAutopilot operation middleware
-func (sh *strictHandler) ListAutopilot(w http.ResponseWriter, r *http.Request) {
-	var request ListAutopilotRequestObject
+// ListController operation middleware
+func (sh *strictHandler) ListController(w http.ResponseWriter, r *http.Request) {
+	var request ListControllerRequestObject
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ListAutopilot(ctx, request.(ListAutopilotRequestObject))
+		return sh.ssi.ListController(ctx, request.(ListControllerRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ListAutopilot")
+		handler = middleware(handler, "ListController")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ListAutopilotResponseObject); ok {
-		if err := validResponse.VisitListAutopilotResponse(w); err != nil {
+	} else if validResponse, ok := response.(ListControllerResponseObject); ok {
+		if err := validResponse.VisitListControllerResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -27501,25 +27501,25 @@ func (sh *strictHandler) ListAutopilot(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// DeleteAutopilot operation middleware
-func (sh *strictHandler) DeleteAutopilot(w http.ResponseWriter, r *http.Request, name AutopilotName) {
-	var request DeleteAutopilotRequestObject
+// DeleteController operation middleware
+func (sh *strictHandler) DeleteController(w http.ResponseWriter, r *http.Request, name ControllerName) {
+	var request DeleteControllerRequestObject
 
 	request.Name = name
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.DeleteAutopilot(ctx, request.(DeleteAutopilotRequestObject))
+		return sh.ssi.DeleteController(ctx, request.(DeleteControllerRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "DeleteAutopilot")
+		handler = middleware(handler, "DeleteController")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(DeleteAutopilotResponseObject); ok {
-		if err := validResponse.VisitDeleteAutopilotResponse(w); err != nil {
+	} else if validResponse, ok := response.(DeleteControllerResponseObject); ok {
+		if err := validResponse.VisitDeleteControllerResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -27527,25 +27527,25 @@ func (sh *strictHandler) DeleteAutopilot(w http.ResponseWriter, r *http.Request,
 	}
 }
 
-// GetAutopilot operation middleware
-func (sh *strictHandler) GetAutopilot(w http.ResponseWriter, r *http.Request, name AutopilotName) {
-	var request GetAutopilotRequestObject
+// GetController operation middleware
+func (sh *strictHandler) GetController(w http.ResponseWriter, r *http.Request, name ControllerName) {
+	var request GetControllerRequestObject
 
 	request.Name = name
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.GetAutopilot(ctx, request.(GetAutopilotRequestObject))
+		return sh.ssi.GetController(ctx, request.(GetControllerRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetAutopilot")
+		handler = middleware(handler, "GetController")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(GetAutopilotResponseObject); ok {
-		if err := validResponse.VisitGetAutopilotResponse(w); err != nil {
+	} else if validResponse, ok := response.(GetControllerResponseObject); ok {
+		if err := validResponse.VisitGetControllerResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -27553,53 +27553,26 @@ func (sh *strictHandler) GetAutopilot(w http.ResponseWriter, r *http.Request, na
 	}
 }
 
-// DeleteAutopilotDocument operation middleware
-func (sh *strictHandler) DeleteAutopilotDocument(w http.ResponseWriter, r *http.Request, name AutopilotName, document AutopilotDocument) {
-	var request DeleteAutopilotDocumentRequestObject
-
-	request.Name = name
-	request.Document = document
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.DeleteAutopilotDocument(ctx, request.(DeleteAutopilotDocumentRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "DeleteAutopilotDocument")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(DeleteAutopilotDocumentResponseObject); ok {
-		if err := validResponse.VisitDeleteAutopilotDocumentResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// GetAutopilotDocument operation middleware
-func (sh *strictHandler) GetAutopilotDocument(w http.ResponseWriter, r *http.Request, name AutopilotName, document AutopilotDocument) {
-	var request GetAutopilotDocumentRequestObject
+// DeleteControllerDocument operation middleware
+func (sh *strictHandler) DeleteControllerDocument(w http.ResponseWriter, r *http.Request, name ControllerName, document ControllerDocument) {
+	var request DeleteControllerDocumentRequestObject
 
 	request.Name = name
 	request.Document = document
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.GetAutopilotDocument(ctx, request.(GetAutopilotDocumentRequestObject))
+		return sh.ssi.DeleteControllerDocument(ctx, request.(DeleteControllerDocumentRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetAutopilotDocument")
+		handler = middleware(handler, "DeleteControllerDocument")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(GetAutopilotDocumentResponseObject); ok {
-		if err := validResponse.VisitGetAutopilotDocumentResponse(w); err != nil {
+	} else if validResponse, ok := response.(DeleteControllerDocumentResponseObject); ok {
+		if err := validResponse.VisitDeleteControllerDocumentResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -27607,14 +27580,41 @@ func (sh *strictHandler) GetAutopilotDocument(w http.ResponseWriter, r *http.Req
 	}
 }
 
-// UpdateAutopilotDocument operation middleware
-func (sh *strictHandler) UpdateAutopilotDocument(w http.ResponseWriter, r *http.Request, name AutopilotName, document AutopilotDocument) {
-	var request UpdateAutopilotDocumentRequestObject
+// GetControllerDocument operation middleware
+func (sh *strictHandler) GetControllerDocument(w http.ResponseWriter, r *http.Request, name ControllerName, document ControllerDocument) {
+	var request GetControllerDocumentRequestObject
 
 	request.Name = name
 	request.Document = document
 
-	var body UpdateAutopilotDocumentJSONRequestBody
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetControllerDocument(ctx, request.(GetControllerDocumentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetControllerDocument")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetControllerDocumentResponseObject); ok {
+		if err := validResponse.VisitGetControllerDocumentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateControllerDocument operation middleware
+func (sh *strictHandler) UpdateControllerDocument(w http.ResponseWriter, r *http.Request, name ControllerName, document ControllerDocument) {
+	var request UpdateControllerDocumentRequestObject
+
+	request.Name = name
+	request.Document = document
+
+	var body UpdateControllerDocumentJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
 		return
@@ -27622,18 +27622,18 @@ func (sh *strictHandler) UpdateAutopilotDocument(w http.ResponseWriter, r *http.
 	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.UpdateAutopilotDocument(ctx, request.(UpdateAutopilotDocumentRequestObject))
+		return sh.ssi.UpdateControllerDocument(ctx, request.(UpdateControllerDocumentRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "UpdateAutopilotDocument")
+		handler = middleware(handler, "UpdateControllerDocument")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(UpdateAutopilotDocumentResponseObject); ok {
-		if err := validResponse.VisitUpdateAutopilotDocumentResponse(w); err != nil {
+	} else if validResponse, ok := response.(UpdateControllerDocumentResponseObject); ok {
+		if err := validResponse.VisitUpdateControllerDocumentResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -27641,13 +27641,13 @@ func (sh *strictHandler) UpdateAutopilotDocument(w http.ResponseWriter, r *http.
 	}
 }
 
-// DuplicateAutopilot operation middleware
-func (sh *strictHandler) DuplicateAutopilot(w http.ResponseWriter, r *http.Request, name AutopilotName) {
-	var request DuplicateAutopilotRequestObject
+// DuplicateController operation middleware
+func (sh *strictHandler) DuplicateController(w http.ResponseWriter, r *http.Request, name ControllerName) {
+	var request DuplicateControllerRequestObject
 
 	request.Name = name
 
-	var body DuplicateAutopilotJSONRequestBody
+	var body DuplicateControllerJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
 		return
@@ -27655,18 +27655,18 @@ func (sh *strictHandler) DuplicateAutopilot(w http.ResponseWriter, r *http.Reque
 	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.DuplicateAutopilot(ctx, request.(DuplicateAutopilotRequestObject))
+		return sh.ssi.DuplicateController(ctx, request.(DuplicateControllerRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "DuplicateAutopilot")
+		handler = middleware(handler, "DuplicateController")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(DuplicateAutopilotResponseObject); ok {
-		if err := validResponse.VisitDuplicateAutopilotResponse(w); err != nil {
+	} else if validResponse, ok := response.(DuplicateControllerResponseObject); ok {
+		if err := validResponse.VisitDuplicateControllerResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -27674,25 +27674,25 @@ func (sh *strictHandler) DuplicateAutopilot(w http.ResponseWriter, r *http.Reque
 	}
 }
 
-// ReflectAutopilotMemory operation middleware
-func (sh *strictHandler) ReflectAutopilotMemory(w http.ResponseWriter, r *http.Request, name AutopilotName) {
-	var request ReflectAutopilotMemoryRequestObject
+// ReflectControllerMemory operation middleware
+func (sh *strictHandler) ReflectControllerMemory(w http.ResponseWriter, r *http.Request, name ControllerName) {
+	var request ReflectControllerMemoryRequestObject
 
 	request.Name = name
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ReflectAutopilotMemory(ctx, request.(ReflectAutopilotMemoryRequestObject))
+		return sh.ssi.ReflectControllerMemory(ctx, request.(ReflectControllerMemoryRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ReflectAutopilotMemory")
+		handler = middleware(handler, "ReflectControllerMemory")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ReflectAutopilotMemoryResponseObject); ok {
-		if err := validResponse.VisitReflectAutopilotMemoryResponse(w); err != nil {
+	} else if validResponse, ok := response.(ReflectControllerMemoryResponseObject); ok {
+		if err := validResponse.VisitReflectControllerMemoryResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -27700,13 +27700,13 @@ func (sh *strictHandler) ReflectAutopilotMemory(w http.ResponseWriter, r *http.R
 	}
 }
 
-// MessageAutopilot operation middleware
-func (sh *strictHandler) MessageAutopilot(w http.ResponseWriter, r *http.Request, name AutopilotName) {
-	var request MessageAutopilotRequestObject
+// MessageController operation middleware
+func (sh *strictHandler) MessageController(w http.ResponseWriter, r *http.Request, name ControllerName) {
+	var request MessageControllerRequestObject
 
 	request.Name = name
 
-	var body MessageAutopilotJSONRequestBody
+	var body MessageControllerJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
 		return
@@ -27714,18 +27714,18 @@ func (sh *strictHandler) MessageAutopilot(w http.ResponseWriter, r *http.Request
 	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.MessageAutopilot(ctx, request.(MessageAutopilotRequestObject))
+		return sh.ssi.MessageController(ctx, request.(MessageControllerRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "MessageAutopilot")
+		handler = middleware(handler, "MessageController")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(MessageAutopilotResponseObject); ok {
-		if err := validResponse.VisitMessageAutopilotResponse(w); err != nil {
+	} else if validResponse, ok := response.(MessageControllerResponseObject); ok {
+		if err := validResponse.VisitMessageControllerResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -27733,25 +27733,25 @@ func (sh *strictHandler) MessageAutopilot(w http.ResponseWriter, r *http.Request
 	}
 }
 
-// PauseAutopilot operation middleware
-func (sh *strictHandler) PauseAutopilot(w http.ResponseWriter, r *http.Request, name AutopilotName) {
-	var request PauseAutopilotRequestObject
+// PauseController operation middleware
+func (sh *strictHandler) PauseController(w http.ResponseWriter, r *http.Request, name ControllerName) {
+	var request PauseControllerRequestObject
 
 	request.Name = name
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.PauseAutopilot(ctx, request.(PauseAutopilotRequestObject))
+		return sh.ssi.PauseController(ctx, request.(PauseControllerRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "PauseAutopilot")
+		handler = middleware(handler, "PauseController")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(PauseAutopilotResponseObject); ok {
-		if err := validResponse.VisitPauseAutopilotResponse(w); err != nil {
+	} else if validResponse, ok := response.(PauseControllerResponseObject); ok {
+		if err := validResponse.VisitPauseControllerResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -27759,13 +27759,13 @@ func (sh *strictHandler) PauseAutopilot(w http.ResponseWriter, r *http.Request, 
 	}
 }
 
-// RenameAutopilot operation middleware
-func (sh *strictHandler) RenameAutopilot(w http.ResponseWriter, r *http.Request, name AutopilotName) {
-	var request RenameAutopilotRequestObject
+// RenameController operation middleware
+func (sh *strictHandler) RenameController(w http.ResponseWriter, r *http.Request, name ControllerName) {
+	var request RenameControllerRequestObject
 
 	request.Name = name
 
-	var body RenameAutopilotJSONRequestBody
+	var body RenameControllerJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
 		return
@@ -27773,18 +27773,18 @@ func (sh *strictHandler) RenameAutopilot(w http.ResponseWriter, r *http.Request,
 	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.RenameAutopilot(ctx, request.(RenameAutopilotRequestObject))
+		return sh.ssi.RenameController(ctx, request.(RenameControllerRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "RenameAutopilot")
+		handler = middleware(handler, "RenameController")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(RenameAutopilotResponseObject); ok {
-		if err := validResponse.VisitRenameAutopilotResponse(w); err != nil {
+	} else if validResponse, ok := response.(RenameControllerResponseObject); ok {
+		if err := validResponse.VisitRenameControllerResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -27792,25 +27792,25 @@ func (sh *strictHandler) RenameAutopilot(w http.ResponseWriter, r *http.Request,
 	}
 }
 
-// ResetAutopilot operation middleware
-func (sh *strictHandler) ResetAutopilot(w http.ResponseWriter, r *http.Request, name AutopilotName) {
-	var request ResetAutopilotRequestObject
+// ResetController operation middleware
+func (sh *strictHandler) ResetController(w http.ResponseWriter, r *http.Request, name ControllerName) {
+	var request ResetControllerRequestObject
 
 	request.Name = name
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ResetAutopilot(ctx, request.(ResetAutopilotRequestObject))
+		return sh.ssi.ResetController(ctx, request.(ResetControllerRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ResetAutopilot")
+		handler = middleware(handler, "ResetController")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ResetAutopilotResponseObject); ok {
-		if err := validResponse.VisitResetAutopilotResponse(w); err != nil {
+	} else if validResponse, ok := response.(ResetControllerResponseObject); ok {
+		if err := validResponse.VisitResetControllerResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -27818,13 +27818,13 @@ func (sh *strictHandler) ResetAutopilot(w http.ResponseWriter, r *http.Request, 
 	}
 }
 
-// RespondAutopilot operation middleware
-func (sh *strictHandler) RespondAutopilot(w http.ResponseWriter, r *http.Request, name AutopilotName) {
-	var request RespondAutopilotRequestObject
+// RespondController operation middleware
+func (sh *strictHandler) RespondController(w http.ResponseWriter, r *http.Request, name ControllerName) {
+	var request RespondControllerRequestObject
 
 	request.Name = name
 
-	var body RespondAutopilotJSONRequestBody
+	var body RespondControllerJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
 		return
@@ -27832,18 +27832,18 @@ func (sh *strictHandler) RespondAutopilot(w http.ResponseWriter, r *http.Request
 	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.RespondAutopilot(ctx, request.(RespondAutopilotRequestObject))
+		return sh.ssi.RespondController(ctx, request.(RespondControllerRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "RespondAutopilot")
+		handler = middleware(handler, "RespondController")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(RespondAutopilotResponseObject); ok {
-		if err := validResponse.VisitRespondAutopilotResponse(w); err != nil {
+	} else if validResponse, ok := response.(RespondControllerResponseObject); ok {
+		if err := validResponse.VisitRespondControllerResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -27851,25 +27851,25 @@ func (sh *strictHandler) RespondAutopilot(w http.ResponseWriter, r *http.Request
 	}
 }
 
-// ResumeAutopilot operation middleware
-func (sh *strictHandler) ResumeAutopilot(w http.ResponseWriter, r *http.Request, name AutopilotName) {
-	var request ResumeAutopilotRequestObject
+// ResumeController operation middleware
+func (sh *strictHandler) ResumeController(w http.ResponseWriter, r *http.Request, name ControllerName) {
+	var request ResumeControllerRequestObject
 
 	request.Name = name
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ResumeAutopilot(ctx, request.(ResumeAutopilotRequestObject))
+		return sh.ssi.ResumeController(ctx, request.(ResumeControllerRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ResumeAutopilot")
+		handler = middleware(handler, "ResumeController")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ResumeAutopilotResponseObject); ok {
-		if err := validResponse.VisitResumeAutopilotResponse(w); err != nil {
+	} else if validResponse, ok := response.(ResumeControllerResponseObject); ok {
+		if err := validResponse.VisitResumeControllerResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -27877,25 +27877,25 @@ func (sh *strictHandler) ResumeAutopilot(w http.ResponseWriter, r *http.Request,
 	}
 }
 
-// GetAutopilotSpec operation middleware
-func (sh *strictHandler) GetAutopilotSpec(w http.ResponseWriter, r *http.Request, name AutopilotName) {
-	var request GetAutopilotSpecRequestObject
+// GetControllerSpec operation middleware
+func (sh *strictHandler) GetControllerSpec(w http.ResponseWriter, r *http.Request, name ControllerName) {
+	var request GetControllerSpecRequestObject
 
 	request.Name = name
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.GetAutopilotSpec(ctx, request.(GetAutopilotSpecRequestObject))
+		return sh.ssi.GetControllerSpec(ctx, request.(GetControllerSpecRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetAutopilotSpec")
+		handler = middleware(handler, "GetControllerSpec")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(GetAutopilotSpecResponseObject); ok {
-		if err := validResponse.VisitGetAutopilotSpecResponse(w); err != nil {
+	} else if validResponse, ok := response.(GetControllerSpecResponseObject); ok {
+		if err := validResponse.VisitGetControllerSpecResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -27903,13 +27903,13 @@ func (sh *strictHandler) GetAutopilotSpec(w http.ResponseWriter, r *http.Request
 	}
 }
 
-// PutAutopilotSpec operation middleware
-func (sh *strictHandler) PutAutopilotSpec(w http.ResponseWriter, r *http.Request, name AutopilotName) {
-	var request PutAutopilotSpecRequestObject
+// PutControllerSpec operation middleware
+func (sh *strictHandler) PutControllerSpec(w http.ResponseWriter, r *http.Request, name ControllerName) {
+	var request PutControllerSpecRequestObject
 
 	request.Name = name
 
-	var body PutAutopilotSpecJSONRequestBody
+	var body PutControllerSpecJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
 		return
@@ -27917,18 +27917,18 @@ func (sh *strictHandler) PutAutopilotSpec(w http.ResponseWriter, r *http.Request
 	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.PutAutopilotSpec(ctx, request.(PutAutopilotSpecRequestObject))
+		return sh.ssi.PutControllerSpec(ctx, request.(PutControllerSpecRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "PutAutopilotSpec")
+		handler = middleware(handler, "PutControllerSpec")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(PutAutopilotSpecResponseObject); ok {
-		if err := validResponse.VisitPutAutopilotSpecResponse(w); err != nil {
+	} else if validResponse, ok := response.(PutControllerSpecResponseObject); ok {
+		if err := validResponse.VisitPutControllerSpecResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -27936,13 +27936,13 @@ func (sh *strictHandler) PutAutopilotSpec(w http.ResponseWriter, r *http.Request
 	}
 }
 
-// StartAutopilot operation middleware
-func (sh *strictHandler) StartAutopilot(w http.ResponseWriter, r *http.Request, name AutopilotName) {
-	var request StartAutopilotRequestObject
+// StartController operation middleware
+func (sh *strictHandler) StartController(w http.ResponseWriter, r *http.Request, name ControllerName) {
+	var request StartControllerRequestObject
 
 	request.Name = name
 
-	var body StartAutopilotJSONRequestBody
+	var body StartControllerJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
 		return
@@ -27950,18 +27950,18 @@ func (sh *strictHandler) StartAutopilot(w http.ResponseWriter, r *http.Request, 
 	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.StartAutopilot(ctx, request.(StartAutopilotRequestObject))
+		return sh.ssi.StartController(ctx, request.(StartControllerRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "StartAutopilot")
+		handler = middleware(handler, "StartController")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(StartAutopilotResponseObject); ok {
-		if err := validResponse.VisitStartAutopilotResponse(w); err != nil {
+	} else if validResponse, ok := response.(StartControllerResponseObject); ok {
+		if err := validResponse.VisitStartControllerResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -27969,13 +27969,13 @@ func (sh *strictHandler) StartAutopilot(w http.ResponseWriter, r *http.Request, 
 	}
 }
 
-// CreateAutopilotTask operation middleware
-func (sh *strictHandler) CreateAutopilotTask(w http.ResponseWriter, r *http.Request, name AutopilotName) {
-	var request CreateAutopilotTaskRequestObject
+// CreateControllerTask operation middleware
+func (sh *strictHandler) CreateControllerTask(w http.ResponseWriter, r *http.Request, name ControllerName) {
+	var request CreateControllerTaskRequestObject
 
 	request.Name = name
 
-	var body CreateAutopilotTaskJSONRequestBody
+	var body CreateControllerTaskJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
 		return
@@ -27983,18 +27983,18 @@ func (sh *strictHandler) CreateAutopilotTask(w http.ResponseWriter, r *http.Requ
 	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.CreateAutopilotTask(ctx, request.(CreateAutopilotTaskRequestObject))
+		return sh.ssi.CreateControllerTask(ctx, request.(CreateControllerTaskRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "CreateAutopilotTask")
+		handler = middleware(handler, "CreateControllerTask")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(CreateAutopilotTaskResponseObject); ok {
-		if err := validResponse.VisitCreateAutopilotTaskResponse(w); err != nil {
+	} else if validResponse, ok := response.(CreateControllerTaskResponseObject); ok {
+		if err := validResponse.VisitCreateControllerTaskResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -28002,13 +28002,13 @@ func (sh *strictHandler) CreateAutopilotTask(w http.ResponseWriter, r *http.Requ
 	}
 }
 
-// ReorderAutopilotTasks operation middleware
-func (sh *strictHandler) ReorderAutopilotTasks(w http.ResponseWriter, r *http.Request, name AutopilotName) {
-	var request ReorderAutopilotTasksRequestObject
+// ReorderControllerTasks operation middleware
+func (sh *strictHandler) ReorderControllerTasks(w http.ResponseWriter, r *http.Request, name ControllerName) {
+	var request ReorderControllerTasksRequestObject
 
 	request.Name = name
 
-	var body ReorderAutopilotTasksJSONRequestBody
+	var body ReorderControllerTasksJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
 		return
@@ -28016,18 +28016,18 @@ func (sh *strictHandler) ReorderAutopilotTasks(w http.ResponseWriter, r *http.Re
 	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ReorderAutopilotTasks(ctx, request.(ReorderAutopilotTasksRequestObject))
+		return sh.ssi.ReorderControllerTasks(ctx, request.(ReorderControllerTasksRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ReorderAutopilotTasks")
+		handler = middleware(handler, "ReorderControllerTasks")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ReorderAutopilotTasksResponseObject); ok {
-		if err := validResponse.VisitReorderAutopilotTasksResponse(w); err != nil {
+	} else if validResponse, ok := response.(ReorderControllerTasksResponseObject); ok {
+		if err := validResponse.VisitReorderControllerTasksResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -28035,26 +28035,26 @@ func (sh *strictHandler) ReorderAutopilotTasks(w http.ResponseWriter, r *http.Re
 	}
 }
 
-// DeleteAutopilotTask operation middleware
-func (sh *strictHandler) DeleteAutopilotTask(w http.ResponseWriter, r *http.Request, name AutopilotName, taskId string) {
-	var request DeleteAutopilotTaskRequestObject
+// DeleteControllerTask operation middleware
+func (sh *strictHandler) DeleteControllerTask(w http.ResponseWriter, r *http.Request, name ControllerName, taskId string) {
+	var request DeleteControllerTaskRequestObject
 
 	request.Name = name
 	request.TaskId = taskId
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.DeleteAutopilotTask(ctx, request.(DeleteAutopilotTaskRequestObject))
+		return sh.ssi.DeleteControllerTask(ctx, request.(DeleteControllerTaskRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "DeleteAutopilotTask")
+		handler = middleware(handler, "DeleteControllerTask")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(DeleteAutopilotTaskResponseObject); ok {
-		if err := validResponse.VisitDeleteAutopilotTaskResponse(w); err != nil {
+	} else if validResponse, ok := response.(DeleteControllerTaskResponseObject); ok {
+		if err := validResponse.VisitDeleteControllerTaskResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -28062,14 +28062,14 @@ func (sh *strictHandler) DeleteAutopilotTask(w http.ResponseWriter, r *http.Requ
 	}
 }
 
-// UpdateAutopilotTask operation middleware
-func (sh *strictHandler) UpdateAutopilotTask(w http.ResponseWriter, r *http.Request, name AutopilotName, taskId string) {
-	var request UpdateAutopilotTaskRequestObject
+// UpdateControllerTask operation middleware
+func (sh *strictHandler) UpdateControllerTask(w http.ResponseWriter, r *http.Request, name ControllerName, taskId string) {
+	var request UpdateControllerTaskRequestObject
 
 	request.Name = name
 	request.TaskId = taskId
 
-	var body UpdateAutopilotTaskJSONRequestBody
+	var body UpdateControllerTaskJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
 		return
@@ -28077,18 +28077,18 @@ func (sh *strictHandler) UpdateAutopilotTask(w http.ResponseWriter, r *http.Requ
 	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.UpdateAutopilotTask(ctx, request.(UpdateAutopilotTaskRequestObject))
+		return sh.ssi.UpdateControllerTask(ctx, request.(UpdateControllerTaskRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "UpdateAutopilotTask")
+		handler = middleware(handler, "UpdateControllerTask")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(UpdateAutopilotTaskResponseObject); ok {
-		if err := validResponse.VisitUpdateAutopilotTaskResponse(w); err != nil {
+	} else if validResponse, ok := response.(UpdateControllerTaskResponseObject); ok {
+		if err := validResponse.VisitUpdateControllerTaskResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

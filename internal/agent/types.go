@@ -150,8 +150,8 @@ type Session struct {
 	UserID string `json:"user_id,omitempty"`
 	// DAGName stores the primary DAG context for this session's memory scope.
 	DAGName string `json:"dag_name,omitempty"`
-	// AutopilotName stores the primary Autopilot context for this session's memory scope.
-	AutopilotName string `json:"autopilot_name,omitempty"`
+	// ControllerName stores the primary Controller context for this session's memory scope.
+	ControllerName string `json:"controller_name,omitempty"`
 	// Title is a human-readable name for the session.
 	Title string `json:"title,omitempty"`
 	// CreatedAt is when this session was created.
@@ -301,7 +301,7 @@ type ToolOut struct {
 	// IsError indicates whether the tool execution failed.
 	IsError bool
 	// InterruptTurn stops the current assistant turn after recording the tool result.
-	// This is used by Autopilot tools that hand control back to the scheduler.
+	// This is used by Controller tools that hand control back to the scheduler.
 	InterruptTurn bool
 	// DelegateIDs references the sub-sessions created by the delegate tool.
 	DelegateIDs []string
@@ -311,48 +311,48 @@ type ToolOut struct {
 	AuditDetails map[string]any
 }
 
-// AutopilotAllowedDAG describes a DAG that an Autopilot session is allowed to run.
-type AutopilotAllowedDAG struct {
+// ControllerAllowedDAG describes a DAG that a Controller session is allowed to run.
+type ControllerAllowedDAG struct {
 	Name        string   `json:"name"`
 	Description string   `json:"description,omitempty"`
 	Tags        []string `json:"tags,omitempty"`
 }
 
-// AutopilotTask describes a single checklist item in an Autopilot runtime.
-type AutopilotTask struct {
+// ControllerTask describes a single checklist item in a Controller runtime.
+type ControllerTask struct {
 	ID          string `json:"id"`
 	Description string `json:"description"`
 	State       string `json:"state"`
 }
 
-// AutopilotRunDAGInput contains the arguments for launching an allowed DAG.
-type AutopilotRunDAGInput struct {
+// ControllerRunDAGInput contains the arguments for launching an allowed DAG.
+type ControllerRunDAGInput struct {
 	DAGName string `json:"dag_name"`
 	Params  string `json:"params,omitempty"`
 }
 
-// AutopilotRunDAGResult is returned after an Autopilot launches a DAG.
-type AutopilotRunDAGResult struct {
+// ControllerRunDAGResult is returned after a Controller launches a DAG.
+type ControllerRunDAGResult struct {
 	DAGName  string `json:"dag_name"`
 	DAGRunID string `json:"dag_run_id"`
 }
 
-// AutopilotHumanPrompt describes a persisted human-input request owned by Autopilot.
-type AutopilotHumanPrompt struct {
+// ControllerHumanPrompt describes a persisted human-input request owned by Controller.
+type ControllerHumanPrompt struct {
 	Question            string             `json:"question"`
 	Options             []UserPromptOption `json:"options,omitempty"`
 	AllowFreeText       bool               `json:"allow_free_text,omitempty"`
 	FreeTextPlaceholder string             `json:"free_text_placeholder,omitempty"`
 }
 
-// AutopilotRuntime exposes scheduler-owned workflow controls to restricted Autopilot sessions.
-type AutopilotRuntime interface {
-	ListTasks(ctx context.Context) ([]AutopilotTask, error)
-	ListAllowedDAGs(ctx context.Context) ([]AutopilotAllowedDAG, error)
-	RunAllowedDAG(ctx context.Context, input AutopilotRunDAGInput) (AutopilotRunDAGResult, error)
-	RetryCurrentRun(ctx context.Context) (AutopilotRunDAGResult, error)
+// ControllerRuntime exposes scheduler-owned workflow controls to restricted Controller sessions.
+type ControllerRuntime interface {
+	ListTasks(ctx context.Context) ([]ControllerTask, error)
+	ListAllowedDAGs(ctx context.Context) ([]ControllerAllowedDAG, error)
+	RunAllowedDAG(ctx context.Context, input ControllerRunDAGInput) (ControllerRunDAGResult, error)
+	RetryCurrentRun(ctx context.Context) (ControllerRunDAGResult, error)
 	SetTaskDone(ctx context.Context, taskID string, done bool) error
-	RequestHumanInput(ctx context.Context, prompt AutopilotHumanPrompt) error
+	RequestHumanInput(ctx context.Context, prompt ControllerHumanPrompt) error
 	Finish(ctx context.Context, summary string) error
 }
 
@@ -439,8 +439,8 @@ type ToolContext struct {
 	Role auth.Role
 	// Delegate provides sub-agent spawning capability. Nil when not available.
 	Delegate *DelegateContext
-	// AutopilotRuntime exposes workflow controls for restricted Autopilot sessions.
-	AutopilotRuntime AutopilotRuntime
+	// ControllerRuntime exposes workflow controls for restricted Controller sessions.
+	ControllerRuntime ControllerRuntime
 }
 
 // AuditInfo configures how a tool's executions appear in audit logs.

@@ -49,7 +49,7 @@ export type Config = {
   oidcButtonLabel: string;
   terminalEnabled: boolean;
   gitSyncEnabled: boolean;
-  autopilotEnabled: boolean;
+  controllerEnabled: boolean;
   agentEnabled: boolean;
   updateAvailable: boolean;
   latestVersion: string;

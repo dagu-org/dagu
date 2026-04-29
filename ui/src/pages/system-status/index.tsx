@@ -197,7 +197,7 @@ function SystemStatus() {
               host: s.host,
               port: s.port,
               status: s.status,
-              autopilotController: s.autopilotController,
+              controllerStatus: s.controllerStatus,
               startedAt: s.startedAt,
             })) || []
           }

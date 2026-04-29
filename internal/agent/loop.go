@@ -81,8 +81,8 @@ type LoopConfig struct {
 	Registry SubSessionRegistry
 	// WebSearch configures provider-native web search for requests.
 	WebSearch *llm.WebSearchRequest
-	// AutopilotRuntime exposes workflow control methods for restricted Autopilot sessions.
-	AutopilotRuntime AutopilotRuntime
+	// ControllerRuntime exposes workflow control methods for restricted Controller sessions.
+	ControllerRuntime ControllerRuntime
 	// OnTurnComplete is called after a queued message batch is successfully
 	// processed (processLLMRequest returned nil). For single-shot callers
 	// like the agent-step executor this is the signal to cancel the loop.
@@ -116,7 +116,7 @@ type Loop struct {
 	sessionStore       SessionStore
 	registry           SubSessionRegistry
 	webSearch          *llm.WebSearchRequest
-	autopilotRuntime   AutopilotRuntime
+	controllerRuntime   ControllerRuntime
 	onTurnComplete     func()
 	activeTurn         bool
 	interruptRequested bool
@@ -151,7 +151,7 @@ func NewLoop(config LoopConfig) *Loop {
 		sessionStore:     config.SessionStore,
 		registry:         config.Registry,
 		webSearch:        config.WebSearch,
-		autopilotRuntime: config.AutopilotRuntime,
+		controllerRuntime: config.ControllerRuntime,
 		onTurnComplete:   config.OnTurnComplete,
 	}
 }
@@ -199,14 +199,14 @@ func (l *Loop) AppendExternalHistory(message llm.Message) {
 func (l *Loop) UpdateRuntime(
 	tools []*AgentTool,
 	systemPrompt string,
-	autopilotRuntime AutopilotRuntime,
+	controllerRuntime ControllerRuntime,
 	workingDir string,
 ) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.tools = tools
 	l.systemPrompt = systemPrompt
-	l.autopilotRuntime = autopilotRuntime
+	l.controllerRuntime = controllerRuntime
 	if workingDir != "" {
 		l.workingDir = workingDir
 	}
@@ -538,7 +538,7 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 		SafeMode:         safeMode,
 		Role:             user.Role,
 		Delegate:         delegate,
-		AutopilotRuntime: l.autopilotRuntime,
+		ControllerRuntime: l.controllerRuntime,
 	}, input)
 
 	l.hooks.RunAfterToolExec(ctx, info, result)
