@@ -1,4 +1,9 @@
-import { components } from '@/api/v1/schema';
+import {
+  components,
+  WebhookAuthMode as WebhookAuthModeValue,
+  WebhookHMACEnforcementMode as WebhookHMACEnforcementModeValue,
+} from '@/api/v1/schema';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -41,6 +46,34 @@ import { useCallback, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 type WebhookDetails = components['schemas']['WebhookDetails'];
+type WebhookAuthMode = components['schemas']['WebhookAuthMode'];
+
+function formatWebhookAuthMode(mode: WebhookAuthMode): string {
+  switch (mode) {
+    case WebhookAuthModeValue.token_and_hmac:
+      return 'Token + HMAC';
+    case WebhookAuthModeValue.hmac_only:
+      return 'HMAC only';
+    case WebhookAuthModeValue.token_only:
+    default:
+      return 'Token only';
+  }
+}
+
+function authModeVariant(
+  webhook: WebhookDetails
+): React.ComponentProps<typeof Badge>['variant'] {
+  if (webhook.authMode === WebhookAuthModeValue.hmac_only) {
+    return 'warning';
+  }
+  if (webhook.authMode === WebhookAuthModeValue.token_and_hmac) {
+    return webhook.hmac.enforcementMode ===
+      WebhookHMACEnforcementModeValue.observe
+      ? 'info'
+      : 'primary';
+  }
+  return 'default';
+}
 
 export default function WebhooksPage() {
   const config = useConfig();
@@ -247,6 +280,7 @@ export default function WebhooksPage() {
             <TableRow>
               <TableHead className="w-[250px]">DAG</TableHead>
               <TableHead className="w-[150px]">Token</TableHead>
+              <TableHead className="w-[160px]">Auth</TableHead>
               <TableHead className="w-[100px]">Status</TableHead>
               <TableHead className="w-[180px]">Created</TableHead>
               <TableHead className="w-[180px]">Last Triggered</TableHead>
@@ -257,7 +291,7 @@ export default function WebhooksPage() {
             {isLoading ? (
               <TableRow>
                 <TableCell
-                  colSpan={6}
+                  colSpan={7}
                   className="text-center text-muted-foreground py-8"
                 >
                   Loading webhooks...
@@ -266,7 +300,7 @@ export default function WebhooksPage() {
             ) : webhooks.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={6}
+                  colSpan={7}
                   className="text-center text-muted-foreground py-8"
                 >
                   No webhooks found. Create webhooks from individual DAG pages.
@@ -288,6 +322,21 @@ export default function WebhooksPage() {
                     <code className="text-xs bg-muted px-1.5 py-0.5 rounded">
                       {webhook.tokenPrefix}...
                     </code>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-col gap-1">
+                      <Badge variant={authModeVariant(webhook)}>
+                        {formatWebhookAuthMode(webhook.authMode)}
+                      </Badge>
+                      {webhook.authMode ===
+                        WebhookAuthModeValue.token_and_hmac &&
+                        webhook.hmac.enforcementMode ===
+                          WebhookHMACEnforcementModeValue.observe && (
+                          <span className="text-[11px] text-muted-foreground">
+                            Observe mode
+                          </span>
+                        )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">

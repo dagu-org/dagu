@@ -5,7 +5,10 @@ package auth
 
 import (
 	"context"
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -20,20 +23,26 @@ import (
 
 // Service errors.
 var (
-	ErrInvalidCredentials   = errors.New("invalid username or password")
-	ErrInvalidToken         = errors.New("invalid or expired token")
-	ErrTokenExpired         = errors.New("token has expired")
-	ErrMissingSecret        = errors.New("token secret is not configured")
-	ErrPasswordMismatch     = errors.New("current password is incorrect")
-	ErrWeakPassword         = errors.New("password does not meet requirements")
-	ErrCannotDeleteSelf     = errors.New("cannot delete your own account")
-	ErrInvalidAPIKey        = errors.New("invalid API key")
-	ErrAPIKeyNotConfigured  = errors.New("API key management is not configured")
-	ErrInvalidCreatorID     = errors.New("creator ID is required")
-	ErrInvalidWebhookToken  = errors.New("invalid webhook token")
-	ErrWebhookNotConfigured = errors.New("webhook management is not configured")
-	ErrWebhookDisabled      = errors.New("webhook is disabled")
-	ErrUserDisabled         = errors.New("your account has been disabled, contact administrator")
+	ErrInvalidCredentials                = errors.New("invalid username or password")
+	ErrInvalidToken                      = errors.New("invalid or expired token")
+	ErrTokenExpired                      = errors.New("token has expired")
+	ErrMissingSecret                     = errors.New("token secret is not configured")
+	ErrPasswordMismatch                  = errors.New("current password is incorrect")
+	ErrWeakPassword                      = errors.New("password does not meet requirements")
+	ErrCannotDeleteSelf                  = errors.New("cannot delete your own account")
+	ErrInvalidAPIKey                     = errors.New("invalid API key")
+	ErrAPIKeyNotConfigured               = errors.New("API key management is not configured")
+	ErrInvalidCreatorID                  = errors.New("creator ID is required")
+	ErrInvalidWebhookToken               = errors.New("invalid webhook token")
+	ErrWebhookNotConfigured              = errors.New("webhook management is not configured")
+	ErrWebhookDisabled                   = errors.New("webhook is disabled")
+	ErrInvalidWebhookAuthMode            = errors.New("invalid webhook auth mode")
+	ErrInvalidWebhookHMACEnforcementMode = errors.New("invalid webhook HMAC enforcement mode")
+	ErrWebhookHMACNotSupported           = errors.New("webhook HMAC is not supported by this store")
+	ErrMissingWebhookHMACSignature       = errors.New("missing webhook HMAC signature")
+	ErrInvalidWebhookHMACSignature       = errors.New("invalid webhook HMAC signature")
+	ErrWebhookHMACNotConfigured          = errors.New("webhook HMAC is not configured")
+	ErrUserDisabled                      = errors.New("your account has been disabled, contact administrator")
 )
 
 const (
@@ -56,6 +65,8 @@ const (
 	// webhookTokenPrefixLength is how many characters of the full token we persist.
 	// Must be > len(webhookTokenPrefix) so the stored prefix includes random characters.
 	webhookTokenPrefixLength = 12
+	// webhookHMACSecretRandomBytes is the number of random bytes for HMAC secret generation.
+	webhookHMACSecretRandomBytes = 32
 )
 
 // Config holds the configuration for the auth service.
@@ -649,6 +660,12 @@ type CreateWebhookResult struct {
 	FullToken string // Only returned once at creation
 }
 
+// WebhookHMACSecretResult contains the result of enabling or rotating HMAC.
+type WebhookHMACSecretResult struct {
+	Webhook    *auth.Webhook
+	FullSecret string // Only returned once at creation or rotation
+}
+
 // CreateWebhook creates a new webhook for a DAG.
 func (s *Service) CreateWebhook(ctx context.Context, dagName, creatorID string) (*CreateWebhookResult, error) {
 	if s.webhookStore == nil {
@@ -722,12 +739,32 @@ func generateWebhookToken(bcryptCost int) (*webhookTokenParts, error) {
 	}, nil
 }
 
+func generateWebhookHMACSecret() (string, error) {
+	randomBytes := make([]byte, webhookHMACSecretRandomBytes)
+	if _, err := rand.Read(randomBytes); err != nil {
+		return "", fmt.Errorf("failed to generate random bytes: %w", err)
+	}
+
+	return stringutil.Base58Encode(randomBytes), nil
+}
+
+func mapWebhookHMACCapabilityError(err error) error {
+	if errors.Is(err, auth.ErrWebhookHMACEncryptorRequired) {
+		return ErrWebhookHMACNotSupported
+	}
+	return err
+}
+
 // GetWebhookByDAGName retrieves the webhook for a specific DAG.
 func (s *Service) GetWebhookByDAGName(ctx context.Context, dagName string) (*auth.Webhook, error) {
 	if s.webhookStore == nil {
 		return nil, ErrWebhookNotConfigured
 	}
-	return s.webhookStore.GetByDAGName(ctx, dagName)
+	webhook, err := s.webhookStore.GetByDAGName(ctx, dagName)
+	if err != nil {
+		return nil, mapWebhookHMACCapabilityError(err)
+	}
+	return webhook, nil
 }
 
 // ListWebhooks returns all webhooks.
@@ -753,7 +790,7 @@ func (s *Service) RegenerateWebhookToken(ctx context.Context, dagName string) (*
 		return nil, ErrWebhookNotConfigured
 	}
 
-	webhook, err := s.webhookStore.GetByDAGName(ctx, dagName)
+	webhook, err := s.GetWebhookByDAGName(ctx, dagName)
 	if err != nil {
 		return nil, err
 	}
@@ -785,7 +822,7 @@ func (s *Service) ToggleWebhook(ctx context.Context, dagName string, enabled boo
 		return nil, ErrWebhookNotConfigured
 	}
 
-	webhook, err := s.webhookStore.GetByDAGName(ctx, dagName)
+	webhook, err := s.GetWebhookByDAGName(ctx, dagName)
 	if err != nil {
 		return nil, err
 	}
@@ -800,6 +837,159 @@ func (s *Service) ToggleWebhook(ctx context.Context, dagName string, enabled boo
 	return webhook, nil
 }
 
+// EnableWebhookHMAC configures HMAC auth for an existing webhook and returns
+// the generated secret exactly once.
+func (s *Service) EnableWebhookHMAC(
+	ctx context.Context,
+	dagName string,
+	authMode auth.WebhookAuthMode,
+	enforcementMode auth.WebhookHMACEnforcementMode,
+) (*WebhookHMACSecretResult, error) {
+	if s.webhookStore == nil {
+		return nil, ErrWebhookNotConfigured
+	}
+	if authMode == auth.WebhookAuthModeTokenOnly {
+		return nil, ErrInvalidWebhookAuthMode
+	}
+
+	enforcementMode, err := validateWebhookHMACMode(authMode, enforcementMode)
+	if err != nil {
+		return nil, err
+	}
+
+	webhook, err := s.GetWebhookByDAGName(ctx, dagName)
+	if err != nil {
+		return nil, err
+	}
+
+	fullSecret, err := generateWebhookHMACSecret()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate webhook HMAC secret: %w", err)
+	}
+
+	now := time.Now().UTC()
+	webhook.AuthMode = authMode
+	webhook.HMACEnforcementMode = enforcementMode
+	webhook.HMACSecret = fullSecret
+	webhook.HMACSecretGeneratedAt = &now
+	webhook.UpdatedAt = now
+
+	if err := s.webhookStore.Update(ctx, webhook); err != nil {
+		if errors.Is(err, auth.ErrWebhookHMACEncryptorRequired) {
+			return nil, ErrWebhookHMACNotSupported
+		}
+		return nil, err
+	}
+
+	return &WebhookHMACSecretResult{
+		Webhook:    webhook,
+		FullSecret: fullSecret,
+	}, nil
+}
+
+// ConfigureWebhookHMAC updates HMAC auth mode or enforcement without rotating the secret.
+func (s *Service) ConfigureWebhookHMAC(
+	ctx context.Context,
+	dagName string,
+	authMode auth.WebhookAuthMode,
+	enforcementMode auth.WebhookHMACEnforcementMode,
+) (*auth.Webhook, error) {
+	if s.webhookStore == nil {
+		return nil, ErrWebhookNotConfigured
+	}
+	if authMode == auth.WebhookAuthModeTokenOnly {
+		return nil, ErrInvalidWebhookAuthMode
+	}
+
+	webhook, err := s.GetWebhookByDAGName(ctx, dagName)
+	if err != nil {
+		return nil, err
+	}
+	if webhook.HMACSecret == "" {
+		return nil, ErrWebhookHMACNotConfigured
+	}
+
+	enforcementMode, err = normalizeWebhookHMACModeForConfigure(webhook, authMode, enforcementMode)
+	if err != nil {
+		return nil, err
+	}
+
+	webhook.AuthMode = authMode
+	webhook.HMACEnforcementMode = enforcementMode
+	webhook.UpdatedAt = time.Now().UTC()
+
+	if err := s.webhookStore.Update(ctx, webhook); err != nil {
+		if errors.Is(err, auth.ErrWebhookHMACEncryptorRequired) {
+			return nil, ErrWebhookHMACNotSupported
+		}
+		return nil, err
+	}
+
+	return webhook, nil
+}
+
+// DisableWebhookHMAC removes HMAC auth from the webhook and returns it to token-only mode.
+func (s *Service) DisableWebhookHMAC(ctx context.Context, dagName string) (*auth.Webhook, error) {
+	if s.webhookStore == nil {
+		return nil, ErrWebhookNotConfigured
+	}
+
+	webhook, err := s.GetWebhookByDAGName(ctx, dagName)
+	if err != nil {
+		return nil, err
+	}
+
+	webhook.AuthMode = auth.WebhookAuthModeTokenOnly
+	webhook.HMACEnforcementMode = ""
+	webhook.HMACSecret = ""
+	webhook.HMACSecretGeneratedAt = nil
+	webhook.UpdatedAt = time.Now().UTC()
+
+	if err := s.webhookStore.Update(ctx, webhook); err != nil {
+		return nil, err
+	}
+
+	return webhook, nil
+}
+
+// RegenerateWebhookHMACSecret rotates the HMAC secret immediately and returns the
+// new secret exactly once.
+func (s *Service) RegenerateWebhookHMACSecret(ctx context.Context, dagName string) (*WebhookHMACSecretResult, error) {
+	if s.webhookStore == nil {
+		return nil, ErrWebhookNotConfigured
+	}
+
+	webhook, err := s.GetWebhookByDAGName(ctx, dagName)
+	if err != nil {
+		return nil, err
+	}
+	if !webhook.HMACEnabled() {
+		return nil, ErrWebhookHMACNotConfigured
+	}
+
+	fullSecret, err := generateWebhookHMACSecret()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate webhook HMAC secret: %w", err)
+	}
+
+	now := time.Now().UTC()
+	webhook.HMACSecret = fullSecret
+	webhook.HMACSecretGeneratedAt = &now
+	webhook.UpdatedAt = now
+
+	if err := s.webhookStore.Update(ctx, webhook); err != nil {
+		if errors.Is(err, auth.ErrWebhookHMACEncryptorRequired) {
+			return nil, ErrWebhookHMACNotSupported
+		}
+		return nil, err
+	}
+
+	return &WebhookHMACSecretResult{
+		Webhook:    webhook,
+		FullSecret: fullSecret,
+	}, nil
+}
+
 // ValidateWebhookToken validates a webhook token for a specific DAG.
 // Returns the webhook if valid and enabled.
 func (s *Service) ValidateWebhookToken(ctx context.Context, dagName, token string) (*auth.Webhook, error) {
@@ -812,7 +1002,7 @@ func (s *Service) ValidateWebhookToken(ctx context.Context, dagName, token strin
 		return nil, ErrInvalidWebhookToken
 	}
 
-	webhook, err := s.webhookStore.GetByDAGName(ctx, dagName)
+	webhook, err := s.GetWebhookByDAGName(ctx, dagName)
 	if err != nil {
 		if errors.Is(err, auth.ErrWebhookNotFound) {
 			return nil, ErrInvalidWebhookToken
@@ -820,8 +1010,7 @@ func (s *Service) ValidateWebhookToken(ctx context.Context, dagName, token strin
 		return nil, err
 	}
 
-	// Validate token hash
-	if err := bcrypt.CompareHashAndPassword([]byte(webhook.TokenHash), []byte(token)); err != nil {
+	if err := validateWebhookTokenAgainst(webhook, token); err != nil {
 		return nil, ErrInvalidWebhookToken
 	}
 
@@ -836,4 +1025,142 @@ func (s *Service) ValidateWebhookToken(ctx context.Context, dagName, token strin
 	}
 
 	return webhook, nil
+}
+
+// AuthorizeWebhookRequest validates the request according to the webhook's auth mode.
+func (s *Service) AuthorizeWebhookRequest(
+	ctx context.Context,
+	dagName, token, signature string,
+	body []byte,
+) (*auth.Webhook, error) {
+	if s.webhookStore == nil {
+		return nil, ErrWebhookNotConfigured
+	}
+
+	webhook, err := s.GetWebhookByDAGName(ctx, dagName)
+	if err != nil {
+		if errors.Is(err, auth.ErrWebhookNotFound) {
+			return nil, ErrInvalidWebhookToken
+		}
+		return nil, err
+	}
+	if !webhook.Enabled {
+		return nil, ErrWebhookDisabled
+	}
+
+	switch webhook.EffectiveAuthMode() {
+	case auth.WebhookAuthModeTokenOnly:
+		if err := validateWebhookTokenAgainst(webhook, token); err != nil {
+			return nil, err
+		}
+	case auth.WebhookAuthModeTokenAndHMAC:
+		if err := validateWebhookTokenAgainst(webhook, token); err != nil {
+			return nil, err
+		}
+		if webhook.HMACEnforcementMode == auth.WebhookHMACEnforcementModeObserve {
+			if err := validateWebhookHMACSignature(webhook, signature, body); err != nil {
+				slog.Warn("webhook HMAC validation observed failure",
+					"dagName", webhook.DAGName,
+					"error", err,
+				)
+			}
+		} else if err := validateWebhookHMACSignature(webhook, signature, body); err != nil {
+			return nil, err
+		}
+	case auth.WebhookAuthModeHMACOnly:
+		if err := validateWebhookHMACSignature(webhook, signature, body); err != nil {
+			return nil, err
+		}
+	default:
+		return nil, ErrInvalidWebhookAuthMode
+	}
+
+	if err := s.webhookStore.UpdateLastUsed(ctx, webhook.ID); err != nil {
+		slog.Error("failed to update webhook last used timestamp", "webhookID", webhook.ID, "error", err)
+	}
+
+	return webhook, nil
+}
+
+func validateWebhookHMACMode(
+	authMode auth.WebhookAuthMode,
+	enforcementMode auth.WebhookHMACEnforcementMode,
+) (auth.WebhookHMACEnforcementMode, error) {
+	switch authMode {
+	case auth.WebhookAuthModeTokenOnly:
+		return "", ErrInvalidWebhookAuthMode
+	case auth.WebhookAuthModeTokenAndHMAC:
+		if enforcementMode == "" {
+			return auth.WebhookHMACEnforcementModeStrict, nil
+		}
+		if enforcementMode != auth.WebhookHMACEnforcementModeStrict && enforcementMode != auth.WebhookHMACEnforcementModeObserve {
+			return "", ErrInvalidWebhookHMACEnforcementMode
+		}
+		return enforcementMode, nil
+	case auth.WebhookAuthModeHMACOnly:
+		if enforcementMode == "" || enforcementMode == auth.WebhookHMACEnforcementModeStrict {
+			return auth.WebhookHMACEnforcementModeStrict, nil
+		}
+		return "", ErrInvalidWebhookHMACEnforcementMode
+	default:
+		return "", ErrInvalidWebhookAuthMode
+	}
+}
+
+func normalizeWebhookHMACModeForConfigure(
+	webhook *auth.Webhook,
+	authMode auth.WebhookAuthMode,
+	enforcementMode auth.WebhookHMACEnforcementMode,
+) (auth.WebhookHMACEnforcementMode, error) {
+	if enforcementMode != "" {
+		return validateWebhookHMACMode(authMode, enforcementMode)
+	}
+	if authMode == auth.WebhookAuthModeHMACOnly {
+		return auth.WebhookHMACEnforcementModeStrict, nil
+	}
+
+	current := webhook.HMACEnforcementMode
+	if current == "" {
+		current = auth.WebhookHMACEnforcementModeStrict
+	}
+	return validateWebhookHMACMode(authMode, current)
+}
+
+func validateWebhookTokenAgainst(webhook *auth.Webhook, token string) error {
+	if !strings.HasPrefix(token, webhookTokenPrefix) {
+		return ErrInvalidWebhookToken
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(webhook.TokenHash), []byte(token)); err != nil {
+		return ErrInvalidWebhookToken
+	}
+	return nil
+}
+
+func validateWebhookHMACSignature(webhook *auth.Webhook, signature string, body []byte) error {
+	if webhook.HMACSecret == "" {
+		return ErrWebhookHMACNotConfigured
+	}
+	if signature == "" {
+		return ErrMissingWebhookHMACSignature
+	}
+
+	providedHex, found := strings.CutPrefix(signature, "sha256=")
+	if !found || providedHex == "" {
+		return ErrInvalidWebhookHMACSignature
+	}
+
+	provided, err := hex.DecodeString(providedHex)
+	if err != nil {
+		return ErrInvalidWebhookHMACSignature
+	}
+
+	mac := hmac.New(sha256.New, []byte(webhook.HMACSecret))
+	_, _ = mac.Write(body)
+	expected := mac.Sum(nil)
+
+	if !hmac.Equal(expected, provided) {
+		return ErrInvalidWebhookHMACSignature
+	}
+
+	return nil
 }

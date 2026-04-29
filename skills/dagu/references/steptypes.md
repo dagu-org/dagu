@@ -24,12 +24,14 @@ steps:
 Aliases: (empty), `command`, `shell`
 
 Step-level fields:
+
 - `command` — Command string to execute
 - `args` — Arguments for the command
 - `script` — Multi-line shell script content
 - `shell` — Shell interpreter (e.g., `/bin/bash`)
 
 Notes:
+
 - Dagu expands `${VAR}` before the shell runs. For large or arbitrary text, prefer `printenv VAR_NAME`, reading `${step_id.stdout}` as a file, or `type: template`.
 
 ## docker
@@ -53,6 +55,7 @@ steps:
 Aliases: `docker`, `container`
 
 `with` fields:
+
 - `image` — Docker image (required unless `container_name` is set)
 - `container_name` — Name/ID of existing container for exec mode
 - `pull` — Image pull policy: `always`, `never`, `missing` (default)
@@ -79,6 +82,7 @@ Aliases: `dag`, `subworkflow`
 Uses step `call:` and `params:` fields. Sub-DAGs do not inherit parent env vars.
 
 Notes:
+
 - Pass values explicitly via `params:` when the child needs parent env vars or derived values.
 - Child step `output:` variables are not propagated back into the parent DAG output map. Use shared files or another explicit handoff if the parent needs results.
 
@@ -121,12 +125,14 @@ steps:
 ```
 
 `parallel` fields:
+
 - `items` — Array of items to process (strings or key-value param maps)
 - `max_concurrent` — Max parallel executions (default 10)
 
 Each parallel invocation receives the current item as the `ITEM` variable.
 
 Notes:
+
 - `parallel:` only works with `call:` to a sub-DAG; it does not fan out a normal shell step.
 - If an upstream step produced multiline text, read `${step_id.stdout}` from a shell step or convert the data into an array before using `parallel:`.
 
@@ -193,9 +199,11 @@ steps:
 ```
 
 Query from `command:`, input JSON from `script:`. `with` fields:
+
 - `raw` — Output raw strings without JSON encoding (like `jq -r`)
 
 Notes:
+
 - The built-in `jq` executor reads inline JSON from `script:` only. It does not consume file paths, `${step_id.stdout}` files, or shell stdin.
 - For local files or large JSON documents, use a shell step with the `jq` CLI instead.
 
@@ -216,6 +224,7 @@ steps:
 ```
 
 Behavior:
+
 - `script` is required and is rendered as a template, not executed as a shell script
 - Template data comes from `with.data` and is accessed as `{{ .key }}`
 - Supports normal Go template control flow plus a safe subset of slim-sprig functions
@@ -224,6 +233,7 @@ Behavior:
 - Relative `with.output` paths are resolved from the step working directory
 
 `with` fields:
+
 - `data` — Object exposed to the template as `.`
 - `output` — File path for rendered output; if omitted, rendered text is written to stdout
 
@@ -309,6 +319,7 @@ steps:
 ```
 
 `with` fields:
+
 - `from` — Sender email address
 - `to` — Recipient(s) (string or array of strings)
 - `subject` — Email subject line
@@ -334,30 +345,6 @@ steps:
 ```
 
 `with` fields: `source` (required), `destination` (required for create), `format` (`zip`, `tar`, `tar.gz`, etc.; inferred from filename if omitted), `compression_level`, `password` (extract/list only), `overwrite`, `strip_components`, `include`/`exclude` (glob patterns).
-
-## chat
-
-LLM chat step.
-
-```yaml
-steps:
-  - name: summarize
-    type: chat
-    llm:
-      provider: anthropic
-      model: claude-sonnet-4-20250514
-      system: "You are a helpful assistant."
-      temperature: 0.7
-      max_tokens: 2000
-      stream: true
-    messages:
-      - role: user
-        content: "Summarize this: ${INPUT}"
-```
-
-Uses step `llm:` config and `messages:` for conversation. Message roles: `system`, `user`, `assistant`, `tool`.
-
-LLM config fields: `provider` (`openai`, `anthropic`, `gemini`, `openrouter`, `local`), `model`, `system`, `temperature` (0.0-2.0), `max_tokens`, `top_p`, `base_url`, `api_key_name`, `stream` (default true), `tools` (list of DAG names as callable tools), `max_tool_iterations` (default 10).
 
 ## agent
 
@@ -421,6 +408,7 @@ Top-level `harness:` acts as a DAG-wide default. Step-level `with` overlays the 
 `provider` may be parameterized with `${...}` and is resolved at runtime after interpolation.
 
 Custom `harnesses:` definitions describe how to invoke arbitrary harness CLIs:
+
 - `binary`
 - `prefix_args`
 - `prompt_mode`: `arg`, `flag`, or `stdin`
@@ -467,15 +455,18 @@ steps:
 ```
 
 Step-level fields:
+
 - `value` — Expression to evaluate (required)
 - `routes` — Map of pattern to list of target step names (required)
 
 Pattern matching:
+
 - Exact match: `"200"` matches the literal value `200`
 - Regex match: `"re:5\\d{2}"` matches `500`, `502`, etc.
 - Catch-all: `"re:.*"` matches anything (sorted last automatically)
 
 Routing rules:
+
 - Routes are evaluated in priority order: exact matches first, then regex, then catch-all
 - Each target step can only be targeted by one route pattern
 - Multiple targets per route execute in parallel

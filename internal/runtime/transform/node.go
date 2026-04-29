@@ -53,6 +53,7 @@ func ToNode(n *exec.Node) *runtime.Node {
 		RejectionReason:   n.RejectionReason,
 		ApprovalIteration: n.ApprovalIteration,
 		PushBackInputs:    n.PushBackInputs,
+		PushBackHistory:   exec.ClonePushBackHistory(n.PushBackHistory),
 	})
 }
 
@@ -96,5 +97,6 @@ func newNode(node runtime.NodeData) *exec.Node {
 		RejectionReason:   node.State.RejectionReason,
 		ApprovalIteration: node.State.ApprovalIteration,
 		PushBackInputs:    node.State.PushBackInputs,
+		PushBackHistory:   exec.ClonePushBackHistory(node.State.PushBackHistory),
 	}
 }

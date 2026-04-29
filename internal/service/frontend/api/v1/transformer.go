@@ -4,7 +4,10 @@
 package api
 
 import (
+	"encoding/json"
+	"log/slog"
 	"os"
+	"time"
 
 	"github.com/dagucloud/dagu/api/v1"
 	"github.com/dagucloud/dagu/internal/cmn/fileutil"
@@ -153,6 +156,7 @@ func toStep(obj core.Step) api.Step {
 			Prompt:   ptrOf(obj.Approval.Prompt),
 			Input:    ptrOf(obj.Approval.Input),
 			Required: ptrOf(obj.Approval.Required),
+			RewindTo: ptrOf(obj.Approval.RewindTo),
 		}
 	}
 
@@ -341,11 +345,47 @@ func toNode(node *exec.Node) api.Node {
 		ApprovedBy:        ptrOf(node.ApprovedBy),
 		ApprovalInputs:    ptrOf(node.ApprovalInputs),
 		PushBackInputs:    ptrOf(node.PushBackInputs),
+		PushBackHistory:   ptrOf(toPushBackHistory(node)),
 		RejectedAt:        ptrOf(node.RejectedAt),
 		RejectedBy:        ptrOf(node.RejectedBy),
 		RejectionReason:   ptrOf(node.RejectionReason),
 		ApprovalIteration: ptrOf(node.ApprovalIteration),
 	}
+}
+
+func toPushBackHistory(node *exec.Node) []api.PushBackHistoryEntry {
+	if node == nil {
+		return nil
+	}
+
+	var allowedInputs []string
+	if node.Step.Approval != nil {
+		allowedInputs = node.Step.Approval.Input
+	}
+	history := exec.NormalizePushBackHistory(
+		allowedInputs,
+		node.ApprovalIteration,
+		node.PushBackInputs,
+		node.PushBackHistory,
+	)
+	if len(history) == 0 {
+		return nil
+	}
+
+	items := make([]api.PushBackHistoryEntry, len(history))
+	for i, entry := range history {
+		items[i] = api.PushBackHistoryEntry{
+			Iteration: entry.Iteration,
+			By:        ptrOf(entry.By),
+			Inputs:    ptrOf(entry.Inputs),
+		}
+		if entry.At != "" {
+			if at, err := time.Parse(time.RFC3339, entry.At); err == nil {
+				items[i].At = &at
+			}
+		}
+	}
+	return items
 }
 
 func toSubDAGRuns(subDAGRuns []exec.SubDAGRun) []api.SubDAGRun {
@@ -404,6 +444,8 @@ func toDAGDetails(dag *core.DAG) *api.DAGDetails {
 		paramDefs = ptrOf(defs)
 	}
 
+	paramSchema := toJSONObject(dag.ParamSchema)
+
 	var artifacts *api.DAGArtifactsConfig
 	if dag.Artifacts != nil {
 		artifacts = &api.DAGArtifactsConfig{
@@ -427,6 +469,7 @@ func toDAGDetails(dag *core.DAG) *api.DAGDetails {
 		MaxActiveSteps:    ptrOf(dag.MaxActiveSteps),
 		Params:            ptrOf(dag.Params),
 		ParamDefs:         paramDefs,
+		ParamSchema:       paramSchema,
 		Preconditions:     ptrOf(preconditions),
 		Schedule:          ptrOf(schedules),
 		Steps:             ptrOf(steps),
@@ -434,6 +477,25 @@ func toDAGDetails(dag *core.DAG) *api.DAGDetails {
 		Tags:              ptrOf(dag.Labels.Strings()),
 		RunConfig:         runConfig,
 	}
+}
+
+func toJSONObject(raw json.RawMessage) *map[string]any {
+	if len(raw) == 0 {
+		return nil
+	}
+
+	var value map[string]any
+	if err := json.Unmarshal(raw, &value); err != nil {
+		slog.Warn(
+			"Failed to unmarshal DAG param schema produced by buildRenderableParamSchema",
+			"error",
+			err,
+			"length",
+			len(raw),
+		)
+		return nil
+	}
+	return &value
 }
 
 func toParamDefs(defs []core.ParamDef) []api.ParamDef {

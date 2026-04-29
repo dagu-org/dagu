@@ -399,6 +399,94 @@ func TestUpdateDAGSpec_ReturnsFatalLoadSpecError(t *testing.T) {
 	require.False(t, dagStore.updateCalled)
 }
 
+func TestUpdateDAGSpec_NotifiesDAGMutation(t *testing.T) {
+	t.Parallel()
+
+	helper := test.Setup(t, test.WithStatusPersistence())
+	helper.CreateDAGFile(t, helper.Config.Paths.DAGsDir, "dag-update-notify", []byte(`
+name: dag-update-notify
+schedule: "34 * * * *"
+steps:
+  - command: echo original
+`))
+
+	var notified []string
+	api := localapi.New(
+		helper.DAGStore,
+		helper.DAGRunStore,
+		helper.QueueStore,
+		helper.ProcStore,
+		helper.DAGRunMgr,
+		helper.Config,
+		nil,
+		helper.ServiceRegistry,
+		nil,
+		nil,
+		localapi.WithDAGMutationNotifier(func(fileName string) {
+			notified = append(notified, fileName)
+		}),
+	)
+
+	respObj, err := api.UpdateDAGSpec(context.Background(), openapi.UpdateDAGSpecRequestObject{
+		FileName: "dag-update-notify",
+		Body: &openapi.UpdateDAGSpecJSONRequestBody{
+			Spec: `
+name: dag-update-notify
+schedule: "43 * * * *"
+steps:
+  - command: echo updated
+`,
+		},
+	})
+	require.NoError(t, err)
+
+	resp, ok := respObj.(openapi.UpdateDAGSpec200JSONResponse)
+	require.True(t, ok, "expected 200 response, got %T", respObj)
+	require.Empty(t, resp.Errors)
+	require.Equal(t, []string{"dag-update-notify"}, notified)
+}
+
+func TestUpdateDAGSuspensionState_NotifiesDAGMutation(t *testing.T) {
+	t.Parallel()
+
+	helper := test.Setup(t, test.WithStatusPersistence())
+	dag := helper.DAG(t, `
+name: dag-suspend-notify
+schedule: "43 * * * *"
+steps:
+  - command: echo original
+`)
+
+	var notified []string
+	api := localapi.New(
+		helper.DAGStore,
+		helper.DAGRunStore,
+		helper.QueueStore,
+		helper.ProcStore,
+		helper.DAGRunMgr,
+		helper.Config,
+		nil,
+		helper.ServiceRegistry,
+		nil,
+		nil,
+		localapi.WithDAGMutationNotifier(func(fileName string) {
+			notified = append(notified, fileName)
+		}),
+	)
+
+	respObj, err := api.UpdateDAGSuspensionState(context.Background(), openapi.UpdateDAGSuspensionStateRequestObject{
+		FileName: dag.FileName(),
+		Body: &openapi.UpdateDAGSuspensionStateJSONRequestBody{
+			Suspend: true,
+		},
+	})
+	require.NoError(t, err)
+
+	_, ok := respObj.(openapi.UpdateDAGSuspensionState200Response)
+	require.True(t, ok, "expected 200 response, got %T", respObj)
+	require.Equal(t, []string{dag.FileName()}, notified)
+}
+
 func TestGetDAGDetails_EditorHintsIncludeInheritedCustomStepTypes(t *testing.T) {
 	t.Parallel()
 

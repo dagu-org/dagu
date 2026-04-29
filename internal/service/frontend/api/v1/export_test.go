@@ -7,6 +7,8 @@ package api
 var (
 	ExtractWebhookToken   = extractWebhookToken
 	MarshalWebhookPayload = marshalWebhookPayload
+	MarshalWebhookHeaders = marshalWebhookHeaders
 	IsWebhookTriggerPath  = isWebhookTriggerPath
 	WithRawBody           = withRawBody
+	WithRequestHeaders    = withRequestHeaders
 )

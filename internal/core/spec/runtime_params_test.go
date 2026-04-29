@@ -281,6 +281,122 @@ steps:
 	assert.Equal(t, []string{"region=us-west-2"}, resolved.Params)
 }
 
+func TestResolveRuntimeParams_AcceptsWebhookPayload_InlineTyped(t *testing.T) {
+	t.Parallel()
+
+	yaml := []byte(`
+name: accept-webhook-payload
+params:
+  - name: idea
+    type: string
+    required: true
+steps:
+  - name: echo
+    command: echo "$idea"
+`)
+
+	dag, err := LoadYAML(context.Background(), yaml, WithoutEval())
+	require.NoError(t, err)
+	dag.YamlData = yaml
+
+	resolved, err := ResolveRuntimeParams(
+		context.Background(),
+		dag,
+		`idea=ship WEBHOOK_PAYLOAD="{\"event\":\"push\"}"`,
+		ResolveRuntimeParamsOptions{},
+	)
+	require.NoError(t, err)
+	assert.Equal(t, []string{
+		"idea=ship",
+		`WEBHOOK_PAYLOAD={"event":"push"}`,
+	}, resolved.Params)
+	assert.JSONEq(t, `{"idea":"ship","WEBHOOK_PAYLOAD":"{\"event\":\"push\"}"}`, resolved.ParamsJSON)
+}
+
+func TestResolveRuntimeParams_AcceptsWebhookHeaders_InlineTyped(t *testing.T) {
+	t.Parallel()
+
+	yaml := []byte(`
+name: accept-webhook-headers
+params:
+  - name: idea
+    type: string
+    required: true
+steps:
+  - name: echo
+    command: echo "$idea"
+`)
+
+	dag, err := LoadYAML(context.Background(), yaml, WithoutEval())
+	require.NoError(t, err)
+	dag.YamlData = yaml
+
+	resolved, err := ResolveRuntimeParams(
+		context.Background(),
+		dag,
+		`idea=ship WEBHOOK_HEADERS="{\"x-github-event\":[\"push\"]}"`,
+		ResolveRuntimeParamsOptions{},
+	)
+	require.NoError(t, err)
+	assert.Equal(t, []string{
+		"idea=ship",
+		`WEBHOOK_HEADERS={"x-github-event":["push"]}`,
+	}, resolved.Params)
+	assert.JSONEq(t, `{"idea":"ship","WEBHOOK_HEADERS":"{\"x-github-event\":[\"push\"]}"}`, resolved.ParamsJSON)
+}
+
+func TestResolveLegacyRuntimePairs_InternalOverridesLastWriteWins(t *testing.T) {
+	t.Parallel()
+
+	pairs, err := resolveLegacyRuntimePairs(
+		nil,
+		`WEBHOOK_PAYLOAD=first`,
+		[]string{`WEBHOOK_PAYLOAD=second`},
+	)
+	require.NoError(t, err)
+	assert.Equal(t, []paramPair{
+		{Name: "WEBHOOK_PAYLOAD", Value: "second"},
+	}, pairs)
+}
+
+func TestResolveLegacyRuntimePairs_WebhookHeadersInternalOverridesLastWriteWins(t *testing.T) {
+	t.Parallel()
+
+	pairs, err := resolveLegacyRuntimePairs(
+		nil,
+		`WEBHOOK_HEADERS=first`,
+		[]string{`WEBHOOK_HEADERS=second`},
+	)
+	require.NoError(t, err)
+	assert.Equal(t, []paramPair{
+		{Name: "WEBHOOK_HEADERS", Value: "second"},
+	}, pairs)
+}
+
+func TestSplitInternalRuntimeOverridePairs_DeclaredWebhookPayloadStaysUserParam(t *testing.T) {
+	t.Parallel()
+
+	userPairs, internalPairs := splitInternalRuntimeOverridePairs(
+		[]paramPair{{Name: "WEBHOOK_PAYLOAD", Value: "42"}},
+		map[string]struct{}{"WEBHOOK_PAYLOAD": {}},
+	)
+
+	assert.Equal(t, []paramPair{{Name: "WEBHOOK_PAYLOAD", Value: "42"}}, userPairs)
+	assert.Empty(t, internalPairs)
+}
+
+func TestSplitInternalRuntimeOverridePairs_DeclaredWebhookHeadersStaysUserParam(t *testing.T) {
+	t.Parallel()
+
+	userPairs, internalPairs := splitInternalRuntimeOverridePairs(
+		[]paramPair{{Name: "WEBHOOK_HEADERS", Value: "42"}},
+		map[string]struct{}{"WEBHOOK_HEADERS": {}},
+	)
+
+	assert.Equal(t, []paramPair{{Name: "WEBHOOK_HEADERS", Value: "42"}}, userPairs)
+	assert.Empty(t, internalPairs)
+}
+
 func TestResolveRuntimeParams_RejectsUnknownNamedParam_LegacyNamed(t *testing.T) {
 	t.Parallel()
 
@@ -404,6 +520,46 @@ params:
 	resolved, err := ResolveRuntimeParams(context.Background(), dag, "region=us-west-2 extra=ok", ResolveRuntimeParamsOptions{})
 	require.NoError(t, err)
 	assert.NotNil(t, resolved)
+}
+
+func TestResolveRuntimeParams_ExternalSchemaAcceptsWebhookPayloadWhenClosed(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	schemaPath := filepath.Join(dir, "params.schema.json")
+	require.NoError(t, os.WriteFile(schemaPath, []byte(`{
+  "type": "object",
+  "properties": {
+    "idea": {
+      "type": "string"
+    }
+  },
+  "required": ["idea"],
+  "additionalProperties": false
+}`), 0o600))
+
+	dagPath := filepath.Join(dir, "external-webhook-payload.yaml")
+	require.NoError(t, os.WriteFile(dagPath, []byte(`
+name: external-webhook-payload
+params:
+  schema: params.schema.json
+`), 0o600))
+
+	dag, err := Load(context.Background(), dagPath, WithoutEval())
+	require.NoError(t, err)
+
+	resolved, err := ResolveRuntimeParams(
+		context.Background(),
+		dag,
+		`idea=ship WEBHOOK_PAYLOAD="{\"event\":\"push\"}"`,
+		ResolveRuntimeParamsOptions{},
+	)
+	require.NoError(t, err)
+	assert.Equal(t, []string{
+		"idea=ship",
+		`WEBHOOK_PAYLOAD={"event":"push"}`,
+	}, resolved.Params)
+	assert.JSONEq(t, `{"idea":"ship","WEBHOOK_PAYLOAD":"{\"event\":\"push\"}"}`, resolved.ParamsJSON)
 }
 
 func TestToFloat64_RejectsUnsafeIntegerPrecision(t *testing.T) {

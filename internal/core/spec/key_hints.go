@@ -31,6 +31,7 @@ var legacyToSnakeCaseKey = map[string]string{
 	"maxCleanUpTimeSec": "max_clean_up_time_sec",
 	"maxOutputSize":     "max_output_size",
 	"runConfig":         "run_config",
+	"forwardHeaders":    "webhook.forward_headers",
 	"workerSelector":    "worker_selector",
 	"registryAuths":     "registry_auths",
 	"shellPackages":     "shell_packages",

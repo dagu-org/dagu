@@ -854,3 +854,32 @@ steps:
 		require.Equal(t, "from-host|", apiStatusOutputValue(t, latestStatus, "RESULT"))
 	})
 }
+
+func TestListDAGsMatchesFileNameWhenDagNameDiffers(t *testing.T) {
+	server := test.SetupServer(t)
+
+	spec := `
+name: test_name
+steps:
+  - command: echo test
+`
+	server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
+		Name: "approvaltest",
+		Spec: &spec,
+	}).ExpectStatus(http.StatusCreated).Send(t)
+	t.Cleanup(func() {
+		server.Client().Delete("/api/v1/dags/approvaltest").Send(t)
+	})
+
+	resp := server.Client().
+		Get("/api/v1/dags?name=approvaltest").
+		ExpectStatus(http.StatusOK).
+		Send(t)
+
+	var body api.ListDAGs200JSONResponse
+	resp.Unmarshal(t, &body)
+
+	require.Len(t, body.Dags, 1)
+	require.Equal(t, "approvaltest", body.Dags[0].FileName)
+	require.Equal(t, "test_name", body.Dags[0].Dag.Name)
+}

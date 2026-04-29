@@ -317,6 +317,7 @@ func (a *API) UpdateDAGSpec(ctx context.Context, request api.UpdateDAGSpecReques
 	}
 
 	a.logAudit(ctx, audit.CategoryDAG, "dag_update", map[string]any{"dag_name": request.FileName})
+	a.notifyDAGMutation(request.FileName)
 
 	return api.UpdateDAGSpec200JSONResponse{
 		Errors: errs,
@@ -852,9 +853,14 @@ func (a *API) GetDAGDAGRunDetails(ctx context.Context, request api.GetDAGDAGRunD
 			}
 			return nil, fmt.Errorf("error getting latest attempt: %w", err)
 		}
+
 		latestStatus, err := a.dagRunMgr.GetLatestStatus(ctx, dag)
 		if err != nil {
 			return nil, fmt.Errorf("error getting latest status: %w", err)
+		}
+		latestStatusPtr := a.repairConfirmedStaleDistributedRunOnRead(ctx, &latestStatus, attempt.ID())
+		if latestStatusPtr != nil {
+			latestStatus = *latestStatusPtr
 		}
 		return &api.GetDAGDAGRunDetails200JSONResponse{
 			DagRun: a.toDAGRunDetailsWithSpecSource(ctx, attempt, latestStatus),
@@ -884,6 +890,8 @@ func (a *API) GetDAGDAGRunDetails(ctx context.Context, request api.GetDAGDAGRunD
 		}
 		return nil, fmt.Errorf("error getting status by dag-run ID: %w", err)
 	}
+
+	dagStatus = a.repairConfirmedStaleDistributedRunOnRead(ctx, dagStatus, attempt.ID())
 
 	return &api.GetDAGDAGRunDetails200JSONResponse{
 		DagRun: a.toDAGRunDetailsWithSpecSource(ctx, attempt, *dagStatus),
@@ -1608,6 +1616,7 @@ func (a *API) UpdateDAGSuspensionState(ctx context.Context, request api.UpdateDA
 		"dag_name":  request.FileName,
 		"suspended": request.Body.Suspend,
 	})
+	a.notifyDAGMutation(request.FileName)
 
 	return api.UpdateDAGSuspensionState200Response{}, nil
 }

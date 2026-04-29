@@ -116,26 +116,33 @@ func contextToLLMHistory(msgs []exec.LLMMessage) []llm.Message {
 	return result
 }
 
-// formatPushBackFeedback creates a user message from push-back inputs,
-// filtering to only declared approval input fields.
+// formatPushBackFeedback creates a user message from push-back inputs.
+// When approval is non-nil, only declared approval input fields are included.
 func formatPushBackFeedback(inputs map[string]string, approval *core.ApprovalConfig) string {
 	var sb strings.Builder
 	sb.WriteString("The reviewer has requested changes to your previous work.\n")
 
-	if len(inputs) > 0 && approval != nil {
+	keys := make([]string, 0, len(inputs))
+	var allowed map[string]struct{}
+	if approval != nil {
 		// Filter to declared input fields only (consistent with env var allowlist).
-		allowed := make(map[string]struct{}, len(approval.Input))
+		allowed = make(map[string]struct{}, len(approval.Input))
 		for _, key := range approval.Input {
 			allowed[key] = struct{}{}
 		}
+	}
 
-		sb.WriteString("\nReviewer feedback:\n")
-		keys := make([]string, 0, len(inputs))
-		for k := range inputs {
-			if _, ok := allowed[k]; ok {
-				keys = append(keys, k)
+	for k := range inputs {
+		if allowed != nil {
+			if _, ok := allowed[k]; !ok {
+				continue
 			}
 		}
+		keys = append(keys, k)
+	}
+
+	if len(keys) > 0 {
+		sb.WriteString("\nReviewer feedback:\n")
 		sort.Strings(keys)
 		for _, k := range keys {
 			fmt.Fprintf(&sb, "- %s: %s\n", k, inputs[k])

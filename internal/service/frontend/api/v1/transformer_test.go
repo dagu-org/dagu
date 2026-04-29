@@ -4,6 +4,7 @@
 package api
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -115,6 +116,42 @@ func TestToDAGDetailsIncludesParamDefDescriptions(t *testing.T) {
 	assert.Equal(t, "Free-form operator notes", *(*details.ParamDefs)[0].Description)
 }
 
+func TestToDAGDetailsIncludesParamSchema(t *testing.T) {
+	details := toDAGDetails(&core.DAG{
+		Name:        "schema-params",
+		ParamSchema: json.RawMessage(`{"type":"object","properties":{"region":{"type":"string"}}}`),
+	})
+
+	require.NotNil(t, details)
+	require.NotNil(t, details.ParamSchema)
+
+	properties, ok := (*details.ParamSchema)["properties"].(map[string]any)
+	require.True(t, ok)
+
+	region, ok := properties["region"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "string", region["type"])
+}
+
+func TestToDAGDetailsOmitsInvalidParamSchema(t *testing.T) {
+	t.Run("missing schema", func(t *testing.T) {
+		details := toDAGDetails(&core.DAG{Name: "no-schema"})
+
+		require.NotNil(t, details)
+		assert.Nil(t, details.ParamSchema)
+	})
+
+	t.Run("malformed schema", func(t *testing.T) {
+		details := toDAGDetails(&core.DAG{
+			Name:        "bad-schema",
+			ParamSchema: json.RawMessage(`{"type":"object"`),
+		})
+
+		require.NotNil(t, details)
+		assert.Nil(t, details.ParamSchema)
+	})
+}
+
 func TestToDAGDetailsIncludesArtifactsDir(t *testing.T) {
 	details := toDAGDetails(&core.DAG{
 		Name: "artifacts-dir",
@@ -129,6 +166,45 @@ func TestToDAGDetailsIncludesArtifactsDir(t *testing.T) {
 	assert.True(t, details.Artifacts.Enabled)
 	require.NotNil(t, details.Artifacts.Dir)
 	assert.Equal(t, "/var/lib/dagu/artifacts", *details.Artifacts.Dir)
+}
+
+func TestToNodeIncludesNormalizedPushBackHistory(t *testing.T) {
+	node := &exec.Node{
+		Step: core.Step{
+			Name: "review",
+			Approval: &core.ApprovalConfig{
+				Input: []string{"FEEDBACK"},
+			},
+		},
+		Status:            core.NodeWaiting,
+		StartedAt:         "2026-04-26T06:00:00Z",
+		FinishedAt:        "2026-04-26T06:01:00Z",
+		Stdout:            "stdout.log",
+		Stderr:            "stderr.log",
+		ApprovalIteration: 1,
+		PushBackInputs:    map[string]string{"FEEDBACK": "revise the summary", "IGNORED": "x"},
+		PushBackHistory: []exec.PushBackEntry{{
+			Iteration: 1,
+			By:        "reviewer",
+			At:        "2026-04-26T06:02:00Z",
+			Inputs:    map[string]string{"FEEDBACK": "revise the summary", "IGNORED": "x"},
+		}},
+	}
+
+	result := toNode(node)
+
+	require.NotNil(t, result.PushBackHistory)
+	require.Len(t, *result.PushBackHistory, 1)
+	entry := (*result.PushBackHistory)[0]
+	assert.Equal(t, 1, entry.Iteration)
+	require.NotNil(t, entry.By)
+	assert.Equal(t, "reviewer", *entry.By)
+	require.NotNil(t, entry.At)
+	assert.Equal(t, "2026-04-26T06:02:00Z", entry.At.UTC().Format(time.RFC3339))
+	require.NotNil(t, entry.Inputs)
+	assert.Equal(t, "revise the summary", (*entry.Inputs)["FEEDBACK"])
+	_, ok := (*entry.Inputs)["IGNORED"]
+	assert.False(t, ok)
 }
 
 func TestToDAGIncludesTypedSchedules(t *testing.T) {

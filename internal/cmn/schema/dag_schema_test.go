@@ -105,6 +105,20 @@ steps:
 `,
 		},
 		{
+			name: "RejectTopLevelInlineSchemaWithPropertiesArray",
+			spec: `
+params:
+  type: object
+  properties:
+    - name: region
+      type: string
+  required: [region]
+steps:
+  - command: echo done
+`,
+			wantErr: "params",
+		},
+		{
 			name: "ExternalInlineSchemaMode",
 			spec: `
 params:

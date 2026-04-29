@@ -125,10 +125,16 @@ func buildDAGParamsResult(ctx BuildContext, d *dag) (*paramsResult, error) {
 		return nil, err
 	}
 
+	paramSchema, err := buildRenderableParamSchema(plan.schema)
+	if err != nil {
+		return nil, err
+	}
+
 	return &paramsResult{
 		Params:        params,
 		DefaultParams: defaultParams,
 		ParamDefs:     cloneParamDefs(plan.paramDefs),
+		ParamSchema:   paramSchema,
 		ParamsJSON:    paramsJSON,
 	}, nil
 }
@@ -152,6 +158,9 @@ func buildDAGParamPlan(ctx BuildContext, d *dag) (*dagParamPlan, error) {
 			return buildLegacyParamPlan(extractSchemaValues(d.Params))
 		}
 		return buildExternalSchemaParamPlan(d.Params, d.WorkingDir, ctx.file)
+	}
+	if err := malformedInlineJSONSchemaShapeError(d.Params); err != nil {
+		return nil, err
 	}
 	if isInlineJSONSchema(d.Params) {
 		return buildInlineSchemaParamPlan(d.Params, ctx.opts.Has(BuildFlagSkipSchemaValidation))

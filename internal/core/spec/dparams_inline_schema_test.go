@@ -52,6 +52,76 @@ func TestIsInlineJSONSchema_MapWithPropertiesAsStringReturnsFalse(t *testing.T) 
 	assert.False(t, isInlineJSONSchema(input))
 }
 
+func TestBuildInlineSchemaParamPlan_RejectsPropertiesArrayShape(t *testing.T) {
+	t.Parallel()
+
+	yaml := []byte(`
+name: inline-schema-properties-array
+params:
+  type: object
+  properties:
+    - name: region
+      type: string
+  required:
+    - region
+`)
+
+	_, err := LoadYAML(context.Background(), yaml, WithoutEval())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "params")
+	assert.Contains(t, err.Error(), "properties must be an object")
+}
+
+func TestBuildInlineSchemaParamPlan_SkipSchemaValidationStillRejectsPropertiesArrayShape(t *testing.T) {
+	t.Parallel()
+
+	yaml := []byte(`
+name: inline-schema-properties-array-skip
+params:
+  type: object
+  properties:
+    - name: region
+      type: string
+`)
+
+	_, err := LoadYAML(context.Background(), yaml, SkipSchemaValidation(), WithoutEval())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "params")
+	assert.Contains(t, err.Error(), "properties must be an object")
+}
+
+func TestBuildInlineSchemaParamPlan_RejectsPropertiesNullShape(t *testing.T) {
+	t.Parallel()
+
+	yaml := []byte(`
+name: inline-schema-properties-null
+params:
+  type: object
+  properties: null
+`)
+
+	_, err := LoadYAML(context.Background(), yaml, WithoutEval())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "params")
+	assert.Contains(t, err.Error(), "properties must be an object")
+}
+
+func TestBuildInlineSchemaParamPlan_SkipSchemaValidationStillRejectsPropertiesNullShape(t *testing.T) {
+	t.Parallel()
+
+	yaml := []byte(`
+name: inline-schema-properties-null-skip
+params:
+  type: object
+  properties: null
+`)
+
+	_, err := LoadYAML(context.Background(), yaml, SkipSchemaValidation(), WithoutEval())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "params")
+	assert.Contains(t, err.Error(), "properties must be an object")
+}
+
 // U6: map with properties as a map IS an inline schema
 func TestIsInlineJSONSchema_MapWithPropertiesAsMapReturnsTrue(t *testing.T) {
 	t.Parallel()
@@ -228,6 +298,75 @@ params:
 	_, err := LoadYAML(context.Background(), yaml, WithoutEval(), WithParams("batch_size=not-an-integer"))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "batch_size")
+}
+
+func TestBuildInlineSchemaParamPlan_ExposesRenderableParamSchema(t *testing.T) {
+	t.Parallel()
+
+	yamlData := []byte(`
+name: inline-schema-ui
+params:
+  type: object
+  properties:
+    region:
+      title: Which compute location?
+      description: Pick the AWS region to run in.
+      oneOf:
+        - const: us-east-1
+          title: US East 1
+        - const: us-west-2
+          title: US West 2
+    count:
+      type: integer
+      default: 3
+      minimum: 1
+  required:
+    - region
+`)
+
+	dag, err := LoadYAML(context.Background(), yamlData, WithoutEval())
+	require.NoError(t, err)
+	require.NotEmpty(t, dag.ParamSchema)
+	assert.JSONEq(t, `{
+	  "type": "object",
+	  "properties": {
+	    "region": {
+	      "type": "string",
+	      "title": "Which compute location?",
+	      "description": "Pick the AWS region to run in.",
+	      "oneOf": [
+	        {"const": "us-east-1", "title": "US East 1", "type": "string"},
+	        {"const": "us-west-2", "title": "US West 2", "type": "string"}
+	      ]
+	    },
+	    "count": {
+	      "type": "integer",
+	      "default": 3,
+	      "minimum": 1
+	    }
+	  },
+	  "required": ["region"]
+	}`, string(dag.ParamSchema))
+}
+
+func TestBuildInlineSchemaParamPlan_OmitsUnsupportedNestedParamSchema(t *testing.T) {
+	t.Parallel()
+
+	yamlData := []byte(`
+name: inline-schema-nested-ui
+params:
+  type: object
+  properties:
+    settings:
+      type: object
+      properties:
+        retries:
+          type: integer
+`)
+
+	dag, err := LoadYAML(context.Background(), yamlData, WithoutEval())
+	require.NoError(t, err)
+	assert.Empty(t, dag.ParamSchema)
 }
 
 // U15: positional parameters are rejected for inline schema

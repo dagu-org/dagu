@@ -5,10 +5,13 @@ package cmd_test
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/dagucloud/dagu/internal/cmd"
+	"github.com/dagucloud/dagu/internal/core/spec"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,6 +27,20 @@ func runExampleCmd(args ...string) (string, error) {
 
 	err := root.Execute()
 	return buf.String(), err
+}
+
+func extractExampleYAML(out string) string {
+	lines := strings.Split(out, "\n")
+	start := 0
+	for start < len(lines) {
+		line := lines[start]
+		if line == "" || strings.HasPrefix(line, "#") {
+			start++
+			continue
+		}
+		break
+	}
+	return strings.Join(lines[start:], "\n")
 }
 
 func TestExampleCommand(t *testing.T) {
@@ -46,11 +63,12 @@ func TestExampleCommand(t *testing.T) {
 		assert.Contains(t, err.Error(), fmt.Sprintf("between 1 and %d", cmd.ExampleCount()))
 	})
 
-	t.Run("AllExamplesValid", func(t *testing.T) {
+	t.Run("AllExamplesLoadYAML", func(t *testing.T) {
 		for i := 1; i <= cmd.ExampleCount(); i++ {
 			out, err := runExampleCmd("example", fmt.Sprintf("%d", i))
 			require.NoError(t, err, "example %d failed", i)
-			assert.Contains(t, out, "type: graph", "example %d missing type: graph", i)
+			_, err = spec.LoadYAML(context.Background(), []byte(extractExampleYAML(out)), spec.WithoutEval())
+			require.NoError(t, err, "example %d failed to load", i)
 		}
 	})
 }

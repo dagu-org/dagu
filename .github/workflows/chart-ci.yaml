@@ -35,6 +35,12 @@ on:
       - "charts/dagu/crds/**"
       - ".github/workflows/chart-ci.yaml"
 
+# Restrict to read-only: this workflow only lints and packages the chart,
+# it never pushes or creates releases. An explicit block prevents the default
+# broad token permissions from being available if the workflow is ever compromised.
+permissions:
+  contents: read
+
 jobs:
   validate:
     name: Validate Helm chart

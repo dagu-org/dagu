@@ -1605,7 +1605,12 @@ func (a *API) PushBackDAGRunStep(ctx context.Context, request api.PushBackDAGRun
 		return nil, fmt.Errorf("error serializing status for rollback: %w", err)
 	}
 
-	applyPushBack(ctx, node, dagStatus, request.Body)
+	if err := applyPushBack(ctx, node, dagStatus, request.Body); err != nil {
+		return &api.PushBackDAGRunStep400JSONResponse{
+			Code:    api.ErrorCodeBadRequest,
+			Message: err.Error(),
+		}, nil
+	}
 
 	if err := a.updateDAGRunStatus(ctx, ref, *dagStatus); err != nil {
 		return nil, fmt.Errorf("error updating status: %w", err)
@@ -1703,7 +1708,12 @@ func (a *API) PushBackSubDAGRunStep(ctx context.Context, request api.PushBackSub
 		return nil, fmt.Errorf("error serializing status for rollback: %w", err)
 	}
 
-	applyPushBack(ctx, node, dagStatus, request.Body)
+	if err := applyPushBack(ctx, node, dagStatus, request.Body); err != nil {
+		return &api.PushBackSubDAGRunStep400JSONResponse{
+			Code:    api.ErrorCodeBadRequest,
+			Message: err.Error(),
+		}, nil
+	}
 
 	if err := a.updateDAGRunStatus(ctx, rootRef, *dagStatus); err != nil {
 		return nil, fmt.Errorf("error updating sub DAG-run status: %w", err)
@@ -1827,41 +1837,124 @@ func isDAGRunLookupNotFound(err error) bool {
 
 // getDAGRunDetailsData returns DAG run details data. Used by both HTTP handler and SSE fetcher.
 func (a *API) getDAGRunDetailsData(ctx context.Context, dagName, dagRunId string) (api.GetDAGRunDetails200JSONResponse, error) {
-	if dagRunId == "latest" {
-		attempt, err := a.dagRunStore.LatestAttempt(ctx, dagName)
-		if err != nil {
-			return api.GetDAGRunDetails200JSONResponse{}, fmt.Errorf("no dag-runs found for DAG %s", dagName)
-		}
-		status, err := attempt.ReadStatus(ctx)
-		if err != nil {
-			return api.GetDAGRunDetails200JSONResponse{}, fmt.Errorf("error getting latest status: %w", err)
-		}
-		if status == nil {
-			return api.GetDAGRunDetails200JSONResponse{}, fmt.Errorf("latest dag-run status is unavailable for DAG %s", dagName)
-		}
-		if err := a.requireWorkspaceVisible(ctx, statusWorkspaceName(status)); err != nil {
-			return api.GetDAGRunDetails200JSONResponse{}, err
-		}
-		return api.GetDAGRunDetails200JSONResponse{
-			DagRunDetails: a.toDAGRunDetailsWithSpecSource(ctx, attempt, *status),
-		}, nil
-	}
-
-	ref := exec.NewDAGRunRef(dagName, dagRunId)
-	attempt, err := a.dagRunStore.FindAttempt(ctx, ref)
+	attempt, dagStatus, err := a.loadRootDAGRunDetailsAttemptAndStatus(ctx, dagName, dagRunId)
 	if err != nil {
-		return api.GetDAGRunDetails200JSONResponse{}, fmt.Errorf("dag-run ID %s not found for DAG %s", dagRunId, dagName)
-	}
-	dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
-	if err != nil {
-		return api.GetDAGRunDetails200JSONResponse{}, fmt.Errorf("dag-run ID %s not found for DAG %s", dagRunId, dagName)
-	}
-	if err := a.requireWorkspaceVisible(ctx, statusWorkspaceName(dagStatus)); err != nil {
 		return api.GetDAGRunDetails200JSONResponse{}, err
 	}
 	return api.GetDAGRunDetails200JSONResponse{
 		DagRunDetails: a.toDAGRunDetailsWithSpecSource(ctx, attempt, *dagStatus),
 	}, nil
+}
+
+func (a *API) loadRootDAGRunDetailsAttemptAndStatus(
+	ctx context.Context,
+	dagName, dagRunId string,
+) (exec.DAGRunAttempt, *exec.DAGRunStatus, error) {
+	if dagRunId == "latest" {
+		attempt, err := a.dagRunStore.LatestAttempt(ctx, dagName)
+		if err != nil {
+			return nil, nil, fmt.Errorf("no dag-runs found for DAG %s", dagName)
+		}
+
+		status, err := attempt.ReadStatus(ctx)
+		if err != nil {
+			return nil, nil, fmt.Errorf("error getting latest status: %w", err)
+		}
+		if status == nil {
+			return nil, nil, fmt.Errorf("latest dag-run status is unavailable for DAG %s", dagName)
+		}
+		if err := a.requireWorkspaceVisible(ctx, statusWorkspaceName(status)); err != nil {
+			return nil, nil, err
+		}
+
+		ref := exec.NewDAGRunRef(dagName, status.DAGRunID)
+		dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
+		if err != nil {
+			return nil, nil, fmt.Errorf("error getting latest status: %w", err)
+		}
+		if dagStatus == nil {
+			return nil, nil, fmt.Errorf("latest dag-run status is unavailable for DAG %s", dagName)
+		}
+
+		return attempt, a.repairConfirmedStaleDistributedRunOnRead(ctx, dagStatus, attempt.ID()), nil
+	}
+
+	ref := exec.NewDAGRunRef(dagName, dagRunId)
+	attempt, err := a.dagRunStore.FindAttempt(ctx, ref)
+	if err != nil {
+		return nil, nil, fmt.Errorf("dag-run ID %s not found for DAG %s", dagRunId, dagName)
+	}
+
+	dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
+	if err != nil {
+		return nil, nil, fmt.Errorf("dag-run ID %s not found for DAG %s", dagRunId, dagName)
+	}
+	if err := a.requireWorkspaceVisible(ctx, statusWorkspaceName(dagStatus)); err != nil {
+		return nil, nil, err
+	}
+
+	return attempt, a.repairConfirmedStaleDistributedRunOnRead(ctx, dagStatus, attempt.ID()), nil
+}
+
+func (a *API) repairConfirmedStaleDistributedRunOnRead(
+	ctx context.Context,
+	status *exec.DAGRunStatus,
+	fallbackAttemptID string,
+) *exec.DAGRunStatus {
+	if status == nil || a.dagRunLeaseStore == nil || a.workerHeartbeatStore == nil {
+		return status
+	}
+
+	attemptID := status.AttemptID
+	if attemptID == "" {
+		attemptID = fallbackAttemptID
+	}
+	fallbackWorkerID := status.WorkerID
+	if fallbackWorkerID == "" {
+		fallbackWorkerID = a.distributedFallbackWorkerIDFromLease(ctx, status, attemptID)
+	}
+
+	reconciled, _, err := runtime.ConfirmAndRepairStaleDistributedRun(ctx, runtime.DistributedRunRepairConfig{
+		DAGRunStore:          a.dagRunStore,
+		DAGRunLeaseStore:     a.dagRunLeaseStore,
+		WorkerHeartbeatStore: a.workerHeartbeatStore,
+		StaleLeaseThreshold:  a.leaseStaleThreshold,
+	}, status, attemptID, fallbackWorkerID)
+	if err != nil {
+		logger.Warn(ctx, "Failed to auto-repair stale distributed run on read",
+			tag.DAG(status.Name),
+			tag.RunID(status.DAGRunID),
+			tag.AttemptID(status.AttemptID),
+			tag.Error(err),
+		)
+		return status
+	}
+	if reconciled != nil {
+		return reconciled
+	}
+	return status
+}
+
+func (a *API) distributedFallbackWorkerIDFromLease(
+	ctx context.Context,
+	status *exec.DAGRunStatus,
+	fallbackAttemptID string,
+) string {
+	if status == nil || status.WorkerID != "" || a.dagRunLeaseStore == nil {
+		return ""
+	}
+
+	attemptKey := exec.AttemptKeyForStatus(status, fallbackAttemptID)
+	if attemptKey == "" {
+		return ""
+	}
+
+	lease, err := a.dagRunLeaseStore.Get(ctx, attemptKey)
+	if err != nil || lease == nil || !exec.IsRemoteWorkerID(lease.WorkerID) {
+		return ""
+	}
+
+	return lease.WorkerID
 }
 
 func (a *API) toDAGRunDetailsWithSpecSource(ctx context.Context, attempt exec.DAGRunAttempt, status exec.DAGRunStatus) api.DAGRunDetails {
@@ -3317,27 +3410,65 @@ func validatePushBackInputs(step core.Step, body *api.PushBackStepRequest) error
 	return checkMissingInputs(step.Approval.Required, provided)
 }
 
-func applyPushBack(_ context.Context, node *exec.Node, status *exec.DAGRunStatus, body *api.PushBackStepRequest) {
-	node.ApprovalIteration++
-	node.Status = core.NodeNotStarted
-	node.StartedAt = "-"
-	node.FinishedAt = "-"
-	node.Error = ""
+func applyPushBack(ctx context.Context, node *exec.Node, status *exec.DAGRunStatus, body *api.PushBackStepRequest) error {
+	targetName := node.Step.Name
+	if node.Step.Approval != nil && strings.TrimSpace(node.Step.Approval.RewindTo) != "" {
+		targetName = strings.TrimSpace(node.Step.Approval.RewindTo)
+	}
+	targetIdx := findStepByName(status.Nodes, targetName)
+	if targetIdx < 0 {
+		return fmt.Errorf("step %s approval.rewind_to references non-existent step %s", node.Step.Name, targetName)
+	}
 
+	nextIteration := node.ApprovalIteration + 1
+	var inputs map[string]string
 	if body != nil && body.Inputs != nil {
-		node.PushBackInputs = *body.Inputs
-	} else {
-		node.PushBackInputs = nil
+		inputs = cloneStringMap(*body.Inputs)
 	}
+	allowedInputs := pushBackAllowedInputs(node.Step)
+	filteredInputs := exec.FilterPushBackInputs(allowedInputs, inputs)
+	history := buildPushBackHistory(ctx, node, allowedInputs, nextIteration, filteredInputs)
 
-	// Clear downstream nodes so they re-execute after the push-back step
-	dependents := findDependentNodes(status.Nodes, node.Step.Name)
-	for _, dep := range dependents {
-		dep.Status = core.NodeNotStarted
-		dep.StartedAt = "-"
-		dep.FinishedAt = "-"
-		dep.Error = ""
+	// Reset the configured rewind target and everything that depends on it.
+	rewoundNodes := append([]*exec.Node{status.Nodes[targetIdx]}, findDependentNodes(status.Nodes, targetName)...)
+	for _, rewoundNode := range rewoundNodes {
+		resetNodeForManualReexecution(rewoundNode)
+		setPushBackContext(rewoundNode, nextIteration, filteredInputs, history)
 	}
+	return nil
+}
+
+func buildPushBackHistory(ctx context.Context, node *exec.Node, allowedInputs []string, nextIteration int, inputs map[string]string) []exec.PushBackEntry {
+	history := exec.NormalizePushBackHistory(allowedInputs, node.ApprovalIteration, node.PushBackInputs, node.PushBackHistory)
+	var actor string
+	if user, ok := auth.UserFromContext(ctx); ok && user != nil {
+		actor = user.Username
+	}
+	history = append(history, exec.PushBackEntry{
+		Iteration: nextIteration,
+		By:        actor,
+		At:        time.Now().UTC().Format(time.RFC3339),
+		Inputs:    cloneStringMap(inputs),
+	})
+	return history
+}
+
+func resetNodeForManualReexecution(node *exec.Node) {
+	step := node.Step
+	*node = *exec.NewNodeFromStep(step)
+}
+
+func setPushBackContext(node *exec.Node, iteration int, inputs map[string]string, history []exec.PushBackEntry) {
+	node.ApprovalIteration = iteration
+	node.PushBackInputs = cloneStringMap(inputs)
+	node.PushBackHistory = exec.ClonePushBackHistory(history)
+}
+
+func pushBackAllowedInputs(step core.Step) []string {
+	if step.Approval == nil {
+		return nil
+	}
+	return step.Approval.Input
 }
 
 // findDependentNodes returns all nodes that directly or transitively depend on the given step.

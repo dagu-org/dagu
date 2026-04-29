@@ -9,8 +9,31 @@ on:
         type: string
 
 jobs:
+  # Validate the user-supplied ref before any job that pushes images or uses secrets.
+  # A ref containing shell metacharacters could otherwise be injected into the
+  # "Resolve version" run step via ${{ inputs.ref }}.
+  validate-inputs:
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Validate ref input
+        env:
+          # Pass via env so the value is treated as data, not interpolated code.
+          INPUT_REF: ${{ inputs.ref }}
+        run: |
+          # Reject refs containing shell metacharacters (space, ;, &, |, $, (, ), `, <, >, !).
+          if echo "$INPUT_REF" | grep -qE '[[:space:];|&$`()<>!]'; then
+            echo "::error::inputs.ref contains invalid characters: ${INPUT_REF}"
+            exit 1
+          fi
+          if [ -z "$INPUT_REF" ]; then
+            echo "::error::inputs.ref must not be empty"
+            exit 1
+          fi
+
   docker-default:
     name: Build and push default image
+    needs: validate-inputs
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -36,13 +59,17 @@ jobs:
       - name: Resolve version
         id: get_version
         shell: bash
+        env:
+          # Pass inputs.ref via env so it's treated as a plain string in the shell,
+          # not code. Writing ${{ inputs.ref }} directly inside `run:` would let a
+          # crafted ref value execute arbitrary commands.
+          INPUT_REF: ${{ inputs.ref }}
         run: |
-          REF="${{ inputs.ref }}"
-          case "$REF" in
-            refs/tags/v*) VERSION="${REF#refs/tags/v}" ;;
-            v*)           VERSION="${REF#v}" ;;
-            refs/tags/*)  VERSION="${REF#refs/tags/}" ;;
-            *)            VERSION="${REF}" ;;
+          case "$INPUT_REF" in
+            refs/tags/v*) VERSION="${INPUT_REF#refs/tags/v}" ;;
+            v*)           VERSION="${INPUT_REF#v}" ;;
+            refs/tags/*)  VERSION="${INPUT_REF#refs/tags/}" ;;
+            *)            VERSION="${INPUT_REF}" ;;
           esac
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
@@ -60,6 +87,7 @@ jobs:
 
   docker-dev:
     name: Build and push dev image
+    needs: validate-inputs
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -85,13 +113,15 @@ jobs:
       - name: Resolve version
         id: get_version
         shell: bash
+        env:
+          # Pass inputs.ref via env — same injection-prevention rationale as docker-default.
+          INPUT_REF: ${{ inputs.ref }}
         run: |
-          REF="${{ inputs.ref }}"
-          case "$REF" in
-            refs/tags/v*) VERSION="${REF#refs/tags/v}" ;;
-            v*)           VERSION="${REF#v}" ;;
-            refs/tags/*)  VERSION="${REF#refs/tags/}" ;;
-            *)            VERSION="${REF}" ;;
+          case "$INPUT_REF" in
+            refs/tags/v*) VERSION="${INPUT_REF#refs/tags/v}" ;;
+            v*)           VERSION="${INPUT_REF#v}" ;;
+            refs/tags/*)  VERSION="${INPUT_REF#refs/tags/}" ;;
+            *)            VERSION="${INPUT_REF}" ;;
           esac
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
@@ -110,6 +140,7 @@ jobs:
 
   docker-alpine:
     name: Build and push alpine image
+    needs: validate-inputs
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -135,13 +166,15 @@ jobs:
       - name: Resolve version
         id: get_version
         shell: bash
+        env:
+          # Pass inputs.ref via env — same injection-prevention rationale as docker-default.
+          INPUT_REF: ${{ inputs.ref }}
         run: |
-          REF="${{ inputs.ref }}"
-          case "$REF" in
-            refs/tags/v*) VERSION="${REF#refs/tags/v}" ;;
-            v*)           VERSION="${REF#v}" ;;
-            refs/tags/*)  VERSION="${REF#refs/tags/}" ;;
-            *)            VERSION="${REF}" ;;
+          case "$INPUT_REF" in
+            refs/tags/v*) VERSION="${INPUT_REF#refs/tags/v}" ;;
+            v*)           VERSION="${INPUT_REF#v}" ;;
+            refs/tags/*)  VERSION="${INPUT_REF#refs/tags/}" ;;
+            *)            VERSION="${INPUT_REF}" ;;
           esac
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 

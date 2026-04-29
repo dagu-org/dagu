@@ -493,6 +493,13 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	if eventSvc != nil {
 		apiOpts = append(apiOpts, apiv1.WithEventService(eventSvc))
 	}
+	apiOpts = append(apiOpts, apiv1.WithDAGMutationNotifier(func(fileName string) {
+		if srv.sseMultiplexer == nil {
+			return
+		}
+		srv.sseMultiplexer.WakeTopicType(sse.TopicTypeDAGsList)
+		srv.sseMultiplexer.WakeTopic(sse.TopicTypeDAG, fileName)
+	}))
 
 	// Pass license manager to API
 	if srv.licenseManager != nil {
@@ -611,7 +618,21 @@ func initBuiltinAuthService(ctx context.Context, cfg *config.Config, collector *
 	if collector != nil {
 		collector.RegisterCache(webhookCache)
 	}
-	webhookStore, err := filewebhook.New(cfg.Paths.WebhooksDir, filewebhook.WithFileCache(webhookCache))
+	var webhookEncryptor *crypto.Encryptor
+	encKey, encErr := crypto.ResolveKey(cfg.Paths.DataDir)
+	if encErr != nil {
+		logger.Warn(ctx, "Failed to resolve encryption key for webhook store", tag.Error(encErr))
+	} else {
+		webhookEncryptor, encErr = crypto.NewEncryptor(encKey)
+		if encErr != nil {
+			logger.Warn(ctx, "Failed to create encryptor for webhook store", tag.Error(encErr))
+		}
+	}
+	webhookOpts := []filewebhook.Option{filewebhook.WithFileCache(webhookCache)}
+	if webhookEncryptor != nil {
+		webhookOpts = append(webhookOpts, filewebhook.WithEncryptor(webhookEncryptor))
+	}
+	webhookStore, err := filewebhook.New(cfg.Paths.WebhooksDir, webhookOpts...)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to create webhook store: %w", err)
 	}

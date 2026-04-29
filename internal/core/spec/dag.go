@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -22,6 +23,16 @@ import (
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/spec/types"
 	"github.com/go-viper/mapstructure/v2"
+)
+
+const dagRunArtifactsDirEnvKey = "DAG_RUN_ARTIFACTS_DIR"
+
+var dagRunArtifactsDirReferencePattern = regexp.MustCompile(
+	`(?:\$\{` + regexp.QuoteMeta(dagRunArtifactsDirEnvKey) + `\}` +
+		`|\$` + regexp.QuoteMeta(dagRunArtifactsDirEnvKey) + `(?:\b|[^A-Za-z0-9_])` +
+		`|\$env:` + regexp.QuoteMeta(dagRunArtifactsDirEnvKey) + `(?:\b|[^A-Za-z0-9_])` +
+		`|%` + regexp.QuoteMeta(dagRunArtifactsDirEnvKey) + `%` +
+		`|env\(["']` + regexp.QuoteMeta(dagRunArtifactsDirEnvKey) + `["']\))`,
 )
 
 // dag is the intermediate representation of a DAG specification.
@@ -129,6 +140,8 @@ type dag struct {
 	Container any `yaml:"container,omitempty"`
 	// RunConfig contains configuration for controlling user interactions during DAG runs.
 	RunConfig *runConfig `yaml:"run_config,omitempty"`
+	// Webhook contains DAG-level webhook trigger behavior configuration.
+	Webhook *webhookConfig `yaml:"webhook,omitempty"`
 	// RegistryAuths maps registry hostnames to authentication configs.
 	// Can be either a JSON string or a map of registry to auth config.
 	RegistryAuths any `yaml:"registry_auths,omitempty"`
@@ -304,6 +317,10 @@ type runConfig struct {
 	DisableRunIdEdit bool `yaml:"disable_run_id_edit,omitempty"` // Disable custom run ID specification
 }
 
+type webhookConfig struct {
+	ForwardHeaders []string `yaml:"forward_headers,omitempty"`
+}
+
 // ssh defines the SSH configuration for the DAG.
 type ssh struct {
 	// User is the SSH user.
@@ -463,6 +480,7 @@ var metadataTransformers = []transform{
 	{"params", newTransformer("Params", buildParams)},
 	{"default_params", newTransformer("DefaultParams", buildDefaultParams)},
 	{"param_defs", newTransformer("ParamDefs", buildParamDefs)},
+	{"param_schema", newTransformer("ParamSchema", buildParamSchema)},
 	{"params_json", newTransformer("ParamsJSON", buildParamsJSON)},
 	{"env", newTransformer("Env", buildEnvs)},
 	{"schedule", newTransformer("Schedule", buildSchedule)},
@@ -489,6 +507,7 @@ var fullTransformers = []transform{
 	{"log_output", newTransformer("LogOutput", buildLogOutput)},
 	{"mail_on", newTransformer("MailOn", buildMailOn)},
 	{"run_config", newTransformer("RunConfig", buildRunConfig)},
+	{"webhook", newTransformer("Webhook", buildWebhookConfig)},
 	{"hist_retention_days", newTransformer("HistRetentionDays", buildHistRetentionDays)},
 	{"max_clean_up_time_sec", newTransformer("MaxCleanUpTime", buildMaxCleanUpTime)},
 	{"shell", newTransformer("Shell", buildShell)},
@@ -822,7 +841,12 @@ func buildLogDir(_ BuildContext, d *dag) (string, error) {
 }
 
 func buildArtifacts(_ BuildContext, d *dag) (*core.ArtifactsConfig, error) {
+	autoEnable := dagReferencesRunArtifactsDir(d)
+
 	if d.Artifacts == nil {
+		if autoEnable {
+			return &core.ArtifactsConfig{Enabled: true}, nil
+		}
 		return nil, nil
 	}
 
@@ -831,11 +855,87 @@ func buildArtifacts(_ BuildContext, d *dag) (*core.ArtifactsConfig, error) {
 	}
 	if d.Artifacts.Enabled != nil {
 		cfg.Enabled = *d.Artifacts.Enabled
+	} else if autoEnable {
+		cfg.Enabled = true
 	}
 	if d.Artifacts.Enabled == nil && cfg.Dir == "" {
-		return nil, nil
+		if !cfg.Enabled {
+			return nil, nil
+		}
 	}
 	return cfg, nil
+}
+
+func dagReferencesRunArtifactsDir(d *dag) bool {
+	return valueReferencesRunArtifactsDir(reflect.ValueOf(d))
+}
+
+func referencesArtifactsEnvVar(s string) bool {
+	return dagRunArtifactsDirReferencePattern.MatchString(s)
+}
+
+func valueReferencesRunArtifactsDir(v reflect.Value) bool {
+	if !v.IsValid() {
+		return false
+	}
+
+	for v.Kind() == reflect.Pointer || v.Kind() == reflect.Interface {
+		if v.IsNil() {
+			return false
+		}
+		v = v.Elem()
+	}
+
+	switch v.Kind() {
+	case reflect.String:
+		return referencesArtifactsEnvVar(v.String())
+	case reflect.Array, reflect.Slice:
+		for i := 0; i < v.Len(); i++ {
+			if valueReferencesRunArtifactsDir(v.Index(i)) {
+				return true
+			}
+		}
+	case reflect.Map:
+		iter := v.MapRange()
+		for iter.Next() {
+			if valueReferencesRunArtifactsDir(iter.Key()) || valueReferencesRunArtifactsDir(iter.Value()) {
+				return true
+			}
+		}
+	case reflect.Struct:
+		for _, field := range v.Fields() {
+			if valueReferencesRunArtifactsDir(field) {
+				return true
+			}
+		}
+	case reflect.Invalid,
+		reflect.Bool,
+		reflect.Int,
+		reflect.Int8,
+		reflect.Int16,
+		reflect.Int32,
+		reflect.Int64,
+		reflect.Uint,
+		reflect.Uint8,
+		reflect.Uint16,
+		reflect.Uint32,
+		reflect.Uint64,
+		reflect.Uintptr,
+		reflect.Float32,
+		reflect.Float64,
+		reflect.Complex64,
+		reflect.Complex128,
+		reflect.Chan,
+		reflect.Func,
+		reflect.Interface,
+		reflect.Pointer,
+		reflect.UnsafePointer:
+		return false
+	default:
+		return false
+	}
+
+	return false
 }
 
 func buildLogOutput(_ BuildContext, d *dag) (core.LogOutputMode, error) {
@@ -866,6 +966,41 @@ func buildRunConfig(_ BuildContext, d *dag) (*core.RunConfig, error) {
 		DisableParamEdit: d.RunConfig.DisableParamEdit,
 		DisableRunIdEdit: d.RunConfig.DisableRunIdEdit,
 	}, nil
+}
+
+func buildWebhookConfig(_ BuildContext, d *dag) (*core.WebhookConfig, error) {
+	if d.Webhook == nil {
+		return nil, nil
+	}
+
+	headers := make([]string, 0, len(d.Webhook.ForwardHeaders))
+	for i, raw := range d.Webhook.ForwardHeaders {
+		header := core.NormalizeWebhookForwardHeader(raw)
+		if header == "" {
+			return nil, core.NewValidationError(
+				fmt.Sprintf("webhook.forward_headers[%d]", i),
+				raw,
+				fmt.Errorf("header name cannot be empty"),
+			)
+		}
+		if !core.IsValidWebhookHeaderToken(header) {
+			return nil, core.NewValidationError(
+				fmt.Sprintf("webhook.forward_headers[%d]", i),
+				raw,
+				fmt.Errorf("invalid HTTP header name"),
+			)
+		}
+		if core.IsDeniedWebhookForwardHeader(header) {
+			return nil, core.NewValidationError(
+				fmt.Sprintf("webhook.forward_headers[%d]", i),
+				raw,
+				fmt.Errorf("authorization header cannot be forwarded"),
+			)
+		}
+		headers = append(headers, header)
+	}
+
+	return &core.WebhookConfig{ForwardHeaders: headers}, nil
 }
 
 func buildHistRetentionDays(_ BuildContext, d *dag) (int, error) {
@@ -928,6 +1063,7 @@ type paramsResult struct {
 	Params        []string
 	DefaultParams string
 	ParamDefs     []core.ParamDef
+	ParamSchema   json.RawMessage
 	ParamsJSON    string // JSON representation of resolved params (original payload when provided as JSON)
 }
 
@@ -971,6 +1107,14 @@ func buildParamsJSON(ctx BuildContext, d *dag) (string, error) {
 		return "", err
 	}
 	return result.ParamsJSON, nil
+}
+
+func buildParamSchema(ctx BuildContext, d *dag) (json.RawMessage, error) {
+	result, err := parseParamsInternal(ctx, d)
+	if err != nil {
+		return nil, err
+	}
+	return cloneParamSchema(result.ParamSchema), nil
 }
 
 // detectJSONParams checks if the input string is valid JSON and returns it if so.

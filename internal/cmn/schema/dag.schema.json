@@ -832,6 +832,20 @@
       },
       "description": "Configuration for controlling user interactions when starting DAG runs. Allows restricting parameter editing and custom run ID input."
     },
+    "webhook": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "forward_headers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Allowlist of request headers to expose to webhook-triggered DAG runs through the WEBHOOK_HEADERS runtime variable. Header names are matched case-insensitively and normalized to lowercase. Authorization cannot be forwarded."
+        }
+      },
+      "description": "DAG-level webhook trigger behavior. Use this to forward selected request headers into webhook-triggered runs."
+    },
     "worker_selector": {
       "oneOf": [
         {
@@ -1119,6 +1133,16 @@
           },
           {
             "$ref": "#/definitions/dagParamInlineSchema"
+          },
+          {
+            "type": "object",
+            "required": ["type", "properties"],
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "object"
+              }
+            }
           }
         ]
       },
@@ -1668,6 +1692,10 @@
                 "type": "string"
               },
               "description": "Subset of input fields that must be provided by the approver."
+            },
+            "rewind_to": {
+              "type": "string",
+              "description": "Optional step name or ID to restart from when the step is pushed back. Must reference the step itself or an upstream dependency."
             }
           },
           "description": "Human approval gate for this step. When configured, the step executes its command first, then pauses the DAG and waits for human approval before proceeding to dependent steps. The approver can provide input values that become available as environment variables in subsequent steps."
