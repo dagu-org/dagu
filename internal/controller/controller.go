@@ -491,6 +491,8 @@ func (s *Service) buildSystemPromptExtra(def *Definition, state *State, workflow
 	sb.WriteString("- Use list_workflows to inspect only the workflows configured for this Controller.\n")
 	sb.WriteString("- Use register_workflow to add a created DAG name to this controller's workflows.names list. Do not edit the controller spec manually.\n")
 	sb.WriteString("- Run only workflows listed under Managed workflows.\n")
+	sb.WriteString("- After every workflow run, inspect the latest result before deciding what to do next.\n")
+	sb.WriteString("- If the latest workflow result is incomplete, incorrect, brittle, or missing expected artifacts, update that workflow with patch before rerunning it or relying on its output.\n")
 	sb.WriteString("- Keep durable controller-owned outputs under the Controller artifacts directory.\n")
 	sb.WriteString("- When you create or improve workflows that should emit files, prefer configuring their top-level artifacts.dir to the Controller artifacts directory.\n")
 	sb.WriteString("- If none of the configured workflows fits the task, create a new workflow YAML in the DAGs directory with patch, register it with register_workflow, then run it.\n")
@@ -536,7 +538,7 @@ func (s *Service) buildResumeMessage(def *Definition, state *State, requestedBy 
 
 func (s *Service) buildRunCompletionMessage(status *exec.DAGRunStatus) string {
 	return fmt.Sprintf(
-		"Child DAG run completed.\nDAG: %s\nRun ID: %s\nStatus: %s\nError: %s\nSummary: %s\nDecide the next action.",
+		"Child DAG run completed.\nDAG: %s\nRun ID: %s\nStatus: %s\nError: %s\nSummary: %s\nInspect this latest result before deciding the next action. If the workflow itself caused a bad or incomplete result, patch the workflow before rerunning it or depending on its output.",
 		status.Name,
 		status.DAGRunID,
 		status.Status.String(),

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/dagucloud/dagu/internal/agent"
+	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/exec"
 	_ "github.com/dagucloud/dagu/internal/llm/allproviders"
 	"github.com/dagucloud/dagu/internal/runtime"
@@ -1526,11 +1527,29 @@ func TestServiceRuntimeOptionsPromptRestrictsWorkflowExecutionToConfiguredList(t
 	opts, err := svc.runtimeOptions(ctx, def, state)
 	require.NoError(t, err)
 	require.Contains(t, opts.SystemPromptExtra, "Run only workflows listed under Managed workflows.")
+	require.Contains(t, opts.SystemPromptExtra, "After every workflow run, inspect the latest result before deciding what to do next.")
+	require.Contains(t, opts.SystemPromptExtra, "If the latest workflow result is incomplete, incorrect, brittle, or missing expected artifacts, update that workflow with patch before rerunning it or relying on its output.")
 	require.Contains(t, opts.SystemPromptExtra, "If none of the configured workflows fits the task, create a new workflow YAML in the DAGs directory with patch, register it with register_workflow, then run it.")
 	require.Contains(t, opts.SystemPromptExtra, "Use register_workflow to add a created DAG name to this controller's workflows.names list. Do not edit the controller spec manually.")
 	require.Contains(t, opts.SystemPromptExtra, "Controller spec path:")
 	require.Contains(t, opts.SystemPromptExtra, "Controller artifacts directory: "+filepath.Join(svc.stateDir, "artifacts", "software_dev"))
 	require.Contains(t, opts.SystemPromptExtra, "prefer configuring their top-level artifacts.dir to the Controller artifacts directory")
+}
+
+func TestServiceBuildRunCompletionMessageDirectsControllerToInspectAndPatchBadWorkflowResults(t *testing.T) {
+	t.Parallel()
+
+	svc, _ := newTestService(t)
+
+	message := svc.buildRunCompletionMessage(&exec.DAGRunStatus{
+		Name:     "build-app",
+		DAGRunID: "run-1",
+		Status:   core.Failed,
+		Error:    "workflow failed",
+	})
+
+	require.Contains(t, message, "Inspect this latest result before deciding the next action.")
+	require.Contains(t, message, "If the workflow itself caused a bad or incomplete result, patch the workflow before rerunning it or depending on its output.")
 }
 
 func TestControllerRuntimeDefaultWorkingDirForDAGRun(t *testing.T) {
