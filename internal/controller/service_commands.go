@@ -368,16 +368,21 @@ func (s *Service) reopenCompletedConversation(ctx context.Context, def *Definiti
 	if state == nil {
 		return errors.New("controller state is required")
 	}
+	instruction := strings.TrimSpace(state.Instruction)
+	if instruction == "" {
+		return errors.New("controller has no prior instruction to continue")
+	}
+	if !hasTaskTemplates(state.TaskTemplates) {
+		return errors.New("at least one task template is required before continuing controller")
+	}
 	if state.State == StateIdle {
-		instruction := strings.TrimSpace(state.Instruction)
-		if instruction == "" {
-			return errors.New("controller has no prior instruction to continue")
-		}
-		if !hasTaskTemplates(state.TaskTemplates) {
-			return errors.New("at least one task template is required before continuing controller")
-		}
 		return s.startCycle(ctx, def, state, instruction, requestedBy)
 	}
+	now := s.clock()
+	state.Tasks = cloneTasksFromTemplates(state.TaskTemplates, now)
+	state.CurrentCycleID = nextCycleID()
+	state.LastTriggeredAt = now
+	state.StartRequestedAt = now
 	state.State = StateRunning
 	state.WaitingReason = WaitingReasonNone
 	state.PendingPrompt = nil

@@ -702,6 +702,11 @@ func TestServiceSubmitOperatorMessageReopensFinishedController(t *testing.T) {
 	state.FinishedAt = fixedTime
 	state.LastSummary = "Initial run completed, but the result needs review."
 	state.Tasks = cloneTasksFromTemplates(state.TaskTemplates, fixedTime)
+	for i := range state.Tasks {
+		state.Tasks[i].State = TaskStateDone
+		state.Tasks[i].DoneAt = fixedTime
+		state.Tasks[i].DoneBy = "tester"
+	}
 	require.NoError(t, svc.sessionStore.CreateSession(ctx, &agent.Session{
 		ID:        state.SessionID,
 		UserID:    svc.systemUser(def.Name).UserID,
@@ -721,6 +726,8 @@ func TestServiceSubmitOperatorMessageReopensFinishedController(t *testing.T) {
 	require.Equal(t, StateRunning, detail.State.State)
 	require.True(t, detail.State.FinishedAt.IsZero())
 	require.Empty(t, detail.State.LastSummary)
+	require.Len(t, detail.State.Tasks, 1)
+	require.Equal(t, TaskStateOpen, detail.State.Tasks[0].State)
 	require.Len(t, detail.Messages, 1)
 	require.Equal(t, agent.MessageTypeUser, detail.Messages[0].Type)
 	require.Contains(t, detail.Messages[0].Content, "Rework it with stronger sources.")
