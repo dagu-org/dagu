@@ -16,6 +16,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestTemplateExecutor covers the end-to-end behavior of the template executor,
+// including literal rendering, file output, and data interpolation edge cases.
 func TestTemplateExecutor(t *testing.T) {
 	t.Parallel()
 
@@ -188,6 +190,40 @@ steps:
 			"RESULT": []test.Contains{
 				test.Contains("${BAR}"),
 				test.Contains("`command`"),
+			},
+		})
+	})
+
+	t.Run("CodeFenceDataPreserved", func(t *testing.T) {
+		t.Parallel()
+
+		th := test.Setup(t)
+		dag := th.DAG(t, `steps:
+  - name: render
+    type: template
+    with:
+      data:
+        issue_text: |
+          `+"```yaml"+`
+          env:
+            TEST_FILE: ~/dagu-test.txt
+
+          steps:
+            - command: touch $TEST_FILE
+          `+"```"+`
+    script: |
+      {{ .issue_text }}
+    output: RESULT
+`)
+		agent := dag.Agent()
+		agent.RunSuccess(t)
+
+		dag.AssertLatestStatus(t, core.Succeeded)
+		dag.AssertOutputs(t, map[string]any{
+			"RESULT": []test.Contains{
+				test.Contains("```yaml"),
+				test.Contains("\n```"),
+				test.Contains("touch $TEST_FILE"),
 			},
 		})
 	})

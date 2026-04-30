@@ -39,8 +39,11 @@ var (
 type blockingSignalExecutor struct {
 	ready  chan struct{}
 	killed chan os.Signal
-	stdout io.Writer
-	stderr io.Writer
+	// Optional test hooks for controlling Kill ordering.
+	killStarted  chan struct{}
+	killContinue chan struct{}
+	stdout       io.Writer
+	stderr       io.Writer
 }
 
 func newBlockingSignalExecutor() *blockingSignalExecutor {
@@ -69,6 +72,15 @@ func (e *blockingSignalExecutor) Kill(sig os.Signal) error {
 	select {
 	case e.killed <- sig:
 	default:
+	}
+	if e.killStarted != nil {
+		select {
+		case e.killStarted <- struct{}{}:
+		default:
+		}
+	}
+	if e.killContinue != nil {
+		<-e.killContinue
 	}
 	return nil
 }
@@ -105,6 +117,29 @@ func withNodeSignalExecutor(t *testing.T) (<-chan *blockingSignalExecutor, func(
 	prev := nodeSignalExecutorFactory
 	nodeSignalExecutorFactory = func() *blockingSignalExecutor {
 		exec := newBlockingSignalExecutor()
+		execCh <- exec
+		return exec
+	}
+	nodeSignalExecutorFactoryMu.Unlock()
+
+	return execCh, func() {
+		nodeSignalExecutorFactoryMu.Lock()
+		nodeSignalExecutorFactory = prev
+		nodeSignalExecutorFactoryMu.Unlock()
+	}
+}
+
+func withNodeSignalExecutorFactory(t *testing.T, factory func() *blockingSignalExecutor) (<-chan *blockingSignalExecutor, func()) {
+	t.Helper()
+
+	registerNodeSignalExecutor(t)
+
+	execCh := make(chan *blockingSignalExecutor, 1)
+
+	nodeSignalExecutorFactoryMu.Lock()
+	prev := nodeSignalExecutorFactory
+	nodeSignalExecutorFactory = func() *blockingSignalExecutor {
+		exec := factory()
 		execCh <- exec
 		return exec
 	}
@@ -167,6 +202,47 @@ func TestNode(t *testing.T) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "signal: interrupt")
 		require.Equal(t, core.NodeAborted.String(), node.State().Status.String())
+	})
+	t.Run("SignalMarksAbortedBeforeKillReturns", func(t *testing.T) {
+		execCh, restore := withNodeSignalExecutorFactory(t, func() *blockingSignalExecutor {
+			exec := newBlockingSignalExecutor()
+			exec.killStarted = make(chan struct{}, 1)
+			exec.killContinue = make(chan struct{})
+			return exec
+		})
+		defer restore()
+
+		node := setupNode(t, withNodeExecutorType(nodeSignalExecutorType), withNodeSignalOnStop("SIGINT"))
+		node.SetStatus(core.NodeRunning)
+
+		dagRunID := uuid.Must(uuid.NewV7()).String()
+		errCh := make(chan error, 1)
+		go func() {
+			errCh <- node.Node.Execute(node.execContext(dagRunID))
+		}()
+
+		exec := <-execCh
+		<-exec.ready
+
+		go node.Signal(node.Context, syscall.Signal(0), true) // allow override signal
+
+		select {
+		case <-exec.killStarted:
+		case <-time.After(2 * time.Second):
+			t.Fatal("timeout waiting for Kill to start")
+		}
+		require.Equal(t, core.NodeAborted.String(), node.State().Status.String())
+
+		close(exec.killContinue)
+
+		var err error
+		select {
+		case err = <-errCh:
+		case <-time.After(2 * time.Second):
+			t.Fatal("timeout waiting for Execute to return")
+		}
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "signal: interrupt")
 	})
 	t.Run("CancelUpdatesOnlyRunningOrWaiting", func(t *testing.T) {
 		t.Parallel()
