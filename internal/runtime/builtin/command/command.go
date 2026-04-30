@@ -419,7 +419,11 @@ func init() {
 		MultipleCommands: true,
 		Script:           true,
 		Shell:            true,
-		GetEvalOptions: func(ctx context.Context, step core.Step) []eval.Option {
+		GetCommandEvalOptions: func(ctx context.Context, step core.Step) []eval.Option {
+			env := runtime.GetEnv(ctx)
+			return runtime.CommandEvalOptions(env.Shell(ctx))
+		},
+		GetScriptEvalOptions: func(ctx context.Context, step core.Step) []eval.Option {
 			env := runtime.GetEnv(ctx)
 			return runtime.CommandEvalOptions(env.Shell(ctx))
 		},
