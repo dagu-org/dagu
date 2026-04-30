@@ -226,12 +226,21 @@ func TestNode(t *testing.T) {
 
 		go node.Signal(node.Context, syscall.Signal(0), true) // allow override signal
 
-		<-exec.killStarted
+		select {
+		case <-exec.killStarted:
+		case <-time.After(2 * time.Second):
+			t.Fatal("timeout waiting for Kill to start")
+		}
 		require.Equal(t, core.NodeAborted.String(), node.State().Status.String())
 
 		close(exec.killContinue)
 
-		err := <-errCh
+		var err error
+		select {
+		case err = <-errCh:
+		case <-time.After(2 * time.Second):
+			t.Fatal("timeout waiting for Execute to return")
+		}
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "signal: interrupt")
 	})
