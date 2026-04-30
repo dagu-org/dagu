@@ -1583,6 +1583,14 @@ func mergeRedisConfig(dagRedis *core.RedisConfig, stepConfig map[string]any) {
 }
 
 func mergeHarnessConfig(dagHarness *core.HarnessConfig, stepConfig map[string]any) map[string]any {
+	effectiveProvider := harnessProviderName(stepConfig)
+	if effectiveProvider == "" && dagHarness != nil {
+		effectiveProvider = harnessProviderName(dagHarness.Config)
+	}
+	if core.IsBuiltinHarnessProvider(effectiveProvider) {
+		stepConfig = core.NormalizeBuiltinHarnessFlagKeys(stepConfig)
+	}
+
 	merged := cloneHarnessSpecMap(stepConfig)
 	if merged == nil {
 		merged = make(map[string]any)
@@ -1592,7 +1600,12 @@ func mergeHarnessConfig(dagHarness *core.HarnessConfig, stepConfig map[string]an
 		return merged
 	}
 
-	for key, value := range dagHarness.Config {
+	dagConfig := dagHarness.Config
+	if core.IsBuiltinHarnessProvider(effectiveProvider) {
+		dagConfig = core.NormalizeBuiltinHarnessFlagKeys(dagConfig)
+	}
+
+	for key, value := range dagConfig {
 		if _, exists := merged[key]; !exists {
 			merged[key] = cloneHarnessSpecValue(value)
 		}
@@ -1605,6 +1618,14 @@ func mergeHarnessConfig(dagHarness *core.HarnessConfig, stepConfig map[string]an
 	}
 
 	return merged
+}
+
+func harnessProviderName(cfg map[string]any) string {
+	if cfg == nil {
+		return ""
+	}
+	provider, _ := cfg["provider"].(string)
+	return strings.TrimSpace(provider)
 }
 
 // isRedisZeroValue checks if a value is a zero value for Redis config merging.

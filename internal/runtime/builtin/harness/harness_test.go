@@ -348,7 +348,7 @@ func TestBuildProviderConfigs(t *testing.T) {
 		require.Len(t, configs, 1)
 		assert.Equal(t, map[string]any{
 			"provider":            "codex",
-			"skip_git_repo_check": true,
+			"skip-git-repo-check": true,
 		}, configs[0].flags)
 	})
 
@@ -361,7 +361,20 @@ func TestBuildProviderConfigs(t *testing.T) {
 		require.Len(t, configs, 1)
 		assert.Equal(t, map[string]any{
 			"provider":            "codex",
-			"skip_git_repo_check": false,
+			"skip-git-repo-check": false,
+		}, configs[0].flags)
+	})
+
+	t.Run("builtin_provider_aliases_are_deduped", func(t *testing.T) {
+		configs, err := buildProviderConfigs(map[string]any{
+			"provider":            "codex",
+			"skip-git-repo-check": false,
+		}, nil)
+		require.NoError(t, err)
+		require.Len(t, configs, 1)
+		assert.Equal(t, map[string]any{
+			"provider":            "codex",
+			"skip-git-repo-check": false,
 		}, configs[0].flags)
 	})
 }

@@ -6,6 +6,7 @@ package core
 import (
 	"maps"
 	"sort"
+	"strings"
 )
 
 type HarnessPromptMode string
@@ -67,6 +68,59 @@ func BuiltinHarnessProviderNames() []string {
 	}
 	sort.Strings(names)
 	return names
+}
+
+// NormalizeBuiltinHarnessFlagKeys clones cfg and canonicalizes builtin harness
+// flag aliases to kebab-case so equivalent keys merge predictably.
+func NormalizeBuiltinHarnessFlagKeys(cfg map[string]any) map[string]any {
+	if cfg == nil {
+		return nil
+	}
+
+	normalized := make(map[string]any, len(cfg))
+	sourceKeys := make(map[string]string, len(cfg))
+	keys := make([]string, 0, len(cfg))
+	for key := range cfg {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		canonical := canonicalBuiltinHarnessFlagKey(key)
+		prevKey, exists := sourceKeys[canonical]
+		if exists && !preferBuiltinHarnessKeyVariant(key, prevKey) {
+			continue
+		}
+		normalized[canonical] = cloneHarnessValue(cfg[key])
+		sourceKeys[canonical] = key
+	}
+
+	return normalized
+}
+
+func canonicalBuiltinHarnessFlagKey(key string) string {
+	if isBuiltinHarnessReservedKey(key) {
+		return key
+	}
+	return strings.ReplaceAll(key, "_", "-")
+}
+
+func isBuiltinHarnessReservedKey(key string) bool {
+	switch key {
+	case "provider", "fallback":
+		return true
+	default:
+		return false
+	}
+}
+
+func preferBuiltinHarnessKeyVariant(candidate, current string) bool {
+	candidateCanonical := !strings.Contains(candidate, "_")
+	currentCanonical := !strings.Contains(current, "_")
+	if candidateCanonical != currentCanonical {
+		return candidateCanonical
+	}
+	return false
 }
 
 func cloneHarnessDefinition(def *HarnessDefinition) *HarnessDefinition {
