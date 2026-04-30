@@ -1,7 +1,6 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { debounce } from 'lodash';
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import {
@@ -30,6 +29,7 @@ import {
   workspaceSelectionQuery,
 } from '../../lib/workspace';
 import LoadingIndicator from '@/components/ui/loading-indicator';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 
 type DAGDefinitionsFilters = {
   searchText: string;
@@ -97,14 +97,10 @@ function DAGsContent() {
     defaultFilters.searchLabels
   );
   const [page, setPage] = React.useState<number>(defaultFilters.page);
-  const [apiSearchText, setAPISearchText] = React.useState(
-    defaultFilters.searchText
-  );
-  const [apiSearchLabels, setAPISearchLabels] = React.useState<string[]>(
-    defaultFilters.searchLabels
-  );
   const [sortField, setSortField] = React.useState(defaultFilters.sortField);
   const [sortOrder, setSortOrder] = React.useState(defaultFilters.sortOrder);
+  const debouncedSearchText = useDebouncedValue(searchText, 500);
+  const debouncedSearchLabels = useDebouncedValue(searchLabels, 500);
 
   // Get selected DAG from tab context
   const selectedDAG = getActiveFileName();
@@ -202,8 +198,6 @@ function DAGsContent() {
     setSearchText(next.searchText);
     setSearchLabels(next.searchLabels);
     setPage(next.page);
-    setAPISearchText(next.searchText);
-    setAPISearchLabels(next.searchLabels);
     setSortField(next.sortField);
     setSortOrder(next.sortOrder);
 
@@ -230,9 +224,11 @@ function DAGsContent() {
       remoteNode,
       page,
       perPage: preferences.pageLimit || 200,
-      name: apiSearchText || undefined,
+      name: debouncedSearchText || undefined,
       labels:
-        apiSearchLabels.length > 0 ? apiSearchLabels.join(',') : undefined,
+        debouncedSearchLabels.length > 0
+          ? debouncedSearchLabels.join(',')
+          : undefined,
       sort: sortField,
       order: sortOrder,
       ...workspaceQuery,
@@ -241,8 +237,8 @@ function DAGsContent() {
       remoteNode,
       page,
       preferences.pageLimit,
-      apiSearchText,
-      apiSearchLabels,
+      debouncedSearchText,
+      debouncedSearchLabels,
       sortField,
       sortOrder,
       workspaceQuery,
@@ -308,34 +304,16 @@ function DAGsContent() {
     setPage(page);
   };
 
-  const debouncedAPISearchText = React.useMemo(
-    () =>
-      debounce((searchText: string) => {
-        setAPISearchText(searchText);
-      }, 500),
-    []
-  );
-
-  const debouncedAPISearchLabels = React.useMemo(
-    () =>
-      debounce((labels: string[]) => {
-        setAPISearchLabels(labels);
-      }, 500),
-    []
-  );
-
   const searchTextChange = (searchText: string) => {
     addSearchParam('search', searchText);
     setSearchText(searchText);
     setPage(1);
-    debouncedAPISearchText(searchText);
   };
 
   const searchLabelsChange = (labels: string[]) => {
     addSearchParam('labels', labels);
     setSearchLabels(labels);
     setPage(1);
-    debouncedAPISearchLabels(labels);
   };
 
   const handleSortChange = (field: string, order: string) => {
