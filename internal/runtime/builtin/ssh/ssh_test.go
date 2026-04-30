@@ -277,11 +277,12 @@ func TestSSHExecutor_GetEvalOptions(t *testing.T) {
 				ctx = WithSSHClient(ctx, &Client{Shell: tt.dagShell})
 			}
 
-			opts := tt.step.EvalOptions(ctx)
+			opts := tt.step.CommandEvalOptions(ctx)
 			evalOpts := eval.NewOptions()
 			for _, opt := range opts {
 				opt(evalOpts)
 			}
+			require.False(t, evalOpts.Substitute, "expected step fields to disable backtick substitution")
 
 			if tt.expectSkipShell {
 				require.False(t, evalOpts.ExpandShell, "expected WithoutExpandShell option")

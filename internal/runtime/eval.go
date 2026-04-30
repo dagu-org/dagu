@@ -21,6 +21,16 @@ func EvalString(ctx context.Context, s string, opts ...eval.Option) (string, err
 	return GetEnv(ctx).EvalString(ctx, s, opts...)
 }
 
+// EvalStepString evaluates a step-owned string field while preserving literal
+// backticks. Step fields are treated as data or downstream program input unless
+// they are explicit condition expressions evaluated elsewhere.
+func EvalStepString(ctx context.Context, s string, opts ...eval.Option) (string, error) {
+	options := make([]eval.Option, 0, len(opts)+1)
+	options = append(options, eval.WithoutSubstitute())
+	options = append(options, opts...)
+	return EvalString(ctx, s, options...)
+}
+
 // EvalBool evaluates the given value with the variables within the execution context
 // and parses it as a boolean.
 func EvalBool(ctx context.Context, value any) (bool, error) {
@@ -31,13 +41,6 @@ func EvalBool(ctx context.Context, value any) (bool, error) {
 // with the variables within the execution context.
 func EvalObject[T any](ctx context.Context, obj T) (T, error) {
 	return eval.Object(ctx, obj, GetEnv(ctx).UserEnvsMap())
-}
-
-// evalObjectTreatingOmittedParamsAsEmpty evaluates template executor config while
-// preserving literal backticks in template data and resolving omitted named params
-// to empty strings so optional template fields can remain unset.
-func evalObjectTreatingOmittedParamsAsEmpty[T any](ctx context.Context, obj T) (T, error) {
-	return eval.Object(ctx, obj, templateConfigEvalVariables(GetEnv(ctx)), eval.WithoutSubstitute())
 }
 
 // templateConfigEvalVariables clones the user env map and seeds omitted named DAG

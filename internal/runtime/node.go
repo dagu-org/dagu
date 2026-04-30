@@ -650,7 +650,7 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 	if child := n.Step().SubDAG; child != nil {
 		copy := *child
 		if n.Step().Parallel == nil {
-			dagName, err := EvalString(ctx, child.Name)
+			dagName, err := EvalStepString(ctx, child.Name)
 			if err != nil {
 				return nil, fmt.Errorf("failed to eval sub DAG name: %w", err)
 			}
@@ -661,7 +661,7 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 
 	// Evaluate script if set
 	if script := n.Step().Script; script != "" {
-		opts := n.Step().EvalOptions(ctx)
+		opts := n.Step().ScriptEvalOptions(ctx)
 		if n.Step().ExecutorConfig.IsCommand() {
 			opts = append(opts, eval.OnlyReplaceVars())
 		}
@@ -701,9 +701,9 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 
 func evalExecutorConfig(ctx context.Context, step core.Step) (map[string]any, error) {
 	if step.ExecutorConfig.Type == "template" {
-		return evalObjectTreatingOmittedParamsAsEmpty(ctx, step.ExecutorConfig.Config)
+		return eval.Object(ctx, step.ExecutorConfig.Config, templateConfigEvalVariables(GetEnv(ctx)), step.ConfigEvalOptions(ctx)...)
 	}
-	return EvalObject(ctx, step.ExecutorConfig.Config)
+	return eval.Object(ctx, step.ExecutorConfig.Config, GetEnv(ctx).UserEnvsMap(), step.ConfigEvalOptions(ctx)...)
 }
 
 func (n *Node) configureSubDAGExecutor(cmd executor.Executor, subRuns []SubDAGRun) error {
@@ -747,7 +747,7 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 	}
 
 	// Get eval options from executor capabilities
-	evalOptions := n.Step().EvalOptions(ctx)
+	evalOptions := n.Step().CommandEvalOptions(ctx)
 
 	step := n.Step()
 
@@ -974,7 +974,7 @@ func (n *Node) BuildSubDAGRuns(ctx context.Context, subDAG *core.SubDAG) ([]SubD
 
 	// Single sub DAG execution (non-parallel)
 	if parallel == nil {
-		params, err := EvalString(ctx, subDAG.Params)
+		params, err := EvalStepString(ctx, subDAG.Params)
 		if err != nil {
 			return nil, fmt.Errorf("failed to eval sub dag params: %w", err)
 		}
@@ -996,7 +996,7 @@ func (n *Node) BuildSubDAGRuns(ctx context.Context, subDAG *core.SubDAG) ([]SubD
 
 	// Handle variable reference
 	if parallel.Variable != "" {
-		value, err := EvalString(ctx, parallel.Variable)
+		value, err := EvalStepString(ctx, parallel.Variable)
 		if err != nil {
 			return nil, fmt.Errorf("failed to eval parallel variable %q: %w", parallel.Variable, err)
 		}
@@ -1013,7 +1013,7 @@ func (n *Node) BuildSubDAGRuns(ctx context.Context, subDAG *core.SubDAG) ([]SubD
 		// Handle static items
 		for _, item := range parallel.Items {
 			if item.Value != "" {
-				value, err := EvalString(ctx, item.Value)
+				value, err := EvalStepString(ctx, item.Value)
 				if err != nil {
 					return nil, fmt.Errorf("failed to eval parallel item value %q: %w", item.Value, err)
 				}
@@ -1022,7 +1022,7 @@ func (n *Node) BuildSubDAGRuns(ctx context.Context, subDAG *core.SubDAG) ([]SubD
 				// evaluate each value in Params
 				m := make(collections.DeterministicMap)
 				for key, value := range item.Params {
-					evaluatedValue, err := EvalString(ctx, value)
+					evaluatedValue, err := EvalStepString(ctx, value)
 					if err != nil {
 						return nil, fmt.Errorf("failed to eval parallel item param %q: %w", key, err)
 					}
@@ -1067,7 +1067,7 @@ func (n *Node) BuildSubDAGRuns(ctx context.Context, subDAG *core.SubDAG) ([]SubD
 			"ITEM": param,
 		}
 
-		dagName, err := EvalString(ctx, subDAG.Name, eval.WithVariables(variables))
+		dagName, err := EvalStepString(ctx, subDAG.Name, eval.WithVariables(variables))
 		if err != nil {
 			return nil, fmt.Errorf("failed to eval sub dag name: %w", err)
 		}
@@ -1076,7 +1076,7 @@ func (n *Node) BuildSubDAGRuns(ctx context.Context, subDAG *core.SubDAG) ([]SubD
 		finalParams := param
 		if subDAG.Params != "" {
 			params := subDAG.Params
-			evaluatedStepParams, err := EvalString(ctx, params, eval.WithVariables(variables))
+			evaluatedStepParams, err := EvalStepString(ctx, params, eval.WithVariables(variables))
 			if err != nil {
 				return nil, fmt.Errorf("failed to eval step params: %w", err)
 			}

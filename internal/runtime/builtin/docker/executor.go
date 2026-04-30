@@ -446,24 +446,24 @@ func EvalContainerFields(ctx context.Context, ct core.Container) (core.Container
 	var err error
 
 	// Evaluate exec field (for exec-into-existing-container mode)
-	if ct.Exec, err = runtime.EvalString(ctx, ct.Exec); err != nil {
+	if ct.Exec, err = runtime.EvalStepString(ctx, ct.Exec); err != nil {
 		return ct, fmt.Errorf("failed to evaluate exec: %w", err)
 	}
 
 	// Evaluate string fields
-	if ct.Image, err = runtime.EvalString(ctx, ct.Image); err != nil {
+	if ct.Image, err = runtime.EvalStepString(ctx, ct.Image); err != nil {
 		return ct, fmt.Errorf("failed to evaluate image: %w", err)
 	}
-	if ct.Name, err = runtime.EvalString(ctx, ct.Name); err != nil {
+	if ct.Name, err = runtime.EvalStepString(ctx, ct.Name); err != nil {
 		return ct, fmt.Errorf("failed to evaluate name: %w", err)
 	}
-	if ct.User, err = runtime.EvalString(ctx, ct.User); err != nil {
+	if ct.User, err = runtime.EvalStepString(ctx, ct.User); err != nil {
 		return ct, fmt.Errorf("failed to evaluate user: %w", err)
 	}
-	if ct.WorkingDir, err = runtime.EvalString(ctx, ct.WorkingDir); err != nil {
+	if ct.WorkingDir, err = runtime.EvalStepString(ctx, ct.WorkingDir); err != nil {
 		return ct, fmt.Errorf("failed to evaluate workingDir: %w", err)
 	}
-	if ct.Network, err = runtime.EvalString(ctx, ct.Network); err != nil {
+	if ct.Network, err = runtime.EvalStepString(ctx, ct.Network); err != nil {
 		return ct, fmt.Errorf("failed to evaluate network: %w", err)
 	}
 
@@ -487,14 +487,14 @@ func EvalContainerFields(ctx context.Context, ct core.Container) (core.Container
 	return ct, nil
 }
 
-// evalStringSlice evaluates each string in a slice using runtime.EvalString.
+// evalStringSlice evaluates each string in a slice as a step-owned field.
 func evalStringSlice(ctx context.Context, ss []string) ([]string, error) {
 	if len(ss) == 0 {
 		return ss, nil
 	}
 	result := make([]string, len(ss))
 	for i, s := range ss {
-		evaluated, err := runtime.EvalString(ctx, s)
+		evaluated, err := runtime.EvalStepString(ctx, s)
 		if err != nil {
 			return nil, err
 		}
@@ -533,7 +533,7 @@ func init() {
 		Command:          true,
 		MultipleCommands: true,
 		Container:        true,
-		GetEvalOptions: func(ctx context.Context, step core.Step) []eval.Option {
+		GetCommandEvalOptions: func(ctx context.Context, step core.Step) []eval.Option {
 			if hasShellConfigured(ctx, step) {
 				return []eval.Option{eval.WithoutDollarEscape()}
 			}

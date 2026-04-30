@@ -88,3 +88,93 @@ func TestEvalExecutorConfig_TemplatePreservesLiteralCodeFencesInData(t *testing.
 	require.True(t, ok)
 	require.Equal(t, "```yaml\nenv:\n  TEST_FILE: ~/dagu-test.txt\n\nsteps:\n  - command: touch $TEST_FILE\n```", data["issue_text"])
 }
+
+// TestEvalExecutorConfig_DefaultPreservesLiteralCodeFencesInData verifies that
+// non-template executor config is also treated as step data and should not
+// execute backticks while resolving variable references.
+func TestEvalExecutorConfig_DefaultPreservesLiteralCodeFencesInData(t *testing.T) {
+	t.Parallel()
+
+	ctx := exec.NewContext(
+		context.Background(),
+		&core.DAG{Name: "test-dag"},
+		"",
+		"",
+	)
+	env := NewEnv(ctx, core.Step{Name: "analyze"})
+	env.Scope = env.Scope.WithEntries(map[string]string{
+		"PROMPT_TEXT": "```yaml\nenv:\n  TEST_FILE: ~/dagu-test.txt\n\nsteps:\n  - command: touch $TEST_FILE\n```",
+	}, eval.EnvSourceStepEnv)
+	ctx = WithEnv(ctx, env)
+
+	result, err := evalExecutorConfig(ctx, core.Step{
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "harness",
+			Config: map[string]any{
+				"provider": "codex",
+				"note":     "${PROMPT_TEXT}",
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, "```yaml\nenv:\n  TEST_FILE: ~/dagu-test.txt\n\nsteps:\n  - command: touch $TEST_FILE\n```", result["note"])
+}
+
+// TestSetupExecutor_HarnessCommandPreservesLiteralCodeFences verifies that
+// command-backed prompt executors resolve ${VAR} placeholders without treating
+// the resulting prompt text as shell command substitution input.
+func TestSetupExecutor_HarnessCommandPreservesLiteralCodeFences(t *testing.T) {
+	t.Parallel()
+
+	step := core.Step{
+		Name: "analyze",
+		ExecutorConfig: core.ExecutorConfig{
+			Type:   "harness",
+			Config: map[string]any{"provider": "codex"},
+		},
+		Commands: []core.CommandEntry{{
+			CmdWithArgs: "${ANALYZE_PROMPT}",
+		}},
+	}
+	ctx := NewContextForTest(context.Background(), &core.DAG{Name: "test-dag"}, "run-1", "test.log")
+	env := NewEnv(ctx, step)
+	env.Scope = env.Scope.WithEntries(map[string]string{
+		"ANALYZE_PROMPT": "```yaml\nenv:\n  TEST_FILE: ~/dagu-test.txt\n\nsteps:\n  - command: touch $TEST_FILE\n```",
+	}, eval.EnvSourceStepEnv)
+	ctx = WithEnv(ctx, env)
+
+	node := NewNode(step, NodeState{})
+	_, err := node.setupExecutor(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "```yaml\nenv:\n  TEST_FILE: ~/dagu-test.txt\n\nsteps:\n  - command: touch $TEST_FILE\n```", node.Step().Commands[0].CmdWithArgs)
+}
+
+// TestSetupExecutor_HarnessScriptPreservesLiteralCodeFences verifies that
+// script-backed prompt content is preserved literally until the target executor
+// consumes it.
+func TestSetupExecutor_HarnessScriptPreservesLiteralCodeFences(t *testing.T) {
+	t.Parallel()
+
+	step := core.Step{
+		Name: "analyze",
+		ExecutorConfig: core.ExecutorConfig{
+			Type:   "harness",
+			Config: map[string]any{"provider": "codex"},
+		},
+		Commands: []core.CommandEntry{{
+			CmdWithArgs: "Summarize the issue",
+		}},
+		Script: "${ANALYZE_SCRIPT}",
+	}
+	ctx := NewContextForTest(context.Background(), &core.DAG{Name: "test-dag"}, "run-1", "test.log")
+	env := NewEnv(ctx, step)
+	env.Scope = env.Scope.WithEntries(map[string]string{
+		"ANALYZE_SCRIPT": "```yaml\nenv:\n  TEST_FILE: ~/dagu-test.txt\n\nsteps:\n  - command: touch $TEST_FILE\n```",
+	}, eval.EnvSourceStepEnv)
+	ctx = WithEnv(ctx, env)
+
+	node := NewNode(step, NodeState{})
+	_, err := node.setupExecutor(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "```yaml\nenv:\n  TEST_FILE: ~/dagu-test.txt\n\nsteps:\n  - command: touch $TEST_FILE\n```", node.Step().Script)
+}
