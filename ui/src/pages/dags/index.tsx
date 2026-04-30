@@ -259,6 +259,7 @@ function DAGsContent() {
     },
     {
       ...sseFallbackOptions(dagsListSSE),
+      keepPreviousData: true,
       revalidateIfStale: false,
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
