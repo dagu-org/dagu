@@ -13,6 +13,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestEvalExecutorConfig_TemplateTreatsOmittedOptionalParamsAsEmpty verifies
+// that optional named params are coerced to empty strings for template config
+// evaluation instead of being left as unresolved placeholders.
 func TestEvalExecutorConfig_TemplateTreatsOmittedOptionalParamsAsEmpty(t *testing.T) {
 	t.Parallel()
 
@@ -51,6 +54,9 @@ func TestEvalExecutorConfig_TemplateTreatsOmittedOptionalParamsAsEmpty(t *testin
 	require.Equal(t, "", data["favorite_color"])
 }
 
+// TestEvalExecutorConfig_TemplatePreservesLiteralCodeFencesInData verifies that
+// template config data can carry fenced content without backtick substitution
+// executing it during evaluator setup.
 func TestEvalExecutorConfig_TemplatePreservesLiteralCodeFencesInData(t *testing.T) {
 	t.Parallel()
 

@@ -16,6 +16,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestTemplateExecutor covers the end-to-end behavior of the template executor,
+// including literal rendering, file output, and data interpolation edge cases.
 func TestTemplateExecutor(t *testing.T) {
 	t.Parallel()
 
