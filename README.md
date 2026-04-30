@@ -462,12 +462,11 @@ See [Custom Step Types](https://docs.dagu.sh/writing-workflows/custom-step-types
 
 ### Authentication
 
-Dagu supports four authentication modes, configured via `DAGU_AUTH_MODE`:
+Dagu supports three top-level authentication modes, configured via `DAGU_AUTH_MODE`:
 
 - **`none`** — No authentication
 - **`basic`** — HTTP Basic authentication
-- **`builtin`** — JWT-based authentication with user management, API keys, and per-DAG webhook tokens
-- **OIDC** — OpenID Connect integration with any compliant identity provider
+- **`builtin`** — JWT-based authentication with user management, API keys, per-DAG webhook tokens, and optional OIDC/SSO integration
 
 ### Role-Based Access Control
 
@@ -488,6 +487,19 @@ API keys can be created with independent role assignments. Audit logging tracks 
 - TLS for the HTTP server (`DAGU_CERT_FILE`, `DAGU_KEY_FILE`)
 - Mutual TLS for gRPC coordinator/worker communication (`DAGU_PEER_CERT_FILE`, `DAGU_PEER_KEY_FILE`, `DAGU_PEER_CLIENT_CA_FILE`)
 - Secret management with three providers: environment variables, files, and [HashiCorp Vault](https://www.vaultproject.io/)
+
+### Production Hardening
+
+For self-hosted production deployments, treat network exposure and execution boundaries as the primary controls:
+
+- Prefer `auth.mode: builtin` for any shared or network-exposed instance. Use `basic` only for simple private setups, and avoid `none` outside isolated local development.
+- Keep `metrics: private` unless the metrics endpoint is reachable only on a trusted private network.
+- Bind Dagu to loopback or a private interface when possible. If you must use `0.0.0.0`, place it behind a trusted reverse proxy, TLS, and network-level access controls.
+- Leave `terminal.enabled: false` unless the instance is admin-only and tightly scoped.
+- In distributed deployments, set `peer.insecure=false` and configure peer TLS when coordinator and workers communicate across host or network boundaries.
+- Treat Docker socket mounts, root containers, and host-level executors as privileged access to the underlying machine.
+
+See [Server Configuration](https://docs.dagu.sh/server-admin/server), [Docker deployment](https://docs.dagu.sh/server-admin/deployment/docker), and [Distributed execution](https://docs.dagu.sh/server-admin/distributed/) for the operator-focused guidance.
 
 ## Observability
 
@@ -607,7 +619,7 @@ See the [distributed execution documentation](https://docs.dagu.sh/server-admin/
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DAGU_AUTH_MODE` | `builtin` | `none`, `basic`, `builtin`, or OIDC |
+| `DAGU_AUTH_MODE` | `builtin` | `none`, `basic`, or `builtin` |
 | `DAGU_AUTH_BASIC_USERNAME` | — | Basic auth username |
 | `DAGU_AUTH_BASIC_PASSWORD` | — | Basic auth password |
 | `DAGU_AUTH_TOKEN_SECRET` | (auto) | JWT signing secret |
