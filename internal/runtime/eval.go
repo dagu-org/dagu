@@ -33,10 +33,15 @@ func EvalObject[T any](ctx context.Context, obj T) (T, error) {
 	return eval.Object(ctx, obj, GetEnv(ctx).UserEnvsMap())
 }
 
+// evalObjectTreatingOmittedParamsAsEmpty evaluates template executor config while
+// preserving literal backticks in template data and resolving omitted named params
+// to empty strings so optional template fields can remain unset.
 func evalObjectTreatingOmittedParamsAsEmpty[T any](ctx context.Context, obj T) (T, error) {
 	return eval.Object(ctx, obj, templateConfigEvalVariables(GetEnv(ctx)), eval.WithoutSubstitute())
 }
 
+// templateConfigEvalVariables clones the user env map and seeds omitted named DAG
+// params with empty strings for template executor config evaluation.
 func templateConfigEvalVariables(env Env) map[string]string {
 	vars := env.UserEnvsMap()
 	if env.DAG == nil || len(env.DAG.ParamDefs) == 0 {
@@ -60,6 +65,8 @@ func templateConfigEvalVariables(env Env) map[string]string {
 	return cloned
 }
 
+// isPositionalParamName reports whether a param name is a positional index rather
+// than a named parameter.
 func isPositionalParamName(name string) bool {
 	_, err := strconv.Atoi(name)
 	return err == nil
