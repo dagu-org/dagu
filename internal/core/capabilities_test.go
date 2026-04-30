@@ -77,38 +77,82 @@ func TestExecutorCapabilities_ConcurrentAccess(t *testing.T) {
 	assert.True(t, registry.Get("executor-63").Command)
 }
 
+func optionsFromSlice(opts []eval.Option) *eval.Options {
+	out := eval.NewOptions()
+	for _, opt := range opts {
+		opt(out)
+	}
+	return out
+}
+
 func TestStep_EvalOptions(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
-	t.Run("WithGetEvalOptions", func(t *testing.T) {
-		// Register executor with GetEvalOptions callback
-		RegisterExecutorCapabilities("eval-opts-test", ExecutorCapabilities{
+	t.Run("CommandUsesFieldSpecificHook", func(t *testing.T) {
+		RegisterExecutorCapabilities("command-eval-opts-test", ExecutorCapabilities{
 			Command: true,
+			GetCommandEvalOptions: func(_ context.Context, _ Step) []eval.Option {
+				return []eval.Option{eval.WithoutExpandShell()}
+			},
+		})
+
+		step := Step{ExecutorConfig: ExecutorConfig{Type: "command-eval-opts-test"}}
+		opts := optionsFromSlice(step.CommandEvalOptions(ctx))
+		assert.False(t, opts.Substitute)
+		assert.False(t, opts.ExpandShell)
+	})
+
+	t.Run("ScriptUsesFieldSpecificHook", func(t *testing.T) {
+		RegisterExecutorCapabilities("script-eval-opts-test", ExecutorCapabilities{
+			Command: true,
+			Script:  true,
+			GetScriptEvalOptions: func(_ context.Context, _ Step) []eval.Option {
+				return []eval.Option{eval.WithNoExpansion()}
+			},
+		})
+
+		step := Step{ExecutorConfig: ExecutorConfig{Type: "script-eval-opts-test"}}
+		opts := optionsFromSlice(step.ScriptEvalOptions(ctx))
+		assert.False(t, opts.Substitute)
+		assert.True(t, opts.NoExpansion)
+	})
+
+	t.Run("ConfigDefaultsDisableSubstitute", func(t *testing.T) {
+		RegisterExecutorCapabilities("config-eval-opts-test", ExecutorCapabilities{
+			Command: true,
+		})
+
+		step := Step{ExecutorConfig: ExecutorConfig{Type: "config-eval-opts-test"}}
+		opts := optionsFromSlice(step.ConfigEvalOptions(ctx))
+		assert.False(t, opts.Substitute)
+	})
+
+	t.Run("LegacyEvalHookFallsBackForCommandAndScript", func(t *testing.T) {
+		RegisterExecutorCapabilities("legacy-eval-opts-test", ExecutorCapabilities{
+			Command: true,
+			Script:  true,
 			GetEvalOptions: func(_ context.Context, _ Step) []eval.Option {
 				return []eval.Option{eval.WithoutExpandShell()}
 			},
 		})
 
-		step := Step{ExecutorConfig: ExecutorConfig{Type: "eval-opts-test"}}
-		opts := step.EvalOptions(ctx)
-		assert.Len(t, opts, 1)
+		step := Step{ExecutorConfig: ExecutorConfig{Type: "legacy-eval-opts-test"}}
+		commandOpts := optionsFromSlice(step.CommandEvalOptions(ctx))
+		scriptOpts := optionsFromSlice(step.ScriptEvalOptions(ctx))
+		assert.False(t, commandOpts.Substitute)
+		assert.False(t, commandOpts.ExpandShell)
+		assert.False(t, scriptOpts.Substitute)
+		assert.False(t, scriptOpts.ExpandShell)
 	})
 
-	t.Run("WithoutGetEvalOptions", func(t *testing.T) {
-		// Register executor without GetEvalOptions
-		RegisterExecutorCapabilities("no-eval-opts-test", ExecutorCapabilities{
-			Command: true,
-		})
-
-		step := Step{ExecutorConfig: ExecutorConfig{Type: "no-eval-opts-test"}}
-		opts := step.EvalOptions(ctx)
-		assert.Nil(t, opts)
-	})
-
-	t.Run("UnregisteredExecutor", func(t *testing.T) {
+	t.Run("UnregisteredExecutorStillDisablesSubstitute", func(t *testing.T) {
 		step := Step{ExecutorConfig: ExecutorConfig{Type: "unregistered-executor"}}
-		opts := step.EvalOptions(ctx)
-		assert.Nil(t, opts)
+		commandOpts := optionsFromSlice(step.CommandEvalOptions(ctx))
+		scriptOpts := optionsFromSlice(step.ScriptEvalOptions(ctx))
+		configOpts := optionsFromSlice(step.ConfigEvalOptions(ctx))
+		assert.False(t, commandOpts.Substitute)
+		assert.False(t, scriptOpts.Substitute)
+		assert.False(t, configOpts.Substitute)
 	})
 }

@@ -15,7 +15,7 @@ import (
 
 func getEscapeDollar(ctx context.Context, step core.Step) bool {
 	opts := eval.NewOptions()
-	for _, opt := range step.EvalOptions(ctx) {
+	for _, opt := range step.CommandEvalOptions(ctx) {
 		opt(opts)
 	}
 	return opts.EscapeDollar

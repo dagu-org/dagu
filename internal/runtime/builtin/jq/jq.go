@@ -49,7 +49,7 @@ func newJQ(ctx context.Context, step core.Step) (executor.Executor, error) {
 		return nil, fmt.Errorf("jq: config.input and script are mutually exclusive; provide one, not both")
 	case jqCfg.Input != "":
 		// Evaluate the input path to resolve step references like ${step.stdout}
-		inputPath, err := runtime.EvalString(ctx, jqCfg.Input)
+		inputPath, err := runtime.EvalStepString(ctx, jqCfg.Input)
 		if err != nil {
 			return nil, fmt.Errorf("jq: failed to evaluate config.input: %w", err)
 		}
