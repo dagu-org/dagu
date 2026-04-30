@@ -1,9 +1,5 @@
 version: 2
 updates:
-  - package-ecosystem: devcontainers
-    directory: /
-    schedule:
-      interval: quarterly
   - package-ecosystem: docker
     directory: /
     schedule:
