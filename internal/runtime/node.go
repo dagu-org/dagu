@@ -802,14 +802,14 @@ func (n *Node) Signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 			tag.Signal(killSignal.String()),
 			tag.Step(n.Name()),
 		)
+		if signal.IsTerminationSignalOS(killSignal) {
+			n.SetStatus(core.NodeAborted)
+		}
 		if err := n.cmd.Kill(killSignal); err != nil {
 			logger.Error(ctx, "Failed to send signal",
 				tag.Error(err),
 				tag.Step(n.Name()),
 			)
-		}
-		if signal.IsTerminationSignalOS(killSignal) {
-			n.SetStatus(core.NodeAborted)
 		}
 	}
 }
