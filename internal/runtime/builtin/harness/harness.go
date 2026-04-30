@@ -451,6 +451,8 @@ func mergeProviderDefaultConfig(provider Provider, cfg map[string]any) map[strin
 	if len(defaults) == 0 {
 		return merged
 	}
+	defaults = core.NormalizeBuiltinHarnessFlagKeys(defaults)
+	merged = core.NormalizeBuiltinHarnessFlagKeys(merged)
 	withDefaults := cloneConfigMap(defaults)
 	maps.Copy(withDefaults, merged)
 	return withDefaults

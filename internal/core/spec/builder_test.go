@@ -3064,6 +3064,28 @@ steps:
 		assert.Equal(t, "codex", fallback[0]["provider"])
 	})
 
+	t.Run("StepOverridesBuiltinFlagAliasesWithoutDuplicates", func(t *testing.T) {
+		yaml := `
+harness:
+  provider: codex
+  skip_git_repo_check: true
+steps:
+  - name: step1
+    type: harness
+    command: "Fix bugs"
+    with:
+      skip-git-repo-check: false
+`
+		dag, err := spec.LoadYAML(context.Background(), []byte(yaml))
+		require.NoError(t, err)
+		step := dag.Steps[0]
+
+		assert.Equal(t, "codex", step.ExecutorConfig.Config["provider"])
+		assert.Equal(t, false, step.ExecutorConfig.Config["skip-git-repo-check"])
+		_, exists := step.ExecutorConfig.Config["skip_git_repo_check"]
+		assert.False(t, exists)
+	})
+
 	t.Run("StepFallbackReplacesDAGFallback", func(t *testing.T) {
 		yaml := `
 harness:
