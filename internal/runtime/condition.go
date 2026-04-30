@@ -10,7 +10,6 @@ import (
 	"os/exec"
 	"slices"
 
-	"github.com/dagucloud/dagu/internal/cmn/eval"
 	"github.com/dagucloud/dagu/internal/cmn/stringutil"
 	"github.com/dagucloud/dagu/internal/core"
 )
@@ -105,7 +104,7 @@ func matchCondition(ctx context.Context, c *core.Condition) error {
 }
 
 func evalCommand(ctx context.Context, shell []string, c *core.Condition) error {
-	commandToRun, err := EvalString(ctx, c.Condition, eval.OnlyReplaceVars())
+	commandToRun, err := EvalString(ctx, c.Condition, CommandEvalOptions(shell)...)
 	if err != nil {
 		return fmt.Errorf("failed to evaluate command: %w", err)
 	}

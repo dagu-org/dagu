@@ -6,6 +6,9 @@ package runtime_test
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
+	goruntime "runtime"
 	"testing"
 
 	"github.com/dagucloud/dagu/internal/cmn/eval"
@@ -205,6 +208,32 @@ func TestEvalConditions_NilShell(t *testing.T) {
 	// the condition should run as a direct command
 	err := runtime.EvalConditions(ctx, nil, []*core.Condition{
 		{Condition: "true"},
+	})
+	require.NoError(t, err)
+}
+
+func TestEvalConditions_CommandFormExpandsHomeRelativeScopeVars(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("Skipping Unix shell test on Windows")
+	}
+
+	homeDir, err := os.UserHomeDir()
+	require.NoError(t, err)
+
+	tempFile, err := os.CreateTemp(homeDir, ".dagu-condition-*")
+	require.NoError(t, err)
+	require.NoError(t, tempFile.Close())
+	t.Cleanup(func() {
+		_ = os.Remove(tempFile.Name())
+	})
+
+	ctx := newTestContext()
+	env := runtime.GetEnv(ctx)
+	env.Scope = env.Scope.WithEntry("TEST_FILE", "~/"+filepath.Base(tempFile.Name()), eval.EnvSourceDAGEnv)
+	ctx = runtime.WithEnv(ctx, env)
+
+	err = runtime.EvalConditions(ctx, []string{"sh"}, []*core.Condition{
+		{Condition: "test -f $TEST_FILE"},
 	})
 	require.NoError(t, err)
 }

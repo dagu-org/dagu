@@ -433,27 +433,8 @@ func init() {
 	executor.RegisterExecutor("command", NewCommand, validateCommandStep, caps)
 }
 
-// commandEvalOptions returns eval options based on the shell type.
-//
-// Shell classification:
-//   - Unix-like (sh, bash, zsh, ksh, ash, dash) and nix-shell: these expand
-//     ${VAR} natively, so Dagu disables its own env expansion to avoid
-//     double-expanding values.
-//   - fish: intentionally excluded from IsUnixLikeShell (it lacks -e flag
-//     support and uses $VAR but not ${VAR}), so Dagu performs ${VAR} expansion.
-//   - Non-Unix (PowerShell, cmd.exe): do not understand ${VAR} syntax at all,
-//     so Dagu must expand variables on their behalf (ExpandEnv stays enabled).
-//   - direct / empty: no shell is involved; Dagu expands OS variables itself.
+// commandEvalOptions keeps the command executor aligned with the shape of the
+// main branch while delegating the shared policy to runtime.
 func commandEvalOptions(shell []string) []eval.Option {
-	if len(shell) == 0 || shell[0] == "direct" {
-		return []eval.Option{eval.WithOSExpansion()}
-	}
-
-	opts := []eval.Option{eval.WithoutDollarEscape()}
-
-	if cmdutil.IsUnixLikeShell(shell[0]) || cmdutil.IsNixShell(shell[0]) {
-		opts = append(opts, eval.WithoutExpandEnv())
-	}
-
-	return opts
+	return runtime.CommandEvalOptions(shell)
 }

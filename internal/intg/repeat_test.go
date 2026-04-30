@@ -161,6 +161,44 @@ func TestRepeatPolicy_WithLimitAndCondition(t *testing.T) {
 	assert.Equal(t, 5, dagRunStatus.Nodes[0].DoneCount, "Step should have stopped at limit of 5")
 }
 
+func TestRepeatPolicy_CommandConditionWithHomeRelativeDAGEnvVar(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping Unix shell test on Windows")
+	}
+
+	repeatPolicyParallel(t)
+	th := test.Setup(t)
+	_, homeRelativePath := posixHomeRelativeTempPath(t, ".dagu-repeat-*")
+
+	dag := th.DAG(t, fmt.Sprintf(`env:
+  - TEST_FILE: %q
+steps:
+  - command: touch $TEST_FILE
+    repeat_policy:
+      repeat: while
+      condition: test ! -f $TEST_FILE
+      interval_sec: 0
+      limit: 2
+`, homeRelativePath))
+	agent := dag.Agent()
+
+	ctx, cancel := context.WithTimeout(agent.Context, repeatPolicyTimeout(10*time.Second))
+	defer cancel()
+
+	err := agent.Run(ctx)
+	require.NoError(t, err, "DAG should complete successfully")
+
+	dag.AssertLatestStatus(t, core.Succeeded)
+
+	dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	require.NoError(t, err)
+	require.NotNil(t, dagRunStatus)
+
+	require.Len(t, dagRunStatus.Nodes, 1)
+	assert.Equal(t, core.NodeSucceeded, dagRunStatus.Nodes[0].Status)
+	assert.Equal(t, 1, dagRunStatus.Nodes[0].DoneCount, "Step should stop after the first run once the file exists")
+}
+
 func TestRepeatPolicy_WithLimitReachedBeforeCondition(t *testing.T) {
 	repeatPolicyParallel(t)
 	th := test.Setup(t)

@@ -9518,10 +9518,10 @@ components:
       properties:
         condition:
           type: string
-          description: "Expression or check to evaluate"
+          description: "Expression or check to evaluate. When `expected` is omitted, the value runs as a command check using the same variable expansion rules as shell `command` steps."
         expected:
           type: string
-          description: "Expected result of the condition evaluation"
+          description: "Expected result of the condition evaluation. When set, Dagu compares the evaluated string output instead of using command exit status."
         negate:
           type: boolean
           description: "If true, inverts the condition result (run when condition does NOT match)"
