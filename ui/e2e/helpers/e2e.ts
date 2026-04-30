@@ -128,6 +128,15 @@ const stackFilePath =
 
 let cachedStack: StackConfig | null = null;
 
+export function hasRBACLicenseSourceConfigured(): boolean {
+  return Boolean(
+    process.env.DAGU_LICENSE_PRIVKEY_B64 ||
+      process.env.DAGU_LICENSE ||
+      process.env.DAGU_LICENSE_KEY ||
+      process.env.DAGU_LICENSE_FILE
+  );
+}
+
 export async function loadStack(): Promise<StackConfig> {
   if (cachedStack) {
     return cachedStack;

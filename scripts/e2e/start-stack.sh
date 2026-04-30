@@ -58,6 +58,11 @@ ensure_license_env() {
     return 0
   fi
 
+  if [[ -n "${DAGU_LICENSE:-}" ]]; then
+    license_token="$DAGU_LICENSE"
+    return 0
+  fi
+
   if [[ -f "$LICENSE_FILE" ]]; then
     license_token="$(cat "$LICENSE_FILE")"
     if [[ -n "$license_token" ]]; then

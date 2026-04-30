@@ -5,6 +5,7 @@ import { expect, test } from '@playwright/test';
 import {
   clearSession,
   createUser,
+  hasRBACLicenseSourceConfigured,
   loadStack,
   loginViaAPI,
   loginViaUI,
@@ -30,6 +31,11 @@ test('redirects unauthenticated users to login and allows admin sign-in', async 
 });
 
 test('enforces viewer route and execute restrictions', async ({ page, request }) => {
+  test.skip(
+    !hasRBACLicenseSourceConfigured(),
+    'requires a Dagu Pro license source for RBAC user management'
+  );
+
   const stack = await loadStack();
   const adminToken = await loginViaAPI(
     request,
