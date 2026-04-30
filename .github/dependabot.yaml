@@ -17,11 +17,16 @@ updates:
     schedule:
       interval: monthly
     groups:
-      patch:
+      actions-patch:
+        applies-to: version-updates
         patterns:
           - "*"
         update-types:
           - patch
+      actions-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
     ignore:
       - dependency-name: "*"
         update-types:
@@ -32,11 +37,36 @@ updates:
     schedule:
       interval: monthly
     groups:
-      patch:
+      go-patch:
+        applies-to: version-updates
         patterns:
           - "*"
         update-types:
           - patch
+      go-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
+  - package-ecosystem: npm
+    directory: /ui
+    schedule:
+      interval: monthly
+    groups:
+      ui-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - patch
+      ui-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
     ignore:
       - dependency-name: "*"
         update-types:
@@ -46,15 +76,19 @@ updates:
     directories:
       - docs
       - npm/*
-      - ui
     schedule:
       interval: monthly
     groups:
-      patch:
+      packaging-patch:
+        applies-to: version-updates
         patterns:
           - "*"
         update-types:
           - patch
+      packaging-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
     ignore:
       - dependency-name: "*"
         update-types:
