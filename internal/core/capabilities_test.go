@@ -96,6 +96,7 @@ func TestStep_EvalOptions(t *testing.T) {
 				return []eval.Option{eval.WithoutExpandShell()}
 			},
 		})
+		t.Cleanup(func() { UnregisterExecutorCapabilities("command-eval-opts-test") })
 
 		step := Step{ExecutorConfig: ExecutorConfig{Type: "command-eval-opts-test"}}
 		opts := optionsFromSlice(step.CommandEvalOptions(ctx))
@@ -111,6 +112,7 @@ func TestStep_EvalOptions(t *testing.T) {
 				return []eval.Option{eval.WithNoExpansion()}
 			},
 		})
+		t.Cleanup(func() { UnregisterExecutorCapabilities("script-eval-opts-test") })
 
 		step := Step{ExecutorConfig: ExecutorConfig{Type: "script-eval-opts-test"}}
 		opts := optionsFromSlice(step.ScriptEvalOptions(ctx))
@@ -122,6 +124,7 @@ func TestStep_EvalOptions(t *testing.T) {
 		RegisterExecutorCapabilities("config-eval-opts-test", ExecutorCapabilities{
 			Command: true,
 		})
+		t.Cleanup(func() { UnregisterExecutorCapabilities("config-eval-opts-test") })
 
 		step := Step{ExecutorConfig: ExecutorConfig{Type: "config-eval-opts-test"}}
 		opts := optionsFromSlice(step.ConfigEvalOptions(ctx))
@@ -136,6 +139,7 @@ func TestStep_EvalOptions(t *testing.T) {
 				return []eval.Option{eval.WithoutExpandShell()}
 			},
 		})
+		t.Cleanup(func() { UnregisterExecutorCapabilities("legacy-eval-opts-test") })
 
 		step := Step{ExecutorConfig: ExecutorConfig{Type: "legacy-eval-opts-test"}}
 		commandOpts := optionsFromSlice(step.CommandEvalOptions(ctx))
