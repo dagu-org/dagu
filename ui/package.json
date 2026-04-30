@@ -105,7 +105,7 @@
     "dayjs": "1.11.20",
     "framer-motion": "12.35.2",
     "lodash": "4.17.21",
-    "lodash-es": "4.17.23",
+    "lodash-es": "4.18.1",
     "lucide": "0.525.0",
     "lucide-react": "0.526.0",
     "mermaid": "11.12.3",
