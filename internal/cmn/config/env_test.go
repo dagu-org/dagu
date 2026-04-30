@@ -14,6 +14,7 @@ import (
 
 func TestLoadBaseEnv(t *testing.T) {
 	windowsExpected := runtime.GOOS == "windows"
+	unixExpected := runtime.GOOS != "windows"
 
 	testCases := []struct {
 		name     string
@@ -21,6 +22,12 @@ func TestLoadBaseEnv(t *testing.T) {
 	}{
 		{"TEST_VAR_BASE_ENV", false},
 		{"DAGU_TEST_BASE_ENV", true},
+
+		// XDG base-dir variables should pass through on Unix/macOS only.
+		{"XDG_CONFIG_HOME", unixExpected},
+		{"XDG_DATA_HOME", unixExpected},
+		{"XDG_CACHE_HOME", unixExpected},
+		{"XDG_STATE_HOME", unixExpected},
 
 		// Windows-specific user profile and install roots should only pass
 		// through on Windows builds.

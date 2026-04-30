@@ -36,6 +36,7 @@ func init() {
 		"XDG_CONFIG_HOME", // User config (usually ~/.config)
 		"XDG_DATA_HOME",   // User data (usually ~/.local/share)
 		"XDG_CACHE_HOME",  // User cache (usually ~/.cache)
+		"XDG_STATE_HOME",  // User state (usually ~/.local/state)
 
 		// Docker daemon connection (used by Docker SDK's client.FromEnv)
 		"DOCKER_HOST",        // Docker daemon address
