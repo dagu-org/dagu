@@ -603,7 +603,7 @@ func (d *dag) build(ctx BuildContext) (*core.DAG, error) {
 
 	buildResult := result
 	if ctx.baseDAG != nil {
-		merged, err := composeBuildDAGContext(ctx.baseDAG, result)
+		merged, err := composeBuildDAGContext(ctx.baseDAG, result, d)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("failed to compose inherited DAG context: %w", err))
 		} else {
@@ -683,7 +683,7 @@ func (d *dag) build(ctx BuildContext) (*core.DAG, error) {
 	return result, nil
 }
 
-func composeBuildDAGContext(base, current *core.DAG) (*core.DAG, error) {
+func composeBuildDAGContext(base, current *core.DAG, currentSpec *dag) (*core.DAG, error) {
 	if base == nil {
 		return current, nil
 	}
@@ -692,16 +692,16 @@ func composeBuildDAGContext(base, current *core.DAG) (*core.DAG, error) {
 	if err := merge(effective, current); err != nil {
 		return nil, err
 	}
-	applyHistoryRetentionOverride(effective, current)
+	applyHistoryRetentionOverride(effective, currentSpec.HistRetentionDays != nil, currentSpec.HistRetentionRuns != nil)
 
 	return effective, nil
 }
 
-func applyHistoryRetentionOverride(effective, current *core.DAG) {
-	if current.HistRetentionRuns > 0 {
+func applyHistoryRetentionOverride(effective *core.DAG, authoredDays, authoredRuns bool) {
+	if authoredRuns {
 		effective.HistRetentionDays = 0
 	}
-	if current.HistRetentionDays > 0 {
+	if authoredDays {
 		effective.HistRetentionRuns = 0
 	}
 }

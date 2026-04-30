@@ -413,6 +413,15 @@ func (dr DataRoot) canRemoveDAGRun(ctx context.Context, r *DAGRun, keepTime time
 		logger.Error(runCtx, "Failed to get latest attempt", tag.Error(err))
 		return false, err
 	}
+	hasStatuslessAttempt, err := hasNewerStatuslessAttempt(ctx, r, latestAttempt)
+	if err != nil {
+		logger.Error(runCtx, "Failed to inspect attempt directories", tag.Error(err))
+		return false, err
+	}
+	if hasStatuslessAttempt {
+		logger.Debug(runCtx, "Skipping run with newer attempt missing status")
+		return false, nil
+	}
 	if !keepTime.IsZero() {
 		lastUpdate, err := latestAttempt.ModTime()
 		if err != nil {
@@ -433,6 +442,40 @@ func (dr DataRoot) canRemoveDAGRun(ctx context.Context, r *DAGRun, keepTime time
 		return false, nil
 	}
 	return true, nil
+}
+
+func hasNewerStatuslessAttempt(ctx context.Context, r *DAGRun, latestAttempt *Attempt) (bool, error) {
+	attDirs, err := r.listAttemptDirs()
+	if err != nil {
+		return false, fmt.Errorf("failed to list attempt directories: %w", err)
+	}
+
+	latestAttemptDir := filepath.Base(filepath.Dir(latestAttempt.file))
+	for _, attDir := range attDirs {
+		if err := ctx.Err(); err != nil {
+			return false, err
+		}
+
+		attempt, err := NewAttempt(filepath.Join(r.baseDir, attDir, JSONLStatusFile), nil)
+		if err != nil {
+			logger.Error(ctx, "Failed to read attempt data",
+				tag.Error(err),
+				tag.RunID(r.dagRunID),
+				tag.Dir(attDir))
+			continue
+		}
+		if attempt.Hidden() {
+			continue
+		}
+		if filepath.Base(filepath.Dir(attempt.file)) == latestAttemptDir {
+			return false, nil
+		}
+		if !attempt.Exists() {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func (dr DataRoot) removeDAGRun(ctx context.Context, r *DAGRun, dryRun bool) {

@@ -3469,7 +3469,7 @@ export interface components {
             delay?: number;
             /** @description Number of days to retain historical logs */
             histRetentionDays?: number;
-            /** @description Number of DAG runs to retain historical logs */
+            /** @description Number of DAG runs to retain historical logs. Mutually exclusive with histRetentionDays. */
             histRetentionRuns?: number;
             /** @description Conditions that must be met before a DAG-run can start */
             preconditions?: components["schemas"]["Condition"][];

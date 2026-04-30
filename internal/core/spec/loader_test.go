@@ -605,6 +605,22 @@ steps:
 		assert.Equal(t, 0, dag.HistRetentionRuns)
 	})
 
+	t.Run("HistoryRetentionDaysZeroOverrideBaseRuns", func(t *testing.T) {
+		t.Parallel()
+
+		baseDAG := createTempYAMLFile(t, `hist_retention_runs: 5
+`)
+		childDAG := createTempYAMLFile(t, `hist_retention_days: 0
+steps:
+  - name: "step1"
+    command: echo "step1"
+`)
+		dag, err := spec.Load(context.Background(), childDAG, spec.WithBaseConfig(baseDAG))
+		require.NoError(t, err)
+
+		assert.Equal(t, 0, dag.HistRetentionRuns)
+	})
+
 	t.Run("WithBaseConfigContent_MergesEnvVars", func(t *testing.T) {
 		t.Parallel()
 

@@ -406,6 +406,44 @@ func TestDataRootRemoveOld(t *testing.T) {
 		assert.True(t, fileutil.FileExists(newRun.baseDir), "newest dag-run should be kept")
 	})
 
+	t.Run("RetentionRunsPreservesRunsWithNewerStatuslessAttempts", func(t *testing.T) {
+		root := setupTestDataRoot(t)
+
+		oldTime := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
+		newTime := time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC)
+		oldRun := root.CreateTestDAGRun(t, "old-dag-run", exec.NewUTC(oldTime))
+		newRun := root.CreateTestDAGRun(t, "new-dag-run", exec.NewUTC(newTime))
+
+		attempt, err := oldRun.CreateAttempt(root.Context, exec.NewUTC(oldTime), nil, "")
+		require.NoError(t, err)
+		require.NoError(t, attempt.Open(root.Context))
+		require.NoError(t, attempt.Write(root.Context, exec.DAGRunStatus{
+			Name:     "test-dag",
+			DAGRunID: oldRun.dagRunID,
+			Status:   core.Succeeded,
+		}))
+		require.NoError(t, attempt.Close(root.Context))
+
+		_, err = oldRun.CreateAttempt(root.Context, exec.NewUTC(oldTime.Add(time.Hour)), nil, "")
+		require.NoError(t, err)
+
+		attempt, err = newRun.CreateAttempt(root.Context, exec.NewUTC(newTime), nil, "")
+		require.NoError(t, err)
+		require.NoError(t, attempt.Open(root.Context))
+		require.NoError(t, attempt.Write(root.Context, exec.DAGRunStatus{
+			Name:     "test-dag",
+			DAGRunID: newRun.dagRunID,
+			Status:   core.Succeeded,
+		}))
+		require.NoError(t, attempt.Close(root.Context))
+
+		removedIDs, err := root.RemoveOldByRuns(root.Context, 1, false)
+		require.NoError(t, err)
+		assert.Empty(t, removedIDs)
+		assert.True(t, fileutil.FileExists(oldRun.baseDir), "dag-run with a newer statusless attempt should be preserved")
+		assert.True(t, fileutil.FileExists(newRun.baseDir), "newest dag-run should be kept")
+	})
+
 	t.Run("RemoveEmptyDirectories", func(t *testing.T) {
 		root := setupTestDataRoot(t)
 

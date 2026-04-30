@@ -658,6 +658,7 @@ func TestBuildHistRetentionRuns(t *testing.T) {
 
 	runs := 3
 	zero := 0
+	neg := -1
 	tests := []struct {
 		name        string
 		input       *int
@@ -667,6 +668,7 @@ func TestBuildHistRetentionRuns(t *testing.T) {
 		{name: "NilDefaultsTo0", input: nil, expected: 0},
 		{name: "CustomValue", input: &runs, expected: 3},
 		{name: "ZeroValueInvalid", input: &zero, errContains: "hist_retention_runs must be > 0"},
+		{name: "NegativeValueInvalid", input: &neg, errContains: "hist_retention_runs must be > 0"},
 	}
 
 	for _, tt := range tests {
