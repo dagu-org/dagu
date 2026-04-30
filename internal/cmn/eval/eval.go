@@ -99,8 +99,8 @@ func ExpandReferencesWithSteps(ctx context.Context, input string, dataMap map[st
 // by default — only explicitly provided vars and non-OS scope entries are used.
 // This prevents OS variables like $HOME from being expanded in non-shell executor
 // configs (SSH, Docker, S3, etc.) where they should be preserved for the remote env.
-func Object[T any](ctx context.Context, obj T, vars map[string]string) (T, error) {
-	options := NewOptions()
+func Object[T any](ctx context.Context, obj T, vars map[string]string, opts ...Option) (T, error) {
+	options := buildOptions(opts)
 	options.Variables = append(options.Variables, vars)
 
 	transform := func(ctx context.Context, s string) (string, error) {

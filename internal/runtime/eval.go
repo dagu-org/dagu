@@ -34,7 +34,7 @@ func EvalObject[T any](ctx context.Context, obj T) (T, error) {
 }
 
 func evalObjectTreatingOmittedParamsAsEmpty[T any](ctx context.Context, obj T) (T, error) {
-	return eval.Object(ctx, obj, templateConfigEvalVariables(GetEnv(ctx)))
+	return eval.Object(ctx, obj, templateConfigEvalVariables(GetEnv(ctx)), eval.WithoutSubstitute())
 }
 
 func templateConfigEvalVariables(env Env) map[string]string {

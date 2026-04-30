@@ -7,6 +7,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/dagucloud/dagu/internal/cmn/eval"
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/exec"
 	"github.com/stretchr/testify/require"
@@ -48,4 +49,36 @@ func TestEvalExecutorConfig_TemplateTreatsOmittedOptionalParamsAsEmpty(t *testin
 	require.True(t, ok)
 	require.Equal(t, "tom", data["name"])
 	require.Equal(t, "", data["favorite_color"])
+}
+
+func TestEvalExecutorConfig_TemplatePreservesLiteralCodeFencesInData(t *testing.T) {
+	t.Parallel()
+
+	ctx := exec.NewContext(
+		context.Background(),
+		&core.DAG{Name: "test-dag"},
+		"",
+		"",
+	)
+	env := NewEnv(ctx, core.Step{Name: "render"})
+	env.Scope = env.Scope.WithEntries(map[string]string{
+		"ISSUE_TEXT": "```yaml\nenv:\n  TEST_FILE: ~/dagu-test.txt\n\nsteps:\n  - command: touch $TEST_FILE\n```",
+	}, eval.EnvSourceStepEnv)
+	ctx = WithEnv(ctx, env)
+
+	result, err := evalExecutorConfig(ctx, core.Step{
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "template",
+			Config: map[string]any{
+				"data": map[string]any{
+					"issue_text": "${ISSUE_TEXT}",
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	data, ok := result["data"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "```yaml\nenv:\n  TEST_FILE: ~/dagu-test.txt\n\nsteps:\n  - command: touch $TEST_FILE\n```", data["issue_text"])
 }
