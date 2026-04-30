@@ -22,7 +22,7 @@ func getEvalOptions(t *testing.T, step core.Step) *eval.Options {
 	ctx = runtime.WithEnv(ctx, env)
 
 	opts := eval.NewOptions()
-	for _, opt := range step.EvalOptions(ctx) {
+	for _, opt := range step.CommandEvalOptions(ctx) {
 		opt(opts)
 	}
 
@@ -124,6 +124,7 @@ func TestCommandExecutor_GetEvalOptions(t *testing.T) {
 			require.Equal(t, tt.wantExpandEnv, opts.ExpandEnv)
 			require.Equal(t, tt.wantExpandOS, opts.ExpandOS)
 			require.Equal(t, tt.wantEscape, opts.EscapeDollar)
+			require.False(t, opts.Substitute)
 		})
 	}
 }

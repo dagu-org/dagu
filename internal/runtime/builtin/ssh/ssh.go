@@ -242,7 +242,15 @@ func init() {
 		MultipleCommands: true,
 		Script:           true,
 		Shell:            true,
-		GetEvalOptions: func(ctx context.Context, step core.Step) []eval.Option {
+		GetCommandEvalOptions: func(ctx context.Context, step core.Step) []eval.Option {
+			if hasShellConfigured(ctx, step) {
+				// Shell is configured, shell features (expansion, pipes, etc.) are supported
+				return []eval.Option{eval.WithoutDollarEscape()}
+			}
+			// No shell configured - skip shell expansion for remote execution
+			return []eval.Option{eval.WithoutExpandShell()}
+		},
+		GetScriptEvalOptions: func(ctx context.Context, step core.Step) []eval.Option {
 			if hasShellConfigured(ctx, step) {
 				// Shell is configured, shell features (expansion, pipes, etc.) are supported
 				return []eval.Option{eval.WithoutDollarEscape()}

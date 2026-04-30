@@ -272,7 +272,7 @@ func normalizeEnvVarExpr(expr string) string {
 func evalMessages(ctx context.Context, msgs []exec.LLMMessage) ([]exec.LLMMessage, error) {
 	result := make([]exec.LLMMessage, len(msgs))
 	for i, msg := range msgs {
-		content, err := runtime.EvalString(ctx, msg.Content)
+		content, err := runtime.EvalStepString(ctx, msg.Content)
 		if err != nil {
 			return nil, fmt.Errorf("failed to evaluate message content: %w", err)
 		}
@@ -448,7 +448,7 @@ func (e *Executor) createProviderForModel(ctx context.Context, model core.ModelE
 	var apiKey string
 	if apiKeyEnvVar != "" {
 		apiKeyExpr := normalizeEnvVarExpr(apiKeyEnvVar)
-		apiKey, err = runtime.EvalString(ctx, apiKeyExpr)
+		apiKey, err = runtime.EvalStepString(ctx, apiKeyExpr)
 		if err != nil {
 			return nil, fmt.Errorf("failed to evaluate API key: %w", err)
 		}
@@ -457,7 +457,7 @@ func (e *Executor) createProviderForModel(ctx context.Context, model core.ModelE
 	// Evaluate base URL if specified
 	baseURL := cfg.BaseURL
 	if baseURL != "" {
-		baseURL, err = runtime.EvalString(ctx, baseURL)
+		baseURL, err = runtime.EvalStepString(ctx, baseURL)
 		if err != nil {
 			return nil, fmt.Errorf("failed to evaluate baseURL: %w", err)
 		}

@@ -189,7 +189,7 @@ func (e *Executor) Run(ctx context.Context) error {
 	// Evaluate variable substitution in messages.
 	var userMessages []llm.Message
 	for _, msg := range e.step.Messages {
-		content, evalErr := runtime.EvalString(ctx, msg.Content)
+		content, evalErr := runtime.EvalStepString(ctx, msg.Content)
 		if evalErr != nil {
 			return fmt.Errorf("failed to evaluate message content: %w", evalErr)
 		}

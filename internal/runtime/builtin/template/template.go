@@ -151,7 +151,7 @@ func buildFuncMap() template.FuncMap {
 func init() {
 	executor.RegisterExecutor("template", newTemplate, validateTemplate, core.ExecutorCapabilities{
 		Script: true,
-		GetEvalOptions: func(_ context.Context, _ core.Step) []eval.Option {
+		GetScriptEvalOptions: func(_ context.Context, _ core.Step) []eval.Option {
 			return []eval.Option{eval.WithNoExpansion()}
 		},
 	})
