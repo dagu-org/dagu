@@ -653,6 +653,39 @@ func TestBuildHistRetentionDays(t *testing.T) {
 	}
 }
 
+func TestBuildHistRetentionRuns(t *testing.T) {
+	t.Parallel()
+
+	runs := 3
+	zero := 0
+	neg := -1
+	tests := []struct {
+		name        string
+		input       *int
+		expected    int
+		errContains string
+	}{
+		{name: "NilDefaultsTo0", input: nil, expected: 0},
+		{name: "CustomValue", input: &runs, expected: 3},
+		{name: "ZeroValueInvalid", input: &zero, errContains: "hist_retention_runs must be > 0"},
+		{name: "NegativeValueInvalid", input: &neg, errContains: "hist_retention_runs must be > 0"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := &dag{HistRetentionRuns: tt.input}
+			result, err := buildHistRetentionRuns(testBuildContext(), d)
+			if tt.errContains != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errContains)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
 func TestBuildMaxCleanUpTime(t *testing.T) {
 	t.Parallel()
 

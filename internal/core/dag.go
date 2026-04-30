@@ -184,6 +184,8 @@ type DAG struct {
 	MaxCleanUpTime time.Duration `json:"maxCleanUpTime,omitempty"`
 	// HistRetentionDays is the number of days to keep the history of dag-runs.
 	HistRetentionDays int `json:"histRetentionDays,omitempty"`
+	// HistRetentionRuns is the number of dag-runs to keep in history.
+	HistRetentionRuns int `json:"histRetentionRuns,omitempty"`
 	// Queue is the name of the queue to assign this DAG to.
 	Queue string `json:"queue,omitempty"`
 	// RetryPolicy controls automatic DAG-level retry behavior for failed runs.
@@ -569,7 +571,7 @@ func (d *DAG) initializeDefaults() {
 	if d.LogOutput == "" {
 		d.LogOutput = LogOutputSeparate
 	}
-	if d.HistRetentionDays == 0 {
+	if d.HistRetentionDays == 0 && d.HistRetentionRuns == 0 {
 		d.HistRetentionDays = defaultHistRetentionDays
 	}
 	if d.MaxCleanUpTime == 0 {

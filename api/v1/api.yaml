@@ -8608,6 +8608,9 @@ components:
         histRetentionDays:
           type: integer
           description: "Number of days to retain historical logs"
+        histRetentionRuns:
+          type: integer
+          description: "Number of DAG runs to retain historical logs. Mutually exclusive with histRetentionDays."
         preconditions:
           type: array
           description: "Conditions that must be met before a DAG-run can start"

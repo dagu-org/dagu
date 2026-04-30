@@ -371,54 +371,125 @@ func (dr DataRoot) RemoveOld(ctx context.Context, retentionDays int, dryRun bool
 	var removedRunIDs []string
 
 	for _, r := range dagRuns {
-		// Enrich context with run directory for all subsequent logs in this iteration
-		runCtx := logger.WithValues(ctx, tag.Dir(r.baseDir))
-
-		latestAttempt, err := r.LatestAttempt(ctx, nil)
-		if err != nil {
-			logger.Error(runCtx, "Failed to get latest attempt",
-				tag.Error(err))
+		removable, err := dr.canRemoveDAGRun(ctx, r, keepTime.Time)
+		if err != nil || !removable {
 			continue
 		}
-		lastUpdate, err := latestAttempt.ModTime()
-		if err != nil {
-			logger.Error(runCtx, "Failed to get last modified time",
-				tag.Error(err))
-			continue
-		}
-		latestStatus, err := latestAttempt.ReadStatus(ctx)
-		if err != nil {
-			logger.Error(runCtx, "Failed to read status",
-				tag.Error(err))
-			continue
-		}
-		if latestStatus.Status.IsActive() {
-			// If the run is still active, skip it
-			logger.Debug(runCtx, "Skipping active run",
-				tag.Status(latestStatus.Status.String()))
-			continue
-		}
-		if lastUpdate.After(keepTime.Time) {
-			continue
-		}
-
-		// Add run ID to removed list
 		removedRunIDs = append(removedRunIDs, r.dagRunID)
-
-		// In dry-run mode, skip actual deletion
-		if dryRun {
-			continue
-		}
-
-		if err := r.Remove(ctx); err != nil {
-			logger.Error(runCtx, "Failed to remove run",
-				tag.Error(err))
-		}
-		dayDir := filepath.Dir(r.baseDir)
-		dagrunindex.DeleteIndex(dayDir)
-		dr.removeEmptyDir(ctx, dayDir)
+		dr.removeDAGRun(ctx, r, dryRun)
 	}
 	return removedRunIDs, nil
+}
+
+// RemoveOldByRuns removes dag-runs beyond the most recent retentionRuns.
+// Active runs are preserved even when they fall outside the retained window.
+func (dr DataRoot) RemoveOldByRuns(ctx context.Context, retentionRuns int, dryRun bool) ([]string, error) {
+	if retentionRuns <= 0 {
+		return nil, nil
+	}
+
+	dagRuns := dr.listDAGRunsInRange(ctx, exec.TimeInUTC{}, exec.TimeInUTC{}, &listDAGRunsInRangeOpts{})
+	if len(dagRuns) <= retentionRuns {
+		return nil, nil
+	}
+
+	var removedRunIDs []string
+	for _, r := range dagRuns[retentionRuns:] {
+		removable, err := dr.canRemoveDAGRun(ctx, r, time.Time{})
+		if err != nil || !removable {
+			continue
+		}
+		removedRunIDs = append(removedRunIDs, r.dagRunID)
+		dr.removeDAGRun(ctx, r, dryRun)
+	}
+	return removedRunIDs, nil
+}
+
+func (dr DataRoot) canRemoveDAGRun(ctx context.Context, r *DAGRun, keepTime time.Time) (bool, error) {
+	runCtx := logger.WithValues(ctx, tag.Dir(r.baseDir))
+
+	latestAttempt, err := r.LatestAttempt(ctx, nil)
+	if err != nil {
+		logger.Error(runCtx, "Failed to get latest attempt", tag.Error(err))
+		return false, err
+	}
+	hasStatuslessAttempt, err := hasNewerStatuslessAttempt(ctx, r, latestAttempt)
+	if err != nil {
+		logger.Error(runCtx, "Failed to inspect attempt directories", tag.Error(err))
+		return false, err
+	}
+	if hasStatuslessAttempt {
+		logger.Debug(runCtx, "Skipping run with newer attempt missing status")
+		return false, nil
+	}
+	if !keepTime.IsZero() {
+		lastUpdate, err := latestAttempt.ModTime()
+		if err != nil {
+			logger.Error(runCtx, "Failed to get last modified time", tag.Error(err))
+			return false, err
+		}
+		if lastUpdate.After(keepTime) {
+			return false, nil
+		}
+	}
+	latestStatus, err := latestAttempt.ReadStatus(ctx)
+	if err != nil {
+		logger.Error(runCtx, "Failed to read status", tag.Error(err))
+		return false, err
+	}
+	if latestStatus.Status.IsActive() {
+		logger.Debug(runCtx, "Skipping active run", tag.Status(latestStatus.Status.String()))
+		return false, nil
+	}
+	return true, nil
+}
+
+func hasNewerStatuslessAttempt(ctx context.Context, r *DAGRun, latestAttempt *Attempt) (bool, error) {
+	attDirs, err := r.listAttemptDirs()
+	if err != nil {
+		return false, fmt.Errorf("failed to list attempt directories: %w", err)
+	}
+
+	latestAttemptDir := filepath.Base(filepath.Dir(latestAttempt.file))
+	for _, attDir := range attDirs {
+		if err := ctx.Err(); err != nil {
+			return false, err
+		}
+
+		attempt, err := NewAttempt(filepath.Join(r.baseDir, attDir, JSONLStatusFile), nil)
+		if err != nil {
+			logger.Error(ctx, "Failed to read attempt data",
+				tag.Error(err),
+				tag.RunID(r.dagRunID),
+				tag.Dir(attDir))
+			continue
+		}
+		if attempt.Hidden() {
+			continue
+		}
+		if filepath.Base(filepath.Dir(attempt.file)) == latestAttemptDir {
+			return false, nil
+		}
+		if !attempt.Exists() {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+func (dr DataRoot) removeDAGRun(ctx context.Context, r *DAGRun, dryRun bool) {
+	if dryRun {
+		return
+	}
+
+	runCtx := logger.WithValues(ctx, tag.Dir(r.baseDir))
+	if err := r.Remove(ctx); err != nil {
+		logger.Error(runCtx, "Failed to remove run", tag.Error(err))
+	}
+	dayDir := filepath.Dir(r.baseDir)
+	dagrunindex.DeleteIndex(dayDir)
+	dr.removeEmptyDir(ctx, dayDir)
 }
 
 func (dr DataRoot) removeEmptyDir(ctx context.Context, dayDir string) {
@@ -592,6 +663,9 @@ SCAN:
 	}
 
 	sort.Slice(result, func(i, j int) bool {
+		if result[i].timestamp.Equal(result[j].timestamp) {
+			return result[i].baseDir > result[j].baseDir
+		}
 		return result[i].timestamp.After(result[j].timestamp)
 	})
 

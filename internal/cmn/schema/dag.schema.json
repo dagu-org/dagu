@@ -3,6 +3,9 @@
   "type": "object",
   "description": "Schema for Dagu DAG YAML format. Dagu uses YAML files to define Directed Acyclic Graphs (DAGs) for workflow orchestration.",
   "additionalProperties": false,
+  "not": {
+    "required": ["hist_retention_days", "hist_retention_runs"]
+  },
   "properties": {
     "name": {
       "type": "string",
@@ -652,6 +655,11 @@
     "hist_retention_days": {
       "type": "integer",
       "description": "Number of days to retain execution history. After this period, older run logs/history can be purged."
+    },
+    "hist_retention_runs": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Number of DAG runs to retain in execution history. Mutually exclusive with hist_retention_days."
     },
     "max_active_runs": {
       "type": "integer",
