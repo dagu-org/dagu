@@ -222,6 +222,7 @@ steps:
 		dag.AssertOutputs(t, map[string]any{
 			"RESULT": []test.Contains{
 				test.Contains("```yaml"),
+				test.Contains("\n```"),
 				test.Contains("touch $TEST_FILE"),
 			},
 		})
