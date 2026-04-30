@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/dagucloud/dagu/api/v1"
@@ -775,9 +774,5 @@ func marshalWebhookHeaders(ctx context.Context, allowList []string) (string, err
 }
 
 func buildWebhookRuntimeParams(payload, headers string) string {
-	parts := []string{
-		fmt.Sprintf("WEBHOOK_PAYLOAD=%s", strconv.Quote(payload)),
-		fmt.Sprintf("WEBHOOK_HEADERS=%s", strconv.Quote(headers)),
-	}
-	return strings.Join(parts, " ")
+	return core.BuildWebhookRuntimeParams(payload, headers, nil)
 }

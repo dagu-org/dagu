@@ -366,3 +366,109 @@ func TestCloudClient_RequestHeaders(t *testing.T) {
 			"User-Agent %q should start with \"dagu-oss/\"", capturedUserAgent)
 	})
 }
+
+func TestCloudClient_PullGitHubDispatch(t *testing.T) {
+	t.Parallel()
+
+	t.Run("200 returns dispatch job", func(t *testing.T) {
+		t.Parallel()
+
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "/api/v1/github/dispatch/pull", r.URL.Path)
+			var req PullGitHubDispatchRequest
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
+			assert.Equal(t, "lic-1", req.LicenseID)
+			assert.Equal(t, "srv-1", req.ServerID)
+			assert.Equal(t, "secret-1", req.HeartbeatSecret)
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(GitHubDispatchJob{
+				ID:             "job-1",
+				LicenseID:      "lic-1",
+				DAGName:        "ci.yaml",
+				EventName:      "push",
+				Payload:        json.RawMessage(`{"ref":"refs/heads/main"}`),
+				Headers:        json.RawMessage(`{"x-github-event":["push"]}`),
+				RepositoryName: "dagucloud/dagu",
+			})
+		})
+
+		_, client := newTestCloudClient(t, handler)
+
+		job, err := client.PullGitHubDispatch(context.Background(), PullGitHubDispatchRequest{
+			LicenseID:       "lic-1",
+			ServerID:        "srv-1",
+			HeartbeatSecret: "secret-1",
+		})
+		require.NoError(t, err)
+		require.NotNil(t, job)
+		assert.Equal(t, "job-1", job.ID)
+		assert.JSONEq(t, `{"ref":"refs/heads/main"}`, string(job.Payload))
+	})
+
+	t.Run("204 returns nil job", func(t *testing.T) {
+		t.Parallel()
+
+		handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusNoContent)
+		})
+
+		_, client := newTestCloudClient(t, handler)
+
+		job, err := client.PullGitHubDispatch(context.Background(), PullGitHubDispatchRequest{})
+		require.NoError(t, err)
+		assert.Nil(t, job)
+	})
+}
+
+func TestCloudClient_AcceptAndFinishGitHubDispatch(t *testing.T) {
+	t.Parallel()
+
+	t.Run("accept posts dag run id", func(t *testing.T) {
+		t.Parallel()
+
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "/api/v1/github/dispatch/job-1/accept", r.URL.Path)
+			var req AcceptGitHubDispatchRequest
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
+			assert.Equal(t, "lic-1", req.LicenseID)
+			assert.Equal(t, "srv-1", req.ServerID)
+			assert.Equal(t, "secret-1", req.Secret)
+			assert.Equal(t, "run-1", req.DAGRunID)
+			w.WriteHeader(http.StatusNoContent)
+		})
+
+		_, client := newTestCloudClient(t, handler)
+
+		err := client.AcceptGitHubDispatch(context.Background(), "job-1", AcceptGitHubDispatchRequest{
+			LicenseID: "lic-1",
+			ServerID:  "srv-1",
+			Secret:    "secret-1",
+			DAGRunID:  "run-1",
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("finish posts terminal status", func(t *testing.T) {
+		t.Parallel()
+
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "/api/v1/github/dispatch/job-1/finish", r.URL.Path)
+			var req FinishGitHubDispatchRequest
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
+			assert.Equal(t, "succeeded", req.ResultStatus)
+			assert.Equal(t, "all green", req.ResultSummary)
+			w.WriteHeader(http.StatusNoContent)
+		})
+
+		_, client := newTestCloudClient(t, handler)
+
+		err := client.FinishGitHubDispatch(context.Background(), "job-1", FinishGitHubDispatchRequest{
+			LicenseID:     "lic-1",
+			ServerID:      "srv-1",
+			Secret:        "secret-1",
+			ResultStatus:  "succeeded",
+			ResultSummary: "all green",
+		})
+		require.NoError(t, err)
+	})
+}

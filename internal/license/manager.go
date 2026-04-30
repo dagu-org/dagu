@@ -68,6 +68,15 @@ func (m *Manager) Checker() Checker {
 	return m.state
 }
 
+// ActivationData returns the persisted activation data when available.
+// A nil result means the current license source does not use activation state.
+func (m *Manager) ActivationData() (*ActivationData, error) {
+	if m == nil || m.store == nil {
+		return nil, nil
+	}
+	return m.store.Load()
+}
+
 // Source returns the discovery source of the current license.
 func (m *Manager) Source() DiscoverySource {
 	return m.source

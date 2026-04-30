@@ -145,6 +145,38 @@ func TestNewManager_FieldsSetCorrectly(t *testing.T) {
 	})
 }
 
+func TestManager_ActivationData(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns persisted activation data from store", func(t *testing.T) {
+		t.Parallel()
+
+		pub, _ := testKeyPair(t)
+		store := &mockActivationStore{data: &ActivationData{
+			Token:           "tok",
+			HeartbeatSecret: "secret",
+			ServerID:        "srv-1",
+		}}
+		m := NewManager(ManagerConfig{LicenseDir: t.TempDir()}, pub, store, slog.Default())
+
+		data, err := m.ActivationData()
+		require.NoError(t, err)
+		require.NotNil(t, data)
+		assert.Equal(t, "srv-1", data.ServerID)
+	})
+
+	t.Run("nil store returns nil activation data", func(t *testing.T) {
+		t.Parallel()
+
+		pub, _ := testKeyPair(t)
+		m := NewManager(ManagerConfig{LicenseDir: t.TempDir()}, pub, nil, slog.Default())
+
+		data, err := m.ActivationData()
+		require.NoError(t, err)
+		assert.Nil(t, data)
+	})
+}
+
 // ---------------------------------------------------------------------------
 // Start — no license
 // ---------------------------------------------------------------------------

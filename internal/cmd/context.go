@@ -43,6 +43,7 @@ import (
 	"github.com/dagucloud/dagu/internal/persis/filedagrun"
 	"github.com/dagucloud/dagu/internal/persis/filedistributed"
 	"github.com/dagucloud/dagu/internal/persis/fileeventstore"
+	"github.com/dagucloud/dagu/internal/persis/filegithubdispatch"
 	"github.com/dagucloud/dagu/internal/persis/filelicense"
 	"github.com/dagucloud/dagu/internal/persis/filememory"
 	"github.com/dagucloud/dagu/internal/persis/fileproc"
@@ -680,6 +681,20 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 	}
 	sched.SetDAGRunLeaseStore(c.DAGRunLeaseStore)
 	sched.SetDispatchTaskStore(c.DispatchTaskStore)
+	if c.LicenseManager != nil {
+		githubTracker := filegithubdispatch.New(filepath.Join(c.Config.Paths.DataDir, "github-dispatch"))
+		sched.SetGitHubDispatchWorker(scheduler.NewGitHubDispatchWorker(
+			c.Config,
+			dr,
+			schedulerRunStore,
+			c.QueueStore,
+			&schedulerRunMgr,
+			c.LicenseManager,
+			license.NewCloudClient(c.Config.License.CloudURL),
+			githubTracker,
+			logger.FromContext(c.Context),
+		))
+	}
 	return sched, nil
 }
 
