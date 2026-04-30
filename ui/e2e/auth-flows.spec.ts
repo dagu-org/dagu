@@ -5,6 +5,7 @@ import { expect, test } from '@playwright/test';
 import {
   clearSession,
   createUser,
+  hasRBACLicenseSourceConfigured,
   loadStack,
   loginViaAPI,
   loginViaUI,
@@ -15,6 +16,11 @@ import {
 } from './helpers/e2e';
 
 test.describe('auth flows', () => {
+  test.skip(
+    !hasRBACLicenseSourceConfigured(),
+    'requires a Dagu Pro license source for RBAC user management'
+  );
+
   test('user changes own password', async ({ page, request }) => {
     const stack = await loadStack();
     const adminToken = await loginViaAPI(
