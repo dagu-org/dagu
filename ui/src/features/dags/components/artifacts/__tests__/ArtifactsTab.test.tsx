@@ -120,6 +120,10 @@ describe('ArtifactsTab', () => {
   });
 
   it('copies the full contents of truncated text artifacts', async () => {
+    const downloadedArtifact = {
+      text: vi.fn().mockResolvedValue('full artifact contents'),
+    } as unknown as Blob;
+
     getMock.mockImplementation((path: string, init?: { params?: { query?: { path?: string } } }) => {
       if (path === '/dag-runs/{name}/{dagRunId}/artifacts') {
         return Promise.resolve({
@@ -159,8 +163,8 @@ describe('ArtifactsTab', () => {
         init?.params?.query?.path === 'output.txt'
       ) {
         return Promise.resolve({
-          data: new Blob(['full artifact contents']),
-          response: new Response(new Blob(['full artifact contents'])),
+          data: downloadedArtifact,
+          response: new Response('full artifact contents'),
         });
       }
 
