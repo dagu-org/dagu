@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/dagucloud/dagu/internal/cmn/config"
@@ -148,18 +149,21 @@ func (c *CloudClient) PullGitHubDispatch(ctx context.Context, req PullGitHubDisp
 	if err != nil {
 		return nil, err
 	}
-	if !ok || resp.ID == "" {
+	if !ok {
 		return nil, nil
+	}
+	if resp.ID == "" {
+		return nil, fmt.Errorf("github dispatch response missing id")
 	}
 	return &resp, nil
 }
 
 func (c *CloudClient) AcceptGitHubDispatch(ctx context.Context, jobID string, req AcceptGitHubDispatchRequest) error {
-	return c.doJSONAllowNoContent(ctx, http.MethodPost, "/api/v1/github/dispatch/"+jobID+"/accept", req, nil)
+	return c.doJSONAllowNoContent(ctx, http.MethodPost, "/api/v1/github/dispatch/"+url.PathEscape(jobID)+"/accept", req, nil)
 }
 
 func (c *CloudClient) FinishGitHubDispatch(ctx context.Context, jobID string, req FinishGitHubDispatchRequest) error {
-	return c.doJSONAllowNoContent(ctx, http.MethodPost, "/api/v1/github/dispatch/"+jobID+"/finish", req, nil)
+	return c.doJSONAllowNoContent(ctx, http.MethodPost, "/api/v1/github/dispatch/"+url.PathEscape(jobID)+"/finish", req, nil)
 }
 
 func (c *CloudClient) doJSON(ctx context.Context, method, path string, reqBody, respBody any) error {
@@ -249,8 +253,11 @@ func (c *CloudClient) doJSONOptional(ctx context.Context, method, path string, r
 		}
 		return false, &CloudError{StatusCode: resp.StatusCode, Message: msg}
 	}
-	if respBody == nil || len(respData) == 0 {
-		return false, nil
+	if respBody == nil {
+		return true, nil
+	}
+	if len(respData) == 0 {
+		return false, fmt.Errorf("empty response body for %s", path)
 	}
 	if err := json.Unmarshal(respData, respBody); err != nil {
 		return false, fmt.Errorf("failed to unmarshal response: %w", err)

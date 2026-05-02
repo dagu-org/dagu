@@ -418,6 +418,39 @@ func TestCloudClient_PullGitHubDispatch(t *testing.T) {
 		require.NoError(t, err)
 		assert.Nil(t, job)
 	})
+
+	t.Run("200 empty body returns error", func(t *testing.T) {
+		t.Parallel()
+
+		handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})
+
+		_, client := newTestCloudClient(t, handler)
+
+		job, err := client.PullGitHubDispatch(context.Background(), PullGitHubDispatchRequest{})
+		require.Error(t, err)
+		assert.Nil(t, job)
+		assert.Contains(t, err.Error(), "empty response body")
+	})
+
+	t.Run("200 missing id returns error", func(t *testing.T) {
+		t.Parallel()
+
+		handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(GitHubDispatchJob{
+				DAGName: "ci.yaml",
+			})
+		})
+
+		_, client := newTestCloudClient(t, handler)
+
+		job, err := client.PullGitHubDispatch(context.Background(), PullGitHubDispatchRequest{})
+		require.Error(t, err)
+		assert.Nil(t, job)
+		assert.Contains(t, err.Error(), "missing id")
+	})
 }
 
 func TestCloudClient_AcceptAndFinishGitHubDispatch(t *testing.T) {
@@ -427,7 +460,8 @@ func TestCloudClient_AcceptAndFinishGitHubDispatch(t *testing.T) {
 		t.Parallel()
 
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			assert.Equal(t, "/api/v1/github/dispatch/job-1/accept", r.URL.Path)
+			assert.Equal(t, "/api/v1/github/dispatch/job%2F1%3Fx=1/accept", r.URL.EscapedPath())
+			assert.Empty(t, r.URL.RawQuery)
 			var req AcceptGitHubDispatchRequest
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
 			assert.Equal(t, "lic-1", req.LicenseID)
@@ -439,7 +473,7 @@ func TestCloudClient_AcceptAndFinishGitHubDispatch(t *testing.T) {
 
 		_, client := newTestCloudClient(t, handler)
 
-		err := client.AcceptGitHubDispatch(context.Background(), "job-1", AcceptGitHubDispatchRequest{
+		err := client.AcceptGitHubDispatch(context.Background(), "job/1?x=1", AcceptGitHubDispatchRequest{
 			LicenseID: "lic-1",
 			ServerID:  "srv-1",
 			Secret:    "secret-1",
@@ -452,7 +486,8 @@ func TestCloudClient_AcceptAndFinishGitHubDispatch(t *testing.T) {
 		t.Parallel()
 
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			assert.Equal(t, "/api/v1/github/dispatch/job-1/finish", r.URL.Path)
+			assert.Equal(t, "/api/v1/github/dispatch/job%2F1%3Fx=1/finish", r.URL.EscapedPath())
+			assert.Empty(t, r.URL.RawQuery)
 			var req FinishGitHubDispatchRequest
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
 			assert.Equal(t, "succeeded", req.ResultStatus)
@@ -462,7 +497,7 @@ func TestCloudClient_AcceptAndFinishGitHubDispatch(t *testing.T) {
 
 		_, client := newTestCloudClient(t, handler)
 
-		err := client.FinishGitHubDispatch(context.Background(), "job-1", FinishGitHubDispatchRequest{
+		err := client.FinishGitHubDispatch(context.Background(), "job/1?x=1", FinishGitHubDispatchRequest{
 			LicenseID:     "lic-1",
 			ServerID:      "srv-1",
 			Secret:        "secret-1",

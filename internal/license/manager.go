@@ -81,7 +81,7 @@ func (m *Manager) ActivationData() (*ActivationData, error) {
 // credential tuple for Cloud control-plane APIs. A nil result means the
 // current license source does not support machine-authenticated Cloud calls.
 func (m *Manager) CloudMachineCredentials() (*CloudMachineCredentials, error) {
-	if m == nil {
+	if m == nil || m.state == nil || !m.source.NeedsHeartbeat() {
 		return nil, nil
 	}
 

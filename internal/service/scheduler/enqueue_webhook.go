@@ -5,6 +5,7 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -39,6 +40,8 @@ func EnqueueWebhookRun(
 			tag.RunID(runID),
 		)
 		return nil
+	} else if !errors.Is(err, exec.ErrDAGRunIDNotFound) {
+		return fmt.Errorf("failed to check existing webhook run: %w", err)
 	}
 
 	fullDAG, err := rehydrateExecutionDAG(ctx, dag, params, baseConfig)

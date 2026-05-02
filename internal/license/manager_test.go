@@ -190,6 +190,7 @@ func TestManager_CloudMachineCredentials(t *testing.T) {
 			HeartbeatSecret: "hb-secret-1",
 		}}
 		m := NewManager(ManagerConfig{LicenseDir: t.TempDir()}, pub, store, slog.Default())
+		m.source = SourceActivationFile
 		m.state.Update(&LicenseClaims{
 			RegisteredClaims: jwt.RegisteredClaims{
 				Subject: "tenant-1",
@@ -210,6 +211,7 @@ func TestManager_CloudMachineCredentials(t *testing.T) {
 
 		pub, _ := testKeyPair(t)
 		m := NewManager(ManagerConfig{LicenseDir: t.TempDir()}, pub, &mockActivationStore{}, slog.Default())
+		m.source = SourceActivationFile
 		m.state.Update(&LicenseClaims{
 			RegisteredClaims: jwt.RegisteredClaims{
 				Subject: "tenant-1",
@@ -220,6 +222,39 @@ func TestManager_CloudMachineCredentials(t *testing.T) {
 		creds, err := m.CloudMachineCredentials()
 		require.NoError(t, err)
 		assert.Nil(t, creds)
+	})
+
+	t.Run("returns nil when source does not support heartbeat credentials", func(t *testing.T) {
+		t.Parallel()
+
+		pub, _ := testKeyPair(t)
+		store := &mockActivationStore{data: &ActivationData{
+			ServerID:        "srv-1",
+			HeartbeatSecret: "hb-secret-1",
+		}}
+		m := NewManager(ManagerConfig{LicenseDir: t.TempDir()}, pub, store, slog.Default())
+		m.source = SourceEnvInline
+		m.state.Update(&LicenseClaims{
+			RegisteredClaims: jwt.RegisteredClaims{
+				ID: "lic-1",
+			},
+		}, "token")
+
+		creds, err := m.CloudMachineCredentials()
+		require.NoError(t, err)
+		assert.Nil(t, creds)
+	})
+
+	t.Run("zero-value manager returns nil without panicking", func(t *testing.T) {
+		t.Parallel()
+
+		m := &Manager{}
+
+		require.NotPanics(t, func() {
+			creds, err := m.CloudMachineCredentials()
+			require.NoError(t, err)
+			assert.Nil(t, creds)
+		})
 	})
 }
 
