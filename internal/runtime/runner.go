@@ -517,6 +517,9 @@ ExecRepeat: // repeat execution
 	}
 }
 
+// setupNodeExecutionEnv prepares the runtime-managed step env before
+// preconditions and command execution so both paths evaluate against the same
+// context.
 func (r *Runner) setupNodeExecutionEnv(ctx context.Context, node *Node) context.Context {
 	ctx = node.SetupEnv(ctx)
 

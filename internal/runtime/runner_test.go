@@ -834,6 +834,11 @@ func TestRunner(t *testing.T) {
 	})
 	t.Run("PreconditionUsesSameRuntimeManagedStepEnvAsCommand", func(t *testing.T) {
 		t.Parallel()
+
+		if windowsShellTest() {
+			t.Skip("Skipping Unix-specific env assertion on Windows")
+		}
+
 		r := setupRunner(t)
 
 		plan := r.newPlan(t,
@@ -3788,6 +3793,8 @@ func TestPushBackInputsExposeJSONHistoryEnvForRewoundStep(t *testing.T) {
 	assert.Equal(t, "2026-04-26T06:20:00Z", second["at"])
 }
 
+// TestPushBackPreconditionUsesSameEnvAsCommand verifies that rewound steps
+// evaluate preconditions with the same push-back env seen by the step command.
 func TestPushBackPreconditionUsesSameEnvAsCommand(t *testing.T) {
 	t.Parallel()
 
