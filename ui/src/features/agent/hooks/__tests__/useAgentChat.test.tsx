@@ -461,6 +461,73 @@ describe('useAgentChat fallback polling', () => {
     );
   });
 
+  it('navigates when a delegate ui_action arrives via fallback polling', async () => {
+    let delegateFetchCount = 0;
+    getMock.mockImplementation(
+      async (
+        _path: string,
+        request?: { params?: { path?: { sessionId?: string } } }
+      ) => {
+        const sessionId = request?.params?.path?.sessionId;
+        if (sessionId === 'sess-1') {
+          return {
+            data: makeSessionDetailResponse({
+              messages: [makeApiMessage('msg-root', 'root session')],
+              delegates: [
+                { id: 'delegate-1', task: 'Delegate task', status: 'running' },
+              ],
+            }),
+          };
+        }
+        if (sessionId === 'delegate-1') {
+          delegateFetchCount += 1;
+          return {
+            data: makeSessionDetailResponse({
+              id: 'delegate-1',
+              delegateTask: 'Delegate task',
+              messages:
+                delegateFetchCount === 1
+                  ? [makeApiMessage('delegate-msg-1', 'delegate initial', 1)]
+                  : [
+                      makeApiMessage('delegate-msg-1', 'delegate initial', 1),
+                      makeApiUIActionMessage(
+                        'delegate-ui-1',
+                        '/dags/delegate-target',
+                        2,
+                        'delegate-1'
+                      ),
+                    ],
+              working: delegateFetchCount === 1,
+            }),
+          };
+        }
+        throw new Error('unexpected request');
+      }
+    );
+
+    const { result } = renderHook(() => useAgentChatWithOpen(), {
+      wrapper: TestProviders,
+    });
+
+    act(() => {
+      result.current.openChat();
+    });
+    await act(async () => {
+      await result.current.selectSession('sess-1');
+    });
+    await act(async () => {
+      await result.current.reopenDelegate('delegate-1', 'Delegate task');
+    });
+
+    expect(navigateMock).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+
+    expect(navigateMock).toHaveBeenCalledWith('/dags/delegate-target');
+  });
+
   it('polls open delegate panes while the root agent stream is offline and stops after reconnect', async () => {
     mockedSSEStatus = {
       isSessionLive: false,

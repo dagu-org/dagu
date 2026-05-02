@@ -236,19 +236,12 @@ func (w *githubDispatchWorker) processJob(ctx context.Context, creds githubDispa
 }
 
 func (w *githubDispatchWorker) processCancelJob(ctx context.Context, creds githubDispatchCredentials, job license.GitHubDispatchJob) error {
-	dag, err := w.dagStore.GetMetadata(ctx, job.DAGName)
-	if err != nil {
-		return fmt.Errorf("load dag %q for cancel: %w", job.DAGName, err)
-	}
-	if err := w.runMgr.Stop(ctx, dag, ""); err != nil {
-		return fmt.Errorf("cancel dag %q: %w", job.DAGName, err)
-	}
 	return w.client.FinishGitHubDispatch(ctx, job.ID, license.FinishGitHubDispatchRequest{
 		LicenseID:     creds.licenseID,
 		ServerID:      creds.serverID,
 		Secret:        creds.secret,
 		ResultStatus:  core.Aborted.String(),
-		ResultSummary: fmt.Sprintf("Cancellation requested for `%s` from GitHub.", job.DAGName),
+		ResultSummary: fmt.Sprintf("GitHub dispatch command %q is not supported by this worker.", job.Command),
 	})
 }
 
@@ -271,10 +264,14 @@ func (w *githubDispatchWorker) reportTrackedJobs(ctx context.Context, creds gith
 	if err != nil {
 		return fmt.Errorf("list tracked jobs: %w", err)
 	}
+	var reportErrs []error
 	for _, item := range tracked {
 		if err := w.handleTrackedJob(ctx, creds, item); err != nil {
-			return err
+			reportErrs = append(reportErrs, fmt.Errorf("job %s: %w", item.JobID, err))
 		}
+	}
+	if len(reportErrs) > 0 {
+		return errors.Join(reportErrs...)
 	}
 	return nil
 }

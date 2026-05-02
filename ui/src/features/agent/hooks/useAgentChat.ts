@@ -221,9 +221,10 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
   } = useAgentChatContext();
 
   const selectGenRef = useRef(0);
-  const handledUIActionIdsRef = useRef<Set<string>>(new Set());
-  const hydratedUIActionsRef = useRef(false);
-  const allowInitialUIActionsRef = useRef(false);
+  const handledUIActionIdsRef = useRef<Map<string, Set<string>>>(new Map());
+  const hydratedUIActionsRef = useRef<Set<string>>(new Set());
+  const allowInitialUIActionsRef = useRef<Set<string>>(new Set());
+  const delegateCatalogHydratedRef = useRef(false);
   const [isSending, setIsSending] = useState(false);
   const [optimisticWorking, setOptimisticWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -247,7 +248,6 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
     resetDelegates,
     bringToFront,
     openDelegate,
-    setDelegateMessagesForId,
     hasDelegateMessages,
     removeDelegate,
   } = dm;
@@ -257,49 +257,71 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
     [openDelegateSessionIds]
   );
 
+  const delegateStatusesRef = useRef(delegateStatuses);
+  delegateStatusesRef.current = delegateStatuses;
+
+  const consumeNavigateUIActions = useCallback(
+    (
+      targetSessionId: string | null | undefined,
+      sessionMessages: Message[]
+    ) => {
+      if (!targetSessionId) {
+        return;
+      }
+
+      const navigateMessages = sessionMessages.filter(
+        (message) =>
+          message.session_id === targetSessionId &&
+          message.type === 'ui_action' &&
+          message.ui_action?.type === 'navigate'
+      );
+      let handled = handledUIActionIdsRef.current.get(targetSessionId);
+      if (!handled) {
+        handled = new Set<string>();
+        handledUIActionIdsRef.current.set(targetSessionId, handled);
+      }
+
+      if (!hydratedUIActionsRef.current.has(targetSessionId)) {
+        hydratedUIActionsRef.current.add(targetSessionId);
+        const shouldReplayExistingActions =
+          allowInitialUIActionsRef.current.has(targetSessionId);
+        allowInitialUIActionsRef.current.delete(targetSessionId);
+
+        if (!shouldReplayExistingActions) {
+          for (const message of navigateMessages) {
+            handled.add(message.id);
+          }
+          return;
+        }
+      }
+
+      for (const message of navigateMessages) {
+        if (handled.has(message.id)) {
+          continue;
+        }
+        handled.add(message.id);
+        if (message.ui_action?.path) {
+          navigate(message.ui_action.path);
+        }
+      }
+    },
+    [navigate]
+  );
+
   useEffect(() => {
-    handledUIActionIdsRef.current = new Set();
-    hydratedUIActionsRef.current = false;
-    if (!sessionId) {
-      allowInitialUIActionsRef.current = false;
+    const allowed = new Set<string>();
+    if (sessionId && allowInitialUIActionsRef.current.has(sessionId)) {
+      allowed.add(sessionId);
     }
+    handledUIActionIdsRef.current = new Map();
+    hydratedUIActionsRef.current = new Set();
+    allowInitialUIActionsRef.current = allowed;
+    delegateCatalogHydratedRef.current = false;
   }, [sessionId]);
 
   useEffect(() => {
-    if (!sessionId) {
-      return;
-    }
-
-    const navigateMessages = messages.filter(
-      (message) =>
-        message.session_id === sessionId &&
-        message.type === 'ui_action' &&
-        message.ui_action?.type === 'navigate'
-    );
-
-    if (!hydratedUIActionsRef.current) {
-      hydratedUIActionsRef.current = true;
-      const shouldReplayExistingActions = allowInitialUIActionsRef.current;
-      allowInitialUIActionsRef.current = false;
-
-      if (!shouldReplayExistingActions) {
-        for (const message of navigateMessages) {
-          handledUIActionIdsRef.current.add(message.id);
-        }
-        return;
-      }
-    }
-
-    for (const message of navigateMessages) {
-      if (handledUIActionIdsRef.current.has(message.id)) {
-        continue;
-      }
-      handledUIActionIdsRef.current.add(message.id);
-      if (message.ui_action?.path) {
-        navigate(message.ui_action.path);
-      }
-    }
-  }, [messages, navigate, sessionId]);
+    consumeNavigateUIActions(sessionId, messages);
+  }, [consumeNavigateUIActions, messages, sessionId]);
 
   const applySessionSnapshot = useCallback(
     (snapshot: StreamResponse) => {
@@ -317,7 +339,16 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
         setSessionState(snapshot.session_state);
       }
 
-      reconcileDelegateSnapshots(snapshot.delegates || []);
+      const nextDelegates = snapshot.delegates || [];
+      if (delegateCatalogHydratedRef.current) {
+        for (const delegate of nextDelegates) {
+          if (!delegateStatusesRef.current[delegate.id]) {
+            allowInitialUIActionsRef.current.add(delegate.id);
+          }
+        }
+      }
+      delegateCatalogHydratedRef.current = true;
+      reconcileDelegateSnapshots(nextDelegates);
     },
     [
       pendingUserMessage,
@@ -356,15 +387,32 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
       }
 
       if (event.delegates) {
+        if (delegateCatalogHydratedRef.current) {
+          for (const delegate of event.delegates) {
+            if (!delegateStatusesRef.current[delegate.id]) {
+              allowInitialUIActionsRef.current.add(delegate.id);
+            }
+          }
+        }
+        delegateCatalogHydratedRef.current = true;
         reconcileDelegateSnapshots(event.delegates);
       }
 
       if (event.delegate_event) {
+        if (event.delegate_event.type === 'started') {
+          allowInitialUIActionsRef.current.add(
+            event.delegate_event.delegate_id
+          );
+        }
         handleDelegateEvent(event.delegate_event);
       }
 
       if (event.delegate_messages) {
         handleDelegateMessages(event.delegate_messages);
+        consumeNavigateUIActions(
+          event.delegate_messages.delegate_id,
+          event.delegate_messages.messages
+        );
       }
     },
     [
@@ -376,23 +424,23 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
       reconcileDelegateSnapshots,
       handleDelegateEvent,
       handleDelegateMessages,
+      consumeNavigateUIActions,
     ]
   );
-
-  const delegateStatusesRef = useRef(delegateStatuses);
-  delegateStatusesRef.current = delegateStatuses;
 
   const applyDelegateSnapshot = useCallback(
     (delegateId: string, snapshot: StreamResponse) => {
       const existing = delegateStatusesRef.current[delegateId];
+      const nextMessages = snapshot.messages || [];
       applyDelegateSessionSnapshot(
         delegateId,
         snapshot.session?.delegate_task || existing?.task || '',
         snapshot.session_state?.working ? 'running' : 'completed',
-        snapshot.messages || []
+        nextMessages
       );
+      consumeNavigateUIActions(delegateId, nextMessages);
     },
-    [applyDelegateSessionSnapshot]
+    [applyDelegateSessionSnapshot, consumeNavigateUIActions]
   );
 
   const applySessionSnapshotRef = useRef(applySessionSnapshot);
@@ -551,7 +599,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
       });
       if (apiError)
         throw new Error(apiError.message || 'Failed to create session');
-      allowInitialUIActionsRef.current = true;
+      allowInitialUIActionsRef.current = new Set([data.sessionId]);
       setSessionId(data.sessionId);
       await fetchSessionsPage(1);
       return data.sessionId;
@@ -670,7 +718,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
       // Set sessionId first so the old agent EventSource closes and frees
       // a connection slot. Without this, fetchSessionDetail would deadlock
       // waiting for a connection while the old SSE holds it.
-      allowInitialUIActionsRef.current = false;
+      allowInitialUIActionsRef.current = new Set();
       setSessionId(id);
       setAnsweredPrompts({});
       try {
@@ -691,7 +739,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
 
   const handleClearSession = useCallback(() => {
     selectGenRef.current++;
-    allowInitialUIActionsRef.current = false;
+    allowInitialUIActionsRef.current = new Set();
     clearSession();
     setOptimisticWorking(false);
     setAnsweredPrompts({});
@@ -703,7 +751,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
       if (!hasDelegateMessages(delegateId)) {
         try {
           const snapshot = await fetchSessionDetail(delegateId);
-          setDelegateMessagesForId(delegateId, task, snapshot.messages || []);
+          applyDelegateSnapshot(delegateId, snapshot);
         } catch {
           // Best effort — panel will show empty state
         }
@@ -713,7 +761,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
     [
       fetchSessionDetail,
       hasDelegateMessages,
-      setDelegateMessagesForId,
+      applyDelegateSnapshot,
       openDelegate,
     ]
   );

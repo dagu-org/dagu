@@ -5,6 +5,7 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"sync"
@@ -137,7 +138,7 @@ func TestGitHubDispatchWorker_ProcessAndReportJob(t *testing.T) {
 	assert.Empty(t, tracked)
 }
 
-func TestGitHubDispatchWorker_CancelCommandStopsRunningDag(t *testing.T) {
+func TestGitHubDispatchWorker_CancelCommandDoesNotStopDag(t *testing.T) {
 	t.Parallel()
 
 	env := newDispatchTestEnv(t, "github-deploy")
@@ -164,11 +165,74 @@ func TestGitHubDispatchWorker_CancelCommandStopsRunningDag(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	require.Len(t, runMgr.calls, 1)
-	assert.Equal(t, env.dag.Name, runMgr.calls[0].dagName)
+	assert.Empty(t, runMgr.calls)
 	require.Len(t, client.finishes, 1)
 	assert.Equal(t, "aborted", client.finishes[0].req.ResultStatus)
-	assert.Contains(t, client.finishes[0].req.ResultSummary, env.dag.Name)
+	assert.Contains(t, client.finishes[0].req.ResultSummary, "not supported")
+
+	items, err := env.queue.ListByDAGName(env.ctx, env.dag.ProcGroup(), env.dag.Name)
+	require.NoError(t, err)
+	assert.Empty(t, items)
+
+	tracked, err := tracker.List()
+	require.NoError(t, err)
+	assert.Empty(t, tracked)
+}
+
+func TestGitHubDispatchWorker_ReportTrackedJobsContinuesAfterError(t *testing.T) {
+	t.Parallel()
+
+	env := newDispatchTestEnv(t, "github-report")
+	tracker := filegithubdispatch.New(filepath.Join(t.TempDir(), "tracker"))
+	client := &stubDispatchClient{
+		finishErrByJobID: map[string]error{
+			"job-1": errors.New("finish failed"),
+		},
+	}
+	licenses := newStubDispatchLicenseManager()
+	worker := NewGitHubDispatchWorker(
+		env.cfg,
+		env.dagStore,
+		env.dagRuns,
+		env.queue,
+		&env.runMgr,
+		licenses,
+		client,
+		tracker,
+		nil,
+	)
+
+	for _, jobID := range []string{"job-1", "job-2"} {
+		err := worker.processJob(env.ctx, licenses.creds(), license.GitHubDispatchJob{
+			ID:      jobID,
+			DAGName: env.dag.Name,
+			Payload: []byte(`{}`),
+			Headers: []byte(`{}`),
+		})
+		require.NoError(t, err)
+
+		attempt, err := env.dagRuns.FindAttempt(env.ctx, coreexec.NewDAGRunRef(env.dag.Name, jobID))
+		require.NoError(t, err)
+		status, err := attempt.ReadStatus(env.ctx)
+		require.NoError(t, err)
+		status.Status = core.Succeeded
+		require.NoError(t, attempt.Open(env.ctx))
+		require.NoError(t, attempt.Write(env.ctx, *status))
+		require.NoError(t, attempt.Close(env.ctx))
+	}
+
+	err := worker.reportTrackedJobs(env.ctx, licenses.creds())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "job-1")
+
+	require.Len(t, client.finishes, 2)
+	assert.Equal(t, "job-1", client.finishes[0].jobID)
+	assert.Equal(t, "job-2", client.finishes[1].jobID)
+
+	tracked, err := tracker.List()
+	require.NoError(t, err)
+	require.Len(t, tracked, 1)
+	assert.Equal(t, "job-1", tracked[0].JobID)
 }
 
 func TestGitHubDispatchWorker_CredentialsEnabledWithoutGitHubFeature(t *testing.T) {
@@ -369,8 +433,11 @@ func newDispatchTestEnv(t *testing.T, dagName string) dispatchTestEnv {
 }
 
 type stubDispatchClient struct {
-	accepts  []dispatchAcceptCall
-	finishes []dispatchFinishCall
+	accepts          []dispatchAcceptCall
+	finishes         []dispatchFinishCall
+	acceptErr        error
+	finishErr        error
+	finishErrByJobID map[string]error
 }
 
 type dispatchAcceptCall struct {
@@ -389,12 +456,15 @@ func (s *stubDispatchClient) PullGitHubDispatch(context.Context, license.PullGit
 
 func (s *stubDispatchClient) AcceptGitHubDispatch(_ context.Context, jobID string, req license.AcceptGitHubDispatchRequest) error {
 	s.accepts = append(s.accepts, dispatchAcceptCall{jobID: jobID, req: req})
-	return nil
+	return s.acceptErr
 }
 
 func (s *stubDispatchClient) FinishGitHubDispatch(_ context.Context, jobID string, req license.FinishGitHubDispatchRequest) error {
 	s.finishes = append(s.finishes, dispatchFinishCall{jobID: jobID, req: req})
-	return nil
+	if err, ok := s.finishErrByJobID[jobID]; ok {
+		return err
+	}
+	return s.finishErr
 }
 
 type loopDispatchClient struct {
