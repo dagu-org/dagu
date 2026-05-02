@@ -42,6 +42,20 @@ func executionStatusTimeout() time.Duration {
 	}
 }
 
+func artifactExecutionStatusTimeout() time.Duration {
+	switch {
+	case runtime.GOOS == "windows" && raceEnabled():
+		return 60 * time.Second
+	case runtime.GOOS == "windows":
+		// Shared-nothing artifact persistence has to archive worker output and
+		// stream it back to the coordinator, which is materially slower on the
+		// GitHub-hosted Windows runners than ordinary distributed execution.
+		return 45 * time.Second
+	default:
+		return 20 * time.Second
+	}
+}
+
 func artifactStepShellYAML() string {
 	if runtime.GOOS == "windows" {
 		return "    shell: powershell\n"
@@ -115,7 +129,7 @@ steps:
 		f.waitForQueued()
 		f.startScheduler(30 * time.Second)
 
-		status := f.waitForStatus(core.Succeeded, executionStatusTimeout())
+		status := f.waitForStatus(core.Succeeded, artifactExecutionStatusTimeout())
 
 		require.Equal(t, core.Succeeded, status.Status)
 		require.Len(t, status.Nodes, 2)
@@ -239,7 +253,7 @@ steps:
 		f.waitForQueued()
 		f.startScheduler(30 * time.Second)
 
-		status := f.waitForStatus(core.Failed, executionStatusTimeout())
+		status := f.waitForStatus(core.Failed, artifactExecutionStatusTimeout())
 
 		require.Equal(t, core.Failed, status.Status)
 		require.NotEmpty(t, status.ArchiveDir)
@@ -266,7 +280,7 @@ steps:
 		f.waitForQueued()
 		f.startScheduler(30 * time.Second)
 
-		status := f.waitForStatus(core.Succeeded, executionStatusTimeout())
+		status := f.waitForStatus(core.Succeeded, artifactExecutionStatusTimeout())
 
 		require.Equal(t, core.Succeeded, status.Status)
 		require.NotEmpty(t, status.ArchiveDir)
@@ -296,7 +310,7 @@ steps:
 		f.waitForQueued()
 		f.startScheduler(30 * time.Second)
 
-		status := f.waitForStatus(core.Succeeded, executionStatusTimeout())
+		status := f.waitForStatus(core.Succeeded, artifactExecutionStatusTimeout())
 
 		require.Equal(t, core.Succeeded, status.Status)
 		require.NotEmpty(t, status.ArchiveDir)
@@ -323,7 +337,7 @@ steps:
 		f.waitForQueued()
 		f.startScheduler(30 * time.Second)
 
-		status := f.waitForStatus(core.Succeeded, executionStatusTimeout())
+		status := f.waitForStatus(core.Succeeded, artifactExecutionStatusTimeout())
 		require.Equal(t, core.Succeeded, status.Status)
 
 		stream, err := f.coordinatorClient.StreamArtifacts(f.coord.Context)
