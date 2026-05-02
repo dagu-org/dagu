@@ -17,3 +17,11 @@ type ActivationStore interface {
 	Save(data *ActivationData) error
 	Remove() error
 }
+
+// CloudMachineCredentials are the machine-authenticated credentials used for
+// control-plane calls from Dagu to Dagu Cloud.
+type CloudMachineCredentials struct {
+	LicenseID       string
+	ServerID        string
+	HeartbeatSecret string
+}

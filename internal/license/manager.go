@@ -77,6 +77,34 @@ func (m *Manager) ActivationData() (*ActivationData, error) {
 	return m.store.Load()
 }
 
+// CloudMachineCredentials returns the canonical machine-authenticated
+// credential tuple for Cloud control-plane APIs. A nil result means the
+// current license source does not support machine-authenticated Cloud calls.
+func (m *Manager) CloudMachineCredentials() (*CloudMachineCredentials, error) {
+	if m == nil {
+		return nil, nil
+	}
+
+	claims := m.state.Claims()
+	if claims == nil || claims.ID == "" {
+		return nil, nil
+	}
+
+	activation, err := m.ActivationData()
+	if err != nil {
+		return nil, err
+	}
+	if activation == nil || activation.ServerID == "" || activation.HeartbeatSecret == "" {
+		return nil, nil
+	}
+
+	return &CloudMachineCredentials{
+		LicenseID:       claims.ID,
+		ServerID:        activation.ServerID,
+		HeartbeatSecret: activation.HeartbeatSecret,
+	}, nil
+}
+
 // Source returns the discovery source of the current license.
 func (m *Manager) Source() DiscoverySource {
 	return m.source

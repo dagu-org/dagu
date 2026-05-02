@@ -44,8 +44,7 @@ type githubDispatchTracker interface {
 }
 
 type githubDispatchLicenseManager interface {
-	Checker() license.Checker
-	ActivationData() (*license.ActivationData, error)
+	CloudMachineCredentials() (*license.CloudMachineCredentials, error)
 }
 
 type githubDispatchRunner interface {
@@ -132,28 +131,18 @@ func (w *githubDispatchWorker) credentials() (githubDispatchCredentials, bool, e
 		return githubDispatchCredentials{}, false, nil
 	}
 
-	checker := w.licenses.Checker()
-	if checker == nil || checker.IsCommunity() {
-		return githubDispatchCredentials{}, false, nil
-	}
-
-	claims := checker.Claims()
-	if claims == nil || claims.ID == "" {
-		return githubDispatchCredentials{}, false, nil
-	}
-
-	activation, err := w.licenses.ActivationData()
+	cloudCreds, err := w.licenses.CloudMachineCredentials()
 	if err != nil {
-		return githubDispatchCredentials{}, false, fmt.Errorf("load activation data: %w", err)
+		return githubDispatchCredentials{}, false, fmt.Errorf("load cloud machine credentials: %w", err)
 	}
-	if activation == nil || activation.ServerID == "" || activation.HeartbeatSecret == "" {
+	if cloudCreds == nil || cloudCreds.LicenseID == "" || cloudCreds.ServerID == "" || cloudCreds.HeartbeatSecret == "" {
 		return githubDispatchCredentials{}, false, nil
 	}
 
 	return githubDispatchCredentials{
-		licenseID: claims.ID,
-		serverID:  activation.ServerID,
-		secret:    activation.HeartbeatSecret,
+		licenseID: cloudCreds.LicenseID,
+		serverID:  cloudCreds.ServerID,
+		secret:    cloudCreds.HeartbeatSecret,
 	}, true, nil
 }
 

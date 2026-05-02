@@ -5,7 +5,6 @@ package scheduler
 
 import (
 	"context"
-	"errors"
 	"os"
 	"path/filepath"
 	"sync"
@@ -23,7 +22,6 @@ import (
 	"github.com/dagucloud/dagu/internal/persis/fileproc"
 	"github.com/dagucloud/dagu/internal/persis/filequeue"
 	"github.com/dagucloud/dagu/internal/runtime"
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -411,46 +409,26 @@ func (l *loopDispatchClient) PullGitHubDispatch(context.Context, license.PullGit
 }
 
 type stubDispatchLicenseManager struct {
-	checker *license.State
+	cloudCreds *license.CloudMachineCredentials
+	err        error
 }
 
 func newStubDispatchLicenseManager() *stubDispatchLicenseManager {
-	checker := &license.State{}
-	checker.Update(&license.LicenseClaims{
-		RegisteredClaims: jwt.RegisteredClaims{
-			Subject: "tenant-1",
-			ID:      "lic-1",
+	return &stubDispatchLicenseManager{
+		cloudCreds: &license.CloudMachineCredentials{
+			LicenseID:       "lic-1",
+			ServerID:        "srv-1",
+			HeartbeatSecret: "secret-1",
 		},
-		Features:         []string{license.FeatureAudit},
-	}, "token")
-	return &stubDispatchLicenseManager{checker: checker}
+	}
 }
 
-func (s *stubDispatchLicenseManager) Checker() license.Checker {
-	return s.checker
-}
-
-func (s *stubDispatchLicenseManager) ActivationData() (*license.ActivationData, error) {
-	return &license.ActivationData{
-		ServerID:        "srv-1",
-		HeartbeatSecret: "secret-1",
-	}, nil
+func (s *stubDispatchLicenseManager) CloudMachineCredentials() (*license.CloudMachineCredentials, error) {
+	return s.cloudCreds, s.err
 }
 
 func (s *stubDispatchLicenseManager) creds() githubDispatchCredentials {
 	return githubDispatchCredentials{licenseID: "lic-1", serverID: "srv-1", secret: "secret-1"}
-}
-
-type disabledDispatchLicenseManager struct {
-	checker license.Checker
-}
-
-func (d *disabledDispatchLicenseManager) Checker() license.Checker {
-	return d.checker
-}
-
-func (d *disabledDispatchLicenseManager) ActivationData() (*license.ActivationData, error) {
-	return nil, errors.New("should not be called")
 }
 
 type stubDispatchRuntimeManager struct {

@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -174,6 +175,51 @@ func TestManager_ActivationData(t *testing.T) {
 		data, err := m.ActivationData()
 		require.NoError(t, err)
 		assert.Nil(t, data)
+	})
+}
+
+func TestManager_CloudMachineCredentials(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns license id from claims id rather than tenant subject", func(t *testing.T) {
+		t.Parallel()
+
+		pub, _ := testKeyPair(t)
+		store := &mockActivationStore{data: &ActivationData{
+			ServerID:        "srv-1",
+			HeartbeatSecret: "hb-secret-1",
+		}}
+		m := NewManager(ManagerConfig{LicenseDir: t.TempDir()}, pub, store, slog.Default())
+		m.state.Update(&LicenseClaims{
+			RegisteredClaims: jwt.RegisteredClaims{
+				Subject: "tenant-1",
+				ID:      "lic-1",
+			},
+		}, "token")
+
+		creds, err := m.CloudMachineCredentials()
+		require.NoError(t, err)
+		require.NotNil(t, creds)
+		assert.Equal(t, "lic-1", creds.LicenseID)
+		assert.Equal(t, "srv-1", creds.ServerID)
+		assert.Equal(t, "hb-secret-1", creds.HeartbeatSecret)
+	})
+
+	t.Run("returns nil when no machine activation data exists", func(t *testing.T) {
+		t.Parallel()
+
+		pub, _ := testKeyPair(t)
+		m := NewManager(ManagerConfig{LicenseDir: t.TempDir()}, pub, &mockActivationStore{}, slog.Default())
+		m.state.Update(&LicenseClaims{
+			RegisteredClaims: jwt.RegisteredClaims{
+				Subject: "tenant-1",
+				ID:      "lic-1",
+			},
+		}, "token")
+
+		creds, err := m.CloudMachineCredentials()
+		require.NoError(t, err)
+		assert.Nil(t, creds)
 	})
 }
 
