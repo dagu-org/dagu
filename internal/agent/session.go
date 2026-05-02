@@ -1004,18 +1004,29 @@ func (sm *SessionManager) appendMessage(msg Message) int64 {
 // createEmitUIActionFunc returns a function for emitting UI actions.
 func (sm *SessionManager) createEmitUIActionFunc() UIActionFunc {
 	return func(action UIAction) {
-		seqID := sm.nextSequenceID()
+		sm.mu.Lock()
+		sm.sequenceID++
+		seqID := sm.sequenceID
+		msg := Message{
+			ID:         fmt.Sprintf("ui-%d", seqID),
+			SessionID:  sm.id,
+			Type:       MessageTypeUIAction,
+			SequenceID: seqID,
+			UIAction:   &action,
+			CreatedAt:  time.Now(),
+		}
+		sm.messages = append(sm.messages, msg)
+		sm.mu.Unlock()
 
-		sm.subpub.Publish(seqID, StreamResponse{
-			Messages: []Message{{
-				ID:         fmt.Sprintf("ui-%d", seqID),
-				SessionID:  sm.id,
-				Type:       MessageTypeUIAction,
-				SequenceID: seqID,
-				UIAction:   &action,
-				CreatedAt:  time.Now(),
-			}},
+		sm.subpub.Publish(msg.SequenceID, StreamResponse{
+			Messages: []Message{msg},
 		})
+
+		if sm.onMessage != nil {
+			if err := sm.onMessage(context.Background(), msg); err != nil {
+				sm.logger.Warn("failed to persist ui action message", "error", err)
+			}
+		}
 	}
 }
 

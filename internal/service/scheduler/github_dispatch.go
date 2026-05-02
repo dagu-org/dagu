@@ -138,7 +138,7 @@ func (w *githubDispatchWorker) credentials() (githubDispatchCredentials, bool, e
 	}
 
 	claims := checker.Claims()
-	if claims == nil || claims.Subject == "" {
+	if claims == nil || claims.ID == "" {
 		return githubDispatchCredentials{}, false, nil
 	}
 
@@ -151,7 +151,7 @@ func (w *githubDispatchWorker) credentials() (githubDispatchCredentials, bool, e
 	}
 
 	return githubDispatchCredentials{
-		licenseID: claims.Subject,
+		licenseID: claims.ID,
 		serverID:  activation.ServerID,
 		secret:    activation.HeartbeatSecret,
 	}, true, nil

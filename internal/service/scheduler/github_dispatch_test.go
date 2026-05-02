@@ -417,7 +417,10 @@ type stubDispatchLicenseManager struct {
 func newStubDispatchLicenseManager() *stubDispatchLicenseManager {
 	checker := &license.State{}
 	checker.Update(&license.LicenseClaims{
-		RegisteredClaims: jwt.RegisteredClaims{Subject: "lic-1"},
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject: "tenant-1",
+			ID:      "lic-1",
+		},
 		Features:         []string{license.FeatureAudit},
 	}, "token")
 	return &stubDispatchLicenseManager{checker: checker}

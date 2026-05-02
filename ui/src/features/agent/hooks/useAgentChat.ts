@@ -221,6 +221,9 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
   } = useAgentChatContext();
 
   const selectGenRef = useRef(0);
+  const handledUIActionIdsRef = useRef<Set<string>>(new Set());
+  const hydratedUIActionsRef = useRef(false);
+  const allowInitialUIActionsRef = useRef(false);
   const [isSending, setIsSending] = useState(false);
   const [optimisticWorking, setOptimisticWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -254,77 +257,127 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
     [openDelegateSessionIds]
   );
 
-  const applySessionSnapshot = useCallback((snapshot: StreamResponse) => {
-    const nextMessages = snapshot.messages || [];
-    if (
-      pendingUserMessage &&
-      nextMessages.some((message) => message.type === 'user')
-    ) {
-      setPendingUserMessage(null);
+  useEffect(() => {
+    handledUIActionIdsRef.current = new Set();
+    hydratedUIActionsRef.current = false;
+    if (!sessionId) {
+      allowInitialUIActionsRef.current = false;
     }
+  }, [sessionId]);
 
-    setMessages(nextMessages);
-    if (snapshot.session_state) {
-      setOptimisticWorking(false);
-      setSessionState(snapshot.session_state);
-    }
-
-    reconcileDelegateSnapshots(snapshot.delegates || []);
-  }, [
-    pendingUserMessage,
-    setPendingUserMessage,
-    setMessages,
-    setSessionState,
-    reconcileDelegateSnapshots,
-  ]);
-
-  const applySessionEvent = useCallback((event: StreamResponse, replace = false) => {
-    if (replace) {
-      applySessionSnapshot(event);
+  useEffect(() => {
+    if (!sessionId) {
       return;
     }
 
-    if (event.messages && event.messages.length > 0) {
+    const navigateMessages = messages.filter(
+      (message) =>
+        message.session_id === sessionId &&
+        message.type === 'ui_action' &&
+        message.ui_action?.type === 'navigate'
+    );
+
+    if (!hydratedUIActionsRef.current) {
+      hydratedUIActionsRef.current = true;
+      const shouldReplayExistingActions = allowInitialUIActionsRef.current;
+      allowInitialUIActionsRef.current = false;
+
+      if (!shouldReplayExistingActions) {
+        for (const message of navigateMessages) {
+          handledUIActionIdsRef.current.add(message.id);
+        }
+        return;
+      }
+    }
+
+    for (const message of navigateMessages) {
+      if (handledUIActionIdsRef.current.has(message.id)) {
+        continue;
+      }
+      handledUIActionIdsRef.current.add(message.id);
+      if (message.ui_action?.path) {
+        navigate(message.ui_action.path);
+      }
+    }
+  }, [messages, navigate, sessionId]);
+
+  const applySessionSnapshot = useCallback(
+    (snapshot: StreamResponse) => {
+      const nextMessages = snapshot.messages || [];
       if (
         pendingUserMessage &&
-        event.messages.some((message) => message.type === 'user')
+        nextMessages.some((message) => message.type === 'user')
       ) {
         setPendingUserMessage(null);
       }
 
-      setMessages((current) => mergeMessages(current, event.messages || []));
-    }
+      setMessages(nextMessages);
+      if (snapshot.session_state) {
+        setOptimisticWorking(false);
+        setSessionState(snapshot.session_state);
+      }
 
-    // Only clear the pending message once the actual user message appears in
-    // the stream. Previously this also cleared on working=true, but that
-    // caused the pending bubble to vanish before the real message arrived.
+      reconcileDelegateSnapshots(snapshot.delegates || []);
+    },
+    [
+      pendingUserMessage,
+      setPendingUserMessage,
+      setMessages,
+      setSessionState,
+      reconcileDelegateSnapshots,
+    ]
+  );
 
-    if (event.session_state) {
-      setOptimisticWorking(false);
-      setSessionState(event.session_state);
-    }
+  const applySessionEvent = useCallback(
+    (event: StreamResponse, replace = false) => {
+      if (replace) {
+        applySessionSnapshot(event);
+        return;
+      }
 
-    if (event.delegates) {
-      reconcileDelegateSnapshots(event.delegates);
-    }
+      if (event.messages && event.messages.length > 0) {
+        if (
+          pendingUserMessage &&
+          event.messages.some((message) => message.type === 'user')
+        ) {
+          setPendingUserMessage(null);
+        }
 
-    if (event.delegate_event) {
-      handleDelegateEvent(event.delegate_event);
-    }
+        setMessages((current) => mergeMessages(current, event.messages || []));
+      }
 
-    if (event.delegate_messages) {
-      handleDelegateMessages(event.delegate_messages);
-    }
-  }, [
-    applySessionSnapshot,
-    pendingUserMessage,
-    setPendingUserMessage,
-    setMessages,
-    setSessionState,
-    reconcileDelegateSnapshots,
-    handleDelegateEvent,
-    handleDelegateMessages,
-  ]);
+      // Only clear the pending message once the actual user message appears in
+      // the stream. Previously this also cleared on working=true, but that
+      // caused the pending bubble to vanish before the real message arrived.
+
+      if (event.session_state) {
+        setOptimisticWorking(false);
+        setSessionState(event.session_state);
+      }
+
+      if (event.delegates) {
+        reconcileDelegateSnapshots(event.delegates);
+      }
+
+      if (event.delegate_event) {
+        handleDelegateEvent(event.delegate_event);
+      }
+
+      if (event.delegate_messages) {
+        handleDelegateMessages(event.delegate_messages);
+      }
+    },
+    [
+      applySessionSnapshot,
+      pendingUserMessage,
+      setPendingUserMessage,
+      setMessages,
+      setSessionState,
+      reconcileDelegateSnapshots,
+      handleDelegateEvent,
+      handleDelegateMessages,
+    ]
+  );
 
   const delegateStatusesRef = useRef(delegateStatuses);
   delegateStatusesRef.current = delegateStatuses;
@@ -430,7 +483,12 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
         clearTimeout(nextPollTimeout);
       }
     };
-  }, [isActive, sessionId, sseStatus.isSessionLive, sortedOpenDelegateSessionIds]);
+  }, [
+    isActive,
+    sessionId,
+    sseStatus.isSessionLive,
+    sortedOpenDelegateSessionIds,
+  ]);
 
   const fetchSessionsPage = useCallback(
     async (page: number): Promise<void> => {
@@ -493,6 +551,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
       });
       if (apiError)
         throw new Error(apiError.message || 'Failed to create session');
+      allowInitialUIActionsRef.current = true;
       setSessionId(data.sessionId);
       await fetchSessionsPage(1);
       return data.sessionId;
@@ -611,6 +670,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
       // Set sessionId first so the old agent EventSource closes and frees
       // a connection slot. Without this, fetchSessionDetail would deadlock
       // waiting for a connection while the old SSE holds it.
+      allowInitialUIActionsRef.current = false;
       setSessionId(id);
       setAnsweredPrompts({});
       try {
@@ -624,12 +684,14 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
     [fetchSessionDetail, setSessionId, applySessionSnapshot]
   );
 
-  const isWorking = isSending || optimisticWorking || sessionState?.working || false;
+  const isWorking =
+    isSending || optimisticWorking || sessionState?.working || false;
 
   const clearError = useCallback(() => setError(null), []);
 
   const handleClearSession = useCallback(() => {
     selectGenRef.current++;
+    allowInitialUIActionsRef.current = false;
     clearSession();
     setOptimisticWorking(false);
     setAnsweredPrompts({});
