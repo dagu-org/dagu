@@ -195,6 +195,28 @@ func TestGitHubDispatchWorker_CredentialsEnabledWithoutGitHubFeature(t *testing.
 	assert.Equal(t, "lic-1", creds.licenseID)
 }
 
+func TestNewGitHubDispatchWorker_DefaultPollingIntervals(t *testing.T) {
+	t.Parallel()
+
+	env := newDispatchTestEnv(t, "github-default-intervals")
+	worker := NewGitHubDispatchWorker(
+		env.cfg,
+		env.dagStore,
+		env.dagRuns,
+		env.queue,
+		&env.runMgr,
+		newStubDispatchLicenseManager(),
+		&stubDispatchClient{},
+		filegithubdispatch.New(filepath.Join(t.TempDir(), "tracker")),
+		nil,
+	)
+
+	require.NotNil(t, worker)
+	assert.Equal(t, 10*time.Second, worker.idleDelay)
+	assert.Equal(t, 10*time.Second, worker.errDelay)
+	assert.Equal(t, 10*time.Second, worker.reportGap)
+}
+
 func TestGitHubDispatchWorker_StartRunsLoopsUntilContextCanceled(t *testing.T) {
 	t.Parallel()
 

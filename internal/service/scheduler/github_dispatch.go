@@ -26,9 +26,9 @@ import (
 const (
 	githubDispatchPendingAccept = "pending_accept"
 	githubDispatchAccepted      = "accepted"
-	githubDispatchIdleDelay     = 2 * time.Second
-	githubDispatchErrorDelay    = 5 * time.Second
-	githubDispatchReportDelay   = 2 * time.Second
+	githubDispatchIdleDelay     = 10 * time.Second
+	githubDispatchErrorDelay    = 10 * time.Second
+	githubDispatchReportDelay   = 10 * time.Second
 )
 
 type githubDispatchClient interface {
