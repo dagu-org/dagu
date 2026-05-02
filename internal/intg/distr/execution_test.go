@@ -129,7 +129,7 @@ steps:
 		f.waitForQueued()
 		f.startScheduler(30 * time.Second)
 
-		status := f.waitForStatus(core.Succeeded, artifactExecutionStatusTimeout())
+		status := f.waitForStatus(core.Succeeded, executionStatusTimeout())
 
 		require.Equal(t, core.Succeeded, status.Status)
 		require.Len(t, status.Nodes, 2)
@@ -226,7 +226,7 @@ steps:
 		f.waitForQueued()
 		f.startScheduler(30 * time.Second)
 
-		status := f.waitForStatus(core.Succeeded, executionStatusTimeout())
+		status := f.waitForStatus(core.Succeeded, artifactExecutionStatusTimeout())
 
 		require.Equal(t, core.Succeeded, status.Status)
 		require.NotEmpty(t, status.ArchiveDir)
