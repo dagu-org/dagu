@@ -832,6 +832,30 @@ func TestRunner(t *testing.T) {
 		result.assertNodeStatus(t, "2", core.NodeSucceeded)
 		result.assertNodeStatus(t, "3", core.NodeSucceeded)
 	})
+	t.Run("PreconditionUsesSameRuntimeManagedStepEnvAsCommand", func(t *testing.T) {
+		t.Parallel()
+
+		if windowsShellTest() {
+			t.Skip("Skipping Unix-specific env assertion on Windows")
+		}
+
+		r := setupRunner(t)
+
+		plan := r.newPlan(t,
+			newStep("1",
+				withCommand(`printf '%s' "$DAG_RUN_STEP_STDOUT_FILE"`),
+				withOutput("RESULT"),
+				withPrecondition(&core.Condition{
+					Condition: `test -n "$DAG_RUN_STEP_STDOUT_FILE"`,
+				}),
+			),
+		)
+
+		result := plan.assertRun(t, core.Succeeded)
+
+		result.assertNodeStatus(t, "1", core.NodeSucceeded)
+		assert.Equal(t, result.nodeByName(t, "1").GetStdout(), result.nodeByName(t, "1").OutputVariablesMap()["RESULT"])
+	})
 	t.Run("PreconditionWithCommandNotMet", func(t *testing.T) {
 		r := setupRunner(t)
 
@@ -3767,6 +3791,38 @@ func TestPushBackInputsExposeJSONHistoryEnvForRewoundStep(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "reviewer-b", second["by"])
 	assert.Equal(t, "2026-04-26T06:20:00Z", second["at"])
+}
+
+// TestPushBackPreconditionUsesSameEnvAsCommand verifies that rewound steps
+// evaluate preconditions with the same push-back env seen by the step command.
+func TestPushBackPreconditionUsesSameEnvAsCommand(t *testing.T) {
+	t.Parallel()
+
+	if windowsShellTest() {
+		t.Skip("Skipping Unix-specific env assertion on Windows")
+	}
+
+	r := setupRunner(t)
+	step := newStep("prepare",
+		withScript(`printf '%s' "$FEEDBACK"`),
+		withPrecondition(&core.Condition{
+			Condition: `test -n "$FEEDBACK"`,
+		}),
+	)
+
+	plan := r.newPlan(t, step)
+	node := plan.GetNodeByName("prepare")
+	require.NotNil(t, node)
+
+	node.SetApprovalIteration(1)
+	node.SetPushBackInputs(map[string]string{"FEEDBACK": "rerun from review"})
+
+	result := plan.assertRun(t, core.Succeeded)
+	result.assertNodeStatus(t, "prepare", core.NodeSucceeded)
+
+	output, err := os.ReadFile(result.nodeByName(t, "prepare").GetStdout())
+	require.NoError(t, err)
+	assert.Equal(t, "rerun from review", strings.TrimSpace(string(output)))
 }
 
 func TestWaitStep(t *testing.T) {
