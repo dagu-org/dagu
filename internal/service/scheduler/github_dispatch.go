@@ -336,13 +336,13 @@ func buildGitHubDispatchRuntimeParams(job license.GitHubDispatchJob) string {
 	}
 
 	extras := map[string]string{
-		"GITHUB_ACTOR":         job.ActorLogin,
-		"GITHUB_COMMAND":       job.Command,
-		"GITHUB_EVENT_ACTION":  job.EventAction,
-		"GITHUB_EVENT_NAME":    job.EventName,
-		"GITHUB_REF":           job.Ref,
-		"GITHUB_REPOSITORY":    job.RepositoryName,
-		"GITHUB_SHA":           job.SHA,
+		"GITHUB_ACTOR":        job.ActorLogin,
+		"GITHUB_COMMAND":      job.Command,
+		"GITHUB_EVENT_ACTION": job.EventAction,
+		"GITHUB_EVENT_NAME":   job.EventName,
+		"GITHUB_REF":          job.Ref,
+		"GITHUB_REPOSITORY":   job.RepositoryName,
+		"GITHUB_SHA":          job.SHA,
 	}
 	if job.PullRequestNumber > 0 {
 		extras["GITHUB_PR_NUMBER"] = strconv.FormatInt(job.PullRequestNumber, 10)
@@ -355,8 +355,8 @@ func buildGitHubDispatchRuntimeParams(job license.GitHubDispatchJob) string {
 	if err := json.Unmarshal(job.Payload, &body); err == nil {
 		if tagName := nestedDispatchString(body, "release", "tag_name"); tagName != "" {
 			extras["GITHUB_RELEASE_TAG"] = tagName
-		} else if strings.HasPrefix(job.Ref, "refs/tags/") {
-			extras["GITHUB_RELEASE_TAG"] = strings.TrimPrefix(job.Ref, "refs/tags/")
+		} else if after, ok := strings.CutPrefix(job.Ref, "refs/tags/"); ok {
+			extras["GITHUB_RELEASE_TAG"] = after
 		}
 
 		switch workflow := body["workflow"].(type) {

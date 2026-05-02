@@ -256,8 +256,7 @@ func TestScheduler_StartsGitHubDispatchWorker(t *testing.T) {
 	runner := &stubDispatchRunner{started: make(chan struct{}, 1)}
 	sc.SetGitHubDispatchWorker(runner)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- sc.Start(ctx)
@@ -279,14 +278,14 @@ func TestScheduler_StartsGitHubDispatchWorker(t *testing.T) {
 }
 
 type dispatchTestEnv struct {
-	ctx     context.Context
-	cfg     *config.Config
-	dag     *core.DAG
+	ctx      context.Context
+	cfg      *config.Config
+	dag      *core.DAG
 	dagStore coreexec.DAGStore
-	dagRuns coreexec.DAGRunStore
-	queue   coreexec.QueueStore
-	proc    coreexec.ProcStore
-	runMgr  runtime.Manager
+	dagRuns  coreexec.DAGRunStore
+	queue    coreexec.QueueStore
+	proc     coreexec.ProcStore
+	runMgr   runtime.Manager
 }
 
 func newDispatchTestEnv(t *testing.T, dagName string) dispatchTestEnv {
