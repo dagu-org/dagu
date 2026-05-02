@@ -434,44 +434,12 @@ func (r *Runner) runNodeExecution(ctx context.Context, plan *Plan, node *Node, p
 	}
 
 	ctx = spanCtx
+	ctx = r.setupNodeExecutionEnv(ctx, node)
 
 	// Check preconditions
 	logger.Debug(ctx, "Checking preconditions")
 	if !meetsPreconditions(ctx, node, progressCh) {
 		return
-	}
-
-	ctx = node.SetupEnv(ctx)
-
-	// Inject push-back inputs as environment variables for any step being
-	// re-executed within the rewound scope.
-	if node.State().ApprovalIteration > 0 {
-		state := node.State()
-		env := GetEnv(ctx)
-		approval := node.Step().Approval
-		var allowedInputs []string
-		if approval != nil {
-			allowedInputs = approval.Input
-		}
-		filteredInputs := exec.FilterPushBackInputs(allowedInputs, state.PushBackInputs)
-		for k, v := range filteredInputs {
-			env = env.WithEnvVars(k, v)
-		}
-		if approval != nil && len(filteredInputs) != len(state.PushBackInputs) {
-			for k := range state.PushBackInputs {
-				if _, ok := filteredInputs[k]; ok {
-					continue
-				}
-				logger.Warn(ctx, "Ignoring unexpected push-back input", slog.String("input", k))
-			}
-		}
-		payload, err := marshalPushBackPayload(allowedInputs, state)
-		if err != nil {
-			logger.Warn(ctx, "Failed to marshal push-back payload", tag.Error(err))
-		} else if payload != "" {
-			env = env.WithEnvVars(exec.EnvKeyDAGPushBack, payload)
-		}
-		ctx = WithEnv(ctx, env)
 	}
 
 	// Setup chat messages from dependencies before execution
@@ -547,6 +515,45 @@ ExecRepeat: // repeat execution
 	if progressCh != nil {
 		progressCh <- node
 	}
+}
+
+func (r *Runner) setupNodeExecutionEnv(ctx context.Context, node *Node) context.Context {
+	ctx = node.SetupEnv(ctx)
+
+	if node.State().ApprovalIteration == 0 {
+		return ctx
+	}
+
+	state := node.State()
+	env := GetEnv(ctx)
+	approval := node.Step().Approval
+	var allowedInputs []string
+	if approval != nil {
+		allowedInputs = approval.Input
+	}
+
+	filteredInputs := exec.FilterPushBackInputs(allowedInputs, state.PushBackInputs)
+	for k, v := range filteredInputs {
+		env = env.WithEnvVars(k, v)
+	}
+
+	if approval != nil && len(filteredInputs) != len(state.PushBackInputs) {
+		for k := range state.PushBackInputs {
+			if _, ok := filteredInputs[k]; ok {
+				continue
+			}
+			logger.Warn(ctx, "Ignoring unexpected push-back input", slog.String("input", k))
+		}
+	}
+
+	payload, err := marshalPushBackPayload(allowedInputs, state)
+	if err != nil {
+		logger.Warn(ctx, "Failed to marshal push-back payload", tag.Error(err))
+	} else if payload != "" {
+		env = env.WithEnvVars(exec.EnvKeyDAGPushBack, payload)
+	}
+
+	return WithEnv(ctx, env)
 }
 
 func (r *Runner) setLastError(err error) {
