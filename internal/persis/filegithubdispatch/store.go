@@ -139,13 +139,8 @@ func (s *Store) saveLocked(jobs map[string]TrackedJob) error {
 	if err := os.Rename(tmpName, finalPath); err != nil {
 		return fmt.Errorf("rename tracker temp file: %w", err)
 	}
-	dir, err := os.Open(s.dir)
-	if err != nil {
-		return fmt.Errorf("open tracker dir for sync: %w", err)
-	}
-	defer dir.Close() //nolint:errcheck
-	if err := dir.Sync(); err != nil {
-		return fmt.Errorf("sync tracker dir: %w", err)
+	if err := syncTrackerDir(s.dir); err != nil {
+		return err
 	}
 	return nil
 }
