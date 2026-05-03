@@ -58,8 +58,8 @@ jobs:
             "name": "test-package",
             "version": "1.0.0",
             "optionalDependencies": {
-              "@dagu-org/dagu-linux-x64": "1.0.0",
-              "@dagu-org/dagu-darwin-arm64": "1.0.0"
+              "@dagucloud/dagu-linux-x64": "1.0.0",
+              "@dagucloud/dagu-darwin-arm64": "1.0.0"
             }
           }
           EOF

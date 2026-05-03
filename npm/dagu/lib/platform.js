@@ -25,8 +25,6 @@ const PLATFORM_MAP = {
   "linux-ppc64": "dagu-linux-ppc64",
   "linux-s390x": "dagu-linux-s390x",
   "freebsd-arm64": "dagu-freebsd-arm64",
-  "freebsd-ia32": "dagu-freebsd-ia32",
-  "freebsd-arm": "dagu-freebsd-arm",
   "openbsd-x64": "dagu-openbsd-x64",
   "openbsd-arm64": "dagu-openbsd-arm64",
 };
@@ -117,7 +115,7 @@ function getBinaryPath() {
     try {
       // Try to resolve the binary using require.resolve (Sentry approach)
       const binaryPath = require.resolve(
-        `${platformPackage}/bin/${binaryName}`
+        `@dagucloud/${platformPackage}/bin/${binaryName}`
       );
       if (fs.existsSync(binaryPath)) {
         cachedBinaryPath = binaryPath;
@@ -129,7 +127,7 @@ function getBinaryPath() {
   }
 
   // Fallback to local binary in main package
-  const localBinary = path.join(__dirname, "..", "bin", binaryName);
+  const localBinary = path.join(__dirname, "..", binaryName);
   if (fs.existsSync(localBinary)) {
     cachedBinaryPath = localBinary;
     return localBinary;
@@ -160,7 +158,7 @@ function isPlatformSpecificPackageInstalled() {
 
   try {
     // Resolving will fail if the optionalDependency was not installed
-    require.resolve(`${platformPackage}/bin/${binaryName}`);
+    require.resolve(`@dagucloud/${platformPackage}/bin/${binaryName}`);
     return true;
   } catch (e) {
     return false;

@@ -84,6 +84,9 @@ async function downloadBinaryFromNpm() {
   });
   // Determine package name for this platform
   const platformSpecificPackageName = getPlatformPackage();
+  if (!platformSpecificPackageName) {
+    throw new Error(`Unsupported platform: ${process.platform}/${process.arch}`);
+  }
 
   const url = `https://registry.npmjs.org/@dagucloud/${platformSpecificPackageName}/-/${platformSpecificPackageName}-${PACKAGE_VERSION}.tgz`;
   console.log(`Downloading binary distribution package from ${url}...`);
@@ -109,6 +112,6 @@ if (!isPlatformSpecificPackageInstalled()) {
   downloadBinaryFromNpm();
 } else {
   console.log(
-    "Platform specific package already installed. Will fall back to manually downloading binary."
+    "Platform specific package already installed. Skipping manual binary download."
   );
 }

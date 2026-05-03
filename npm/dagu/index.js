@@ -13,9 +13,9 @@ const binaryName = process.platform === "win32" ? "dagu.exe" : "dagu";
 function getBinaryPath() {
   try {
     const platformSpecificPackageName = getPlatformPackage();
-    return require.resolve(`${platformSpecificPackageName}/bin/${binaryName}`);
+    return require.resolve(`@dagucloud/${platformSpecificPackageName}/bin/${binaryName}`);
   } catch (e) {
-    return path.join(__dirname, "..", binaryName);
+    return path.join(__dirname, binaryName);
   }
 }
 
