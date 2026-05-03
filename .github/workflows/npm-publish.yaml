@@ -202,15 +202,16 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           cd "npm/${PACKAGE_NAME}"
-          # Try to publish, but don't fail if version already exists
-          npm publish --access public --provenance 2>&1 | tee publish.log || {
+          set -o pipefail
+
+          # Try to publish, but don't fail if version already exists.
+          if ! npm publish --access public --provenance 2>&1 | tee publish.log; then
             if grep -q "cannot publish over the previously published versions" publish.log; then
               echo "Version already published, skipping..."
               exit 0
-            else
-              exit 1
             fi
-          }
+            exit 1
+          fi
         continue-on-error: ${{ matrix.arch == 'ppc64' || matrix.arch == 's390x' || matrix.arch == 'armv6' }}
 
   # Then publish the main package that depends on platform packages
@@ -267,15 +268,16 @@ jobs:
       - name: Publish main package
         run: |
           cd npm/dagu
-          # Try to publish, but don't fail if version already exists
-          npm publish --access public --provenance 2>&1 | tee publish.log || {
+          set -o pipefail
+
+          # Try to publish, but don't fail if version already exists.
+          if ! npm publish --access public --provenance 2>&1 | tee publish.log; then
             if grep -q "cannot publish over the previously published versions" publish.log; then
               echo "Version already published, skipping..."
               exit 0
-            else
-              exit 1
             fi
-          }
+            exit 1
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -306,14 +308,22 @@ jobs:
         run: |
           # Wait for package to be available with retries
           echo "Checking npm package availability..."
+          PKG_VERSION="${VERSION#v}"
+          available=false
           for i in {1..30}; do
-            if npm view @dagucloud/dagu version 2>/dev/null; then
+            if npm view "@dagucloud/dagu@${PKG_VERSION}" version 2>/dev/null; then
               echo "Package is available!"
+              available=true
               break
             fi
             echo "Attempt $i/30: Package not yet available, waiting 10 seconds..."
             sleep 10
           done
+
+          if [ "$available" != "true" ]; then
+            echo "::error::Package @dagucloud/dagu@${PKG_VERSION} was not available after 30 attempts"
+            exit 1
+          fi
 
       - name: Test installation
         run: |
