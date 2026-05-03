@@ -8,13 +8,15 @@
 ## Installation
 
 ```bash
-npm install -g @dagucloud/dagu
+npm install -g --ignore-scripts=false @dagucloud/dagu
 ```
+
+`--ignore-scripts=false` ensures npm runs the postinstall script that downloads the Dagu binary.
 
 Or add to your project:
 
 ```bash
-npm install @dagucloud/dagu
+npm install --ignore-scripts=false @dagucloud/dagu
 ```
 
 ## Usage
