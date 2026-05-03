@@ -382,13 +382,16 @@ func convertMessages(messages []llm.Message) (instructions string, input []any) 
 			}
 			for _, tc := range msg.ToolCalls {
 				callID, itemID := splitToolCallID(tc.ID)
-				input = append(input, map[string]any{
+				toolCall := map[string]any{
 					"type":      "function_call",
-					"id":        itemID,
 					"call_id":   callID,
 					"name":      tc.Function.Name,
 					"arguments": defaultJSON(tc.Function.Arguments),
-				})
+				}
+				if itemID != "" {
+					toolCall["id"] = itemID
+				}
+				input = append(input, toolCall)
 			}
 		case llm.RoleTool:
 			callID, _ := splitToolCallID(msg.ToolCallID)

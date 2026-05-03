@@ -1704,3 +1704,34 @@ func TestSessionManager_EmitUserPrompt_ForcesFreeText(t *testing.T) {
 		assert.False(t, msgs[0].UserPrompt.AllowFreeText, "approval prompts should not force free text")
 	})
 }
+
+func TestSessionManager_EmitUIAction_PersistsInHistory(t *testing.T) {
+	t.Parallel()
+
+	var persisted []Message
+	sm := NewSessionManager(SessionManagerConfig{
+		ID: "ui-action-test",
+		OnMessage: func(_ context.Context, msg Message) error {
+			persisted = append(persisted, msg)
+			return nil
+		},
+	})
+
+	emitFn := sm.createEmitUIActionFunc()
+	emitFn(UIAction{
+		Type: UIActionNavigate,
+		Path: "/dags/github_webhook_codex_analysis",
+	})
+
+	msgs := sm.GetMessages()
+	require.Len(t, msgs, 1)
+	assert.Equal(t, MessageTypeUIAction, msgs[0].Type)
+	require.NotNil(t, msgs[0].UIAction)
+	assert.Equal(t, UIActionNavigate, msgs[0].UIAction.Type)
+	assert.Equal(t, "/dags/github_webhook_codex_analysis", msgs[0].UIAction.Path)
+
+	require.Len(t, persisted, 1)
+	assert.Equal(t, MessageTypeUIAction, persisted[0].Type)
+	require.NotNil(t, persisted[0].UIAction)
+	assert.Equal(t, "/dags/github_webhook_codex_analysis", persisted[0].UIAction.Path)
+}

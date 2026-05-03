@@ -51,6 +51,39 @@ func TestConvertMessages(t *testing.T) {
 	assert.Equal(t, "function_call_output", input[3].(map[string]any)["type"])
 }
 
+func TestConvertMessages_OmitsEmptyFunctionCallItemID(t *testing.T) {
+	t.Parallel()
+
+	_, input := convertMessages([]llm.Message{
+		{Role: llm.RoleUser, Content: "hello"},
+		{
+			Role: llm.RoleAssistant,
+			ToolCalls: []llm.ToolCall{{
+				ID:   "call-1",
+				Type: "function",
+				Function: llm.ToolCallFunction{
+					Name:      "lookup",
+					Arguments: `{"city":"tokyo"}`,
+				},
+			}},
+		},
+		{Role: llm.RoleTool, ToolCallID: "call-1", Content: "sunny"},
+	})
+
+	require.Len(t, input, 3)
+	toolCall, ok := input[1].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "function_call", toolCall["type"])
+	assert.Equal(t, "call-1", toolCall["call_id"])
+	_, hasItemID := toolCall["id"]
+	assert.False(t, hasItemID)
+
+	toolResult, ok := input[2].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "function_call_output", toolResult["type"])
+	assert.Equal(t, "call-1", toolResult["call_id"])
+}
+
 func TestStreamResponse_CollectsTextToolCallsAndUsage(t *testing.T) {
 	t.Parallel()
 
