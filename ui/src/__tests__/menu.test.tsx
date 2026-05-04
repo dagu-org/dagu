@@ -97,7 +97,8 @@ const config: Config = {
 
 function renderMenu(
   initialEntry = '/cockpit',
-  configOverride: Partial<Config> = {}
+  configOverride: Partial<Config> = {},
+  appBarOverride: Partial<React.ContextType<typeof AppBarContext>> = {}
 ): void {
   render(
     <MemoryRouter initialEntries={[initialEntry]}>
@@ -116,6 +117,7 @@ function renderMenu(
             selectWorkspace: vi.fn(),
             createWorkspace: vi.fn(),
             deleteWorkspace: vi.fn(),
+            ...appBarOverride,
           }}
         >
           <MainListItems isOpen />
@@ -139,6 +141,29 @@ beforeEach(() => {
 });
 
 describe('sidebar menu', () => {
+  it('hides the remote node selector when local is the only option', () => {
+    renderMenu('/cockpit', {}, { remoteNodes: ['local'] });
+
+    expect(
+      screen.queryByRole('combobox', { name: /remote node/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the remote node selector when another node is available', () => {
+    renderMenu(
+      '/cockpit',
+      {},
+      {
+        remoteNodes: ['local', 'worker-a'],
+        selectedRemoteNode: 'worker-a',
+      }
+    );
+
+    expect(
+      screen.getByRole('combobox', { name: /remote node/i })
+    ).toHaveTextContent('worker-a');
+  });
+
   it('renders top-level operational sections as collapsed accordions', () => {
     renderMenu();
 

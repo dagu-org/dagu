@@ -90,6 +90,10 @@ const sidebarItemActiveClassName = cn(
   'bg-sidebar-active shadow-[inset_3px_0_0_0_var(--sidebar-primary),inset_0_0_0_1px_var(--sidebar-border)]'
 );
 
+function uniqueRemoteNodes(nodes: string[]): string[] {
+  return [...new Set(nodes.map((node) => node.trim()).filter(Boolean))];
+}
+
 type RemoteNodeSelectContentProps = {
   nodes: string[];
 };
@@ -97,7 +101,7 @@ type RemoteNodeSelectContentProps = {
 function RemoteNodeSelectContent({
   nodes,
 }: RemoteNodeSelectContentProps): React.ReactElement {
-  const uniqueNodes = [...new Set(nodes)];
+  const uniqueNodes = uniqueRemoteNodes(nodes);
   return (
     <SelectContent>
       {uniqueNodes.map((node) => (
@@ -539,7 +543,8 @@ export const mainListItems = React.forwardRef<
               createWorkspace,
               deleteWorkspace,
             } = context;
-            if (!remoteNodes || remoteNodes.length === 0) return null;
+            const selectableRemoteNodes = uniqueRemoteNodes(remoteNodes ?? []);
+            if (selectableRemoteNodes.length === 0) return null;
 
             return (
               <div className="space-y-2">
@@ -557,48 +562,50 @@ export const mainListItems = React.forwardRef<
                   variant="sidebar"
                   collapsed={!isOpen}
                 />
-                <div className="px-1">
-                  <Select
-                    value={selectedRemoteNode}
-                    onValueChange={selectRemoteNode}
-                  >
-                    <SelectTrigger
-                      aria-label="Remote node"
-                      className={cn(
-                        'h-9 text-xs text-sidebar-foreground rounded-md',
-                        isOpen
-                          ? 'bg-sidebar-hover border-sidebar-border hover:bg-sidebar-active'
-                          : 'bg-transparent border-transparent hover:bg-sidebar-hover [&>svg:last-child]:hidden'
-                      )}
-                      style={{
-                        transition:
-                          'width 280ms cubic-bezier(0.4, 0, 0.2, 1), background-color 150ms ease, border-color 150ms ease, padding 280ms cubic-bezier(0.4, 0, 0.2, 1)',
-                        width: isOpen ? '100%' : '36px',
-                        paddingLeft: isOpen ? '12px' : '9px',
-                        paddingRight: isOpen ? '12px' : '9px',
-                      }}
+                {selectableRemoteNodes.length > 1 && (
+                  <div className="px-1">
+                    <Select
+                      value={selectedRemoteNode}
+                      onValueChange={selectRemoteNode}
                     >
-                      <div className="flex items-center gap-2">
-                        <Globe
-                          size={18}
-                          className="text-sidebar-foreground flex-shrink-0"
-                        />
-                        <span
-                          className="overflow-hidden whitespace-nowrap"
-                          style={{
-                            transition:
-                              'opacity 200ms cubic-bezier(0.4, 0, 0.2, 1), max-width 280ms cubic-bezier(0.4, 0, 0.2, 1)',
-                            opacity: isOpen ? 1 : 0,
-                            maxWidth: isOpen ? '150px' : '0px',
-                          }}
-                        >
-                          <SelectValue />
-                        </span>
-                      </div>
-                    </SelectTrigger>
-                    <RemoteNodeSelectContent nodes={remoteNodes} />
-                  </Select>
-                </div>
+                      <SelectTrigger
+                        aria-label="Remote node"
+                        className={cn(
+                          'h-9 text-xs text-sidebar-foreground rounded-md',
+                          isOpen
+                            ? 'bg-sidebar-hover border-sidebar-border hover:bg-sidebar-active'
+                            : 'bg-transparent border-transparent hover:bg-sidebar-hover [&>svg:last-child]:hidden'
+                        )}
+                        style={{
+                          transition:
+                            'width 280ms cubic-bezier(0.4, 0, 0.2, 1), background-color 150ms ease, border-color 150ms ease, padding 280ms cubic-bezier(0.4, 0, 0.2, 1)',
+                          width: isOpen ? '100%' : '36px',
+                          paddingLeft: isOpen ? '12px' : '9px',
+                          paddingRight: isOpen ? '12px' : '9px',
+                        }}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Globe
+                            size={18}
+                            className="text-sidebar-foreground flex-shrink-0"
+                          />
+                          <span
+                            className="overflow-hidden whitespace-nowrap"
+                            style={{
+                              transition:
+                                'opacity 200ms cubic-bezier(0.4, 0, 0.2, 1), max-width 280ms cubic-bezier(0.4, 0, 0.2, 1)',
+                              opacity: isOpen ? 1 : 0,
+                              maxWidth: isOpen ? '150px' : '0px',
+                            }}
+                          >
+                            <SelectValue />
+                          </span>
+                        </div>
+                      </SelectTrigger>
+                      <RemoteNodeSelectContent nodes={selectableRemoteNodes} />
+                    </Select>
+                  </div>
+                )}
               </div>
             );
           }}
