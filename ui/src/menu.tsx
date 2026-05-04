@@ -23,28 +23,16 @@ import { defaultWorkspaceSelection } from '@/lib/workspace';
 import { UserRole } from '@/api/v1/schema';
 import {
   Activity,
-  BarChart2,
-  Bot,
-  Brain,
   ChevronDown,
-  FileCog,
-  FileText,
   Gauge,
-  Ghost,
   Shield,
-  GitBranch,
   Globe,
   History,
-  Inbox,
-  KeyRound,
   Moon,
   Network,
   PanelLeft,
-  ScrollText,
-  Search,
   Sun,
   Terminal,
-  Users,
   Webhook,
 } from 'lucide-react';
 import * as React from 'react';
@@ -56,11 +44,12 @@ import { WorkspaceSelector } from './components/workspace/WorkspaceSelector';
 
 type NavItemProps = {
   to: string;
-  icon: React.ReactNode;
+  icon?: React.ReactNode;
   text: string;
   isOpen: boolean;
   onClick?: () => void;
   customColor?: boolean;
+  activePaths?: string | string[];
 };
 
 type MainListItemsProps = {
@@ -120,36 +109,6 @@ function RemoteNodeSelectContent({
   );
 }
 
-type SectionLabelProps = {
-  label: string;
-  isOpen: boolean;
-  customColor?: boolean;
-};
-
-// Developer-tool Section Labels - Subtle & Professional
-function SectionLabel({
-  label,
-  isOpen,
-  customColor = false,
-}: SectionLabelProps): React.ReactElement {
-  return (
-    <div
-      className={cn(
-        'px-3 mb-2 mt-1 text-[11px] font-medium uppercase tracking-wide overflow-hidden whitespace-nowrap',
-        customColor ? 'text-sidebar-foreground' : 'text-sidebar-foreground/60'
-      )}
-      style={{
-        transition:
-          'opacity 200ms cubic-bezier(0.4, 0, 0.2, 1), max-height 250ms cubic-bezier(0.4, 0, 0.2, 1)',
-        opacity: isOpen ? 1 : 0,
-        maxHeight: isOpen ? '24px' : '0px',
-      }}
-    >
-      {label}
-    </div>
-  );
-}
-
 type SidebarButtonProps = {
   onClick: () => void;
   icon: React.ReactNode;
@@ -200,11 +159,12 @@ function NavItem({
   isOpen,
   onClick,
   customColor = false,
+  activePaths,
 }: NavItemProps): React.ReactElement {
   const location = useLocation();
-  const isActive =
-    location.pathname === to ||
-    (to !== '/' && location.pathname.startsWith(to + '/'));
+  const isActive = activePaths
+    ? isBasePathActive(location, activePaths)
+    : isNavTargetActive(location, to);
 
   const linkClassName = cn(
     'flex items-center rounded-md px-2 group relative',
@@ -238,7 +198,7 @@ function NavItem({
             style={{ transition: 'opacity 200ms ease' }}
           />
         )}
-        <div className={iconClassName}>{icon}</div>
+        {icon && <div className={iconClassName}>{icon}</div>}
         <span
           className={cn(
             'text-sm font-medium whitespace-nowrap overflow-hidden',
@@ -261,13 +221,54 @@ function NavItem({
 
 type NavGroupProps = {
   groupKey: string;
-  icon: React.ReactNode;
+  icon?: React.ReactNode;
   label: string;
   isOpen: boolean;
-  basePath: string;
+  basePath: string | string[];
+  to?: string;
+  onClick?: () => void;
   customColor?: boolean;
+  defaultExpanded?: boolean;
+  persistExpanded?: boolean;
+  unmountChildrenWhenCollapsed?: boolean;
   children: React.ReactNode;
 };
+
+function isNavTargetActive(
+  location: ReturnType<typeof useLocation>,
+  target: string
+): boolean {
+  const [targetPath, targetHash] = target.split('#');
+  if (targetHash) {
+    return (
+      location.pathname === targetPath && location.hash === `#${targetHash}`
+    );
+  }
+  return (
+    location.pathname === targetPath ||
+    (targetPath !== '/' && location.pathname.startsWith(targetPath + '/'))
+  );
+}
+
+function isBasePathActive(
+  location: ReturnType<typeof useLocation>,
+  basePath: string | string[]
+): boolean {
+  const paths = Array.isArray(basePath) ? basePath : [basePath];
+  return paths.some((path) => {
+    if (path.includes('#')) {
+      return isNavTargetActive(location, path);
+    }
+    if (path === '/') {
+      return location.pathname === '/';
+    }
+    return (
+      location.pathname === path ||
+      location.pathname.startsWith(path + '/') ||
+      (path.endsWith('-') && location.pathname.startsWith(path))
+    );
+  });
+}
 
 function NavGroup({
   groupKey,
@@ -275,21 +276,36 @@ function NavGroup({
   label,
   isOpen,
   basePath,
+  to,
+  onClick,
   customColor = false,
+  defaultExpanded = false,
+  persistExpanded = true,
+  unmountChildrenWhenCollapsed = false,
   children,
 }: NavGroupProps): React.ReactElement {
   const location = useLocation();
-  const isChildActive = location.pathname.startsWith(basePath);
+  const isChildActive = isBasePathActive(location, basePath);
+  const isGroupTargetActive = to ? isNavTargetActive(location, to) : false;
 
   const [isExpanded, setIsExpanded] = React.useState(() => {
     try {
-      return localStorage.getItem(`navgroup_expanded_${groupKey}`) === 'true';
+      if (persistExpanded) {
+        const stored = localStorage.getItem(`navgroup_expanded_${groupKey}`);
+        if (stored !== null) {
+          return stored === 'true';
+        }
+      }
     } catch {
-      return false;
+      /* ignore */
     }
+    return defaultExpanded;
   });
 
   React.useEffect(() => {
+    if (!persistExpanded) {
+      return;
+    }
     try {
       localStorage.setItem(
         `navgroup_expanded_${groupKey}`,
@@ -298,15 +314,11 @@ function NavGroup({
     } catch {
       /* ignore */
     }
-  }, [isExpanded, groupKey]);
+  }, [isExpanded, groupKey, persistExpanded]);
 
-  React.useEffect(() => {
-    if (isChildActive && !isExpanded) {
-      setIsExpanded(true);
-    }
-  }, [isChildActive]);
-
-  const effectivelyExpanded = isExpanded;
+  const effectivelyExpanded = isOpen && isExpanded;
+  const shouldRenderChildren =
+    !unmountChildrenWhenCollapsed || effectivelyExpanded;
 
   const headerClassName = cn(
     'flex items-center rounded-md px-2 group relative w-full',
@@ -322,67 +334,104 @@ function NavGroup({
     isChildActive ? getActiveIconStyle(customColor) : 'text-sidebar-foreground'
   );
 
+  const labelStyle = {
+    transition:
+      'opacity 200ms cubic-bezier(0.4, 0, 0.2, 1), transform 200ms cubic-bezier(0.4, 0, 0.2, 1), max-width 280ms cubic-bezier(0.4, 0, 0.2, 1)',
+    opacity: isOpen ? 1 : 0,
+    maxWidth: isOpen ? '180px' : '0px',
+    transform: isOpen ? 'translateX(0)' : 'translateX(-8px)',
+  };
+
+  const chevronStyle = {
+    transition:
+      'opacity 200ms cubic-bezier(0.4, 0, 0.2, 1), transform 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+    opacity: isOpen ? 0.6 : 0,
+    transform: effectivelyExpanded ? 'rotate(0deg)' : 'rotate(-90deg)',
+  };
+
+  const activeIndicator = isChildActive ? (
+    <div
+      className={cn(
+        'absolute left-0 w-[3px] h-6 rounded-r-sm',
+        getActiveIndicatorStyle()
+      )}
+      style={{ transition: 'opacity 200ms ease' }}
+    />
+  ) : null;
+
+  const labelNode = (
+    <>
+      {icon && <div className={iconClassName}>{icon}</div>}
+      <span
+        className={cn(
+          'text-sm font-medium whitespace-nowrap overflow-hidden',
+          isChildActive ? 'text-sidebar-foreground' : 'text-sidebar-foreground'
+        )}
+        style={labelStyle}
+      >
+        {label}
+      </span>
+    </>
+  );
+
   return (
     <div>
       <div className="px-1">
-        <button
-          onClick={() => setIsExpanded((prev) => !prev)}
-          className={headerClassName}
-          title={isOpen ? '' : label}
-          aria-expanded={effectivelyExpanded}
-        >
-          {isChildActive && (
-            <div
-              className={cn(
-                'absolute left-0 w-[3px] h-6 rounded-r-sm',
-                getActiveIndicatorStyle()
-              )}
-              style={{ transition: 'opacity 200ms ease' }}
-            />
-          )}
-          <div className={iconClassName}>{icon}</div>
-          <span
-            className={cn(
-              'text-sm font-medium whitespace-nowrap overflow-hidden',
-              isChildActive
-                ? 'text-sidebar-foreground'
-                : 'text-sidebar-foreground'
-            )}
-            style={{
-              transition:
-                'opacity 200ms cubic-bezier(0.4, 0, 0.2, 1), transform 200ms cubic-bezier(0.4, 0, 0.2, 1), max-width 280ms cubic-bezier(0.4, 0, 0.2, 1)',
-              opacity: isOpen ? 1 : 0,
-              maxWidth: isOpen ? '180px' : '0px',
-              transform: isOpen ? 'translateX(0)' : 'translateX(-8px)',
-            }}
-          >
-            {label}
-          </span>
+        {to ? (
           <div
-            className="ml-auto flex-shrink-0"
-            style={{
-              transition:
-                'opacity 200ms cubic-bezier(0.4, 0, 0.2, 1), transform 200ms cubic-bezier(0.4, 0, 0.2, 1)',
-              opacity: isOpen ? 0.6 : 0,
-              transform: effectivelyExpanded
-                ? 'rotate(0deg)'
-                : 'rotate(-90deg)',
-            }}
+            className={cn(headerClassName, 'gap-0 overflow-hidden px-0')}
+            title={isOpen ? '' : label}
           >
-            <ChevronDown size={14} />
+            {activeIndicator}
+            <Link
+              to={to}
+              onClick={onClick}
+              className="flex h-full min-w-0 flex-1 items-center gap-3 px-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring"
+              aria-current={isGroupTargetActive ? 'page' : undefined}
+            >
+              {labelNode}
+            </Link>
+            <button
+              type="button"
+              onClick={() => setIsExpanded((prev) => !prev)}
+              className="flex h-full w-8 flex-shrink-0 items-center justify-center focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring"
+              aria-expanded={effectivelyExpanded}
+              aria-label={`Toggle ${label} section`}
+            >
+              <div style={chevronStyle}>
+                <ChevronDown size={14} />
+              </div>
+            </button>
           </div>
-        </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setIsExpanded((prev) => !prev)}
+            className={headerClassName}
+            title={isOpen ? '' : label}
+            aria-expanded={effectivelyExpanded}
+            aria-label={`${label} section`}
+          >
+            {activeIndicator}
+            {labelNode}
+            <div className="ml-auto flex-shrink-0" style={chevronStyle}>
+              <ChevronDown size={14} />
+            </div>
+          </button>
+        )}
       </div>
       <div
         style={{
           transition:
             'max-height 250ms cubic-bezier(0.4, 0, 0.2, 1), opacity 200ms cubic-bezier(0.4, 0, 0.2, 1)',
-          maxHeight: effectivelyExpanded ? '200px' : '0px',
+          maxHeight: effectivelyExpanded ? '640px' : '0px',
           opacity: effectivelyExpanded ? 1 : 0,
           overflow: 'hidden',
         }}
       >
-        <div className={cn(isOpen && 'pl-4')}>{children}</div>
+        {shouldRenderChildren && (
+          <div className={cn(isOpen && 'pl-4')}>{children}</div>
+        )}
       </div>
     </div>
   );
@@ -477,7 +526,7 @@ export const mainListItems = React.forwardRef<
       </div>
 
       {/* Developer-tool Navigation - Compact Spacing */}
-      <nav className="flex-1 flex flex-col gap-4">
+      <nav className="flex-1 min-h-0 overflow-y-auto pr-1 flex flex-col gap-4">
         <AppBarContext.Consumer>
           {(context) => {
             const {
@@ -555,81 +604,36 @@ export const mainListItems = React.forwardRef<
           }}
         </AppBarContext.Consumer>
 
-        <div className="space-y-4">
-          <div className="space-y-0.5">
-            <SectionLabel
-              label="Overview"
-              isOpen={isOpen}
-              customColor={customColor}
-            />
-            <NavItem
-              to="/cockpit"
-              text="Cockpit"
-              icon={<Gauge size={18} />}
-              isOpen={isOpen}
-              onClick={onNavItemClick}
-              customColor={customColor}
-            />
-            <NavItem
-              to="/dashboard"
-              text="Dashboard"
-              icon={<BarChart2 size={18} />}
-              isOpen={isOpen}
-              onClick={onNavItemClick}
-              customColor={customColor}
-            />
-            <NavItem
-              to="/queues"
-              text="Queues"
-              icon={<Inbox size={18} />}
-              isOpen={isOpen}
-              onClick={onNavItemClick}
-              customColor={customColor}
-            />
-            <NavItem
-              to="/docs"
-              text="Docs"
-              icon={<FileText size={18} />}
-              isOpen={isOpen}
-              onClick={onNavItemClick}
-              customColor={customColor}
-            />
-            <NavItem
-              to="/api-docs"
-              text="API Docs"
-              icon={<ScrollText size={18} />}
-              isOpen={isOpen}
-              onClick={onNavItemClick}
-              customColor={customColor}
-            />
-          </div>
+        <div className="space-y-1">
+          <NavItem
+            to="/"
+            text="Overview"
+            icon={<Gauge size={18} />}
+            isOpen={isOpen}
+            onClick={onNavItemClick}
+            customColor={customColor}
+            activePaths={['/', '/dashboard', '/cockpit']}
+          />
 
-          <div className="space-y-0.5">
-            <SectionLabel
-              label="Workflows"
-              isOpen={isOpen}
-              customColor={customColor}
-            />
-            <NavItem
-              to="/dags"
-              text="Definitions"
-              icon={<Network size={18} />}
-              isOpen={isOpen}
-              onClick={onNavItemClick}
-              customColor={customColor}
-            />
-            <NavItem
-              to="/dag-runs"
-              text="Runs"
-              icon={<History size={18} />}
-              isOpen={isOpen}
-              onClick={onNavItemClick}
-              customColor={customColor}
-            />
+          <NavGroup
+            groupKey="workflows"
+            icon={<Network size={18} />}
+            label="Workflows"
+            isOpen={isOpen}
+            basePath={[
+              '/dags',
+              '/search',
+              '/base-config',
+              '/docs',
+              '/git-sync',
+            ]}
+            to="/dags"
+            onClick={onNavItemClick}
+            customColor={customColor}
+          >
             <NavItem
               to="/search"
               text="Search"
-              icon={<Search size={18} />}
               isOpen={isOpen}
               onClick={onNavItemClick}
               customColor={customColor}
@@ -638,70 +642,63 @@ export const mainListItems = React.forwardRef<
               <NavItem
                 to="/base-config"
                 text="Base Config"
-                icon={<FileCog size={18} />}
                 isOpen={isOpen}
                 onClick={onNavItemClick}
                 customColor={customColor}
               />
             )}
+            <NavItem
+              to="/docs"
+              text="Runbooks"
+              isOpen={isOpen}
+              onClick={onNavItemClick}
+              customColor={customColor}
+            />
             {canWrite && config.gitSyncEnabled && (
               <NavItem
                 to="/git-sync"
                 text="Git Sync"
-                icon={<GitBranch size={18} />}
                 isOpen={isOpen}
                 onClick={onNavItemClick}
                 customColor={customColor}
               />
             )}
-          </div>
+          </NavGroup>
 
-          {(canWrite ||
-            canAccessSystemStatus ||
-            canManageWebhooks ||
-            canViewEventLogs ||
-            canViewAuditLogs) && (
-            <div className="space-y-0.5">
-              <SectionLabel
-                label="Settings"
-                isOpen={isOpen}
-                customColor={customColor}
-              />
-              {canAccessSystemStatus && (
-                <NavItem
-                  to="/system-status"
-                  text="System Status"
-                  icon={<Activity size={18} />}
-                  isOpen={isOpen}
-                  onClick={onNavItemClick}
-                  customColor={customColor}
-                />
-              )}
-              {isAdmin && (
-                <NavItem
-                  to="/remote-nodes"
-                  text="Remote Nodes"
-                  icon={<Globe size={18} />}
-                  isOpen={isOpen}
-                  onClick={onNavItemClick}
-                  customColor={customColor}
-                />
-              )}
-              {canManageWebhooks && (
-                <NavItem
-                  to="/webhooks"
-                  text="Webhooks"
-                  icon={<Webhook size={18} />}
-                  isOpen={isOpen}
-                  onClick={onNavItemClick}
-                  customColor={customColor}
-                />
-              )}
+          <NavGroup
+            groupKey="execution"
+            icon={<History size={18} />}
+            label="Executions"
+            isOpen={isOpen}
+            basePath={['/dag-runs', '/queues']}
+            to="/dag-runs"
+            onClick={onNavItemClick}
+            customColor={customColor}
+          >
+            <NavItem
+              to="/queues"
+              text="Queues"
+              isOpen={isOpen}
+              onClick={onNavItemClick}
+              customColor={customColor}
+            />
+          </NavGroup>
+
+          {(canAccessSystemStatus || canViewEventLogs || canViewAuditLogs) && (
+            <NavGroup
+              groupKey="monitor"
+              icon={<Activity size={18} />}
+              label="Monitor"
+              isOpen={isOpen}
+              basePath={['/event-logs', '/audit-logs', '/system-status']}
+              to="/system-status"
+              onClick={onNavItemClick}
+              customColor={customColor}
+            >
               {canViewEventLogs && (
                 <NavItem
                   to="/event-logs"
                   text="Events"
-                  icon={<ScrollText size={18} />}
                   isOpen={isOpen}
                   onClick={onNavItemClick}
                   customColor={customColor}
@@ -711,96 +708,171 @@ export const mainListItems = React.forwardRef<
                 <NavItem
                   to="/audit-logs"
                   text={hasAudit ? 'Audit Logs' : 'Audit Logs (Pro)'}
-                  icon={<Shield size={18} />}
                   isOpen={isOpen}
                   onClick={onNavItemClick}
                   customColor={customColor}
                 />
               )}
-              {isAdmin && config.agentEnabled && (
+            </NavGroup>
+          )}
+
+          <NavGroup
+            groupKey="integrations"
+            icon={<Webhook size={18} />}
+            label="Integrations"
+            isOpen={isOpen}
+            basePath={['/integrations', '/webhooks', '/api-docs']}
+            to="/integrations"
+            onClick={onNavItemClick}
+            customColor={customColor}
+          >
+            {canManageWebhooks && (
+              <NavItem
+                to="/webhooks"
+                text="Webhooks"
+                isOpen={isOpen}
+                onClick={onNavItemClick}
+                customColor={customColor}
+              />
+            )}
+            <NavItem
+              to="/api-docs"
+              text="API Reference"
+              isOpen={isOpen}
+              onClick={onNavItemClick}
+              customColor={customColor}
+            />
+          </NavGroup>
+
+          {isAdmin && (
+            <NavGroup
+              groupKey="administration"
+              icon={<Shield size={18} />}
+              label="Administration"
+              isOpen={isOpen}
+              basePath={[
+                '/users',
+                '/api-keys',
+                '/remote-nodes',
+                '/terminal',
+                '/license',
+                '/agent',
+                '/agent-settings',
+                '/agent-tools',
+                '/agent-memory',
+                '/agent-souls',
+                '/administration',
+              ]}
+              to="/administration"
+              onClick={onNavItemClick}
+              customColor={customColor}
+              unmountChildrenWhenCollapsed
+            >
+              {config.authMode === 'builtin' && (
                 <NavGroup
-                  groupKey="agent"
-                  icon={<Bot size={18} />}
-                  label="Agent"
+                  groupKey="administration-access"
+                  label="Access"
                   isOpen={isOpen}
-                  basePath="/agent-"
+                  basePath={['/users', '/api-keys']}
                   customColor={customColor}
+                  persistExpanded={false}
                 >
                   <NavItem
-                    to="/agent-settings"
-                    text="Settings"
-                    icon={<Bot size={18} />}
+                    to="/users"
+                    text={hasRbac ? 'Users' : 'Users (Pro)'}
                     isOpen={isOpen}
                     onClick={onNavItemClick}
                     customColor={customColor}
                   />
                   <NavItem
-                    to="/agent-memory"
-                    text="Memory"
-                    icon={<Brain size={18} />}
-                    isOpen={isOpen}
-                    onClick={onNavItemClick}
-                    customColor={customColor}
-                  />
-                  <NavItem
-                    to="/agent-souls"
-                    text="Souls"
-                    icon={<Ghost size={18} />}
+                    to="/api-keys"
+                    text="API Keys"
                     isOpen={isOpen}
                     onClick={onNavItemClick}
                     customColor={customColor}
                   />
                 </NavGroup>
               )}
-            </div>
-          )}
 
-          {isAdmin && (
-            <div className="space-y-0.5">
-              <SectionLabel
-                label="Admin"
+              <NavGroup
+                groupKey="administration-infrastructure"
+                label="Infrastructure"
                 isOpen={isOpen}
+                basePath={['/remote-nodes', '/terminal', '/license']}
                 customColor={customColor}
-              />
-              {config.authMode === 'builtin' && (
+                persistExpanded={false}
+              >
                 <NavItem
-                  to="/users"
-                  text={hasRbac ? 'Users' : 'Users (Pro)'}
-                  icon={<Users size={18} />}
+                  to="/remote-nodes"
+                  text="Remote Nodes"
                   isOpen={isOpen}
                   onClick={onNavItemClick}
                   customColor={customColor}
                 />
-              )}
-              {config.authMode === 'builtin' && (
+                {config.terminalEnabled && (
+                  <NavItem
+                    to="/terminal"
+                    text="Terminal"
+                    isOpen={isOpen}
+                    onClick={onNavItemClick}
+                    customColor={customColor}
+                  />
+                )}
                 <NavItem
-                  to="/api-keys"
-                  text="API Keys"
-                  icon={<KeyRound size={18} />}
+                  to="/license"
+                  text="License"
                   isOpen={isOpen}
                   onClick={onNavItemClick}
                   customColor={customColor}
                 />
-              )}
-              {config.terminalEnabled && (
-                <NavItem
-                  to="/terminal"
-                  text="Terminal"
-                  icon={<Terminal size={18} />}
-                  isOpen={isOpen}
-                  onClick={onNavItemClick}
-                  customColor={customColor}
-                />
-              )}
-              <NavItem
-                to="/license"
-                text="License"
-                icon={<Shield size={18} />}
+              </NavGroup>
+
+              <NavGroup
+                groupKey="administration-agent"
+                label="Agent"
                 isOpen={isOpen}
+                basePath={[
+                  '/agent',
+                  '/agent-settings',
+                  '/agent-tools',
+                  '/agent-memory',
+                  '/agent-souls',
+                ]}
+                to="/agent"
                 onClick={onNavItemClick}
                 customColor={customColor}
-              />
-            </div>
+                persistExpanded={false}
+              >
+                <NavItem
+                  to="/agent-settings"
+                  text="Models"
+                  isOpen={isOpen}
+                  onClick={onNavItemClick}
+                  customColor={customColor}
+                />
+                <NavItem
+                  to="/agent-tools"
+                  text="Tools"
+                  isOpen={isOpen}
+                  onClick={onNavItemClick}
+                  customColor={customColor}
+                />
+                <NavItem
+                  to="/agent-memory"
+                  text="Memory"
+                  isOpen={isOpen}
+                  onClick={onNavItemClick}
+                  customColor={customColor}
+                />
+                <NavItem
+                  to="/agent-souls"
+                  text="Souls"
+                  isOpen={isOpen}
+                  onClick={onNavItemClick}
+                  customColor={customColor}
+                />
+              </NavGroup>
+            </NavGroup>
           )}
         </div>
       </nav>

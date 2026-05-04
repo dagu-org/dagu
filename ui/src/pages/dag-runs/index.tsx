@@ -447,7 +447,7 @@ function DAGRuns() {
   }, [currentFilters, searchState, searchStateScope]);
 
   React.useEffect(() => {
-    appBarContext.setTitle('DAG Runs');
+    appBarContext.setTitle('Executions');
   }, [appBarContext]);
 
   // Fetch available labels for the filter dropdown
@@ -773,7 +773,7 @@ function DAGRuns() {
   return (
     <div className="max-w-7xl">
       <div className="flex items-center justify-between mb-2">
-        <Title>DAG Runs</Title>
+        <Title>Executions</Title>
         <ToggleGroup aria-label="View mode">
           <ToggleButton
             value="list"

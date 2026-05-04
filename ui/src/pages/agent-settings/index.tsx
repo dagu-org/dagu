@@ -67,15 +67,9 @@ type UpdateAgentConfigRequest =
   components['schemas']['UpdateAgentConfigRequest'];
 type AgentAuthProviderStatus = components['schemas']['AgentAuthProviderStatus'];
 
-type SoulOption = {
-  id: string;
-  name: string;
-};
-
 type SavedAgentConfig = {
   enabled: boolean;
   defaultModelId?: string;
-  selectedSoulId?: string;
   toolPolicy: AgentToolPolicy;
   webSearchEnabled: boolean;
   webSearchMaxUses?: number;
@@ -85,6 +79,10 @@ type ToolMeta = {
   name: string;
   label: string;
   description: string;
+};
+
+type AgentSettingsPageProps = {
+  mode?: 'settings' | 'tools';
 };
 
 function createDefaultToolPolicy(tools: ToolMeta[]): AgentToolPolicy {
@@ -145,8 +143,11 @@ function canonicalizeToolPolicy(
   };
 }
 
-export default function AgentSettingsPage(): ReactNode {
+export default function AgentSettingsPage({
+  mode = 'settings',
+}: AgentSettingsPageProps): ReactNode {
   const client = useClient();
+  const isToolsPage = mode === 'tools';
   const isAdmin = useIsAdmin();
   const updateConfig = useUpdateConfig();
   const appBarContext = useContext(AppBarContext);
@@ -174,8 +175,6 @@ export default function AgentSettingsPage(): ReactNode {
   const [bashRuleIds, setBashRuleIds] = useState<string[]>([]);
   const [models, setModels] = useState<ModelConfig[]>([]);
   const [presets, setPresets] = useState<ModelPreset[]>([]);
-  const [souls, setSouls] = useState<SoulOption[]>([]);
-  const [selectedSoulId, setSelectedSoulId] = useState<string | undefined>();
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   const [webSearchMaxUses, setWebSearchMaxUses] = useState<
     number | undefined
@@ -205,8 +204,8 @@ export default function AgentSettingsPage(): ReactNode {
   );
 
   useEffect(() => {
-    appBarContext.setTitle('Agent Settings');
-  }, [appBarContext]);
+    appBarContext.setTitle(isToolsPage ? 'Agent Tools' : 'Agent Settings');
+  }, [appBarContext, isToolsPage]);
 
   const fetchTools = useCallback(async (): Promise<ToolMeta[]> => {
     try {
@@ -232,14 +231,12 @@ export default function AgentSettingsPage(): ReactNode {
         const normalizedPolicy = normalizeToolPolicy(data.toolPolicy, tools);
         setEnabled(data.enabled ?? false);
         setDefaultModelId(data.defaultModelId);
-        setSelectedSoulId(data.selectedSoulId ?? undefined);
         setToolPolicy(normalizedPolicy);
         setWebSearchEnabled(data.webSearch?.enabled ?? false);
         setWebSearchMaxUses(data.webSearch?.maxUses ?? undefined);
         setSavedConfig({
           enabled: data.enabled ?? false,
           defaultModelId: data.defaultModelId,
-          selectedSoulId: data.selectedSoulId ?? undefined,
           toolPolicy: normalizedPolicy,
           webSearchEnabled: data.webSearch?.enabled ?? false,
           webSearchMaxUses: data.webSearch?.maxUses ?? undefined,
@@ -285,32 +282,18 @@ export default function AgentSettingsPage(): ReactNode {
     }
   }, [client, remoteNode]);
 
-  const fetchSouls = useCallback(async () => {
-    try {
-      const { data } = await client.GET('/settings/agent/souls', {
-        params: { query: { remoteNode } },
-      });
-      if (data) {
-        setSouls((data.souls || []).map((s) => ({ id: s.id, name: s.name })));
-      }
-    } catch {
-      // Souls fetch is best-effort
-    }
-  }, [client, remoteNode]);
-
   useEffect(() => {
     async function load() {
-      const tools = await fetchTools();
-      await Promise.all([
-        fetchConfig(tools),
-        fetchModels(),
-        fetchPresets(),
-        fetchSouls(),
-      ]);
+      if (isToolsPage) {
+        const tools = await fetchTools();
+        await fetchConfig(tools);
+      } else {
+        await Promise.all([fetchModels(), fetchPresets()]);
+      }
       setIsLoading(false);
     }
     load();
-  }, [fetchTools, fetchConfig, fetchModels, fetchPresets, fetchSouls]);
+  }, [fetchTools, fetchConfig, fetchModels, fetchPresets, isToolsPage]);
 
   async function handleSaveConfig(): Promise<void> {
     setIsSaving(true);
@@ -333,9 +316,6 @@ export default function AgentSettingsPage(): ReactNode {
       }
       if (!savedConfig || defaultModelId !== savedConfig.defaultModelId) {
         requestBody.defaultModelId = defaultModelId;
-      }
-      if (!savedConfig || selectedSoulId !== savedConfig.selectedSoulId) {
-        requestBody.selectedSoulId = selectedSoulId;
       }
       if (
         !savedConfig ||
@@ -372,14 +352,12 @@ export default function AgentSettingsPage(): ReactNode {
       const normalizedPolicy = normalizeToolPolicy(data.toolPolicy, toolMetas);
       setEnabled(data.enabled ?? false);
       setDefaultModelId(data.defaultModelId);
-      setSelectedSoulId(data.selectedSoulId ?? undefined);
       setToolPolicy(normalizedPolicy);
       setWebSearchEnabled(data.webSearch?.enabled ?? false);
       setWebSearchMaxUses(data.webSearch?.maxUses ?? undefined);
       setSavedConfig({
         enabled: data.enabled ?? false,
         defaultModelId: data.defaultModelId,
-        selectedSoulId: data.selectedSoulId ?? undefined,
         toolPolicy: normalizedPolicy,
         webSearchEnabled: data.webSearch?.enabled ?? false,
         webSearchMaxUses: data.webSearch?.maxUses ?? undefined,
@@ -591,29 +569,35 @@ export default function AgentSettingsPage(): ReactNode {
     <div className="space-y-4 max-w-7xl pb-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold">Agent Settings</h1>
+          <h1 className="text-lg font-semibold">
+            {isToolsPage ? 'Agent Tools' : 'Agent Settings'}
+          </h1>
           <p className="text-sm text-muted-foreground">
-            Configure the AI assistant for workflow generation
+            {isToolsPage
+              ? 'Control agent tool access, web search, and bash command policy'
+              : 'Configure the AI assistant for workflow generation'}
           </p>
         </div>
-        <Button
-          onClick={handleSaveConfig}
-          disabled={isSaving}
-          size="sm"
-          className="h-8"
-        >
-          {isSaving ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-              Saving...
-            </>
-          ) : (
-            <>
-              <Save className="h-4 w-4 mr-1.5" />
-              Save Settings
-            </>
-          )}
-        </Button>
+        {isToolsPage && (
+          <Button
+            onClick={handleSaveConfig}
+            disabled={isSaving}
+            size="sm"
+            className="h-8"
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4 mr-1.5" />
+                Save Tools
+              </>
+            )}
+          </Button>
+        )}
       </div>
 
       {error && (
@@ -628,354 +612,330 @@ export default function AgentSettingsPage(): ReactNode {
         </div>
       )}
 
-      {/* General Settings */}
-      <div className="card-obsidian p-4 space-y-4 max-w-xl">
-        <div className="flex items-center justify-between">
-          <div className="space-y-0.5">
-            <Label htmlFor="enabled" className="text-sm font-medium">
-              Enable Agent
-            </Label>
-            <p className="text-xs text-muted-foreground">
-              Turn on the AI assistant feature
-            </p>
-          </div>
-          <Switch id="enabled" checked={enabled} onCheckedChange={setEnabled} />
-        </div>
-
-        {souls.length > 0 && (
-          <div className="space-y-1">
-            <Label className="text-sm font-medium">Agent Personality</Label>
-            <p className="text-xs text-muted-foreground">
-              Select the soul that defines the agent&apos;s identity and
-              communication style
-            </p>
-            <Select
-              value={selectedSoulId || '__none__'}
-              onValueChange={(value) =>
-                setSelectedSoulId(value === '__none__' ? undefined : value)
-              }
-            >
-              <SelectTrigger className="h-8 text-xs max-w-[300px]">
-                <SelectValue placeholder="Select soul" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__" className="text-xs">
-                  Default (no soul)
-                </SelectItem>
-                {souls.map((s) => (
-                  <SelectItem key={s.id} value={s.id} className="text-xs">
-                    {s.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-      </div>
-
-      {/* Web Search */}
-      <div className="card-obsidian p-4 space-y-4 max-w-xl">
-        <div className="flex items-center justify-between">
-          <div className="space-y-0.5">
-            <Label htmlFor="web-search" className="text-sm font-medium">
-              Web Search
-            </Label>
-            <p className="text-xs text-muted-foreground">
-              Enable provider-native web search for agent sessions
-            </p>
-          </div>
-          <Switch
-            id="web-search"
-            checked={webSearchEnabled}
-            onCheckedChange={setWebSearchEnabled}
-          />
-        </div>
-
-        {webSearchEnabled && (
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">
-              Max Uses per Request
-            </Label>
-            <Input
-              type="number"
-              min={1}
-              className="h-8 text-xs max-w-[200px]"
-              placeholder="No limit"
-              value={webSearchMaxUses ?? ''}
-              onChange={(e) => {
-                const val = e.target.value;
-                if (val === '') {
-                  setWebSearchMaxUses(undefined);
-                  return;
-                }
-                const parsed = parseInt(val, 10);
-                setWebSearchMaxUses(
-                  Number.isNaN(parsed) || parsed < 1 ? undefined : parsed
-                );
-              }}
-            />
-          </div>
-        )}
-      </div>
-
-      {/* Subscription Providers */}
-      <div className="space-y-3 max-w-3xl">
-        <div>
-          <h2 className="text-sm font-medium">Subscription Providers</h2>
-          <p className="text-xs text-muted-foreground">
-            Connect browser-based subscriptions that do not use API keys.
-          </p>
-        </div>
-
-        {authError ? (
-          <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            {authError}
-          </div>
-        ) : codexProvider ? (
-          <ProviderAuthCard
-            provider={codexProvider}
-            isLoading={authLoading}
-            onStartLogin={startLogin}
-            onCompleteLogin={completeLogin}
-            onDisconnect={disconnect}
-          />
-        ) : (
-          <div className="rounded-md border border-dashed border-border/80 px-3 py-6 text-sm text-muted-foreground">
-            {authLoading
-              ? 'Loading provider connections...'
-              : 'No subscription providers are available.'}
-          </div>
-        )}
-      </div>
-
-      {/* Tool Permissions */}
-      <div className="card-obsidian p-4 space-y-4">
-        <div className="flex items-center gap-2 text-sm font-medium">
-          <Shield className="h-4 w-4 text-muted-foreground" />
-          Tool Permissions
-        </div>
-
-        <div className="grid gap-3 md:grid-cols-2">
-          {toolMetas.map((tool) => (
-            <div
-              key={tool.name}
-              className="rounded-md border border-border/60 p-3 flex items-start justify-between gap-3"
-            >
-              <div className="space-y-0.5 min-w-0">
-                <p className="text-sm font-medium">{tool.label}</p>
-                <p className="text-xs text-muted-foreground">
-                  {tool.description}
-                </p>
-              </div>
-              <Switch
-                checked={normalizedPolicy.tools?.[tool.name] ?? false}
-                onCheckedChange={(checked) =>
-                  updateToolToggle(tool.name, checked)
-                }
-              />
-            </div>
-          ))}
-        </div>
-
-        <div className="border border-border/60 rounded-md p-3 space-y-3">
-          <div className="flex items-center justify-between gap-3">
+      {!isToolsPage && (
+        <>
+          {/* Subscription Providers */}
+          <div className="space-y-3 max-w-3xl">
             <div>
-              <p className="text-sm font-medium">Bash Command Policy</p>
+              <h2 className="text-sm font-medium">Subscription Providers</h2>
               <p className="text-xs text-muted-foreground">
-                Regex rules are checked top-down for each command segment.
+                Connect browser-based subscriptions that do not use API keys.
               </p>
             </div>
-          </div>
 
-          <div className="grid gap-3 md:grid-cols-2">
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">
-                No Match Behavior
-              </Label>
-              <Select
-                value={
-                  normalizedPolicy.bash?.defaultBehavior ||
-                  AgentBashPolicyDefaultBehavior.deny
-                }
-                onValueChange={(value) =>
-                  updateBashPolicy(
-                    'defaultBehavior',
-                    value as AgentBashPolicyDefaultBehavior
-                  )
-                }
-              >
-                <SelectTrigger className="h-8 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={AgentBashPolicyDefaultBehavior.allow}>
-                    Allow
-                  </SelectItem>
-                  <SelectItem value={AgentBashPolicyDefaultBehavior.deny}>
-                    Deny
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">On Deny</Label>
-              <Select
-                value={
-                  normalizedPolicy.bash?.denyBehavior ||
-                  AgentBashPolicyDenyBehavior.ask_user
-                }
-                onValueChange={(value) =>
-                  updateBashPolicy(
-                    'denyBehavior',
-                    value as AgentBashPolicyDenyBehavior
-                  )
-                }
-              >
-                <SelectTrigger className="h-8 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={AgentBashPolicyDenyBehavior.ask_user}>
-                    Ask User
-                  </SelectItem>
-                  <SelectItem value={AgentBashPolicyDenyBehavior.block}>
-                    Block
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs text-muted-foreground">
-                Rules (ordered)
-              </Label>
-              <Button
-                size="sm"
-                className="h-7 text-xs"
-                variant="outline"
-                onClick={addBashRule}
-              >
-                <Plus className="h-3.5 w-3.5 mr-1" />
-                Add Rule
-              </Button>
-            </div>
-
-            {(normalizedPolicy.bash?.rules || []).length === 0 ? (
-              <div className="rounded-md border border-dashed border-border/80 p-3 text-xs text-muted-foreground">
-                No rules defined. Behavior falls back to "No Match Behavior".
+            {authError ? (
+              <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {authError}
               </div>
+            ) : codexProvider ? (
+              <ProviderAuthCard
+                provider={codexProvider}
+                isLoading={authLoading}
+                onStartLogin={startLogin}
+                onCompleteLogin={completeLogin}
+                onDisconnect={disconnect}
+              />
             ) : (
-              <div className="space-y-2">
-                {(normalizedPolicy.bash?.rules || []).map((rule, index) => (
-                  <div
-                    key={bashRuleIds[index] || `bash_rule_fallback_${index}`}
-                    className="rounded-md border border-border/60 p-2 space-y-2"
-                  >
-                    <div className="grid gap-2 md:grid-cols-[1fr,2fr,150px,auto] items-end">
-                      <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">
-                          Name
-                        </Label>
-                        <Input
-                          value={rule.name || ''}
-                          onChange={(e) =>
-                            updateBashRule(index, { name: e.target.value })
-                          }
-                          className="h-8 text-xs"
-                          placeholder={`rule_${index + 1}`}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">
-                          Regex Pattern
-                        </Label>
-                        <Input
-                          value={rule.pattern}
-                          onChange={(e) =>
-                            updateBashRule(index, { pattern: e.target.value })
-                          }
-                          className="h-8 text-xs font-mono"
-                          placeholder="^git\\s+status$"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">
-                          Action
-                        </Label>
-                        <Select
-                          value={rule.action}
-                          onValueChange={(value) =>
-                            updateBashRule(index, {
-                              action: value as AgentBashRuleAction,
-                            })
-                          }
-                        >
-                          <SelectTrigger className="h-8 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value={AgentBashRuleAction.allow}>
-                              Allow
-                            </SelectItem>
-                            <SelectItem value={AgentBashRuleAction.deny}>
-                              Deny
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="flex items-center justify-end gap-2">
-                        <div className="flex items-center gap-2">
-                          <Label className="text-xs text-muted-foreground">
-                            Enabled
-                          </Label>
-                          <Switch
-                            checked={rule.enabled ?? true}
-                            onCheckedChange={(checked) =>
-                              updateBashRule(index, { enabled: checked })
-                            }
-                          />
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 text-xs"
-                        onClick={() => moveBashRule(index, -1)}
-                      >
-                        Up
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 text-xs"
-                        onClick={() => moveBashRule(index, 1)}
-                      >
-                        Down
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        className="h-7 text-xs"
-                        onClick={() => removeBashRule(index)}
-                      >
-                        Remove
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+              <div className="rounded-md border border-dashed border-border/80 px-3 py-6 text-sm text-muted-foreground">
+                {authLoading
+                  ? 'Loading provider connections...'
+                  : 'No subscription providers are available.'}
               </div>
             )}
           </div>
-        </div>
-      </div>
+        </>
+      )}
+
+      {/* Tool Permissions */}
+      {isToolsPage && (
+        <>
+          {/* Web Search */}
+          <div className="card-obsidian p-4 space-y-4 max-w-xl">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="web-search" className="text-sm font-medium">
+                  Web Search
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Enable provider-native web search for agent sessions
+                </p>
+              </div>
+              <Switch
+                id="web-search"
+                checked={webSearchEnabled}
+                onCheckedChange={setWebSearchEnabled}
+              />
+            </div>
+
+            {webSearchEnabled && (
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">
+                  Max Uses per Request
+                </Label>
+                <Input
+                  type="number"
+                  min={1}
+                  className="h-8 text-xs max-w-[200px]"
+                  placeholder="No limit"
+                  value={webSearchMaxUses ?? ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '') {
+                      setWebSearchMaxUses(undefined);
+                      return;
+                    }
+                    const parsed = parseInt(val, 10);
+                    setWebSearchMaxUses(
+                      Number.isNaN(parsed) || parsed < 1 ? undefined : parsed
+                    );
+                  }}
+                />
+              </div>
+            )}
+          </div>
+
+          <div
+            id="agent-tools"
+            className="card-obsidian p-4 space-y-4 scroll-mt-4"
+          >
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <Shield className="h-4 w-4 text-muted-foreground" />
+              Tool Permissions
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              {toolMetas.map((tool) => (
+                <div
+                  key={tool.name}
+                  className="rounded-md border border-border/60 p-3 flex items-start justify-between gap-3"
+                >
+                  <div className="space-y-0.5 min-w-0">
+                    <p className="text-sm font-medium">{tool.label}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {tool.description}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={normalizedPolicy.tools?.[tool.name] ?? false}
+                    onCheckedChange={(checked) =>
+                      updateToolToggle(tool.name, checked)
+                    }
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="border border-border/60 rounded-md p-3 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium">Bash Command Policy</p>
+                  <p className="text-xs text-muted-foreground">
+                    Regex rules are checked top-down for each command segment.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">
+                    No Match Behavior
+                  </Label>
+                  <Select
+                    value={
+                      normalizedPolicy.bash?.defaultBehavior ||
+                      AgentBashPolicyDefaultBehavior.deny
+                    }
+                    onValueChange={(value) =>
+                      updateBashPolicy(
+                        'defaultBehavior',
+                        value as AgentBashPolicyDefaultBehavior
+                      )
+                    }
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={AgentBashPolicyDefaultBehavior.allow}>
+                        Allow
+                      </SelectItem>
+                      <SelectItem value={AgentBashPolicyDefaultBehavior.deny}>
+                        Deny
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">
+                    On Deny
+                  </Label>
+                  <Select
+                    value={
+                      normalizedPolicy.bash?.denyBehavior ||
+                      AgentBashPolicyDenyBehavior.ask_user
+                    }
+                    onValueChange={(value) =>
+                      updateBashPolicy(
+                        'denyBehavior',
+                        value as AgentBashPolicyDenyBehavior
+                      )
+                    }
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={AgentBashPolicyDenyBehavior.ask_user}>
+                        Ask User
+                      </SelectItem>
+                      <SelectItem value={AgentBashPolicyDenyBehavior.block}>
+                        Block
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs text-muted-foreground">
+                    Rules (ordered)
+                  </Label>
+                  <Button
+                    size="sm"
+                    className="h-7 text-xs"
+                    variant="outline"
+                    onClick={addBashRule}
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1" />
+                    Add Rule
+                  </Button>
+                </div>
+
+                {(normalizedPolicy.bash?.rules || []).length === 0 ? (
+                  <div className="rounded-md border border-dashed border-border/80 p-3 text-xs text-muted-foreground">
+                    No rules defined. Behavior falls back to "No Match
+                    Behavior".
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {(normalizedPolicy.bash?.rules || []).map((rule, index) => (
+                      <div
+                        key={
+                          bashRuleIds[index] || `bash_rule_fallback_${index}`
+                        }
+                        className="rounded-md border border-border/60 p-2 space-y-2"
+                      >
+                        <div className="grid gap-2 md:grid-cols-[1fr,2fr,150px,auto] items-end">
+                          <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">
+                              Name
+                            </Label>
+                            <Input
+                              value={rule.name || ''}
+                              onChange={(e) =>
+                                updateBashRule(index, { name: e.target.value })
+                              }
+                              className="h-8 text-xs"
+                              placeholder={`rule_${index + 1}`}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">
+                              Regex Pattern
+                            </Label>
+                            <Input
+                              value={rule.pattern}
+                              onChange={(e) =>
+                                updateBashRule(index, {
+                                  pattern: e.target.value,
+                                })
+                              }
+                              className="h-8 text-xs font-mono"
+                              placeholder="^git\\s+status$"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">
+                              Action
+                            </Label>
+                            <Select
+                              value={rule.action}
+                              onValueChange={(value) =>
+                                updateBashRule(index, {
+                                  action: value as AgentBashRuleAction,
+                                })
+                              }
+                            >
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value={AgentBashRuleAction.allow}>
+                                  Allow
+                                </SelectItem>
+                                <SelectItem value={AgentBashRuleAction.deny}>
+                                  Deny
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="flex items-center justify-end gap-2">
+                            <div className="flex items-center gap-2">
+                              <Label className="text-xs text-muted-foreground">
+                                Enabled
+                              </Label>
+                              <Switch
+                                checked={rule.enabled ?? true}
+                                onCheckedChange={(checked) =>
+                                  updateBashRule(index, { enabled: checked })
+                                }
+                              />
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs"
+                            onClick={() => moveBashRule(index, -1)}
+                          >
+                            Up
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs"
+                            onClick={() => moveBashRule(index, 1)}
+                          >
+                            Down
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="h-7 text-xs"
+                            onClick={() => removeBashRule(index)}
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Models Table */}
-      {enabled && (
-        <div className="card-obsidian overflow-auto">
+      {!isToolsPage && (
+        <div
+          id="agent-models"
+          className="card-obsidian overflow-auto scroll-mt-4"
+        >
           <div className="flex items-center justify-between p-4 pb-2">
             <div className="flex items-center gap-2 text-sm font-medium">
               <Bot className="h-4 w-4 text-muted-foreground" />
@@ -1116,52 +1076,56 @@ export default function AgentSettingsPage(): ReactNode {
         </div>
       )}
 
-      {/* Create Model Modal */}
-      <ModelFormModal
-        open={showCreateModal}
-        presets={presets}
-        codexProvider={codexProvider}
-        codexAuthLoading={authLoading}
-        onStartProviderLogin={startLogin}
-        onCompleteProviderLogin={completeLogin}
-        onDisconnectProvider={disconnect}
-        onClose={() => setShowCreateModal(false)}
-        onSuccess={() => {
-          setShowCreateModal(false);
-          fetchModels();
-        }}
-      />
+      {!isToolsPage && (
+        <>
+          {/* Create Model Modal */}
+          <ModelFormModal
+            open={showCreateModal}
+            presets={presets}
+            codexProvider={codexProvider}
+            codexAuthLoading={authLoading}
+            onStartProviderLogin={startLogin}
+            onCompleteProviderLogin={completeLogin}
+            onDisconnectProvider={disconnect}
+            onClose={() => setShowCreateModal(false)}
+            onSuccess={() => {
+              setShowCreateModal(false);
+              fetchModels();
+            }}
+          />
 
-      {/* Edit Model Modal */}
-      <ModelFormModal
-        open={!!editingModel}
-        model={editingModel || undefined}
-        presets={presets}
-        codexProvider={codexProvider}
-        codexAuthLoading={authLoading}
-        onStartProviderLogin={startLogin}
-        onCompleteProviderLogin={completeLogin}
-        onDisconnectProvider={disconnect}
-        onClose={() => setEditingModel(null)}
-        onSuccess={() => {
-          setEditingModel(null);
-          fetchModels();
-        }}
-      />
+          {/* Edit Model Modal */}
+          <ModelFormModal
+            open={!!editingModel}
+            model={editingModel || undefined}
+            presets={presets}
+            codexProvider={codexProvider}
+            codexAuthLoading={authLoading}
+            onStartProviderLogin={startLogin}
+            onCompleteProviderLogin={completeLogin}
+            onDisconnectProvider={disconnect}
+            onClose={() => setEditingModel(null)}
+            onSuccess={() => {
+              setEditingModel(null);
+              fetchModels();
+            }}
+          />
 
-      {/* Delete Confirmation */}
-      <ConfirmModal
-        title="Delete Model"
-        buttonText="Delete"
-        visible={!!deletingModel}
-        dismissModal={() => setDeletingModel(null)}
-        onSubmit={handleDeleteModel}
-      >
-        <p>
-          Are you sure you want to delete the model &quot;{deletingModel?.name}
-          &quot;? This action cannot be undone.
-        </p>
-      </ConfirmModal>
+          {/* Delete Confirmation */}
+          <ConfirmModal
+            title="Delete Model"
+            buttonText="Delete"
+            visible={!!deletingModel}
+            dismissModal={() => setDeletingModel(null)}
+            onSubmit={handleDeleteModel}
+          >
+            <p>
+              Are you sure you want to delete the model &quot;
+              {deletingModel?.name}&quot;? This action cannot be undone.
+            </p>
+          </ConfirmModal>
+        </>
+      )}
     </div>
   );
 }

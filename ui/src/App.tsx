@@ -35,7 +35,6 @@ import {
 import { AgentChatModal, AgentChatProvider } from './features/agent';
 import Layout from './layouts/Layout';
 import fetchJson from './lib/fetchJson';
-import { getAuthHeaders } from './lib/authHeaders';
 import { fetchWithTimeout, shouldRetryQueryError } from './lib/requestTimeout';
 import { useClient } from './hooks/api';
 import {
@@ -48,12 +47,13 @@ import {
   type WorkspaceSelection,
 } from './lib/workspace';
 import { UserRole } from './api/v1/schema';
-import Dashboard from './pages';
-import CockpitPage from './pages/cockpit';
 import AgentMemoryPage from './pages/agent-memory';
+import AgentPage from './pages/agent';
 import AgentSettingsPage from './pages/agent-settings';
 import AgentSoulsPage from './pages/agent-souls';
 import SoulEditorPage from './pages/agent-souls/SoulEditorPage';
+import AgentToolsPage from './pages/agent-tools';
+import AdministrationPage from './pages/administration';
 import APIKeysPage from './pages/api-keys';
 import APIDocsPage from './pages/api-docs';
 import AuditLogsPage from './pages/audit-logs';
@@ -66,8 +66,10 @@ import WorkflowDesignPage from './pages/design';
 import DocsPage from './pages/docs';
 import EventLogsPage from './pages/event-logs';
 import GitSyncPage from './pages/git-sync';
+import IntegrationsPage from './pages/integrations';
 import LicensePage from './pages/license';
 import LoginPage from './pages/login';
+import OverviewPage from './pages/overview';
 import Queues from './pages/queues';
 import QueueDetailsPage from './pages/queues/queue';
 import Search from './pages/search';
@@ -192,10 +194,7 @@ function AgentChatModalHost({
 }): React.ReactElement | null {
   const location = useLocation();
   const isDesignWorkspace =
-    location.pathname === '/design' ||
-    location.pathname.startsWith('/design/') ||
-    location.pathname === '/agent' ||
-    location.pathname.startsWith('/agent/');
+    location.pathname === '/design' || location.pathname.startsWith('/design/');
   if (!enabled || isDesignWorkspace) {
     return null;
   }
@@ -321,10 +320,9 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
         applyWorkspaces(initialWorkspacesRef.current ?? []);
       }
     } finally {
-      if (workspaceFetchSeqRef.current !== requestSeq) {
-        return;
+      if (workspaceFetchSeqRef.current === requestSeq) {
+        setWorkspacesLoaded(true);
       }
-      setWorkspacesLoaded(true);
     }
   }, [applyWorkspaces, client, selectedRemoteNode]);
 
@@ -506,19 +504,27 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
                                       <Routes>
                                         <Route
                                           path="/"
-                                          element={<CockpitPage />}
+                                          element={<OverviewPage />}
                                         />
                                         <Route
                                           path="/dashboard"
-                                          element={<Dashboard />}
+                                          element={
+                                            <OverviewPage initialTab="timeline" />
+                                          }
                                         />
                                         <Route
                                           path="/cockpit"
-                                          element={<CockpitPage />}
+                                          element={
+                                            <OverviewPage initialTab="cockpit" />
+                                          }
                                         />
                                         <Route
                                           path="/api-docs"
                                           element={<APIDocsPage />}
+                                        />
+                                        <Route
+                                          path="/integrations"
+                                          element={<IntegrationsPage />}
                                         />
                                         <Route
                                           path="/dags/"
@@ -538,12 +544,6 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
                                             <WriteElement>
                                               <WorkflowDesignPage />
                                             </WriteElement>
-                                          }
-                                        />
-                                        <Route
-                                          path="/agent"
-                                          element={
-                                            <Navigate to="/design" replace />
                                           }
                                         />
                                         <Route
@@ -591,6 +591,14 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
                                           element={
                                             <AdminElement>
                                               <UsersPage />
+                                            </AdminElement>
+                                          }
+                                        />
+                                        <Route
+                                          path="/administration"
+                                          element={
+                                            <AdminElement>
+                                              <AdministrationPage />
                                             </AdminElement>
                                           }
                                         />
@@ -661,10 +669,26 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
                                           }
                                         />
                                         <Route
+                                          path="/agent"
+                                          element={
+                                            <AdminElement>
+                                              <AgentPage />
+                                            </AdminElement>
+                                          }
+                                        />
+                                        <Route
                                           path="/agent-settings"
                                           element={
                                             <AdminElement>
                                               <AgentSettingsPage />
+                                            </AdminElement>
+                                          }
+                                        />
+                                        <Route
+                                          path="/agent-tools"
+                                          element={
+                                            <AdminElement>
+                                              <AgentToolsPage />
                                             </AdminElement>
                                           }
                                         />

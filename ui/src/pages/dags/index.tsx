@@ -297,7 +297,7 @@ function DAGsContent() {
   }, [mutate]);
 
   React.useEffect(() => {
-    appBarContext.setTitle('DAG Definitions');
+    appBarContext.setTitle('Workflows');
   }, [appBarContext]);
 
   const pageChange = (page: number) => {

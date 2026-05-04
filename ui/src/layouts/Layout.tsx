@@ -125,10 +125,7 @@ function Content({ navbarColor, children }: LayoutProps) {
   }, [isSidebarExpanded]);
 
   const isDesignWorkspace =
-    location.pathname === '/design' ||
-    location.pathname.startsWith('/design/') ||
-    location.pathname === '/agent' ||
-    location.pathname.startsWith('/agent/');
+    location.pathname === '/design' || location.pathname.startsWith('/design/');
 
   if (isDesignWorkspace) {
     return (

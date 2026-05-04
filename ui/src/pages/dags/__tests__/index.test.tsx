@@ -1,7 +1,13 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from '@testing-library/react';
 import * as React from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -160,7 +166,7 @@ function makeConfig(overrides: Partial<Config> = {}): Config {
   };
 }
 
-function renderPage() {
+function renderPage(setTitle = vi.fn()) {
   return render(
     <MemoryRouter initialEntries={['/dags']}>
       <ConfigContext.Provider value={makeConfig()}>
@@ -168,7 +174,7 @@ function renderPage() {
           <AppBarContext.Provider
             value={{
               title: '',
-              setTitle: () => undefined,
+              setTitle,
               remoteNodes: ['local', 'remote-a'],
               setRemoteNodes: () => undefined,
               selectedRemoteNode: 'remote-a',
@@ -281,5 +287,13 @@ describe('DagsPage', () => {
     );
 
     expect(screen.getByRole('textbox', { name: 'Search DAGs' })).toHaveFocus();
+  });
+
+  it('uses the Workflows app bar title', () => {
+    const setTitle = vi.fn();
+
+    renderPage(setTitle);
+
+    expect(setTitle).toHaveBeenCalledWith('Workflows');
   });
 });

@@ -13,7 +13,6 @@ import {
 } from '@/components/ui/select';
 import { Filter } from 'lucide-react';
 import React from 'react';
-import type { components } from '../api/v1/schema';
 import {
   PathsDagsGetParametersQueryOrder,
   PathsDagsGetParametersQuerySort,
@@ -34,8 +33,6 @@ import {
   workspaceSelectionQuery,
 } from '../lib/workspace';
 import Title from '@/components/ui/title';
-
-type DAGRunSummary = components['schemas']['DAGRunSummary'];
 
 type Metrics = Record<Status, number>;
 
@@ -339,7 +336,7 @@ function Dashboard(): React.ReactElement | null {
 
   React.useEffect(() => {
     if (appBarContext) {
-      appBarContext.setTitle('Dashboard');
+      appBarContext.setTitle('Timeline');
     }
   }, [appBarContext]);
 
@@ -445,7 +442,7 @@ function Dashboard(): React.ReactElement | null {
 
   return (
     <div className="flex flex-col max-w-7xl h-full overflow-hidden">
-      <Title>Dashboard</Title>
+      <Title>Timeline</Title>
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-h-0 gap-3 p-1">

@@ -47,7 +47,7 @@ function OpenWorkflowDesignButton() {
 
 const DAGListHeader: React.FC<DAGListHeaderProps> = ({ onRefresh }) => (
   <div className="flex flex-row items-center justify-between mb-2">
-    <Title>DAG Definitions</Title>
+    <Title>Workflows</Title>
     <div className="flex gap-2">
       <CreateDAGButton />
       <OpenWorkflowDesignButton />
