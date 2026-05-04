@@ -499,6 +499,10 @@ func (store *Storage) List(ctx context.Context, opts exec.ListDAGsOptions) (exec
 		// Pre-calculate next run times to avoid recalculating on each comparison
 		nextRunTimes := make(map[*core.DAG]time.Time, len(allDags))
 		for _, dag := range allDags {
+			if store.IsSuspended(ctx, dag.FileName()) {
+				nextRunTimes[dag] = time.Time{}
+				continue
+			}
 			nextRunTimes[dag] = projectNextRun(dag, now)
 		}
 

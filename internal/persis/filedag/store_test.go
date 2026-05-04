@@ -1483,6 +1483,42 @@ func TestListWithNextRunSorting(t *testing.T) {
 	assert.Equal(t, "no-schedule", result.Items[2].Name)
 }
 
+func TestListWithNextRunSortingPutsSuspendedDAGsLast(t *testing.T) {
+	tmpDir := fileutil.MustTempDir("test-list-nextrun-suspended")
+	t.Cleanup(func() {
+		_ = os.RemoveAll(tmpDir)
+	})
+
+	store := New(tmpDir, WithSkipExamples(true))
+	ctx := context.Background()
+
+	createDAG := func(name, schedule string) {
+		content := fmt.Sprintf(`name: %s
+schedule: "%s"
+steps:
+  - name: step1
+    command: echo "test"`, name, schedule)
+		require.NoError(t, store.Create(ctx, name, []byte(content)))
+	}
+
+	createDAG("suspended-sooner", "0 2 * * *")
+	createDAG("live-later", "0 3 * * *")
+	require.NoError(t, store.ToggleSuspend(ctx, "suspended-sooner", true))
+
+	fixedTime := time.Date(2024, 1, 15, 1, 30, 0, 0, time.UTC)
+
+	result, _, err := store.List(ctx, exec.ListDAGsOptions{
+		Sort:  "nextRun",
+		Order: "asc",
+		Time:  &fixedTime,
+	})
+	require.NoError(t, err)
+	require.Len(t, result.Items, 2)
+
+	assert.Equal(t, "live-later", result.Items[0].Name)
+	assert.Equal(t, "suspended-sooner", result.Items[1].Name)
+}
+
 func TestConcurrentList(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := New(tmpDir, WithSkipExamples(true))
