@@ -159,25 +159,23 @@ func (c *remoteClient) enqueueDAG(ctx context.Context, fileName string, body api
 }
 
 func (c *remoteClient) listDAGRuns(ctx context.Context, query remoteHistoryQuery) ([]api.DAGRunSummary, error) {
-	params := map[string]string{}
+	params := url.Values{}
 	if query.From != nil {
-		params["fromDate"] = fmt.Sprintf("%d", *query.From)
+		params.Set("fromDate", fmt.Sprintf("%d", *query.From))
 	}
 	if query.To != nil {
-		params["toDate"] = fmt.Sprintf("%d", *query.To)
+		params.Set("toDate", fmt.Sprintf("%d", *query.To))
 	}
 	if len(query.Statuses) > 0 {
-		values := make([]string, 0, len(query.Statuses))
 		for _, status := range query.Statuses {
-			values = append(values, fmt.Sprintf("%d", status))
+			params.Add("status", fmt.Sprintf("%d", status))
 		}
-		params["status"] = strings.Join(values, ",")
 	}
 	if query.RunID != "" {
-		params["dagRunId"] = query.RunID
+		params.Set("dagRunId", query.RunID)
 	}
 	if len(query.Labels) > 0 {
-		params["labels"] = strings.Join(query.Labels, ",")
+		params.Set("labels", strings.Join(query.Labels, ","))
 	}
 
 	var out struct {
@@ -187,7 +185,7 @@ func (c *remoteClient) listDAGRuns(ctx context.Context, query remoteHistoryQuery
 	if query.Name != "" {
 		path = "/dag-runs/" + url.PathEscape(query.Name)
 	}
-	if err := c.do(ctx, http.MethodGet, path, nil, &out, params); err != nil {
+	if err := c.doWithQueryValues(ctx, http.MethodGet, path, nil, &out, params); err != nil {
 		return nil, err
 	}
 	return out.DagRuns, nil
@@ -245,15 +243,19 @@ func dagRunPath(name, dagRunID string) string {
 }
 
 func (c *remoteClient) do(ctx context.Context, method, path string, body any, out any, query map[string]string) error {
+	values := url.Values{}
+	for key, value := range query {
+		if value != "" {
+			values.Set(key, value)
+		}
+	}
+	return c.doWithQueryValues(ctx, method, path, body, out, values)
+}
+
+func (c *remoteClient) doWithQueryValues(ctx context.Context, method, path string, body any, out any, query url.Values) error {
 	fullURL := c.baseURL + path
 	if len(query) > 0 {
-		values := url.Values{}
-		for key, value := range query {
-			if value != "" {
-				values.Set(key, value)
-			}
-		}
-		if encoded := values.Encode(); encoded != "" {
+		if encoded := query.Encode(); encoded != "" {
 			fullURL += "?" + encoded
 		}
 	}
