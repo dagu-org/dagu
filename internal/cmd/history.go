@@ -34,7 +34,8 @@ Date/Time Filtering:
                     Note: --last cannot be combined with --from or --to
 
 Status Filtering:
-  --status          Filter by execution status (running, succeeded, failed, aborted, skipped, waiting, none)
+  --status          Filter by execution status. Accepts a single status or comma-separated statuses
+                    (running, succeeded, failed, aborted, queued, waiting, rejected, not_started, partially_succeeded)
 
 Other Filters:
   --labels          Filter by DAG labels (comma-separated, AND logic)
@@ -55,6 +56,7 @@ Examples:
   dagu history --from 2026-01-01              # Runs since date
   dagu history --last 7d                      # Last 7 days
   dagu history --status failed                # Only failed runs
+  dagu history --status running,queued        # Running or queued runs
   dagu history --format json                  # JSON output
   dagu history --labels "prod,critical"       # Filter by labels (AND logic)
   dagu history --limit 50                     # Limit to 50 results
@@ -260,12 +262,12 @@ func buildStatusOption(ctx *Context) (exec.ListDAGRunStatusesOption, error) {
 		return nil, nil
 	}
 
-	status, err := parseStatus(statusStr)
+	statuses, err := parseStatuses(statusStr)
 	if err != nil {
 		return nil, err
 	}
 
-	return exec.WithStatuses([]core.Status{status}), nil
+	return exec.WithStatuses(statuses), nil
 }
 
 // buildRunIDOption constructs run ID filtering option.
@@ -412,6 +414,27 @@ func parseStatus(s string) (core.Status, error) {
 	}
 
 	return core.NotStarted, fmt.Errorf("invalid status '%s'. Valid values: running, succeeded, failed, aborted, queued, waiting, rejected, not_started, partially_succeeded", s)
+}
+
+// parseStatuses converts a comma-separated status string to core.Status values.
+func parseStatuses(s string) ([]core.Status, error) {
+	parts := strings.Split(s, ",")
+	statuses := make([]core.Status, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed == "" {
+			continue
+		}
+		status, err := parseStatus(trimmed)
+		if err != nil {
+			return nil, err
+		}
+		statuses = append(statuses, status)
+	}
+	if len(statuses) == 0 {
+		return nil, fmt.Errorf("invalid status '%s'. Valid values: running, succeeded, failed, aborted, queued, waiting, rejected, not_started, partially_succeeded", s)
+	}
+	return statuses, nil
 }
 
 // parseLabels splits comma-separated labels and trims whitespace.

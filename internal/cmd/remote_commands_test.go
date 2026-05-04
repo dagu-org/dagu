@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -86,6 +87,44 @@ func TestBuildRemoteHistoryQueryRejectsMalformedLimit(t *testing.T) {
 	_, _, err = buildRemoteHistoryQuery(ctx, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "greater than 0")
+}
+
+func TestBuildRemoteHistoryQueryParsesMultipleStatuses(t *testing.T) {
+	t.Parallel()
+
+	command := &cobra.Command{Use: "history"}
+	initFlags(command, historyFlags...)
+	require.NoError(t, command.Flags().Set("status", "running,queued"))
+
+	ctx := &Context{Command: command}
+	query, limit, err := buildRemoteHistoryQuery(ctx, nil)
+	require.NoError(t, err)
+
+	assert.Equal(t, 100, limit)
+	assert.Equal(t, []int{int(core.Running), int(core.Queued)}, query.Statuses)
+}
+
+func TestRemoteClientListDAGRunsUsesRepeatedStatusParams(t *testing.T) {
+	t.Parallel()
+
+	statusValues := make(chan []string, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		statusValues <- append([]string(nil), r.URL.Query()["status"]...)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"dagRuns":[]}`))
+	}))
+	defer server.Close()
+
+	client := &remoteClient{
+		baseURL: server.URL,
+		client:  server.Client(),
+	}
+
+	_, err := client.listDAGRuns(context.Background(), remoteHistoryQuery{
+		Statuses: []int{int(core.Running), int(core.Queued)},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"1", "5"}, <-statusValues)
 }
 
 func TestWaitForRemoteStopHonorsContextCancellation(t *testing.T) {
