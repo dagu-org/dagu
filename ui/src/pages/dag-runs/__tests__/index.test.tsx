@@ -123,4 +123,34 @@ describe('DAGRuns page', () => {
     expect(screen.queryByRole('heading', { name: /dag runs/i })).toBeNull();
     expect(setTitle).toHaveBeenCalledWith('Executions');
   });
+
+  it('uses consistent filter control sizing', () => {
+    renderPage();
+
+    expect(
+      screen.getByPlaceholderText('Filter by DAG name...').className
+    ).toContain('h-9');
+    expect(
+      screen.getByPlaceholderText('Filter by Run ID...').className
+    ).toContain('h-9');
+    expect(screen.getByRole('combobox', { name: 'Status' }).className).toContain(
+      'h-9'
+    );
+    expect(
+      screen.getByRole('combobox', { name: 'Date preset' }).className
+    ).toContain('h-9');
+    expect(screen.getByRole('button', { name: 'Search' }).className).toContain(
+      'h-9'
+    );
+
+    const labelInput = screen.getByRole('combobox', {
+      name: 'Filter by labels...',
+    });
+    expect(labelInput.parentElement?.className).toContain('min-h-9');
+    expect(labelInput.parentElement?.className).toContain('bg-card');
+
+    expect(screen.getByRole('combobox', { name: 'Status' })).toHaveTextContent(
+      'All Statuses'
+    );
+  });
 });

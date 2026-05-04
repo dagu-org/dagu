@@ -200,7 +200,6 @@ function DAGRunBatchActions({
         <div className="text-sm text-muted-foreground">{summaryText}</div>
         <div className="flex flex-wrap items-center gap-2">
           <Button
-            size="sm"
             variant="outline"
             onClick={onSelectAllLoaded}
             disabled={loadedCount === 0 || isRunning}
@@ -208,7 +207,6 @@ function DAGRunBatchActions({
             Select all loaded
           </Button>
           <Button
-            size="sm"
             variant="outline"
             onClick={onClearSelection}
             disabled={selectedCount === 0 || isRunning}
@@ -216,7 +214,6 @@ function DAGRunBatchActions({
             Clear selection
           </Button>
           <Button
-            size="sm"
             variant="outline"
             onClick={() => openBatchDialog('retry')}
             disabled={selectedCount === 0 || isRunning}
@@ -224,14 +221,13 @@ function DAGRunBatchActions({
             Retry selected
           </Button>
           <Button
-            size="sm"
+            variant="outline"
             onClick={() => openBatchDialog('reschedule')}
             disabled={selectedCount === 0 || isRunning}
           >
             Reschedule selected
           </Button>
           <Button
-            size="sm"
             variant="destructive"
             onClick={() => openBatchDialog('delete')}
             disabled={selectedCount === 0 || isRunning}

@@ -168,7 +168,7 @@ function LabelCombobox({
     <div ref={containerRef} className={cn('relative', className)}>
       <div
         className={cn(
-          'flex flex-wrap items-center gap-1 min-h-7 px-2 py-0.5 rounded-md border border-border bg-background cursor-text',
+          'flex min-h-9 flex-wrap items-center gap-1 rounded-md border border-input bg-card px-2 py-0.5 shadow-sm cursor-text',
           'focus-within:border-ring'
         )}
         onClick={() => inputRef.current?.focus()}
@@ -217,6 +217,7 @@ function LabelCombobox({
           onFocus={handleInputFocus}
           placeholder={selectedLabels.length === 0 ? placeholder : ''}
           role="combobox"
+          aria-label={placeholder}
           aria-expanded={isOpen}
           aria-haspopup="listbox"
           aria-autocomplete="list"

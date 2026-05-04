@@ -71,21 +71,13 @@ const STATUS_CONFIG: Record<Status, string> = {
 
 function StatusSelectDisplay({ status }: { status: string }): React.ReactNode {
   if (status === 'all') {
-    return (
-      <div className="inline-flex items-center rounded-full border bg-muted border-border text-foreground py-0.5 px-2 text-xs font-medium">
-        All
-      </div>
-    );
+    return 'All Statuses';
   }
 
   const statusNum = parseInt(status) as Status;
   const label = STATUS_CONFIG[statusNum];
   if (label) {
-    return (
-      <StatusChip status={statusNum} size="sm">
-        {label}
-      </StatusChip>
-    );
+    return label;
   }
 
   return null;
@@ -774,7 +766,7 @@ function DAGRuns() {
     <div className="max-w-7xl">
       <div className="flex items-center justify-between mb-2">
         <Title>Executions</Title>
-        <ToggleGroup aria-label="View mode">
+        <ToggleGroup aria-label="View mode" className="h-9 p-0.5">
           <ToggleButton
             value="list"
             groupValue={viewMode}
@@ -800,24 +792,24 @@ function DAGRuns() {
         </ToggleGroup>
       </div>
       <div>
-        <div className="bg-muted/50 rounded-lg mb-2 space-y-2">
-          <div className="flex flex-wrap gap-2">
+        <div className="mb-3 space-y-3 rounded-lg border border-border bg-card/50 p-3">
+          <div className="flex flex-wrap items-center gap-2">
             <Input
               placeholder="Filter by DAG name..."
               value={searchText}
               onChange={handleNameInputChange}
               onKeyDown={handleInputKeyPress}
-              className="w-[220px]"
+              className="w-[200px]"
             />
             <Input
               placeholder="Filter by Run ID..."
               value={dagRunId}
               onChange={handleDagRunIdInputChange}
               onKeyDown={handleInputKeyPress}
-              className="w-[200px]"
+              className="w-[180px]"
             />
             <Select value={status} onValueChange={handleStatusChange}>
-              <SelectTrigger className="w-[160px]">
+              <SelectTrigger aria-label="Status" className="w-[150px]">
                 <SelectValue placeholder="Status">
                   <StatusSelectDisplay status={status} />
                 </SelectValue>
@@ -846,25 +838,25 @@ function DAGRuns() {
               onLabelsChange={updateLabels}
               availableLabels={availableLabels}
               placeholder="Filter by labels..."
-              className="min-w-[180px] max-w-[300px] h-7"
+              className="h-9 min-w-[170px] max-w-[220px]"
             />
             <Button
               onClick={() => handleSearch()}
-              size="xs"
-              className="px-6 font-medium"
+              className="px-4 font-medium"
             >
-              <Search size={18} className="mr-2" />
+              <Search className="mr-1.5 h-4 w-4" />
               Search
             </Button>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <ToggleGroup aria-label="Date range mode">
+            <ToggleGroup aria-label="Date range mode" className="h-9 p-0.5">
               <ToggleButton
                 value="preset"
                 groupValue={dateRangeMode}
                 onClick={() => handleDateRangeModeChange('preset')}
                 position="first"
                 aria-label="Quick select"
+                className="h-8 px-3"
               >
                 Quick
               </ToggleButton>
@@ -874,6 +866,7 @@ function DAGRuns() {
                 onClick={() => handleDateRangeModeChange('specific')}
                 position="middle"
                 aria-label="Specific date/month/year"
+                className="h-8 px-3"
               >
                 Specific
               </ToggleButton>
@@ -883,13 +876,14 @@ function DAGRuns() {
                 onClick={() => handleDateRangeModeChange('custom')}
                 position="last"
                 aria-label="Custom range"
+                className="h-8 px-3"
               >
                 Custom
               </ToggleButton>
             </ToggleGroup>
             {dateRangeMode === 'preset' ? (
               <Select value={datePreset} onValueChange={handleDatePresetChange}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger aria-label="Date preset" className="w-[180px]">
                   <SelectValue placeholder="Select period" />
                 </SelectTrigger>
                 <SelectContent>
@@ -929,7 +923,10 @@ function DAGRuns() {
                     handleSpecificPeriodChange(newValue, newPeriod);
                   }}
                 >
-                  <SelectTrigger className="w-[120px]">
+                  <SelectTrigger
+                    aria-label="Specific period"
+                    className="w-[120px]"
+                  >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -945,7 +942,7 @@ function DAGRuns() {
                   placeholder={specificPeriod === 'year' ? 'YYYY' : undefined}
                   min={specificPeriod === 'year' ? '2000' : undefined}
                   max={specificPeriod === 'year' ? '2100' : undefined}
-                  className="w-[160px] h-8"
+                  className="h-9 w-[160px]"
                 />
               </>
             ) : (
