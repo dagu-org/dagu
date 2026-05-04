@@ -29,6 +29,7 @@ Examples:
 	dagu enqueue --run-id=run_id my_dag -- P1=foo P2=bar
 	dagu enqueue --name my_custom_name my_dag.yaml -- P1=foo P2=bar
 `,
+			Args: cobra.MinimumNArgs(1),
 		}, enqueueFlags, runEnqueue,
 	)
 }
