@@ -367,7 +367,7 @@ var (
 
 	historyStatusFlag = commandLineFlag{
 		name:  "status",
-		usage: "Filter by execution status (running, succeeded, failed, aborted, queued, waiting, rejected, not_started, partially_succeeded)",
+		usage: "Filter by execution status; accepts a single value or comma-separated values (running, succeeded, failed, aborted, queued, waiting, rejected, not_started, partially_succeeded)",
 	}
 
 	historyRunIDFlag = commandLineFlag{

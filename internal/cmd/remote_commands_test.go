@@ -88,6 +88,21 @@ func TestBuildRemoteHistoryQueryRejectsMalformedLimit(t *testing.T) {
 	assert.Contains(t, err.Error(), "greater than 0")
 }
 
+func TestBuildRemoteHistoryQueryParsesMultipleStatuses(t *testing.T) {
+	t.Parallel()
+
+	command := &cobra.Command{Use: "history"}
+	initFlags(command, historyFlags...)
+	require.NoError(t, command.Flags().Set("status", "running,queued"))
+
+	ctx := &Context{Command: command}
+	query, limit, err := buildRemoteHistoryQuery(ctx, nil)
+	require.NoError(t, err)
+
+	assert.Equal(t, 100, limit)
+	assert.Equal(t, []int{int(core.Running), int(core.Queued)}, query.Statuses)
+}
+
 func TestWaitForRemoteStopHonorsContextCancellation(t *testing.T) {
 	t.Parallel()
 

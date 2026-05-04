@@ -483,11 +483,11 @@ func buildRemoteHistoryQuery(ctx *Context, args []string) (remoteHistoryQuery, i
 	}
 	statusValue, _ := ctx.StringParam("status")
 	if statusValue != "" {
-		s, err := remoteStatusValue(statusValue)
+		statuses, err := remoteStatusValues(statusValue)
 		if err != nil {
 			return query, 0, err
 		}
-		query.Status = &s
+		query.Statuses = statuses
 	}
 	runID, _ := ctx.StringParam("run-id")
 	query.RunID = runID
@@ -511,24 +511,35 @@ func buildRemoteHistoryQuery(ctx *Context, args []string) (remoteHistoryQuery, i
 }
 
 func remoteStatusValue(s string) (int, error) {
-	switch s {
-	case "running":
-		return int(core.Running), nil
-	case "succeeded":
-		return int(core.Succeeded), nil
-	case "failed":
-		return int(core.Failed), nil
-	case "aborted":
-		return int(core.Aborted), nil
-	case "queued":
-		return int(core.Queued), nil
-	case "waiting":
-		return int(core.Waiting), nil
-	case "none":
+	if strings.EqualFold(strings.TrimSpace(s), "none") {
 		return 0, fmt.Errorf("status %q is not supported in remote history", s)
-	default:
-		return 0, fmt.Errorf("invalid status %q", s)
 	}
+
+	status, err := parseStatus(s)
+	if err != nil {
+		return 0, err
+	}
+	return int(status), nil
+}
+
+func remoteStatusValues(s string) ([]int, error) {
+	parts := strings.Split(s, ",")
+	statuses := make([]int, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed == "" {
+			continue
+		}
+		status, err := remoteStatusValue(trimmed)
+		if err != nil {
+			return nil, err
+		}
+		statuses = append(statuses, status)
+	}
+	if len(statuses) == 0 {
+		return nil, fmt.Errorf("invalid status %q", s)
+	}
+	return statuses, nil
 }
 
 func waitForRemoteStop(ctx *Context, name, dagRunID string) error {

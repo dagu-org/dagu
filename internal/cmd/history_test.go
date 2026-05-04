@@ -308,6 +308,59 @@ func TestParseStatus(t *testing.T) {
 	}
 }
 
+func TestParseStatuses(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    string
+		expected []core.Status
+		wantErr  bool
+	}{
+		{
+			name:     "comma-separated statuses",
+			input:    "running,queued",
+			expected: []core.Status{core.Running, core.Queued},
+		},
+		{
+			name:     "trims spaces",
+			input:    " running, succeeded ",
+			expected: []core.Status{core.Running, core.Succeeded},
+		},
+		{
+			name:     "ignores empty entries",
+			input:    "running,,queued,",
+			expected: []core.Status{core.Running, core.Queued},
+		},
+		{
+			name:    "rejects empty list",
+			input:   ",,",
+			wantErr: true,
+		},
+		{
+			name:    "rejects mixed invalid status",
+			input:   "running,unknown",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := parseStatuses(tt.input)
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "invalid status")
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, got)
+		})
+	}
+}
+
 func TestParseLabels(t *testing.T) {
 	t.Parallel()
 

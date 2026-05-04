@@ -46,12 +46,12 @@ func (e *remoteError) NotFound() bool {
 }
 
 type remoteHistoryQuery struct {
-	Name   string
-	From   *int64
-	To     *int64
-	Status *int
-	RunID  string
-	Labels []string
+	Name     string
+	From     *int64
+	To       *int64
+	Statuses []int
+	RunID    string
+	Labels   []string
 }
 
 func newRemoteClient(ctx *clicontext.Context) (*remoteClient, error) {
@@ -166,8 +166,12 @@ func (c *remoteClient) listDAGRuns(ctx context.Context, query remoteHistoryQuery
 	if query.To != nil {
 		params["toDate"] = fmt.Sprintf("%d", *query.To)
 	}
-	if query.Status != nil {
-		params["status"] = fmt.Sprintf("%d", *query.Status)
+	if len(query.Statuses) > 0 {
+		values := make([]string, 0, len(query.Statuses))
+		for _, status := range query.Statuses {
+			values = append(values, fmt.Sprintf("%d", status))
+		}
+		params["status"] = strings.Join(values, ",")
 	}
 	if query.RunID != "" {
 		params["dagRunId"] = query.RunID
