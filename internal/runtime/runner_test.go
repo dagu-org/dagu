@@ -1748,33 +1748,73 @@ func TestRunner_DryRunWithHandlers(t *testing.T) {
 
 func TestRunner_ConcurrentExecution(t *testing.T) {
 	steps := func() []core.Step {
+		sleep := test.Sleep(300 * time.Millisecond)
 		return []core.Step{
-			newStep("1", withScript("sleep 0.3")),
-			newStep("2", withScript("sleep 0.3")),
-			newStep("3", withScript("sleep 0.3")),
+			newStep("1", withScript(sleep)),
+			newStep("2", withScript(sleep)),
+			newStep("3", withScript(sleep)),
 		}
+	}
+
+	type nodeInterval struct {
+		name     string
+		started  time.Time
+		finished time.Time
+	}
+	intervals := func(result runResult) []nodeInterval {
+		names := []string{"1", "2", "3"}
+		ret := make([]nodeInterval, 0, len(names))
+		for _, name := range names {
+			state := result.nodeByName(t, name).State()
+			require.False(t, state.StartedAt.IsZero(), "step %s should record a start time", name)
+			require.False(t, state.FinishedAt.IsZero(), "step %s should record a finish time", name)
+			require.False(t, state.FinishedAt.Before(state.StartedAt), "step %s should finish after it starts", name)
+			ret = append(ret, nodeInterval{
+				name:     name,
+				started:  state.StartedAt,
+				finished: state.FinishedAt,
+			})
+		}
+		return ret
+	}
+	overlaps := func(a, b nodeInterval) bool {
+		return a.started.Before(b.finished) && b.started.Before(a.finished)
 	}
 
 	sequential := setupRunner(t, withMaxActiveRuns(1))
 	planSequential := sequential.newPlan(t, steps()...)
-	startSequential := time.Now()
 	resultSequential := planSequential.assertRun(t, core.Succeeded)
-	elapsedSequential := time.Since(startSequential)
 	resultSequential.assertNodeStatus(t, "1", core.NodeSucceeded)
 	resultSequential.assertNodeStatus(t, "2", core.NodeSucceeded)
 	resultSequential.assertNodeStatus(t, "3", core.NodeSucceeded)
+	sequentialIntervals := intervals(resultSequential)
+	for i := range sequentialIntervals {
+		for j := i + 1; j < len(sequentialIntervals); j++ {
+			assert.False(t, overlaps(sequentialIntervals[i], sequentialIntervals[j]),
+				"sequential steps %s and %s should not overlap",
+				sequentialIntervals[i].name, sequentialIntervals[j].name)
+		}
+	}
 
 	concurrent := setupRunner(t, withMaxActiveRuns(3))
 	planConcurrent := concurrent.newPlan(t, steps()...)
-	startConcurrent := time.Now()
 	resultConcurrent := planConcurrent.assertRun(t, core.Succeeded)
-	elapsedConcurrent := time.Since(startConcurrent)
 	resultConcurrent.assertNodeStatus(t, "1", core.NodeSucceeded)
 	resultConcurrent.assertNodeStatus(t, "2", core.NodeSucceeded)
 	resultConcurrent.assertNodeStatus(t, "3", core.NodeSucceeded)
+	concurrentIntervals := intervals(resultConcurrent)
+	firstFinishedAt := concurrentIntervals[0].finished
+	for _, interval := range concurrentIntervals[1:] {
+		if interval.finished.Before(firstFinishedAt) {
+			firstFinishedAt = interval.finished
+		}
+	}
 
-	assert.Greater(t, elapsedSequential, elapsedConcurrent)
-	assert.Greater(t, elapsedSequential-elapsedConcurrent, 200*time.Millisecond)
+	for _, interval := range concurrentIntervals {
+		assert.False(t, interval.started.After(firstFinishedAt),
+			"concurrent step %s should start before the first concurrent step finishes",
+			interval.name)
+	}
 }
 
 func TestRunner_ErrorHandling(t *testing.T) {
