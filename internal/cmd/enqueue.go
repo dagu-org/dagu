@@ -18,6 +18,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Enqueue returns the cobra command for queueing a DAG-run.
 func Enqueue() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
