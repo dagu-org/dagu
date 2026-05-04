@@ -8,6 +8,7 @@ import (
 
 	"github.com/dagucloud/dagu/internal/cmd"
 	"github.com/dagucloud/dagu/internal/test"
+	"github.com/stretchr/testify/require"
 )
 
 func TestEnqueueCommand(t *testing.T) {
@@ -57,4 +58,16 @@ steps:
 			th.RunCommand(t, cmd.Enqueue(), tc)
 		})
 	}
+}
+
+func TestEnqueueCommand_RequiresDAGDefinition(t *testing.T) {
+	t.Parallel()
+
+	th := test.SetupCommand(t)
+
+	err := th.RunCommandWithError(t, cmd.Enqueue(), test.CmdTest{
+		Args: []string{"enqueue"},
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "requires at least 1 arg")
 }
