@@ -1747,74 +1747,96 @@ func TestRunner_DryRunWithHandlers(t *testing.T) {
 }
 
 func TestRunner_ConcurrentExecution(t *testing.T) {
-	steps := func() []core.Step {
-		sleep := test.Sleep(300 * time.Millisecond)
+	sequentialGuardScript := func(name, lockDir string) string {
+		if windowsShellTest() {
+			return fmt.Sprintf(`
+				$lockDir = %s
+				if (-not (New-Item -ItemType Directory -Path $lockDir -ErrorAction SilentlyContinue)) {
+					Write-Error "sequential step %s overlapped another active step"
+					exit 1
+				}
+				try {
+					%s
+				} finally {
+					Remove-Item -LiteralPath $lockDir -Force
+				}
+			`, test.PowerShellQuote(shellTestPath(lockDir)), name, test.Sleep(platformTestDuration(300*time.Millisecond, 600*time.Millisecond)))
+		}
+
+		return fmt.Sprintf(`
+			lock_dir=%s
+			if ! mkdir "$lock_dir"; then
+				echo "sequential step %s overlapped another active step" >&2
+				exit 1
+			fi
+			trap 'rmdir "$lock_dir"' EXIT
+			%s
+		`, test.PosixQuote(lockDir), name, test.Sleep(300*time.Millisecond))
+	}
+
+	concurrentBarrierScript := func(name, readyDir string, readyCount int, timeout time.Duration) string {
+		if windowsShellTest() {
+			return fmt.Sprintf(`
+				$readyDir = %s
+				New-Item -ItemType Directory -Path $readyDir -Force | Out-Null
+				New-Item -ItemType File -Path (Join-Path $readyDir %s) -Force | Out-Null
+				$deadline = (Get-Date).AddSeconds(%d)
+				while (@(Get-ChildItem -LiteralPath $readyDir -File).Count -lt %d) {
+					if ((Get-Date) -ge $deadline) {
+						Write-Error "concurrent step %s did not observe all active steps"
+						exit 1
+					}
+					Start-Sleep -Milliseconds 50
+				}
+			`, test.PowerShellQuote(shellTestPath(readyDir)), test.PowerShellQuote(name), int(timeout/time.Second), readyCount, name)
+		}
+
+		return fmt.Sprintf(`
+			ready_dir=%s
+			mkdir -p "$ready_dir"
+			: > "$ready_dir/%s"
+			deadline=$(( $(date +%%s) + %d ))
+			while true; do
+				ready_count=$(find "$ready_dir" -type f | wc -l | tr -d '[:space:]')
+				if [ "$ready_count" -ge %d ]; then
+					break
+				fi
+				if [ "$(date +%%s)" -ge "$deadline" ]; then
+					echo "concurrent step %s did not observe all active steps" >&2
+					exit 1
+				fi
+				sleep 0.05
+			done
+		`, test.PosixQuote(readyDir), name, int(timeout/time.Second), readyCount, name)
+	}
+
+	steps := func(script func(string) string) []core.Step {
 		return []core.Step{
-			newStep("1", withScript(sleep)),
-			newStep("2", withScript(sleep)),
-			newStep("3", withScript(sleep)),
+			newStep("1", withScript(script("1"))),
+			newStep("2", withScript(script("2"))),
+			newStep("3", withScript(script("3"))),
 		}
 	}
 
-	type nodeInterval struct {
-		name     string
-		started  time.Time
-		finished time.Time
-	}
-	intervals := func(result runResult) []nodeInterval {
-		names := []string{"1", "2", "3"}
-		ret := make([]nodeInterval, 0, len(names))
-		for _, name := range names {
-			state := result.nodeByName(t, name).State()
-			require.False(t, state.StartedAt.IsZero(), "step %s should record a start time", name)
-			require.False(t, state.FinishedAt.IsZero(), "step %s should record a finish time", name)
-			require.False(t, state.FinishedAt.Before(state.StartedAt), "step %s should finish after it starts", name)
-			ret = append(ret, nodeInterval{
-				name:     name,
-				started:  state.StartedAt,
-				finished: state.FinishedAt,
-			})
-		}
-		return ret
-	}
-	overlaps := func(a, b nodeInterval) bool {
-		return a.started.Before(b.finished) && b.started.Before(a.finished)
-	}
-
+	lockDir := filepath.Join(t.TempDir(), "active-step")
 	sequential := setupRunner(t, withMaxActiveRuns(1))
-	planSequential := sequential.newPlan(t, steps()...)
+	planSequential := sequential.newPlan(t, steps(func(name string) string {
+		return sequentialGuardScript(name, lockDir)
+	})...)
 	resultSequential := planSequential.assertRun(t, core.Succeeded)
 	resultSequential.assertNodeStatus(t, "1", core.NodeSucceeded)
 	resultSequential.assertNodeStatus(t, "2", core.NodeSucceeded)
 	resultSequential.assertNodeStatus(t, "3", core.NodeSucceeded)
-	sequentialIntervals := intervals(resultSequential)
-	for i := range sequentialIntervals {
-		for j := i + 1; j < len(sequentialIntervals); j++ {
-			assert.False(t, overlaps(sequentialIntervals[i], sequentialIntervals[j]),
-				"sequential steps %s and %s should not overlap",
-				sequentialIntervals[i].name, sequentialIntervals[j].name)
-		}
-	}
 
+	readyDir := filepath.Join(t.TempDir(), "ready")
 	concurrent := setupRunner(t, withMaxActiveRuns(3))
-	planConcurrent := concurrent.newPlan(t, steps()...)
+	planConcurrent := concurrent.newPlan(t, steps(func(name string) string {
+		return concurrentBarrierScript(name, readyDir, 3, platformTestDuration(10*time.Second, 30*time.Second))
+	})...)
 	resultConcurrent := planConcurrent.assertRun(t, core.Succeeded)
 	resultConcurrent.assertNodeStatus(t, "1", core.NodeSucceeded)
 	resultConcurrent.assertNodeStatus(t, "2", core.NodeSucceeded)
 	resultConcurrent.assertNodeStatus(t, "3", core.NodeSucceeded)
-	concurrentIntervals := intervals(resultConcurrent)
-	firstFinishedAt := concurrentIntervals[0].finished
-	for _, interval := range concurrentIntervals[1:] {
-		if interval.finished.Before(firstFinishedAt) {
-			firstFinishedAt = interval.finished
-		}
-	}
-
-	for _, interval := range concurrentIntervals {
-		assert.False(t, interval.started.After(firstFinishedAt),
-			"concurrent step %s should start before the first concurrent step finishes",
-			interval.name)
-	}
 }
 
 func TestRunner_ErrorHandling(t *testing.T) {
