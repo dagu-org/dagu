@@ -143,6 +143,22 @@ func (store *Storage) useIndexedMetadata() bool {
 	return true
 }
 
+func (store *Storage) readSuspendFlags(ctx context.Context) dagindex.SuspendFlags {
+	flags := make(dagindex.SuspendFlags)
+	flagEntries, err := os.ReadDir(store.flagsBaseDir)
+	if err != nil {
+		// Flags directory may not exist yet (e.g., new installations).
+		logger.Debug(ctx, "Could not read flags directory", tag.Dir(store.flagsBaseDir))
+		return flags
+	}
+	for _, fe := range flagEntries {
+		if !fe.IsDir() {
+			flags[fe.Name()] = struct{}{}
+		}
+	}
+	return flags
+}
+
 func (store *Storage) defaultLoadOptions(opts ...spec.LoadOption) []spec.LoadOption {
 	loadOpts := make([]spec.LoadOption, 0, len(opts)+1)
 	if store.baseConfigPath != "" {
@@ -371,18 +387,7 @@ func (store *Storage) loadOrRebuildIndex(ctx context.Context) []*indexv1.DAGInde
 	}
 
 	// Build suspend flags set.
-	flags := make(dagindex.SuspendFlags)
-	flagEntries, err := os.ReadDir(store.flagsBaseDir)
-	if err != nil {
-		// Flags directory may not exist yet (e.g., new installations).
-		logger.Debug(ctx, "Could not read flags directory", tag.Dir(store.flagsBaseDir))
-	} else {
-		for _, fe := range flagEntries {
-			if !fe.IsDir() {
-				flags[fe.Name()] = struct{}{}
-			}
-		}
-	}
+	flags := store.readSuspendFlags(ctx)
 
 	indexPath := filepath.Join(store.baseDir, dagindex.IndexFileName)
 
@@ -497,8 +502,13 @@ func (store *Storage) List(ctx context.Context, opts exec.ListDAGsOptions) (exec
 			}
 		}
 		// Pre-calculate next run times to avoid recalculating on each comparison
+		suspendFlags := store.readSuspendFlags(ctx)
 		nextRunTimes := make(map[*core.DAG]time.Time, len(allDags))
 		for _, dag := range allDags {
+			if _, suspended := suspendFlags[fileName(dag.FileName())]; suspended {
+				nextRunTimes[dag] = time.Time{}
+				continue
+			}
 			nextRunTimes[dag] = projectNextRun(dag, now)
 		}
 
