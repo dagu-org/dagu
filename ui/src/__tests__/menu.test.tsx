@@ -139,101 +139,111 @@ beforeEach(() => {
 });
 
 describe('sidebar menu', () => {
-  it('organizes navigation into multi-level operational accordions', () => {
+  it('renders top-level operational sections as collapsed accordions', () => {
     renderMenu();
 
-    expect(screen.getByRole('link', { name: /overview/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Overview' })).toHaveAttribute(
       'href',
       '/'
     );
-    expect(screen.getByRole('link', { name: /overview/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Overview' })).toHaveAttribute(
       'aria-current',
       'page'
     );
     expect(
-      screen.queryByRole('button', { name: /toggle overview section/i })
+      screen.queryByRole('button', { name: 'Toggle Overview section' })
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('link', { name: /timeline/i })
+      screen.queryByRole('link', { name: 'Timeline' })
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('link', { name: /cockpit/i })
+      screen.queryByRole('link', { name: 'Cockpit' })
     ).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /workflows/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Workflows' })).toHaveAttribute(
       'href',
       '/dags'
     );
     expect(
-      screen.getByRole('button', { name: /toggle workflows section/i })
+      screen.getByRole('button', { name: 'Toggle Workflows section' })
     ).toHaveAttribute('aria-expanded', 'false');
     expect(
-      screen.queryByRole('link', { name: /definitions/i })
+      screen.queryByRole('link', { name: 'Definitions' })
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole('link', { name: /workflows/i }).querySelector('svg')
+      screen.getByRole('link', { name: 'Workflows' }).querySelector('svg')
     ).not.toBeNull();
-    expect(screen.getByRole('link', { name: /^executions$/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Executions' })).toHaveAttribute(
       'href',
       '/dag-runs'
     );
     expect(
-      screen.getByRole('button', { name: /toggle executions section/i })
+      screen.getByRole('button', { name: 'Toggle Executions section' })
     ).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.getByRole('link', { name: /monitor/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Monitor' })).toHaveAttribute(
       'href',
       '/system-status'
     );
     expect(
-      screen.getByRole('button', { name: /toggle monitor section/i })
+      screen.getByRole('button', { name: 'Toggle Monitor section' })
     ).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.getByRole('link', { name: /integrations/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Integrations' })).toHaveAttribute(
       'href',
       '/integrations'
     );
     expect(
-      screen.getByRole('button', { name: /toggle integrations section/i })
+      screen.getByRole('button', { name: 'Toggle Integrations section' })
     ).toHaveAttribute('aria-expanded', 'false');
     expect(
-      screen.getByRole('link', { name: /administration/i })
+      screen.getByRole('link', { name: 'Administration' })
     ).toHaveAttribute('href', '/administration');
     expect(
-      screen.getByRole('button', { name: /toggle administration section/i })
+      screen.getByRole('button', { name: 'Toggle Administration section' })
     ).toHaveAttribute('aria-expanded', 'false');
 
-    fireEvent.click(screen.getByRole('link', { name: /workflows/i }));
     expect(
-      screen.getByRole('button', { name: /toggle workflows section/i })
+      screen.queryByRole('link', { name: 'Docs' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'API Docs' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Dashboard' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('expands workflow, execution, and monitor sections', () => {
+    renderMenu();
+
+    fireEvent.click(screen.getByRole('link', { name: 'Workflows' }));
+    expect(
+      screen.getByRole('button', { name: 'Toggle Workflows section' })
     ).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(
-      screen.getByRole('button', { name: /toggle workflows section/i })
+      screen.getByRole('button', { name: 'Toggle Workflows section' })
     );
     expect(
-      screen.getByRole('button', { name: /toggle workflows section/i })
+      screen.getByRole('button', { name: 'Toggle Workflows section' })
     ).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.queryByRole('link', { name: /definitions/i })).toBeNull();
-    expect(screen.getByRole('link', { name: /git sync/i })).toBeVisible();
+    expect(screen.queryByRole('link', { name: 'Definitions' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Git Sync' })).toBeVisible();
 
     fireEvent.click(
-      screen.getByRole('button', { name: /toggle executions section/i })
+      screen.getByRole('button', { name: 'Toggle Executions section' })
     );
-    expect(screen.queryByRole('link', { name: /^runs$/i })).toBeNull();
-    const executionSubmenuItems = [
-      screen.getByRole('link', { name: /queues/i }),
-    ];
-    for (const item of executionSubmenuItems) {
-      expect(item).toBeVisible();
-      expect(item.querySelector('svg')).toBeNull();
-    }
+    expect(screen.queryByRole('link', { name: 'Runs' })).toBeNull();
+    const queueLink = screen.getByRole('link', { name: 'Queues' });
+    expect(queueLink).toBeVisible();
+    expect(queueLink.querySelector('svg')).toBeNull();
 
     fireEvent.click(
-      screen.getByRole('button', { name: /toggle monitor section/i })
+      screen.getByRole('button', { name: 'Toggle Monitor section' })
     );
     expect(
-      screen.queryByRole('link', { name: /system status/i })
+      screen.queryByRole('link', { name: 'System Status' })
     ).not.toBeInTheDocument();
     const monitorSubmenuItems = [
-      screen.getByRole('link', { name: /events/i }),
-      screen.getByRole('link', { name: /audit logs/i }),
+      screen.getByRole('link', { name: 'Events' }),
+      screen.getByRole('link', { name: 'Audit Logs' }),
     ];
     for (const item of monitorSubmenuItems) {
       expect(item).toBeVisible();
@@ -241,22 +251,26 @@ describe('sidebar menu', () => {
     }
 
     const workflowSubmenuItems = [
-      screen.getByRole('link', { name: /search/i }),
-      screen.getByRole('link', { name: /base config/i }),
-      screen.getByRole('link', { name: /runbooks/i }),
-      screen.getByRole('link', { name: /git sync/i }),
+      screen.getByRole('link', { name: 'Search' }),
+      screen.getByRole('link', { name: 'Base Config' }),
+      screen.getByRole('link', { name: 'Runbooks' }),
+      screen.getByRole('link', { name: 'Git Sync' }),
     ];
     for (const item of workflowSubmenuItems) {
       expect(item).toBeVisible();
       expect(item.querySelector('svg')).toBeNull();
     }
+  });
+
+  it('expands integration and administration nested sections', () => {
+    renderMenu();
 
     fireEvent.click(
-      screen.getByRole('button', { name: /toggle integrations section/i })
+      screen.getByRole('button', { name: 'Toggle Integrations section' })
     );
     const integrationSubmenuItems = [
-      screen.getByRole('link', { name: /webhooks/i }),
-      screen.getByRole('link', { name: /api reference/i }),
+      screen.getByRole('link', { name: 'Webhooks' }),
+      screen.getByRole('link', { name: 'API Reference' }),
     ];
     for (const item of integrationSubmenuItems) {
       expect(item).toBeVisible();
@@ -264,13 +278,13 @@ describe('sidebar menu', () => {
     }
 
     fireEvent.click(
-      screen.getByRole('button', { name: /toggle administration section/i })
+      screen.getByRole('button', { name: 'Toggle Administration section' })
     );
     const accessSection = screen.getByRole('button', {
-      name: /access section/i,
+      name: 'Access section',
     });
     const infrastructureSection = screen.getByRole('button', {
-      name: /infrastructure section/i,
+      name: 'Infrastructure section',
     });
     expect(accessSection).toBeVisible();
     expect(
@@ -281,44 +295,34 @@ describe('sidebar menu', () => {
       infrastructureSection.querySelector('svg:not(.lucide-chevron-down)')
     ).toBeNull();
 
-    expect(screen.getByRole('link', { name: /agent/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Agent' })).toHaveAttribute(
       'href',
       '/agent'
     );
     expect(
-      screen.getByRole('button', { name: /toggle agent section/i })
+      screen.getByRole('button', { name: 'Toggle Agent section' })
     ).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(
-      screen.getByRole('button', { name: /toggle agent section/i })
+      screen.getByRole('button', { name: 'Toggle Agent section' })
     );
     const agentSubmenuItems = [
-      screen.getByRole('link', { name: /models/i }),
-      screen.getByRole('link', { name: /tools/i }),
-      screen.getByRole('link', { name: /memory/i }),
-      screen.getByRole('link', { name: /souls/i }),
+      screen.getByRole('link', { name: 'Models' }),
+      screen.getByRole('link', { name: 'Tools' }),
+      screen.getByRole('link', { name: 'Memory' }),
+      screen.getByRole('link', { name: 'Souls' }),
     ];
     for (const item of agentSubmenuItems) {
       expect(item).toBeVisible();
       expect(item.querySelector('svg')).toBeNull();
     }
-    expect(screen.getByRole('link', { name: /models/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Models' })).toHaveAttribute(
       'href',
       '/agent-settings'
     );
-    expect(screen.getByRole('link', { name: /tools/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Tools' })).toHaveAttribute(
       'href',
       '/agent-tools'
     );
-
-    expect(
-      screen.queryByRole('link', { name: /^docs$/i })
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('link', { name: /api docs/i })
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('link', { name: /^dashboard$/i })
-    ).not.toBeInTheDocument();
   });
 
   it('uses Workflows as the selectable Definitions entry', () => {
