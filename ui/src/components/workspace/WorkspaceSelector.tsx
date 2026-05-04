@@ -4,7 +4,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import ConfirmModal from '@/components/ui/confirm-dialog';
-import { Briefcase, Plus, Trash2 } from 'lucide-react';
+import { Folders, Plus, Trash2 } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -173,7 +173,7 @@ export function WorkspaceSelector({
           >
             {variant === 'sidebar' ? (
               <div className="flex items-center gap-2 min-w-0">
-                <Briefcase
+                <Folders
                   size={18}
                   className="text-sidebar-foreground flex-shrink-0"
                 />
