@@ -81,7 +81,10 @@ steps:
   await expect(row).toContainText('OK');
 
   await selectRemoteNode(page, remoteNodeName);
-  await page.getByRole('link', { name: 'Definitions' }).click();
+  await page
+    .locator('aside')
+    .getByRole('link', { name: 'Workflows' })
+    .click();
   await expect(page).toHaveURL(/\/dags$/);
   await expect(page.getByRole('main')).toContainText(remoteDagName);
   await expect(page.getByRole('main')).not.toContainText(localDagName);
