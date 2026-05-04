@@ -30,7 +30,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { components, Status } from '../../../../api/v1/schema';
 import type { Config } from '../../../../contexts/ConfigContext';
 import dayjs from '../../../../lib/dayjs';
@@ -785,6 +785,19 @@ function getDefaultSortOrder(field: string): string {
   return 'asc';
 }
 
+function buildGrepSearchUrl(searchText: string): string {
+  const params = new URLSearchParams();
+  const query = searchText.trim();
+
+  if (query) {
+    params.set('q', query);
+    params.set('scope', 'dags');
+    return `/search?${params.toString()}`;
+  }
+
+  return '/search';
+}
+
 // --- Header Component for both Server-side and Client-side Sorting ---
 const SortableHeader = ({
   column,
@@ -1168,46 +1181,26 @@ function DAGTable({
     <div className="space-y-2">
       {/* Search, Filter and Pagination Controls */}
       <div
-        className={`bg-muted/50 rounded-lg mb-2 space-y-2 ${
+        data-testid="workflow-controls"
+        className={`mb-3 space-y-3 rounded-lg border border-border bg-card/50 p-3 ${
           isLoading ? 'opacity-70 pointer-events-none' : ''
         }`}
       >
         <div className="flex flex-wrap items-center gap-2">
           {/* Search input */}
-          <div className="relative flex-1 min-w-[120px] max-w-[280px]">
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-              <Search className="h-4 w-4" />
-            </div>
-            <Input
-              type="text"
-              placeholder="Search..."
-              value={searchText}
-              onChange={(e) => handleSearchTextChange(e.target.value)}
-              className="pl-10 h-9 border border-border rounded-md w-full"
-            />
-            {searchText && (
-              <button
-                onClick={() => handleSearchTextChange('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="Clear search"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                  <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-              </button>
-            )}
-          </div>
+          <Input
+            type="text"
+            placeholder="Filter by workflow name..."
+            value={searchText}
+            onChange={(e) => handleSearchTextChange(e.target.value)}
+            className="w-[200px]"
+          />
+          <Button asChild variant="outline" className="px-4 font-medium">
+            <Link to={buildGrepSearchUrl(searchText)}>
+              <Search className="mr-1.5 h-4 w-4" />
+              Grep
+            </Link>
+          </Button>
 
           {/* Label filter */}
           <LabelCombobox
@@ -1215,7 +1208,7 @@ function DAGTable({
             onLabelsChange={handleSearchLabelsChange}
             availableLabels={availableLabels}
             placeholder="Filter by labels..."
-            className="min-w-[180px] max-w-[300px] flex-shrink-0 h-8"
+            className="h-9 min-w-[170px] max-w-[220px]"
           />
 
           {/* Pagination - pushed to right */}

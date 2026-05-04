@@ -18,34 +18,8 @@ import { useQuery } from '@/hooks/api';
 import { WorkspaceKind } from '@/lib/workspace';
 import DagsPage from '../index';
 
-vi.mock('@/components/SplitLayout', () => {
-  return {
-    PanelWidthContext: React.createContext<number | null>(null),
-    default: ({
-      leftPanel,
-      rightPanel,
-    }: {
-      leftPanel: React.ReactNode;
-      rightPanel: React.ReactNode;
-    }) => (
-      <div>
-        <div>{leftPanel}</div>
-        <div>{rightPanel}</div>
-      </div>
-    ),
-  };
-});
-
-vi.mock('@/contexts/TabContext', () => ({
-  TabProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  useTabContext: () => ({
-    tabs: [],
-    activeTabId: null,
-    selectDAG: vi.fn(),
-    addTab: vi.fn(),
-    closeTab: vi.fn(),
-    getActiveFileName: () => '',
-  }),
+const { clientGetMock } = vi.hoisted(() => ({
+  clientGetMock: vi.fn(),
 }));
 
 vi.mock('@/contexts/UserPreference', () => ({
@@ -58,7 +32,9 @@ vi.mock('@/contexts/UserPreference', () => ({
 }));
 
 vi.mock('@/features/dags/components/dag-details', () => ({
-  DAGDetailsPanel: () => null,
+  DAGDetailsModal: ({ fileName }: { fileName: string }) => (
+    <div role="dialog">Workflow modal for {fileName}</div>
+  ),
 }));
 
 vi.mock('@/features/dags/components/dag-editor', () => ({
@@ -67,17 +43,37 @@ vi.mock('@/features/dags/components/dag-editor', () => ({
 
 vi.mock('@/features/dags/components/dag-list', () => ({
   DAGTable: ({
+    dags,
     searchText,
     handleSearchTextChange,
+    selectedDAG,
+    onSelectDAG,
   }: {
+    dags: Array<{ fileName: string; dag: { name: string } }>;
     searchText: string;
     handleSearchTextChange: (value: string) => void;
+    selectedDAG?: string | null;
+    onSelectDAG?: (fileName: string, title: string) => void;
   }) => (
-    <input
-      aria-label="Search DAGs"
-      value={searchText}
-      onChange={(event) => handleSearchTextChange(event.target.value)}
-    />
+    <div>
+      <input
+        aria-label="Search DAGs"
+        value={searchText}
+        onChange={(event) => handleSearchTextChange(event.target.value)}
+      />
+      <button
+        type="button"
+        aria-pressed={selectedDAG === 'demo.yaml'}
+        onClick={() => onSelectDAG?.('demo.yaml', 'demo')}
+      >
+        Open demo workflow
+      </button>
+      <ul>
+        {dags.map((dag) => (
+          <li key={dag.fileName}>{dag.fileName}</li>
+        ))}
+      </ul>
+    </div>
   ),
 }));
 
@@ -87,6 +83,9 @@ vi.mock('@/features/dags/components/dag-list/DAGListHeader', () => ({
 
 vi.mock('@/hooks/api', () => ({
   useQuery: vi.fn(),
+  useClient: () => ({
+    GET: clientGetMock,
+  }),
 }));
 
 vi.mock('@/hooks/useDAGsListSSE', () => ({
@@ -105,6 +104,24 @@ type QueryCall = {
   path: string;
   init: unknown;
   config: unknown;
+};
+
+type DagsPageResponse = {
+  dags: Array<{
+    fileName: string;
+    dag: {
+      name: string;
+    };
+    latestDAGRun: Record<string, unknown>;
+  }>;
+  errors: string[];
+  pagination: {
+    totalRecords: number;
+    currentPage: number;
+    totalPages: number;
+    nextPage: number;
+    prevPage: number;
+  };
 };
 
 const useQueryMock = useQuery as unknown as {
@@ -194,12 +211,33 @@ function renderPage(setTitle = vi.fn()) {
 
 describe('DagsPage', () => {
   const calls: QueryCall[] = [];
+  let dagsPageResponse: DagsPageResponse;
 
   beforeEach(() => {
     vi.useFakeTimers();
     localStorage.clear();
     sessionStorage.clear();
     calls.length = 0;
+    clientGetMock.mockReset();
+    dagsPageResponse = {
+      dags: [
+        {
+          fileName: 'demo.yaml',
+          dag: {
+            name: 'demo',
+          },
+          latestDAGRun: {},
+        },
+      ],
+      errors: [],
+      pagination: {
+        totalRecords: 1,
+        currentPage: 1,
+        totalPages: 1,
+        nextPage: 0,
+        prevPage: 0,
+      },
+    };
 
     useQueryMock.mockImplementation((path, init, config) => {
       calls.push({ path, init, config });
@@ -225,21 +263,7 @@ describe('DagsPage', () => {
         );
 
         return {
-          data: {
-            dags: [
-              {
-                fileName: 'demo.yaml',
-                dag: {
-                  name: 'demo',
-                },
-                latestDAGRun: {},
-              },
-            ],
-            errors: [],
-            pagination: {
-              totalPages: 1,
-            },
-          },
+          data: dagsPageResponse,
           isLoading: name.length > 0,
           mutate: vi.fn(),
           ...(name.length > 0 && !keepPreviousData ? { data: undefined } : {}),
@@ -295,5 +319,88 @@ describe('DagsPage', () => {
     renderPage(setTitle);
 
     expect(setTitle).toHaveBeenCalledWith('Workflows');
+  });
+
+  it('opens workflow details in the page-level modal when a table row is selected', () => {
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open demo workflow' }));
+
+    expect(screen.getByRole('dialog')).toHaveTextContent(
+      'Workflow modal for demo.yaml'
+    );
+    expect(
+      screen.getByRole('button', { name: 'Open demo workflow' })
+    ).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('loads and appends the next workflow page from the footer control', async () => {
+    dagsPageResponse = {
+      dags: [
+        {
+          fileName: 'demo.yaml',
+          dag: {
+            name: 'demo',
+          },
+          latestDAGRun: {},
+        },
+      ],
+      errors: [],
+      pagination: {
+        totalRecords: 2,
+        currentPage: 1,
+        totalPages: 2,
+        nextPage: 2,
+        prevPage: 0,
+      },
+    };
+    clientGetMock.mockResolvedValueOnce({
+      data: {
+        dags: [
+          {
+            fileName: 'next.yaml',
+            dag: {
+              name: 'next',
+            },
+            latestDAGRun: {},
+          },
+        ],
+        errors: [],
+        pagination: {
+          totalRecords: 2,
+          currentPage: 2,
+          totalPages: 2,
+          nextPage: 0,
+          prevPage: 1,
+        },
+      },
+    });
+
+    renderPage();
+
+    expect(screen.getByText('demo.yaml')).toBeVisible();
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Load more workflows' })
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.getByText('next.yaml')).toBeVisible();
+    expect(screen.getByText('demo.yaml')).toBeVisible();
+    expect(clientGetMock).toHaveBeenCalledWith(
+      '/dags',
+      expect.objectContaining({
+        params: {
+          query: expect.objectContaining({
+            remoteNode: 'remote-a',
+            page: 2,
+            perPage: 200,
+          }),
+        },
+      })
+    );
   });
 });
