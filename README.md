@@ -14,50 +14,11 @@
   </p>
 </div>
 
-## Run Scripts, Cron Jobs, and Runbooks as Workflows
+## Local-first workflow engine for production scripts
 
-Dagu turns the commands your team already runs into scheduled, observable workflows that are safe to rerun.
+Define workflows in simple declarative YAML syntax, execute them anywhere with a single binary, compose complex pipelines from reusable sub-workflows, and distribute tasks across workers. The built-in Web UI eliminates the need for SSHing into servers to debug failed runs, check logs, or retry steps manually. All without requiring databases, message brokers, or code changes to your existing scripts. It natively supports command execution via SSH, running docker containers, kubernetes jobs, and you can extend it with custom step types for your specific use case.
 
-Keep your automation as shell scripts, Python scripts, containers, SSH commands, SQL jobs, HTTP calls, and runbooks. Define the workflow in plain YAML, run it with one binary, and get the operational layer that cron and ad hoc scripts are missing: dependencies, retries, queues, logs, artifacts, approvals, API/webhooks, and optional distributed workers.
-
-No database required. No message broker. No framework rewrite. No platform migration. State is file-backed by default, and a full local server starts with `dagu start-all`.
-
-| Existing work | Dagu adds |
-|---|---|
-| Cron jobs scattered across machines | Central schedules, history, logs, retries, and catch-up |
-| Scripts that only one person knows how to run | Parameters, approvals, artifacts, and reviewed execution |
-| Long-running or fragile jobs | Queues, concurrency limits, timeouts, retries, and recovery |
-| Jobs that need private hosts, containers, or networks | Self-hosted execution with optional distributed workers |
-
-```yaml
-schedule:
-  - "0 2 * * *"
-
-steps:
-  - name: backup-db
-    command: ./scripts/backup-db.sh
-
-  - name: upload
-    command: aws s3 cp ./backup.tar.gz s3://ops-backups/
-    depends: [backup-db]
-    retryPolicy:
-      limit: 3
-      intervalSec: 30
-```
-
-Use Dagu when cron is too hidden, scripts are too manual, and a full workflow stack would be more machinery than the job needs.
-
-Save the YAML above as `backup.yaml` and run it with:
-
-```sh
-dagu start backup.yaml
-```
-
-For a quick look at workflow YAML, see the [examples](https://docs.dagu.sh/writing-workflows/examples).
-
-<div align="center">
-  <img src="./assets/images/dagu-demo.gif" width="720" alt="Dagu demo showing the cockpit kanban view and YAML workflow editing">
-</div>
+Built for developers who want powerful workflow orchestration without the operational overhead. For a quick feel of how it works, take a look at the [examples](https://docs.daguit.dev/writing-workflows/examples).
 
 | Run Details | Step Logs | Documents |
 |---|---|---|
@@ -65,46 +26,33 @@ For a quick look at workflow YAML, see the [examples](https://docs.dagu.sh/writi
 
 **Try it live:** [Live Demo](https://dagu-demo-f5e33d0e.dagu.sh) (credentials: `demouser` / `demouser`)
 
-## Try It Locally
-
-**macOS/Linux installer:**
+## Why Dagu?
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/dagucloud/dagu/main/scripts/installer.sh | bash
+  Traditional Orchestrator          Dagu
+  ┌────────────────────────┐        ┌──────────────────┐
+  │  Web Server            │        │                  │
+  │  Scheduler             │        │  dagu start-all  │
+  │  Worker(s)             │        │                  │
+  │  PostgreSQL            │        └──────────────────┘
+  │  Redis / RabbitMQ      │         Single binary.
+  │  Python Runtime        │         Self-hosted by default.
+  └────────────────────────┘         Adds scheduling, retries, and approvals around existing automation.
+    6+ services to manage
 ```
 
-```sh
-dagu start-all
-```
+I have created Dagu to solve my own pain points with existing workflow engines. I needed something that was lightweight, easy to operate, and flexible enough to run my existing scripts and cron jobs without rewriting them into a new framework. I also wanted a system that could run on on-premises and in the cloud, with a simple deployment model that didn't require managing databases, message brokers, or complex infrastructure.
 
-Open http://localhost:8080.
-
-Other installation paths:
-
-| Method | Command |
-|---|---|
-| Homebrew | `brew install dagu` |
-| npm | `npm install -g --ignore-scripts=false @dagucloud/dagu` |
-| Windows PowerShell | `irm https://raw.githubusercontent.com/dagucloud/dagu/main/scripts/installer.ps1 \| iex` |
-| Docker | `docker run --rm -v ~/.dagu:/var/lib/dagu -p 8080:8080 ghcr.io/dagucloud/dagu:latest dagu start-all` |
-| Helm | `helm repo add dagu https://dagucloud.github.io/dagu && helm repo update && helm install dagu dagu/dagu --set persistence.storageClass=<your-rwx-storage-class>` |
-
-The script installers run a guided wizard that can add Dagu to your PATH, set it up as a background service, and create the initial admin account. Homebrew, npm, Docker, and Helm install without the wizard. See [Installation docs](https://docs.dagu.sh/getting-started/installation) for all options.
-
-For Helm, replace `<your-rwx-storage-class>` with a StorageClass that supports `ReadWriteMany`. See [charts/dagu/README.md](./charts/dagu/README.md) for chart configuration.
-
-## Production Operation Notes
+## Performance
 
 Dagu stores state in local files by default. How much it can run depends on the machine and the workload. CPU, disk speed, workflow duration, queue settings, and worker capacity all matter.
 
 - **Throughput:** On one machine, Dagu can run thousands of workflow runs per day when the hardware and workflow shape fit the workload.
 - **Load control:** Use [queues](https://docs.dagu.sh/server-admin/queues), concurrency limits, and optional [distributed workers](https://docs.dagu.sh/server-admin/distributed/) to decide how many runs execute at once and where they run.
-- **Scheduling and recovery:** Use [cron schedules and catchup](https://docs.dagu.sh/writing-workflows/scheduling), [durable automatic retries](https://docs.dagu.sh/writing-workflows/durable-execution), reruns, timeouts, [event handler scripts](https://docs.dagu.sh/writing-workflows/lifecycle-handlers), and [email notifications](https://docs.dagu.sh/writing-workflows/email-notifications) to keep scheduled jobs recoverable.
-- **Team operation:** Use [user management and RBAC](https://docs.dagu.sh/server-admin/authentication/builtin), [workspaces](https://docs.dagu.sh/web-ui/workspaces), approvals, secrets, the [REST API](https://docs.dagu.sh/web-ui/api), CLI, webhooks, and [GitHub Integration](https://docs.dagu.sh/github-integration/) when multiple people or systems operate workflows.
 
 ## Real-World Use Cases
 
-Most teams adopt Dagu to get out of cron-and-script sprawl without turning that work into a large orchestration project. Dagu wraps existing automation with scheduling, dependencies, run history, logs, retries, approvals, optional distributed execution, and licensed team controls such as RBAC and audit logging.
+Dagu is useful when teams need to consolidate scripts, cron jobs, server tasks, containers, data jobs, and approval-gated operational work into one visible, governed workflow system without rewriting the underlying automation.
 
 **Cron and legacy script management.** Run existing shell scripts, Python scripts, HTTP calls, and scheduled jobs without rewriting them. Dagu turns hidden cron jobs into visible workflows with dependencies, run status, logs, retries, approvals, and history.
 
@@ -122,32 +70,74 @@ Most teams adopt Dagu to get out of cron-and-script sprawl without turning that 
 
 **IoT and edge workflows.** Run sensor polling, local cleanup, offline sync, health checks, and device maintenance jobs on small devices. The single binary and file-backed state work well on edge devices while still providing visibility through the Web UI.
 
-## Why Dagu?
+## Quick Start
+
+### Install
+
+**macOS/Linux:**
 
 ```sh
-  Stack you often end up running     Dagu
-  ┌────────────────────────┐        ┌──────────────────┐
-  │  Web Server            │        │                  │
-  │  Scheduler             │        │  dagu start-all  │
-  │  Worker(s)             │        │                  │
-  │  PostgreSQL            │        └──────────────────┘
-  │  Redis / RabbitMQ      │         Single binary.
-  │  Runtime packaging     │         Self-hosted by default.
-  └────────────────────────┘         Adds scheduling, retries, and approvals around existing automation.
-    6+ services to manage
+curl -fsSL https://raw.githubusercontent.com/dagucloud/dagu/main/scripts/installer.sh | bash
 ```
 
-Dagu is built for operations automation, not platform migration. Keep automation as commands you understand, then make it schedulable, observable, retryable, and safe for a team to run.
+**Homebrew:**
 
-| Work you avoid | Dagu path |
-|---|---|
-| Stand up and operate a metadata database | File-backed state by default |
-| Manage webserver, scheduler, executor, workers, and often a broker | Start with one binary |
-| Turn jobs into framework code and deployment artifacts | Wrap existing commands in YAML |
-| Debug scheduler, worker, dependency, and environment issues separately | View run status, logs, retries, and artifacts in one UI |
-| Build custom internal runbook tooling around workflows | Use parameters, approvals, API/webhooks, and licensed team controls |
+```sh
+brew install dagu
+```
 
-Use Dagu when you need reliable operations around the scripts, jobs, containers, and runbooks you already have.
+**Windows (PowerShell):**
+
+```powershell
+irm https://raw.githubusercontent.com/dagucloud/dagu/main/scripts/installer.ps1 | iex
+```
+
+**Docker:**
+
+```sh
+docker run --rm -v ~/.dagu:/var/lib/dagu -p 8080:8080 ghcr.io/dagucloud/dagu:latest dagu start-all
+```
+
+**Kubernetes (Helm):**
+
+```sh
+helm repo add dagu https://dagucloud.github.io/dagu
+helm repo update
+helm install dagu dagu/dagu --set persistence.storageClass=<your-rwx-storage-class>
+```
+
+> Replace `<your-rwx-storage-class>` with a StorageClass that supports `ReadWriteMany`. See [charts/dagu/README.md](./charts/dagu/README.md) for chart configuration.
+
+The script installers run a guided wizard that can add Dagu to your PATH, set it up as a background service, and create the initial admin account. Homebrew, npm, Docker, and Helm install without the wizard. See [Installation docs](https://docs.dagu.sh/g
+tting-started/installation) for all options.
+
+### Create and run a workflow
+
+```sh
+cat > ./hello.yaml << 'EOF'
+steps:
+  - echo "Hello from Dagu!"
+  - echo "Running step 2"
+EOF
+
+dagu start hello.yaml
+```
+
+### Start the server
+
+```sh
+dagu start-all
+```
+
+Visit http://localhost:8080
+
+### Install the Dagu skill for AI coding tools
+
+Install the Dagu authoring skill for Claude Code, Codex, Gemini CLI, and other AI coding tools:
+
+```sh
+gh skill install dagucloud/dagu dagu
+```
 
 ## Deployment Models
 
