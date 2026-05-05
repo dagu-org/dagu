@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { describe, expect, it } from 'vitest';
 import { normalizeDocPathFromURL } from '../doc-url';
 
@@ -5,6 +8,9 @@ describe('normalizeDocPathFromURL', () => {
   it('strips a markdown extension from URL paths', () => {
     expect(normalizeDocPathFromURL('runbooks/deploy.md')).toBe(
       'runbooks/deploy'
+    );
+    expect(normalizeDocPathFromURL('runbooks/DEPLOY.MD')).toBe(
+      'runbooks/DEPLOY'
     );
   });
 
