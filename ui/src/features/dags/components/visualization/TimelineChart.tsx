@@ -14,10 +14,20 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { AppBarContext } from '@/contexts/AppBarContext';
+import { useQuery } from '@/hooks/api';
+import { whenEnabled } from '@/hooks/queryUtils';
 import dayjs from '@/lib/dayjs';
 import { isActiveNodeStatus } from '@/lib/status-utils';
-import { useMemo } from 'react';
-import { components, NodeStatus } from '../../../../api/v1/schema';
+import { useContext, useEffect, useMemo } from 'react';
+import { components, NodeStatus, Status } from '../../../../api/v1/schema';
+import {
+  buildTimelineRows,
+  getSubRunQueryContext,
+  getTimelineSubRuns,
+  hasTimelineSubRuns,
+  TimelineRow,
+} from './timelineItems';
 
 /**
  * Props for the TimelineChart component
@@ -33,7 +43,7 @@ const timeFormat = 'HH:mm:ss';
 /**
  * Get status label for display
  */
-function getStatusLabel(status: NodeStatus): string {
+function getNodeStatusLabel(status: NodeStatus): string {
   switch (status) {
     case NodeStatus.NotStarted:
       return 'Not Started';
@@ -58,6 +68,41 @@ function getStatusLabel(status: NodeStatus): string {
     default:
       return 'Unknown';
   }
+}
+
+/**
+ * Get DAG-run status label for display
+ */
+function getDAGRunStatusLabel(status: Status): string {
+  switch (status) {
+    case Status.NotStarted:
+      return 'Not Started';
+    case Status.Running:
+      return 'Running';
+    case Status.Success:
+      return 'Success';
+    case Status.Failed:
+      return 'Failed';
+    case Status.Aborted:
+      return 'Aborted';
+    case Status.Queued:
+      return 'Queued';
+    case Status.PartialSuccess:
+      return 'Partial Success';
+    case Status.Waiting:
+      return 'Waiting';
+    case Status.Rejected:
+      return 'Rejected';
+    default:
+      return 'Unknown';
+  }
+}
+
+function getStatusLabel(row: TimelineRow): string {
+  if (row.statusSource === 'dagrun') {
+    return getDAGRunStatusLabel(row.status as Status);
+  }
+  return getNodeStatusLabel(row.status as NodeStatus);
 }
 
 /**
@@ -127,60 +172,124 @@ const statusColors: Record<NodeStatus, { bg: string; border: string }> = {
   },
 };
 
+const dagRunStatusColors: Record<Status, { bg: string; border: string }> = {
+  [Status.NotStarted]: {
+    bg: 'var(--status-neutral)',
+    border: 'var(--status-neutral)',
+  },
+  [Status.Running]: {
+    bg: 'var(--status-running)',
+    border: 'var(--status-running)',
+  },
+  [Status.Failed]: {
+    bg: 'var(--status-error)',
+    border: 'var(--status-error)',
+  },
+  [Status.Aborted]: {
+    bg: 'var(--status-aborted)',
+    border: 'var(--status-aborted)',
+  },
+  [Status.Success]: {
+    bg: 'var(--status-success)',
+    border: 'var(--status-success)',
+  },
+  [Status.Queued]: {
+    bg: 'var(--status-neutral)',
+    border: 'var(--status-neutral)',
+  },
+  [Status.PartialSuccess]: {
+    bg: 'var(--status-warning)',
+    border: 'var(--status-warning)',
+  },
+  [Status.Waiting]: {
+    bg: 'var(--status-warning)',
+    border: 'var(--status-warning)',
+  },
+  [Status.Rejected]: {
+    bg: 'var(--status-error)',
+    border: 'var(--status-error)',
+  },
+};
+
 /**
  * Get color for a node status
  */
-function getStatusColor(status: NodeStatus): { bg: string; border: string } {
-  return statusColors[status] || { bg: '#6b7280', border: '#6b7280' };
+function getStatusColor(row: TimelineRow): { bg: string; border: string } {
+  if (row.statusSource === 'dagrun') {
+    return (
+      dagRunStatusColors[row.status as Status] || {
+        bg: '#6b7280',
+        border: '#6b7280',
+      }
+    );
+  }
+
+  return (
+    statusColors[row.status as NodeStatus] || {
+      bg: '#6b7280',
+      border: '#6b7280',
+    }
+  );
 }
 
-type TimelineItem = {
-  name: string;
-  startMs: number;
-  endMs: number;
-  status: NodeStatus;
-  node: components['schemas']['Node'];
-};
+function isActiveTimelineStatus(row: TimelineRow): boolean {
+  if (row.statusSource === 'dagrun') {
+    return row.status === Status.Running || row.status === Status.Queued;
+  }
+  return isActiveNodeStatus(row.status as NodeStatus);
+}
 
 /**
  * TimelineChart component renders a horizontal bar chart showing step execution
  */
 function TimelineChart({ status }: Props) {
+  const appBarContext = useContext(AppBarContext);
+  const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  const shouldFetchSubRuns = hasTimelineSubRuns(status);
+  const queryContext = getSubRunQueryContext(status);
+  const eligibleSubRunIdsKey = useMemo(
+    () =>
+      (status.nodes || [])
+        .flatMap((node) => getTimelineSubRuns(node).map((sr) => sr.dagRunId))
+        .join('|'),
+    [status.nodes]
+  );
+  const { data: subRunsData, mutate: refetchSubRuns } = useQuery(
+    '/dag-runs/{name}/{dagRunId}/sub-dag-runs',
+    whenEnabled(shouldFetchSubRuns, {
+      params: {
+        path: {
+          name: queryContext.rootDagName,
+          dagRunId: queryContext.rootDagRunId,
+        },
+        query: {
+          remoteNode,
+          parentSubDAGRunId: queryContext.parentSubDAGRunId,
+        },
+      },
+    }),
+    {
+      refreshInterval:
+        shouldFetchSubRuns &&
+        (status.status === Status.Running || status.status === Status.Queued)
+          ? 3000
+          : 0,
+    }
+  );
+
+  useEffect(() => {
+    if (!shouldFetchSubRuns) {
+      return;
+    }
+    refetchSubRuns();
+  }, [shouldFetchSubRuns, eligibleSubRunIdsKey, refetchSubRuns]);
+
   const { items, timelineStart, timelineEnd, timeMarkers } = useMemo(() => {
-    const now = Date.now();
-    const validItems: TimelineItem[] = [];
-
-    (status.nodes || []).forEach((node) => {
-      // Skip steps that haven't started
-      if (!node.startedAt || node.startedAt === '-') {
-        return;
-      }
-
-      const startMs = dayjs(node.startedAt).valueOf();
-      let endMs: number;
-
-      // Use current time for active steps
-      if (!node.finishedAt || node.finishedAt === '-') {
-        endMs = now;
-      } else {
-        endMs = dayjs(node.finishedAt).valueOf();
-      }
-
-      // Validate
-      if (isNaN(startMs) || isNaN(endMs)) return;
-      if (endMs < startMs) endMs = startMs + 100;
-
-      validItems.push({
-        name: node.step.name,
-        startMs,
-        endMs,
-        status: node.status,
-        node,
-      });
+    const validItems = buildTimelineRows({
+      dagRun: status,
+      subRunDetails: subRunsData?.subRuns || [],
+      nowMs: Date.now(),
     });
-
-    // Sort by start time
-    validItems.sort((a, b) => a.startMs - b.startMs);
 
     if (validItems.length === 0) {
       return { items: [], timelineStart: 0, timelineEnd: 0, timeMarkers: [] };
@@ -265,25 +374,31 @@ function TimelineChart({ status }: Props) {
           const leftPercent =
             ((item.startMs - timelineStart) / totalRange) * 100;
           const widthPercent = ((item.endMs - item.startMs) / totalRange) * 100;
-          const colors = getStatusColor(item.status);
-          const isActive = isActiveNodeStatus(item.status);
+          const colors = getStatusColor(item);
+          const isActive = isActiveTimelineStatus(item);
 
           return (
             <div
-              key={item.name}
+              key={item.id}
+              data-testid="timeline-row"
+              data-row-id={item.id}
               className={`relative h-8 flex items-center ${
                 idx % 2 === 0 ? 'bg-background' : 'bg-muted/20'
               }`}
             >
               {/* Step name label */}
-              <div className="absolute left-2 z-10 text-xs font-medium text-foreground truncate max-w-[120px]">
-                {item.name}
+              <div
+                className="absolute z-10 text-xs font-medium text-foreground truncate max-w-[120px]"
+                style={{ left: item.depth === 0 ? '0.5rem' : '1.5rem' }}
+              >
+                {item.label}
               </div>
 
               {/* Timeline bar */}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div
+                    data-testid={`timeline-bar-${item.id}`}
                     className={`absolute h-5 rounded cursor-pointer transition-opacity hover:opacity-80 ${
                       isActive ? 'animate-pulse' : ''
                     }`}
@@ -298,16 +413,34 @@ function TimelineChart({ status }: Props) {
                 </TooltipTrigger>
                 <TooltipContent side="top" className="max-w-xs">
                   <div className="space-y-1">
-                    <div className="font-semibold">{item.name}</div>
-                    {item.node.step.description && (
+                    <div className="font-semibold">
+                      {item.kind === 'subdag'
+                        ? `${item.parentStepName} ${item.label}`
+                        : item.label}
+                    </div>
+                    {item.description && (
                       <div className="text-xs text-muted-foreground">
-                        {item.node.step.description}
+                        {item.description}
+                      </div>
+                    )}
+                    {item.dagName && (
+                      <div className="text-xs">DAG: {item.dagName}</div>
+                    )}
+                    {item.dagRunId && (
+                      <div className="text-xs">Run ID: {item.dagRunId}</div>
+                    )}
+                    {item.params && (
+                      <div className="text-xs">Params: {item.params}</div>
+                    )}
+                    {item.parentStepName && (
+                      <div className="text-xs text-muted-foreground">
+                        Parent: {item.parentStepName}
                       </div>
                     )}
                     <div className="text-xs">
                       Status:{' '}
                       <span className="font-medium">
-                        {getStatusLabel(item.status)}
+                        {getStatusLabel(item)}
                       </span>
                     </div>
                     <div className="text-xs">
@@ -320,9 +453,9 @@ function TimelineChart({ status }: Props) {
                       {dayjs(item.startMs).format('HH:mm:ss')} →{' '}
                       {dayjs(item.endMs).format('HH:mm:ss')}
                     </div>
-                    {item.node.error && (
+                    {item.error && (
                       <div className="text-xs text-destructive">
-                        Error: {item.node.error}
+                        Error: {item.error}
                       </div>
                     )}
                   </div>
