@@ -134,6 +134,10 @@ function getChoiceCount(schema: JSONSchema): number {
   return 0;
 }
 
+/**
+ * Treats plain string schemas as multiline user input while leaving formatted
+ * strings and fixed-choice fields to their specialized widgets.
+ */
 function isFreeTextSchema(schema: JSONSchema): boolean {
   if (
     schema.const !== undefined ||

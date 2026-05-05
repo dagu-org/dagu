@@ -46,6 +46,8 @@ function SchemaTextareaWidget<
   const containerRef = React.useRef<HTMLDivElement>(null);
 
   React.useLayoutEffect(() => {
+    // RJSF's shadcn textarea widget does not expose a ref, so the wrapper
+    // applies the shared auto-grow behavior to the rendered textarea.
     const textarea = containerRef.current?.querySelector('textarea');
     if (textarea) {
       autoGrowTextarea(textarea);

@@ -3,6 +3,9 @@
 
 const maxTextareaHeight = 150;
 
+/**
+ * Resizes a textarea to fit its content while preserving a bounded modal layout.
+ */
 export function autoGrowTextarea(el: HTMLTextAreaElement) {
   el.style.height = 'auto';
   const clamped = Math.min(el.scrollHeight, maxTextareaHeight);
