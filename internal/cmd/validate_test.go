@@ -4,6 +4,7 @@
 package cmd_test
 
 import (
+	"os"
 	"testing"
 
 	"github.com/dagucloud/dagu/internal/cmd"
@@ -22,6 +23,38 @@ steps:
 
 		th.RunCommand(t, cmd.Validate(), test.CmdTest{
 			Args:        []string{"validate", dag.Location},
+			ExpectedOut: []string{"DAG spec is valid"},
+		})
+	})
+
+	t.Run("BaseConfigStepTypes", func(t *testing.T) {
+		require.NoError(t, os.WriteFile(th.Config.Paths.BaseConfig, []byte(`
+step_types:
+  greet:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [message]
+      properties:
+        message:
+          type: string
+    template:
+      exec:
+        command: /bin/echo
+        args:
+          - {$input: message}
+`), 0600))
+
+		dagFile := th.CreateDAGFile(t, "base_config_step_type.yaml", `
+steps:
+  - type: greet
+    with:
+      message: hello
+`)
+
+		th.RunCommand(t, cmd.Validate(), test.CmdTest{
+			Args:        []string{"validate", dagFile},
 			ExpectedOut: []string{"DAG spec is valid"},
 		})
 	})
