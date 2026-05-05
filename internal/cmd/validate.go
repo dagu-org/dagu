@@ -51,12 +51,15 @@ similar to the server-side spec validation.`,
 
 func runValidate(ctx *Context, args []string) error {
 	// Try loading the DAG without evaluation, resolving relative names against DAGsDir
-	dag, err := spec.Load(
-		ctx,
-		args[0],
+	loadOpts := []spec.LoadOption{
 		spec.WithoutEval(),
 		spec.WithDAGsDir(ctx.Config.Paths.DAGsDir),
-	)
+	}
+	if ctx.Config.Paths.BaseConfig != "" {
+		loadOpts = append(loadOpts, spec.WithBaseConfig(ctx.Config.Paths.BaseConfig))
+	}
+
+	dag, err := spec.Load(ctx, args[0], loadOpts...)
 
 	if err != nil {
 		// Collect and return a formatted error message
