@@ -35,8 +35,13 @@ ARG DAGU_HOME="/var/lib/dagu"
 ENV DEBIAN_FRONTEND=noninteractive
 # Install common tools without cache mounts to avoid multi-platform conflicts
 RUN set -ex && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
+    for attempt in 1 2 3 4 5; do \
+      apt-get update -o Acquire::Retries=5 \
+                     -o APT::Update::Error-Mode=any && break; \
+      if [ "$attempt" = 5 ]; then exit 1; fi; \
+      sleep $((attempt * 10)); \
+    done && \
+    apt-get -o Acquire::Retries=5 install -y --no-install-recommends \
     sudo \
     git \
     curl \

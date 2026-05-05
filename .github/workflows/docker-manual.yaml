@@ -8,6 +8,9 @@ on:
         required: true
         type: string
 
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository }}
+
 jobs:
   # Validate the user-supplied ref before any job that pushes images or uses secrets.
   # A ref containing shell metacharacters could otherwise be injected into the
@@ -31,23 +34,52 @@ jobs:
             exit 1
           fi
 
-  docker-default:
-    name: Build and push default image
+  docker-build:
+    name: docker-${{ matrix.image.name }} (${{ matrix.platform.value }})
     needs: validate-inputs
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.platform.runner }}
     permissions:
       contents: read
       packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - name: default
+            dockerfile: Dockerfile
+          - name: dev
+            dockerfile: Dockerfile.dev
+          - name: alpine
+            dockerfile: Dockerfile.alpine
+        platform:
+          - value: linux/amd64
+            runner: ubuntu-latest
+            digest_suffix: linux-amd64
+            qemu: false
+          - value: linux/arm64
+            runner: ubuntu-24.04-arm
+            digest_suffix: linux-arm64
+            qemu: false
+          - value: linux/arm/v7
+            runner: ubuntu-24.04-arm
+            digest_suffix: linux-arm-v7
+            qemu: true
     steps:
       - name: Check out code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ inputs.ref }}
 
+      - name: Set up QEMU
+        if: ${{ matrix.platform.qemu }}
+        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
+        with:
+          platforms: arm
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
         with:
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          platforms: ${{ matrix.platform.value }}
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
@@ -74,47 +106,62 @@ jobs:
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
       - name: Build and push Docker image
+        id: build
         uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
         with:
           context: .
-          file: Dockerfile
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
-          push: true
+          file: ${{ matrix.image.dockerfile }}
+          platforms: ${{ matrix.platform.value }}
+          outputs: type=image,name=${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
           build-args: |
             LDFLAGS=-X 'main.version=${{ env.VERSION }}'
-          tags: |
-            ghcr.io/${{ github.repository }}:${{ env.VERSION }}
 
-  docker-dev:
-    name: Build and push dev image
-    needs: validate-inputs
+      - name: Export digest
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/digests/${{ matrix.image.name }}"
+          digest="${{ steps.build.outputs.digest }}"
+          if [ -z "$digest" ]; then
+            echo "::error::Build digest output is empty"
+            exit 1
+          fi
+          touch "${RUNNER_TEMP}/digests/${{ matrix.image.name }}/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: digests-${{ matrix.image.name }}-${{ matrix.platform.digest_suffix }}
+          path: ${{ runner.temp }}/digests/${{ matrix.image.name }}/*
+          if-no-files-found: error
+          retention-days: 1
+
+  docker-manifest:
+    name: docker-${{ matrix.image.name }} manifest
+    needs: docker-build
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    strategy:
+      matrix:
+        image:
+          - name: default
+            tag_suffix: ""
+            channel_tag: ""
+          - name: dev
+            tag_suffix: "-dev"
+            channel_tag: dev
+          - name: alpine
+            tag_suffix: "-alpine"
+            channel_tag: alpine
     steps:
-      - name: Check out code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          ref: ${{ inputs.ref }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
-        with:
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.DAGU_GITHUB_TOKEN }}
-
       - name: Resolve version
         id: get_version
         shell: bash
         env:
-          # Pass inputs.ref via env — same injection-prevention rationale as docker-default.
+          # Pass inputs.ref via env so it's treated as a plain string in the shell,
+          # not code. Writing ${{ inputs.ref }} directly inside `run:` would let a
+          # crafted ref value execute arbitrary commands.
           INPUT_REF: ${{ inputs.ref }}
         run: |
           case "$INPUT_REF" in
@@ -125,36 +172,15 @@ jobs:
           esac
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
+      - name: Download digests
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          context: .
-          file: Dockerfile.dev
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
-          push: true
-          build-args: |
-            LDFLAGS=-X 'main.version=${{ env.VERSION }}'
-          tags: |
-            ghcr.io/${{ github.repository }}:dev
-            ghcr.io/${{ github.repository }}:${{ env.VERSION }}-dev
-
-  docker-alpine:
-    name: Build and push alpine image
-    needs: validate-inputs
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - name: Check out code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          ref: ${{ inputs.ref }}
+          pattern: digests-${{ matrix.image.name }}-*
+          path: ${{ runner.temp }}/digests
+          merge-multiple: true
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
-        with:
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
@@ -163,30 +189,25 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.DAGU_GITHUB_TOKEN }}
 
-      - name: Resolve version
-        id: get_version
-        shell: bash
-        env:
-          # Pass inputs.ref via env — same injection-prevention rationale as docker-default.
-          INPUT_REF: ${{ inputs.ref }}
+      - name: Create manifest
         run: |
-          case "$INPUT_REF" in
-            refs/tags/v*) VERSION="${INPUT_REF#refs/tags/v}" ;;
-            v*)           VERSION="${INPUT_REF#v}" ;;
-            refs/tags/*)  VERSION="${INPUT_REF#refs/tags/}" ;;
-            *)            VERSION="${INPUT_REF}" ;;
-          esac
-          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          set -euo pipefail
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
-        with:
-          context: .
-          file: Dockerfile.alpine
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
-          push: true
-          build-args: |
-            LDFLAGS=-X 'main.version=${{ env.VERSION }}'
-          tags: |
-            ghcr.io/${{ github.repository }}:alpine
-            ghcr.io/${{ github.repository }}:${{ env.VERSION }}-alpine
+          tags=(-t "${IMAGE_NAME}:${VERSION}${{ matrix.image.tag_suffix }}")
+          channel_tag="${{ matrix.image.channel_tag }}"
+          if [ -n "$channel_tag" ]; then
+            tags+=(-t "${IMAGE_NAME}:${channel_tag}")
+          fi
+
+          images=()
+          while IFS= read -r digest_file; do
+            digest="$(basename "$digest_file")"
+            images+=("${IMAGE_NAME}@sha256:${digest}")
+          done < <(find "${RUNNER_TEMP}/digests" -type f | sort)
+
+          if [ "${#images[@]}" -eq 0 ]; then
+            echo "::error::No digests found for ${{ matrix.image.name }}"
+            exit 1
+          fi
+
+          docker buildx imagetools create "${tags[@]}" "${images[@]}"

@@ -37,16 +37,29 @@ ARG DAGU_HOME="/var/lib/dagu"
 # Temporarily disable signature checking just long enough to install the
 # new keyring, then re-enable normal verification for everything else.
 RUN set -eux; \
-    apt-get update -o Acquire::AllowInsecureRepositories=true \
-                   -o Acquire::AllowDowngradeToInsecureRepositories=true; \
+    for attempt in 1 2 3 4 5; do \
+      apt-get update -o Acquire::Retries=5 \
+                     -o Acquire::AllowInsecureRepositories=true \
+                     -o Acquire::AllowDowngradeToInsecureRepositories=true && \
+      apt-cache show ubuntu-keyring >/dev/null && \
+      apt-cache show ca-certificates >/dev/null && break; \
+      if [ "$attempt" = 5 ]; then exit 1; fi; \
+      sleep $((attempt * 10)); \
+    done; \
     DEBIAN_FRONTEND=noninteractive \
-      apt-get install -y --no-install-recommends ubuntu-keyring ca-certificates; \
+      apt-get -o Acquire::Retries=5 install -y --no-install-recommends ubuntu-keyring ca-certificates; \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install common tools
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && \
-    apt-get install -y \
+RUN set -eux; \
+    for attempt in 1 2 3 4 5; do \
+      apt-get update -o Acquire::Retries=5 \
+                     -o APT::Update::Error-Mode=any && break; \
+      if [ "$attempt" = 5 ]; then exit 1; fi; \
+      sleep $((attempt * 10)); \
+    done; \
+    apt-get -o Acquire::Retries=5 install -y \
     sudo \
     tzdata \
     jq \
