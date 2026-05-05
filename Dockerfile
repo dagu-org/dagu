@@ -38,33 +38,38 @@ ARG DAGU_HOME="/var/lib/dagu"
 # new keyring, then re-enable normal verification for everything else.
 RUN set -eux; \
     for attempt in 1 2 3 4 5; do \
+      rm -rf /var/lib/apt/lists/*; \
       apt-get update -o Acquire::Retries=5 \
                      -o Acquire::AllowInsecureRepositories=true \
                      -o Acquire::AllowDowngradeToInsecureRepositories=true && \
       apt-cache show ubuntu-keyring >/dev/null && \
-      apt-cache show ca-certificates >/dev/null && break; \
+      apt-cache show ca-certificates >/dev/null && \
+      DEBIAN_FRONTEND=noninteractive \
+        apt-get -o Acquire::Retries=5 install -y --no-install-recommends \
+        ubuntu-keyring ca-certificates && break; \
       if [ "$attempt" = 5 ]; then exit 1; fi; \
+      apt-get clean; \
       sleep $((attempt * 10)); \
     done; \
-    DEBIAN_FRONTEND=noninteractive \
-      apt-get -o Acquire::Retries=5 install -y --no-install-recommends ubuntu-keyring ca-certificates; \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install common tools
 ENV DEBIAN_FRONTEND=noninteractive
 RUN set -eux; \
     for attempt in 1 2 3 4 5; do \
+      rm -rf /var/lib/apt/lists/*; \
       apt-get update -o Acquire::Retries=5 \
-                     -o APT::Update::Error-Mode=any && break; \
+                     -o APT::Update::Error-Mode=any && \
+      apt-get -o Acquire::Retries=5 install -y \
+      sudo \
+      tzdata \
+      jq \
+      && break; \
       if [ "$attempt" = 5 ]; then exit 1; fi; \
+      apt-get clean; \
       sleep $((attempt * 10)); \
     done; \
-    apt-get -o Acquire::Retries=5 install -y \
-    sudo \
-    tzdata \
-    jq \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY --from=go-builder /app/bin/dagu /usr/local/bin/
 COPY ./entrypoint.sh /entrypoint.sh
