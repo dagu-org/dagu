@@ -47,6 +47,10 @@ export function buildParamSchemaUiSchema(
     const choiceCount = getChoiceCount(propertySchema);
     if (choiceCount > 0 && choiceCount <= radioChoiceLimit) {
       uiSchema[name] = { 'ui:widget': 'radio' };
+      continue;
+    }
+    if (isFreeTextSchema(propertySchema)) {
+      uiSchema[name] = { 'ui:widget': 'textarea' };
     }
   }
 
@@ -128,4 +132,15 @@ function getChoiceCount(schema: JSONSchema): number {
     return schema.oneOf.filter((option) => option.const !== undefined).length;
   }
   return 0;
+}
+
+function isFreeTextSchema(schema: JSONSchema): boolean {
+  if (
+    schema.const !== undefined ||
+    getChoiceCount(schema) > 0 ||
+    typeof schema.format === 'string'
+  ) {
+    return false;
+  }
+  return inferScalarType(schema) === 'string';
 }

@@ -28,6 +28,7 @@ import React from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { autoGrowTextarea } from './textareaAutoGrow';
 
 function SchemaSelectWidget<
   T = any,
@@ -42,8 +43,26 @@ function SchemaTextareaWidget<
   S extends StrictRJSFSchema = RJSFSchema,
   F extends FormContextType = any,
 >(props: WidgetProps<T, S, F>) {
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
+  React.useLayoutEffect(() => {
+    const textarea = containerRef.current?.querySelector('textarea');
+    if (textarea) {
+      autoGrowTextarea(textarea);
+    }
+  }, [props.value]);
+
   return (
-    <TextareaWidget {...props} className={cn('bg-card', props.className)} />
+    <div
+      ref={containerRef}
+      onInput={(event) => {
+        if (event.target instanceof HTMLTextAreaElement) {
+          autoGrowTextarea(event.target);
+        }
+      }}
+    >
+      <TextareaWidget {...props} className={cn('bg-card', props.className)} />
+    </div>
   );
 }
 

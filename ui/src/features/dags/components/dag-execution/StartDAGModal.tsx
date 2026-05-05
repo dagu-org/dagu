@@ -41,6 +41,7 @@ import {
 } from './paramSchemaForm';
 import { schemaFormTemplates } from './schemaFormTemplates';
 import { schemaFormWidgets } from './schemaFormWidgets';
+import { autoGrowTextarea } from './textareaAutoGrow';
 
 type ScalarValue = components['schemas']['ParamScalar'];
 type ParamDef = components['schemas']['ParamDef'];
@@ -79,15 +80,6 @@ type Props = {
   ) => Promise<void> | void;
   action?: 'start' | 'enqueue';
 };
-
-const maxTextareaHeight = 150;
-
-function autoGrowTextarea(el: HTMLTextAreaElement) {
-  el.style.height = 'auto';
-  const clamped = Math.min(el.scrollHeight, maxTextareaHeight);
-  el.style.height = `${clamped}px`;
-  el.style.overflowY = el.scrollHeight > maxTextareaHeight ? 'auto' : 'hidden';
-}
 
 function createParamFields(paramDefs: ParamDef[] = []): ParamField[] {
   return paramDefs.map((def, index) => {
