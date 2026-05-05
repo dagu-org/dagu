@@ -25,7 +25,7 @@ const (
 	// IndexFileName is the name of the DAG run index file.
 	IndexFileName = ".dagrun.index"
 	// IndexVersion is the current index format version.
-	IndexVersion = 6
+	IndexVersion = 7
 	// MinRunsForIndex is the minimum number of runs needed to create an index.
 	MinRunsForIndex = 10
 
@@ -66,6 +66,7 @@ type Entry struct {
 	AutoRetryMaxInterval time.Duration
 	ProcGroup            string
 	SuspendFlagName      string
+	ArchiveDir           string
 }
 
 // TryLoadForDay attempts to load and validate the index for a day directory.
@@ -159,6 +160,7 @@ func RebuildForDay(dayDir string, dagRunDirs []os.DirEntry) ([]Entry, bool, erro
 			AutoRetryMaxInterval: status.AutoRetryMaxInterval,
 			ProcGroup:            status.ProcGroup,
 			SuspendFlagName:      status.SuspendFlagName,
+			ArchiveDir:           status.ArchiveDir,
 		})
 	}
 
@@ -278,6 +280,7 @@ func writeIndex(dayDir string, entries []Entry) error {
 			AutoRetryMaxInterval: int64(e.AutoRetryMaxInterval),
 			ProcGroup:            e.ProcGroup,
 			SuspendFlagName:      e.SuspendFlagName,
+			ArchiveDir:           e.ArchiveDir,
 		})
 	}
 
@@ -323,6 +326,7 @@ func protoToEntries(protoEntries []*indexv1.DAGRunIndexEntry) []Entry {
 			AutoRetryMaxInterval: time.Duration(pe.AutoRetryMaxInterval),
 			ProcGroup:            pe.ProcGroup,
 			SuspendFlagName:      pe.SuspendFlagName,
+			ArchiveDir:           pe.ArchiveDir,
 		}
 	}
 	return entries

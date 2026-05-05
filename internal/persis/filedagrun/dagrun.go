@@ -76,6 +76,7 @@ type DAGRunSummary struct {
 	AutoRetryMaxInterval time.Duration
 	ProcGroup            string
 	SuspendFlagName      string
+	ArchiveDir           string
 }
 
 // DAGRun represents a dag-run with its associated timestamp and run ID.
