@@ -2,7 +2,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { describe, expect, it } from 'vitest';
-import { components, NodeStatus, Status, StatusLabel } from '@/api/v1/schema';
+import {
+  components,
+  NodeStatus,
+  NodeStatusLabel,
+  Status,
+  StatusLabel,
+} from '@/api/v1/schema';
 import {
   buildTimelineRows,
   getSubRunQueryContext,
@@ -25,7 +31,7 @@ function node(overrides: Partial<Node> = {}): Node {
     startedAt: '2026-01-01T00:00:00Z',
     finishedAt: '2026-01-01T00:00:10Z',
     status: NodeStatus.Success,
-    statusLabel: 'succeeded' as never,
+    statusLabel: NodeStatusLabel.succeeded,
     retryCount: 0,
     doneCount: 1,
     ...nodeOverrides,

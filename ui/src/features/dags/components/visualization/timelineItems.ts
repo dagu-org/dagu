@@ -9,6 +9,7 @@ type Node = components['schemas']['Node'];
 type SubDAGRun = components['schemas']['SubDAGRun'];
 type SubDAGRunDetail = components['schemas']['SubDAGRunDetail'];
 
+/** Render-ready timeline row for either a parent step or expanded sub-DAG run. */
 export type TimelineRow = {
   id: string;
   kind: 'step' | 'subdag';
@@ -27,23 +28,27 @@ export type TimelineRow = {
   depth: number;
 };
 
+/** API query context needed to load sub-DAG runs for a root or nested DAG run. */
 export type SubRunQueryContext = {
   rootDagName: string;
   rootDagRunId: string;
   parentSubDAGRunId?: string;
 };
 
+/** Returns sub-runs that should be shown under a parallel parent step. */
 export function getTimelineSubRuns(node: Node): SubDAGRun[] {
   if (!node.step.parallel) return [];
   return node.subRuns || [];
 }
 
+/** Checks whether a DAG run has any parallel sub-runs worth expanding. */
 export function hasTimelineSubRuns(dagRun: DAGRunDetails): boolean {
   return (dagRun.nodes || []).some(
     (node) => getTimelineSubRuns(node).length > 0
   );
 }
 
+/** Builds the root-aware query context for fetching sub-DAG run details. */
 export function getSubRunQueryContext(
   dagRun: DAGRunDetails
 ): SubRunQueryContext {
@@ -59,6 +64,7 @@ export function getSubRunQueryContext(
   };
 }
 
+/** Builds sorted timeline rows from parent nodes and loaded sub-DAG details. */
 export function buildTimelineRows({
   dagRun,
   subRunDetails,

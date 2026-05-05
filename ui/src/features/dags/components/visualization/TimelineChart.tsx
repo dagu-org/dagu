@@ -323,7 +323,7 @@ function TimelineChart({ status }: Props) {
       timelineEnd: end,
       timeMarkers: markers,
     };
-  }, [status.nodes]);
+  }, [status, subRunsData?.subRuns, timeFormat]);
 
   // Don't render if there are no items
   if (items.length === 0) {
