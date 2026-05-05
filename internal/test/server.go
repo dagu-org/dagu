@@ -16,6 +16,7 @@ import (
 	"github.com/dagucloud/dagu/internal/cmn/telemetry"
 	"github.com/dagucloud/dagu/internal/service/coordinator"
 	"github.com/dagucloud/dagu/internal/service/frontend"
+	"github.com/dagucloud/dagu/internal/service/frontend/api/pathutil"
 	apiv1 "github.com/dagucloud/dagu/internal/service/frontend/api/v1"
 	"github.com/go-resty/resty/v2"
 	"github.com/stretchr/testify/require"
@@ -58,31 +59,24 @@ func SetupServer(t *testing.T, opts ...HelperOption) Server {
 
 	srv := Server{Helper: helper}
 
-	// Use error channel to detect server startup failures
-	errChan := make(chan error, 1)
-	go srv.runServer(t, listener, errChan)
-
-	// Wait for the server to start or fail
-	select {
-	case err := <-errChan:
-		if err != nil {
-			_ = listener.Close() // Clean up listener on failure
-			t.Fatalf("server failed to start: %v", err)
-		}
-		// Server started successfully, wait for it to be ready
-		waitForServerStart(t, fmt.Sprintf("localhost:%d", port))
-	case <-time.After(10 * time.Second):
+	server, err := srv.newFrontendServer(listener)
+	if err != nil {
 		_ = listener.Close()
-		t.Fatal("server failed to start within timeout")
+		t.Fatalf("server failed to initialize: %v", err)
 	}
+
+	serveErr := make(chan error, 1)
+	go func() {
+		serveErr <- server.Serve(srv.Context)
+	}()
+
+	waitForServerStart(t, srv.healthURL(), serveErr)
 
 	return srv
 }
 
-// runServer starts the HTTP server with the provided listener
-func (srv *Server) runServer(t *testing.T, listener net.Listener, errChan chan<- error) {
-	t.Helper()
-
+// newFrontendServer constructs the HTTP server with the provided listener.
+func (srv *Server) newFrontendServer(listener net.Listener) (*frontend.Server, error) {
 	cc := coordinator.New(srv.ServiceRegistry, coordinator.DefaultConfig())
 
 	collector := telemetry.NewCollector(
@@ -107,15 +101,19 @@ func (srv *Server) runServer(t *testing.T, listener net.Listener, errChan chan<-
 		serverOpts...,
 	)
 	if err != nil {
-		errChan <- fmt.Errorf("failed to create server: %w", err)
-		return
+		return nil, fmt.Errorf("failed to create server: %w", err)
 	}
-	close(errChan) // Signal that server created successfully
-	err = server.Serve(srv.Context)
-	if err != nil {
-		// Log but don't fail - context cancellation is expected
-		t.Logf("server.Serve returned: %v", err)
-	}
+
+	return server, nil
+}
+
+func (srv *Server) healthURL() string {
+	healthPath := pathutil.BuildMountedAPIEndpointPath(
+		srv.Config.Server.BasePath,
+		srv.Config.Server.APIBasePath,
+		"health",
+	)
+	return fmt.Sprintf("http://%s:%d%s", srv.Config.Server.Host, srv.Config.Server.Port, healthPath)
 }
 
 // Client returns an HTTP client for the server
@@ -300,23 +298,40 @@ func (r *Response) Unmarshal(t *testing.T, v any) {
 	require.NoError(t, err, "failed to unmarshal response body")
 }
 
-// waitForServerStart polls the server until it responds or times out
-func waitForServerStart(t *testing.T, addr string) {
+// waitForServerStart polls the health endpoint until the server is ready.
+func waitForServerStart(t *testing.T, url string, serveErr <-chan error) {
 	t.Helper()
 
-	const (
-		maxRetries = 10
-		retryDelay = 100 * time.Millisecond
-	)
+	const retryDelay = 100 * time.Millisecond
 
-	for range maxRetries {
-		conn, err := net.Dial("tcp", addr)
-		if err == nil {
-			_ = conn.Close()
+	client := &http.Client{Timeout: 500 * time.Millisecond}
+	deadline := time.Now().Add(10 * time.Second)
+	var lastErr error
+
+	for time.Now().Before(deadline) {
+		select {
+		case err := <-serveErr:
+			if err != nil {
+				t.Fatalf("server failed before health endpoint became ready: %v", err)
+			}
+			t.Fatal("server stopped before health endpoint became ready")
+		default:
+		}
+
+		resp, err := client.Get(url)
+		switch {
+		case err == nil && resp != nil && resp.StatusCode == http.StatusOK:
+			_ = resp.Body.Close()
 			return
+		case resp != nil:
+			statusCode := resp.StatusCode
+			_ = resp.Body.Close()
+			lastErr = fmt.Errorf("unexpected status %d", statusCode)
+		default:
+			lastErr = err
 		}
 		time.Sleep(retryDelay)
 	}
 
-	t.Fatalf("server failed to start within %v", maxRetries*retryDelay)
+	t.Fatalf("server health endpoint did not become ready within 10s: %v", lastErr)
 }
