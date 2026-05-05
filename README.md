@@ -14,11 +14,19 @@
   </p>
 </div>
 
-## Local-first workflow engine for production scripts
+## Local-first Control Plane for Existing Ops Automation and AI Agent Workflows
 
-Define workflows in simple declarative YAML syntax, execute them anywhere with a single binary, compose complex pipelines from reusable sub-workflows, and distribute tasks across workers. The built-in Web UI eliminates the need for SSHing into servers to debug failed runs, check logs, or retry steps manually. All without requiring databases, message brokers, or code changes to your existing scripts. It natively supports command execution via SSH, running docker containers, kubernetes jobs, and you can extend it with custom step types for your specific use case.
+Dagu gives your automation a home. Run your existing scripts, containers, SQL jobs, and HTTP calls as visible, governed workflows with schedules, retries, logs, artifacts, human-in-the-loop, and observability without Airflow-level complexity.
 
-Built for developers who want powerful workflow orchestration without the operational overhead. For a quick feel of how it works, take a look at the [examples](https://docs.daguit.dev/writing-workflows/examples).
+Keep your existing automation as shell scripts, Python scripts, containers, SSH commands, SQL jobs, HTTP calls, and AI harnesses. Define the workflow in plain YAML, run it with one binary, and get the operational layer that cron and ad hoc scripts are missing: dependencies, retries, queues, logs, artifacts, approvals, API/webhooks, and optional distributed workers.
+
+Dagu is local-first by default. API keys, private repositories, internal documents, customer data, Slack logs, and agent artifacts can stay inside your own machine or infrastructure instead of being handed to a cloud automation SaaS.
+
+For a quick look at how workflows are defined, see the [examples](https://docs.dagu.sh/writing-workflows/examples).
+
+<div align="center">
+  <img src="./assets/images/dagu-demo.gif" width="720" alt="Dagu demo showing the cockpit kanban view and YAML workflow editing">
+</div>
 
 | Run Details | Step Logs | Documents |
 |---|---|---|
@@ -41,7 +49,7 @@ Built for developers who want powerful workflow orchestration without the operat
     6+ services to manage
 ```
 
-I have created Dagu to solve my own pain points with existing workflow engines. I needed something that was lightweight, easy to operate, and flexible enough to run my existing scripts and cron jobs without rewriting them into a new framework. I also wanted a system that could run on on-premises and in the cloud, with a simple deployment model that didn't require managing databases, message brokers, or complex infrastructure.
+Dagu was built for teams that need lightweight, self-hosted workflow orchestration without databases, brokers, or framework rewrites.
 
 ## Performance
 
@@ -108,19 +116,52 @@ helm install dagu dagu/dagu --set persistence.storageClass=<your-rwx-storage-cla
 
 > Replace `<your-rwx-storage-class>` with a StorageClass that supports `ReadWriteMany`. See [charts/dagu/README.md](./charts/dagu/README.md) for chart configuration.
 
-The script installers run a guided wizard that can add Dagu to your PATH, set it up as a background service, and create the initial admin account. Homebrew, npm, Docker, and Helm install without the wizard. See [Installation docs](https://docs.dagu.sh/g
-tting-started/installation) for all options.
+The script installers run a guided wizard that can add Dagu to your PATH, set it up as a background service, and create the initial admin account. Homebrew, npm, Docker, and Helm install without the wizard. See [Installation docs](https://docs.dagu.sh/getting-started/installation) for all options.
 
 ### Create and run a workflow
 
-```sh
-cat > ./hello.yaml << 'EOF'
-steps:
-  - echo "Hello from Dagu!"
-  - echo "Running step 2"
-EOF
+Create a YAML file with your workflow definition. For example, create `review-readme.yaml` with the following content:
 
-dagu start hello.yaml
+```yaml
+params:
+  - name: REPO_URL
+    type: string
+    required: true
+
+harnesses:
+  codex-cli:
+    binary: codex
+    prefix_args:
+      - exec
+      - --sandbox
+      - workspace-write
+      - --skip-git-repo-check
+    prompt_mode: arg
+
+steps:
+  - id: review_pr
+    type: harness
+    command: |
+      Review the README.md file in ${REPO_URL}.
+      Write Markdown findings to review.md.
+    with:
+      provider: codex-cli
+
+  - id: approval
+    type: noop
+    approval:
+      prompt: Review review.md. Approve to post an issue with the findings, or reject to skip.
+
+  - id: post_issue
+    command: gh issue create --title "Review Findings" --body-file review.md
+```
+
+This workflow uses the [`harness` step type](https://docs.dagu.sh/step-types/harness#harness) and assumes you have the `codex` CLI installed and configured. It reviews a GitHub repository's README file, generates findings with Codex, and then prompts for manual [approval](https://docs.dagu.sh/writing-workflows/yaml-specification#approval) before posting an issue with the findings.
+
+Run the workflow with:
+
+```sh
+dagu start review-readme.yaml -- params REPO_URL=<your-repo-url>
 ```
 
 ### Start the server
@@ -381,10 +422,10 @@ steps:
 steps:
   - name: flaky-api-call
     command: curl -f https://api.example.com/data
-    retryPolicy:
+    retry_policy:
       limit: 3
-      intervalSec: 10
-    continueOn:
+      interval_sec: 10
+    continue_on:
       failure: true
 ```
 
@@ -393,9 +434,9 @@ steps:
 ```yaml
 schedule:
   - "0 */6 * * *"              # Every 6 hours
-overlapPolicy: skip             # Skip if previous run is still active
-timeoutSec: 3600
-handlerOn:
+overlap_policy: skip            # Skip if previous run is still active
+timeout_sec: 3600
+handler_on:
   failure:
     command: notify-team.sh
   exit:
@@ -561,7 +602,7 @@ The coordinator/worker architecture distributes DAG execution across multiple ma
 
 ```sh
 # Start coordinator
-dagu coord
+dagu coordinator
 
 # Start workers (on separate machines)
 DAGU_WORKER_LABELS=gpu=true,memory=64G dagu worker
@@ -574,22 +615,22 @@ See the [distributed execution documentation](https://docs.dagu.sh/server-admin/
 | Command | Description |
 |---------|-------------|
 | `dagu start <dag>` | Execute a DAG |
-| `dagu start-all` | Start HTTP server + scheduler |
+| `dagu start-all` | Start HTTP server + scheduler + coordinator |
 | `dagu server` | Start HTTP server only |
 | `dagu scheduler` | Start scheduler only |
-| `dagu coord` | Start coordinator (distributed mode) |
+| `dagu coordinator` | Start coordinator (distributed mode) |
 | `dagu worker` | Start worker (distributed mode) |
 | `dagu stop <dag>` | Stop a running DAG |
 | `dagu restart <dag>` | Restart a DAG |
-| `dagu retry <dag> <run-id>` | Retry a failed run |
+| `dagu retry --run-id=<run-id> <dag>` | Retry a failed run |
 | `dagu dry <dag>` | Dry run — show what would execute |
 | `dagu status <dag>` | Show DAG run status |
 | `dagu history <dag>` | Show execution history |
 | `dagu validate <dag>` | Validate DAG YAML |
 | `dagu enqueue <dag>` | Add DAG to the execution queue |
-| `dagu dequeue <dag>` | Remove DAG from the queue |
-| `dagu cleanup` | Clean up old run data |
-| `dagu migrate` | Run database migrations |
+| `dagu dequeue <queue-name> [--dag-run=<dag>:<run-id>]` | Remove a DAG-run from the queue |
+| `dagu cleanup <dag>` | Clean up old run data |
+| `dagu migrate history` | Migrate legacy run history |
 | `dagu version` | Show version |
 
 ## Environment Variables
