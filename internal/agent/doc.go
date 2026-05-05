@@ -123,8 +123,8 @@ type DocStore interface {
 }
 
 // validDocIDRegexp matches a valid doc ID: segments separated by slashes.
-// Each segment starts with alphanumeric and can contain alphanumeric, underscore, dot, hyphen, or space.
-var validDocIDRegexp = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_. -]*(/[a-zA-Z0-9][a-zA-Z0-9_. -]*)*$`)
+// Each segment starts with alphanumeric or underscore and can contain alphanumeric, underscore, dot, hyphen, or space.
+var validDocIDRegexp = regexp.MustCompile(`^[a-zA-Z0-9_][a-zA-Z0-9_. -]*(/[a-zA-Z0-9_][a-zA-Z0-9_. -]*)*$`)
 
 // maxDocIDLength is the maximum allowed length for a doc ID.
 const maxDocIDLength = 256
@@ -138,7 +138,7 @@ func ValidateDocID(id string) error {
 		return fmt.Errorf("%w: exceeds maximum length of %d", ErrInvalidDocID, maxDocIDLength)
 	}
 	if !validDocIDRegexp.MatchString(id) {
-		return fmt.Errorf("%w: must match pattern [a-zA-Z0-9][a-zA-Z0-9_. -]*(/[a-zA-Z0-9][a-zA-Z0-9_. -]*)*", ErrInvalidDocID)
+		return fmt.Errorf("%w: must match pattern [a-zA-Z0-9_][a-zA-Z0-9_. -]*(/[a-zA-Z0-9_][a-zA-Z0-9_. -]*)*", ErrInvalidDocID)
 	}
 	return nil
 }

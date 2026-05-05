@@ -358,10 +358,12 @@ func TestValidateDocID(t *testing.T) {
 	assert.NoError(t, agent.ValidateDocID("simple"))
 	assert.NoError(t, agent.ValidateDocID("with-hyphen"))
 	assert.NoError(t, agent.ValidateDocID("with_underscore"))
+	assert.NoError(t, agent.ValidateDocID("_leading-underscore"))
 	assert.NoError(t, agent.ValidateDocID("with space"))
 	assert.NoError(t, agent.ValidateDocID("with.dot"))
 	assert.NoError(t, agent.ValidateDocID("MixedCase"))
 	assert.NoError(t, agent.ValidateDocID("nested/path/doc"))
+	assert.NoError(t, agent.ValidateDocID("nested/_partial"))
 	assert.NoError(t, agent.ValidateDocID("123"))
 
 	// Invalid IDs.
@@ -415,6 +417,35 @@ func TestBuildTreeSkipsNonConformingFiles(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.TotalCount)
 	assert.Equal(t, "good-doc", result.Items[0].ID)
+}
+
+func TestListTreeIncludesLeadingUnderscoreDocs(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, os.MkdirAll(filepath.Join(store.baseDir, "guides"), 0750))
+	require.NoError(t, os.WriteFile(filepath.Join(store.baseDir, "_index.md"), []byte("top"), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(store.baseDir, "guides", "_partial.md"), []byte("nested"), 0600))
+
+	result, err := store.List(ctx, defaultListOpts(1, 50))
+	require.NoError(t, err)
+	require.Len(t, result.Items, 2)
+	assert.Equal(t, "guides", result.Items[0].ID)
+	require.Len(t, result.Items[0].Children, 1)
+	assert.Equal(t, "guides/_partial", result.Items[0].Children[0].ID)
+	assert.Equal(t, "_index", result.Items[1].ID)
+}
+
+func TestGetLeadingUnderscoreDoc(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, os.WriteFile(filepath.Join(store.baseDir, "_index.md"), []byte("content"), 0600))
+
+	doc, err := store.Get(ctx, "_index")
+	require.NoError(t, err)
+	assert.Equal(t, "_index", doc.ID)
+	assert.Equal(t, "content", doc.Content)
 }
 
 func TestSearchSkipsNonConformingFiles(t *testing.T) {
