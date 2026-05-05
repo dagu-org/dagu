@@ -30,6 +30,9 @@ import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { autoGrowTextarea } from './textareaAutoGrow';
 
+/**
+ * Applies Dagu's card background styling to RJSF's shadcn select widget.
+ */
 function SchemaSelectWidget<
   T = any,
   S extends StrictRJSFSchema = RJSFSchema,
@@ -38,6 +41,9 @@ function SchemaSelectWidget<
   return <SelectWidget {...props} className={cn('bg-card', props.className)} />;
 }
 
+/**
+ * Wraps RJSF's shadcn textarea so schema-backed text parameters auto-resize.
+ */
 function SchemaTextareaWidget<
   T = any,
   S extends StrictRJSFSchema = RJSFSchema,
@@ -68,6 +74,9 @@ function SchemaTextareaWidget<
   );
 }
 
+/**
+ * Renders boolean schema fields with the local checkbox component styling.
+ */
 function SchemaCheckboxWidget<
   T = any,
   S extends StrictRJSFSchema = RJSFSchema,
@@ -144,6 +153,9 @@ function SchemaCheckboxWidget<
   );
 }
 
+/**
+ * Renders small fixed-choice schema fields as accessible radio groups.
+ */
 function SchemaRadioWidget<
   T = any,
   S extends StrictRJSFSchema = RJSFSchema,

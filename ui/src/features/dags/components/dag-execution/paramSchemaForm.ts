@@ -9,6 +9,9 @@ export type ParamSchemaUiSchema = Record<string, Record<string, unknown>>;
 
 const radioChoiceLimit = 4;
 
+/**
+ * Builds typed schema form data from the legacy newline-delimited parameter text.
+ */
 export function buildParamSchemaFormData(
   schema: JSONSchema,
   defaultParams?: string
@@ -36,6 +39,9 @@ export function buildParamSchemaFormData(
   return formData;
 }
 
+/**
+ * Chooses compact widgets for schema-backed parameters without losing free-text editing.
+ */
 export function buildParamSchemaUiSchema(
   schema: JSONSchema
 ): ParamSchemaUiSchema {
@@ -57,12 +63,18 @@ export function buildParamSchemaUiSchema(
   return uiSchema;
 }
 
+/**
+ * Serializes schema form data into the parameter payload expected by the start API.
+ */
 export function stringifyParamSchemaFormData(
   formData: ParamSchemaFormData
 ): string {
   return JSON.stringify(formData);
 }
 
+/**
+ * Converts default string parameters to the scalar type declared by the JSON schema.
+ */
 function coerceParamSchemaValue(value: string, schema: JSONSchema): unknown {
   if (value.trim() === '') {
     return value;
@@ -91,6 +103,9 @@ function coerceParamSchemaValue(value: string, schema: JSONSchema): unknown {
   }
 }
 
+/**
+ * Infers the effective scalar type from direct, oneOf, or enum schema declarations.
+ */
 function inferScalarType(schema: JSONSchema): string | undefined {
   if (typeof schema.type === 'string') {
     return schema.type;
@@ -111,6 +126,9 @@ function inferScalarType(schema: JSONSchema): string | undefined {
   return undefined;
 }
 
+/**
+ * Maps a JavaScript scalar value back to the JSON schema type that represents it.
+ */
 function inferTypeFromValue(value: unknown): string | undefined {
   switch (typeof value) {
     case 'string':
@@ -124,6 +142,9 @@ function inferTypeFromValue(value: unknown): string | undefined {
   }
 }
 
+/**
+ * Counts fixed choices represented as enum values or oneOf constants.
+ */
 function getChoiceCount(schema: JSONSchema): number {
   if (Array.isArray(schema.enum)) {
     return schema.enum.length;
