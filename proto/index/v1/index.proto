@@ -65,4 +65,5 @@ message DAGRunIndexEntry {
   int64 auto_retry_max_interval = 25;  // Duration in nanoseconds
   string proc_group = 26;
   string suspend_flag_name = 27;
+  string archive_dir = 28;
 }

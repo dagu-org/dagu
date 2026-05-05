@@ -995,6 +995,49 @@ func TestListStatuses_WithAllHistoryBypassesDefaultTodayWindow(t *testing.T) {
 }
 
 func TestListStatusesPage(t *testing.T) {
+	t.Run("IndexPathPreservesArchiveDir", func(t *testing.T) {
+		th := setupTestStore(t)
+
+		base := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+		dag := th.DAG("artifact-dag")
+		artifactDir := filepath.Join(th.TmpDir, "artifacts", "artifact-dag", "artifact-run")
+
+		attempt, err := th.Store.CreateAttempt(th.Context, dag.DAG, base, "artifact-run", exec.NewDAGRunAttemptOptions{})
+		require.NoError(t, err)
+		require.NoError(t, attempt.Open(th.Context))
+		defer func() {
+			require.NoError(t, attempt.Close(th.Context))
+		}()
+
+		status := exec.InitialStatus(dag.DAG)
+		status.DAGRunID = "artifact-run"
+		status.Status = core.Succeeded
+		status.ArchiveDir = artifactDir
+		require.NoError(t, attempt.Write(th.Context, status))
+
+		for i := range 9 {
+			th.CreateAttemptWithDAG(t, base.Add(time.Duration(i+1)*time.Second), fmt.Sprintf("filler-run-%d", i), core.Succeeded, dag.DAG)
+		}
+
+		_, err = th.Store.ListStatusesPage(
+			th.Context,
+			exec.WithAllHistory(),
+			exec.WithDAGRunID("artifact-run"),
+			exec.WithLimit(20),
+		)
+		require.NoError(t, err)
+
+		page, err := th.Store.ListStatusesPage(
+			th.Context,
+			exec.WithAllHistory(),
+			exec.WithDAGRunID("artifact-run"),
+			exec.WithLimit(20),
+		)
+		require.NoError(t, err)
+		require.Len(t, page.Items, 1)
+		assert.Equal(t, artifactDir, page.Items[0].ArchiveDir)
+	})
+
 	t.Run("ForwardPaginationHasDeterministicOrderWithoutDuplicates", func(t *testing.T) {
 		th := setupTestStore(t)
 
