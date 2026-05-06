@@ -10,6 +10,11 @@ import React from 'react';
 import { DAGNameInputModal } from '../../../../components/DAGNameInputModal';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useClient } from '../../../../hooks/api';
+import { defaultDAGSpec } from '../../../../lib/dagSpec';
+import {
+  sanitizeWorkspaceSelection,
+  WorkspaceKind,
+} from '../../../../lib/workspace';
 
 /**
  * CreateDAGButton displays a button that opens a prompt to create a new DAG
@@ -22,6 +27,9 @@ function CreateDAGButton() {
   const [error, setError] = React.useState<string | null>(null);
   const [isOpen, setIsOpen] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
+  const workspaceSelection = sanitizeWorkspaceSelection(
+    appBarContext.workspaceSelection
+  );
 
   if (!canWrite) {
     return null;
@@ -45,6 +53,11 @@ function CreateDAGButton() {
         },
         body: {
           name,
+          spec:
+            workspaceSelection.kind === WorkspaceKind.workspace &&
+            workspaceSelection.workspace
+              ? defaultDAGSpec(workspaceSelection.workspace)
+              : undefined,
         },
       });
 

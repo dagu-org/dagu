@@ -15,6 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -472,6 +473,9 @@ function StartDAGModal({
           <DialogTitle>
             {forceEnqueue ? 'Enqueue the DAG' : 'Start the DAG'}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Configure the DAG run before submitting it.
+          </DialogDescription>
         </DialogHeader>
 
         {(paramsReadOnly || runIdReadOnly) && (

@@ -122,10 +122,10 @@ export function DAGNameInputModal({
             <DialogTitle>{modalContent.title}</DialogTitle>
             <DialogDescription>
               {modalContent.description}
-              <div className="mt-1 font-mono text-xs bg-muted p-1 rounded">
-                Pattern: {DAG_NAME_PATTERN_STRING}
-              </div>
             </DialogDescription>
+            <div className="mt-1 font-mono text-xs bg-muted p-1 rounded text-muted-foreground">
+              Pattern: {DAG_NAME_PATTERN_STRING}
+            </div>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
