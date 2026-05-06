@@ -9404,6 +9404,9 @@ components:
           type: string
         title:
           type: string
+        description:
+          type: string
+          description: "Short document description from YAML frontmatter"
         workspace:
           type: string
           description: "Workspace that owns this document. Omitted for default documents."
@@ -9421,6 +9424,7 @@ components:
       required:
         - id
         - title
+        - description
         - hasMoreMatches
         - matches
 
@@ -10993,12 +10997,16 @@ components:
       required:
         - id
         - title
+        - description
         - content
       properties:
         id:
           type: string
         title:
           type: string
+        description:
+          type: string
+          description: "Short document description from YAML frontmatter"
         workspace:
           type: string
           description: "Workspace that owns this document. Omitted for default documents."
@@ -11023,11 +11031,15 @@ components:
       required:
         - id
         - title
+        - description
       properties:
         id:
           type: string
         title:
           type: string
+        description:
+          type: string
+          description: "Short document description from YAML frontmatter"
         workspace:
           type: string
           description: "Workspace that owns this document. Omitted for default documents."
@@ -11090,11 +11102,15 @@ components:
       required:
         - id
         - title
+        - description
       properties:
         id:
           type: string
         title:
           type: string
+        description:
+          type: string
+          description: "Short document description from YAML frontmatter"
         workspace:
           type: string
           description: "Workspace that owns this document. Omitted for default documents."

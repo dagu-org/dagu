@@ -23,6 +23,10 @@ function headingId(children: ReactNode): string {
   return slugifyHeading(text);
 }
 
+function stripFrontmatter(content: string): string {
+  return content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '');
+}
+
 export function DocMarkdownPreview({
   content,
   className,
@@ -53,7 +57,7 @@ export function DocMarkdownPreview({
           },
         }}
       >
-        {content ?? ''}
+        {stripFrontmatter(content ?? '')}
       </ReactMarkdown>
     </div>
   );
