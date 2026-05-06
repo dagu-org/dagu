@@ -722,6 +722,91 @@ steps:
 		assert.Contains(t, dag.Env, "SOURCE=embedded")
 	})
 
+	t.Run("WithWorkspaceBaseConfigDir_MergesNamedWorkspaceConfig", func(t *testing.T) {
+		t.Parallel()
+
+		root := t.TempDir()
+		globalBase := filepath.Join(root, "base.yaml")
+		require.NoError(t, os.WriteFile(globalBase, []byte(`
+env:
+  GLOBAL_ONLY: "global"
+  SHARED: "global"
+log_dir: "/global/logs"
+hist_retention_days: 30
+`), 0600))
+
+		workspaceConfigDir := filepath.Join(root, "workspaces")
+		require.NoError(t, os.MkdirAll(filepath.Join(workspaceConfigDir, "ops"), 0750))
+		require.NoError(t, os.WriteFile(filepath.Join(workspaceConfigDir, "ops", "base.yaml"), []byte(`
+env:
+  WORKSPACE_ONLY: "ops"
+  SHARED: "workspace"
+log_dir: "/workspace/logs"
+max_active_steps: 7
+`), 0600))
+
+		childDAG := createTempYAMLFile(t, `
+labels:
+  - workspace=ops
+env:
+  DAG_ONLY: "dag"
+steps:
+  - name: "step1"
+    command: echo "step1"
+`)
+
+		dag, err := spec.Load(context.Background(), childDAG,
+			spec.WithBaseConfig(globalBase),
+			spec.WithWorkspaceBaseConfigDir(workspaceConfigDir),
+		)
+		require.NoError(t, err)
+
+		assert.Contains(t, dag.Env, "GLOBAL_ONLY=global")
+		assert.Contains(t, dag.Env, "WORKSPACE_ONLY=ops")
+		assert.Contains(t, dag.Env, "DAG_ONLY=dag")
+		assert.Contains(t, dag.Env, "SHARED=workspace")
+		assert.Equal(t, "/workspace/logs", dag.LogDir)
+		assert.Equal(t, 30, dag.HistRetentionDays)
+		assert.Equal(t, 7, dag.MaxActiveSteps)
+		assert.Contains(t, string(dag.BaseConfigData), "WORKSPACE_ONLY")
+	})
+
+	t.Run("WithWorkspaceBaseConfigDir_IgnoresDefaultWorkspace", func(t *testing.T) {
+		t.Parallel()
+
+		root := t.TempDir()
+		globalBase := filepath.Join(root, "base.yaml")
+		require.NoError(t, os.WriteFile(globalBase, []byte(`
+env:
+  GLOBAL_ONLY: "global"
+log_dir: "/global/logs"
+`), 0600))
+
+		workspaceConfigDir := filepath.Join(root, "workspaces")
+		require.NoError(t, os.MkdirAll(filepath.Join(workspaceConfigDir, "default"), 0750))
+		require.NoError(t, os.WriteFile(filepath.Join(workspaceConfigDir, "default", "base.yaml"), []byte(`
+env:
+  SHOULD_NOT_APPLY: "default"
+log_dir: "/default/logs"
+`), 0600))
+
+		childDAG := createTempYAMLFile(t, `
+steps:
+  - name: "step1"
+    command: echo "step1"
+`)
+
+		dag, err := spec.Load(context.Background(), childDAG,
+			spec.WithBaseConfig(globalBase),
+			spec.WithWorkspaceBaseConfigDir(workspaceConfigDir),
+		)
+		require.NoError(t, err)
+
+		assert.Contains(t, dag.Env, "GLOBAL_ONLY=global")
+		assert.NotContains(t, dag.Env, "SHOULD_NOT_APPLY=default")
+		assert.Equal(t, "/global/logs", dag.LogDir)
+	})
+
 	t.Run("OverrideBaseConfig", func(t *testing.T) {
 		t.Parallel()
 

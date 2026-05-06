@@ -41,6 +41,7 @@ import (
 	"github.com/dagucloud/dagu/internal/runtime"
 	"github.com/dagucloud/dagu/internal/runtime/executor"
 	"github.com/dagucloud/dagu/internal/service/audit"
+	"github.com/dagucloud/dagu/internal/workspace"
 	coordinatorv1 "github.com/dagucloud/dagu/proto/coordinator/v1"
 	"github.com/goccy/go-yaml"
 	"github.com/goccy/go-yaml/parser"
@@ -4256,6 +4257,7 @@ func (a *API) loadCurrentRescheduleDAG(ctx context.Context, sourceFile, nameOver
 
 	loadOpts := []spec.LoadOption{
 		spec.WithBaseConfig(a.config.Paths.BaseConfig),
+		spec.WithWorkspaceBaseConfigDir(workspace.BaseConfigDir(a.config.Paths.DAGsDir)),
 		spec.WithDAGsDir(a.config.Paths.DAGsDir),
 	}
 	if nameOverride != "" {

@@ -58,6 +58,7 @@ import (
 	apiv1 "github.com/dagucloud/dagu/internal/service/frontend/api/v1"
 	"github.com/dagucloud/dagu/internal/service/resource"
 	"github.com/dagucloud/dagu/internal/service/scheduler"
+	"github.com/dagucloud/dagu/internal/workspace"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -745,6 +746,7 @@ func (c *Context) dagStore(cfg dagStoreConfig) (exec.DAGStore, error) {
 		filedag.WithFlagsBaseDir(c.Config.Paths.SuspendFlagsDir),
 		filedag.WithSearchPaths(searchPaths),
 		filedag.WithBaseConfig(c.Config.Paths.BaseConfig),
+		filedag.WithWorkspaceBaseConfigDir(workspace.BaseConfigDir(c.Config.Paths.DAGsDir)),
 		filedag.WithFileCache(cfg.Cache),
 		filedag.WithSkipExamples(c.Config.Core.SkipExamples),
 		filedag.WithSkipDirectoryCreation(cfg.SkipDirectoryCreation),

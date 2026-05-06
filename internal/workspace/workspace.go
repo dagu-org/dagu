@@ -5,6 +5,7 @@ package workspace
 
 import (
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -13,6 +14,29 @@ import (
 )
 
 var workspaceNamePattern = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+
+const (
+	// BaseConfigDirName is the directory below DAGsDir that stores workspace-scoped config.
+	BaseConfigDirName = "workspaces"
+	// BaseConfigFileName is the file name for a workspace-scoped base config.
+	BaseConfigFileName = "base.yaml"
+)
+
+// BaseConfigDir returns the root directory for workspace-scoped base configs.
+func BaseConfigDir(dagsDir string) string {
+	if strings.TrimSpace(dagsDir) == "" {
+		return ""
+	}
+	return filepath.Join(dagsDir, BaseConfigDirName)
+}
+
+// BaseConfigPath returns the workspace-scoped base config path for name.
+func BaseConfigPath(dagsDir, name string) string {
+	if strings.TrimSpace(dagsDir) == "" || strings.TrimSpace(name) == "" {
+		return ""
+	}
+	return filepath.Join(BaseConfigDir(dagsDir), name, BaseConfigFileName)
+}
 
 // Workspace is the domain model for a cockpit workspace.
 type Workspace struct {
