@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { LicenseBanner } from '@/components/LicenseBanner';
 import { UpdateBanner } from '@/components/UpdateBanner';
 import { useConfig } from '@/contexts/ConfigContext';
@@ -393,11 +396,13 @@ function Content({ navbarColor, children }: LayoutProps) {
         </header>
 
         {/* Scrollable Content - More Compact Padding */}
-        <main className="flex-1 overflow-auto">
+        <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <ContentNavigation pathname={location.pathname} />
           <UpdateBanner />
           <LicenseBanner />
-          <div className="p-4 md:p-6 w-full h-full">{children}</div>
+          <div className="min-h-0 flex-1 overflow-auto p-4 md:p-6 w-full">
+            {children}
+          </div>
         </main>
       </div>
 
