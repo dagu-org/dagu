@@ -4,7 +4,7 @@
 import { render, screen } from '@testing-library/react';
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { components } from '@/api/v1/schema';
 import {
   NodeStatus,
@@ -13,6 +13,7 @@ import {
   StatusLabel,
 } from '@/api/v1/schema';
 import { AppBarContext } from '@/contexts/AppBarContext';
+import { useQuery } from '@/hooks/api';
 import { DAGContext } from '../../../contexts/DAGContext';
 import NodeStatusTableRow from '../NodeStatusTableRow';
 
@@ -21,6 +22,7 @@ vi.mock('@/hooks/api', () => ({
     PATCH: vi.fn(),
     POST: vi.fn(),
   }),
+  useQuery: vi.fn(),
 }));
 
 vi.mock('@/components/ui/error-modal', () => ({
@@ -48,7 +50,21 @@ const dagRun = {
   autoRetryCount: 0,
 } as components['schemas']['DAGRunDetails'];
 
+const mockedUseQuery = vi.mocked(
+  useQuery as unknown as (path: unknown, init: unknown) => unknown
+);
+
 describe('NodeStatusTableRow', () => {
+  beforeEach(() => {
+    mockedUseQuery.mockImplementation((_, init) => ({
+      data: init ? { content: 'Deploying production\n' } : undefined,
+      isLoading: false,
+      error: undefined,
+      isValidating: false,
+      mutate: vi.fn(),
+    }));
+  });
+
   it('shows log step messages in the status table without opening step logs', () => {
     const node = {
       step: {
@@ -96,9 +112,13 @@ describe('NodeStatusTableRow', () => {
       </MemoryRouter>
     );
 
+    const message = screen.getByLabelText('Log message: Deploying production');
+    expect(message).toBeInTheDocument();
+    expect(message).toHaveClass('w-[320px]');
+    expect(message.querySelector('svg')).not.toBeInTheDocument();
     expect(
-      screen.getByLabelText('Log message: Deploying ${ENVIRONMENT}')
-    ).toBeInTheDocument();
+      screen.queryByText('Deploying ${ENVIRONMENT}')
+    ).not.toBeInTheDocument();
     expect(screen.getByText('stdout')).toBeInTheDocument();
   });
 });

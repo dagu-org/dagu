@@ -7,7 +7,6 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { MessageSquare } from 'lucide-react';
 
 type LogStepMessageProps = {
   message: string;
@@ -59,14 +58,13 @@ export function LogStepMessage({
   const content = (
     <div
       className={cn(
-        'inline-flex min-w-0 max-w-full items-start gap-1.5 rounded-md border border-border bg-muted/40 px-2 py-1.5',
-        compact ? 'max-w-[260px]' : 'w-full',
+        'min-w-0 rounded-md border border-border bg-muted/40 px-2 py-1.5',
+        compact ? 'w-[320px] max-w-full' : 'w-full',
         className
       )}
       aria-label={`Log message: ${formatSingleLine(message)}`}
     >
-      <MessageSquare className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-primary" />
-      <div className="min-w-0 flex-1">{messageBody}</div>
+      {messageBody}
     </div>
   );
 

@@ -3,7 +3,7 @@
 
 import type { components } from '@/api/v1/schema';
 import { describe, expect, it } from 'vitest';
-import { getLogStepMessage } from '../executor-utils';
+import { formatLogStepOutput, getLogStepMessage } from '../executor-utils';
 
 describe('getLogStepMessage', () => {
   it('returns the configured log message for log steps', () => {
@@ -30,5 +30,20 @@ describe('getLogStepMessage', () => {
     } as components['schemas']['Step'];
 
     expect(getLogStepMessage(step)).toBeNull();
+  });
+});
+
+describe('formatLogStepOutput', () => {
+  it('formats stdout content for inline log step display', () => {
+    expect(formatLogStepOutput('Deploying production\n')).toBe(
+      'Deploying production'
+    );
+    expect(formatLogStepOutput('one\r\ntwo\r\n')).toBe('one\ntwo');
+  });
+
+  it('removes ANSI escape codes from stdout content', () => {
+    expect(
+      formatLogStepOutput('\u001b[32mDeploying production\u001b[0m\n')
+    ).toBe('Deploying production');
   });
 });

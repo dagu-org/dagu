@@ -14,8 +14,13 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { AppBarContext } from '@/contexts/AppBarContext';
-import { useClient } from '@/hooks/api';
-import { getExecutorCommand, getLogStepMessage } from '@/lib/executor-utils';
+import { useClient, useQuery } from '@/hooks/api';
+import { whenEnabled } from '@/hooks/queryUtils';
+import {
+  formatLogStepOutput,
+  getExecutorCommand,
+  getLogStepMessage,
+} from '@/lib/executor-utils';
 import { isHarnessStep } from '@/lib/harness-step';
 import { isActiveNodeStatus } from '@/lib/status-utils';
 import dayjs from '@/lib/dayjs';
@@ -172,6 +177,68 @@ function NodeStatusTableRow({
   const activeDotClass =
     node.status === NodeStatus.Retrying ? 'bg-warning' : 'bg-success';
   const logMessage = getLogStepMessage(node.step);
+  const hasStdout = !!node.stdout;
+  const hasStderr = !!node.stderr;
+  const hasLogs = hasStdout || hasStderr;
+  const isSubDAGRun =
+    !!dagRun.rootDAGRunId &&
+    !!dagRun.rootDAGRunName &&
+    dagRun.rootDAGRunId !== dagRun.dagRunId;
+  const shouldFetchLogStepOutput =
+    logMessage !== null && hasStdout && !!dagRunId;
+
+  const subDAGLogQuery = useQuery(
+    '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/log',
+    whenEnabled(shouldFetchLogStepOutput && isSubDAGRun, {
+      params: {
+        query: {
+          remoteNode,
+          stream: Stream.stdout,
+        },
+        path: {
+          name: dagRun.rootDAGRunName,
+          dagRunId: dagRun.rootDAGRunId || '',
+          subDAGRunId: dagRun.dagRunId,
+          stepName: node.step.name,
+        },
+      },
+    }),
+    {
+      refreshInterval: isActiveNode ? 2000 : 0,
+      revalidateOnFocus: false,
+    }
+  );
+
+  const dagRunLogQuery = useQuery(
+    '/dag-runs/{name}/{dagRunId}/steps/{stepName}/log',
+    whenEnabled(shouldFetchLogStepOutput && !isSubDAGRun, {
+      params: {
+        query: {
+          remoteNode,
+          stream: Stream.stdout,
+        },
+        path: {
+          name: dagRun?.name || name,
+          dagRunId: dagRunId || '',
+          stepName: node.step.name,
+        },
+      },
+    }),
+    {
+      refreshInterval: isActiveNode ? 2000 : 0,
+      revalidateOnFocus: false,
+    }
+  );
+
+  const logOutputContent = isSubDAGRun
+    ? subDAGLogQuery.data?.content
+    : dagRunLogQuery.data?.content;
+  const logStepDisplayMessage =
+    typeof logOutputContent === 'string'
+      ? formatLogStepOutput(logOutputContent)
+      : shouldFetchLogStepOutput
+        ? 'Loading log output...'
+        : logMessage;
 
   // Update duration every second for active tasks.
   useEffect(() => {
@@ -337,11 +404,6 @@ function NodeStatusTableRow({
     status: NodeStatus
   ) => {
     // Check if this is a sub DAG-run
-    const isSubDAGRun =
-      dagRun.rootDAGRunId &&
-      dagRun.rootDAGRunName &&
-      dagRun.rootDAGRunId !== dagRun.dagRunId;
-
     // Define path parameters
     const pathParams = {
       name: isSubDAGRun ? dagRun.rootDAGRunName : dagName,
@@ -379,11 +441,6 @@ function NodeStatusTableRow({
     dagContext.refresh();
     setShowStatusModal(false);
   };
-
-  // Determine if logs are available
-  const hasStdout = !!node.stdout;
-  const hasStderr = !!node.stderr;
-  const hasLogs = hasStdout || hasStderr;
 
   // Determine which stream to show based on active tab
   const currentStream: components['schemas']['Stream'] =
@@ -529,8 +586,8 @@ function NodeStatusTableRow({
             <div className="space-y-1.5">
               {isHarnessStep(node.step) ? (
                 <HarnessStepSummary step={node.step} />
-              ) : logMessage !== null ? (
-                <LogStepMessage message={logMessage} compact />
+              ) : logStepDisplayMessage !== null ? (
+                <LogStepMessage message={logStepDisplayMessage} compact />
               ) : node.step.commands && node.step.commands.length > 0 ? (
                 <CommandDisplay
                   commands={node.step.commands}
@@ -951,16 +1008,16 @@ function NodeStatusTableRow({
           {logMessage !== null
             ? 'Message:'
             : isHarnessStep(node.step)
-            ? 'Execution:'
-            : node.step.commands && node.step.commands.length > 1
-              ? 'Commands:'
-              : 'Command:'}
+              ? 'Execution:'
+              : node.step.commands && node.step.commands.length > 1
+                ? 'Commands:'
+                : 'Command:'}
         </div>
         <div className="space-y-1.5">
           {isHarnessStep(node.step) ? (
             <HarnessStepSummary step={node.step} />
-          ) : logMessage !== null ? (
-            <LogStepMessage message={logMessage} />
+          ) : logStepDisplayMessage !== null ? (
+            <LogStepMessage message={logStepDisplayMessage} />
           ) : node.step.commands && node.step.commands.length > 0 ? (
             <div className="space-y-1.5">
               {node.step.commands.map((entry, idx) => {
