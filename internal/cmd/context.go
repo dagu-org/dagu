@@ -447,12 +447,24 @@ func commandFamilyName(cmd *cobra.Command) string {
 	if isContextCommand(cmd) {
 		return "context"
 	}
+	if isAgentCLICommand(cmd) {
+		return "agent"
+	}
 	return cmd.Name()
 }
 
 func isContextCommand(cmd *cobra.Command) bool {
 	for current := cmd; current != nil; current = current.Parent() {
 		if current.Name() == "context" {
+			return true
+		}
+	}
+	return false
+}
+
+func isAgentCLICommand(cmd *cobra.Command) bool {
+	for current := cmd; current != nil; current = current.Parent() {
+		if current.Name() == "agent" {
 			return true
 		}
 	}
@@ -538,7 +550,7 @@ func serviceForCommand(cmdName string) config.Service {
 		return config.ServiceWorker
 	case "coordinator":
 		return config.ServiceCoordinator
-	case "start", "restart", "retry", "dry", "exec":
+	case "start", "restart", "retry", "dry", "exec", "agent":
 		return config.ServiceAgent
 	default:
 		// For all other commands (status, stop, validate, etc.), load all config
@@ -550,7 +562,7 @@ func serviceForCommand(cmdName string) config.Service {
 // that displays progress or tree output.
 func isAgentCommand(cmdName string) bool {
 	switch cmdName {
-	case "start", "restart", "retry", "dry", "exec":
+	case "start", "restart", "retry", "dry", "exec", "agent":
 		return true
 	default:
 		return false

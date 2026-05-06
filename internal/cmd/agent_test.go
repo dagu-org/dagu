@@ -1,0 +1,168 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package cmd
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"log/slog"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+
+	api "github.com/dagucloud/dagu/api/v1"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestAgentCommandShape(t *testing.T) {
+	cmd := Agent()
+
+	assert.Equal(t, "agent", cmd.Name())
+	assert.NotNil(t, cmd.Flags().Lookup("prompt"))
+	assert.Equal(t, "p", cmd.Flags().Lookup("prompt").Shorthand)
+	assert.NotNil(t, cmd.Flags().Lookup("model"))
+	assert.Nil(t, cmd.Flags().Lookup("server"))
+
+	subcommands := map[string]bool{}
+	for _, sub := range cmd.Commands() {
+		subcommands[sub.Name()] = true
+	}
+	assert.True(t, subcommands["history"])
+	assert.True(t, subcommands["resume"])
+}
+
+func TestRunAgentWithoutPromptStartsInteractiveMode(t *testing.T) {
+	cmd := Agent()
+	cmd.SetIn(strings.NewReader("/exit\n"))
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+
+	err := runAgent(&Context{
+		Context: context.Background(),
+		Command: cmd,
+	}, nil)
+
+	require.NoError(t, err)
+	assert.Contains(t, out.String(), "Type /exit")
+}
+
+func TestRemoteClientCreateAgentSession(t *testing.T) {
+	var gotPath string
+	var gotRequest api.AgentChatRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		require.Equal(t, http.MethodPost, r.Method)
+		require.Equal(t, "Bearer test-key", r.Header.Get("Authorization"))
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&gotRequest))
+		_ = json.NewEncoder(w).Encode(api.CreateAgentSessionResponse{
+			SessionId: "session-1",
+			Status:    "accepted",
+		})
+	}))
+	defer srv.Close()
+
+	remote := &remoteClient{
+		baseURL: srv.URL,
+		apiKey:  "test-key",
+		client:  srv.Client(),
+	}
+	resp, err := remote.createAgentSession(context.Background(), api.AgentChatRequest{
+		Message: "create a DAG",
+		Model:   stringPtrOrNil("gpt-4.1"),
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "/agent/sessions", gotPath)
+	assert.Equal(t, "create a DAG", gotRequest.Message)
+	require.NotNil(t, gotRequest.Model)
+	assert.Equal(t, "gpt-4.1", *gotRequest.Model)
+	assert.Equal(t, "session-1", resp.SessionId)
+	assert.Equal(t, "accepted", resp.Status)
+}
+
+func TestRemoteClientSendAgentMessage(t *testing.T) {
+	var gotPath string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		require.Equal(t, http.MethodPost, r.Method)
+		require.Equal(t, "Bearer test-key", r.Header.Get("Authorization"))
+		w.WriteHeader(http.StatusAccepted)
+		_ = json.NewEncoder(w).Encode(api.AgentStatusResponse{Status: "accepted"})
+	}))
+	defer srv.Close()
+
+	remote := &remoteClient{
+		baseURL: srv.URL,
+		apiKey:  "test-key",
+		client:  srv.Client(),
+	}
+	err := remote.sendAgentMessage(context.Background(), "session-1", api.AgentChatRequest{
+		Message: "continue",
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "/agent/sessions/session-1/chat", gotPath)
+}
+
+func TestRemoteClientRespondAgentPrompt(t *testing.T) {
+	var gotPath string
+	var gotRequest api.AgentUserPromptResponse
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		require.Equal(t, http.MethodPost, r.Method)
+		require.Equal(t, "Bearer test-key", r.Header.Get("Authorization"))
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&gotRequest))
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(api.AgentStatusResponse{Status: "accepted"})
+	}))
+	defer srv.Close()
+
+	remote := &remoteClient{
+		baseURL: srv.URL,
+		apiKey:  "test-key",
+		client:  srv.Client(),
+	}
+	err := remote.respondAgentPrompt(context.Background(), "session-1", api.AgentUserPromptResponse{
+		PromptId: "prompt-1",
+		SelectedOptionIds: &[]string{
+			"approve",
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "/agent/sessions/session-1/respond", gotPath)
+	assert.Equal(t, "prompt-1", gotRequest.PromptId)
+	require.NotNil(t, gotRequest.SelectedOptionIds)
+	assert.Equal(t, []string{"approve"}, *gotRequest.SelectedOptionIds)
+}
+
+func TestBuildAgentPromptResponseMatchesOptionLabels(t *testing.T) {
+	resp, err := buildAgentPromptResponse(&agentPromptRow{
+		ID: "prompt-1",
+		Options: []agentPromptOptionRow{
+			{ID: "approve", Label: "Approve"},
+			{ID: "reject", Label: "Reject"},
+		},
+	}, "approve")
+
+	require.NoError(t, err)
+	assert.Equal(t, "prompt-1", resp.PromptID)
+	assert.Equal(t, []string{"approve"}, resp.SelectedOptionIDs)
+}
+
+func TestCLIAgentLoggerDoesNotWriteToDefaultLogger(t *testing.T) {
+	var buf bytes.Buffer
+	original := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	t.Cleanup(func() {
+		slog.SetDefault(original)
+	})
+
+	newCLIAgentLogger().Info("queued user message", "session_id", "session-1")
+
+	assert.Empty(t, buf.String())
+}
