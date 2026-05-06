@@ -30,7 +30,7 @@ func readAttemptQueries(t *testing.T) string {
 	t.Helper()
 	data, err := os.ReadFile("queries/attempts.sql")
 	require.NoError(t, err)
-	return string(data)
+	return strings.ReplaceAll(string(data), "\r\n", "\n")
 }
 
 func namedQuery(t *testing.T, queryText, name string) string {
