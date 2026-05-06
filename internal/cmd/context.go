@@ -678,12 +678,21 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize scheduler DAG-run store: %w", err)
 	}
+	ownsSchedulerRunStore := true
+	defer func() {
+		if ownsSchedulerRunStore {
+			if closeErr := exec.CloseDAGRunStore(context.Background(), schedulerRunStore); closeErr != nil {
+				logger.Warn(c, "Failed to close scheduler DAG-run store", tag.Error(closeErr))
+			}
+		}
+	}()
 	schedulerRunMgr := runtime.NewManager(schedulerRunStore, c.ProcStore, c.Config)
 
 	sched, err := scheduler.New(c.Config, m, schedulerRunMgr, schedulerRunStore, c.QueueStore, c.ProcStore, c.ServiceRegistry, coordinatorCli, wmStore)
 	if err != nil {
 		return nil, err
 	}
+	ownsSchedulerRunStore = false
 	if c.EventService != nil {
 		collector, eventErr := fileeventstore.NewCollector(c.Config.Paths.EventStoreDir, c.Config.EventStore.RetentionDays)
 		if eventErr != nil {

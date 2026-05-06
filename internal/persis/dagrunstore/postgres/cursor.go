@@ -92,22 +92,39 @@ func queryFilterHash(opts exec.ListDAGRunStatusesOptions) string {
 	labels := append([]string(nil), opts.Labels...)
 	sort.Strings(labels)
 
+	type workspaceFilterFingerprint struct {
+		Enabled           bool     `json:"enabled,omitempty"`
+		Workspaces        []string `json:"workspaces,omitempty"`
+		IncludeUnlabelled bool     `json:"include_unlabelled,omitempty"`
+	}
+	workspaceFilter := workspaceFilterFingerprint{Workspaces: []string{}}
+	if opts.WorkspaceFilter != nil {
+		workspaceFilter.Enabled = opts.WorkspaceFilter.Enabled
+		if opts.WorkspaceFilter.Enabled {
+			workspaceFilter.Workspaces = append([]string(nil), opts.WorkspaceFilter.Workspaces...)
+			sort.Strings(workspaceFilter.Workspaces)
+			workspaceFilter.IncludeUnlabelled = opts.WorkspaceFilter.IncludeUnlabelled
+		}
+	}
+
 	normalized := struct {
-		DAGRunID   string   `json:"dag_run_id,omitempty"`
-		Name       string   `json:"name,omitempty"`
-		ExactName  string   `json:"exact_name,omitempty"`
-		From       string   `json:"from,omitempty"`
-		To         string   `json:"to,omitempty"`
-		Statuses   []int    `json:"statuses,omitempty"`
-		Labels     []string `json:"labels,omitempty"`
-		AllHistory bool     `json:"all_history,omitempty"`
+		DAGRunID        string                     `json:"dag_run_id,omitempty"`
+		Name            string                     `json:"name,omitempty"`
+		ExactName       string                     `json:"exact_name,omitempty"`
+		From            string                     `json:"from,omitempty"`
+		To              string                     `json:"to,omitempty"`
+		Statuses        []int                      `json:"statuses,omitempty"`
+		Labels          []string                   `json:"labels,omitempty"`
+		WorkspaceFilter workspaceFilterFingerprint `json:"workspace_filter"`
+		AllHistory      bool                       `json:"all_history,omitempty"`
 	}{
-		DAGRunID:   opts.DAGRunID,
-		Name:       opts.Name,
-		ExactName:  opts.ExactName,
-		Statuses:   statuses,
-		Labels:     labels,
-		AllHistory: opts.AllHistory,
+		DAGRunID:        opts.DAGRunID,
+		Name:            opts.Name,
+		ExactName:       opts.ExactName,
+		Statuses:        statuses,
+		Labels:          labels,
+		WorkspaceFilter: workspaceFilter,
+		AllHistory:      opts.AllHistory,
 	}
 	if !opts.From.IsZero() {
 		normalized.From = opts.From.UTC().Format(time.RFC3339Nano)

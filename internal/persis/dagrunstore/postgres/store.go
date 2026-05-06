@@ -641,24 +641,30 @@ func (s *Store) RemoveDAGRun(ctx context.Context, dagRun exec.DAGRunRef, opts ..
 	for _, opt := range opts {
 		opt(&options)
 	}
-	if options.RejectActive {
-		attempt, err := s.FindAttempt(ctx, dagRun)
-		if err != nil {
-			return err
-		}
-		status, err := attempt.ReadStatus(ctx)
-		if err != nil {
-			return err
-		}
-		if status.Status.IsActive() {
-			return fmt.Errorf("%w: %s", exec.ErrDAGRunActive, status.Status.String())
-		}
-	}
 
 	var deleted []string
 	if err := s.withTx(ctx, func(q *db.Queries) error {
 		if err := q.LockDAGRunKey(ctx, dagLockKey(dagRun.Name, dagRun.ID)); err != nil {
 			return err
+		}
+		if options.RejectActive {
+			row, err := q.LatestRootAttemptForUpdate(ctx, db.LatestRootAttemptForUpdateParams{
+				DagName:  dagRun.Name,
+				DagRunID: dagRun.ID,
+			})
+			if err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					return fmt.Errorf("%w: %s", exec.ErrDAGRunIDNotFound, dagRun.ID)
+				}
+				return err
+			}
+			status, err := statusFromRow(row)
+			if err != nil {
+				return err
+			}
+			if status.Status.IsActive() {
+				return fmt.Errorf("%w: %s", exec.ErrDAGRunActive, status.Status.String())
+			}
 		}
 		ids, err := q.DeleteDAGRunRows(ctx, db.DeleteDAGRunRowsParams{
 			RootDagName:  dagRun.Name,
