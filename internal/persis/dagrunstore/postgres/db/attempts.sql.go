@@ -420,33 +420,43 @@ func (q *Queries) LatestSubAttempt(ctx context.Context, arg LatestSubAttemptPara
 
 const listRemovableRunsByCount = `-- name: ListRemovableRunsByCount :many
 WITH latest AS (
-    SELECT DISTINCT ON (dag_run_id) dag_run_id, status, run_created_at
+    SELECT DISTINCT ON (dag_run_id) dag_run_id, status, run_created_at, status_data
     FROM dagu_dag_run_attempts
     WHERE is_root
-      AND dag_name = $2
+      AND dag_name = $1
       AND NOT hidden
-      AND status_data IS NOT NULL
     ORDER BY dag_run_id, attempt_created_at DESC, id DESC
 ),
 terminal AS (
     SELECT dag_run_id, run_created_at
     FROM latest
-    WHERE status <> ALL($3::integer[])
+    WHERE status_data IS NOT NULL
+      AND status <> ALL($2::integer[])
+),
+ranked AS (
+    SELECT dag_run_id, run_created_at
+    FROM latest
+    ORDER BY run_created_at DESC, dag_run_id ASC
+    OFFSET $3::integer
+),
+removable AS (
+    SELECT ranked.dag_run_id, ranked.run_created_at
+    FROM ranked
+    JOIN terminal USING (dag_run_id)
 )
 SELECT dag_run_id
-FROM terminal
+FROM removable
 ORDER BY run_created_at DESC, dag_run_id ASC
-OFFSET $1::integer
 `
 
 type ListRemovableRunsByCountParams struct {
-	RetentionRuns  int32   `json:"retention_runs"`
 	DagName        string  `json:"dag_name"`
 	ActiveStatuses []int32 `json:"active_statuses"`
+	RetentionRuns  int32   `json:"retention_runs"`
 }
 
 func (q *Queries) ListRemovableRunsByCount(ctx context.Context, arg ListRemovableRunsByCountParams) ([]string, error) {
-	rows, err := q.db.Query(ctx, listRemovableRunsByCount, arg.RetentionRuns, arg.DagName, arg.ActiveStatuses)
+	rows, err := q.db.Query(ctx, listRemovableRunsByCount, arg.DagName, arg.ActiveStatuses, arg.RetentionRuns)
 	if err != nil {
 		return nil, err
 	}
@@ -467,17 +477,18 @@ func (q *Queries) ListRemovableRunsByCount(ctx context.Context, arg ListRemovabl
 
 const listRemovableRunsByDays = `-- name: ListRemovableRunsByDays :many
 WITH latest AS (
-    SELECT DISTINCT ON (dag_run_id) dag_run_id, status, run_created_at
+    SELECT DISTINCT ON (dag_run_id) dag_run_id, status, run_created_at, updated_at, status_data
     FROM dagu_dag_run_attempts
     WHERE is_root
       AND dag_name = $3
       AND NOT hidden
-      AND status_data IS NOT NULL
     ORDER BY dag_run_id, attempt_created_at DESC, id DESC
 )
 SELECT dag_run_id
 FROM latest
 WHERE run_created_at < $1::timestamptz
+  AND updated_at < $1::timestamptz
+  AND status_data IS NOT NULL
   AND status <> ALL($2::integer[])
 ORDER BY run_created_at ASC, dag_run_id ASC
 `

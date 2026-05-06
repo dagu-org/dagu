@@ -208,39 +208,50 @@ LIMIT sqlc.arg(page_limit)::integer;
 
 -- name: ListRemovableRunsByDays :many
 WITH latest AS (
-    SELECT DISTINCT ON (dag_run_id) dag_run_id, status, run_created_at
+    SELECT DISTINCT ON (dag_run_id) dag_run_id, status, run_created_at, updated_at, status_data
     FROM dagu_dag_run_attempts
     WHERE is_root
       AND dag_name = sqlc.arg(dag_name)
       AND NOT hidden
-      AND status_data IS NOT NULL
     ORDER BY dag_run_id, attempt_created_at DESC, id DESC
 )
 SELECT dag_run_id
 FROM latest
 WHERE run_created_at < sqlc.arg(cutoff)::timestamptz
+  AND updated_at < sqlc.arg(cutoff)::timestamptz
+  AND status_data IS NOT NULL
   AND status <> ALL(sqlc.arg(active_statuses)::integer[])
 ORDER BY run_created_at ASC, dag_run_id ASC;
 
 -- name: ListRemovableRunsByCount :many
 WITH latest AS (
-    SELECT DISTINCT ON (dag_run_id) dag_run_id, status, run_created_at
+    SELECT DISTINCT ON (dag_run_id) dag_run_id, status, run_created_at, status_data
     FROM dagu_dag_run_attempts
     WHERE is_root
       AND dag_name = sqlc.arg(dag_name)
       AND NOT hidden
-      AND status_data IS NOT NULL
     ORDER BY dag_run_id, attempt_created_at DESC, id DESC
 ),
 terminal AS (
     SELECT dag_run_id, run_created_at
     FROM latest
-    WHERE status <> ALL(sqlc.arg(active_statuses)::integer[])
+    WHERE status_data IS NOT NULL
+      AND status <> ALL(sqlc.arg(active_statuses)::integer[])
+),
+ranked AS (
+    SELECT dag_run_id, run_created_at
+    FROM latest
+    ORDER BY run_created_at DESC, dag_run_id ASC
+    OFFSET sqlc.arg(retention_runs)::integer
+),
+removable AS (
+    SELECT ranked.dag_run_id, ranked.run_created_at
+    FROM ranked
+    JOIN terminal USING (dag_run_id)
 )
 SELECT dag_run_id
-FROM terminal
-ORDER BY run_created_at DESC, dag_run_id ASC
-OFFSET sqlc.arg(retention_runs)::integer;
+FROM removable
+ORDER BY run_created_at DESC, dag_run_id ASC;
 
 -- name: DeleteDAGRunRows :many
 DELETE FROM dagu_dag_run_attempts
