@@ -19,6 +19,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 			DAGsDir:        "/dags",
 			DocsDir:        "/dags/docs",
 			LogDir:         "/logs",
+			SessionsDir:    "/data/agent/sessions",
 			WorkingDir:     "/work",
 			BaseConfigFile: "/config/base.yaml",
 		}
@@ -28,6 +29,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 		assert.NotEmpty(t, result)
 		assert.Contains(t, result, "/dags")
 		assert.Contains(t, result, "/dags/docs")
+		assert.Contains(t, result, "Session Store Directory: /data/agent/sessions")
 		assert.Contains(t, result, "/config/base.yaml")
 		assert.Contains(t, result, "Authenticated role: developer")
 	})
@@ -214,6 +216,15 @@ func TestGenerateSystemPrompt(t *testing.T) {
 		assert.Contains(t, result, "Before using tools or starting a long-running action")
 		assert.Contains(t, result, "Do not stay silent until the final answer")
 		assert.Contains(t, result, "what you did, what you found, and what you will do next")
+	})
+
+	t.Run("documents session search tool", func(t *testing.T) {
+		t.Parallel()
+		env := EnvironmentInfo{DAGsDir: "/dags"}
+
+		result := GenerateSystemPrompt(SystemPromptParams{Env: env, Role: auth.RoleDeveloper})
+
+		assert.Contains(t, result, "`session_search`: Search past persisted session transcripts")
 	})
 }
 

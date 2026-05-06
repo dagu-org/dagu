@@ -783,6 +783,7 @@ func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore 
 			DocsDir:        paths.DocsDir,
 			LogDir:         paths.LogDir,
 			DataDir:        paths.DataDir,
+			SessionsDir:    paths.SessionsDir,
 			ConfigFile:     paths.ConfigFileUsed,
 			WorkingDir:     paths.DAGsDir,
 			BaseConfigFile: paths.BaseConfig,
