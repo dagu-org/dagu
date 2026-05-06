@@ -164,6 +164,34 @@ func collectOutputValueReferenceStrings(field string, value any, add func(string
 		if len(v.Raw) > 0 {
 			add(field+".raw", string(v.Raw))
 		}
+	default:
+		collectReflectOutputValueReferenceStrings(field, value, add)
+	}
+}
+
+func collectReflectOutputValueReferenceStrings(field string, value any, add func(string, string)) {
+	if value == nil {
+		return
+	}
+	rv := reflect.ValueOf(value)
+	switch rv.Kind() {
+	case reflect.Slice, reflect.Array:
+		for i := range rv.Len() {
+			collectOutputValueReferenceStrings(fmt.Sprintf("%s[%d]", field, i), rv.Index(i).Interface(), add)
+		}
+	case reflect.Map:
+		if rv.Type().Key().Kind() != reflect.String {
+			return
+		}
+		keys := make([]string, 0, rv.Len())
+		iter := rv.MapRange()
+		for iter.Next() {
+			keys = append(keys, iter.Key().String())
+		}
+		slices.Sort(keys)
+		for _, key := range keys {
+			collectOutputValueReferenceStrings(field+"."+key, rv.MapIndex(reflect.ValueOf(key)).Interface(), add)
+		}
 	}
 }
 
@@ -284,8 +312,7 @@ func hasSchemaComposition(schema map[string]any) bool {
 }
 
 func validateComposedSchemaOutputPath(schema map[string]any, path []string) outputReferenceValidationStatus {
-	status := outputReferenceUnknown
-	for _, key := range []string{"anyOf", "oneOf", "allOf"} {
+	for _, key := range []string{"anyOf", "oneOf"} {
 		branches, ok := schemaArray(schema[key])
 		if !ok || len(branches) == 0 {
 			continue
@@ -295,11 +322,30 @@ func validateComposedSchemaOutputPath(schema map[string]any, path []string) outp
 			if !ok {
 				return outputReferenceUnknown
 			}
-			status = outputReferenceInvalid
 			branchStatus := validateSchemaOutputPath(branchSchema, path)
 			if branchStatus == outputReferenceValid || branchStatus == outputReferenceUnknown {
 				return outputReferenceUnknown
 			}
+		}
+		return outputReferenceInvalid
+	}
+
+	branches, ok := schemaArray(schema["allOf"])
+	if !ok || len(branches) == 0 {
+		return outputReferenceUnknown
+	}
+	status := outputReferenceValid
+	for _, branch := range branches {
+		branchSchema, ok := schemaMap(branch)
+		if !ok {
+			return outputReferenceUnknown
+		}
+		branchStatus := validateSchemaOutputPath(branchSchema, path)
+		if branchStatus == outputReferenceInvalid {
+			return outputReferenceInvalid
+		}
+		if branchStatus == outputReferenceUnknown {
+			status = outputReferenceUnknown
 		}
 	}
 	return status

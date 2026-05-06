@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPublishedOutputContractValidatePath(t *testing.T) {
@@ -72,6 +73,31 @@ func TestPublishedOutputContractValidatePath(t *testing.T) {
 		}
 	})
 
+	t.Run("AllOfInvalidBranchIsInvalid", func(t *testing.T) {
+		t.Parallel()
+
+		contract := publishedOutputContract{
+			StepName: "build",
+			Source:   "output_schema",
+			Schema: map[string]any{
+				"allOf": []any{
+					map[string]any{
+						"type":                 "object",
+						"properties":           map[string]any{"artifact": map[string]any{"type": "string"}},
+						"additionalProperties": false,
+					},
+					map[string]any{
+						"type":                 "object",
+						"properties":           map[string]any{},
+						"additionalProperties": false,
+					},
+				},
+			},
+		}
+
+		assert.Equal(t, outputReferenceInvalid, contract.validatePath([]string{"artifact"}))
+	})
+
 	t.Run("ClosedSchemaWithPatternPropertiesIsUnknown", func(t *testing.T) {
 		t.Parallel()
 
@@ -90,4 +116,28 @@ func TestPublishedOutputContractValidatePath(t *testing.T) {
 		assert.Equal(t, outputReferenceUnknown, contract.validatePath([]string{"x_dynamic"}))
 		assert.Equal(t, outputReferenceInvalid, contract.validatePath([]string{"dynamic"}))
 	})
+}
+
+func TestCollectOutputValueReferenceStringsDescendsTypedContainers(t *testing.T) {
+	t.Parallel()
+
+	type collectedReference struct {
+		field string
+		ref   outputReference
+	}
+	var refs []collectedReference
+	collectOutputValueReferenceStrings("output.payload.value", []map[string]string{
+		{"z": "${build.output.zed}"},
+		{"a": "${build.output.alpha}"},
+	}, func(field, value string) {
+		for _, ref := range extractOutputReferences(value) {
+			refs = append(refs, collectedReference{field: field, ref: ref})
+		}
+	})
+
+	require.Len(t, refs, 2)
+	assert.Equal(t, "output.payload.value[0].z", refs[0].field)
+	assert.Equal(t, "zed", refs[0].ref.Path[0])
+	assert.Equal(t, "output.payload.value[1].a", refs[1].field)
+	assert.Equal(t, "alpha", refs[1].ref.Path[0])
 }
