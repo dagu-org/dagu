@@ -123,8 +123,8 @@ name: batch-dag
 max_active_runs: 3
 steps:
   - name: sleep
-    command: %s
-`, test.ShellQuote(test.Sleep(time.Second)))).Enqueue(3).StartScheduler(30 * time.Second)
+    %s
+`, directSleepStepYAML(t, time.Second))).Enqueue(3).StartScheduler(30 * time.Second)
 	defer f.Stop()
 
 	f.WaitDrain(20 * time.Second)

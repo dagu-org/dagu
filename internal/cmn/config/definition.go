@@ -78,18 +78,19 @@ type Definition struct {
 	DefaultExecutionMode string `mapstructure:"default_execution_mode"`
 
 	// Features
-	Monitoring *MonitoringDef `mapstructure:"monitoring"`
-	Metrics    *string        `mapstructure:"metrics"` // "public" or "private"
-	Cache      *string        `mapstructure:"cache"`   // "low", "normal", or "high"
-	Terminal   *TerminalDef   `mapstructure:"terminal"`
-	Audit      *AuditDef      `mapstructure:"audit"`
-	EventStore *EventStoreDef `mapstructure:"event_store"`
-	Session    *SessionDef    `mapstructure:"session"`
-	SSE        *SSEDef        `mapstructure:"sse"`
-	GitSync    *GitSyncDef    `mapstructure:"git_sync"`
-	Tunnel     *TunnelDef     `mapstructure:"tunnel"`
-	Bots       *BotsDef       `mapstructure:"bots"`
-	License    *LicenseDef    `mapstructure:"license"`
+	Monitoring  *MonitoringDef  `mapstructure:"monitoring"`
+	Metrics     *string         `mapstructure:"metrics"` // "public" or "private"
+	Cache       *string         `mapstructure:"cache"`   // "low", "normal", or "high"
+	Terminal    *TerminalDef    `mapstructure:"terminal"`
+	Audit       *AuditDef       `mapstructure:"audit"`
+	EventStore  *EventStoreDef  `mapstructure:"event_store"`
+	DAGRunStore *DAGRunStoreDef `mapstructure:"dag_run_store"`
+	Session     *SessionDef     `mapstructure:"session"`
+	SSE         *SSEDef         `mapstructure:"sse"`
+	GitSync     *GitSyncDef     `mapstructure:"git_sync"`
+	Tunnel      *TunnelDef      `mapstructure:"tunnel"`
+	Bots        *BotsDef        `mapstructure:"bots"`
+	License     *LicenseDef     `mapstructure:"license"`
 }
 
 // -----------------------------------------------------------------------------
@@ -365,6 +366,34 @@ type AuditDef struct {
 type EventStoreDef struct {
 	Enabled       *bool `mapstructure:"enabled"`        // Default: true
 	RetentionDays *int  `mapstructure:"retention_days"` // Default: 1
+}
+
+// DAGRunStoreDef configures DAG-run status persistence.
+type DAGRunStoreDef struct {
+	Backend  string                  `mapstructure:"backend"` // "file" or "postgres"
+	Postgres *DAGRunStorePostgresDef `mapstructure:"postgres"`
+}
+
+// DAGRunStorePostgresDef configures PostgreSQL DAG-run status persistence.
+type DAGRunStorePostgresDef struct {
+	Server    *DAGRunStorePostgresRoleDef  `mapstructure:"server"`
+	Scheduler *DAGRunStorePostgresRoleDef  `mapstructure:"scheduler"`
+	Agent     *DAGRunStorePostgresAgentDef `mapstructure:"agent"`
+}
+
+// DAGRunStorePostgresRoleDef configures PostgreSQL persistence for one Dagu process role.
+type DAGRunStorePostgresRoleDef struct {
+	DSN         string           `mapstructure:"dsn"`
+	AutoMigrate *bool            `mapstructure:"auto_migrate"`
+	Pool        *PostgresPoolDef `mapstructure:"pool"`
+}
+
+// DAGRunStorePostgresAgentDef configures PostgreSQL persistence for DAG execution processes.
+type DAGRunStorePostgresAgentDef struct {
+	DSN          string           `mapstructure:"dsn"`
+	AutoMigrate  *bool            `mapstructure:"auto_migrate"`
+	DirectAccess *bool            `mapstructure:"direct_access"`
+	Pool         *PostgresPoolDef `mapstructure:"pool"`
 }
 
 // SessionDef configures agent session storage.

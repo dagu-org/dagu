@@ -254,6 +254,7 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	}
 	l.loadSecretsConfig(&cfg, def)
 	l.loadEventStoreConfig(&cfg, def)
+	l.loadDAGRunStoreConfig(&cfg, def)
 
 	// Load service-specific sections
 	sectionLoaders := []struct {
@@ -443,6 +444,31 @@ func (l *ConfigLoader) loadEventStoreConfig(cfg *Config, def Definition) {
 	cfg.EventStore.RetentionDays = l.v.GetInt("event_store.retention_days")
 	if def.EventStore != nil && def.EventStore.RetentionDays != nil {
 		cfg.EventStore.RetentionDays = *def.EventStore.RetentionDays
+	}
+}
+
+func (l *ConfigLoader) loadDAGRunStoreConfig(cfg *Config, _ Definition) {
+	cfg.DAGRunStore.Backend = DAGRunStoreBackend(l.v.GetString("dag_run_store.backend"))
+	if cfg.DAGRunStore.Backend == "" {
+		cfg.DAGRunStore.Backend = DAGRunStoreBackendFile
+	}
+	cfg.DAGRunStore.Postgres.Server = l.loadDAGRunStorePostgresRoleConfig("server")
+	cfg.DAGRunStore.Postgres.Scheduler = l.loadDAGRunStorePostgresRoleConfig("scheduler")
+	cfg.DAGRunStore.Postgres.Agent = l.loadDAGRunStorePostgresRoleConfig("agent")
+}
+
+func (l *ConfigLoader) loadDAGRunStorePostgresRoleConfig(role string) DAGRunStorePostgresRoleConfig {
+	prefix := "dag_run_store.postgres." + role
+	return DAGRunStorePostgresRoleConfig{
+		DSN:          l.v.GetString(prefix + ".dsn"),
+		AutoMigrate:  l.v.GetBool(prefix + ".auto_migrate"),
+		DirectAccess: l.v.GetBool(prefix + ".direct_access"),
+		Pool: PostgresPoolConfig{
+			MaxOpenConns:    l.v.GetInt(prefix + ".pool.max_open_conns"),
+			MaxIdleConns:    l.v.GetInt(prefix + ".pool.max_idle_conns"),
+			ConnMaxLifetime: l.v.GetInt(prefix + ".pool.conn_max_lifetime"),
+			ConnMaxIdleTime: l.v.GetInt(prefix + ".pool.conn_max_idle_time"),
+		},
 	}
 }
 
@@ -823,14 +849,14 @@ func (l *ConfigLoader) setWorkerDefaults(cfg *Config) {
 }
 
 func (l *ConfigLoader) loadPostgresPoolConfig(pool *PostgresPoolConfig, def *PostgresPoolDef) {
-	setIfPositive(&pool.MaxOpenConns, def.MaxOpenConns)
-	setIfPositive(&pool.MaxIdleConns, def.MaxIdleConns)
-	setIfPositive(&pool.ConnMaxLifetime, def.ConnMaxLifetime)
-	setIfPositive(&pool.ConnMaxIdleTime, def.ConnMaxIdleTime)
+	setIfNonZero(&pool.MaxOpenConns, def.MaxOpenConns)
+	setIfNonZero(&pool.MaxIdleConns, def.MaxIdleConns)
+	setIfNonZero(&pool.ConnMaxLifetime, def.ConnMaxLifetime)
+	setIfNonZero(&pool.ConnMaxIdleTime, def.ConnMaxIdleTime)
 }
 
-func setIfPositive(target *int, value int) {
-	if value > 0 {
+func setIfNonZero(target *int, value int) {
+	if value != 0 {
 		*target = value
 	}
 }
@@ -1599,6 +1625,25 @@ func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	l.v.SetDefault("event_store.enabled", true)
 	l.v.SetDefault("event_store.retention_days", 1)
 
+	// DAG-run store
+	l.v.SetDefault("dag_run_store.backend", string(DAGRunStoreBackendFile))
+	l.v.SetDefault("dag_run_store.postgres.server.auto_migrate", true)
+	l.v.SetDefault("dag_run_store.postgres.server.pool.max_open_conns", 10)
+	l.v.SetDefault("dag_run_store.postgres.server.pool.max_idle_conns", 2)
+	l.v.SetDefault("dag_run_store.postgres.server.pool.conn_max_lifetime", 300)
+	l.v.SetDefault("dag_run_store.postgres.server.pool.conn_max_idle_time", 60)
+	l.v.SetDefault("dag_run_store.postgres.scheduler.auto_migrate", true)
+	l.v.SetDefault("dag_run_store.postgres.scheduler.pool.max_open_conns", 10)
+	l.v.SetDefault("dag_run_store.postgres.scheduler.pool.max_idle_conns", 2)
+	l.v.SetDefault("dag_run_store.postgres.scheduler.pool.conn_max_lifetime", 300)
+	l.v.SetDefault("dag_run_store.postgres.scheduler.pool.conn_max_idle_time", 60)
+	l.v.SetDefault("dag_run_store.postgres.agent.auto_migrate", false)
+	l.v.SetDefault("dag_run_store.postgres.agent.direct_access", false)
+	l.v.SetDefault("dag_run_store.postgres.agent.pool.max_open_conns", 2)
+	l.v.SetDefault("dag_run_store.postgres.agent.pool.max_idle_conns", 0)
+	l.v.SetDefault("dag_run_store.postgres.agent.pool.conn_max_lifetime", 300)
+	l.v.SetDefault("dag_run_store.postgres.agent.pool.conn_max_idle_time", 30)
+
 	// Terminal
 	l.v.SetDefault("terminal.max_sessions", 5)
 
@@ -1645,6 +1690,26 @@ var envBindings = []envBinding{
 	{key: "audit.retention_days", env: "AUDIT_RETENTION_DAYS"},
 	{key: "event_store.enabled", env: "EVENT_STORE_ENABLED"},
 	{key: "event_store.retention_days", env: "EVENT_STORE_RETENTION_DAYS"},
+	{key: "dag_run_store.backend", env: "DAG_RUN_STORE_BACKEND"},
+	{key: "dag_run_store.postgres.server.dsn", env: "DAG_RUN_STORE_POSTGRES_SERVER_DSN"},
+	{key: "dag_run_store.postgres.server.auto_migrate", env: "DAG_RUN_STORE_POSTGRES_SERVER_AUTO_MIGRATE"},
+	{key: "dag_run_store.postgres.server.pool.max_open_conns", env: "DAG_RUN_STORE_POSTGRES_SERVER_POOL_MAX_OPEN_CONNS"},
+	{key: "dag_run_store.postgres.server.pool.max_idle_conns", env: "DAG_RUN_STORE_POSTGRES_SERVER_POOL_MAX_IDLE_CONNS"},
+	{key: "dag_run_store.postgres.server.pool.conn_max_lifetime", env: "DAG_RUN_STORE_POSTGRES_SERVER_POOL_CONN_MAX_LIFETIME"},
+	{key: "dag_run_store.postgres.server.pool.conn_max_idle_time", env: "DAG_RUN_STORE_POSTGRES_SERVER_POOL_CONN_MAX_IDLE_TIME"},
+	{key: "dag_run_store.postgres.scheduler.dsn", env: "DAG_RUN_STORE_POSTGRES_SCHEDULER_DSN"},
+	{key: "dag_run_store.postgres.scheduler.auto_migrate", env: "DAG_RUN_STORE_POSTGRES_SCHEDULER_AUTO_MIGRATE"},
+	{key: "dag_run_store.postgres.scheduler.pool.max_open_conns", env: "DAG_RUN_STORE_POSTGRES_SCHEDULER_POOL_MAX_OPEN_CONNS"},
+	{key: "dag_run_store.postgres.scheduler.pool.max_idle_conns", env: "DAG_RUN_STORE_POSTGRES_SCHEDULER_POOL_MAX_IDLE_CONNS"},
+	{key: "dag_run_store.postgres.scheduler.pool.conn_max_lifetime", env: "DAG_RUN_STORE_POSTGRES_SCHEDULER_POOL_CONN_MAX_LIFETIME"},
+	{key: "dag_run_store.postgres.scheduler.pool.conn_max_idle_time", env: "DAG_RUN_STORE_POSTGRES_SCHEDULER_POOL_CONN_MAX_IDLE_TIME"},
+	{key: "dag_run_store.postgres.agent.dsn", env: "DAG_RUN_STORE_POSTGRES_AGENT_DSN"},
+	{key: "dag_run_store.postgres.agent.auto_migrate", env: "DAG_RUN_STORE_POSTGRES_AGENT_AUTO_MIGRATE"},
+	{key: "dag_run_store.postgres.agent.direct_access", env: "DAG_RUN_STORE_POSTGRES_AGENT_DIRECT_ACCESS"},
+	{key: "dag_run_store.postgres.agent.pool.max_open_conns", env: "DAG_RUN_STORE_POSTGRES_AGENT_POOL_MAX_OPEN_CONNS"},
+	{key: "dag_run_store.postgres.agent.pool.max_idle_conns", env: "DAG_RUN_STORE_POSTGRES_AGENT_POOL_MAX_IDLE_CONNS"},
+	{key: "dag_run_store.postgres.agent.pool.conn_max_lifetime", env: "DAG_RUN_STORE_POSTGRES_AGENT_POOL_CONN_MAX_LIFETIME"},
+	{key: "dag_run_store.postgres.agent.pool.conn_max_idle_time", env: "DAG_RUN_STORE_POSTGRES_AGENT_POOL_CONN_MAX_IDLE_TIME"},
 	{key: "session.max_per_user", env: "SESSION_MAX_PER_USER"},
 	{key: "sse.max_topics_per_connection", env: "SSE_MAX_TOPICS_PER_CONNECTION"},
 	{key: "sse.max_clients", env: "SSE_MAX_CLIENTS"},

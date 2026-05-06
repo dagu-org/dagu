@@ -35,6 +35,7 @@ linters:
       - ui
       - docs
       - gen
+      - internal/persis/dagrunstore/postgres/db
       - filenotify
   settings:
     revive:

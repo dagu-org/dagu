@@ -375,6 +375,7 @@ func (s *Scheduler) cleanupFailedStartup(state startupState) {
 	if state.lockAcquired {
 		s.releaseDirLock(cleanupCtx, "Failed to release scheduler lock during startup cleanup")
 	}
+	s.closeDAGRunStore(cleanupCtx)
 }
 
 func (s *Scheduler) updateServiceStatus(ctx context.Context, status exec.ServiceStatus, failureMsg, successMsg string) {
@@ -765,7 +766,15 @@ func (s *Scheduler) Stop(ctx context.Context) {
 		s.releaseDirLock(ctx, "Failed to release scheduler lock in Stop")
 
 		wg.Wait()
+
+		s.closeDAGRunStore(ctx)
 	})
+}
+
+func (s *Scheduler) closeDAGRunStore(ctx context.Context) {
+	if err := exec.CloseDAGRunStore(ctx, s.dagRunStore); err != nil {
+		logger.Warn(ctx, "Failed to close scheduler DAG-run store", tag.Error(err))
+	}
 }
 
 func (s *Scheduler) stopCron(ctx context.Context) {

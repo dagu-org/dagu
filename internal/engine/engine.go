@@ -15,8 +15,8 @@ import (
 	"github.com/dagucloud/dagu/internal/cmn/logger"
 	"github.com/dagucloud/dagu/internal/core"
 	coreexec "github.com/dagucloud/dagu/internal/core/exec"
+	"github.com/dagucloud/dagu/internal/persis/dagrunstore"
 	"github.com/dagucloud/dagu/internal/persis/filedag"
-	"github.com/dagucloud/dagu/internal/persis/filedagrun"
 	"github.com/dagucloud/dagu/internal/persis/fileproc"
 	"github.com/dagucloud/dagu/internal/persis/fileserviceregistry"
 	"github.com/dagucloud/dagu/internal/runtime"
@@ -70,12 +70,22 @@ func New(ctx context.Context, opts Options) (*Engine, error) {
 		return nil, err
 	}
 
-	dagRunStore := filedagrun.New(
-		cfg.Paths.DAGRunsDir,
-		filedagrun.WithArtifactDir(cfg.Paths.ArtifactDir),
-		filedagrun.WithLatestStatusToday(false),
-		filedagrun.WithLocation(cfg.Core.Location),
+	dagRunStore, err := dagrunstore.New(
+		ctx,
+		cfg,
+		dagrunstore.WithRole(dagrunstore.RoleAgent),
+		dagrunstore.WithLatestStatusToday(false),
+		dagrunstore.WithLocation(cfg.Core.Location),
 	)
+	if err != nil {
+		return nil, fmt.Errorf("initialize DAG-run store: %w", err)
+	}
+	cleanupDAGRunStore := true
+	defer func() {
+		if cleanupDAGRunStore {
+			_ = coreexec.CloseDAGRunStore(context.Background(), dagRunStore)
+		}
+	}()
 	serviceRegistry := fileserviceregistry.New(cfg.Paths.ServiceRegistryDir)
 	dagRunMgr := runtime.NewManager(dagRunStore, procStore, cfg)
 
@@ -83,6 +93,7 @@ func New(ctx context.Context, opts Options) (*Engine, error) {
 	if err != nil {
 		return nil, err
 	}
+	cleanupDAGRunStore = false
 
 	mode := opts.DefaultMode
 	if mode == "" {
@@ -111,7 +122,7 @@ func (e *Engine) Close(ctx context.Context) error {
 		return nil
 	}
 	e.serviceRegistry.Unregister(ctx)
-	return nil
+	return coreexec.CloseDAGRunStore(ctx, e.dagRunStore)
 }
 
 func (e *Engine) context(ctx context.Context) context.Context {

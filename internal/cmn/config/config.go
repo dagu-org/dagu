@@ -15,6 +15,7 @@ type Config struct {
 	Core            Core
 	Server          Server
 	EventStore      EventStoreConfig
+	DAGRunStore     DAGRunStoreConfig
 	Paths           PathsConfig
 	Secrets         SecretsConfig
 	UI              UI
@@ -220,6 +221,35 @@ type AuditConfig struct {
 type EventStoreConfig struct {
 	Enabled       bool // Default: true
 	RetentionDays int  // Default: 1; 0 = keep forever
+}
+
+// DAGRunStoreBackend identifies a DAG-run status persistence backend.
+type DAGRunStoreBackend string
+
+const (
+	DAGRunStoreBackendFile     DAGRunStoreBackend = "file"
+	DAGRunStoreBackendPostgres DAGRunStoreBackend = "postgres"
+)
+
+// DAGRunStoreConfig holds DAG-run status persistence configuration.
+type DAGRunStoreConfig struct {
+	Backend  DAGRunStoreBackend
+	Postgres DAGRunStorePostgresConfig
+}
+
+// DAGRunStorePostgresConfig holds PostgreSQL DAG-run store configuration.
+type DAGRunStorePostgresConfig struct {
+	Server    DAGRunStorePostgresRoleConfig
+	Scheduler DAGRunStorePostgresRoleConfig
+	Agent     DAGRunStorePostgresRoleConfig
+}
+
+// DAGRunStorePostgresRoleConfig holds PostgreSQL settings for one Dagu process role.
+type DAGRunStorePostgresRoleConfig struct {
+	DSN          string
+	AutoMigrate  bool
+	DirectAccess bool
+	Pool         PostgresPoolConfig
 }
 
 // SessionConfig contains configuration for agent session cleanup.
@@ -484,7 +514,7 @@ type Scheduler struct {
 	FailureThreshold        int           // Default: 3
 }
 
-// PostgresPoolConfig holds PostgreSQL connection pool settings for workers.
+// PostgresPoolConfig holds PostgreSQL connection pool settings.
 type PostgresPoolConfig struct {
 	MaxOpenConns    int // Default: 25
 	MaxIdleConns    int // Default: 5
@@ -548,6 +578,9 @@ func (c *Config) Validate() error {
 	if err := c.validateEventStore(); err != nil {
 		return err
 	}
+	if err := c.validateDAGRunStore(); err != nil {
+		return err
+	}
 	if err := c.validateBots(); err != nil {
 		return err
 	}
@@ -602,6 +635,31 @@ func (c *Config) validateEventStore() error {
 	return nil
 }
 
+func (c *Config) validateDAGRunStore() error {
+	switch c.DAGRunStore.Backend {
+	case "", DAGRunStoreBackendFile:
+		return nil
+	case DAGRunStoreBackendPostgres:
+		if err := validatePostgresPool("dag_run_store.postgres.server.pool", c.DAGRunStore.Postgres.Server.Pool); err != nil {
+			return err
+		}
+		if err := validatePostgresPool("dag_run_store.postgres.scheduler.pool", c.DAGRunStore.Postgres.Scheduler.Pool); err != nil {
+			return err
+		}
+		if err := validatePostgresPool("dag_run_store.postgres.agent.pool", c.DAGRunStore.Postgres.Agent.Pool); err != nil {
+			return err
+		}
+		if c.DAGRunStore.Postgres.Server.DSN == "" &&
+			c.DAGRunStore.Postgres.Scheduler.DSN == "" &&
+			c.DAGRunStore.Postgres.Agent.DSN == "" {
+			return fmt.Errorf("invalid dag_run_store.backend: postgres selected but no role DSNs configured")
+		}
+		return nil
+	default:
+		return fmt.Errorf("invalid dag_run_store.backend: %q", c.DAGRunStore.Backend)
+	}
+}
+
 func (c *Config) validateBots() error {
 	if err := validateInterestedEventTypes("bots.telegram.interested_event_types", c.Bots.Telegram.InterestedEventTypes); err != nil {
 		return err
@@ -649,6 +707,28 @@ func (c *Config) validateCoordinator() error {
 func (c *Config) validateWorker() error {
 	if c.Worker.HealthPort < 0 || c.Worker.HealthPort > 65535 {
 		return fmt.Errorf("invalid worker.health_port: %d", c.Worker.HealthPort)
+	}
+	if err := validatePostgresPool("worker.postgres_pool", c.Worker.PostgresPool); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validatePostgresPool(path string, pool PostgresPoolConfig) error {
+	if pool.MaxOpenConns < 0 {
+		return fmt.Errorf("%s.max_open_conns must be >= 0", path)
+	}
+	if pool.MaxIdleConns < 0 {
+		return fmt.Errorf("%s.max_idle_conns must be >= 0", path)
+	}
+	if pool.MaxOpenConns > 0 && pool.MaxIdleConns > pool.MaxOpenConns {
+		return fmt.Errorf("%s.max_idle_conns must be <= %s.max_open_conns", path, path)
+	}
+	if pool.ConnMaxLifetime < 0 {
+		return fmt.Errorf("%s.conn_max_lifetime must be >= 0", path)
+	}
+	if pool.ConnMaxIdleTime < 0 {
+		return fmt.Errorf("%s.conn_max_idle_time must be >= 0", path)
 	}
 	return nil
 }

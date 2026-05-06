@@ -207,6 +207,9 @@
     "event_store": {
       "$ref": "#/definitions/EventStoreDef"
     },
+    "dag_run_store": {
+      "$ref": "#/definitions/DAGRunStoreDef"
+    },
     "session": {
       "$ref": "#/definitions/SessionDef"
     },
@@ -756,11 +759,11 @@
       "properties": {
         "max_open_conns": {
           "type": "integer",
-          "description": "Maximum number of open connections. Default: 25."
+          "description": "Maximum number of open connections. Default depends on the subsystem."
         },
         "max_idle_conns": {
           "type": "integer",
-          "description": "Maximum number of idle connections. Default: 5."
+          "description": "Maximum number of idle connections. Default depends on the subsystem."
         },
         "conn_max_lifetime": {
           "type": "integer",
@@ -930,6 +933,96 @@
           "type": "integer",
           "description": "Number of days to retain event logs. Default: 1.",
           "minimum": 0
+        }
+      }
+    },
+    "DAGRunStoreDef": {
+      "type": "object",
+      "description": "DAG-run status persistence configuration.",
+      "additionalProperties": false,
+      "properties": {
+        "backend": {
+          "type": "string",
+          "description": "DAG-run status persistence backend. Default: file.",
+          "enum": ["file", "postgres"],
+          "default": "file"
+        },
+        "postgres": {
+          "$ref": "#/definitions/DAGRunStorePostgresDef"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": ["backend"],
+            "properties": {
+              "backend": {
+                "const": "postgres"
+              }
+            }
+          },
+          "then": {
+            "required": ["postgres"]
+          }
+        }
+      ]
+    },
+    "DAGRunStorePostgresDef": {
+      "type": "object",
+      "description": "PostgreSQL DAG-run status store configuration.",
+      "additionalProperties": false,
+      "properties": {
+        "server": {
+          "$ref": "#/definitions/DAGRunStorePostgresRoleDef",
+          "description": "PostgreSQL settings used by the server/API process."
+        },
+        "scheduler": {
+          "$ref": "#/definitions/DAGRunStorePostgresRoleDef",
+          "description": "PostgreSQL settings used by the scheduler process."
+        },
+        "agent": {
+          "$ref": "#/definitions/DAGRunStorePostgresAgentDef",
+          "description": "PostgreSQL settings used by DAG execution processes."
+        }
+      }
+    },
+    "DAGRunStorePostgresRoleDef": {
+      "type": "object",
+      "description": "PostgreSQL DAG-run status store configuration for one Dagu process role.",
+      "additionalProperties": false,
+      "properties": {
+        "dsn": {
+          "type": "string",
+          "description": "PostgreSQL connection string used by this process role."
+        },
+        "auto_migrate": {
+          "type": "boolean",
+          "description": "Run DAG-run store migrations when this process role opens the store."
+        },
+        "pool": {
+          "$ref": "#/definitions/PostgresPoolDef"
+        }
+      }
+    },
+    "DAGRunStorePostgresAgentDef": {
+      "type": "object",
+      "description": "PostgreSQL DAG-run status store configuration for DAG execution processes.",
+      "additionalProperties": false,
+      "properties": {
+        "dsn": {
+          "type": "string",
+          "description": "PostgreSQL connection string used by DAG execution processes when direct_access is enabled."
+        },
+        "auto_migrate": {
+          "type": "boolean",
+          "description": "Run DAG-run store migrations when an agent process opens the store. Default: false."
+        },
+        "direct_access": {
+          "type": "boolean",
+          "description": "Allow DAG execution processes to open the PostgreSQL DAG-run store directly. Default: false; production PostgreSQL deployments should use coordinator/shared-nothing worker execution instead."
+        },
+        "pool": {
+          "$ref": "#/definitions/PostgresPoolDef"
         }
       }
     },

@@ -34,6 +34,9 @@ func TestNewContext_DAGRunStoreUsesConfiguredArtifactDirForCleanup(t *testing.T)
 
 	ctx, err := NewContext(command, nil)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, ctx.Close(ctx))
+	})
 
 	dag := &core.DAG{
 		Name:      "cleanup-artifact-test",
@@ -88,6 +91,9 @@ steps:
 
 	ctx, err := NewContext(command, nil)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, ctx.Close(ctx))
+	})
 
 	err = runDry(ctx, []string{dagFile})
 	require.NoError(t, err)

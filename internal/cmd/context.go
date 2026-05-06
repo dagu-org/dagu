@@ -37,10 +37,10 @@ import (
 	"github.com/dagucloud/dagu/internal/persis/fileagentmodel"
 	"github.com/dagucloud/dagu/internal/persis/fileagentoauth"
 
+	"github.com/dagucloud/dagu/internal/persis/dagrunstore"
 	"github.com/dagucloud/dagu/internal/persis/fileagentsoul"
 	"github.com/dagucloud/dagu/internal/persis/filebaseconfig"
 	"github.com/dagucloud/dagu/internal/persis/filedag"
-	"github.com/dagucloud/dagu/internal/persis/filedagrun"
 	"github.com/dagucloud/dagu/internal/persis/filedistributed"
 	"github.com/dagucloud/dagu/internal/persis/fileeventstore"
 	"github.com/dagucloud/dagu/internal/persis/filegithubdispatch"
@@ -152,6 +152,14 @@ func (c *Context) LogToFile(f *os.File) {
 		opts = append(opts, logger.WithWriter(f))
 	}
 	c.Context = logger.WithLogger(c.Context, logger.NewLogger(opts...))
+}
+
+// Close releases resources owned by the command context.
+func (c *Context) Close(ctx context.Context) error {
+	if c == nil {
+		return nil
+	}
+	return exec.CloseDAGRunStore(ctx, c.DAGRunStore)
 }
 
 // NewContext creates and initializes an application Context for the given Cobra command.
@@ -327,22 +335,6 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		}, nil
 	}
 
-	// Initialize history repository and history manager
-	hrOpts := []filedagrun.DAGRunStoreOption{
-		filedagrun.WithArtifactDir(cfg.Paths.ArtifactDir),
-		filedagrun.WithLatestStatusToday(cfg.Server.LatestStatusToday),
-		filedagrun.WithLocation(cfg.Core.Location),
-	}
-
-	switch cmd.Name() {
-	case "server", "scheduler", "start-all", "coordinator":
-		// For long-running process, we setup file cache for better performance
-		limits := cfg.Cache.Limits()
-		hc := fileutil.NewCache[*exec.DAGRunStatus]("dag_run_status", limits.DAGRun.Limit, limits.DAGRun.TTL)
-		hc.StartEviction(ctx)
-		hrOpts = append(hrOpts, filedagrun.WithHistoryFileCache(hc))
-	}
-
 	ps := fileproc.New(cfg.Paths.ProcDir,
 		fileproc.WithStaleThreshold(cfg.Proc.StaleThreshold),
 		fileproc.WithHeartbeatInterval(cfg.Proc.HeartbeatInterval),
@@ -351,11 +343,21 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	if err := ps.Validate(ctx); err != nil {
 		return nil, fmt.Errorf("failed to validate proc directory %s: %w", cfg.Paths.ProcDir, err)
 	}
-	drs := filedagrun.New(cfg.Paths.DAGRunsDir, hrOpts...)
 	distributedDir := filepath.Join(cfg.Paths.DataDir, "distributed")
 	dagRunLeaseStore := filedistributed.NewDAGRunLeaseStore(distributedDir)
 	activeDistributedRunStore := filedistributed.NewActiveDistributedRunStore(distributedDir)
-	drm := runtime.NewManager(drs, ps, cfg)
+	var (
+		drs exec.DAGRunStore
+		drm runtime.Manager
+	)
+	if contextNeedsDAGRunStore(cmd) && !shouldDeferAgentDAGRunStore(cmd, cfg) {
+		var err error
+		drs, err = newContextDAGRunStore(baseCtx, ctx, cmd, cfg)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize DAG-run store: %w", err)
+		}
+		drm = runtime.NewManager(drs, ps, cfg)
+	}
 	qs := filequeue.New(cfg.Paths.QueueDir)
 	sm := fileserviceregistry.New(cfg.Paths.ServiceRegistryDir)
 	dispatchTaskStore := filedistributed.NewDispatchTaskStore(distributedDir)
@@ -559,6 +561,61 @@ func serviceForCommand(cmdName string) config.Service {
 	}
 }
 
+func dagRunStoreRoleForCommand(cmd *cobra.Command) dagrunstore.Role {
+	if cmd == nil {
+		return dagrunstore.RoleServer
+	}
+	switch cmd.Name() {
+	case "scheduler":
+		return dagrunstore.RoleScheduler
+	case "start", "restart", "retry", "dry", "exec", "worker":
+		return dagrunstore.RoleAgent
+	default:
+		return dagrunstore.RoleServer
+	}
+}
+
+func contextNeedsDAGRunStore(cmd *cobra.Command) bool {
+	if cmd == nil || isContextCommand(cmd) || isSubcommandOf(cmd, "sync") {
+		return false
+	}
+	switch cmd.Name() {
+	case "server", "start-all", "coordinator",
+		"start", "restart", "retry", "dry", "exec",
+		"status", "history", "stop", "enqueue", "dequeue", "cleanup", "migrate":
+		return true
+	default:
+		return false
+	}
+}
+
+func isSubcommandOf(cmd *cobra.Command, name string) bool {
+	for parent := cmd.Parent(); parent != nil; parent = parent.Parent() {
+		if parent.Name() == name {
+			return true
+		}
+	}
+	return false
+}
+
+func newContextDAGRunStore(baseCtx, cacheCtx context.Context, cmd *cobra.Command, cfg *config.Config) (exec.DAGRunStore, error) {
+	drsOpts := []dagrunstore.Option{
+		dagrunstore.WithLatestStatusToday(cfg.Server.LatestStatusToday),
+		dagrunstore.WithLocation(cfg.Core.Location),
+		dagrunstore.WithRole(dagRunStoreRoleForCommand(cmd)),
+	}
+
+	switch cmd.Name() {
+	case "server", "start-all", "coordinator":
+		limits := cfg.Cache.Limits()
+		hc := fileutil.NewCache[*exec.DAGRunStatus]("dag_run_status", limits.DAGRun.Limit, limits.DAGRun.TTL)
+		hc.StartEviction(cacheCtx)
+		drsOpts = append(drsOpts, dagrunstore.WithHistoryFileCache(hc))
+	}
+
+	return dagrunstore.New(baseCtx, cfg, drsOpts...)
+}
+
 // isAgentCommand returns true if the command name is an agent command
 // that displays progress or tree output.
 func isAgentCommand(cmdName string) bool {
@@ -577,6 +634,31 @@ func isSharedNothingWorker(cmd *cobra.Command, cfg *config.Config) bool {
 		return false
 	}
 	return len(cfg.Worker.Coordinators) > 0
+}
+
+func shouldDeferAgentDAGRunStore(cmd *cobra.Command, cfg *config.Config) bool {
+	if !postgresAgentDirectAccessDisabled(cfg) {
+		return false
+	}
+	switch cmd.Name() {
+	case "start", "exec":
+		return true
+	default:
+		return false
+	}
+}
+
+func postgresAgentDirectAccessDisabled(cfg *config.Config) bool {
+	return cfg != nil &&
+		cfg.DAGRunStore.Backend == config.DAGRunStoreBackendPostgres &&
+		!cfg.DAGRunStore.Postgres.Agent.DirectAccess
+}
+
+func errPostgresAgentDirectAccessDisabled(command string) error {
+	if command == "" {
+		command = "agent command"
+	}
+	return fmt.Errorf("postgres DAG-run store direct agent access is disabled for %s; use coordinator/shared-nothing worker execution or set dag_run_store.postgres.agent.direct_access=true for local development", command)
 }
 
 // NewServer creates and returns a new web UI NewServer.
@@ -672,19 +754,32 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 
 	statusCache := fileutil.NewCache[*exec.DAGRunStatus]("scheduler_dag_run_status", limits.DAGRun.Limit, limits.DAGRun.TTL)
 	statusCache.StartEviction(c)
-	schedulerRunStore := filedagrun.New(
-		c.Config.Paths.DAGRunsDir,
-		filedagrun.WithArtifactDir(c.Config.Paths.ArtifactDir),
-		filedagrun.WithLatestStatusToday(false),
-		filedagrun.WithLocation(c.Config.Core.Location),
-		filedagrun.WithHistoryFileCache(statusCache),
+	schedulerRunStore, err := dagrunstore.New(
+		c,
+		c.Config,
+		dagrunstore.WithRole(dagrunstore.RoleScheduler),
+		dagrunstore.WithLatestStatusToday(false),
+		dagrunstore.WithLocation(c.Config.Core.Location),
+		dagrunstore.WithHistoryFileCache(statusCache),
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize scheduler DAG-run store: %w", err)
+	}
+	ownsSchedulerRunStore := true
+	defer func() {
+		if ownsSchedulerRunStore {
+			if closeErr := exec.CloseDAGRunStore(context.Background(), schedulerRunStore); closeErr != nil {
+				logger.Warn(c, "Failed to close scheduler DAG-run store", tag.Error(closeErr))
+			}
+		}
+	}()
 	schedulerRunMgr := runtime.NewManager(schedulerRunStore, c.ProcStore, c.Config)
 
 	sched, err := scheduler.New(c.Config, m, schedulerRunMgr, schedulerRunStore, c.QueueStore, c.ProcStore, c.ServiceRegistry, coordinatorCli, wmStore)
 	if err != nil {
 		return nil, err
 	}
+	ownsSchedulerRunStore = false
 	if c.EventService != nil {
 		collector, eventErr := fileeventstore.NewCollector(c.Config.Paths.EventStoreDir, c.Config.EventStore.RetentionDays)
 		if eventErr != nil {
@@ -906,10 +1001,20 @@ func NewCommand(cmd *cobra.Command, flags []commandLineFlag, runFunc func(cmd *C
 		if err != nil {
 			return fmt.Errorf("initialization error: %w", err)
 		}
-		return runFunc(ctx, args)
+		runErr := runFunc(ctx, args)
+		if closeErr := closeCommandContext(ctx); closeErr != nil {
+			return errors.Join(runErr, closeErr)
+		}
+		return runErr
 	}
 
 	return cmd
+}
+
+func closeCommandContext(ctx *Context) error {
+	closeCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	return ctx.Close(closeCtx)
 }
 
 // genRunID creates a new UUID string to be used as a dag-run IDentifier.

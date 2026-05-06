@@ -23,6 +23,7 @@ var (
 	ErrDAGRunActive        = errors.New("dag-run is active")
 	ErrNoStatusData        = errors.New("no status data")
 	ErrCorruptedStatusFile = errors.New("corrupted status file") // Status file exists but contains no valid data or is corrupted
+	ErrInvalidQueryCursor  = errors.New("invalid query cursor")
 )
 
 // reDAGRunID validates dag-run IDs: alphanumeric, hyphens, and underscores only.
@@ -92,6 +93,28 @@ type DAGRunStore interface {
 	RenameDAGRuns(ctx context.Context, oldName, newName string) error
 	// RemoveDAGRun removes a dag-run record by its reference.
 	RemoveDAGRun(ctx context.Context, dagRun DAGRunRef, opts ...RemoveDAGRunOption) error
+}
+
+type dagRunStoreContextCloser interface {
+	Close(context.Context) error
+}
+
+type dagRunStoreCloser interface {
+	Close() error
+}
+
+// CloseDAGRunStore releases optional resources held by a DAGRunStore.
+func CloseDAGRunStore(ctx context.Context, store DAGRunStore) error {
+	if store == nil {
+		return nil
+	}
+	if closer, ok := store.(dagRunStoreContextCloser); ok {
+		return closer.Close(ctx)
+	}
+	if closer, ok := store.(dagRunStoreCloser); ok {
+		return closer.Close()
+	}
+	return nil
 }
 
 // ListDAGRunStatusesOptions contains options for listing runs
