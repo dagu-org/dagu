@@ -95,6 +95,28 @@ type DAGRunStore interface {
 	RemoveDAGRun(ctx context.Context, dagRun DAGRunRef, opts ...RemoveDAGRunOption) error
 }
 
+type dagRunStoreContextCloser interface {
+	Close(context.Context) error
+}
+
+type dagRunStoreCloser interface {
+	Close() error
+}
+
+// CloseDAGRunStore releases optional resources held by a DAGRunStore.
+func CloseDAGRunStore(ctx context.Context, store DAGRunStore) error {
+	if store == nil {
+		return nil
+	}
+	if closer, ok := store.(dagRunStoreContextCloser); ok {
+		return closer.Close(ctx)
+	}
+	if closer, ok := store.(dagRunStoreCloser); ok {
+		return closer.Close()
+	}
+	return nil
+}
+
 // ListDAGRunStatusesOptions contains options for listing runs
 type ListDAGRunStatusesOptions struct {
 	DAGRunID        string

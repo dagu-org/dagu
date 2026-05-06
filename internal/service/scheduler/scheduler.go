@@ -765,6 +765,10 @@ func (s *Scheduler) Stop(ctx context.Context) {
 		s.releaseDirLock(ctx, "Failed to release scheduler lock in Stop")
 
 		wg.Wait()
+
+		if err := exec.CloseDAGRunStore(ctx, s.dagRunStore); err != nil {
+			logger.Warn(ctx, "Failed to close scheduler DAG-run store", tag.Error(err))
+		}
 	})
 }
 

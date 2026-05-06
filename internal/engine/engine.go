@@ -113,7 +113,7 @@ func (e *Engine) Close(ctx context.Context) error {
 		return nil
 	}
 	e.serviceRegistry.Unregister(ctx)
-	return nil
+	return coreexec.CloseDAGRunStore(ctx, e.dagRunStore)
 }
 
 func (e *Engine) context(ctx context.Context) context.Context {

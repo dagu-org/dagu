@@ -24,4 +24,10 @@ sql:
           - db_type: "dagu_dag_run_id"
             go_type: "string"
           - db_type: "dagu_workspace_name"
+            nullable: false
             go_type: "string"
+          - db_type: "dagu_workspace_name"
+            nullable: true
+            go_type:
+              import: "database/sql"
+              type: "NullString"

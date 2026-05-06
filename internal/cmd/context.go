@@ -153,6 +153,14 @@ func (c *Context) LogToFile(f *os.File) {
 	c.Context = logger.WithLogger(c.Context, logger.NewLogger(opts...))
 }
 
+// Close releases resources owned by the command context.
+func (c *Context) Close(ctx context.Context) error {
+	if c == nil {
+		return nil
+	}
+	return exec.CloseDAGRunStore(ctx, c.DAGRunStore)
+}
+
 // NewContext creates and initializes an application Context for the given Cobra command.
 // It binds command flags, loads configuration scoped to the command, configures logging
 // (respecting debug, quiet, and log format settings), logs any configuration warnings,
@@ -896,7 +904,11 @@ func NewCommand(cmd *cobra.Command, flags []commandLineFlag, runFunc func(cmd *C
 		if err != nil {
 			return fmt.Errorf("initialization error: %w", err)
 		}
-		return runFunc(ctx, args)
+		runErr := runFunc(ctx, args)
+		if closeErr := ctx.Close(ctx); closeErr != nil {
+			return errors.Join(runErr, closeErr)
+		}
+		return runErr
 	}
 
 	return cmd

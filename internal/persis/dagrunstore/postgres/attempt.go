@@ -232,24 +232,14 @@ func (att *Attempt) WriteStepMessages(ctx context.Context, stepName string, mess
 	if len(messages) == 0 {
 		return nil
 	}
-	row, err := att.queries.GetAttempt(ctx, att.id)
-	if err != nil {
-		return err
-	}
-	messagesByStep := map[string][]exec.LLMMessage{}
-	if len(row.MessagesData) > 0 {
-		if err := json.Unmarshal(row.MessagesData, &messagesByStep); err != nil {
-			return fmt.Errorf("unmarshal step messages: %w", err)
-		}
-	}
-	messagesByStep[stepName] = messages
-	data, err := json.Marshal(messagesByStep)
+	data, err := json.Marshal(messages)
 	if err != nil {
 		return fmt.Errorf("marshal step messages: %w", err)
 	}
-	return att.queries.UpdateAttemptMessages(ctx, db.UpdateAttemptMessagesParams{
-		ID:           att.id,
-		MessagesData: data,
+	return att.queries.MergeAttemptStepMessages(ctx, db.MergeAttemptStepMessagesParams{
+		ID:       att.id,
+		StepName: stepName,
+		Messages: data,
 	})
 }
 

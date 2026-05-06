@@ -116,7 +116,10 @@ func queryFilterHash(opts exec.ListDAGRunStatusesOptions) string {
 		normalized.To = opts.To.UTC().Format(time.RFC3339Nano)
 	}
 
-	data, _ := json.Marshal(normalized)
+	data, err := json.Marshal(normalized)
+	if err != nil {
+		panic(fmt.Errorf("marshal query cursor filter: %w", err))
+	}
 	sum := sha256.Sum256(data)
 	return hex.EncodeToString(sum[:])
 }

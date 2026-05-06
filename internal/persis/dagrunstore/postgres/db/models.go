@@ -5,6 +5,8 @@
 package db
 
 import (
+	"database/sql"
+
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -19,7 +21,7 @@ type DaguDagRunAttempt struct {
 	AttemptID        string             `json:"attempt_id"`
 	RunCreatedAt     pgtype.Timestamptz `json:"run_created_at"`
 	AttemptCreatedAt pgtype.Timestamptz `json:"attempt_created_at"`
-	Workspace        interface{}        `json:"workspace"`
+	Workspace        sql.NullString     `json:"workspace"`
 	WorkspaceValid   bool               `json:"workspace_valid"`
 	Status           pgtype.Int4        `json:"status"`
 	StartedAt        pgtype.Timestamptz `json:"started_at"`

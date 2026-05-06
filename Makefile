@@ -292,6 +292,7 @@ addlicense:
 	@${LOCAL_BIN_DIR}/addlicense \
 		-ignore "**/node_modules/**" \
 		-ignore "./**/gen/**" \
+		-ignore "internal/persis/dagrunstore/postgres/db/**" \
 		-ignore "Dockerfile" \
 		-ignore "ui/*" \
 		-ignore "ui/**/*" \

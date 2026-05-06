@@ -6,10 +6,12 @@ package postgres
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math"
 	"os"
 	"path/filepath"
@@ -21,6 +23,8 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/dagucloud/dagu/internal/cmn/logger"
+	"github.com/dagucloud/dagu/internal/cmn/logger/tag"
 	"github.com/dagucloud/dagu/internal/cmn/stringutil"
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/exec"
@@ -97,15 +101,23 @@ func New(ctx context.Context, cfg Config) (*Store, error) {
 }
 
 // Close closes the underlying PostgreSQL connection pool.
-func (s *Store) Close() {
+func (s *Store) Close() error {
 	if s != nil && s.pool != nil {
 		s.pool.Close()
 	}
+	return nil
 }
 
 func applyPoolConfig(poolCfg *pgxpool.Config, cfg PoolConfig) {
 	if cfg.MaxOpenConns > 0 {
 		poolCfg.MaxConns = int32(cfg.MaxOpenConns) //nolint:gosec
+	}
+	if cfg.MaxIdleConns > 0 {
+		minIdleConns := int32(cfg.MaxIdleConns) //nolint:gosec
+		if poolCfg.MaxConns > 0 && minIdleConns > poolCfg.MaxConns {
+			minIdleConns = poolCfg.MaxConns
+		}
+		poolCfg.MinIdleConns = minIdleConns
 	}
 	if cfg.ConnMaxLifetime > 0 {
 		poolCfg.MaxConnLifetime = time.Duration(cfg.ConnMaxLifetime) * time.Second
@@ -270,6 +282,10 @@ func (s *Store) RecentAttempts(ctx context.Context, name string, itemLimit int) 
 		ItemLimit: int32(itemLimit), //nolint:gosec
 	})
 	if err != nil {
+		logger.Warn(ctx, "postgres dag-run store: recent attempts query failed",
+			tag.Error(err),
+			slog.String("dag", name),
+		)
 		return nil
 	}
 
@@ -488,6 +504,13 @@ func (s *Store) listStatuses(ctx context.Context, opts exec.ListDAGRunStatusesOp
 
 			status, err := statusFromListRow(row)
 			if err != nil {
+				if !errors.Is(err, exec.ErrNoStatusData) {
+					logger.Warn(ctx, "postgres dag-run store: failed to decode status row; skipping",
+						tag.Error(err),
+						slog.String("dag", row.DagName),
+						slog.String("dag_run_id", row.DagRunID),
+					)
+				}
 				continue
 			}
 			if len(labelFilters) > 0 && !core.NewLabels(status.Labels).MatchesFilters(labelFilters) {
@@ -681,59 +704,11 @@ func (s *Store) attemptFromRow(row db.DaguDagRunAttempt) *Attempt {
 }
 
 func (s *Store) attemptFromRecentRow(row db.RecentAttemptsByNameRow) *Attempt {
-	return newAttempt(s.queries, db.DaguDagRunAttempt{
-		ID:               row.ID,
-		DagName:          row.DagName,
-		DagRunID:         row.DagRunID,
-		RootDagName:      row.RootDagName,
-		RootDagRunID:     row.RootDagRunID,
-		IsRoot:           row.IsRoot,
-		AttemptID:        row.AttemptID,
-		RunCreatedAt:     row.RunCreatedAt,
-		AttemptCreatedAt: row.AttemptCreatedAt,
-		Workspace:        row.Workspace,
-		WorkspaceValid:   row.WorkspaceValid,
-		Status:           row.Status,
-		StartedAt:        row.StartedAt,
-		FinishedAt:       row.FinishedAt,
-		StatusData:       row.StatusData,
-		DagData:          row.DagData,
-		OutputsData:      row.OutputsData,
-		MessagesData:     row.MessagesData,
-		CancelRequested:  row.CancelRequested,
-		Hidden:           row.Hidden,
-		LocalWorkDir:     row.LocalWorkDir,
-		CreatedAt:        row.CreatedAt,
-		UpdatedAt:        row.UpdatedAt,
-	})
+	return newAttempt(s.queries, db.DaguDagRunAttempt(row))
 }
 
 func statusFromListRow(row db.ListRootStatusRowsRow) (*exec.DAGRunStatus, error) {
-	return statusFromRow(db.DaguDagRunAttempt{
-		ID:               row.ID,
-		DagName:          row.DagName,
-		DagRunID:         row.DagRunID,
-		RootDagName:      row.RootDagName,
-		RootDagRunID:     row.RootDagRunID,
-		IsRoot:           row.IsRoot,
-		AttemptID:        row.AttemptID,
-		RunCreatedAt:     row.RunCreatedAt,
-		AttemptCreatedAt: row.AttemptCreatedAt,
-		Workspace:        row.Workspace,
-		WorkspaceValid:   row.WorkspaceValid,
-		Status:           row.Status,
-		StartedAt:        row.StartedAt,
-		FinishedAt:       row.FinishedAt,
-		StatusData:       row.StatusData,
-		DagData:          row.DagData,
-		OutputsData:      row.OutputsData,
-		MessagesData:     row.MessagesData,
-		CancelRequested:  row.CancelRequested,
-		Hidden:           row.Hidden,
-		LocalWorkDir:     row.LocalWorkDir,
-		CreatedAt:        row.CreatedAt,
-		UpdatedAt:        row.UpdatedAt,
-	})
+	return statusFromRow(db.DaguDagRunAttempt(row))
 }
 
 func statusFromRow(row db.DaguDagRunAttempt) (*exec.DAGRunStatus, error) {
@@ -771,17 +746,17 @@ func marshalOptionalDAG(dag *core.DAG) ([]byte, error) {
 	return data, nil
 }
 
-func workspaceFromLabels(labels core.Labels) (any, bool) {
+func workspaceFromLabels(labels core.Labels) (sql.NullString, bool) {
 	workspaceName, state := exec.WorkspaceLabelFromLabels(labels)
 	switch state {
 	case exec.WorkspaceLabelValid:
-		return workspaceName, true
+		return sql.NullString{String: workspaceName, Valid: true}, true
 	case exec.WorkspaceLabelMissing:
-		return nil, true
+		return sql.NullString{}, true
 	case exec.WorkspaceLabelInvalid:
-		return nil, false
+		return sql.NullString{}, false
 	default:
-		return nil, false
+		return sql.NullString{}, false
 	}
 }
 

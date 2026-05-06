@@ -137,6 +137,17 @@ SET messages_data = sqlc.arg(messages_data),
     updated_at = now()
 WHERE id = sqlc.arg(id);
 
+-- name: MergeAttemptStepMessages :exec
+UPDATE dagu_dag_run_attempts
+SET messages_data = jsonb_set(
+        coalesce(messages_data, '{}'::jsonb),
+        ARRAY[sqlc.arg(step_name)::text],
+        sqlc.arg(messages)::jsonb,
+        true
+    ),
+    updated_at = now()
+WHERE id = sqlc.arg(id);
+
 -- name: SetAttemptCancelRequested :exec
 UPDATE dagu_dag_run_attempts
 SET cancel_requested = true,

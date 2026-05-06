@@ -7,6 +7,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -55,7 +56,7 @@ type CreateAttemptParams struct {
 	AttemptID        string             `json:"attempt_id"`
 	RunCreatedAt     pgtype.Timestamptz `json:"run_created_at"`
 	AttemptCreatedAt pgtype.Timestamptz `json:"attempt_created_at"`
-	Workspace        interface{}        `json:"workspace"`
+	Workspace        sql.NullString     `json:"workspace"`
 	WorkspaceValid   bool               `json:"workspace_valid"`
 	DagData          []byte             `json:"dag_data"`
 	LocalWorkDir     string             `json:"local_work_dir"`
@@ -580,7 +581,7 @@ type ListRootStatusRowsRow struct {
 	AttemptID        string             `json:"attempt_id"`
 	RunCreatedAt     pgtype.Timestamptz `json:"run_created_at"`
 	AttemptCreatedAt pgtype.Timestamptz `json:"attempt_created_at"`
-	Workspace        interface{}        `json:"workspace"`
+	Workspace        sql.NullString     `json:"workspace"`
 	WorkspaceValid   bool               `json:"workspace_valid"`
 	Status           pgtype.Int4        `json:"status"`
 	StartedAt        pgtype.Timestamptz `json:"started_at"`
@@ -666,6 +667,29 @@ func (q *Queries) LockDAGRunKey(ctx context.Context, lockKey string) error {
 	return err
 }
 
+const mergeAttemptStepMessages = `-- name: MergeAttemptStepMessages :exec
+UPDATE dagu_dag_run_attempts
+SET messages_data = jsonb_set(
+        coalesce(messages_data, '{}'::jsonb),
+        ARRAY[$1::text],
+        $2::jsonb,
+        true
+    ),
+    updated_at = now()
+WHERE id = $3
+`
+
+type MergeAttemptStepMessagesParams struct {
+	StepName string    `json:"step_name"`
+	Messages []byte    `json:"messages"`
+	ID       uuid.UUID `json:"id"`
+}
+
+func (q *Queries) MergeAttemptStepMessages(ctx context.Context, arg MergeAttemptStepMessagesParams) error {
+	_, err := q.db.Exec(ctx, mergeAttemptStepMessages, arg.StepName, arg.Messages, arg.ID)
+	return err
+}
+
 const recentAttemptsByName = `-- name: RecentAttemptsByName :many
 WITH latest AS (
     SELECT DISTINCT ON (dag_run_id) id, dag_name, dag_run_id, root_dag_name, root_dag_run_id, is_root, attempt_id, run_created_at, attempt_created_at, workspace, workspace_valid, status, started_at, finished_at, status_data, dag_data, outputs_data, messages_data, cancel_requested, hidden, local_work_dir, created_at, updated_at
@@ -697,7 +721,7 @@ type RecentAttemptsByNameRow struct {
 	AttemptID        string             `json:"attempt_id"`
 	RunCreatedAt     pgtype.Timestamptz `json:"run_created_at"`
 	AttemptCreatedAt pgtype.Timestamptz `json:"attempt_created_at"`
-	Workspace        interface{}        `json:"workspace"`
+	Workspace        sql.NullString     `json:"workspace"`
 	WorkspaceValid   bool               `json:"workspace_valid"`
 	Status           pgtype.Int4        `json:"status"`
 	StartedAt        pgtype.Timestamptz `json:"started_at"`
@@ -866,7 +890,7 @@ WHERE id = $7
 type UpdateAttemptStatusParams struct {
 	StatusData     []byte             `json:"status_data"`
 	Status         pgtype.Int4        `json:"status"`
-	Workspace      interface{}        `json:"workspace"`
+	Workspace      sql.NullString     `json:"workspace"`
 	WorkspaceValid bool               `json:"workspace_valid"`
 	StartedAt      pgtype.Timestamptz `json:"started_at"`
 	FinishedAt     pgtype.Timestamptz `json:"finished_at"`

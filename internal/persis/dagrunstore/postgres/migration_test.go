@@ -4,6 +4,7 @@
 package postgres
 
 import (
+	"database/sql"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -30,19 +31,19 @@ func TestMigrationUsesExistingIdentifierConstraints(t *testing.T) {
 func TestWorkspaceFromLabels(t *testing.T) {
 	t.Run("Missing", func(t *testing.T) {
 		workspaceName, valid := workspaceFromLabels(core.NewLabels(nil))
-		assert.Nil(t, workspaceName)
+		assert.Equal(t, sql.NullString{}, workspaceName)
 		assert.True(t, valid)
 	})
 
 	t.Run("Valid", func(t *testing.T) {
 		workspaceName, valid := workspaceFromLabels(core.NewLabels([]string{"workspace=ops"}))
-		assert.Equal(t, "ops", workspaceName)
+		assert.Equal(t, sql.NullString{String: "ops", Valid: true}, workspaceName)
 		assert.True(t, valid)
 	})
 
 	t.Run("Invalid", func(t *testing.T) {
 		workspaceName, valid := workspaceFromLabels(core.NewLabels([]string{"workspace=default"}))
-		assert.Nil(t, workspaceName)
+		assert.Equal(t, sql.NullString{}, workspaceName)
 		assert.False(t, valid)
 	})
 }
