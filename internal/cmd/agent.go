@@ -630,16 +630,12 @@ func followAgentSessionWithSeen(ctx context.Context, out io.Writer, seen map[str
 func renderAgentMessage(out io.Writer, msg agentMessageRow) error {
 	switch msg.Type {
 	case string(agent.MessageTypeUser):
-		if strings.TrimSpace(msg.Content) == "" {
-			return nil
-		}
-		_, err := fmt.Fprintf(out, "\nYou:\n%s\n", strings.TrimSpace(msg.Content))
-		return err
+		return nil
 	case string(agent.MessageTypeAssistant):
 		if strings.TrimSpace(msg.Content) == "" {
 			return nil
 		}
-		_, err := fmt.Fprintf(out, "\nAgent:\n%s\n", strings.TrimSpace(msg.Content))
+		_, err := fmt.Fprintf(out, "\n%s\n", strings.TrimSpace(msg.Content))
 		return err
 	case string(agent.MessageTypeError):
 		if strings.TrimSpace(msg.Content) == "" {

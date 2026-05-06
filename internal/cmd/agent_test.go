@@ -180,3 +180,35 @@ func TestFollowAgentSessionNonInteractivePrintsPendingPromptHint(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, out.String(), "Pending input required; run `dagu agent resume session-1` to respond.")
 }
+
+func TestRenderAgentMessageOmitsSpeakerLabels(t *testing.T) {
+	var out bytes.Buffer
+
+	require.NoError(t, renderAgentMessage(&out, agentMessageRow{
+		ID:      "assistant-1",
+		Type:    "assistant",
+		Content: "hello",
+	}))
+
+	assert.Equal(t, "\nhello\n", out.String())
+	assert.NotContains(t, out.String(), "Agent:")
+}
+
+func TestFollowAgentSessionDoesNotEchoUserMessages(t *testing.T) {
+	var out bytes.Buffer
+
+	_, err := followAgentSessionWithSeen(context.Background(), &out, nil, func(context.Context) (*agentSessionDetail, error) {
+		return &agentSessionDetail{
+			Messages: []agentMessageRow{
+				{ID: "user-1", Type: "user", Content: "typed text"},
+				{ID: "assistant-1", Type: "assistant", Content: "reply text"},
+			},
+		}, nil
+	})
+
+	require.NoError(t, err)
+	assert.NotContains(t, out.String(), "You:")
+	assert.NotContains(t, out.String(), "typed text")
+	assert.NotContains(t, out.String(), "Agent:")
+	assert.Contains(t, out.String(), "reply text")
+}
