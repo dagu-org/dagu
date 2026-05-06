@@ -14,6 +14,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/collectors"
 
 	"github.com/dagucloud/dagu/internal/cmn/fileutil"
+	"github.com/dagucloud/dagu/internal/cmn/logger"
+	"github.com/dagucloud/dagu/internal/cmn/logger/tag"
 	"github.com/dagucloud/dagu/internal/cmn/stringutil"
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/exec"
@@ -515,6 +517,7 @@ func (c *Collector) collectWorkerMetrics(ctx context.Context, ch chan<- promethe
 
 	records, err := c.workerHeartbeatStore.List(ctx)
 	if err != nil {
+		logger.Warn(ctx, "Failed to list worker heartbeats for metrics", tag.Error(err))
 		ch <- prometheus.MustNewConstMetric(
 			c.workersRegisteredDesc,
 			prometheus.GaugeValue,
@@ -548,10 +551,7 @@ func (c *Collector) collectWorkerRecordMetrics(
 	c.collectWorkerInfoMetrics(ch, record)
 
 	lastHeartbeat := record.LastHeartbeatTime()
-	lastHeartbeatSeconds := float64(0)
-	if !lastHeartbeat.IsZero() {
-		lastHeartbeatSeconds = float64(record.LastHeartbeatAt) / 1000
-	}
+	lastHeartbeatSeconds := float64(record.LastHeartbeatAt) / 1000
 
 	ch <- prometheus.MustNewConstMetric(
 		c.workerHeartbeatTimestampDesc,
