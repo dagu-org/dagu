@@ -129,7 +129,7 @@ run: ${FE_BUNDLE_JS}
 	@DAGU_DEBUG=1 go run ./cmd start-all
 
 # dev-pg starts a local PostgreSQL instance and runs Dagu with the Postgres DAG-run store.
-.PHONY: dev-pg dev-pg-up dev-pg-wait dev-pg-start
+.PHONY: dev-pg dev-pg-up dev-pg-wait dev-pg-start dev-pg-down
 dev-pg: dev-pg-start
 
 dev-pg-start: ${FE_BUNDLE_JS} dev-pg-wait
@@ -164,6 +164,10 @@ dev-pg-wait: dev-pg-up
 dev-pg-up:
 	@printf '%b\n' "${COLOR_GREEN}Starting PostgreSQL for DAG-run store development...${COLOR_RESET}"
 	@docker compose -p ${DEV_PG_COMPOSE_PROJECT} -f ${DEV_PG_COMPOSE_FILE} up -d postgres
+
+dev-pg-down:
+	@printf '%b\n' "${COLOR_GREEN}Stopping PostgreSQL DAG-run store development environment...${COLOR_RESET}"
+	@docker compose -p ${DEV_PG_COMPOSE_PROJECT} -f ${DEV_PG_COMPOSE_FILE} down
 
 # server build the binary and start the server.
 .PHONY: run-server
