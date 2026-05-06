@@ -588,6 +588,7 @@ func (c *Context) NewServer(rs *resource.Service, opts ...frontend.ServerOption)
 		c.QueueStore,
 		c.ServiceRegistry,
 	)
+	collector.SetWorkerHeartbeatStore(c.WorkerHeartbeatStore)
 
 	// Register DAG definition cache for metrics
 	collector.RegisterCache(dc)
