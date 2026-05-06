@@ -247,12 +247,32 @@ func TestLoad_Env(t *testing.T) {
 		DAGRunStore: DAGRunStoreConfig{
 			Backend: DAGRunStoreBackendFile,
 			Postgres: DAGRunStorePostgresConfig{
-				AutoMigrate: true,
-				Pool: PostgresPoolConfig{
-					MaxOpenConns:    25,
-					MaxIdleConns:    5,
-					ConnMaxLifetime: 300,
-					ConnMaxIdleTime: 60,
+				Server: DAGRunStorePostgresRoleConfig{
+					AutoMigrate: true,
+					Pool: PostgresPoolConfig{
+						MaxOpenConns:    10,
+						MaxIdleConns:    2,
+						ConnMaxLifetime: 300,
+						ConnMaxIdleTime: 60,
+					},
+				},
+				Scheduler: DAGRunStorePostgresRoleConfig{
+					AutoMigrate: true,
+					Pool: PostgresPoolConfig{
+						MaxOpenConns:    10,
+						MaxIdleConns:    2,
+						ConnMaxLifetime: 300,
+						ConnMaxIdleTime: 60,
+					},
+				},
+				Agent: DAGRunStorePostgresRoleConfig{
+					AutoMigrate: false,
+					Pool: PostgresPoolConfig{
+						MaxOpenConns:    2,
+						MaxIdleConns:    0,
+						ConnMaxLifetime: 300,
+						ConnMaxIdleTime: 30,
+					},
 				},
 			},
 		},
@@ -409,14 +429,30 @@ func TestLoad_DAGRunStore(t *testing.T) {
 		cfg := loadFromYAML(t, "# empty")
 
 		assert.Equal(t, DAGRunStoreBackendFile, cfg.DAGRunStore.Backend)
-		assert.Empty(t, cfg.DAGRunStore.Postgres.DSN)
-		assert.True(t, cfg.DAGRunStore.Postgres.AutoMigrate)
+		assert.Empty(t, cfg.DAGRunStore.Postgres.Server.DSN)
+		assert.True(t, cfg.DAGRunStore.Postgres.Server.AutoMigrate)
 		assert.Equal(t, PostgresPoolConfig{
-			MaxOpenConns:    25,
-			MaxIdleConns:    5,
+			MaxOpenConns:    10,
+			MaxIdleConns:    2,
 			ConnMaxLifetime: 300,
 			ConnMaxIdleTime: 60,
-		}, cfg.DAGRunStore.Postgres.Pool)
+		}, cfg.DAGRunStore.Postgres.Server.Pool)
+		assert.Empty(t, cfg.DAGRunStore.Postgres.Scheduler.DSN)
+		assert.True(t, cfg.DAGRunStore.Postgres.Scheduler.AutoMigrate)
+		assert.Equal(t, PostgresPoolConfig{
+			MaxOpenConns:    10,
+			MaxIdleConns:    2,
+			ConnMaxLifetime: 300,
+			ConnMaxIdleTime: 60,
+		}, cfg.DAGRunStore.Postgres.Scheduler.Pool)
+		assert.Empty(t, cfg.DAGRunStore.Postgres.Agent.DSN)
+		assert.False(t, cfg.DAGRunStore.Postgres.Agent.AutoMigrate)
+		assert.Equal(t, PostgresPoolConfig{
+			MaxOpenConns:    2,
+			MaxIdleConns:    0,
+			ConnMaxLifetime: 300,
+			ConnMaxIdleTime: 30,
+		}, cfg.DAGRunStore.Postgres.Agent.Pool)
 	})
 
 	t.Run("PostgresFromYAML", func(t *testing.T) {
@@ -424,56 +460,99 @@ func TestLoad_DAGRunStore(t *testing.T) {
 dag_run_store:
   backend: postgres
   postgres:
-    dsn: postgres://dagu:secret@localhost:5432/dagu?sslmode=disable
-    auto_migrate: false
-    pool:
-      max_open_conns: 17
-      max_idle_conns: 3
-      conn_max_lifetime: 120
-      conn_max_idle_time: 45
+    server:
+      dsn: postgres://dagu:server@localhost:5432/dagu_server?sslmode=disable
+      auto_migrate: false
+      pool:
+        max_open_conns: 17
+        max_idle_conns: 3
+        conn_max_lifetime: 120
+        conn_max_idle_time: 45
+    scheduler:
+      dsn: postgres://dagu:scheduler@localhost:5432/dagu_scheduler?sslmode=disable
+      auto_migrate: false
+      pool:
+        max_open_conns: 11
+        max_idle_conns: 2
+        conn_max_lifetime: 180
+        conn_max_idle_time: 40
+    agent:
+      dsn: postgres://dagu:agent@localhost:5432/dagu_agent?sslmode=disable
+      auto_migrate: true
+      pool:
+        max_open_conns: 3
+        max_idle_conns: 1
+        conn_max_lifetime: 90
+        conn_max_idle_time: 20
 `)
 
 		assert.Equal(t, DAGRunStoreBackendPostgres, cfg.DAGRunStore.Backend)
-		assert.Equal(t, "postgres://dagu:secret@localhost:5432/dagu?sslmode=disable", cfg.DAGRunStore.Postgres.DSN)
-		assert.False(t, cfg.DAGRunStore.Postgres.AutoMigrate)
+		assert.Equal(t, "postgres://dagu:server@localhost:5432/dagu_server?sslmode=disable", cfg.DAGRunStore.Postgres.Server.DSN)
+		assert.False(t, cfg.DAGRunStore.Postgres.Server.AutoMigrate)
 		assert.Equal(t, PostgresPoolConfig{
 			MaxOpenConns:    17,
 			MaxIdleConns:    3,
 			ConnMaxLifetime: 120,
 			ConnMaxIdleTime: 45,
-		}, cfg.DAGRunStore.Postgres.Pool)
+		}, cfg.DAGRunStore.Postgres.Server.Pool)
+		assert.Equal(t, "postgres://dagu:scheduler@localhost:5432/dagu_scheduler?sslmode=disable", cfg.DAGRunStore.Postgres.Scheduler.DSN)
+		assert.False(t, cfg.DAGRunStore.Postgres.Scheduler.AutoMigrate)
+		assert.Equal(t, PostgresPoolConfig{
+			MaxOpenConns:    11,
+			MaxIdleConns:    2,
+			ConnMaxLifetime: 180,
+			ConnMaxIdleTime: 40,
+		}, cfg.DAGRunStore.Postgres.Scheduler.Pool)
+		assert.Equal(t, "postgres://dagu:agent@localhost:5432/dagu_agent?sslmode=disable", cfg.DAGRunStore.Postgres.Agent.DSN)
+		assert.True(t, cfg.DAGRunStore.Postgres.Agent.AutoMigrate)
+		assert.Equal(t, PostgresPoolConfig{
+			MaxOpenConns:    3,
+			MaxIdleConns:    1,
+			ConnMaxLifetime: 90,
+			ConnMaxIdleTime: 20,
+		}, cfg.DAGRunStore.Postgres.Agent.Pool)
 	})
 
 	t.Run("PostgresFromEnv", func(t *testing.T) {
 		cfg := loadWithEnv(t, "# empty", map[string]string{
-			"DAGU_DAG_RUN_STORE_BACKEND":                          "postgres",
-			"DAGU_DAG_RUN_STORE_POSTGRES_DSN":                     "postgres://dagu:secret@localhost:5432/dagu_env?sslmode=disable",
-			"DAGU_DAG_RUN_STORE_POSTGRES_AUTO_MIGRATE":            "false",
-			"DAGU_DAG_RUN_STORE_POSTGRES_POOL_MAX_OPEN_CONNS":     "19",
-			"DAGU_DAG_RUN_STORE_POSTGRES_POOL_MAX_IDLE_CONNS":     "4",
-			"DAGU_DAG_RUN_STORE_POSTGRES_POOL_CONN_MAX_LIFETIME":  "240",
-			"DAGU_DAG_RUN_STORE_POSTGRES_POOL_CONN_MAX_IDLE_TIME": "30",
+			"DAGU_DAG_RUN_STORE_BACKEND":                                 "postgres",
+			"DAGU_DAG_RUN_STORE_POSTGRES_SERVER_DSN":                     "postgres://dagu:server@localhost:5432/dagu_env_server?sslmode=disable",
+			"DAGU_DAG_RUN_STORE_POSTGRES_SERVER_AUTO_MIGRATE":            "false",
+			"DAGU_DAG_RUN_STORE_POSTGRES_SERVER_POOL_MAX_OPEN_CONNS":     "19",
+			"DAGU_DAG_RUN_STORE_POSTGRES_SERVER_POOL_MAX_IDLE_CONNS":     "4",
+			"DAGU_DAG_RUN_STORE_POSTGRES_SERVER_POOL_CONN_MAX_LIFETIME":  "240",
+			"DAGU_DAG_RUN_STORE_POSTGRES_SERVER_POOL_CONN_MAX_IDLE_TIME": "30",
+			"DAGU_DAG_RUN_STORE_POSTGRES_SCHEDULER_DSN":                  "postgres://dagu:scheduler@localhost:5432/dagu_env_scheduler?sslmode=disable",
+			"DAGU_DAG_RUN_STORE_POSTGRES_SCHEDULER_POOL_MAX_OPEN_CONNS":  "13",
+			"DAGU_DAG_RUN_STORE_POSTGRES_AGENT_DSN":                      "postgres://dagu:agent@localhost:5432/dagu_env_agent?sslmode=disable",
+			"DAGU_DAG_RUN_STORE_POSTGRES_AGENT_AUTO_MIGRATE":             "true",
+			"DAGU_DAG_RUN_STORE_POSTGRES_AGENT_POOL_CONN_MAX_IDLE_TIME":  "15",
 		})
 
 		assert.Equal(t, DAGRunStoreBackendPostgres, cfg.DAGRunStore.Backend)
-		assert.Equal(t, "postgres://dagu:secret@localhost:5432/dagu_env?sslmode=disable", cfg.DAGRunStore.Postgres.DSN)
-		assert.False(t, cfg.DAGRunStore.Postgres.AutoMigrate)
+		assert.Equal(t, "postgres://dagu:server@localhost:5432/dagu_env_server?sslmode=disable", cfg.DAGRunStore.Postgres.Server.DSN)
+		assert.False(t, cfg.DAGRunStore.Postgres.Server.AutoMigrate)
 		assert.Equal(t, PostgresPoolConfig{
 			MaxOpenConns:    19,
 			MaxIdleConns:    4,
 			ConnMaxLifetime: 240,
 			ConnMaxIdleTime: 30,
-		}, cfg.DAGRunStore.Postgres.Pool)
-	})
-
-	t.Run("PostgresRequiresDSN", func(t *testing.T) {
-		err := loadWithErrorFromYAML(t, `
-dag_run_store:
-  backend: postgres
-`)
-
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "dag_run_store.postgres.dsn is required")
+		}, cfg.DAGRunStore.Postgres.Server.Pool)
+		assert.Equal(t, "postgres://dagu:scheduler@localhost:5432/dagu_env_scheduler?sslmode=disable", cfg.DAGRunStore.Postgres.Scheduler.DSN)
+		assert.Equal(t, PostgresPoolConfig{
+			MaxOpenConns:    13,
+			MaxIdleConns:    2,
+			ConnMaxLifetime: 300,
+			ConnMaxIdleTime: 60,
+		}, cfg.DAGRunStore.Postgres.Scheduler.Pool)
+		assert.Equal(t, "postgres://dagu:agent@localhost:5432/dagu_env_agent?sslmode=disable", cfg.DAGRunStore.Postgres.Agent.DSN)
+		assert.True(t, cfg.DAGRunStore.Postgres.Agent.AutoMigrate)
+		assert.Equal(t, PostgresPoolConfig{
+			MaxOpenConns:    2,
+			MaxIdleConns:    0,
+			ConnMaxLifetime: 300,
+			ConnMaxIdleTime: 15,
+		}, cfg.DAGRunStore.Postgres.Agent.Pool)
 	})
 
 	t.Run("InvalidBackend", func(t *testing.T) {
@@ -798,12 +877,32 @@ scheduler:
 		DAGRunStore: DAGRunStoreConfig{
 			Backend: DAGRunStoreBackendFile,
 			Postgres: DAGRunStorePostgresConfig{
-				AutoMigrate: true,
-				Pool: PostgresPoolConfig{
-					MaxOpenConns:    25,
-					MaxIdleConns:    5,
-					ConnMaxLifetime: 300,
-					ConnMaxIdleTime: 60,
+				Server: DAGRunStorePostgresRoleConfig{
+					AutoMigrate: true,
+					Pool: PostgresPoolConfig{
+						MaxOpenConns:    10,
+						MaxIdleConns:    2,
+						ConnMaxLifetime: 300,
+						ConnMaxIdleTime: 60,
+					},
+				},
+				Scheduler: DAGRunStorePostgresRoleConfig{
+					AutoMigrate: true,
+					Pool: PostgresPoolConfig{
+						MaxOpenConns:    10,
+						MaxIdleConns:    2,
+						ConnMaxLifetime: 300,
+						ConnMaxIdleTime: 60,
+					},
+				},
+				Agent: DAGRunStorePostgresRoleConfig{
+					AutoMigrate: false,
+					Pool: PostgresPoolConfig{
+						MaxOpenConns:    2,
+						MaxIdleConns:    0,
+						ConnMaxLifetime: 300,
+						ConnMaxIdleTime: 30,
+					},
 				},
 			},
 		},

@@ -21,10 +21,23 @@ type Options struct {
 	FileCache         *fileutil.Cache[*exec.DAGRunStatus]
 	LatestStatusToday bool
 	Location          *time.Location
+	Role              Role
 }
 
 // Option configures DAG-run store construction.
 type Option func(*Options)
+
+// Role identifies the Dagu process role that owns a DAG-run store connection.
+type Role string
+
+const (
+	// RoleServer is used by the frontend/API process.
+	RoleServer Role = "server"
+	// RoleScheduler is used by the scheduler process.
+	RoleScheduler Role = "scheduler"
+	// RoleAgent is used by DAG execution processes.
+	RoleAgent Role = "agent"
+)
 
 // WithHistoryFileCache sets the optional file-store status cache.
 func WithHistoryFileCache(cache *fileutil.Cache[*exec.DAGRunStatus]) Option {
@@ -47,6 +60,13 @@ func WithLocation(location *time.Location) Option {
 	}
 }
 
+// WithRole selects the process-specific PostgreSQL DAG-run store settings.
+func WithRole(role Role) Option {
+	return func(o *Options) {
+		o.Role = role
+	}
+}
+
 // New creates the configured DAG-run store.
 func New(ctx context.Context, cfg *config.Config, opts ...Option) (exec.DAGRunStore, error) {
 	if cfg == nil {
@@ -54,6 +74,7 @@ func New(ctx context.Context, cfg *config.Config, opts ...Option) (exec.DAGRunSt
 	}
 	options := Options{
 		Location: cfg.Core.Location,
+		Role:     RoleServer,
 	}
 	for _, opt := range opts {
 		opt(&options)
@@ -63,21 +84,41 @@ func New(ctx context.Context, cfg *config.Config, opts ...Option) (exec.DAGRunSt
 	case "", config.DAGRunStoreBackendFile:
 		return newFileStore(cfg, options), nil
 	case config.DAGRunStoreBackendPostgres:
+		pgCfg, err := postgresRoleConfig(cfg.DAGRunStore.Postgres, options.Role)
+		if err != nil {
+			return nil, err
+		}
+		if pgCfg.DSN == "" {
+			return nil, fmt.Errorf("dag_run_store.postgres.%s.dsn is required when dag_run_store.backend is postgres", options.Role)
+		}
 		return postgres.New(ctx, postgres.Config{
-			DSN:               cfg.DAGRunStore.Postgres.DSN,
+			DSN:               pgCfg.DSN,
 			LocalWorkDirBase:  cfg.Paths.DAGRunsDir,
-			AutoMigrate:       cfg.DAGRunStore.Postgres.AutoMigrate,
+			AutoMigrate:       pgCfg.AutoMigrate,
 			LatestStatusToday: options.LatestStatusToday,
 			Location:          options.Location,
 			Pool: postgres.PoolConfig{
-				MaxOpenConns:    cfg.DAGRunStore.Postgres.Pool.MaxOpenConns,
-				MaxIdleConns:    cfg.DAGRunStore.Postgres.Pool.MaxIdleConns,
-				ConnMaxLifetime: cfg.DAGRunStore.Postgres.Pool.ConnMaxLifetime,
-				ConnMaxIdleTime: cfg.DAGRunStore.Postgres.Pool.ConnMaxIdleTime,
+				MaxOpenConns:    pgCfg.Pool.MaxOpenConns,
+				MaxIdleConns:    pgCfg.Pool.MaxIdleConns,
+				ConnMaxLifetime: pgCfg.Pool.ConnMaxLifetime,
+				ConnMaxIdleTime: pgCfg.Pool.ConnMaxIdleTime,
 			},
 		})
 	default:
 		return nil, fmt.Errorf("unsupported dag-run store backend %q", cfg.DAGRunStore.Backend)
+	}
+}
+
+func postgresRoleConfig(cfg config.DAGRunStorePostgresConfig, role Role) (config.DAGRunStorePostgresRoleConfig, error) {
+	switch role {
+	case "", RoleServer:
+		return cfg.Server, nil
+	case RoleScheduler:
+		return cfg.Scheduler, nil
+	case RoleAgent:
+		return cfg.Agent, nil
+	default:
+		return config.DAGRunStorePostgresRoleConfig{}, fmt.Errorf("unsupported dag-run store role %q", role)
 	}
 }
 

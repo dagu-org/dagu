@@ -759,11 +759,11 @@
       "properties": {
         "max_open_conns": {
           "type": "integer",
-          "description": "Maximum number of open connections. Default: 25."
+          "description": "Maximum number of open connections. Default depends on the subsystem."
         },
         "max_idle_conns": {
           "type": "integer",
-          "description": "Maximum number of idle connections. Default: 5."
+          "description": "Maximum number of idle connections. Default depends on the subsystem."
         },
         "conn_max_lifetime": {
           "type": "integer",
@@ -962,18 +962,7 @@
             }
           },
           "then": {
-            "required": ["postgres"],
-            "properties": {
-              "postgres": {
-                "required": ["dsn"],
-                "properties": {
-                  "dsn": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                }
-              }
-            }
+            "required": ["postgres"]
           }
         }
       ]
@@ -983,14 +972,32 @@
       "description": "PostgreSQL DAG-run status store configuration.",
       "additionalProperties": false,
       "properties": {
+        "server": {
+          "$ref": "#/definitions/DAGRunStorePostgresRoleDef",
+          "description": "PostgreSQL settings used by the server/API process."
+        },
+        "scheduler": {
+          "$ref": "#/definitions/DAGRunStorePostgresRoleDef",
+          "description": "PostgreSQL settings used by the scheduler process."
+        },
+        "agent": {
+          "$ref": "#/definitions/DAGRunStorePostgresRoleDef",
+          "description": "PostgreSQL settings used by DAG execution processes."
+        }
+      }
+    },
+    "DAGRunStorePostgresRoleDef": {
+      "type": "object",
+      "description": "PostgreSQL DAG-run status store configuration for one Dagu process role.",
+      "additionalProperties": false,
+      "properties": {
         "dsn": {
           "type": "string",
-          "description": "PostgreSQL connection string used when dag_run_store.backend is postgres."
+          "description": "PostgreSQL connection string used by this process role."
         },
         "auto_migrate": {
           "type": "boolean",
-          "description": "Run DAG-run store migrations at startup. Default: true.",
-          "default": true
+          "description": "Run DAG-run store migrations when this process role opens the store."
         },
         "pool": {
           "$ref": "#/definitions/PostgresPoolDef"

@@ -338,6 +338,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	drsOpts := []dagrunstore.Option{
 		dagrunstore.WithLatestStatusToday(cfg.Server.LatestStatusToday),
 		dagrunstore.WithLocation(cfg.Core.Location),
+		dagrunstore.WithRole(dagRunStoreRoleForCommand(cmd)),
 	}
 
 	switch cmd.Name() {
@@ -556,6 +557,20 @@ func serviceForCommand(cmdName string) config.Service {
 	}
 }
 
+func dagRunStoreRoleForCommand(cmd *cobra.Command) dagrunstore.Role {
+	if cmd == nil {
+		return dagrunstore.RoleServer
+	}
+	switch cmd.Name() {
+	case "scheduler":
+		return dagrunstore.RoleScheduler
+	case "start", "restart", "retry", "dry", "exec", "worker":
+		return dagrunstore.RoleAgent
+	default:
+		return dagrunstore.RoleServer
+	}
+}
+
 // isAgentCommand returns true if the command name is an agent command
 // that displays progress or tree output.
 func isAgentCommand(cmdName string) bool {
@@ -671,6 +686,7 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 	schedulerRunStore, err := dagrunstore.New(
 		c,
 		c.Config,
+		dagrunstore.WithRole(dagrunstore.RoleScheduler),
 		dagrunstore.WithLatestStatusToday(false),
 		dagrunstore.WithLocation(c.Config.Core.Location),
 		dagrunstore.WithHistoryFileCache(statusCache),

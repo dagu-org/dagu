@@ -376,8 +376,15 @@ type DAGRunStoreDef struct {
 
 // DAGRunStorePostgresDef configures PostgreSQL DAG-run status persistence.
 type DAGRunStorePostgresDef struct {
+	Server    *DAGRunStorePostgresRoleDef `mapstructure:"server"`
+	Scheduler *DAGRunStorePostgresRoleDef `mapstructure:"scheduler"`
+	Agent     *DAGRunStorePostgresRoleDef `mapstructure:"agent"`
+}
+
+// DAGRunStorePostgresRoleDef configures PostgreSQL persistence for one Dagu process role.
+type DAGRunStorePostgresRoleDef struct {
 	DSN         string           `mapstructure:"dsn"`
-	AutoMigrate *bool            `mapstructure:"auto_migrate"` // Default: true
+	AutoMigrate *bool            `mapstructure:"auto_migrate"`
 	Pool        *PostgresPoolDef `mapstructure:"pool"`
 }
 

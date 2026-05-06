@@ -239,6 +239,13 @@ type DAGRunStoreConfig struct {
 
 // DAGRunStorePostgresConfig holds PostgreSQL DAG-run store configuration.
 type DAGRunStorePostgresConfig struct {
+	Server    DAGRunStorePostgresRoleConfig
+	Scheduler DAGRunStorePostgresRoleConfig
+	Agent     DAGRunStorePostgresRoleConfig
+}
+
+// DAGRunStorePostgresRoleConfig holds PostgreSQL settings for one Dagu process role.
+type DAGRunStorePostgresRoleConfig struct {
 	DSN         string
 	AutoMigrate bool
 	Pool        PostgresPoolConfig
@@ -506,7 +513,7 @@ type Scheduler struct {
 	FailureThreshold        int           // Default: 3
 }
 
-// PostgresPoolConfig holds PostgreSQL connection pool settings for workers.
+// PostgresPoolConfig holds PostgreSQL connection pool settings.
 type PostgresPoolConfig struct {
 	MaxOpenConns    int // Default: 25
 	MaxIdleConns    int // Default: 5
@@ -632,9 +639,6 @@ func (c *Config) validateDAGRunStore() error {
 	case "", DAGRunStoreBackendFile:
 		return nil
 	case DAGRunStoreBackendPostgres:
-		if c.DAGRunStore.Postgres.DSN == "" {
-			return fmt.Errorf("dag_run_store.postgres.dsn is required when dag_run_store.backend is postgres")
-		}
 		return nil
 	default:
 		return fmt.Errorf("invalid dag_run_store.backend: %q", c.DAGRunStore.Backend)

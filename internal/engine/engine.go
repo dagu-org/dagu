@@ -72,6 +72,7 @@ func New(ctx context.Context, opts Options) (*Engine, error) {
 	dagRunStore, err := dagrunstore.New(
 		ctx,
 		cfg,
+		dagrunstore.WithRole(dagrunstore.RoleAgent),
 		dagrunstore.WithLatestStatusToday(false),
 		dagrunstore.WithLocation(cfg.Core.Location),
 	)
