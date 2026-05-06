@@ -1975,8 +1975,12 @@
           }
         },
         {
-          "if": { "properties": { "type": { "const": "log" } } },
+          "if": {
+            "properties": { "type": { "const": "log" } },
+            "required": ["type"]
+          },
           "then": {
+            "anyOf": [{ "required": ["with"] }, { "required": ["config"] }],
             "properties": {
               "with": { "$ref": "#/definitions/logExecutorConfig" },
               "config": {
@@ -5367,8 +5371,12 @@
           }
         },
         {
-          "if": { "properties": { "type": { "const": "log" } } },
+          "if": {
+            "properties": { "type": { "const": "log" } },
+            "required": ["type"]
+          },
           "then": {
+            "required": ["config"],
             "properties": {
               "config": { "$ref": "#/definitions/logExecutorConfig" }
             }

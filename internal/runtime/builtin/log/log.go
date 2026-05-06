@@ -58,12 +58,18 @@ func (*logExecutor) SetStderr(_ io.Writer) {}
 
 func (*logExecutor) Kill(_ os.Signal) error { return nil }
 
-func (e *logExecutor) Run(_ context.Context) error {
+func (e *logExecutor) Run(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if _, err := io.WriteString(e.stdout, e.message); err != nil {
 		return err
 	}
 	if strings.HasSuffix(e.message, "\n") {
 		return nil
+	}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 	_, err := io.WriteString(e.stdout, "\n")
 	return err

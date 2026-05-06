@@ -15,6 +15,7 @@ type LogStepMessageProps = {
 };
 
 const singleLineLimit = 72;
+const ariaLabelLimit = 120;
 
 function formatSingleLine(message: string): string {
   return message.length === 0 ? '(empty message)' : message;
@@ -34,6 +35,14 @@ function truncateSingleLine(message: string): {
   };
 }
 
+function truncateAriaLabel(message: string): string {
+  const display = formatSingleLine(message).replace(/\s+/g, ' ');
+  if (display.length <= ariaLabelLimit) {
+    return display;
+  }
+  return `${display.slice(0, ariaLabelLimit - 3)}...`;
+}
+
 export function LogStepMessage({
   message,
   className,
@@ -41,6 +50,7 @@ export function LogStepMessage({
 }: LogStepMessageProps) {
   const isMultiline = message.includes('\n');
   const singleLine = truncateSingleLine(message);
+  const ariaLabel = truncateAriaLabel(message);
 
   const messageBody = isMultiline ? (
     <pre className="max-h-28 overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-5 text-foreground">
@@ -62,7 +72,7 @@ export function LogStepMessage({
         compact ? 'w-[320px] max-w-full' : 'w-full',
         className
       )}
-      aria-label={`Log message: ${formatSingleLine(message)}`}
+      aria-label={`Log message: ${ariaLabel}`}
     >
       {messageBody}
     </div>

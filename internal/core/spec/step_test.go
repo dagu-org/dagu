@@ -55,6 +55,8 @@ func TestMain(m *testing.M) {
 	}
 	// mail: no command support
 	core.RegisterExecutorCapabilities("mail", core.ExecutorCapabilities{})
+	// log: no command support
+	core.RegisterExecutorCapabilities("log", core.ExecutorCapabilities{})
 	// chat: LLM executor
 	core.RegisterExecutorCapabilities("chat", core.ExecutorCapabilities{LLM: true})
 

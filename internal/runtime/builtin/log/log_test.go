@@ -5,6 +5,7 @@ package log
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -50,6 +51,30 @@ func TestExecutorRunDoesNotDuplicateTrailingNewline(t *testing.T) {
 
 	require.NoError(t, exec.Run(context.Background()))
 	require.Equal(t, "line one\nline two\n", stdout.String())
+}
+
+func TestExecutorRunStopsWhenContextIsCanceled(t *testing.T) {
+	t.Parallel()
+
+	exec, err := newLog(context.Background(), core.Step{
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "log",
+			Config: map[string]any{
+				"message": "Deploying ${ENVIRONMENT}",
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	var stdout strings.Builder
+	exec.SetStdout(&stdout)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err = exec.Run(ctx)
+	require.True(t, errors.Is(err, context.Canceled))
+	require.Empty(t, stdout.String())
 }
 
 func TestNewLogRequiresMessage(t *testing.T) {

@@ -672,6 +672,120 @@ steps:
 	}
 }
 
+func TestDAGSchemaLogStepRequiresMessage(t *testing.T) {
+	t.Parallel()
+
+	resolved := mustResolveDAGSchema(t)
+
+	tests := []struct {
+		name    string
+		spec    string
+		wantErr string
+	}{
+		{
+			name: "CanonicalWith",
+			spec: `
+steps:
+  - type: log
+    with:
+      message: hello
+`,
+		},
+		{
+			name: "LegacyConfigAlias",
+			spec: `
+steps:
+  - type: log
+    config:
+      message: hello
+`,
+		},
+		{
+			name: "RejectMissingWithOrConfig",
+			spec: `
+steps:
+  - type: log
+`,
+			wantErr: "steps",
+		},
+		{
+			name: "RejectMissingMessage",
+			spec: `
+steps:
+  - type: log
+    with: {}
+`,
+			wantErr: "steps",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			doc := mustParseYAMLDocument(t, tt.spec)
+			err := resolved.Validate(doc)
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tt.wantErr)
+		})
+	}
+}
+
+func TestDAGSchemaLogExecutorObjectRequiresMessage(t *testing.T) {
+	t.Parallel()
+
+	resolved := mustResolveDAGSchemaDefinition(t, "executorObject")
+
+	tests := []struct {
+		name    string
+		value   map[string]any
+		wantErr string
+	}{
+		{
+			name: "Valid",
+			value: map[string]any{
+				"type": "log",
+				"config": map[string]any{
+					"message": "hello",
+				},
+			},
+		},
+		{
+			name: "RejectMissingConfig",
+			value: map[string]any{
+				"type": "log",
+			},
+			wantErr: "config",
+		},
+		{
+			name: "RejectMissingMessage",
+			value: map[string]any{
+				"type":   "log",
+				"config": map[string]any{},
+			},
+			wantErr: "message",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := resolved.Validate(tt.value)
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tt.wantErr)
+		})
+	}
+}
+
 func TestDAGSchemaSSHExecutorPort(t *testing.T) {
 	t.Parallel()
 
@@ -1235,16 +1349,16 @@ func mustResolveDAGSchema(t *testing.T) *jsonschema.Resolved {
 func mustResolveDAGSchemaDefinition(t *testing.T, name string) *jsonschema.Resolved {
 	t.Helper()
 
-	var root struct {
-		Definitions map[string]json.RawMessage `json:"definitions"`
-	}
+	var root jsonschema.Schema
 	require.NoError(t, json.Unmarshal(DAGSchemaJSON, &root))
 
-	definition, ok := root.Definitions[name]
+	_, ok := root.Definitions[name]
 	require.True(t, ok, "schema definition %q should exist", name)
 
-	var schema jsonschema.Schema
-	require.NoError(t, json.Unmarshal(definition, &schema))
+	schema := jsonschema.Schema{
+		Ref:         "#/definitions/" + name,
+		Definitions: root.Definitions,
+	}
 
 	resolved, err := schema.Resolve(&jsonschema.ResolveOptions{})
 	require.NoError(t, err)

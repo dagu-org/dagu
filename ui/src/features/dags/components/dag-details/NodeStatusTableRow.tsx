@@ -197,7 +197,7 @@ function NodeStatusTableRow({
         },
         path: {
           name: dagRun.rootDAGRunName,
-          dagRunId: dagRun.rootDAGRunId || '',
+          dagRunId: dagRun.rootDAGRunId,
           subDAGRunId: dagRun.dagRunId,
           stepName: node.step.name,
         },
@@ -218,7 +218,7 @@ function NodeStatusTableRow({
           stream: Stream.stdout,
         },
         path: {
-          name: dagRun?.name || name,
+          name: dagRun.name,
           dagRunId: dagRunId || '',
           stepName: node.step.name,
         },
@@ -233,10 +233,13 @@ function NodeStatusTableRow({
   const logOutputContent = isSubDAGRun
     ? subDAGLogQuery.data?.content
     : dagRunLogQuery.data?.content;
+  const logQueryError = isSubDAGRun
+    ? subDAGLogQuery.error
+    : dagRunLogQuery.error;
   const logStepDisplayMessage =
     typeof logOutputContent === 'string'
       ? formatLogStepOutput(logOutputContent)
-      : shouldFetchLogStepOutput
+      : shouldFetchLogStepOutput && !logQueryError
         ? 'Loading log output...'
         : logMessage;
 

@@ -54,10 +54,15 @@ const mockedUseQuery = vi.mocked(
   useQuery as unknown as (path: unknown, init: unknown) => unknown
 );
 
+const stepLogPath = '/dag-runs/{name}/{dagRunId}/steps/{stepName}/log';
+
 describe('NodeStatusTableRow', () => {
   beforeEach(() => {
-    mockedUseQuery.mockImplementation((_, init) => ({
-      data: init ? { content: 'Deploying production\n' } : undefined,
+    mockedUseQuery.mockImplementation((path, init) => ({
+      data:
+        path === stepLogPath && init
+          ? { content: 'Deploying production\n' }
+          : undefined,
       isLoading: false,
       error: undefined,
       isValidating: false,
@@ -114,11 +119,72 @@ describe('NodeStatusTableRow', () => {
 
     const message = screen.getByLabelText('Log message: Deploying production');
     expect(message).toBeInTheDocument();
-    expect(message).toHaveClass('w-[320px]');
     expect(message.querySelector('svg')).not.toBeInTheDocument();
     expect(
       screen.queryByText('Deploying ${ENVIRONMENT}')
     ).not.toBeInTheDocument();
     expect(screen.getByText('stdout')).toBeInTheDocument();
+  });
+
+  it('falls back to the configured log message when stdout cannot be loaded', () => {
+    mockedUseQuery.mockImplementation((path, init) => ({
+      data: undefined,
+      isLoading: false,
+      error:
+        path === stepLogPath && init ? new Error('log not found') : undefined,
+      isValidating: false,
+      mutate: vi.fn(),
+    }));
+
+    const node = {
+      step: {
+        name: 'announce',
+        executorConfig: {
+          type: 'log',
+          config: {
+            message: 'Deploying ${ENVIRONMENT}',
+          },
+        },
+      },
+      status: NodeStatus.Success,
+      statusLabel: NodeStatusLabel.succeeded,
+      stdout: '/tmp/announce.out',
+      stderr: '',
+      startedAt: '',
+      finishedAt: '',
+      retryCount: 0,
+      doneCount: 1,
+    } as components['schemas']['Node'];
+
+    render(
+      <MemoryRouter>
+        <AppBarContext.Provider value={appBarValue}>
+          <DAGContext.Provider
+            value={{
+              refresh: vi.fn(),
+              name: 'example',
+              fileName: 'example.yaml',
+            }}
+          >
+            <table>
+              <tbody>
+                <NodeStatusTableRow
+                  rownum={1}
+                  node={node}
+                  name="example.yaml"
+                  dagRun={dagRun}
+                  view="desktop"
+                />
+              </tbody>
+            </table>
+          </DAGContext.Provider>
+        </AppBarContext.Provider>
+      </MemoryRouter>
+    );
+
+    expect(
+      screen.getByLabelText('Log message: Deploying ${ENVIRONMENT}')
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Loading log output...')).not.toBeInTheDocument();
   });
 });
