@@ -214,6 +214,12 @@ func (n *Node) Execute(ctx context.Context, onSetup ...func()) error {
 			pbHandler.SetPushBackContext(state.PushBackInputs, state.ApprovalIteration)
 		}
 	}
+	if pbHandler, ok := cmd.(executor.PushBackPreviousStdoutAware); ok {
+		state := n.State()
+		if state.ApprovalIteration > 0 {
+			pbHandler.SetPushBackPreviousStdout(state.PushBackPreviousStdout)
+		}
+	}
 
 	flusher := n.startOutputFlusher()
 	defer func() {

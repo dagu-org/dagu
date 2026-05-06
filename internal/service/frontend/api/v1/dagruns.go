@@ -3432,8 +3432,9 @@ func applyPushBack(ctx context.Context, node *exec.Node, status *exec.DAGRunStat
 	// Reset the configured rewind target and everything that depends on it.
 	rewoundNodes := append([]*exec.Node{status.Nodes[targetIdx]}, findDependentNodes(status.Nodes, targetName)...)
 	for _, rewoundNode := range rewoundNodes {
+		previousStdout := rewoundNode.Stdout
 		resetNodeForManualReexecution(rewoundNode)
-		setPushBackContext(rewoundNode, nextIteration, filteredInputs, history)
+		setPushBackContext(rewoundNode, nextIteration, filteredInputs, history, previousStdout)
 	}
 	return nil
 }
@@ -3458,10 +3459,11 @@ func resetNodeForManualReexecution(node *exec.Node) {
 	*node = *exec.NewNodeFromStep(step)
 }
 
-func setPushBackContext(node *exec.Node, iteration int, inputs map[string]string, history []exec.PushBackEntry) {
+func setPushBackContext(node *exec.Node, iteration int, inputs map[string]string, history []exec.PushBackEntry, previousStdout string) {
 	node.ApprovalIteration = iteration
 	node.PushBackInputs = cloneStringMap(inputs)
 	node.PushBackHistory = exec.ClonePushBackHistory(history)
+	node.PushBackPreviousStdout = previousStdout
 }
 
 func pushBackAllowedInputs(step core.Step) []string {
