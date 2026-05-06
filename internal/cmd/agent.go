@@ -117,7 +117,6 @@ func runAgentOnce(ctx *Context, prompt string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(out, "Session: %s\n", resp.SessionId)
 		return followAgentSessionNonInteractive(ctx, out, resp.SessionId, func(context.Context) (*agentSessionDetail, error) {
 			return ctx.Remote.getAgentSessionDetail(ctx, resp.SessionId)
 		})
@@ -132,7 +131,6 @@ func runAgentOnce(ctx *Context, prompt string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "Session: %s\n", sessionID)
 	return followAgentSessionNonInteractive(ctx, out, sessionID, func(context.Context) (*agentSessionDetail, error) {
 		return getLocalAgentSessionDetail(ctx, agentAPI, sessionID, user.UserID)
 	})
@@ -766,7 +764,6 @@ func runAgentInteractive(ctx *Context, sessionID string) error {
 				}
 				sessionID = createdID
 			}
-			fmt.Fprintf(out, "Session: %s\n", sessionID)
 		} else {
 			req, err := buildAgentChatRequest(ctx, input)
 			if err != nil {

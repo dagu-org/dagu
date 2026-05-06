@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	api "github.com/dagucloud/dagu/api/v1"
 	"github.com/stretchr/testify/assert"
@@ -140,6 +141,45 @@ func TestRemoteClientRespondAgentPrompt(t *testing.T) {
 	assert.Equal(t, []string{"approve"}, *gotRequest.SelectedOptionIds)
 }
 
+func TestRunAgentOnceDoesNotPrintSessionID(t *testing.T) {
+	remote := newAgentCommandRemoteServer(t, "reply text")
+	var out bytes.Buffer
+	cmd := Agent()
+	cmd.SetOut(&out)
+
+	err := runAgentOnce(&Context{
+		Context:     context.Background(),
+		Command:     cmd,
+		ContextName: "remote",
+		Remote:      remote,
+	}, "typed text")
+
+	require.NoError(t, err)
+	assert.NotContains(t, out.String(), "Session:")
+	assert.NotContains(t, out.String(), "typed text")
+	assert.Contains(t, out.String(), "reply text")
+}
+
+func TestRunAgentInteractiveDoesNotPrintSessionID(t *testing.T) {
+	remote := newAgentCommandRemoteServer(t, "reply text")
+	var out bytes.Buffer
+	cmd := Agent()
+	cmd.SetIn(strings.NewReader("typed text\n/exit\n"))
+	cmd.SetOut(&out)
+
+	err := runAgentInteractive(&Context{
+		Context:     context.Background(),
+		Command:     cmd,
+		ContextName: "remote",
+		Remote:      remote,
+	}, "")
+
+	require.NoError(t, err)
+	assert.NotContains(t, out.String(), "Session:")
+	assert.NotContains(t, out.String(), "typed text")
+	assert.Contains(t, out.String(), "reply text")
+}
+
 func TestBuildAgentPromptResponseMatchesOptionLabels(t *testing.T) {
 	resp, err := buildAgentPromptResponse(&agentPromptRow{
 		ID: "prompt-1",
@@ -211,4 +251,58 @@ func TestFollowAgentSessionDoesNotEchoUserMessages(t *testing.T) {
 	assert.NotContains(t, out.String(), "typed text")
 	assert.NotContains(t, out.String(), "Agent:")
 	assert.Contains(t, out.String(), "reply text")
+}
+
+func newAgentCommandRemoteServer(t *testing.T, assistantContent string) *remoteClient {
+	t.Helper()
+
+	sessionID := "session-1"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/agent/sessions":
+			_ = json.NewEncoder(w).Encode(api.CreateAgentSessionResponse{
+				SessionId: sessionID,
+				Status:    "accepted",
+			})
+		case r.Method == http.MethodGet && r.URL.Path == "/agent/sessions/"+sessionID:
+			now := time.Now()
+			_ = json.NewEncoder(w).Encode(api.AgentSessionDetailResponse{
+				Session: api.AgentSession{
+					Id:        sessionID,
+					CreatedAt: now,
+					UpdatedAt: now,
+				},
+				SessionState: api.AgentSessionState{
+					SessionId: sessionID,
+					Working:   false,
+				},
+				Messages: []api.AgentMessage{
+					{
+						Id:         "user-1",
+						SessionId:  sessionID,
+						SequenceId: 1,
+						Type:       api.AgentMessageType("user"),
+						Content:    stringPtrOrNil("typed text"),
+						CreatedAt:  now,
+					},
+					{
+						Id:         "assistant-1",
+						SessionId:  sessionID,
+						SequenceId: 2,
+						Type:       api.AgentMessageType("assistant"),
+						Content:    stringPtrOrNil(assistantContent),
+						CreatedAt:  now,
+					},
+				},
+			})
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	return &remoteClient{
+		baseURL: srv.URL,
+		client:  srv.Client(),
+	}
 }
