@@ -43,6 +43,21 @@ func TestPublishedOutputContractValidatePath(t *testing.T) {
 			},
 		}
 
+		tassert := assert.New(t)
+		tassert.Equal(outputReferenceUnknown, contract.validatePath([]string{"artifact"}))
+	})
+
+	t.Run("TreatsEmptyCompositionAsUnknown", func(t *testing.T) {
+		t.Parallel()
+
+		contract := publishedOutputContract{
+			StepName: "build",
+			Source:   "output_schema",
+			Schema: map[string]any{
+				"anyOf": []any{},
+			},
+		}
+
 		assert.Equal(t, outputReferenceUnknown, contract.validatePath([]string{"artifact"}))
 	})
 }

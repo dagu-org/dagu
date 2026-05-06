@@ -281,7 +281,7 @@ func hasSchemaComposition(schema map[string]any) bool {
 }
 
 func validateComposedSchemaOutputPath(schema map[string]any, path []string) outputReferenceValidationStatus {
-	status := outputReferenceInvalid
+	status := outputReferenceUnknown
 	for _, key := range []string{"anyOf", "oneOf", "allOf"} {
 		branches, ok := schemaArray(schema[key])
 		if !ok || len(branches) == 0 {
@@ -292,6 +292,7 @@ func validateComposedSchemaOutputPath(schema map[string]any, path []string) outp
 			if !ok {
 				return outputReferenceUnknown
 			}
+			status = outputReferenceInvalid
 			branchStatus := validateSchemaOutputPath(branchSchema, path)
 			if branchStatus == outputReferenceValid || branchStatus == outputReferenceUnknown {
 				return outputReferenceUnknown

@@ -49,6 +49,10 @@ type Node struct {
 	done         atomic.Bool
 	retryPolicy  RetryPolicy
 	cmdEvaluated atomic.Bool
+
+	outputSchemaOnce sync.Once
+	outputSchema     *jsonschema.Resolved
+	outputSchemaErr  error
 }
 
 func NewNode(step core.Step, state NodeState) *Node {
@@ -421,7 +425,6 @@ func (n *Node) captureOutput(ctx context.Context) error {
 }
 
 func (n *Node) evaluateOutputSchema(ctx context.Context) (string, error) {
-	step := n.Step()
 	raw, err := n.outputs.capturedOutput(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to capture stdout for output_schema: %w", err)
@@ -431,7 +434,7 @@ func (n *Node) evaluateOutputSchema(ctx context.Context) (string, error) {
 	if err := json.Unmarshal([]byte(raw), &decoded); err != nil {
 		return "", fmt.Errorf("failed to decode stdout JSON for output_schema: %w", err)
 	}
-	if err := validateOutputSchema(step.OutputSchema, decoded); err != nil {
+	if err := n.validateOutputSchema(decoded); err != nil {
 		return "", err
 	}
 
@@ -445,24 +448,41 @@ func (n *Node) evaluateOutputSchema(ctx context.Context) (string, error) {
 	return string(data), nil
 }
 
-func validateOutputSchema(schemaDecl map[string]any, value any) error {
-	data, err := json.Marshal(schemaDecl)
+func (n *Node) validateOutputSchema(value any) error {
+	resolved, err := n.resolvedOutputSchema()
 	if err != nil {
-		return fmt.Errorf("failed to marshal output_schema: %w", err)
-	}
-	var schema jsonschema.Schema
-	if err := json.Unmarshal(data, &schema); err != nil {
-		return fmt.Errorf("failed to parse output_schema: %w", err)
-	}
-	resolved, err := schema.Resolve(&jsonschema.ResolveOptions{ValidateDefaults: true})
-	if err != nil {
-		return fmt.Errorf("failed to resolve output_schema: %w", err)
+		return err
 	}
 	if err := resolved.Validate(value); err != nil {
 		// Avoid wrapping the validation error because it may contain parts of stdout.
 		return fmt.Errorf("stdout JSON does not match output_schema")
 	}
 	return nil
+}
+
+func (n *Node) resolvedOutputSchema() (*jsonschema.Resolved, error) {
+	n.outputSchemaOnce.Do(func() {
+		data, err := json.Marshal(n.Step().OutputSchema)
+		if err != nil {
+			n.outputSchemaErr = fmt.Errorf("failed to marshal output_schema: %w", err)
+			return
+		}
+		var schema jsonschema.Schema
+		if err := json.Unmarshal(data, &schema); err != nil {
+			n.outputSchemaErr = fmt.Errorf("failed to parse output_schema: %w", err)
+			return
+		}
+		resolved, err := schema.Resolve(&jsonschema.ResolveOptions{ValidateDefaults: true})
+		if err != nil {
+			n.outputSchemaErr = fmt.Errorf("failed to resolve output_schema: %w", err)
+			return
+		}
+		n.outputSchema = resolved
+	})
+	if n.outputSchemaErr != nil {
+		return nil, n.outputSchemaErr
+	}
+	return n.outputSchema, nil
 }
 
 func (n *Node) evaluateStructuredOutput(ctx context.Context) (string, error) {
