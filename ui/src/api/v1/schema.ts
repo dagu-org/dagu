@@ -3894,6 +3894,8 @@ export interface components {
         DocSearchPageItem: {
             id: string;
             title: string;
+            /** @description Short document description from YAML frontmatter */
+            description: string;
             /** @description Workspace that owns this document. Omitted for default documents. */
             workspace?: string;
             /** @description Whether additional snippets are available beyond the preview */
@@ -3946,9 +3948,9 @@ export interface components {
         };
         /** @description Precondition that must be satisfied before running a step or DAG-run */
         Condition: {
-            /** @description Expression or check to evaluate */
+            /** @description Expression or check to evaluate. When `expected` is omitted, the value runs as a command check using the same variable expansion rules as shell `command` steps. */
             condition: string;
-            /** @description Expected result of the condition evaluation */
+            /** @description Expected result of the condition evaluation. When set, Dagu compares the evaluated string output instead of using command exit status. */
             expected?: string;
             /** @description If true, inverts the condition result (run when condition does NOT match) */
             negate?: boolean;
@@ -4703,6 +4705,8 @@ export interface components {
         DocResponse: {
             id: string;
             title: string;
+            /** @description Short document description from YAML frontmatter */
+            description: string;
             /** @description Workspace that owns this document. Omitted for default documents. */
             workspace?: string;
             /** @description Full file content including YAML frontmatter */
@@ -4724,6 +4728,8 @@ export interface components {
         DocMetadataResponse: {
             id: string;
             title: string;
+            /** @description Short document description from YAML frontmatter */
+            description: string;
             /** @description Workspace that owns this document. Omitted for default documents. */
             workspace?: string;
             /**
@@ -4758,6 +4764,8 @@ export interface components {
         DocSearchResultItem: {
             id: string;
             title: string;
+            /** @description Short document description from YAML frontmatter */
+            description: string;
             /** @description Workspace that owns this document. Omitted for default documents. */
             workspace?: string;
             matches?: components["schemas"]["SearchMatchItem"][];
