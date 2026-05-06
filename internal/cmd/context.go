@@ -37,10 +37,10 @@ import (
 	"github.com/dagucloud/dagu/internal/persis/fileagentmodel"
 	"github.com/dagucloud/dagu/internal/persis/fileagentoauth"
 
+	"github.com/dagucloud/dagu/internal/persis/dagrunstore"
 	"github.com/dagucloud/dagu/internal/persis/fileagentsoul"
 	"github.com/dagucloud/dagu/internal/persis/filebaseconfig"
 	"github.com/dagucloud/dagu/internal/persis/filedag"
-	"github.com/dagucloud/dagu/internal/persis/filedagrun"
 	"github.com/dagucloud/dagu/internal/persis/filedistributed"
 	"github.com/dagucloud/dagu/internal/persis/fileeventstore"
 	"github.com/dagucloud/dagu/internal/persis/filegithubdispatch"
@@ -327,10 +327,9 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	}
 
 	// Initialize history repository and history manager
-	hrOpts := []filedagrun.DAGRunStoreOption{
-		filedagrun.WithArtifactDir(cfg.Paths.ArtifactDir),
-		filedagrun.WithLatestStatusToday(cfg.Server.LatestStatusToday),
-		filedagrun.WithLocation(cfg.Core.Location),
+	drsOpts := []dagrunstore.Option{
+		dagrunstore.WithLatestStatusToday(cfg.Server.LatestStatusToday),
+		dagrunstore.WithLocation(cfg.Core.Location),
 	}
 
 	switch cmd.Name() {
@@ -339,7 +338,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		limits := cfg.Cache.Limits()
 		hc := fileutil.NewCache[*exec.DAGRunStatus]("dag_run_status", limits.DAGRun.Limit, limits.DAGRun.TTL)
 		hc.StartEviction(ctx)
-		hrOpts = append(hrOpts, filedagrun.WithHistoryFileCache(hc))
+		drsOpts = append(drsOpts, dagrunstore.WithHistoryFileCache(hc))
 	}
 
 	ps := fileproc.New(cfg.Paths.ProcDir,
@@ -350,7 +349,10 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	if err := ps.Validate(ctx); err != nil {
 		return nil, fmt.Errorf("failed to validate proc directory %s: %w", cfg.Paths.ProcDir, err)
 	}
-	drs := filedagrun.New(cfg.Paths.DAGRunsDir, hrOpts...)
+	drs, err := dagrunstore.New(baseCtx, cfg, drsOpts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize DAG-run store: %w", err)
+	}
 	distributedDir := filepath.Join(cfg.Paths.DataDir, "distributed")
 	dagRunLeaseStore := filedistributed.NewDAGRunLeaseStore(distributedDir)
 	activeDistributedRunStore := filedistributed.NewActiveDistributedRunStore(distributedDir)
@@ -658,13 +660,16 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 
 	statusCache := fileutil.NewCache[*exec.DAGRunStatus]("scheduler_dag_run_status", limits.DAGRun.Limit, limits.DAGRun.TTL)
 	statusCache.StartEviction(c)
-	schedulerRunStore := filedagrun.New(
-		c.Config.Paths.DAGRunsDir,
-		filedagrun.WithArtifactDir(c.Config.Paths.ArtifactDir),
-		filedagrun.WithLatestStatusToday(false),
-		filedagrun.WithLocation(c.Config.Core.Location),
-		filedagrun.WithHistoryFileCache(statusCache),
+	schedulerRunStore, err := dagrunstore.New(
+		c,
+		c.Config,
+		dagrunstore.WithLatestStatusToday(false),
+		dagrunstore.WithLocation(c.Config.Core.Location),
+		dagrunstore.WithHistoryFileCache(statusCache),
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize scheduler DAG-run store: %w", err)
+	}
 	schedulerRunMgr := runtime.NewManager(schedulerRunStore, c.ProcStore, c.Config)
 
 	sched, err := scheduler.New(c.Config, m, schedulerRunMgr, schedulerRunStore, c.QueueStore, c.ProcStore, c.ServiceRegistry, coordinatorCli, wmStore)

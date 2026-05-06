@@ -254,6 +254,7 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	}
 	l.loadSecretsConfig(&cfg, def)
 	l.loadEventStoreConfig(&cfg, def)
+	l.loadDAGRunStoreConfig(&cfg, def)
 
 	// Load service-specific sections
 	sectionLoaders := []struct {
@@ -443,6 +444,21 @@ func (l *ConfigLoader) loadEventStoreConfig(cfg *Config, def Definition) {
 	cfg.EventStore.RetentionDays = l.v.GetInt("event_store.retention_days")
 	if def.EventStore != nil && def.EventStore.RetentionDays != nil {
 		cfg.EventStore.RetentionDays = *def.EventStore.RetentionDays
+	}
+}
+
+func (l *ConfigLoader) loadDAGRunStoreConfig(cfg *Config, _ Definition) {
+	cfg.DAGRunStore.Backend = DAGRunStoreBackend(l.v.GetString("dag_run_store.backend"))
+	if cfg.DAGRunStore.Backend == "" {
+		cfg.DAGRunStore.Backend = DAGRunStoreBackendFile
+	}
+	cfg.DAGRunStore.Postgres.DSN = l.v.GetString("dag_run_store.postgres.dsn")
+	cfg.DAGRunStore.Postgres.AutoMigrate = l.v.GetBool("dag_run_store.postgres.auto_migrate")
+	cfg.DAGRunStore.Postgres.Pool = PostgresPoolConfig{
+		MaxOpenConns:    l.v.GetInt("dag_run_store.postgres.pool.max_open_conns"),
+		MaxIdleConns:    l.v.GetInt("dag_run_store.postgres.pool.max_idle_conns"),
+		ConnMaxLifetime: l.v.GetInt("dag_run_store.postgres.pool.conn_max_lifetime"),
+		ConnMaxIdleTime: l.v.GetInt("dag_run_store.postgres.pool.conn_max_idle_time"),
 	}
 }
 
@@ -1599,6 +1615,14 @@ func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	l.v.SetDefault("event_store.enabled", true)
 	l.v.SetDefault("event_store.retention_days", 1)
 
+	// DAG-run store
+	l.v.SetDefault("dag_run_store.backend", string(DAGRunStoreBackendFile))
+	l.v.SetDefault("dag_run_store.postgres.auto_migrate", true)
+	l.v.SetDefault("dag_run_store.postgres.pool.max_open_conns", 25)
+	l.v.SetDefault("dag_run_store.postgres.pool.max_idle_conns", 5)
+	l.v.SetDefault("dag_run_store.postgres.pool.conn_max_lifetime", 300)
+	l.v.SetDefault("dag_run_store.postgres.pool.conn_max_idle_time", 60)
+
 	// Terminal
 	l.v.SetDefault("terminal.max_sessions", 5)
 
@@ -1645,6 +1669,13 @@ var envBindings = []envBinding{
 	{key: "audit.retention_days", env: "AUDIT_RETENTION_DAYS"},
 	{key: "event_store.enabled", env: "EVENT_STORE_ENABLED"},
 	{key: "event_store.retention_days", env: "EVENT_STORE_RETENTION_DAYS"},
+	{key: "dag_run_store.backend", env: "DAG_RUN_STORE_BACKEND"},
+	{key: "dag_run_store.postgres.dsn", env: "DAG_RUN_STORE_POSTGRES_DSN"},
+	{key: "dag_run_store.postgres.auto_migrate", env: "DAG_RUN_STORE_POSTGRES_AUTO_MIGRATE"},
+	{key: "dag_run_store.postgres.pool.max_open_conns", env: "DAG_RUN_STORE_POSTGRES_POOL_MAX_OPEN_CONNS"},
+	{key: "dag_run_store.postgres.pool.max_idle_conns", env: "DAG_RUN_STORE_POSTGRES_POOL_MAX_IDLE_CONNS"},
+	{key: "dag_run_store.postgres.pool.conn_max_lifetime", env: "DAG_RUN_STORE_POSTGRES_POOL_CONN_MAX_LIFETIME"},
+	{key: "dag_run_store.postgres.pool.conn_max_idle_time", env: "DAG_RUN_STORE_POSTGRES_POOL_CONN_MAX_IDLE_TIME"},
 	{key: "session.max_per_user", env: "SESSION_MAX_PER_USER"},
 	{key: "sse.max_topics_per_connection", env: "SSE_MAX_TOPICS_PER_CONNECTION"},
 	{key: "sse.max_clients", env: "SSE_MAX_CLIENTS"},

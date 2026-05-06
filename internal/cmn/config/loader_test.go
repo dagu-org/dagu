@@ -244,6 +244,18 @@ func TestLoad_Env(t *testing.T) {
 			Enabled:       true,
 			RetentionDays: 1,
 		},
+		DAGRunStore: DAGRunStoreConfig{
+			Backend: DAGRunStoreBackendFile,
+			Postgres: DAGRunStorePostgresConfig{
+				AutoMigrate: true,
+				Pool: PostgresPoolConfig{
+					MaxOpenConns:    25,
+					MaxIdleConns:    5,
+					ConnMaxLifetime: 300,
+					ConnMaxIdleTime: 60,
+				},
+			},
+		},
 		Paths: PathsConfig{
 			DAGsDir:            filepath.Join(testPaths, "dags"),
 			DocsDir:            filepath.Join(testPaths, "dags", "docs"),
@@ -390,6 +402,89 @@ worker:
 
 	assert.Zero(t, cfg.Coordinator.HealthPort)
 	assert.Zero(t, cfg.Worker.HealthPort)
+}
+
+func TestLoad_DAGRunStore(t *testing.T) {
+	t.Run("Defaults", func(t *testing.T) {
+		cfg := loadFromYAML(t, "# empty")
+
+		assert.Equal(t, DAGRunStoreBackendFile, cfg.DAGRunStore.Backend)
+		assert.Empty(t, cfg.DAGRunStore.Postgres.DSN)
+		assert.True(t, cfg.DAGRunStore.Postgres.AutoMigrate)
+		assert.Equal(t, PostgresPoolConfig{
+			MaxOpenConns:    25,
+			MaxIdleConns:    5,
+			ConnMaxLifetime: 300,
+			ConnMaxIdleTime: 60,
+		}, cfg.DAGRunStore.Postgres.Pool)
+	})
+
+	t.Run("PostgresFromYAML", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+dag_run_store:
+  backend: postgres
+  postgres:
+    dsn: postgres://dagu:secret@localhost:5432/dagu?sslmode=disable
+    auto_migrate: false
+    pool:
+      max_open_conns: 17
+      max_idle_conns: 3
+      conn_max_lifetime: 120
+      conn_max_idle_time: 45
+`)
+
+		assert.Equal(t, DAGRunStoreBackendPostgres, cfg.DAGRunStore.Backend)
+		assert.Equal(t, "postgres://dagu:secret@localhost:5432/dagu?sslmode=disable", cfg.DAGRunStore.Postgres.DSN)
+		assert.False(t, cfg.DAGRunStore.Postgres.AutoMigrate)
+		assert.Equal(t, PostgresPoolConfig{
+			MaxOpenConns:    17,
+			MaxIdleConns:    3,
+			ConnMaxLifetime: 120,
+			ConnMaxIdleTime: 45,
+		}, cfg.DAGRunStore.Postgres.Pool)
+	})
+
+	t.Run("PostgresFromEnv", func(t *testing.T) {
+		cfg := loadWithEnv(t, "# empty", map[string]string{
+			"DAGU_DAG_RUN_STORE_BACKEND":                          "postgres",
+			"DAGU_DAG_RUN_STORE_POSTGRES_DSN":                     "postgres://dagu:secret@localhost:5432/dagu_env?sslmode=disable",
+			"DAGU_DAG_RUN_STORE_POSTGRES_AUTO_MIGRATE":            "false",
+			"DAGU_DAG_RUN_STORE_POSTGRES_POOL_MAX_OPEN_CONNS":     "19",
+			"DAGU_DAG_RUN_STORE_POSTGRES_POOL_MAX_IDLE_CONNS":     "4",
+			"DAGU_DAG_RUN_STORE_POSTGRES_POOL_CONN_MAX_LIFETIME":  "240",
+			"DAGU_DAG_RUN_STORE_POSTGRES_POOL_CONN_MAX_IDLE_TIME": "30",
+		})
+
+		assert.Equal(t, DAGRunStoreBackendPostgres, cfg.DAGRunStore.Backend)
+		assert.Equal(t, "postgres://dagu:secret@localhost:5432/dagu_env?sslmode=disable", cfg.DAGRunStore.Postgres.DSN)
+		assert.False(t, cfg.DAGRunStore.Postgres.AutoMigrate)
+		assert.Equal(t, PostgresPoolConfig{
+			MaxOpenConns:    19,
+			MaxIdleConns:    4,
+			ConnMaxLifetime: 240,
+			ConnMaxIdleTime: 30,
+		}, cfg.DAGRunStore.Postgres.Pool)
+	})
+
+	t.Run("PostgresRequiresDSN", func(t *testing.T) {
+		err := loadWithErrorFromYAML(t, `
+dag_run_store:
+  backend: postgres
+`)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "dag_run_store.postgres.dsn is required")
+	})
+
+	t.Run("InvalidBackend", func(t *testing.T) {
+		err := loadWithErrorFromYAML(t, `
+dag_run_store:
+  backend: cassandra
+`)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid dag_run_store.backend")
+	})
 }
 
 func TestLoad_WithAppHomeDir(t *testing.T) {
@@ -699,6 +794,18 @@ scheduler:
 		EventStore: EventStoreConfig{
 			Enabled:       true,
 			RetentionDays: 1,
+		},
+		DAGRunStore: DAGRunStoreConfig{
+			Backend: DAGRunStoreBackendFile,
+			Postgres: DAGRunStorePostgresConfig{
+				AutoMigrate: true,
+				Pool: PostgresPoolConfig{
+					MaxOpenConns:    25,
+					MaxIdleConns:    5,
+					ConnMaxLifetime: 300,
+					ConnMaxIdleTime: 60,
+				},
+			},
 		},
 		Paths: PathsConfig{
 			DAGsDir:            resolvedTestPath(t, "/var/dagu/dags"),

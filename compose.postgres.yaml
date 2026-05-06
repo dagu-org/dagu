@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: dagu
+      POSTGRES_PASSWORD: dagu
+      POSTGRES_DB: dagu
+    ports:
+      - "54321:5432"
+    volumes:
+      - dagu-dev-postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dagu -d dagu"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  dagu-dev-postgres-data:

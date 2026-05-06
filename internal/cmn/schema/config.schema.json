@@ -207,6 +207,9 @@
     "event_store": {
       "$ref": "#/definitions/EventStoreDef"
     },
+    "dag_run_store": {
+      "$ref": "#/definitions/DAGRunStoreDef"
+    },
     "session": {
       "$ref": "#/definitions/SessionDef"
     },
@@ -930,6 +933,41 @@
           "type": "integer",
           "description": "Number of days to retain event logs. Default: 1.",
           "minimum": 0
+        }
+      }
+    },
+    "DAGRunStoreDef": {
+      "type": "object",
+      "description": "DAG-run status persistence configuration.",
+      "additionalProperties": false,
+      "properties": {
+        "backend": {
+          "type": "string",
+          "description": "DAG-run status persistence backend. Default: file.",
+          "enum": ["file", "postgres"],
+          "default": "file"
+        },
+        "postgres": {
+          "$ref": "#/definitions/DAGRunStorePostgresDef"
+        }
+      }
+    },
+    "DAGRunStorePostgresDef": {
+      "type": "object",
+      "description": "PostgreSQL DAG-run status store configuration.",
+      "additionalProperties": false,
+      "properties": {
+        "dsn": {
+          "type": "string",
+          "description": "PostgreSQL connection string used when dag_run_store.backend is postgres."
+        },
+        "auto_migrate": {
+          "type": "boolean",
+          "description": "Run DAG-run store migrations at startup. Default: true.",
+          "default": true
+        },
+        "pool": {
+          "$ref": "#/definitions/PostgresPoolDef"
         }
       }
     },

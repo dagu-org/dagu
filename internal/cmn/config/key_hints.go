@@ -122,6 +122,19 @@ var legacyToSnakeCaseKey = map[string]string{
 	"worker.postgrespool.connmaxlifetime": "worker.postgres_pool.conn_max_lifetime",
 	"worker.postgrespool.connmaxidletime": "worker.postgres_pool.conn_max_idle_time",
 
+	// DAG-run store
+	"dagrunstore":                                 "dag_run_store",
+	"dagrunstore.backend":                         "dag_run_store.backend",
+	"dagrunstore.postgres.automigrate":            "dag_run_store.postgres.auto_migrate",
+	"dagrunstore.postgres.pool.maxopenconns":      "dag_run_store.postgres.pool.max_open_conns",
+	"dagrunstore.postgres.pool.maxidleconns":      "dag_run_store.postgres.pool.max_idle_conns",
+	"dagrunstore.postgres.pool.connmaxlifetime":   "dag_run_store.postgres.pool.conn_max_lifetime",
+	"dagrunstore.postgres.pool.connmaxidletime":   "dag_run_store.postgres.pool.conn_max_idle_time",
+	"dag_run_store.postgres.pool.maxopenconns":    "dag_run_store.postgres.pool.max_open_conns",
+	"dag_run_store.postgres.pool.maxidleconns":    "dag_run_store.postgres.pool.max_idle_conns",
+	"dag_run_store.postgres.pool.connmaxlifetime": "dag_run_store.postgres.pool.conn_max_lifetime",
+	"dag_run_store.postgres.pool.connmaxidletime": "dag_run_store.postgres.pool.conn_max_idle_time",
+
 	// Scheduler
 	"scheduler.lockstalethreshold":      "scheduler.lock_stale_threshold",
 	"scheduler.lockretryinterval":       "scheduler.lock_retry_interval",

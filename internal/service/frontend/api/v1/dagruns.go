@@ -37,7 +37,6 @@ import (
 	"github.com/dagucloud/dagu/internal/core/exec"
 	"github.com/dagucloud/dagu/internal/core/spec"
 	spectypes "github.com/dagucloud/dagu/internal/core/spec/types"
-	"github.com/dagucloud/dagu/internal/persis/filedagrun"
 	"github.com/dagucloud/dagu/internal/runtime"
 	"github.com/dagucloud/dagu/internal/runtime/executor"
 	"github.com/dagucloud/dagu/internal/service/audit"
@@ -749,7 +748,7 @@ func (a *API) readDAGRunsPage(
 }
 
 func dagRunListBadRequest(err error) *Error {
-	if !errors.Is(err, filedagrun.ErrInvalidQueryCursor) {
+	if !errors.Is(err, exec.ErrInvalidQueryCursor) {
 		return nil
 	}
 	return &Error{
@@ -4064,7 +4063,7 @@ func (a *API) GetDAGRunsListData(ctx context.Context, queryString string) (any, 
 
 		page, err := a.dagRunStore.ListStatusesPage(readCtx, opts.query...)
 		if err != nil {
-			if errors.Is(err, filedagrun.ErrInvalidQueryCursor) {
+			if errors.Is(err, exec.ErrInvalidQueryCursor) {
 				return nil, err
 			}
 			return nil, fmt.Errorf("error listing dag-runs: %w", err)

@@ -15,6 +15,7 @@ type Config struct {
 	Core            Core
 	Server          Server
 	EventStore      EventStoreConfig
+	DAGRunStore     DAGRunStoreConfig
 	Paths           PathsConfig
 	Secrets         SecretsConfig
 	UI              UI
@@ -220,6 +221,27 @@ type AuditConfig struct {
 type EventStoreConfig struct {
 	Enabled       bool // Default: true
 	RetentionDays int  // Default: 1; 0 = keep forever
+}
+
+// DAGRunStoreBackend identifies a DAG-run status persistence backend.
+type DAGRunStoreBackend string
+
+const (
+	DAGRunStoreBackendFile     DAGRunStoreBackend = "file"
+	DAGRunStoreBackendPostgres DAGRunStoreBackend = "postgres"
+)
+
+// DAGRunStoreConfig holds DAG-run status persistence configuration.
+type DAGRunStoreConfig struct {
+	Backend  DAGRunStoreBackend
+	Postgres DAGRunStorePostgresConfig
+}
+
+// DAGRunStorePostgresConfig holds PostgreSQL DAG-run store configuration.
+type DAGRunStorePostgresConfig struct {
+	DSN         string
+	AutoMigrate bool
+	Pool        PostgresPoolConfig
 }
 
 // SessionConfig contains configuration for agent session cleanup.
@@ -548,6 +570,9 @@ func (c *Config) Validate() error {
 	if err := c.validateEventStore(); err != nil {
 		return err
 	}
+	if err := c.validateDAGRunStore(); err != nil {
+		return err
+	}
 	if err := c.validateBots(); err != nil {
 		return err
 	}
@@ -600,6 +625,20 @@ func (c *Config) validateEventStore() error {
 		return fmt.Errorf("event_store.retention_days must be >= 0")
 	}
 	return nil
+}
+
+func (c *Config) validateDAGRunStore() error {
+	switch c.DAGRunStore.Backend {
+	case "", DAGRunStoreBackendFile:
+		return nil
+	case DAGRunStoreBackendPostgres:
+		if c.DAGRunStore.Postgres.DSN == "" {
+			return fmt.Errorf("dag_run_store.postgres.dsn is required when dag_run_store.backend is postgres")
+		}
+		return nil
+	default:
+		return fmt.Errorf("invalid dag_run_store.backend: %q", c.DAGRunStore.Backend)
+	}
 }
 
 func (c *Config) validateBots() error {

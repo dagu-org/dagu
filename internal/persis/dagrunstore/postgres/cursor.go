@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package filedagrun
+package postgres
 
 import (
 	"crypto/sha256"
@@ -15,10 +15,13 @@ import (
 	"github.com/dagucloud/dagu/internal/core/exec"
 )
 
-var ErrInvalidQueryCursor = exec.ErrInvalidQueryCursor
-
-// queryCursorVersion 2 reflects the filter hash JSON key migration from tags to labels.
 const queryCursorVersion = 2
+
+type listKey struct {
+	Timestamp time.Time
+	Name      string
+	DAGRunID  string
+}
 
 type queryCursorPayload struct {
 	Version    int    `json:"v"`
@@ -28,7 +31,7 @@ type queryCursorPayload struct {
 	DAGRunID   string `json:"r"`
 }
 
-func encodeQueryCursor(opts exec.ListDAGRunStatusesOptions, key dagRunListKey) (string, error) {
+func encodeQueryCursor(opts exec.ListDAGRunStatusesOptions, key listKey) (string, error) {
 	payload := queryCursorPayload{
 		Version:    queryCursorVersion,
 		FilterHash: queryFilterHash(opts),
@@ -38,41 +41,41 @@ func encodeQueryCursor(opts exec.ListDAGRunStatusesOptions, key dagRunListKey) (
 	}
 	data, err := json.Marshal(payload)
 	if err != nil {
-		return "", fmt.Errorf("filedagrun: marshal query cursor: %w", err)
+		return "", fmt.Errorf("marshal query cursor: %w", err)
 	}
 	return base64.RawURLEncoding.EncodeToString(data), nil
 }
 
-func decodeQueryCursor(cursor string, opts exec.ListDAGRunStatusesOptions) (dagRunListKey, error) {
+func decodeQueryCursor(cursor string, opts exec.ListDAGRunStatusesOptions) (listKey, error) {
 	if cursor == "" {
-		return dagRunListKey{}, nil
+		return listKey{}, nil
 	}
 
 	data, err := base64.RawURLEncoding.DecodeString(cursor)
 	if err != nil {
-		return dagRunListKey{}, invalidQueryCursor("decode cursor")
+		return listKey{}, invalidQueryCursor("decode cursor")
 	}
 
 	var payload queryCursorPayload
 	if err := json.Unmarshal(data, &payload); err != nil {
-		return dagRunListKey{}, invalidQueryCursor("parse cursor")
+		return listKey{}, invalidQueryCursor("parse cursor")
 	}
 	if payload.Version != queryCursorVersion {
-		return dagRunListKey{}, invalidQueryCursor("unsupported cursor version")
+		return listKey{}, invalidQueryCursor("unsupported cursor version")
 	}
 	if payload.FilterHash == "" || payload.Timestamp == "" || payload.Name == "" || payload.DAGRunID == "" {
-		return dagRunListKey{}, invalidQueryCursor("cursor is incomplete")
+		return listKey{}, invalidQueryCursor("cursor is incomplete")
 	}
 	if payload.FilterHash != queryFilterHash(opts) {
-		return dagRunListKey{}, invalidQueryCursor("cursor does not match the current filters")
+		return listKey{}, invalidQueryCursor("cursor does not match the current filters")
 	}
 
 	ts, err := time.Parse(time.RFC3339Nano, payload.Timestamp)
 	if err != nil {
-		return dagRunListKey{}, invalidQueryCursor("invalid cursor timestamp")
+		return listKey{}, invalidQueryCursor("invalid cursor timestamp")
 	}
 
-	return dagRunListKey{
+	return listKey{
 		Timestamp: ts.UTC(),
 		Name:      payload.Name,
 		DAGRunID:  payload.DAGRunID,
@@ -119,5 +122,5 @@ func queryFilterHash(opts exec.ListDAGRunStatusesOptions) string {
 }
 
 func invalidQueryCursor(reason string) error {
-	return fmt.Errorf("%w: %s", ErrInvalidQueryCursor, reason)
+	return fmt.Errorf("%w: %s", exec.ErrInvalidQueryCursor, reason)
 }
