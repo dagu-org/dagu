@@ -174,24 +174,23 @@ func collectReflectOutputValueReferenceStrings(field string, value any, add func
 		return
 	}
 	rv := reflect.ValueOf(value)
-	switch rv.Kind() {
-	case reflect.Slice, reflect.Array:
+	if rv.Kind() == reflect.Slice || rv.Kind() == reflect.Array {
 		for i := range rv.Len() {
 			collectOutputValueReferenceStrings(fmt.Sprintf("%s[%d]", field, i), rv.Index(i).Interface(), add)
 		}
-	case reflect.Map:
-		if rv.Type().Key().Kind() != reflect.String {
-			return
-		}
-		keys := make([]string, 0, rv.Len())
-		iter := rv.MapRange()
-		for iter.Next() {
-			keys = append(keys, iter.Key().String())
-		}
-		slices.Sort(keys)
-		for _, key := range keys {
-			collectOutputValueReferenceStrings(field+"."+key, rv.MapIndex(reflect.ValueOf(key)).Interface(), add)
-		}
+		return
+	}
+	if rv.Kind() != reflect.Map || rv.Type().Key().Kind() != reflect.String {
+		return
+	}
+	keys := make([]string, 0, rv.Len())
+	iter := rv.MapRange()
+	for iter.Next() {
+		keys = append(keys, iter.Key().String())
+	}
+	slices.Sort(keys)
+	for _, key := range keys {
+		collectOutputValueReferenceStrings(field+"."+key, rv.MapIndex(reflect.ValueOf(key)).Interface(), add)
 	}
 }
 
