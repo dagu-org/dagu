@@ -35,7 +35,15 @@ func BaseConfigPath(dagsDir, name string) string {
 	if strings.TrimSpace(dagsDir) == "" || strings.TrimSpace(name) == "" {
 		return ""
 	}
+	if err := ValidateName(name); err != nil {
+		return ""
+	}
 	return filepath.Join(BaseConfigDir(dagsDir), name, BaseConfigFileName)
+}
+
+// BaseConfigStem returns the sync item name for a base config file without extension.
+func BaseConfigStem() string {
+	return strings.TrimSuffix(BaseConfigFileName, filepath.Ext(BaseConfigFileName))
 }
 
 // Workspace is the domain model for a cockpit workspace.

@@ -11433,7 +11433,7 @@ export interface operations {
             };
             header?: never;
             path: {
-                workspaceName: string;
+                workspaceName: components["schemas"]["WorkspaceName"];
             };
             cookie?: never;
         };
@@ -11508,7 +11508,7 @@ export interface operations {
             };
             header?: never;
             path: {
-                workspaceName: string;
+                workspaceName: components["schemas"]["WorkspaceName"];
             };
             cookie?: never;
         };

@@ -521,7 +521,7 @@ func (s *serviceImpl) scanConfigFiles(state *State) {
 		if !entry.IsDir() || workspace.ValidateName(entry.Name()) != nil {
 			continue
 		}
-		itemID := path.Join(workspace.BaseConfigDirName, entry.Name(), strings.TrimSuffix(workspace.BaseConfigFileName, ".yaml"))
+		itemID := path.Join(workspace.BaseConfigDirName, entry.Name(), workspace.BaseConfigStem())
 		s.scanConfigFile(state, itemID, workspace.BaseConfigPath(s.dagsDir, entry.Name()), DAGKindConfig)
 	}
 }

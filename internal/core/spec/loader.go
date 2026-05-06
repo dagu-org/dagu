@@ -417,9 +417,25 @@ func loadDAGsFromData(ctx BuildContext, data []byte, filePath string, baseDef *d
 		return nil, err
 	}
 
+	fileBaseDef, fileBaseRaw := baseDef, baseRaw
+	if len(docs) > 0 {
+		fileBaseDef, fileBaseRaw, err = loadEffectiveBaseDefinition(ctx.opts, docs[0].data, baseDef, baseRaw)
+		if err != nil {
+			return nil, fmt.Errorf("failed to process document %d: %w", docs[0].index, err)
+		}
+	}
+
 	dags := make([]*core.DAG, 0, len(docs))
 	for _, doc := range docs {
-		dag, err := processDAGDocument(buildDocumentContext(ctx, doc.index), doc.data, baseDef, baseRaw, filePath, data)
+		docBaseDef, docBaseRaw := fileBaseDef, fileBaseRaw
+		if doc.index == 0 || workspaceNameFromDocument(doc.data) != "" {
+			docBaseDef, docBaseRaw, err = loadEffectiveBaseDefinition(ctx.opts, doc.data, baseDef, baseRaw)
+			if err != nil {
+				return nil, fmt.Errorf("failed to process document %d: %w", doc.index, err)
+			}
+		}
+
+		dag, err := processDAGDocument(buildDocumentContext(ctx, doc.index), doc.data, docBaseDef, docBaseRaw, filePath, data)
 		if err != nil {
 			return nil, fmt.Errorf("failed to process document %d: %w", doc.index, err)
 		}
@@ -512,23 +528,18 @@ func processDAGDocument(
 	filePath string,
 	fullData []byte,
 ) (*core.DAG, error) {
-	effectiveBaseDef, effectiveBaseRaw, err := loadEffectiveBaseDefinition(ctx.opts, doc, baseDef, baseRaw)
-	if err != nil {
-		return nil, err
-	}
-
 	spec, err := decode(doc)
 	if err != nil {
 		return nil, err
 	}
 
-	docCtx, dest, err := prepareDocumentContext(ctx, effectiveBaseDef, spec)
+	docCtx, dest, err := prepareDocumentContext(ctx, baseDef, spec)
 	if err != nil {
 		return nil, err
 	}
 
-	if shouldInheritType(doc, effectiveBaseDef, spec) {
-		spec.Type = effectiveBaseDef.Type
+	if shouldInheritType(doc, baseDef, spec) {
+		spec.Type = baseDef.Type
 	}
 
 	dag, err := spec.build(docCtx)
@@ -538,8 +549,8 @@ func processDAGDocument(
 	if err := merge(dest, dag); err != nil {
 		return nil, err
 	}
-	if len(effectiveBaseRaw) > 0 {
-		dest.BaseConfigData = effectiveBaseRaw
+	if len(baseRaw) > 0 {
+		dest.BaseConfigData = baseRaw
 	}
 	applyHistoryRetentionOverride(dest, spec.HistRetentionDays != nil, spec.HistRetentionRuns != nil)
 
@@ -656,7 +667,10 @@ func mergeBaseDefinitionData(baseRaw, overrideRaw []byte) (*dag, []byte, error) 
 		return nil, nil, fmt.Errorf("failed to unmarshal workspace base config: %w", err)
 	}
 
-	mergedMap := mergeDefinitionMaps(baseMap, overrideMap)
+	mergedMap, err := mergeDefinitionMaps(baseMap, overrideMap)
+	if err != nil {
+		return nil, nil, err
+	}
 	def, err := decode(mergedMap)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to decode merged base config: %w", err)
@@ -669,22 +683,56 @@ func mergeBaseDefinitionData(baseRaw, overrideRaw []byte) (*dag, []byte, error) 
 	return def, mergedRaw, nil
 }
 
-func mergeDefinitionMaps(base, override map[string]any) map[string]any {
+func mergeDefinitionMaps(base, override map[string]any) (map[string]any, error) {
 	merged := cloneMap(base)
 	if merged == nil {
 		merged = make(map[string]any, len(override))
 	}
 	for key, overrideValue := range override {
 		baseValue, ok := merged[key]
+		if key == "env" {
+			mergedEnv, err := mergeBaseEnvRaw(baseValue, overrideValue)
+			if err != nil {
+				return nil, err
+			}
+			merged[key] = mergedEnv
+			continue
+		}
+
 		baseMap, baseIsMap := baseValue.(map[string]any)
 		overrideMap, overrideIsMap := overrideValue.(map[string]any)
 		if ok && baseIsMap && overrideIsMap {
-			merged[key] = mergeDefinitionMaps(baseMap, overrideMap)
+			mergedNested, err := mergeDefinitionMaps(baseMap, overrideMap)
+			if err != nil {
+				return nil, err
+			}
+			merged[key] = mergedNested
 			continue
 		}
 		merged[key] = cloneAny(overrideValue)
 	}
-	return merged
+	return merged, nil
+}
+
+func mergeBaseEnvRaw(base, override any) (any, error) {
+	switch {
+	case base == nil:
+		return cloneAny(override), nil
+	case override == nil:
+		return cloneAny(base), nil
+	}
+
+	baseEnv, err := decodeViaYAML[types.EnvValue](base)
+	if err != nil {
+		return nil, fmt.Errorf("invalid base config env: %w", err)
+	}
+	overrideEnv, err := decodeViaYAML[types.EnvValue](override)
+	if err != nil {
+		return nil, fmt.Errorf("invalid workspace base config env: %w", err)
+	}
+
+	combined := overrideEnv.Prepend(baseEnv)
+	return envValueToRaw(combined), nil
 }
 
 // buildDocumentContext applies per-document overrides for multi-DAG files.

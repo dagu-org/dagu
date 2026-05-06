@@ -5150,7 +5150,7 @@ paths:
           in: path
           required: true
           schema:
-            type: string
+            $ref: "#/components/schemas/WorkspaceName"
         - $ref: "#/components/parameters/RemoteNode"
       responses:
         "200":
@@ -5213,7 +5213,7 @@ paths:
           in: path
           required: true
           schema:
-            type: string
+            $ref: "#/components/schemas/WorkspaceName"
         - $ref: "#/components/parameters/RemoteNode"
       requestBody:
         required: true

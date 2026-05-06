@@ -14,6 +14,7 @@ import (
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/spec"
 	_ "github.com/dagucloud/dagu/internal/runtime/builtin/harness"
+	"github.com/dagucloud/dagu/internal/workspace"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -771,6 +772,44 @@ steps:
 		assert.Contains(t, string(dag.BaseConfigData), "WORKSPACE_ONLY")
 	})
 
+	t.Run("WithWorkspaceBaseConfigDir_MergesListSyntaxEnv", func(t *testing.T) {
+		t.Parallel()
+
+		root := t.TempDir()
+		globalBase := filepath.Join(root, "base.yaml")
+		require.NoError(t, os.WriteFile(globalBase, []byte(`
+env:
+  - GLOBAL_ONLY=global
+  - SHARED=global
+`), 0600))
+
+		workspaceConfigDir := filepath.Join(root, "workspaces")
+		require.NoError(t, os.MkdirAll(filepath.Join(workspaceConfigDir, "ops"), 0750))
+		require.NoError(t, os.WriteFile(filepath.Join(workspaceConfigDir, "ops", "base.yaml"), []byte(`
+env:
+  - WORKSPACE_ONLY=ops
+  - SHARED=workspace
+`), 0600))
+
+		childDAG := createTempYAMLFile(t, `
+labels:
+  - workspace=ops
+steps:
+  - name: "step1"
+    command: echo "step1"
+`)
+
+		dag, err := spec.Load(context.Background(), childDAG,
+			spec.WithBaseConfig(globalBase),
+			spec.WithWorkspaceBaseConfigDir(workspaceConfigDir),
+		)
+		require.NoError(t, err)
+
+		assert.Contains(t, dag.Env, "GLOBAL_ONLY=global")
+		assert.Contains(t, dag.Env, "WORKSPACE_ONLY=ops")
+		assert.Contains(t, dag.Env, "SHARED=workspace")
+	})
+
 	t.Run("WithWorkspaceBaseConfigDir_IgnoresDefaultWorkspace", func(t *testing.T) {
 		t.Parallel()
 
@@ -1413,6 +1452,57 @@ steps:
 	assert.Equal(t, dagFile, childDAG.SourceFile)
 	assert.Contains(t, string(childDAG.YamlData), "name: child-task")
 	assert.NotContains(t, string(childDAG.YamlData), "call: child-task")
+}
+
+func TestLoad_MultiDocumentFilePropagatesWorkspaceBaseConfig(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	globalBase := filepath.Join(root, "base.yaml")
+	require.NoError(t, os.WriteFile(globalBase, []byte(`
+env:
+  GLOBAL_ONLY: "global"
+  SHARED: "global"
+`), 0600))
+
+	workspaceConfigDir := workspace.BaseConfigDir(root)
+	require.NoError(t, os.MkdirAll(filepath.Join(workspaceConfigDir, "ops"), 0750))
+	require.NoError(t, os.WriteFile(workspace.BaseConfigPath(root, "ops"), []byte(`
+env:
+  WORKSPACE_ONLY: "ops"
+  SHARED: "workspace"
+`), 0600))
+
+	dagFile := filepath.Join(root, "parent.yaml")
+	require.NoError(t, os.WriteFile(dagFile, []byte(`
+labels:
+  - workspace=ops
+steps:
+  - name: call-child
+    call: child-task
+
+---
+name: child-task
+steps:
+  - name: work
+    command: echo "child"
+`), 0600))
+
+	dag, err := spec.Load(context.Background(), dagFile,
+		spec.WithBaseConfig(globalBase),
+		spec.WithWorkspaceBaseConfigDir(workspaceConfigDir),
+	)
+	require.NoError(t, err)
+
+	childDAG, ok := dag.LocalDAGs["child-task"]
+	require.True(t, ok)
+
+	assert.Contains(t, dag.Env, "WORKSPACE_ONLY=ops")
+	assert.Contains(t, dag.Env, "SHARED=workspace")
+	assert.Contains(t, childDAG.Env, "GLOBAL_ONLY=global")
+	assert.Contains(t, childDAG.Env, "WORKSPACE_ONLY=ops")
+	assert.Contains(t, childDAG.Env, "SHARED=workspace")
+	assert.Contains(t, string(childDAG.BaseConfigData), "WORKSPACE_ONLY")
 }
 
 func TestLoadYAMLWithOpts_TypeInheritanceInMultiDocumentYAML(t *testing.T) {

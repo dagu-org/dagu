@@ -81,6 +81,8 @@ func TestKindForDAGID_ConfigFiles(t *testing.T) {
 
 	assert.Equal(t, DAGKindConfig, KindForDAGID("base"))
 	assert.Equal(t, DAGKindConfig, KindForDAGID("workspaces/ops/base"))
+	// TestKindForDAGID_ConfigFiles expects KindForDAGID to reject reserved
+	// workspace names through workspace.ValidateName and fall back to DAG files.
 	assert.Equal(t, DAGKindDAG, KindForDAGID("workspaces/default/base"))
 	assert.Equal(t, DAGKindDAG, KindForDAGID("workspaces/ops/other"))
 }

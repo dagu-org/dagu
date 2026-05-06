@@ -89,6 +89,11 @@ function BaseConfigPage(): React.ReactNode {
     setWorkspaceDirty(false);
   }, [selectedWorkspace, remoteNode]);
 
+  useEffect(() => {
+    setGlobalValue(null);
+    setGlobalDirty(false);
+  }, [remoteNode]);
+
   const globalEditable = !!config.permissions.writeDags;
   const workspaceEditable =
     !!config.permissions.writeDags && hasWorkspaceConfig && canWriteWorkspace;

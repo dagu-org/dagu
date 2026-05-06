@@ -103,7 +103,7 @@ func workspaceBaseConfigNameFromID(id string) (string, bool) {
 	if len(parts) != 3 {
 		return "", false
 	}
-	if parts[0] != workspace.BaseConfigDirName || parts[2] != strings.TrimSuffix(workspace.BaseConfigFileName, ".yaml") {
+	if parts[0] != workspace.BaseConfigDirName || parts[2] != workspace.BaseConfigStem() {
 		return "", false
 	}
 	if err := workspace.ValidateName(parts[1]); err != nil {
