@@ -145,7 +145,7 @@ func validateCommandStep(step core.Step) error {
 	case step.SubDAG != nil:
 		// Sub DAG - valid
 	default:
-		return core.ErrStepCommandIsRequired
+		return core.NewValidationError("command", nil, core.ErrStepCommandIsRequired)
 	}
 
 	return nil

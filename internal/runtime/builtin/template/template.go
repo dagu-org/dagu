@@ -132,7 +132,7 @@ func decodeConfig(dat map[string]any, cfg *templateConfig) error {
 
 func validateTemplate(step core.Step) error {
 	if step.Script == "" {
-		return fmt.Errorf("template executor requires a script field")
+		return core.NewValidationError("script", nil, fmt.Errorf("script field is required"))
 	}
 	return nil
 }

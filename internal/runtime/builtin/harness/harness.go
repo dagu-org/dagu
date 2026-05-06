@@ -584,18 +584,21 @@ func validateHarnessStep(step core.Step) error {
 	}
 	cfg := step.ExecutorConfig.Config
 	if cfg == nil {
-		return fmt.Errorf("harness: config is required")
+		return core.NewValidationError("with", nil, fmt.Errorf("config is required"))
 	}
 
-	return validateProviderConfigs(cfg)
+	if err := validateProviderConfigs(cfg); err != nil {
+		return core.NewValidationError("with", nil, err)
+	}
+	return nil
 }
 
 func validatePromptCommand(step core.Step) error {
 	if len(step.Commands) > 1 {
-		return fmt.Errorf("harness: executor does not support multiple commands")
+		return core.NewValidationError("command", nil, fmt.Errorf("step type %q supports only one command", "harness"))
 	}
 	if len(step.Commands) == 0 || extractPrompt(step) == "" {
-		return fmt.Errorf("harness: command field (prompt) is required")
+		return core.NewValidationError("command", nil, fmt.Errorf("command field (prompt) is required"))
 	}
 	return nil
 }

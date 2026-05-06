@@ -55,7 +55,7 @@ type sshExecutor struct {
 func NewSSHExecutor(ctx context.Context, step core.Step) (executor.Executor, error) {
 	client, err := resolveSSHClient(ctx, step)
 	if err != nil {
-		return nil, fmt.Errorf("failed to setup ssh executor: %w", err)
+		return nil, fmt.Errorf("failed to set up ssh step: %w", err)
 	}
 	if client == nil {
 		return nil, fmt.Errorf("ssh configuration is not found")

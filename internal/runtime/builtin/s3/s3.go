@@ -45,7 +45,7 @@ func validateStep(step core.Step) error {
 		command = step.Commands[0].Command
 	}
 	if strings.TrimSpace(command) == "" {
-		return fmt.Errorf("%w: command is required (upload, download, list, delete)", ErrConfig)
+		return core.NewValidationError("command", nil, fmt.Errorf("%w: command is required (upload, download, list, delete)", ErrConfig))
 	}
 	return nil
 }

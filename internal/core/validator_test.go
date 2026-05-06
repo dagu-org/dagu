@@ -753,8 +753,33 @@ func TestValidateStepWithValidator(t *testing.T) {
 
 		var ve *ValidationError
 		require.ErrorAs(t, err, &ve)
-		assert.Equal(t, "executor_config", ve.Field)
+		assert.Equal(t, "type", ve.Field)
+		assert.Equal(t, "field 'type': custom validation error", err.Error())
+		assert.NotContains(t, err.Error(), "executor")
+		assert.NotContains(t, err.Error(), "value:")
 		assert.ErrorIs(t, err, customErr)
+	})
+
+	t.Run("validator validation error keeps field context", func(t *testing.T) {
+		defer UnregisterStepValidator("pre-wrapped-error-type")
+
+		RegisterStepValidator("pre-wrapped-error-type", func(_ Step) error {
+			return NewValidationError("command", nil, ErrStepCommandIsRequired)
+		})
+
+		step := Step{
+			Name:           "step1",
+			ExecutorConfig: ExecutorConfig{Type: "pre-wrapped-error-type"},
+		}
+		err := validateStepWithValidator(step)
+		require.Error(t, err)
+
+		var ve *ValidationError
+		require.ErrorAs(t, err, &ve)
+		assert.Equal(t, "command", ve.Field)
+		assert.Equal(t, "field 'command': step command is required", err.Error())
+		assert.NotContains(t, err.Error(), "executor_config")
+		assert.ErrorIs(t, err, ErrStepCommandIsRequired)
 	})
 }
 

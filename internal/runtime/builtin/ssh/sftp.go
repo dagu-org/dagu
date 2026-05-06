@@ -37,10 +37,10 @@ type sftpExecutor struct {
 func NewSFTPExecutor(ctx context.Context, step core.Step) (executor.Executor, error) {
 	client, err := resolveSSHClient(ctx, step)
 	if err != nil {
-		return nil, fmt.Errorf("failed to setup sftp executor: %w", err)
+		return nil, fmt.Errorf("failed to set up sftp step: %w", err)
 	}
 	if client == nil {
-		return nil, fmt.Errorf("ssh configuration is not found for sftp executor")
+		return nil, fmt.Errorf("ssh configuration is not found for sftp step")
 	}
 
 	config := step.ExecutorConfig.Config
@@ -51,12 +51,12 @@ func NewSFTPExecutor(ctx context.Context, step core.Step) (executor.Executor, er
 
 	source := getStringConfig(config, "source", "")
 	if source == "" {
-		return nil, fmt.Errorf("source path is required for sftp executor")
+		return nil, fmt.Errorf("source path is required for sftp step")
 	}
 
 	destination := getStringConfig(config, "destination", "")
 	if destination == "" {
-		return nil, fmt.Errorf("destination path is required for sftp executor")
+		return nil, fmt.Errorf("destination path is required for sftp step")
 	}
 
 	return &sftpExecutor{

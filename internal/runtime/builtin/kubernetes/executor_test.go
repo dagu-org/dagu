@@ -221,7 +221,8 @@ func TestKubernetesExecutorValidateStepRequiresConfig(t *testing.T) {
 	})
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "requires config")
+	assert.Contains(t, err.Error(), "field 'with.image': image is required")
+	assert.NotContains(t, err.Error(), "executor")
 }
 
 func TestKubernetesExecutorWaitForCompletionReturnsJobFailure(t *testing.T) {

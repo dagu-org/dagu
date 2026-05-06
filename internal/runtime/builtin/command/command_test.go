@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core/spec"
 	"github.com/dagucloud/dagu/internal/runtime"
 	"github.com/dagucloud/dagu/internal/runtime/executor"
 	"github.com/stretchr/testify/assert"
@@ -1344,6 +1345,37 @@ func TestValidateCommandStep(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestValidateCommandStepMissingCommandErrorMessage(t *testing.T) {
+	dag := &core.DAG{
+		Steps: []core.Step{
+			{
+				Name:           "missing",
+				ExecutorConfig: core.ExecutorConfig{Type: "command"},
+			},
+		},
+	}
+
+	err := core.ValidateSteps(dag)
+	require.Error(t, err)
+	assert.Equal(t, "field 'command': step command is required", err.Error())
+	assert.NotContains(t, err.Error(), "executor_config")
+	assert.NotContains(t, err.Error(), "value:")
+	assert.ErrorIs(t, err, core.ErrStepCommandIsRequired)
+}
+
+func TestLoadYAMLMissingCommandErrorMessage(t *testing.T) {
+	_, err := spec.LoadYAML(context.Background(), []byte(`
+steps:
+  - name: missing
+    type: command
+`))
+	require.Error(t, err)
+	assert.Equal(t, "failed to process document 0: failed to build DAG: field 'command': step command is required", err.Error())
+	assert.NotContains(t, err.Error(), "executor_config")
+	assert.NotContains(t, err.Error(), "value:")
+	assert.ErrorIs(t, err, core.ErrStepCommandIsRequired)
 }
 
 // TestExitCodeFromError tests exit code extraction from errors
