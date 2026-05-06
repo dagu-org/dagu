@@ -221,6 +221,17 @@ function Content({ navbarColor, children }: LayoutProps) {
     };
   }, [isResizingAgentSidebar]);
 
+  React.useEffect(() => {
+    const handleResize = () => {
+      setAgentSidebarWidth((width) => clampAgentSidebarWidth(width));
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
   const isDesignWorkspace =
     location.pathname === '/design' || location.pathname.startsWith('/design/');
 

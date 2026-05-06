@@ -48,6 +48,7 @@ const STATIC_ROUTE_LABELS: Record<string, string> = {
   '/agent-tools': 'Tools',
   '/agent-memory': 'Memory',
   '/agent-souls': 'Souls',
+  '/agent-souls/new': 'New Soul',
 };
 
 function decodePathSegment(segment: string): string {
@@ -121,11 +122,30 @@ export function getBreadcrumbItems(pathname: string): BreadcrumbItemData[] {
   if (segments[0]?.startsWith('agent')) {
     items.push(
       { label: 'Administration', to: '/administration' },
-      { label: 'Agent', to: '/agent' }
+      { label: 'Agent', to: normalized === '/agent' ? undefined : '/agent' }
     );
-    if (normalized !== '/agent') {
-      items.push({ label: STATIC_ROUTE_LABELS[normalized] ?? 'Agent' });
+
+    if (normalized === '/agent') {
+      return items;
     }
+
+    const sectionPath = `/${segments[0]}`;
+    items.push({
+      label:
+        STATIC_ROUTE_LABELS[sectionPath] ??
+        humanizePathSegment(segments[0] ?? ''),
+      to: normalized === sectionPath ? undefined : sectionPath,
+    });
+
+    for (let index = 1; index < segments.length; index += 1) {
+      const path = `${sectionPath}/${segments.slice(1, index + 1).join('/')}`;
+      items.push({
+        label:
+          STATIC_ROUTE_LABELS[path] ?? decodePathSegment(segments[index] ?? ''),
+        to: index === segments.length - 1 ? undefined : path,
+      });
+    }
+
     return items;
   }
 

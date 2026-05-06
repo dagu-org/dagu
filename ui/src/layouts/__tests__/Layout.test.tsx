@@ -62,6 +62,11 @@ function renderLayout(path: string): void {
 describe('Layout', () => {
   beforeEach(() => {
     localStorage.clear();
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      value: 1024,
+      writable: true,
+    });
   });
 
   it('keeps the app sidebar visible on the agent home page', () => {
@@ -87,6 +92,20 @@ describe('Layout', () => {
     expect(
       screen.getByText('019df6cf-0127-7340-bd96-d51bc1453045')
     ).toBeVisible();
+  });
+
+  it('preserves nested agent page labels in breadcrumbs', () => {
+    renderLayout('/agent-souls/new');
+
+    expect(screen.getByRole('link', { name: 'Agent' })).toHaveAttribute(
+      'href',
+      '/agent'
+    );
+    expect(screen.getByRole('link', { name: 'Souls' })).toHaveAttribute(
+      'href',
+      '/agent-souls'
+    );
+    expect(screen.getByText('New Soul')).toBeVisible();
   });
 
   it('keeps workflow design fullscreen without the app sidebar', () => {
@@ -128,5 +147,30 @@ describe('Layout', () => {
     fireEvent.pointerUp(document);
 
     expect(sidebar).toHaveStyle({ width: '520px' });
+  });
+
+  it('reclamps the saved agent sidebar width when the viewport narrows', () => {
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      value: 1200,
+      writable: true,
+    });
+    localStorage.setItem('agentSidebarWidth', '720');
+    renderLayout('/cockpit');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Agent' }));
+    const sidebar = screen.getByTestId('app-sidebar');
+
+    expect(sidebar).toHaveStyle({ width: '720px' });
+
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      value: 700,
+      writable: true,
+    });
+    fireEvent.resize(window);
+
+    expect(sidebar).toHaveStyle({ width: '340px' });
+    expect(localStorage.getItem('agentSidebarWidth')).toBe('340');
   });
 });
