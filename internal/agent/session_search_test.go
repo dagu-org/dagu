@@ -6,6 +6,7 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -120,4 +121,93 @@ func TestSessionSearchTool_Run(t *testing.T) {
 		assert.True(t, result.IsError)
 		assert.Contains(t, result.Content, "Session store is not available")
 	})
+
+	t.Run("returns empty result message", func(t *testing.T) {
+		t.Parallel()
+		store := newMockSessionStore()
+		now := time.Date(2026, 5, 6, 12, 0, 0, 0, time.UTC)
+		seedSearchSession(t, store, &Session{
+			ID:        "past-session",
+			UserID:    "admin",
+			Title:     "Unrelated task",
+			CreatedAt: now.Add(-time.Hour),
+			UpdatedAt: now.Add(-time.Hour),
+		}, Message{
+			Type:       MessageTypeUser,
+			SequenceID: 1,
+			Content:    "This transcript does not contain the target phrase.",
+			CreatedAt:  now.Add(-time.Hour),
+		})
+
+		result := NewSessionSearchTool().Run(ToolContext{
+			Context:      context.Background(),
+			User:         UserIdentity{UserID: "admin"},
+			SessionStore: store,
+		}, sessionSearchInput(t, "missing needle", 0))
+
+		assert.False(t, result.IsError)
+		assert.Contains(t, result.Content, `No matching past sessions found for "missing needle".`)
+	})
+
+	t.Run("returns metadata-only matches", func(t *testing.T) {
+		t.Parallel()
+		store := newMockSessionStore()
+		now := time.Date(2026, 5, 6, 12, 0, 0, 0, time.UTC)
+		seedSearchSession(t, store, &Session{
+			ID:        "metadata-session",
+			UserID:    "admin",
+			Title:     "Release notes",
+			DAGName:   "publish-docs",
+			CreatedAt: now.Add(-2 * time.Hour),
+			UpdatedAt: now.Add(-time.Hour),
+		}, Message{
+			Type:       MessageTypeAssistant,
+			SequenceID: 1,
+			Content:    "This transcript should not be shown because only metadata matched.",
+			CreatedAt:  now.Add(-time.Hour),
+		})
+
+		result := NewSessionSearchTool().Run(ToolContext{
+			Context:      context.Background(),
+			User:         UserIdentity{UserID: "admin"},
+			SessionStore: store,
+		}, sessionSearchInput(t, "release", 5))
+
+		assert.False(t, result.IsError)
+		assert.Contains(t, result.Content, "metadata-session")
+		assert.Contains(t, result.Content, "Release notes")
+		assert.Contains(t, result.Content, "matched session metadata")
+		assert.NotContains(t, result.Content, "This transcript should not be shown")
+	})
+}
+
+func TestSessionSearchLimitHelpers(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, defaultSessionSearchLimit, normalizeSessionSearchLimit(0))
+	assert.Equal(t, defaultSessionSearchLimit, normalizeSessionSearchLimit(-1))
+	assert.Equal(t, 3, normalizeSessionSearchLimit(3))
+	assert.Equal(t, maxSessionSearchLimit, normalizeSessionSearchLimit(maxSessionSearchLimit+1))
+}
+
+func TestPrepareSessionSearchCandidates(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, 5, 6, 12, 0, 0, 0, time.UTC)
+	total := maxSessionSearchLimit*sessionSearchScanMultiplier + 5
+	sessions := make([]*Session, 0, total)
+	for i := 0; i < total; i++ {
+		sessions = append(sessions, &Session{
+			ID:        fmt.Sprintf("session-%03d", i),
+			UserID:    "admin",
+			UpdatedAt: now.Add(time.Duration(i) * time.Minute),
+		})
+	}
+
+	candidates := prepareSessionSearchCandidates(sessions, maxSessionSearchLimit)
+
+	assert.Len(t, candidates, maxSessionSearchLimit*sessionSearchScanMultiplier)
+	assert.Equal(t, "session-404", candidates[0].ID)
+	assert.Equal(t, "session-005", candidates[len(candidates)-1].ID)
+	assert.Equal(t, "session-000", sessions[0].ID)
 }

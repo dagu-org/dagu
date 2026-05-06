@@ -7,8 +7,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/dagucloud/dagu/internal/llm"
 )
@@ -17,6 +19,7 @@ const (
 	sessionSearchToolName           = "session_search"
 	defaultSessionSearchLimit       = 5
 	maxSessionSearchLimit           = 20
+	sessionSearchScanMultiplier     = 20
 	maxSessionSearchSnippets        = 3
 	sessionSearchSnippetRunesBefore = 80
 	sessionSearchSnippetRunesAfter  = 140
@@ -112,9 +115,10 @@ func sessionSearchRun(ctx ToolContext, input json.RawMessage) ToolOut {
 	}
 
 	limit := normalizeSessionSearchLimit(args.Limit)
+	candidates := prepareSessionSearchCandidates(sessions, limit)
 	results := make([]sessionSearchResult, 0, limit)
 	queryLower := strings.ToLower(query)
-	for _, sess := range sessions {
+	for _, sess := range candidates {
 		if sess == nil || sess.ID == "" || sess.ID == ctx.SessionID {
 			continue
 		}
@@ -145,6 +149,27 @@ func normalizeSessionSearchLimit(limit int) int {
 		return defaultSessionSearchLimit
 	}
 	return min(limit, maxSessionSearchLimit)
+}
+
+func prepareSessionSearchCandidates(sessions []*Session, limit int) []*Session {
+	candidates := append([]*Session(nil), sessions...)
+	sort.SliceStable(candidates, func(i, j int) bool {
+		left := candidates[i]
+		right := candidates[j]
+		if left == nil {
+			return false
+		}
+		if right == nil {
+			return true
+		}
+		return left.UpdatedAt.After(right.UpdatedAt)
+	})
+
+	maxCandidates := limit * sessionSearchScanMultiplier
+	if maxCandidates > 0 && len(candidates) > maxCandidates {
+		return candidates[:maxCandidates]
+	}
+	return candidates
 }
 
 func searchSessionMessages(ctx context.Context, store SessionStore, sess *Session, query, queryLower string) (sessionSearchResult, error) {
@@ -208,17 +233,15 @@ func sessionSearchMessageText(msg Message) string {
 }
 
 func sessionSearchIndex(text, queryLower string) int {
-	queryRuneLen := len([]rune(queryLower))
-	if queryRuneLen == 0 {
+	if queryLower == "" {
 		return -1
 	}
-	runes := []rune(text)
-	for i := 0; i+queryRuneLen <= len(runes); i++ {
-		if strings.ToLower(string(runes[i:i+queryRuneLen])) == queryLower {
-			return i
-		}
+	lowerText := strings.ToLower(text)
+	matchByteIndex := strings.Index(lowerText, queryLower)
+	if matchByteIndex < 0 {
+		return -1
 	}
-	return -1
+	return utf8.RuneCountInString(lowerText[:matchByteIndex])
 }
 
 func sessionSearchSnippetText(text, query string, matchRuneIndex int) string {
