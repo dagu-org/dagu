@@ -70,6 +70,7 @@ var builtinStepTypeNames = map[string]struct{}{
 	"jq":            {},
 	"k8s":           {},
 	"kubernetes":    {},
+	"log":           {},
 	"mail":          {},
 	"noop":          {},
 	"parallel":      {},

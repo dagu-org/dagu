@@ -5,11 +5,13 @@ package runtime
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/dagucloud/dagu/internal/cmn/eval"
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/exec"
+	_ "github.com/dagucloud/dagu/internal/runtime/builtin/log"
 	"github.com/stretchr/testify/require"
 )
 
@@ -118,6 +120,35 @@ func TestEvalExecutorConfig_DefaultPreservesLiteralCodeFencesInData(t *testing.T
 	})
 	require.NoError(t, err)
 	require.Equal(t, "```yaml\nenv:\n  TEST_FILE: ~/dagu-test.txt\n\nsteps:\n  - command: touch $TEST_FILE\n```", result["note"])
+}
+
+func TestSetupExecutor_LogMessageExpandsVariables(t *testing.T) {
+	t.Parallel()
+
+	step := core.Step{
+		Name: "announce",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "log",
+			Config: map[string]any{
+				"message": "Deploying ${ENVIRONMENT}",
+			},
+		},
+	}
+	ctx := NewContextForTest(context.Background(), &core.DAG{Name: "test-dag"}, "run-1", "test.log")
+	env := NewEnv(ctx, step)
+	env.Scope = env.Scope.WithEntries(map[string]string{
+		"ENVIRONMENT": "production",
+	}, eval.EnvSourceStepEnv)
+	ctx = WithEnv(ctx, env)
+
+	node := NewNode(step, NodeState{})
+	cmd, err := node.setupExecutor(ctx)
+	require.NoError(t, err)
+
+	var stdout strings.Builder
+	cmd.SetStdout(&stdout)
+	require.NoError(t, cmd.Run(ctx))
+	require.Equal(t, "Deploying production\n", stdout.String())
 }
 
 // TestSetupExecutor_HarnessCommandPreservesLiteralCodeFences verifies that

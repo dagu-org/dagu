@@ -1975,6 +1975,19 @@
           }
         },
         {
+          "if": { "properties": { "type": { "const": "log" } } },
+          "then": {
+            "properties": {
+              "with": { "$ref": "#/definitions/logExecutorConfig" },
+              "config": {
+                "$ref": "#/definitions/logExecutorConfig",
+                "deprecated": true,
+                "doNotSuggest": true
+              }
+            }
+          }
+        },
+        {
           "if": { "properties": { "type": { "const": "postgres" } } },
           "then": {
             "properties": {
@@ -2633,6 +2646,18 @@
         }
       },
       "description": "Configuration options for HTTP executor requests."
+    },
+    "logExecutorConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["message"],
+      "properties": {
+        "message": {
+          "type": "string",
+          "description": "Message to write to stdout. Supports Dagu variable substitution such as ${VAR}."
+        }
+      },
+      "description": "Configuration for log steps. Writes message to stdout without running a shell command."
     },
     "sshExecutorConfig": {
       "type": "object",
@@ -5186,6 +5211,7 @@
         "parallel",
         "archive",
         "chat",
+        "log",
         "postgres",
         "sqlite",
         "redis",
@@ -5337,6 +5363,14 @@
           "then": {
             "properties": {
               "config": { "$ref": "#/definitions/archiveExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "log" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/logExecutorConfig" }
             }
           }
         },

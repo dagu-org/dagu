@@ -227,6 +227,23 @@ func TestBuildStepScript(t *testing.T) {
 	}
 }
 
+func TestLoadYAMLLogStep(t *testing.T) {
+	t.Parallel()
+
+	dag, err := LoadYAML(context.Background(), []byte(`
+steps:
+  - name: announce
+    type: log
+    with:
+      message: "Deploying ${ENVIRONMENT}"
+`))
+	require.NoError(t, err)
+	require.Len(t, dag.Steps, 1)
+	assert.Equal(t, "announce", dag.Steps[0].Name)
+	assert.Equal(t, "log", dag.Steps[0].ExecutorConfig.Type)
+	assert.Equal(t, "Deploying ${ENVIRONMENT}", dag.Steps[0].ExecutorConfig.Config["message"])
+}
+
 func TestBuildStepStdout(t *testing.T) {
 	t.Parallel()
 
