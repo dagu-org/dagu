@@ -246,9 +246,10 @@ type DAGRunStorePostgresConfig struct {
 
 // DAGRunStorePostgresRoleConfig holds PostgreSQL settings for one Dagu process role.
 type DAGRunStorePostgresRoleConfig struct {
-	DSN         string
-	AutoMigrate bool
-	Pool        PostgresPoolConfig
+	DSN          string
+	AutoMigrate  bool
+	DirectAccess bool
+	Pool         PostgresPoolConfig
 }
 
 // SessionConfig contains configuration for agent session cleanup.

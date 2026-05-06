@@ -460,8 +460,9 @@ func (l *ConfigLoader) loadDAGRunStoreConfig(cfg *Config, _ Definition) {
 func (l *ConfigLoader) loadDAGRunStorePostgresRoleConfig(role string) DAGRunStorePostgresRoleConfig {
 	prefix := "dag_run_store.postgres." + role
 	return DAGRunStorePostgresRoleConfig{
-		DSN:         l.v.GetString(prefix + ".dsn"),
-		AutoMigrate: l.v.GetBool(prefix + ".auto_migrate"),
+		DSN:          l.v.GetString(prefix + ".dsn"),
+		AutoMigrate:  l.v.GetBool(prefix + ".auto_migrate"),
+		DirectAccess: l.v.GetBool(prefix + ".direct_access"),
 		Pool: PostgresPoolConfig{
 			MaxOpenConns:    l.v.GetInt(prefix + ".pool.max_open_conns"),
 			MaxIdleConns:    l.v.GetInt(prefix + ".pool.max_idle_conns"),
@@ -1637,6 +1638,7 @@ func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	l.v.SetDefault("dag_run_store.postgres.scheduler.pool.conn_max_lifetime", 300)
 	l.v.SetDefault("dag_run_store.postgres.scheduler.pool.conn_max_idle_time", 60)
 	l.v.SetDefault("dag_run_store.postgres.agent.auto_migrate", false)
+	l.v.SetDefault("dag_run_store.postgres.agent.direct_access", false)
 	l.v.SetDefault("dag_run_store.postgres.agent.pool.max_open_conns", 2)
 	l.v.SetDefault("dag_run_store.postgres.agent.pool.max_idle_conns", 0)
 	l.v.SetDefault("dag_run_store.postgres.agent.pool.conn_max_lifetime", 300)
@@ -1703,6 +1705,7 @@ var envBindings = []envBinding{
 	{key: "dag_run_store.postgres.scheduler.pool.conn_max_idle_time", env: "DAG_RUN_STORE_POSTGRES_SCHEDULER_POOL_CONN_MAX_IDLE_TIME"},
 	{key: "dag_run_store.postgres.agent.dsn", env: "DAG_RUN_STORE_POSTGRES_AGENT_DSN"},
 	{key: "dag_run_store.postgres.agent.auto_migrate", env: "DAG_RUN_STORE_POSTGRES_AGENT_AUTO_MIGRATE"},
+	{key: "dag_run_store.postgres.agent.direct_access", env: "DAG_RUN_STORE_POSTGRES_AGENT_DIRECT_ACCESS"},
 	{key: "dag_run_store.postgres.agent.pool.max_open_conns", env: "DAG_RUN_STORE_POSTGRES_AGENT_POOL_MAX_OPEN_CONNS"},
 	{key: "dag_run_store.postgres.agent.pool.max_idle_conns", env: "DAG_RUN_STORE_POSTGRES_AGENT_POOL_MAX_IDLE_CONNS"},
 	{key: "dag_run_store.postgres.agent.pool.conn_max_lifetime", env: "DAG_RUN_STORE_POSTGRES_AGENT_POOL_CONN_MAX_LIFETIME"},

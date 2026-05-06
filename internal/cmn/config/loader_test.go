@@ -447,6 +447,7 @@ func TestLoad_DAGRunStore(t *testing.T) {
 		}, cfg.DAGRunStore.Postgres.Scheduler.Pool)
 		assert.Empty(t, cfg.DAGRunStore.Postgres.Agent.DSN)
 		assert.False(t, cfg.DAGRunStore.Postgres.Agent.AutoMigrate)
+		assert.False(t, cfg.DAGRunStore.Postgres.Agent.DirectAccess)
 		assert.Equal(t, PostgresPoolConfig{
 			MaxOpenConns:    2,
 			MaxIdleConns:    0,
@@ -479,6 +480,7 @@ dag_run_store:
     agent:
       dsn: postgres://dagu:agent@localhost:5432/dagu_agent?sslmode=disable
       auto_migrate: true
+      direct_access: true
       pool:
         max_open_conns: 3
         max_idle_conns: 1
@@ -505,6 +507,7 @@ dag_run_store:
 		}, cfg.DAGRunStore.Postgres.Scheduler.Pool)
 		assert.Equal(t, "postgres://dagu:agent@localhost:5432/dagu_agent?sslmode=disable", cfg.DAGRunStore.Postgres.Agent.DSN)
 		assert.True(t, cfg.DAGRunStore.Postgres.Agent.AutoMigrate)
+		assert.True(t, cfg.DAGRunStore.Postgres.Agent.DirectAccess)
 		assert.Equal(t, PostgresPoolConfig{
 			MaxOpenConns:    3,
 			MaxIdleConns:    1,
@@ -526,6 +529,7 @@ dag_run_store:
 			"DAGU_DAG_RUN_STORE_POSTGRES_SCHEDULER_POOL_MAX_OPEN_CONNS":  "13",
 			"DAGU_DAG_RUN_STORE_POSTGRES_AGENT_DSN":                      "postgres://dagu:agent@localhost:5432/dagu_env_agent?sslmode=disable",
 			"DAGU_DAG_RUN_STORE_POSTGRES_AGENT_AUTO_MIGRATE":             "true",
+			"DAGU_DAG_RUN_STORE_POSTGRES_AGENT_DIRECT_ACCESS":            "true",
 			"DAGU_DAG_RUN_STORE_POSTGRES_AGENT_POOL_CONN_MAX_IDLE_TIME":  "15",
 		})
 
@@ -547,6 +551,7 @@ dag_run_store:
 		}, cfg.DAGRunStore.Postgres.Scheduler.Pool)
 		assert.Equal(t, "postgres://dagu:agent@localhost:5432/dagu_env_agent?sslmode=disable", cfg.DAGRunStore.Postgres.Agent.DSN)
 		assert.True(t, cfg.DAGRunStore.Postgres.Agent.AutoMigrate)
+		assert.True(t, cfg.DAGRunStore.Postgres.Agent.DirectAccess)
 		assert.Equal(t, PostgresPoolConfig{
 			MaxOpenConns:    2,
 			MaxIdleConns:    0,

@@ -24,6 +24,9 @@ func TestNewPostgresRequiresRoleSpecificDSN(t *testing.T) {
 				Scheduler: config.DAGRunStorePostgresRoleConfig{
 					DSN: "postgres://scheduler@example.invalid/dagu",
 				},
+				Agent: config.DAGRunStorePostgresRoleConfig{
+					DirectAccess: true,
+				},
 			},
 		},
 	}
@@ -32,4 +35,22 @@ func TestNewPostgresRequiresRoleSpecificDSN(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "dag_run_store.postgres.agent.dsn is required")
+}
+
+func TestNewPostgresRejectsAgentDirectAccessByDefault(t *testing.T) {
+	cfg := &config.Config{
+		DAGRunStore: config.DAGRunStoreConfig{
+			Backend: config.DAGRunStoreBackendPostgres,
+			Postgres: config.DAGRunStorePostgresConfig{
+				Agent: config.DAGRunStorePostgresRoleConfig{
+					DSN: "postgres://agent@example.invalid/dagu",
+				},
+			},
+		},
+	}
+
+	_, err := New(context.Background(), cfg, WithRole(RoleAgent))
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "dag_run_store.postgres.agent.direct_access must be true")
 }

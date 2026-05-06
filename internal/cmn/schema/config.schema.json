@@ -981,7 +981,7 @@
           "description": "PostgreSQL settings used by the scheduler process."
         },
         "agent": {
-          "$ref": "#/definitions/DAGRunStorePostgresRoleDef",
+          "$ref": "#/definitions/DAGRunStorePostgresAgentDef",
           "description": "PostgreSQL settings used by DAG execution processes."
         }
       }
@@ -998,6 +998,28 @@
         "auto_migrate": {
           "type": "boolean",
           "description": "Run DAG-run store migrations when this process role opens the store."
+        },
+        "pool": {
+          "$ref": "#/definitions/PostgresPoolDef"
+        }
+      }
+    },
+    "DAGRunStorePostgresAgentDef": {
+      "type": "object",
+      "description": "PostgreSQL DAG-run status store configuration for DAG execution processes.",
+      "additionalProperties": false,
+      "properties": {
+        "dsn": {
+          "type": "string",
+          "description": "PostgreSQL connection string used by DAG execution processes when direct_access is enabled."
+        },
+        "auto_migrate": {
+          "type": "boolean",
+          "description": "Run DAG-run store migrations when an agent process opens the store. Default: false."
+        },
+        "direct_access": {
+          "type": "boolean",
+          "description": "Allow DAG execution processes to open the PostgreSQL DAG-run store directly. Default: false; production PostgreSQL deployments should use coordinator/shared-nothing worker execution instead."
         },
         "pool": {
           "$ref": "#/definitions/PostgresPoolDef"

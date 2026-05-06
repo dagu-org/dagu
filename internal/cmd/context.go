@@ -349,7 +349,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		drs exec.DAGRunStore
 		drm runtime.Manager
 	)
-	if contextNeedsDAGRunStore(cmd) {
+	if contextNeedsDAGRunStore(cmd) && !shouldDeferAgentDAGRunStore(cmd, cfg) {
 		var err error
 		drs, err = newContextDAGRunStore(baseCtx, ctx, cmd, cfg)
 		if err != nil {
@@ -621,6 +621,31 @@ func isSharedNothingWorker(cmd *cobra.Command, cfg *config.Config) bool {
 		return false
 	}
 	return len(cfg.Worker.Coordinators) > 0
+}
+
+func shouldDeferAgentDAGRunStore(cmd *cobra.Command, cfg *config.Config) bool {
+	if !postgresAgentDirectAccessDisabled(cfg) {
+		return false
+	}
+	switch cmd.Name() {
+	case "start", "exec":
+		return true
+	default:
+		return false
+	}
+}
+
+func postgresAgentDirectAccessDisabled(cfg *config.Config) bool {
+	return cfg != nil &&
+		cfg.DAGRunStore.Backend == config.DAGRunStoreBackendPostgres &&
+		!cfg.DAGRunStore.Postgres.Agent.DirectAccess
+}
+
+func errPostgresAgentDirectAccessDisabled(command string) error {
+	if command == "" {
+		command = "agent command"
+	}
+	return fmt.Errorf("postgres DAG-run store direct agent access is disabled for %s; use coordinator/shared-nothing worker execution or set dag_run_store.postgres.agent.direct_access=true for local development", command)
 }
 
 // NewServer creates and returns a new web UI NewServer.

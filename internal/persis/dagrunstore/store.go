@@ -88,6 +88,9 @@ func New(ctx context.Context, cfg *config.Config, opts ...Option) (exec.DAGRunSt
 		if err != nil {
 			return nil, err
 		}
+		if options.Role == RoleAgent && !pgCfg.DirectAccess {
+			return nil, fmt.Errorf("dag_run_store.postgres.agent.direct_access must be true to open PostgreSQL DAG-run store from an agent process; use a shared-nothing worker with coordinator or enable direct_access for local development")
+		}
 		if pgCfg.DSN == "" {
 			return nil, fmt.Errorf("dag_run_store.postgres.%s.dsn is required when dag_run_store.backend is postgres", options.Role)
 		}

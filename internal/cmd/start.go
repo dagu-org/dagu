@@ -133,6 +133,9 @@ func runStart(ctx *Context, args []string) error {
 	)
 
 	if fromRunID != "" {
+		if ctx.DAGRunStore == nil {
+			return errPostgresAgentDirectAccessDisabled("start --from-run-id")
+		}
 		if len(args) == 0 {
 			return fmt.Errorf("DAG name or file must be provided when using --from-run-id")
 		}
@@ -238,6 +241,13 @@ func tryExecuteDAG(ctx *Context, dag *core.DAG, dagRunID string, root exec.DAGRu
 
 	if workerID != "local" && ctx.DAGRunStore == nil {
 		return executeDAGRun(ctx, dag, exec.DAGRunRef{}, dagRunID, root, workerID, attemptID, triggerType, scheduleTime, nil)
+	}
+	if ctx.DAGRunStore == nil {
+		commandName := ""
+		if ctx.Command != nil {
+			commandName = ctx.Command.Name()
+		}
+		return errPostgresAgentDirectAccessDisabled(commandName)
 	}
 
 	return withPreparedLocalExecution(
@@ -421,6 +431,9 @@ func handleSubDAGRun(ctx *Context, dag *core.DAG, dagRunID string, params string
 	}
 
 	logger.Debug(ctx, "Checking for previous sub dag-run with the dag-run ID")
+	if ctx.DAGRunStore == nil {
+		return errPostgresAgentDirectAccessDisabled("local sub-DAG execution")
+	}
 
 	subAttempt, err := ctx.DAGRunStore.FindSubAttempt(ctx, root, dagRunID)
 	if errors.Is(err, exec.ErrDAGRunIDNotFound) {
