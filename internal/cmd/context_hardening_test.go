@@ -129,10 +129,60 @@ func TestNewContext_RemoteExplicitFailsWhenContextStoreUnavailable(t *testing.T)
 	assert.Contains(t, err.Error(), "failed to initialize context store")
 }
 
+func TestNewContext_DefersPostgresDAGRunStoreForNonRuntimeCommands(t *testing.T) {
+	t.Parallel()
+
+	home := t.TempDir()
+	configPath := writeRawTestConfig(t, `
+dag_run_store:
+  backend: postgres
+  postgres:
+    scheduler:
+      dsn: postgres://dagu:dagu@127.0.0.1:1/dagu?sslmode=disable
+`)
+
+	for _, name := range []string{"scheduler", "config"} {
+		t.Run(name, func(t *testing.T) {
+			command := &cobra.Command{Use: name}
+			initFlags(command)
+			command.SetContext(context.Background())
+			require.NoError(t, command.Flags().Set("dagu-home", home))
+			require.NoError(t, command.Flags().Set("config", configPath))
+
+			ctx, err := NewContext(command, nil)
+			require.NoError(t, err)
+			assert.Nil(t, ctx.DAGRunStore)
+			assert.Zero(t, ctx.DAGRunMgr)
+		})
+	}
+}
+
+func TestNewContext_InitializesDAGRunStoreForDAGRunCommands(t *testing.T) {
+	t.Parallel()
+
+	home := t.TempDir()
+	command := &cobra.Command{Use: "status"}
+	initFlags(command)
+	command.SetContext(context.Background())
+	require.NoError(t, command.Flags().Set("dagu-home", home))
+
+	ctx, err := NewContext(command, nil)
+	require.NoError(t, err)
+	assert.NotNil(t, ctx.DAGRunStore)
+	assert.NotNil(t, ctx.DAGRunMgr)
+}
+
 func writeTestConfig(t *testing.T, home, contextsDir string) string {
 	t.Helper()
 	configPath := filepath.Join(home, "config.yaml")
 	content := "paths:\n  contexts_dir: " + contextsDir + "\n"
+	require.NoError(t, os.WriteFile(configPath, []byte(content), 0o600))
+	return configPath
+}
+
+func writeRawTestConfig(t *testing.T, content string) string {
+	t.Helper()
+	configPath := filepath.Join(t.TempDir(), "config.yaml")
 	require.NoError(t, os.WriteFile(configPath, []byte(content), 0o600))
 	return configPath
 }

@@ -334,22 +334,6 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		}, nil
 	}
 
-	// Initialize history repository and history manager
-	drsOpts := []dagrunstore.Option{
-		dagrunstore.WithLatestStatusToday(cfg.Server.LatestStatusToday),
-		dagrunstore.WithLocation(cfg.Core.Location),
-		dagrunstore.WithRole(dagRunStoreRoleForCommand(cmd)),
-	}
-
-	switch cmd.Name() {
-	case "server", "scheduler", "start-all", "coordinator":
-		// For long-running process, we setup file cache for better performance
-		limits := cfg.Cache.Limits()
-		hc := fileutil.NewCache[*exec.DAGRunStatus]("dag_run_status", limits.DAGRun.Limit, limits.DAGRun.TTL)
-		hc.StartEviction(ctx)
-		drsOpts = append(drsOpts, dagrunstore.WithHistoryFileCache(hc))
-	}
-
 	ps := fileproc.New(cfg.Paths.ProcDir,
 		fileproc.WithStaleThreshold(cfg.Proc.StaleThreshold),
 		fileproc.WithHeartbeatInterval(cfg.Proc.HeartbeatInterval),
@@ -358,14 +342,21 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	if err := ps.Validate(ctx); err != nil {
 		return nil, fmt.Errorf("failed to validate proc directory %s: %w", cfg.Paths.ProcDir, err)
 	}
-	drs, err := dagrunstore.New(baseCtx, cfg, drsOpts...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize DAG-run store: %w", err)
-	}
 	distributedDir := filepath.Join(cfg.Paths.DataDir, "distributed")
 	dagRunLeaseStore := filedistributed.NewDAGRunLeaseStore(distributedDir)
 	activeDistributedRunStore := filedistributed.NewActiveDistributedRunStore(distributedDir)
-	drm := runtime.NewManager(drs, ps, cfg)
+	var (
+		drs exec.DAGRunStore
+		drm runtime.Manager
+	)
+	if contextNeedsDAGRunStore(cmd) {
+		var err error
+		drs, err = newContextDAGRunStore(baseCtx, ctx, cmd, cfg)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize DAG-run store: %w", err)
+		}
+		drm = runtime.NewManager(drs, ps, cfg)
+	}
 	qs := filequeue.New(cfg.Paths.QueueDir)
 	sm := fileserviceregistry.New(cfg.Paths.ServiceRegistryDir)
 	dispatchTaskStore := filedistributed.NewDispatchTaskStore(distributedDir)
@@ -569,6 +560,47 @@ func dagRunStoreRoleForCommand(cmd *cobra.Command) dagrunstore.Role {
 	default:
 		return dagrunstore.RoleServer
 	}
+}
+
+func contextNeedsDAGRunStore(cmd *cobra.Command) bool {
+	if cmd == nil || isContextCommand(cmd) || isSubcommandOf(cmd, "sync") {
+		return false
+	}
+	switch cmd.Name() {
+	case "server", "start-all", "coordinator",
+		"start", "restart", "retry", "dry", "exec",
+		"status", "history", "stop", "enqueue", "dequeue", "cleanup", "migrate":
+		return true
+	default:
+		return false
+	}
+}
+
+func isSubcommandOf(cmd *cobra.Command, name string) bool {
+	for parent := cmd.Parent(); parent != nil; parent = parent.Parent() {
+		if parent.Name() == name {
+			return true
+		}
+	}
+	return false
+}
+
+func newContextDAGRunStore(baseCtx, cacheCtx context.Context, cmd *cobra.Command, cfg *config.Config) (exec.DAGRunStore, error) {
+	drsOpts := []dagrunstore.Option{
+		dagrunstore.WithLatestStatusToday(cfg.Server.LatestStatusToday),
+		dagrunstore.WithLocation(cfg.Core.Location),
+		dagrunstore.WithRole(dagRunStoreRoleForCommand(cmd)),
+	}
+
+	switch cmd.Name() {
+	case "server", "start-all", "coordinator":
+		limits := cfg.Cache.Limits()
+		hc := fileutil.NewCache[*exec.DAGRunStatus]("dag_run_status", limits.DAGRun.Limit, limits.DAGRun.TTL)
+		hc.StartEviction(cacheCtx)
+		drsOpts = append(drsOpts, dagrunstore.WithHistoryFileCache(hc))
+	}
+
+	return dagrunstore.New(baseCtx, cfg, drsOpts...)
 }
 
 // isAgentCommand returns true if the command name is an agent command

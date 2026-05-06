@@ -848,14 +848,14 @@ func (l *ConfigLoader) setWorkerDefaults(cfg *Config) {
 }
 
 func (l *ConfigLoader) loadPostgresPoolConfig(pool *PostgresPoolConfig, def *PostgresPoolDef) {
-	setIfPositive(&pool.MaxOpenConns, def.MaxOpenConns)
-	setIfPositive(&pool.MaxIdleConns, def.MaxIdleConns)
-	setIfPositive(&pool.ConnMaxLifetime, def.ConnMaxLifetime)
-	setIfPositive(&pool.ConnMaxIdleTime, def.ConnMaxIdleTime)
+	setIfNonZero(&pool.MaxOpenConns, def.MaxOpenConns)
+	setIfNonZero(&pool.MaxIdleConns, def.MaxIdleConns)
+	setIfNonZero(&pool.ConnMaxLifetime, def.ConnMaxLifetime)
+	setIfNonZero(&pool.ConnMaxIdleTime, def.ConnMaxIdleTime)
 }
 
-func setIfPositive(target *int, value int) {
-	if value > 0 {
+func setIfNonZero(target *int, value int) {
+	if value != 0 {
 		*target = value
 	}
 }

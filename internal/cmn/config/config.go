@@ -639,6 +639,15 @@ func (c *Config) validateDAGRunStore() error {
 	case "", DAGRunStoreBackendFile:
 		return nil
 	case DAGRunStoreBackendPostgres:
+		if err := validatePostgresPool("dag_run_store.postgres.server.pool", c.DAGRunStore.Postgres.Server.Pool); err != nil {
+			return err
+		}
+		if err := validatePostgresPool("dag_run_store.postgres.scheduler.pool", c.DAGRunStore.Postgres.Scheduler.Pool); err != nil {
+			return err
+		}
+		if err := validatePostgresPool("dag_run_store.postgres.agent.pool", c.DAGRunStore.Postgres.Agent.Pool); err != nil {
+			return err
+		}
 		if c.DAGRunStore.Postgres.Server.DSN == "" &&
 			c.DAGRunStore.Postgres.Scheduler.DSN == "" &&
 			c.DAGRunStore.Postgres.Agent.DSN == "" {
@@ -697,6 +706,28 @@ func (c *Config) validateCoordinator() error {
 func (c *Config) validateWorker() error {
 	if c.Worker.HealthPort < 0 || c.Worker.HealthPort > 65535 {
 		return fmt.Errorf("invalid worker.health_port: %d", c.Worker.HealthPort)
+	}
+	if err := validatePostgresPool("worker.postgres_pool", c.Worker.PostgresPool); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validatePostgresPool(path string, pool PostgresPoolConfig) error {
+	if pool.MaxOpenConns < 0 {
+		return fmt.Errorf("%s.max_open_conns must be >= 0", path)
+	}
+	if pool.MaxIdleConns < 0 {
+		return fmt.Errorf("%s.max_idle_conns must be >= 0", path)
+	}
+	if pool.MaxOpenConns > 0 && pool.MaxIdleConns > pool.MaxOpenConns {
+		return fmt.Errorf("%s.max_idle_conns must be <= %s.max_open_conns", path, path)
+	}
+	if pool.ConnMaxLifetime < 0 {
+		return fmt.Errorf("%s.conn_max_lifetime must be >= 0", path)
+	}
+	if pool.ConnMaxIdleTime < 0 {
+		return fmt.Errorf("%s.conn_max_idle_time must be >= 0", path)
 	}
 	return nil
 }

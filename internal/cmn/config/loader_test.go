@@ -600,6 +600,37 @@ dag_run_store:
 		assert.Equal(t, "postgres://dagu:agent@localhost:5432/dagu_agent?sslmode=disable", cfg.DAGRunStore.Postgres.Agent.DSN)
 	})
 
+	t.Run("PostgresRejectsInvalidRolePool", func(t *testing.T) {
+		err := loadWithErrorFromYAML(t, `
+dag_run_store:
+  backend: postgres
+  postgres:
+    server:
+      dsn: postgres://dagu:server@localhost:5432/dagu_server?sslmode=disable
+      pool:
+        max_open_conns: 2
+        max_idle_conns: 3
+`)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "dag_run_store.postgres.server.pool.max_idle_conns must be <= dag_run_store.postgres.server.pool.max_open_conns")
+	})
+
+	t.Run("PostgresRejectsNegativeRolePoolValue", func(t *testing.T) {
+		err := loadWithErrorFromYAML(t, `
+dag_run_store:
+  backend: postgres
+  postgres:
+    agent:
+      dsn: postgres://dagu:agent@localhost:5432/dagu_agent?sslmode=disable
+      pool:
+        conn_max_idle_time: -1
+`)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "dag_run_store.postgres.agent.pool.conn_max_idle_time must be >= 0")
+	})
+
 	t.Run("InvalidBackend", func(t *testing.T) {
 		err := loadWithErrorFromYAML(t, `
 dag_run_store:
@@ -608,6 +639,31 @@ dag_run_store:
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid dag_run_store.backend")
+	})
+}
+
+func TestLoad_WorkerPostgresPoolValidation(t *testing.T) {
+	t.Run("RejectsNegativeValue", func(t *testing.T) {
+		err := loadWithErrorFromYAML(t, `
+worker:
+  postgres_pool:
+    max_open_conns: -1
+`)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "worker.postgres_pool.max_open_conns must be >= 0")
+	})
+
+	t.Run("RejectsIdleGreaterThanOpen", func(t *testing.T) {
+		err := loadWithErrorFromYAML(t, `
+worker:
+  postgres_pool:
+    max_open_conns: 1
+    max_idle_conns: 2
+`)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "worker.postgres_pool.max_idle_conns must be <= worker.postgres_pool.max_open_conns")
 	})
 }
 

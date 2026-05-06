@@ -37,6 +37,8 @@ DOCKER_CMD := docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v
 DEV_PG_COMPOSE_FILE=$(SCRIPT_DIR)/compose.postgres.yaml
 DEV_PG_COMPOSE_PROJECT?=dagu-dev-pg
 DEV_PG_DSN?=postgres://dagu:dagu@localhost:54321/dagu?sslmode=disable
+DEV_PG_WAIT_RETRIES?=60
+DEV_PG_WAIT_INTERVAL_SEC?=1
 
 # Arguments for the tests
 GOTESTSUM_ARGS=--format=standard-quiet
@@ -145,14 +147,14 @@ dev-pg-start: ${FE_BUNDLE_JS} dev-pg-wait
 dev-pg-wait: dev-pg-up
 	@printf '%b\n' "${COLOR_GREEN}Waiting for PostgreSQL to become ready...${COLOR_RESET}"
 	@i=0; \
-	while [ $$i -lt 30 ]; do \
+	while [ $$i -lt ${DEV_PG_WAIT_RETRIES} ]; do \
 		if docker compose -p ${DEV_PG_COMPOSE_PROJECT} -f ${DEV_PG_COMPOSE_FILE} exec -T postgres pg_isready -U dagu -d dagu >/dev/null 2>&1; then \
 			break; \
 		fi; \
 		i=$$((i + 1)); \
-		sleep 1; \
+		sleep ${DEV_PG_WAIT_INTERVAL_SEC}; \
 	done; \
-	if [ $$i -ge 30 ]; then \
+	if [ $$i -ge ${DEV_PG_WAIT_RETRIES} ]; then \
 		printf '%b\n' "${COLOR_RED}Error: PostgreSQL did not become ready.${COLOR_RESET}"; \
 		docker compose -p ${DEV_PG_COMPOSE_PROJECT} -f ${DEV_PG_COMPOSE_FILE} ps; \
 		exit 1; \
