@@ -9,6 +9,9 @@ export type ParamSchemaUiSchema = Record<string, Record<string, unknown>>;
 
 const radioChoiceLimit = 4;
 
+/**
+ * Builds typed schema form data from the legacy newline-delimited parameter text.
+ */
 export function buildParamSchemaFormData(
   schema: JSONSchema,
   defaultParams?: string
@@ -36,6 +39,9 @@ export function buildParamSchemaFormData(
   return formData;
 }
 
+/**
+ * Chooses compact widgets for schema-backed parameters without losing free-text editing.
+ */
 export function buildParamSchemaUiSchema(
   schema: JSONSchema
 ): ParamSchemaUiSchema {
@@ -47,18 +53,28 @@ export function buildParamSchemaUiSchema(
     const choiceCount = getChoiceCount(propertySchema);
     if (choiceCount > 0 && choiceCount <= radioChoiceLimit) {
       uiSchema[name] = { 'ui:widget': 'radio' };
+      continue;
+    }
+    if (isFreeTextSchema(propertySchema)) {
+      uiSchema[name] = { 'ui:widget': 'textarea' };
     }
   }
 
   return uiSchema;
 }
 
+/**
+ * Serializes schema form data into the parameter payload expected by the start API.
+ */
 export function stringifyParamSchemaFormData(
   formData: ParamSchemaFormData
 ): string {
   return JSON.stringify(formData);
 }
 
+/**
+ * Converts default string parameters to the scalar type declared by the JSON schema.
+ */
 function coerceParamSchemaValue(value: string, schema: JSONSchema): unknown {
   if (value.trim() === '') {
     return value;
@@ -87,6 +103,9 @@ function coerceParamSchemaValue(value: string, schema: JSONSchema): unknown {
   }
 }
 
+/**
+ * Infers the effective scalar type from direct, oneOf, or enum schema declarations.
+ */
 function inferScalarType(schema: JSONSchema): string | undefined {
   if (typeof schema.type === 'string') {
     return schema.type;
@@ -107,6 +126,9 @@ function inferScalarType(schema: JSONSchema): string | undefined {
   return undefined;
 }
 
+/**
+ * Maps a JavaScript scalar value back to the JSON schema type that represents it.
+ */
 function inferTypeFromValue(value: unknown): string | undefined {
   switch (typeof value) {
     case 'string':
@@ -120,6 +142,9 @@ function inferTypeFromValue(value: unknown): string | undefined {
   }
 }
 
+/**
+ * Counts fixed choices represented as enum values or oneOf constants.
+ */
 function getChoiceCount(schema: JSONSchema): number {
   if (Array.isArray(schema.enum)) {
     return schema.enum.length;
@@ -128,4 +153,19 @@ function getChoiceCount(schema: JSONSchema): number {
     return schema.oneOf.filter((option) => option.const !== undefined).length;
   }
   return 0;
+}
+
+/**
+ * Treats plain string schemas as multiline user input while leaving formatted
+ * strings and fixed-choice fields to their specialized widgets.
+ */
+function isFreeTextSchema(schema: JSONSchema): boolean {
+  if (
+    schema.const !== undefined ||
+    getChoiceCount(schema) > 0 ||
+    typeof schema.format === 'string'
+  ) {
+    return false;
+  }
+  return inferScalarType(schema) === 'string';
 }

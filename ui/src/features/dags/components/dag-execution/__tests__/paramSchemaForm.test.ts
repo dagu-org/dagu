@@ -66,6 +66,26 @@ describe('paramSchemaForm helpers', () => {
     expect(uiSchema.backend?.['ui:widget']).toBeUndefined();
   });
 
+  it('uses textarea widgets for free text schema fields', () => {
+    const schema: JSONSchema = {
+      type: 'object',
+      properties: {
+        message: { type: 'string' },
+        date: { type: 'string', format: 'date' },
+        region: {
+          type: 'string',
+          enum: ['us-east-1', 'us-west-2'],
+        },
+      },
+    };
+
+    const uiSchema = buildParamSchemaUiSchema(schema);
+
+    expect(uiSchema.message?.['ui:widget']).toBe('textarea');
+    expect(uiSchema.date).toBeUndefined();
+    expect(uiSchema.region?.['ui:widget']).toBe('radio');
+  });
+
   it('serializes schema-backed form data as a JSON object payload', () => {
     expect(
       stringifyParamSchemaFormData({

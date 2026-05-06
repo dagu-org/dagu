@@ -28,7 +28,11 @@ import React from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { autoGrowTextarea } from './textareaAutoGrow';
 
+/**
+ * Applies Dagu's card background styling to RJSF's shadcn select widget.
+ */
 function SchemaSelectWidget<
   T = any,
   S extends StrictRJSFSchema = RJSFSchema,
@@ -37,16 +41,53 @@ function SchemaSelectWidget<
   return <SelectWidget {...props} className={cn('bg-card', props.className)} />;
 }
 
+/**
+ * Wraps RJSF's shadcn textarea so schema-backed text parameters auto-resize.
+ */
 function SchemaTextareaWidget<
   T = any,
   S extends StrictRJSFSchema = RJSFSchema,
   F extends FormContextType = any,
 >(props: WidgetProps<T, S, F>) {
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const options = React.useMemo(
+    () => ({ ...props.options, rows: props.options.rows ?? 1 }),
+    [props.options]
+  );
+
+  React.useLayoutEffect(() => {
+    // RJSF's shadcn textarea widget does not expose a ref, so the wrapper
+    // applies the shared auto-grow behavior to the rendered textarea.
+    const textarea = containerRef.current?.querySelector('textarea');
+    if (textarea) {
+      autoGrowTextarea(textarea);
+    }
+  }, [props.value]);
+
   return (
-    <TextareaWidget {...props} className={cn('bg-card', props.className)} />
+    <div
+      ref={containerRef}
+      onInput={(event) => {
+        if (event.target instanceof HTMLTextAreaElement) {
+          autoGrowTextarea(event.target);
+        }
+      }}
+    >
+      <TextareaWidget
+        {...props}
+        options={options}
+        className={cn(
+          'bg-card min-h-9 resize-none overflow-hidden',
+          props.className
+        )}
+      />
+    </div>
   );
 }
 
+/**
+ * Renders boolean schema fields with the local checkbox component styling.
+ */
 function SchemaCheckboxWidget<
   T = any,
   S extends StrictRJSFSchema = RJSFSchema,
@@ -123,6 +164,9 @@ function SchemaCheckboxWidget<
   );
 }
 
+/**
+ * Renders small fixed-choice schema fields as accessible radio groups.
+ */
 function SchemaRadioWidget<
   T = any,
   S extends StrictRJSFSchema = RJSFSchema,

@@ -15,7 +15,7 @@ vi.mock('@rjsf/shadcn', async () => {
     default: React.forwardRef(function MockSchemaForm(
       props: {
         formData?: Record<string, unknown>;
-        uiSchema?: Record<string, unknown>;
+        uiSchema?: Record<string, Record<string, unknown>>;
         onChange?: (event: { formData: Record<string, unknown> }) => void;
       },
       ref: any
@@ -24,9 +24,15 @@ vi.mock('@rjsf/shadcn', async () => {
       React.useImperativeHandle(ref, () => ({
         validateForm: () => true,
       }));
+      const widget = props.uiSchema?.message?.['ui:widget'];
 
       return (
         <div data-testid="schema-form">
+          {widget === 'textarea' ? (
+            <textarea aria-label="message" defaultValue="" />
+          ) : (
+            <input aria-label="message" defaultValue="" />
+          )}
           <button
             type="button"
             onClick={() =>
@@ -110,6 +116,42 @@ describe('StartDAGModal', () => {
         true
       )
     );
+  });
+
+  it('does not submit a schema-backed string param when Shift+Enter is pressed', () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <StartDAGModal
+        visible={true}
+        dismissModal={vi.fn()}
+        onSubmit={onSubmit}
+        dag={
+          {
+            name: 'schema-dag',
+            paramSchema: {
+              type: 'object',
+              properties: {
+                message: {
+                  type: 'string',
+                },
+              },
+            },
+          } as never
+        }
+      />
+    );
+
+    const messageInput = screen.getByLabelText('message');
+    expect(messageInput.tagName).toBe('TEXTAREA');
+    messageInput.focus();
+
+    fireEvent.keyDown(messageInput, {
+      key: 'Enter',
+      shiftKey: true,
+    });
+
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 
   it('falls back to typed param fields when paramSchema is absent', () => {
