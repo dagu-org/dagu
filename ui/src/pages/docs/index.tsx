@@ -45,6 +45,7 @@ import { CreateDocModal } from './components/CreateDocModal';
 import DocTabEditorPanel from './components/DocTabEditorPanel';
 import DocTreeSidebar from './components/DocTreeSidebar';
 import { RenameDocModal } from './components/RenameDocModal';
+import { normalizeDocPathFromURL } from './lib/doc-url';
 import type { ContextAction } from './components/DocArboristNode';
 
 function titleFromPath(docPath: string): string {
@@ -232,7 +233,7 @@ function DocsContent() {
         searchParams.get('workspace') ?? ''
       );
       const docWorkspace = queryWorkspace || null;
-      const decodedPath = decodeURIComponent(docPath);
+      const decodedPath = normalizeDocPathFromURL(decodeURIComponent(docPath));
       openDoc(decodedPath, titleFromPath(decodedPath), docWorkspace);
     }
   }, [location.pathname, location.search, openDoc, selectedWorkspace]);

@@ -1,6 +1,10 @@
-export const DOC_PATH_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_. -]*(\/[a-zA-Z0-9][a-zA-Z0-9_. -]*)*$/;
+export const DOC_PATH_PATTERN =
+  /^[a-zA-Z0-9_][a-zA-Z0-9_. -]*(\/[a-zA-Z0-9_][a-zA-Z0-9_. -]*)*$/;
 
-export function validateDocPath(path: string): { isValid: boolean; error?: string } {
+export function validateDocPath(path: string): {
+  isValid: boolean;
+  error?: string;
+} {
   const trimmed = path.trim();
   if (!trimmed) {
     return { isValid: false, error: 'Path is required' };
@@ -11,7 +15,8 @@ export function validateDocPath(path: string): { isValid: boolean; error?: strin
   if (!DOC_PATH_PATTERN.test(trimmed)) {
     return {
       isValid: false,
-      error: 'Invalid path. Use letters, numbers, underscores, dots, hyphens, and spaces. Use / for directories.',
+      error:
+        'Invalid path. Use letters, numbers, underscores, dots, hyphens, and spaces. Use / for directories.',
     };
   }
   return { isValid: true };
