@@ -176,7 +176,7 @@ func (n *Node) Execute(ctx context.Context, onSetup ...func()) error {
 
 	cmd, err := n.setupExecutor(ctx)
 	if err != nil {
-		n.SetError(fmt.Errorf("failed to setup executor: %w", err))
+		n.SetError(fmt.Errorf("failed to set up step: %w", err))
 		return err
 	}
 
@@ -637,11 +637,11 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 		return nil, err
 	}
 
-	// Evaluate the executor config if set
+	// Evaluate the step configuration if set
 	execConfig := n.Step().ExecutorConfig
 	cfg, err := evalExecutorConfig(ctx, n.Step())
 	if err != nil {
-		return nil, fmt.Errorf("failed to eval executor config: %w", err)
+		return nil, fmt.Errorf("failed to evaluate step configuration: %w", err)
 	}
 	execConfig.Config = cfg
 	n.SetExecutorConfig(execConfig)
@@ -680,7 +680,7 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 	n.cmd = cmd
 
 	if err := n.outputs.setupExecutorIO(ctx, cmd, n.NodeData()); err != nil {
-		return nil, fmt.Errorf("failed to setup executor IO: %w", err)
+		return nil, fmt.Errorf("failed to set up step output: %w", err)
 	}
 
 	// Handle sub DAG execution
@@ -710,7 +710,7 @@ func (n *Node) configureSubDAGExecutor(cmd executor.Executor, subRuns []SubDAGRu
 	if n.Step().Parallel == nil {
 		dagExecutor, ok := cmd.(executor.DAGExecutor)
 		if !ok {
-			return fmt.Errorf("executor %T does not support sub DAG execution", cmd)
+			return fmt.Errorf("step type %q does not support sub DAG execution", n.Step().ExecutorConfig.Type)
 		}
 		dagExecutor.SetParams(runParams(subRuns[0]))
 		return nil
@@ -718,7 +718,7 @@ func (n *Node) configureSubDAGExecutor(cmd executor.Executor, subRuns []SubDAGRu
 
 	parallelExecutor, ok := cmd.(executor.ParallelExecutor)
 	if !ok {
-		return fmt.Errorf("executor %T does not support parallel execution", cmd)
+		return fmt.Errorf("step type %q does not support parallel execution", n.Step().ExecutorConfig.Type)
 	}
 	parallelExecutor.SetParamsList(runParamsList(subRuns))
 	return nil

@@ -56,7 +56,7 @@ type Executor struct {
 // newChatExecutor creates a new chat executor from a step configuration.
 func newChatExecutor(ctx context.Context, step core.Step) (executor.Executor, error) {
 	if step.LLM == nil {
-		return nil, fmt.Errorf("llm configuration is required for chat executor")
+		return nil, fmt.Errorf("llm configuration is required for chat step")
 	}
 
 	cfg := step.LLM

@@ -425,7 +425,8 @@ steps:
 
 		_, err = spec.Load(th.Context, testFile)
 		require.Error(t, err, "expected error for multiple commands with jq executor")
-		require.Contains(t, err.Error(), "executor does not support multiple commands")
+		require.Contains(t, err.Error(), `step type "jq" supports only one command`)
+		require.NotContains(t, err.Error(), "executor")
 	})
 
 	t.Run("HTTPExecutorRejectsMultipleCommands", func(t *testing.T) {
@@ -448,7 +449,8 @@ steps:
 
 		_, err = spec.Load(th.Context, testFile)
 		require.Error(t, err, "expected error for multiple commands with http executor")
-		require.Contains(t, err.Error(), "executor does not support multiple commands")
+		require.Contains(t, err.Error(), `step type "http" supports only one command`)
+		require.NotContains(t, err.Error(), "executor")
 	})
 
 	t.Run("ShellExecutorAllowsMultipleCommands", func(t *testing.T) {

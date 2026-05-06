@@ -4,6 +4,7 @@
 package core
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -286,7 +287,11 @@ func validateStepWithValidator(step Step) error {
 		return nil
 	}
 	if err := validator(step); err != nil {
-		return NewValidationError("executor_config", step.ExecutorConfig, err)
+		var ve *ValidationError
+		if errors.As(err, &ve) {
+			return err
+		}
+		return NewValidationError("type", nil, err)
 	}
 	return nil
 }

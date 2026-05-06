@@ -11,9 +11,24 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/dagucloud/dagu/internal/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestValidateTemplateRequiresScriptMessage(t *testing.T) {
+	err := validateTemplate(core.Step{})
+	require.Error(t, err)
+	assert.Equal(t, "field 'script': script field is required", err.Error())
+	assert.NotContains(t, err.Error(), "executor")
+}
+
+func TestNewTemplateRequiresScriptMessage(t *testing.T) {
+	_, err := newTemplate(context.Background(), core.Step{})
+	require.Error(t, err)
+	assert.Equal(t, "field 'script': script field is required", err.Error())
+	assert.NotContains(t, err.Error(), "executor")
+}
 
 func TestTemplateExec_BasicStdout(t *testing.T) {
 	t.Parallel()

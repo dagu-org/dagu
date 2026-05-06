@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -16,6 +17,23 @@ import (
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/mholt/archives"
 )
+
+func TestNewExecutorRequiresCommandMessage(t *testing.T) {
+	t.Parallel()
+
+	_, err := newExecutor(context.Background(), core.Step{
+		ExecutorConfig: core.ExecutorConfig{Type: executorType},
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if got, want := err.Error(), "field 'command': archive: configuration error: command must specify archive operation"; got != want {
+		t.Fatalf("unexpected error:\nwant: %s\n got: %s", want, got)
+	}
+	if !errors.Is(err, ErrConfig) {
+		t.Fatalf("expected error to wrap ErrConfig, got %v", err)
+	}
+}
 
 func TestRunExtractZip(t *testing.T) {
 	t.Parallel()

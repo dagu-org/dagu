@@ -265,7 +265,7 @@ func newKubernetes(_ context.Context, step core.Step) (executor.Executor, error)
 	execCfg := step.ExecutorConfig
 
 	if len(execCfg.Config) == 0 {
-		return nil, fmt.Errorf("kubernetes executor requires config with at least 'image' field")
+		return nil, fmt.Errorf("kubernetes step requires with.image")
 	}
 
 	cfg, err := LoadConfigFromMap(execCfg.Config)
@@ -283,10 +283,12 @@ func newKubernetes(_ context.Context, step core.Step) (executor.Executor, error)
 
 func validateStep(step core.Step) error {
 	if len(step.ExecutorConfig.Config) == 0 {
-		return fmt.Errorf("kubernetes executor requires config with at least 'image' field")
+		return core.NewValidationError("with.image", nil, ErrImageRequired)
 	}
-	_, err := LoadConfigFromMap(step.ExecutorConfig.Config)
-	return err
+	if _, err := LoadConfigFromMap(step.ExecutorConfig.Config); err != nil {
+		return core.NewValidationError("with", nil, err)
+	}
+	return nil
 }
 
 // buildCommand constructs the command slice from the step's commands.

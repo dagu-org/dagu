@@ -5,6 +5,7 @@ package spec
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -2111,8 +2112,10 @@ func TestValidateMultipleCommands(t *testing.T) {
 
 			if tt.wantErr {
 				assert.Error(t, err)
-				assert.Contains(t, err.Error(), "executor does not support multiple commands")
-				assert.Contains(t, err.Error(), tt.executorType)
+				assert.Contains(t, err.Error(), `step type "`+tt.executorType+`" supports only one command`)
+				assert.NotContains(t, err.Error(), "step type does not support multiple commands")
+				assert.NotContains(t, err.Error(), "executor")
+				assert.True(t, errors.Is(err, ErrExecutorDoesNotSupportMultipleCmd))
 			} else {
 				assert.NoError(t, err)
 			}
@@ -2429,7 +2432,7 @@ func TestValidateSubDAG(t *testing.T) {
 
 			if tt.wantErr {
 				assert.Error(t, err)
-				assert.Contains(t, err.Error(), "does not support sub-DAG execution")
+				assert.Contains(t, err.Error(), "does not support call field")
 				assert.Contains(t, err.Error(), tt.executorType)
 			} else {
 				assert.NoError(t, err)
@@ -2648,6 +2651,70 @@ func TestValidateWorkerSelector(t *testing.T) {
 	}
 }
 
+func TestStepValidationMessagesUseYAMLTerms(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		err  func() error
+		want string
+	}{
+		{
+			name: "unsupported command",
+			err: func() error {
+				return validateCommand(&core.Step{
+					Commands:       []core.CommandEntry{{Command: "echo", Args: []string{"hello"}}},
+					ExecutorConfig: core.ExecutorConfig{Type: "dag"},
+				})
+			},
+			want: `step type "dag" does not support command field`,
+		},
+		{
+			name: "unsupported multiple commands",
+			err: func() error {
+				return validateMultipleCommands(&core.Step{
+					Commands: []core.CommandEntry{
+						{Command: "GET", Args: []string{"https://example.com"}},
+						{Command: "POST", Args: []string{"https://example.com"}},
+					},
+					ExecutorConfig: core.ExecutorConfig{Type: "http"},
+				})
+			},
+			want: `step type "http" supports only one command`,
+		},
+		{
+			name: "unsupported llm",
+			err: func() error {
+				return validateLLM(&core.Step{
+					ExecutorConfig: core.ExecutorConfig{Type: "shell"},
+					LLM:            &core.LLMConfig{Provider: "openai", Model: "gpt-4"},
+				})
+			},
+			want: `step type "shell" does not support llm field`,
+		},
+		{
+			name: "unknown type",
+			err: func() error {
+				result := &core.Step{ExecutorConfig: core.ExecutorConfig{Config: make(map[string]any)}}
+				return buildStepExecutor(testStepBuildContext(), &step{Type: "non-existent"}, result)
+			},
+			want: `unknown step type "non-existent"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := tt.err()
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.want)
+			assert.NotContains(t, err.Error(), "executor")
+			assert.NotContains(t, err.Error(), "executor_config")
+		})
+	}
+}
+
 func TestUnregisteredExecutorValidation(t *testing.T) {
 	t.Parallel()
 
@@ -2664,7 +2731,9 @@ steps:
 
 	_, err = Load(context.Background(), tmpFile)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "executor type \"non-existent\" does not support command field")
+	assert.Contains(t, err.Error(), "unknown step type \"non-existent\"")
+	assert.NotContains(t, err.Error(), "does not support command field")
+	assert.NotContains(t, err.Error(), "executor")
 }
 
 func TestBuildStepLogOutput(t *testing.T) {

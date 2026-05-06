@@ -96,7 +96,7 @@ func registerNodeSignalExecutor(t *testing.T) {
 				factory := nodeSignalExecutorFactory
 				nodeSignalExecutorFactoryMu.Unlock()
 				if factory == nil {
-					return nil, fmt.Errorf("node signal executor factory not configured")
+					return nil, fmt.Errorf("node signal step factory not configured")
 				}
 				return factory(), nil
 			},

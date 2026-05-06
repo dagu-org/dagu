@@ -45,7 +45,7 @@ func validateStep(step core.Step) error {
 		command = step.Commands[0].Command
 	}
 	if strings.TrimSpace(command) == "" {
-		return fmt.Errorf("%w: command is required", ErrConfig)
+		return core.NewValidationError("command", nil, fmt.Errorf("%w: command is required", ErrConfig))
 	}
 	return nil
 }
@@ -79,7 +79,7 @@ func newExecutor(ctx context.Context, step core.Step) (executor.Executor, error)
 	}
 	op := strings.ToLower(strings.TrimSpace(command))
 	if op == "" {
-		return nil, fmt.Errorf("%w: command must specify archive operation", ErrConfig)
+		return nil, core.NewValidationError("command", nil, fmt.Errorf("%w: command must specify archive operation", ErrConfig))
 	}
 
 	switch op {
@@ -202,7 +202,7 @@ func (e *executorImpl) resultWriter(v any) error {
 
 func (e *executorImpl) warn(format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
-	_, _ = fmt.Fprintf(e.stderr, "archive executor warning: %s\n", msg)
+	_, _ = fmt.Fprintf(e.stderr, "archive step warning: %s\n", msg)
 }
 
 func (e *executorImpl) ensureDir(path string) error {

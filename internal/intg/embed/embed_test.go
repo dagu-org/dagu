@@ -191,6 +191,6 @@ func (e *echoExecutor) Run(context.Context) error {
 	if command == "" && len(e.step.Commands) > 0 {
 		command = e.step.Commands[0].CmdWithArgs
 	}
-	_, err := fmt.Fprintf(out, "embedded executor ran %s: %s\n", e.step.Name, command)
+	_, err := fmt.Fprintf(out, "embedded step ran %s: %s\n", e.step.Name, command)
 	return err
 }

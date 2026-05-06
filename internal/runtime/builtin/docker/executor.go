@@ -25,7 +25,7 @@ import (
 )
 
 var (
-	ErrExecutorConfigRequired = errors.New("executor config is required")
+	ErrExecutorConfigRequired = errors.New("docker step configuration is required")
 )
 
 // Docker executor runs a command in a Docker container.

@@ -209,7 +209,8 @@ func TestValidateHarnessStep(t *testing.T) {
 			ExecutorConfig: core.ExecutorConfig{Config: map[string]any{"provider": "claude"}},
 		})
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "multiple commands")
+		assert.Contains(t, err.Error(), "field 'command': step type \"harness\" supports only one command")
+		assert.NotContains(t, err.Error(), "executor")
 	})
 
 	t.Run("invalid_fallback_shape", func(t *testing.T) {
@@ -813,7 +814,8 @@ func TestNewHarnessRejectsMultipleCommands(t *testing.T) {
 	ctx := newHarnessTestContext(t, nil, step)
 	_, err := newHarness(ctx, step)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "multiple commands")
+	assert.Contains(t, err.Error(), "field 'command': step type \"harness\" supports only one command")
+	assert.NotContains(t, err.Error(), "executor")
 }
 
 func TestExtractPrompt(t *testing.T) {

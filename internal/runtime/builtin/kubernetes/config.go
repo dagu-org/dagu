@@ -20,15 +20,15 @@ import (
 )
 
 var (
-	ErrImageRequired            = errors.New("kubernetes executor requires an image")
-	ErrInvalidCleanupPolicy     = errors.New("kubernetes executor cleanup_policy must be either delete or keep")
-	ErrInvalidImagePullPolicy   = errors.New("kubernetes executor image_pull_policy must be one of Always, IfNotPresent, or Never")
-	ErrNegativeActiveDeadline   = errors.New("kubernetes executor active_deadline must be >= 0")
-	ErrNegativeBackoffLimit     = errors.New("kubernetes executor backoff_limit must be >= 0")
-	ErrNegativeTTLAfterFinished = errors.New("kubernetes executor ttl_after_finished must be >= 0")
-	ErrNegativeTerminationGrace = errors.New("kubernetes executor termination_grace_period_seconds must be >= 0")
-	ErrNegativeQuantity         = errors.New("kubernetes executor resource quantity must be >= 0")
-	ErrInvalidVolumeSource      = errors.New("kubernetes executor volume must define exactly one source")
+	ErrImageRequired            = errors.New("image is required")
+	ErrInvalidCleanupPolicy     = errors.New("cleanup_policy must be either delete or keep")
+	ErrInvalidImagePullPolicy   = errors.New("image_pull_policy must be one of Always, IfNotPresent, or Never")
+	ErrNegativeActiveDeadline   = errors.New("active_deadline must be >= 0")
+	ErrNegativeBackoffLimit     = errors.New("backoff_limit must be >= 0")
+	ErrNegativeTTLAfterFinished = errors.New("ttl_after_finished must be >= 0")
+	ErrNegativeTerminationGrace = errors.New("termination_grace_period_seconds must be >= 0")
+	ErrNegativeQuantity         = errors.New("resource quantity must be >= 0")
+	ErrInvalidVolumeSource      = errors.New("volume must define exactly one source")
 )
 
 const (
