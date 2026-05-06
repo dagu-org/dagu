@@ -323,9 +323,6 @@ func schemaMap(value any) (map[string]any, bool) {
 	if m, ok := value.(map[string]any); ok {
 		return m, true
 	}
-	if m, ok := value.(map[string]interface{}); ok {
-		return map[string]any(m), true
-	}
 	rv := reflect.ValueOf(value)
 	if rv.Kind() != reflect.Map || rv.Type().Key().Kind() != reflect.String {
 		return nil, false
