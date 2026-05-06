@@ -5,6 +5,8 @@ package postgres
 
 import (
 	"database/sql"
+	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -18,14 +20,21 @@ func TestMigrationUsesExistingIdentifierConstraints(t *testing.T) {
 	data, err := migrations.FS.ReadFile("20260506000000_create_dag_run_attempts.sql")
 	require.NoError(t, err)
 
-	sql := string(data)
-	assert.Contains(t, sql, "VALUE ~ '^[a-zA-Z0-9_.-]+$'")
-	assert.Contains(t, sql, "char_length(VALUE) <= 40")
-	assert.Contains(t, sql, "VALUE ~ '^[-a-zA-Z0-9_]+$'")
-	assert.Contains(t, sql, "char_length(VALUE) <= 64")
-	assert.Contains(t, sql, "VALUE ~ '^[A-Za-z0-9_-]+$'")
-	assert.Contains(t, sql, "lower(VALUE) NOT IN ('all', 'default')")
-	assert.Contains(t, sql, "VALUE::text ~* '^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'")
+	sqlText := string(data)
+	assertSQLFragment(t, sqlText, "VALUE ~ '^[a-zA-Z0-9_.-]+$'")
+	assertSQLFragment(t, sqlText, "char_length(VALUE) <= 40")
+	assertSQLFragment(t, sqlText, "VALUE ~ '^[-a-zA-Z0-9_]+$'")
+	assertSQLFragment(t, sqlText, "char_length(VALUE) <= 64")
+	assertSQLFragment(t, sqlText, "VALUE ~ '^[A-Za-z0-9_-]+$'")
+	assertSQLFragment(t, sqlText, "lower(VALUE) NOT IN ('all', 'default')")
+	assertSQLFragment(t, sqlText, "VALUE::text ~* '^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'")
+}
+
+func assertSQLFragment(t *testing.T, sqlText, fragment string) {
+	t.Helper()
+	quoted := regexp.QuoteMeta(fragment)
+	pattern := strings.Join(strings.Fields(quoted), `\s+`)
+	assert.Regexp(t, regexp.MustCompile(pattern), sqlText)
 }
 
 func TestWorkspaceFromLabels(t *testing.T) {
@@ -46,4 +55,10 @@ func TestWorkspaceFromLabels(t *testing.T) {
 		assert.Equal(t, sql.NullString{}, workspaceName)
 		assert.False(t, valid)
 	})
+}
+
+func TestDAGLockKeyUsesTextSafeSeparator(t *testing.T) {
+	key := dagLockKey("example", "run-1")
+	assert.Equal(t, "example:run-1", key)
+	assert.NotContains(t, key, "\x00")
 }

@@ -187,7 +187,7 @@ func (s *Store) createRootAttempt(ctx context.Context, dag *core.DAG, timestamp 
 	if err != nil {
 		return nil, err
 	}
-	return s.attemptFromRow(row), nil
+	return s.attemptFromRow(row)
 }
 
 func (s *Store) createSubAttempt(ctx context.Context, dag *core.DAG, timestamp time.Time, dagRunID string, opts exec.NewDAGRunAttemptOptions) (exec.DAGRunAttempt, error) {
@@ -224,7 +224,7 @@ func (s *Store) createSubAttempt(ctx context.Context, dag *core.DAG, timestamp t
 	if err != nil {
 		return nil, err
 	}
-	return s.attemptFromRow(row), nil
+	return s.attemptFromRow(row)
 }
 
 func (s *Store) insertAttempt(
@@ -291,7 +291,16 @@ func (s *Store) RecentAttempts(ctx context.Context, name string, itemLimit int) 
 
 	attempts := make([]exec.DAGRunAttempt, 0, len(rows))
 	for _, row := range rows {
-		attempts = append(attempts, s.attemptFromRecentRow(row))
+		attempt, err := s.attemptFromRecentRow(row)
+		if err != nil {
+			logger.Warn(ctx, "postgres dag-run store: failed to decode recent attempt; skipping",
+				tag.Error(err),
+				slog.String("dag", row.DagName),
+				slog.String("dag_run_id", row.DagRunID),
+			)
+			continue
+		}
+		attempts = append(attempts, attempt)
 	}
 	return attempts
 }
@@ -317,7 +326,7 @@ func (s *Store) LatestAttempt(ctx context.Context, name string) (exec.DAGRunAtte
 		}
 		return nil, err
 	}
-	return s.attemptFromRow(row), nil
+	return s.attemptFromRow(row)
 }
 
 func (s *Store) FindAttempt(ctx context.Context, dagRun exec.DAGRunRef) (exec.DAGRunAttempt, error) {
@@ -328,7 +337,7 @@ func (s *Store) FindAttempt(ctx context.Context, dagRun exec.DAGRunRef) (exec.DA
 	if err != nil {
 		return nil, err
 	}
-	return s.attemptFromRow(row), nil
+	return s.attemptFromRow(row)
 }
 
 func (s *Store) latestRootAttempt(ctx context.Context, dagRun exec.DAGRunRef) (db.DaguDagRunAttempt, error) {
@@ -366,7 +375,7 @@ func (s *Store) FindSubAttempt(ctx context.Context, dagRun exec.DAGRunRef, subDA
 		}
 		return nil, err
 	}
-	return s.attemptFromRow(row), nil
+	return s.attemptFromRow(row)
 }
 
 func (s *Store) CreateSubAttempt(ctx context.Context, rootRef exec.DAGRunRef, subDAGRunID string) (exec.DAGRunAttempt, error) {
@@ -699,11 +708,11 @@ func (s *Store) withTx(ctx context.Context, fn func(*db.Queries) error) error {
 	return tx.Commit(ctx)
 }
 
-func (s *Store) attemptFromRow(row db.DaguDagRunAttempt) *Attempt {
+func (s *Store) attemptFromRow(row db.DaguDagRunAttempt) (*Attempt, error) {
 	return newAttempt(s.queries, row)
 }
 
-func (s *Store) attemptFromRecentRow(row db.RecentAttemptsByNameRow) *Attempt {
+func (s *Store) attemptFromRecentRow(row db.RecentAttemptsByNameRow) (*Attempt, error) {
 	return newAttempt(s.queries, db.DaguDagRunAttempt(row))
 }
 
@@ -783,7 +792,7 @@ func timeFromTimestamptz(t pgtype.Timestamptz) time.Time {
 }
 
 func dagLockKey(name, runID string) string {
-	return name + "\x00" + runID
+	return name + ":" + runID
 }
 
 func (s *Store) workDir(root exec.DAGRunRef, dagRunID string) string {

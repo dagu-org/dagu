@@ -1,5 +1,8 @@
 -- name: LockDAGRunKey :exec
-SELECT pg_advisory_xact_lock(hashtext(sqlc.arg(lock_key)::text)::bigint);
+SELECT pg_advisory_xact_lock(
+    hashtext(sqlc.arg(lock_key)::text),
+    hashtext('dagu-dag-run:' || sqlc.arg(lock_key)::text)
+);
 
 -- name: CreateAttempt :one
 INSERT INTO dagu_dag_run_attempts (
@@ -250,5 +253,5 @@ UPDATE dagu_dag_run_attempts
 SET dag_name = CASE WHEN is_root AND dag_name::text = sqlc.arg(old_name)::text THEN sqlc.arg(new_name) ELSE dag_name END,
     root_dag_name = CASE WHEN root_dag_name::text = sqlc.arg(old_name)::text THEN sqlc.arg(new_name) ELSE root_dag_name END,
     updated_at = now()
-WHERE dag_name::text = sqlc.arg(old_name)::text
-   OR root_dag_name::text = sqlc.arg(old_name)::text;
+WHERE root_dag_name::text = sqlc.arg(old_name)::text
+   OR (is_root AND dag_name::text = sqlc.arg(old_name)::text);

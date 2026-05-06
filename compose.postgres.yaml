@@ -8,6 +8,7 @@ services:
     ports:
       - "54321:5432"
     volumes:
+      # PostgreSQL 18 stores data in a major-version subdirectory under this path.
       - dagu-dev-postgres-data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U dagu -d dagu"]

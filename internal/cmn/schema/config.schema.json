@@ -950,7 +950,33 @@
         "postgres": {
           "$ref": "#/definitions/DAGRunStorePostgresDef"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": ["backend"],
+            "properties": {
+              "backend": {
+                "const": "postgres"
+              }
+            }
+          },
+          "then": {
+            "required": ["postgres"],
+            "properties": {
+              "postgres": {
+                "required": ["dsn"],
+                "properties": {
+                  "dsn": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
     },
     "DAGRunStorePostgresDef": {
       "type": "object",

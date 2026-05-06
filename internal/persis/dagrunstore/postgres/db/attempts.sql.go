@@ -659,7 +659,10 @@ func (q *Queries) ListRootStatusRows(ctx context.Context, arg ListRootStatusRows
 }
 
 const lockDAGRunKey = `-- name: LockDAGRunKey :exec
-SELECT pg_advisory_xact_lock(hashtext($1::text)::bigint)
+SELECT pg_advisory_xact_lock(
+    hashtext($1::text),
+    hashtext('dagu-dag-run:' || $1::text)
+)
 `
 
 func (q *Queries) LockDAGRunKey(ctx context.Context, lockKey string) error {
@@ -786,8 +789,8 @@ UPDATE dagu_dag_run_attempts
 SET dag_name = CASE WHEN is_root AND dag_name::text = $1::text THEN $2 ELSE dag_name END,
     root_dag_name = CASE WHEN root_dag_name::text = $1::text THEN $2 ELSE root_dag_name END,
     updated_at = now()
-WHERE dag_name::text = $1::text
-   OR root_dag_name::text = $1::text
+WHERE root_dag_name::text = $1::text
+   OR (is_root AND dag_name::text = $1::text)
 `
 
 type RenameDAGRunsParams struct {

@@ -46,7 +46,7 @@ type Attempt struct {
 	lastEmittedEventType eventstore.EventType
 }
 
-func newAttempt(queries *db.Queries, row db.DaguDagRunAttempt) *Attempt {
+func newAttempt(queries *db.Queries, row db.DaguDagRunAttempt) (*Attempt, error) {
 	att := &Attempt{
 		id:        row.ID,
 		attemptID: row.AttemptID,
@@ -57,11 +57,13 @@ func newAttempt(queries *db.Queries, row db.DaguDagRunAttempt) *Attempt {
 	att.cancelRequested.Store(row.CancelRequested)
 	if len(row.DagData) > 0 {
 		var dag core.DAG
-		if err := json.Unmarshal(row.DagData, &dag); err == nil {
-			att.dag = &dag
+		if err := json.Unmarshal(row.DagData, &dag); err != nil {
+			return nil, fmt.Errorf("unmarshal DAG data for dag %q run %q attempt %q: %w",
+				row.DagName, row.DagRunID, row.AttemptID, err)
 		}
+		att.dag = &dag
 	}
-	return att
+	return att, nil
 }
 
 func (att *Attempt) ID() string {
