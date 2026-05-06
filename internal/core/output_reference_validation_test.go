@@ -50,14 +50,25 @@ func TestPublishedOutputContractValidatePath(t *testing.T) {
 	t.Run("TreatsEmptyCompositionAsUnknown", func(t *testing.T) {
 		t.Parallel()
 
-		contract := publishedOutputContract{
-			StepName: "build",
-			Source:   "output_schema",
-			Schema: map[string]any{
-				"anyOf": []any{},
-			},
-		}
+		for name, schema := range map[string]map[string]any{
+			"empty anyOf":     {"anyOf": []any{}},
+			"empty oneOf":     {"oneOf": []any{}},
+			"empty allOf":     {"allOf": []any{}},
+			"non-array anyOf": {"anyOf": "not-an-array"},
+			"non-array oneOf": {"oneOf": "not-an-array"},
+			"non-array allOf": {"allOf": "not-an-array"},
+		} {
+			t.Run(name, func(t *testing.T) {
+				t.Parallel()
 
-		assert.Equal(t, outputReferenceUnknown, contract.validatePath([]string{"artifact"}))
+				contract := publishedOutputContract{
+					StepName: "build",
+					Source:   "output_schema",
+					Schema:   schema,
+				}
+
+				assert.Equal(t, outputReferenceUnknown, contract.validatePath([]string{"artifact"}))
+			})
+		}
 	})
 }

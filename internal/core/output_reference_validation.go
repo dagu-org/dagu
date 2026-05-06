@@ -362,7 +362,7 @@ func outputReferenceError(location outputReferenceLocation, contract publishedOu
 			location.Field,
 			ref.Expression,
 			ref.StepName,
-			ref.Path[0],
+			strings.Join(ref.Path, "."),
 			contract.Source,
 			known,
 		)
@@ -373,7 +373,7 @@ func outputReferenceError(location outputReferenceLocation, contract publishedOu
 		location.Field,
 		ref.Expression,
 		ref.StepName,
-		ref.Path[0],
+		strings.Join(ref.Path, "."),
 		contract.Source,
 	)
 }

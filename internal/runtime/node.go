@@ -388,9 +388,28 @@ func (n *Node) handleCommandError(cmd executor.Executor, err error) (int, error)
 func (n *Node) captureOutput(ctx context.Context) error {
 	step := n.Step()
 
+	var stdout string
+	var stdoutCaptured bool
+	captureStdout := func() (string, error) {
+		if stdoutCaptured {
+			return stdout, nil
+		}
+		value, err := n.outputs.capturedOutput(ctx)
+		if err != nil {
+			return "", err
+		}
+		stdout = value
+		stdoutCaptured = true
+		return stdout, nil
+	}
+
 	var schemaOutput string
 	if step.HasOutputSchema() {
-		value, err := n.evaluateOutputSchema(ctx)
+		raw, err := captureStdout()
+		if err != nil {
+			return fmt.Errorf("failed to capture stdout for output_schema: %w", err)
+		}
+		value, err := n.evaluateOutputSchema(ctx, raw)
 		if err != nil {
 			return fmt.Errorf("failed to validate output_schema: %w", err)
 		}
@@ -398,7 +417,7 @@ func (n *Node) captureOutput(ctx context.Context) error {
 	}
 
 	if step.Output != "" {
-		value, err := n.outputs.capturedOutput(ctx)
+		value, err := captureStdout()
 		if err != nil {
 			return fmt.Errorf("failed to capture output: %w", err)
 		}
@@ -410,7 +429,7 @@ func (n *Node) captureOutput(ctx context.Context) error {
 	}
 
 	if step.HasStructuredOutput() {
-		value, err := n.evaluateStructuredOutput(ctx)
+		value, err := n.evaluateStructuredOutput(ctx, stdout, stdoutCaptured)
 		if err != nil {
 			return fmt.Errorf("failed to evaluate structured output: %w", err)
 		}
@@ -424,14 +443,14 @@ func (n *Node) captureOutput(ctx context.Context) error {
 	return nil
 }
 
-func (n *Node) evaluateOutputSchema(ctx context.Context) (string, error) {
-	raw, err := n.outputs.capturedOutput(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to capture stdout for output_schema: %w", err)
+func (n *Node) evaluateOutputSchema(ctx context.Context, raw string) (string, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return "", fmt.Errorf("output_schema requires stdout to contain a JSON value matching the schema")
 	}
 
 	var decoded any
-	if err := json.Unmarshal([]byte(raw), &decoded); err != nil {
+	if err := json.Unmarshal([]byte(trimmed), &decoded); err != nil {
 		return "", fmt.Errorf("failed to decode stdout JSON for output_schema: %w", err)
 	}
 	if err := n.validateOutputSchema(decoded); err != nil {
@@ -485,12 +504,12 @@ func (n *Node) resolvedOutputSchema() (*jsonschema.Resolved, error) {
 	return n.outputSchema, nil
 }
 
-func (n *Node) evaluateStructuredOutput(ctx context.Context) (string, error) {
+func (n *Node) evaluateStructuredOutput(ctx context.Context, stdout string, stdoutCaptured bool) (string, error) {
 	step := n.Step()
 	result := make(map[string]any, len(step.StructuredOutput))
 
 	for key, entry := range step.StructuredOutput {
-		value, err := n.resolveStructuredOutputEntry(ctx, key, entry)
+		value, err := n.resolveStructuredOutputEntry(ctx, key, entry, stdout, stdoutCaptured)
 		if err != nil {
 			return "", err
 		}
@@ -507,7 +526,7 @@ func (n *Node) evaluateStructuredOutput(ctx context.Context) (string, error) {
 	return string(data), nil
 }
 
-func (n *Node) resolveStructuredOutputEntry(ctx context.Context, key string, entry core.StepOutputEntry) (any, error) {
+func (n *Node) resolveStructuredOutputEntry(ctx context.Context, key string, entry core.StepOutputEntry, stdout string, stdoutCaptured bool) (any, error) {
 	if entry.HasValue {
 		value, err := n.evaluateStructuredLiteral(ctx, entry.Value)
 		if err != nil {
@@ -516,7 +535,7 @@ func (n *Node) resolveStructuredOutputEntry(ctx context.Context, key string, ent
 		return value, nil
 	}
 
-	raw, err := n.readStructuredOutputSource(ctx, key, entry)
+	raw, err := n.readStructuredOutputSource(ctx, key, entry, stdout, stdoutCaptured)
 	if err != nil {
 		return nil, err
 	}
@@ -533,9 +552,12 @@ func (n *Node) resolveStructuredOutputEntry(ctx context.Context, key string, ent
 	}
 }
 
-func (n *Node) readStructuredOutputSource(ctx context.Context, key string, entry core.StepOutputEntry) (string, error) {
+func (n *Node) readStructuredOutputSource(ctx context.Context, key string, entry core.StepOutputEntry, stdout string, stdoutCaptured bool) (string, error) {
 	switch entry.From {
 	case core.StepOutputSourceStdout:
+		if stdoutCaptured {
+			return stdout, nil
+		}
 		value, err := n.outputs.capturedOutput(ctx)
 		if err != nil {
 			return "", fmt.Errorf("%s: failed to capture stdout: %w", key, err)

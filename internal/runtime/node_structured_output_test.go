@@ -318,7 +318,7 @@ func TestNodeResolveStructuredOutputEntry(t *testing.T) {
 				tt.prepare(t, workDir, node)
 			}
 
-			got, err := node.resolveStructuredOutputEntry(ctx, "result", tt.entry)
+			got, err := node.resolveStructuredOutputEntry(ctx, "result", tt.entry, "", false)
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
@@ -447,6 +447,22 @@ func TestNodeCaptureOutputSchema(t *testing.T) {
 		assert.NotContains(t, err.Error(), "secret-value")
 	})
 
+	t.Run("EmptyStdoutFailsWithContractError", func(t *testing.T) {
+		t.Parallel()
+
+		workDir := t.TempDir()
+		ctx := structuredOutputTestContext(t, nil, workDir)
+		node := NodeWithData(NodeData{
+			Step: core.Step{OutputSchema: validSchema},
+		})
+		node.outputs.outputCaptured = true
+		node.outputs.outputData = "  \n\t  "
+
+		err := node.captureOutput(ctx)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "output_schema requires stdout to contain a JSON value matching the schema")
+	})
+
 	t.Run("SchemaMismatchFails", func(t *testing.T) {
 		t.Parallel()
 
@@ -537,7 +553,7 @@ func TestNodeEvaluateStructuredOutput(t *testing.T) {
 			},
 		})
 
-		got, err := node.evaluateStructuredOutput(ctx)
+		got, err := node.evaluateStructuredOutput(ctx, "", false)
 		require.NoError(t, err)
 		assert.JSONEq(t, `{"version":"v1.2.3","meta":{"channel":"stable","approved":true}}`, got)
 	})
@@ -561,7 +577,7 @@ func TestNodeEvaluateStructuredOutput(t *testing.T) {
 			},
 		})
 
-		_, err := node.evaluateStructuredOutput(ctx)
+		_, err := node.evaluateStructuredOutput(ctx, "", false)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "output exceeded maximum size limit")
 	})
@@ -581,7 +597,7 @@ func TestNodeEvaluateStructuredOutput(t *testing.T) {
 			},
 		})
 
-		_, err := node.evaluateStructuredOutput(ctx)
+		_, err := node.evaluateStructuredOutput(ctx, "", false)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), `payload: unsupported output source "network"`)
 	})
