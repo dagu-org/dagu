@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/tooltip';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useClient } from '@/hooks/api';
-import { getExecutorCommand } from '@/lib/executor-utils';
+import { getExecutorCommand, getLogStepMessage } from '@/lib/executor-utils';
 import { isHarnessStep } from '@/lib/harness-step';
 import { isActiveNodeStatus } from '@/lib/status-utils';
 import dayjs from '@/lib/dayjs';
@@ -47,10 +47,11 @@ import {
 } from '../../../../api/v1/schema';
 import StyledTableRow from '@/components/ui/styled-table-row';
 import { DAGContext } from '../../contexts/DAGContext';
-import { NodeStatusChip } from '../common';
+import NodeStatusChip from '../common/NodeStatusChip';
 import { InlineLogViewer } from '../common/InlineLogViewer';
 import StatusUpdateModal from '../dag-execution/StatusUpdateModal';
 import HarnessStepSummary from './HarnessStepSummary';
+import { LogStepMessage } from './LogStepMessage';
 import { SubDAGRunsList } from './SubDAGRunsList';
 import PushBackHistory from '../common/PushBackHistory';
 
@@ -170,6 +171,7 @@ function NodeStatusTableRow({
   const isActiveNode = isActiveNodeStatus(node.status);
   const activeDotClass =
     node.status === NodeStatus.Retrying ? 'bg-warning' : 'bg-success';
+  const logMessage = getLogStepMessage(node.step);
 
   // Update duration every second for active tasks.
   useEffect(() => {
@@ -527,6 +529,8 @@ function NodeStatusTableRow({
             <div className="space-y-1.5">
               {isHarnessStep(node.step) ? (
                 <HarnessStepSummary step={node.step} />
+              ) : logMessage !== null ? (
+                <LogStepMessage message={logMessage} compact />
               ) : node.step.commands && node.step.commands.length > 0 ? (
                 <CommandDisplay
                   commands={node.step.commands}
@@ -944,7 +948,9 @@ function NodeStatusTableRow({
       {/* Command section */}
       <div className="mb-3">
         <div className="text-xs font-medium text-foreground/90 mb-1">
-          {isHarnessStep(node.step)
+          {logMessage !== null
+            ? 'Message:'
+            : isHarnessStep(node.step)
             ? 'Execution:'
             : node.step.commands && node.step.commands.length > 1
               ? 'Commands:'
@@ -953,6 +959,8 @@ function NodeStatusTableRow({
         <div className="space-y-1.5">
           {isHarnessStep(node.step) ? (
             <HarnessStepSummary step={node.step} />
+          ) : logMessage !== null ? (
+            <LogStepMessage message={logMessage} />
           ) : node.step.commands && node.step.commands.length > 0 ? (
             <div className="space-y-1.5">
               {node.step.commands.map((entry, idx) => {

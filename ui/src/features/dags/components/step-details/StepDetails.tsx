@@ -4,7 +4,9 @@
 import { components } from '@/api/v1/schema';
 import { Badge } from '@/components/ui/badge';
 import BorderedBox from '@/components/ui/bordered-box';
+import { getLogMessageFromConfig } from '@/lib/executor-utils';
 import React from 'react';
+import { LogStepMessage } from '../dag-details/LogStepMessage';
 
 type Step = components['schemas']['Step'];
 
@@ -161,10 +163,40 @@ function renderStepFieldValue(name: string, value: unknown): React.ReactNode {
   }
 
   if (isPlainObject(value)) {
+    if (name === 'executorConfig') {
+      return <ExecutorConfigField value={value} />;
+    }
     return <ObjectFieldCard value={value} />;
   }
 
   return <div className="text-sm text-foreground">{String(value)}</div>;
+}
+
+function ExecutorConfigField({ value }: { value: Record<string, unknown> }) {
+  const type = typeof value.type === 'string' ? value.type : '';
+  const config = isPlainObject(value.config) ? value.config : undefined;
+  const logMessage = type === 'log' ? getLogMessageFromConfig(config) : null;
+
+  if (logMessage === null) {
+    return <ObjectFieldCard value={value} />;
+  }
+
+  return (
+    <div className="space-y-3 rounded-md border border-border bg-background p-3">
+      <div className="min-w-0">
+        <div className="mb-1 text-[11px] font-medium uppercase text-muted-foreground">
+          Type
+        </div>
+        <Badge variant="outline">log</Badge>
+      </div>
+      <div className="min-w-0">
+        <div className="mb-1 text-[11px] font-medium uppercase text-muted-foreground">
+          Message
+        </div>
+        <LogStepMessage message={logMessage} />
+      </div>
+    </div>
+  );
 }
 
 function ObjectFieldCard({ value }: { value: unknown }) {

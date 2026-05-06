@@ -11,7 +11,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { isHarnessStep } from '@/lib/harness-step';
-import { getExecutorCommand } from '@/lib/executor-utils';
+import { getExecutorCommand, getLogStepMessage } from '@/lib/executor-utils';
 import {
   ArrowRight,
   Code,
@@ -25,6 +25,7 @@ import { components } from '../../../../api/v1/schema';
 import { Badge } from '@/components/ui/badge';
 import { TableCell, TableRow } from '@/components/ui/table';
 import HarnessStepSummary from './HarnessStepSummary';
+import { LogStepMessage } from './LogStepMessage';
 
 /**
  * Props for the DAGStepTableRow component
@@ -41,6 +42,7 @@ type Props = {
  */
 function DAGStepTableRow({ step, index }: Props) {
   const subDagName = step.call;
+  const logMessage = getLogStepMessage(step);
   // Format preconditions as a list
   const preconditions = step.preconditions?.map((c, index) => (
     <div
@@ -120,6 +122,8 @@ function DAGStepTableRow({ step, index }: Props) {
         <div className="space-y-1.5">
           {isHarnessStep(step) ? (
             <HarnessStepSummary step={step} />
+          ) : logMessage !== null ? (
+            <LogStepMessage message={logMessage} compact />
           ) : step.commands && step.commands.length > 0 ? (
             <CommandDisplay
               commands={step.commands}

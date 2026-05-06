@@ -54,3 +54,21 @@ export function getExecutorCommand(
       return null;
   }
 }
+
+export function getLogStepMessage(
+  step: components['schemas']['Step']
+): string | null {
+  if (step.executorConfig?.type !== 'log') {
+    return null;
+  }
+
+  const config = step.executorConfig.config as Record<string, unknown>;
+  return getLogMessageFromConfig(config);
+}
+
+export function getLogMessageFromConfig(
+  config?: Record<string, unknown>
+): string | null {
+  const message = config?.message;
+  return typeof message === 'string' ? message : null;
+}
