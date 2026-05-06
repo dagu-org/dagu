@@ -41,7 +41,7 @@ type docFrontmatter struct {
 
 // Store implements a file-based doc store.
 // Docs are stored as files: {baseDir}/{id}.md
-// Each file contains optional YAML frontmatter (title) and a Markdown body.
+// Each file contains optional YAML frontmatter (title, description) and a Markdown body.
 // Unlike the soul store, this has no cached index — it scans the filesystem
 // on every call, following the DAG store pattern.
 type Store struct {
@@ -121,7 +121,7 @@ func scopedDocID(prefix, id string) (string, error) {
 
 // parseDocFile parses a doc .md file into an agent.Doc.
 // The file format is optional YAML frontmatter between --- delimiters, followed by markdown body.
-// Content always contains the full file (including frontmatter); frontmatter is only parsed to extract the title.
+// Content always contains the full file (including frontmatter); frontmatter is parsed to extract title and description.
 func parseDocFile(data []byte, id string) (*agent.Doc, error) {
 	content := strings.ReplaceAll(string(data), "\r\n", "\n")
 	content = strings.TrimRight(content, "\n")
