@@ -40,7 +40,7 @@ similar to the server-side spec validation.`,
 				return fmt.Errorf("initialization error: %w", err)
 			}
 			runErr := runValidate(ctx, args)
-			if closeErr := ctx.Close(ctx); closeErr != nil {
+			if closeErr := closeCommandContext(ctx); closeErr != nil {
 				return errors.Join(runErr, closeErr)
 			}
 			return runErr

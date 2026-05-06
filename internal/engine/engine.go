@@ -79,6 +79,12 @@ func New(ctx context.Context, opts Options) (*Engine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("initialize DAG-run store: %w", err)
 	}
+	cleanupDAGRunStore := true
+	defer func() {
+		if cleanupDAGRunStore {
+			_ = coreexec.CloseDAGRunStore(context.Background(), dagRunStore)
+		}
+	}()
 	serviceRegistry := fileserviceregistry.New(cfg.Paths.ServiceRegistryDir)
 	dagRunMgr := runtime.NewManager(dagRunStore, procStore, cfg)
 
@@ -86,6 +92,7 @@ func New(ctx context.Context, opts Options) (*Engine, error) {
 	if err != nil {
 		return nil, err
 	}
+	cleanupDAGRunStore = false
 
 	mode := opts.DefaultMode
 	if mode == "" {

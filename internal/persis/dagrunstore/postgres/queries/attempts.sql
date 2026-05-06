@@ -254,15 +254,27 @@ FROM removable
 ORDER BY run_created_at DESC, dag_run_id ASC;
 
 -- name: DeleteDAGRunRows :many
-DELETE FROM dagu_dag_run_attempts
-WHERE root_dag_name = sqlc.arg(root_dag_name)
-  AND root_dag_run_id = sqlc.arg(root_dag_run_id)
-RETURNING dag_run_id;
+WITH deleted AS (
+    DELETE FROM dagu_dag_run_attempts
+    WHERE root_dag_name = sqlc.arg(root_dag_name)
+      AND root_dag_run_id = sqlc.arg(root_dag_run_id)
+    RETURNING dag_run_id
+)
+SELECT DISTINCT dag_run_id
+FROM deleted
+ORDER BY dag_run_id;
 
 -- name: RenameDAGRuns :exec
 UPDATE dagu_dag_run_attempts
 SET dag_name = CASE WHEN is_root AND dag_name::text = sqlc.arg(old_name)::text THEN sqlc.arg(new_name) ELSE dag_name END,
     root_dag_name = CASE WHEN root_dag_name::text = sqlc.arg(old_name)::text THEN sqlc.arg(new_name) ELSE root_dag_name END,
+    status_data = CASE
+        WHEN is_root
+         AND dag_name::text = sqlc.arg(old_name)::text
+         AND status_data IS NOT NULL
+        THEN jsonb_set(status_data, '{name}', to_jsonb(sqlc.arg(new_name)::text), true)
+        ELSE status_data
+    END,
     updated_at = now()
 WHERE root_dag_name::text = sqlc.arg(old_name)::text
    OR (is_root AND dag_name::text = sqlc.arg(old_name)::text);

@@ -639,6 +639,11 @@ func (c *Config) validateDAGRunStore() error {
 	case "", DAGRunStoreBackendFile:
 		return nil
 	case DAGRunStoreBackendPostgres:
+		if c.DAGRunStore.Postgres.Server.DSN == "" &&
+			c.DAGRunStore.Postgres.Scheduler.DSN == "" &&
+			c.DAGRunStore.Postgres.Agent.DSN == "" {
+			return fmt.Errorf("invalid dag_run_store.backend: postgres selected but no role DSNs configured")
+		}
 		return nil
 	default:
 		return fmt.Errorf("invalid dag_run_store.backend: %q", c.DAGRunStore.Backend)

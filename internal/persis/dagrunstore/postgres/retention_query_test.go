@@ -26,6 +26,22 @@ func TestRetentionQueriesUseLatestAttemptLikeFileStore(t *testing.T) {
 	assert.Contains(t, countQuery, "status_data IS NOT NULL")
 }
 
+func TestDeleteDAGRunRowsReturnsDistinctRunIDs(t *testing.T) {
+	query := namedQuery(t, readAttemptQueries(t), "DeleteDAGRunRows")
+
+	assert.Contains(t, query, "WITH deleted AS (")
+	assert.Contains(t, query, "SELECT DISTINCT dag_run_id")
+	assert.Contains(t, query, "ORDER BY dag_run_id")
+}
+
+func TestRenameDAGRunsUpdatesRootStatusName(t *testing.T) {
+	query := namedQuery(t, readAttemptQueries(t), "RenameDAGRuns")
+
+	assert.Contains(t, query, "status_data = CASE")
+	assert.Contains(t, query, "WHEN is_root")
+	assert.Contains(t, query, "jsonb_set(status_data, '{name}', to_jsonb(sqlc.arg(new_name)::text), true)")
+}
+
 func readAttemptQueries(t *testing.T) string {
 	t.Helper()
 	data, err := os.ReadFile("queries/attempts.sql")
@@ -35,7 +51,7 @@ func readAttemptQueries(t *testing.T) string {
 
 func namedQuery(t *testing.T, queryText, name string) string {
 	t.Helper()
-	pattern := regexp.MustCompile(`(?ms)-- name: ` + regexp.QuoteMeta(name) + ` :many\n(.*?)(?:\n-- name:|\z)`)
+	pattern := regexp.MustCompile(`(?ms)-- name: ` + regexp.QuoteMeta(name) + ` :\w+\n(.*?)(?:\n-- name:|\z)`)
 	matches := pattern.FindStringSubmatch(queryText)
 	require.Len(t, matches, 2)
 	return strings.TrimSpace(matches[1])

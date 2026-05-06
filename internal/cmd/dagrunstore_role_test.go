@@ -24,6 +24,7 @@ func TestDAGRunStoreRoleForCommand(t *testing.T) {
 		{name: "restart", want: dagrunstore.RoleAgent},
 		{name: "retry", want: dagrunstore.RoleAgent},
 		{name: "dry", want: dagrunstore.RoleAgent},
+		{name: "exec", want: dagrunstore.RoleAgent},
 		{name: "worker", want: dagrunstore.RoleAgent},
 	}
 

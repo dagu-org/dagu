@@ -555,6 +555,51 @@ dag_run_store:
 		}, cfg.DAGRunStore.Postgres.Agent.Pool)
 	})
 
+	t.Run("PostgresAutoMigrateCamelCaseAliasesReportMigration", func(t *testing.T) {
+		err := loadWithErrorFromYAML(t, `
+dag_run_store:
+  backend: postgres
+  postgres:
+    server:
+      dsn: postgres://dagu:server@localhost:5432/dagu_server?sslmode=disable
+      autoMigrate: false
+    scheduler:
+      dsn: postgres://dagu:scheduler@localhost:5432/dagu_scheduler?sslmode=disable
+      autoMigrate: false
+    agent:
+      dsn: postgres://dagu:agent@localhost:5432/dagu_agent?sslmode=disable
+      autoMigrate: true
+`)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "dag_run_store.postgres.server.automigrate -> dag_run_store.postgres.server.auto_migrate")
+		assert.Contains(t, err.Error(), "dag_run_store.postgres.scheduler.automigrate -> dag_run_store.postgres.scheduler.auto_migrate")
+		assert.Contains(t, err.Error(), "dag_run_store.postgres.agent.automigrate -> dag_run_store.postgres.agent.auto_migrate")
+	})
+
+	t.Run("PostgresRequiresAtLeastOneRoleDSN", func(t *testing.T) {
+		err := loadWithErrorFromYAML(t, `
+dag_run_store:
+  backend: postgres
+`)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "postgres selected but no role DSNs configured")
+	})
+
+	t.Run("PostgresAllowsSingleRoleDSN", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+dag_run_store:
+  backend: postgres
+  postgres:
+    agent:
+      dsn: postgres://dagu:agent@localhost:5432/dagu_agent?sslmode=disable
+`)
+
+		assert.Equal(t, DAGRunStoreBackendPostgres, cfg.DAGRunStore.Backend)
+		assert.Equal(t, "postgres://dagu:agent@localhost:5432/dagu_agent?sslmode=disable", cfg.DAGRunStore.Postgres.Agent.DSN)
+	})
+
 	t.Run("InvalidBackend", func(t *testing.T) {
 		err := loadWithErrorFromYAML(t, `
 dag_run_store:

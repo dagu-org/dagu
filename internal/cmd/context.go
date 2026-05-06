@@ -930,13 +930,19 @@ func NewCommand(cmd *cobra.Command, flags []commandLineFlag, runFunc func(cmd *C
 			return fmt.Errorf("initialization error: %w", err)
 		}
 		runErr := runFunc(ctx, args)
-		if closeErr := ctx.Close(ctx); closeErr != nil {
+		if closeErr := closeCommandContext(ctx); closeErr != nil {
 			return errors.Join(runErr, closeErr)
 		}
 		return runErr
 	}
 
 	return cmd
+}
+
+func closeCommandContext(ctx *Context) error {
+	closeCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	return ctx.Close(closeCtx)
 }
 
 // genRunID creates a new UUID string to be used as a dag-run IDentifier.

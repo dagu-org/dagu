@@ -127,10 +127,22 @@ run: ${FE_BUNDLE_JS}
 	@DAGU_DEBUG=1 go run ./cmd start-all
 
 # dev-pg starts a local PostgreSQL instance and runs Dagu with the Postgres DAG-run store.
-.PHONY: dev-pg
-dev-pg: ${FE_BUNDLE_JS}
-	@printf '%b\n' "${COLOR_GREEN}Starting PostgreSQL for DAG-run store development...${COLOR_RESET}"
-	@docker compose -p ${DEV_PG_COMPOSE_PROJECT} -f ${DEV_PG_COMPOSE_FILE} up -d postgres
+.PHONY: dev-pg dev-pg-up dev-pg-wait dev-pg-start
+dev-pg: dev-pg-start
+
+dev-pg-start: ${FE_BUNDLE_JS} dev-pg-wait
+	@printf '%b\n' "${COLOR_GREEN}Starting Dagu with PostgreSQL DAG-run store...${COLOR_RESET}"
+	@DAGU_DEBUG=1 \
+		DAGU_DAG_RUN_STORE_BACKEND=postgres \
+		DAGU_DAG_RUN_STORE_POSTGRES_SERVER_DSN='${DEV_PG_DSN}' \
+		DAGU_DAG_RUN_STORE_POSTGRES_SERVER_AUTO_MIGRATE=true \
+		DAGU_DAG_RUN_STORE_POSTGRES_SCHEDULER_DSN='${DEV_PG_DSN}' \
+		DAGU_DAG_RUN_STORE_POSTGRES_SCHEDULER_AUTO_MIGRATE=true \
+		DAGU_DAG_RUN_STORE_POSTGRES_AGENT_DSN='${DEV_PG_DSN}' \
+		DAGU_DAG_RUN_STORE_POSTGRES_AGENT_AUTO_MIGRATE=false \
+		go run ./cmd start-all
+
+dev-pg-wait: dev-pg-up
 	@printf '%b\n' "${COLOR_GREEN}Waiting for PostgreSQL to become ready...${COLOR_RESET}"
 	@i=0; \
 	while [ $$i -lt 30 ]; do \
@@ -145,16 +157,10 @@ dev-pg: ${FE_BUNDLE_JS}
 		docker compose -p ${DEV_PG_COMPOSE_PROJECT} -f ${DEV_PG_COMPOSE_FILE} ps; \
 		exit 1; \
 	fi
-	@printf '%b\n' "${COLOR_GREEN}Starting Dagu with PostgreSQL DAG-run store...${COLOR_RESET}"
-	@DAGU_DEBUG=1 \
-		DAGU_DAG_RUN_STORE_BACKEND=postgres \
-		DAGU_DAG_RUN_STORE_POSTGRES_SERVER_DSN='${DEV_PG_DSN}' \
-		DAGU_DAG_RUN_STORE_POSTGRES_SERVER_AUTO_MIGRATE=true \
-		DAGU_DAG_RUN_STORE_POSTGRES_SCHEDULER_DSN='${DEV_PG_DSN}' \
-		DAGU_DAG_RUN_STORE_POSTGRES_SCHEDULER_AUTO_MIGRATE=true \
-		DAGU_DAG_RUN_STORE_POSTGRES_AGENT_DSN='${DEV_PG_DSN}' \
-		DAGU_DAG_RUN_STORE_POSTGRES_AGENT_AUTO_MIGRATE=false \
-		go run ./cmd start-all
+
+dev-pg-up:
+	@printf '%b\n' "${COLOR_GREEN}Starting PostgreSQL for DAG-run store development...${COLOR_RESET}"
+	@docker compose -p ${DEV_PG_COMPOSE_PROJECT} -f ${DEV_PG_COMPOSE_FILE} up -d postgres
 
 # server build the binary and start the server.
 .PHONY: run-server

@@ -108,10 +108,15 @@ func (q *Queries) CreateAttempt(ctx context.Context, arg CreateAttemptParams) (D
 }
 
 const deleteDAGRunRows = `-- name: DeleteDAGRunRows :many
-DELETE FROM dagu_dag_run_attempts
-WHERE root_dag_name = $1
-  AND root_dag_run_id = $2
-RETURNING dag_run_id
+WITH deleted AS (
+    DELETE FROM dagu_dag_run_attempts
+    WHERE root_dag_name = $1
+      AND root_dag_run_id = $2
+    RETURNING dag_run_id
+)
+SELECT DISTINCT dag_run_id
+FROM deleted
+ORDER BY dag_run_id
 `
 
 type DeleteDAGRunRowsParams struct {
@@ -799,6 +804,13 @@ const renameDAGRuns = `-- name: RenameDAGRuns :exec
 UPDATE dagu_dag_run_attempts
 SET dag_name = CASE WHEN is_root AND dag_name::text = $1::text THEN $2 ELSE dag_name END,
     root_dag_name = CASE WHEN root_dag_name::text = $1::text THEN $2 ELSE root_dag_name END,
+    status_data = CASE
+        WHEN is_root
+         AND dag_name::text = $1::text
+         AND status_data IS NOT NULL
+        THEN jsonb_set(status_data, '{name}', to_jsonb($2::text), true)
+        ELSE status_data
+    END,
     updated_at = now()
 WHERE root_dag_name::text = $1::text
    OR (is_root AND dag_name::text = $1::text)
