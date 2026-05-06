@@ -258,6 +258,9 @@ func validateSchemaOutputPath(schema map[string]any, path []string) outputRefere
 	properties, _ := schemaMap(schema["properties"])
 	propertySchema, exists := properties[path[0]]
 	if !exists {
+		if schemaPatternPropertiesMayAllow(schema, path[0]) {
+			return outputReferenceUnknown
+		}
 		if schemaAdditionalPropertiesFalse(schema) {
 			return outputReferenceInvalid
 		}
@@ -317,6 +320,20 @@ func schemaAdditionalPropertiesFalse(schema map[string]any) bool {
 	}
 	boolValue, ok := value.(bool)
 	return ok && !boolValue
+}
+
+func schemaPatternPropertiesMayAllow(schema map[string]any, property string) bool {
+	patternProperties, ok := schemaMap(schema["patternProperties"])
+	if !ok {
+		return false
+	}
+	for pattern := range patternProperties {
+		matched, err := regexp.MatchString(pattern, property)
+		if err != nil || matched {
+			return true
+		}
+	}
+	return false
 }
 
 func schemaMap(value any) (map[string]any, bool) {

@@ -472,11 +472,12 @@ func TestNodeCaptureOutputSchema(t *testing.T) {
 			Step: core.Step{OutputSchema: validSchema},
 		})
 		node.outputs.outputCaptured = true
-		node.outputs.outputData = `{"category":"bug","confidence":2}`
+		node.outputs.outputData = `{"category":"leak-sentinel-bug","confidence":2}`
 
 		err := node.captureOutput(ctx)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "stdout JSON does not match output_schema")
+		assert.NotContains(t, err.Error(), "leak-sentinel-bug")
 	})
 
 	t.Run("ValidatesBeforeExplicitOutputMapping", func(t *testing.T) {

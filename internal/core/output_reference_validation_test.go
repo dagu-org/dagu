@@ -71,4 +71,23 @@ func TestPublishedOutputContractValidatePath(t *testing.T) {
 			})
 		}
 	})
+
+	t.Run("ClosedSchemaWithPatternPropertiesIsUnknown", func(t *testing.T) {
+		t.Parallel()
+
+		contract := publishedOutputContract{
+			StepName: "build",
+			Source:   "output_schema",
+			Schema: map[string]any{
+				"type":                 "object",
+				"additionalProperties": false,
+				"patternProperties": map[string]any{
+					"^x_": map[string]any{"type": "string"},
+				},
+			},
+		}
+
+		assert.Equal(t, outputReferenceUnknown, contract.validatePath([]string{"x_dynamic"}))
+		assert.Equal(t, outputReferenceInvalid, contract.validatePath([]string{"dynamic"}))
+	})
 }
