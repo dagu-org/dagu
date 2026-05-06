@@ -5,6 +5,7 @@ package runtime
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -478,6 +479,23 @@ func TestNodeCaptureOutputSchema(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "stdout JSON does not match output_schema")
 		assert.NotContains(t, err.Error(), "leak-sentinel-bug")
+	})
+
+	t.Run("PreservesExecutionErrorOverSchemaError", func(t *testing.T) {
+		t.Parallel()
+
+		workDir := t.TempDir()
+		ctx := structuredOutputTestContext(t, nil, workDir)
+		node := NodeWithData(NodeData{
+			Step: core.Step{OutputSchema: validSchema},
+		})
+		node.outputs.outputCaptured = true
+		node.outputs.outputData = `not-json`
+		execErr := errors.New("executor failed")
+		node.SetError(execErr)
+
+		require.NoError(t, node.captureOutput(ctx))
+		assert.ErrorIs(t, node.Error(), execErr)
 	})
 
 	t.Run("ValidatesBeforeExplicitOutputMapping", func(t *testing.T) {

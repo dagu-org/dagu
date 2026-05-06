@@ -404,16 +404,22 @@ func (n *Node) captureOutput(ctx context.Context) error {
 	}
 
 	var schemaOutput string
+	var schemaErr error
 	if step.HasOutputSchema() {
 		raw, err := captureStdout()
 		if err != nil {
-			return fmt.Errorf("failed to capture stdout for output_schema: %w", err)
+			schemaErr = fmt.Errorf("failed to capture stdout for output_schema: %w", err)
+		} else {
+			value, err := n.evaluateOutputSchema(ctx, raw)
+			if err != nil {
+				schemaErr = fmt.Errorf("failed to validate output_schema: %w", err)
+			} else {
+				schemaOutput = value
+			}
 		}
-		value, err := n.evaluateOutputSchema(ctx, raw)
-		if err != nil {
-			return fmt.Errorf("failed to validate output_schema: %w", err)
+		if schemaErr != nil && n.Error() == nil {
+			return schemaErr
 		}
-		schemaOutput = value
 	}
 
 	if step.Output != "" {

@@ -116,6 +116,32 @@ func TestPublishedOutputContractValidatePath(t *testing.T) {
 		assert.Equal(t, outputReferenceUnknown, contract.validatePath([]string{"x_dynamic"}))
 		assert.Equal(t, outputReferenceInvalid, contract.validatePath([]string{"dynamic"}))
 	})
+
+	t.Run("NestedLookupUnderScalarLiteralIsInvalid", func(t *testing.T) {
+		t.Parallel()
+
+		contract := publishedOutputContract{
+			StepName: "build",
+			Source:   "output",
+			Keys: map[string]StepOutputEntry{
+				"version": {HasValue: true, Value: "v1"},
+			},
+		}
+
+		assert.Equal(t, outputReferenceInvalid, contract.validatePath([]string{"version", "major"}))
+	})
+
+	t.Run("NonObjectOutputSchemaRejectsFieldAccess", func(t *testing.T) {
+		t.Parallel()
+
+		contract := publishedOutputContract{
+			StepName: "build",
+			Source:   "output_schema",
+			Schema:   map[string]any{"type": "string"},
+		}
+
+		assert.Equal(t, outputReferenceInvalid, contract.validatePath([]string{"field"}))
+	})
 }
 
 func TestCollectOutputValueReferenceStringsDescendsTypedContainers(t *testing.T) {
@@ -140,4 +166,25 @@ func TestCollectOutputValueReferenceStringsDescendsTypedContainers(t *testing.T)
 	assert.Equal(t, "zed", refs[0].ref.Path[0])
 	assert.Equal(t, "output.payload.value[1].a", refs[1].field)
 	assert.Equal(t, "alpha", refs[1].ref.Path[0])
+}
+
+func TestCollectStepOutputReferenceStringsIncludesExecutorConfig(t *testing.T) {
+	t.Parallel()
+
+	refs := collectStepOutputReferenceStrings(Step{
+		ExecutorConfig: ExecutorConfig{
+			Config: map[string]any{
+				"endpoint": "https://example.com/${build.output.host}",
+				"headers": map[string]any{
+					"authorization": "Bearer ${build.output.token}",
+				},
+			},
+		},
+	})
+
+	require.Len(t, refs, 2)
+	assert.Equal(t, "with.endpoint", refs[0].field)
+	assert.Equal(t, "https://example.com/${build.output.host}", refs[0].value)
+	assert.Equal(t, "with.headers.authorization", refs[1].field)
+	assert.Equal(t, "Bearer ${build.output.token}", refs[1].value)
 }

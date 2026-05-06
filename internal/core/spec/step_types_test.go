@@ -122,6 +122,36 @@ steps:
 	assert.Contains(t, err.Error(), "output_schema must resolve to an object schema")
 }
 
+func TestCustomStepTypes_AllowsRefObjectOutputSchema(t *testing.T) {
+	t.Parallel()
+
+	dag, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-ref-output-schema
+step_types:
+  classify:
+    type: command
+    input_schema:
+      type: object
+    output_schema:
+      $ref: '#/$defs/result'
+      $defs:
+        result:
+          type: object
+          additionalProperties: false
+          properties:
+            category:
+              type: string
+    template:
+      command: echo '{"category":"bug"}'
+steps:
+  - type: classify
+`))
+	require.NoError(t, err)
+	require.Len(t, dag.Steps, 1)
+	require.NotNil(t, dag.Steps[0].OutputSchema)
+	assert.Equal(t, "#/$defs/result", dag.Steps[0].OutputSchema["$ref"])
+}
+
 func TestCustomStepTypes_AllowsComposedObjectOutputSchema(t *testing.T) {
 	t.Parallel()
 

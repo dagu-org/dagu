@@ -63,7 +63,7 @@ type Step struct {
 	// StructuredOutput publishes post-processed step-scoped outputs for ${step.output.*} access.
 	StructuredOutput map[string]StepOutputEntry `json:"structuredOutput,omitempty"`
 	// OutputSchema validates stdout JSON before publishing step-scoped output.
-	OutputSchema map[string]any `json:"outputSchema,omitempty"`
+	OutputSchema map[string]any `json:"outputSchema,omitzero"`
 	// Depends contains the list of step names to depend on.
 	Depends []string `json:"depends,omitempty"`
 	// ExplicitlyNoDeps indicates the depends field was explicitly set to empty

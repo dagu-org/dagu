@@ -130,6 +130,7 @@ func collectStepOutputReferenceStrings(step Step) []outputReferenceString {
 		add(fmt.Sprintf("output.%s.path", name), entry.Path)
 		add(fmt.Sprintf("output.%s.select", name), entry.Select)
 	}
+	collectOutputValueReferenceStrings("with", step.ExecutorConfig.Config, add)
 	collectOutputValueReferenceStrings("params", step.Params, add)
 	return refs
 }
@@ -260,7 +261,7 @@ func validateLiteralOutputPath(value any, path []string) outputReferenceValidati
 	}
 	m, ok := schemaMap(value)
 	if !ok {
-		return outputReferenceUnknown
+		return outputReferenceInvalid
 	}
 	next, ok := m[path[0]]
 	if !ok {
@@ -278,6 +279,9 @@ func validateSchemaOutputPath(schema map[string]any, path []string) outputRefere
 	}
 	if hasSchemaComposition(schema) {
 		return validateComposedSchemaOutputPath(schema, path)
+	}
+	if typ, ok := schema["type"].(string); ok && typ != "object" {
+		return outputReferenceInvalid
 	}
 	if !schemaLooksObject(schema) {
 		return outputReferenceUnknown
