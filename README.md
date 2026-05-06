@@ -123,10 +123,15 @@ The script installers run a guided wizard that can add Dagu to your PATH, set it
 Create a YAML file with your workflow definition. For example, create `review-readme.yaml` with the following content:
 
 ```yaml
+working_dir: ${DAG_RUN_ARTIFACTS_DIR}
+
 params:
   - name: REPO_URL
     type: string
     required: true
+
+artifacts:
+  enabled: true
 
 harnesses:
   codex-cli:
@@ -143,20 +148,20 @@ steps:
     type: harness
     command: |
       Review the README.md file in ${REPO_URL}.
-      Write Markdown findings to review.md.
+      Write Markdown findings to ${DAG_RUN_ARTIFACTS_DIR}/review.md.
     with:
       provider: codex-cli
 
   - id: approval
     type: noop
     approval:
-      prompt: Review review.md. Approve to post an issue with the findings, or reject to skip.
+      prompt: Review the review.md artifact. Approve to post an issue with the findings, or reject to skip.
 
   - id: post_issue
-    command: gh issue create --title "Review Findings" --body-file review.md
+    command: gh issue create --title "Review Findings" --body-file "${DAG_RUN_ARTIFACTS_DIR}/review.md"
 ```
 
-This workflow uses the [`harness` step type](https://docs.dagu.sh/step-types/harness#harness) and assumes you have the `codex` CLI installed and configured. It reviews a GitHub repository's README file, generates findings with Codex, and then prompts for manual [approval](https://docs.dagu.sh/writing-workflows/yaml-specification#approval) before posting an issue with the findings.
+This workflow uses the [`harness` step type](https://docs.dagu.sh/step-types/harness#harness) and assumes you have the `codex` CLI installed and configured. It reviews a GitHub repository's README file, generates findings with Codex, and then prompts for manual [approval](https://docs.dagu.sh/writing-workflows/yaml-specification#approval) before posting an issue with the findings. GitHub CLI (`gh`) is used in the final step to create the issue.
 
 Run the workflow with:
 
@@ -429,18 +434,49 @@ steps:
       failure: true
 ```
 
-### Scheduling with overlap control
+### Scheduling with overlap control and catch-up
 
 ```yaml
 schedule:
-  - "0 */6 * * *"              # Every 6 hours
-overlap_policy: skip            # Skip if previous run is still active
+  - "0 */6 * * *"          # Every 6 hours
+overlap_policy: skip       # Skip if previous run is still active
+catchup_window: "5h"       # Catch up missed runs when scheduler is down for up to 5 hours
+  
 timeout_sec: 3600
 handler_on:
   failure:
     command: notify-team.sh
   exit:
     command: cleanup.sh
+```
+
+### Harness step with manual approval
+
+```yaml
+harnesses:
+  codex-cli:
+    binary: codex
+    prefix_args:
+      - exec
+      - --sandbox
+      - workspace-write
+      - --skip-git-repo-check
+    prompt_mode: arg
+
+steps:
+  - name: review
+    type: harness
+    command: Review the README.md file and write findings to review.md.
+    with:
+      provider: codex-cli
+
+  - name: approval
+    type: noop
+    approval:
+      prompt: Review the review.md artifact. Approve to post an issue with the findings, or reject to skip.
+
+  - name: post_issue
+    command: gh issue create --title "Review Findings" --body-file "${DAG_RUN_ARTIFACTS_DIR}/review.md"
 ```
 
 For more examples, see the [Examples documentation](https://docs.dagu.sh/writing-workflows/examples).
@@ -467,8 +503,7 @@ Dagu includes built-in step types that run within the Dagu process (or worker).
 | [`router`](https://docs.dagu.sh/step-types/router) | Conditional step routing based on values and patterns |
 | [`dag` / `subworkflow` / `call:`](https://docs.dagu.sh/writing-workflows/control-flow) | Invoke another DAG as a sub-workflow with params and dependencies |
 | [`harness`](https://docs.dagu.sh/step-types/harness) | Run coding agent CLIs such as Claude Code, Codex, Copilot, OpenCode, and Pi |
-| [`chat`](https://docs.dagu.sh/features/chat/basics) | Single-shot LLM calls inside workflows |
-| [`agent`](https://docs.dagu.sh/features/agent/step) | Multi-step LLM agent execution with tool calling |
+| [`agent`](https://docs.dagu.sh/features/agent/step) | Built-in agent step type with tool use |
 
 You can also define your own reusable step types with the top-level `step_types` field. Custom step types expand to built-in step types during DAG load, so you can wrap a common shell, HTTP, SQL, or other step pattern behind a typed interface with validated input.
 
