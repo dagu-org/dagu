@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { MermaidBlock } from '@/components/ui/mermaid-block';
 import { cn } from '@/lib/utils';
 import { slugifyHeading } from '@/lib/text-utils';
