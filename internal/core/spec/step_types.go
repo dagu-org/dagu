@@ -22,18 +22,20 @@ import (
 )
 
 type customStepTypeSpec struct {
-	Type        string         `yaml:"type,omitempty"`
-	Description string         `yaml:"description,omitempty"`
-	InputSchema any            `yaml:"input_schema,omitempty"`
-	Template    map[string]any `yaml:"template,omitempty"`
+	Type         string         `yaml:"type,omitempty"`
+	Description  string         `yaml:"description,omitempty"`
+	InputSchema  any            `yaml:"input_schema,omitempty"`
+	OutputSchema any            `yaml:"output_schema,omitempty"`
+	Template     map[string]any `yaml:"template,omitempty"`
 }
 
 type customStepType struct {
-	Name        string
-	Type        string
-	Description string
-	InputSchema *jsonschema.Resolved
-	Template    map[string]any
+	Name         string
+	Type         string
+	Description  string
+	InputSchema  *jsonschema.Resolved
+	OutputSchema map[string]any
+	Template     map[string]any
 }
 
 type customStepTypeRegistry struct {
@@ -265,13 +267,21 @@ func validateCustomStepTypeSpec(name string, spec customStepTypeSpec) (*customSt
 	if err != nil {
 		return nil, err
 	}
+	var outputSchema map[string]any
+	if spec.OutputSchema != nil {
+		outputSchema, err = resolveOutputSchemaDeclaration(fmt.Sprintf("step_types.%s.output_schema", name), spec.OutputSchema)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	return &customStepType{
-		Name:        name,
-		Type:        targetType,
-		Description: strings.TrimSpace(spec.Description),
-		InputSchema: inputSchema,
-		Template:    cloneMap(spec.Template),
+		Name:         name,
+		Type:         targetType,
+		Description:  strings.TrimSpace(spec.Description),
+		InputSchema:  inputSchema,
+		OutputSchema: outputSchema,
+		Template:     cloneMap(spec.Template),
 	}, nil
 }
 
@@ -301,6 +311,30 @@ func resolveCustomStepTypeInputSchema(name string, schemaDecl any) (*jsonschema.
 		)
 	}
 	return resolved, nil
+}
+
+func resolveOutputSchemaDeclaration(fieldName string, schemaDecl any) (map[string]any, error) {
+	schemaMap, ok := schemaDecl.(map[string]any)
+	if !ok {
+		return nil, core.NewValidationError(
+			fieldName,
+			schemaDecl,
+			fmt.Errorf("output_schema must be an inline JSON Schema object"),
+		)
+	}
+	resolved, err := resolveSchemaDeclaration(schemaMap, "", "")
+	if err != nil {
+		return nil, core.NewValidationError(fieldName, schemaDecl, err)
+	}
+	root := resolved.Schema()
+	if root == nil || !schemaDeclaresObject(root) {
+		return nil, core.NewValidationError(
+			fieldName,
+			schemaDecl,
+			fmt.Errorf("output_schema must resolve to an object schema"),
+		)
+	}
+	return cloneMap(schemaMap), nil
 }
 
 func schemaDeclaresObject(root *jsonschema.Schema) bool {
@@ -734,6 +768,9 @@ func buildCustomStepFromSpec(
 		builtStep.ExecutorConfig.Metadata = make(map[string]any, 1)
 	}
 	builtStep.ExecutorConfig.Metadata["custom_type"] = customType.Name
+	if len(customType.OutputSchema) > 0 && len(builtStep.OutputSchema) == 0 {
+		builtStep.OutputSchema = cloneMap(customType.OutputSchema)
+	}
 	if customType.Description != "" && builtStep.Description == "" {
 		builtStep.Description = customType.Description
 	}

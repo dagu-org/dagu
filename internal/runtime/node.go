@@ -31,6 +31,7 @@ import (
 	"github.com/dagucloud/dagu/internal/core/exec"
 	"github.com/dagucloud/dagu/internal/runtime/executor"
 	"github.com/goccy/go-yaml"
+	"github.com/google/jsonschema-go/jsonschema"
 )
 
 // systemVarPrefix is the prefix for temporary variables used internally by Dagu
@@ -383,6 +384,15 @@ func (n *Node) handleCommandError(cmd executor.Executor, err error) (int, error)
 func (n *Node) captureOutput(ctx context.Context) error {
 	step := n.Step()
 
+	var schemaOutput string
+	if step.HasOutputSchema() {
+		value, err := n.evaluateOutputSchema(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to validate output_schema: %w", err)
+		}
+		schemaOutput = value
+	}
+
 	if step.Output != "" {
 		value, err := n.outputs.capturedOutput(ctx)
 		if err != nil {
@@ -393,15 +403,63 @@ func (n *Node) captureOutput(ctx context.Context) error {
 		return nil
 	}
 
-	if !step.HasStructuredOutput() {
+	if step.HasStructuredOutput() {
+		value, err := n.evaluateStructuredOutput(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to evaluate structured output: %w", err)
+		}
+		n.setOutputValue(value)
 		return nil
 	}
 
-	value, err := n.evaluateStructuredOutput(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to evaluate structured output: %w", err)
+	if step.HasOutputSchema() {
+		n.setOutputValue(schemaOutput)
 	}
-	n.setOutputValue(value)
+	return nil
+}
+
+func (n *Node) evaluateOutputSchema(ctx context.Context) (string, error) {
+	step := n.Step()
+	raw, err := n.outputs.capturedOutput(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to capture stdout for output_schema: %w", err)
+	}
+
+	var decoded any
+	if err := json.Unmarshal([]byte(raw), &decoded); err != nil {
+		return "", fmt.Errorf("failed to decode stdout JSON for output_schema: %w", err)
+	}
+	if err := validateOutputSchema(step.OutputSchema, decoded); err != nil {
+		return "", err
+	}
+
+	data, err := json.Marshal(decoded)
+	if err != nil {
+		return "", fmt.Errorf("failed to serialize validated output_schema value: %w", err)
+	}
+	if int64(len(data)) > maxOutputSize(ctx) {
+		return "", fmt.Errorf("output exceeded maximum size limit of %d bytes", maxOutputSize(ctx))
+	}
+	return string(data), nil
+}
+
+func validateOutputSchema(schemaDecl map[string]any, value any) error {
+	data, err := json.Marshal(schemaDecl)
+	if err != nil {
+		return fmt.Errorf("failed to marshal output_schema: %w", err)
+	}
+	var schema jsonschema.Schema
+	if err := json.Unmarshal(data, &schema); err != nil {
+		return fmt.Errorf("failed to parse output_schema: %w", err)
+	}
+	resolved, err := schema.Resolve(&jsonschema.ResolveOptions{ValidateDefaults: true})
+	if err != nil {
+		return fmt.Errorf("failed to resolve output_schema: %w", err)
+	}
+	if err := resolved.Validate(value); err != nil {
+		// Avoid wrapping the validation error because it may contain parts of stdout.
+		return fmt.Errorf("stdout JSON does not match output_schema")
+	}
 	return nil
 }
 

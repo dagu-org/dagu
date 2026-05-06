@@ -59,6 +59,69 @@ steps:
 	assert.Equal(t, "Send a greeting", step.Description)
 }
 
+func TestCustomStepTypes_OutputSchemaIsAttachedToExpandedStep(t *testing.T) {
+	t.Parallel()
+
+	dag, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-output-schema
+step_types:
+  classify:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      properties:
+        text:
+          type: string
+    output_schema:
+      type: object
+      additionalProperties: false
+      required: [category, confidence]
+      properties:
+        category:
+          type: string
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+    template:
+      command: echo '{"category":"bug","confidence":0.9}'
+steps:
+  - id: classify
+    type: classify
+    with:
+      text: crash on startup
+`))
+	require.NoError(t, err)
+	require.Len(t, dag.Steps, 1)
+
+	step := dag.Steps[0]
+	require.NotNil(t, step.OutputSchema)
+	assert.Equal(t, "object", step.OutputSchema["type"])
+	assert.Contains(t, step.OutputSchema, "required")
+}
+
+func TestCustomStepTypes_RejectInvalidOutputSchema(t *testing.T) {
+	t.Parallel()
+
+	_, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-invalid-output-schema
+step_types:
+  classify:
+    type: command
+    input_schema:
+      type: object
+    output_schema:
+      type: string
+    template:
+      command: echo '{}'
+steps:
+  - type: classify
+`))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "output_schema must resolve to an object schema")
+}
+
 func TestCustomStepTypes_LegacyConfigAlias(t *testing.T) {
 	t.Parallel()
 
