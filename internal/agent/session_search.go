@@ -237,11 +237,11 @@ func sessionSearchIndex(text, queryLower string) int {
 		return -1
 	}
 	lowerText := strings.ToLower(text)
-	matchByteIndex := strings.Index(lowerText, queryLower)
-	if matchByteIndex < 0 {
+	before, _, ok := strings.Cut(lowerText, queryLower)
+	if !ok {
 		return -1
 	}
-	return utf8.RuneCountInString(lowerText[:matchByteIndex])
+	return utf8.RuneCountInString(before)
 }
 
 func sessionSearchSnippetText(text, query string, matchRuneIndex int) string {

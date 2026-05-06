@@ -196,7 +196,7 @@ func TestPrepareSessionSearchCandidates(t *testing.T) {
 	now := time.Date(2026, 5, 6, 12, 0, 0, 0, time.UTC)
 	total := maxSessionSearchLimit*sessionSearchScanMultiplier + 5
 	sessions := make([]*Session, 0, total)
-	for i := 0; i < total; i++ {
+	for i := range total {
 		sessions = append(sessions, &Session{
 			ID:        fmt.Sprintf("session-%03d", i),
 			UserID:    "admin",
