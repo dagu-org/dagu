@@ -516,6 +516,9 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 		WaitUserResponse: l.waitUserResponse,
 		SafeMode:         safeMode,
 		Role:             user.Role,
+		SessionID:        l.sessionID,
+		User:             user,
+		SessionStore:     l.sessionStore,
 		Delegate:         delegate,
 	}, input)
 

@@ -387,6 +387,12 @@ type ToolContext struct {
 	// Role is the authenticated role of the current user.
 	// Empty means role checks should be skipped (e.g., auth-disabled compatibility).
 	Role auth.Role
+	// SessionID is the current agent session ID.
+	SessionID string
+	// User is the authenticated user for this tool call.
+	User UserIdentity
+	// SessionStore provides read access to persisted agent sessions.
+	SessionStore SessionStore
 	// Delegate provides sub-agent spawning capability. Nil when not available.
 	Delegate *DelegateContext
 }

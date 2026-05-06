@@ -217,6 +217,15 @@ func TestGenerateSystemPrompt(t *testing.T) {
 		assert.Contains(t, result, "Do not stay silent until the final answer")
 		assert.Contains(t, result, "what you did, what you found, and what you will do next")
 	})
+
+	t.Run("documents session search tool", func(t *testing.T) {
+		t.Parallel()
+		env := EnvironmentInfo{DAGsDir: "/dags"}
+
+		result := GenerateSystemPrompt(SystemPromptParams{Env: env, Role: auth.RoleDeveloper})
+
+		assert.Contains(t, result, "`session_search`: Search past persisted session transcripts")
+	})
 }
 
 func TestFallbackPrompt(t *testing.T) {

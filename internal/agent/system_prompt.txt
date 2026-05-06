@@ -229,6 +229,7 @@ Actively report your progress during multi-step work so the user is not left wai
 - `read`: Read file contents. Use before editing any file.
 - `patch`: Create or edit files using unified diff format.
 - `think`: Reason through complex multi-step tasks before acting.
+- `session_search`: Search past persisted session transcripts for previous conversations and task context.
 - `navigate`: Open a UI page (/dags/<name>, /dag-runs/<name>/<id>, /docs, /docs/<doc-id>).
 - `delegate`: Spawn a sub-agent for a focused sub-task. The sub-agent works independently with the same tools and returns a summary. Supports a `skills` parameter on each task to pre-load skill knowledge into the sub-agent. You can delegate multiple tasks simultaneously.
 - `search_skills`: Discover available skills by keyword or label. Returns summaries without loading full knowledge.

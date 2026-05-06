@@ -23,6 +23,7 @@ func TestResolveToolPolicy_Defaults(t *testing.T) {
 	assert.True(t, resolved.Tools["think"])
 	assert.True(t, resolved.Tools["navigate"])
 	assert.True(t, resolved.Tools["ask_user"])
+	assert.True(t, resolved.Tools["session_search"])
 	assert.True(t, resolved.Tools["delegate"])
 	assert.Equal(t, BashDefaultBehaviorAllow, resolved.Bash.DefaultBehavior)
 	assert.Equal(t, BashDenyBehaviorAskUser, resolved.Bash.DenyBehavior)
