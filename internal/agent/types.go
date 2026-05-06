@@ -436,6 +436,8 @@ type EnvironmentInfo struct {
 	LogDir string
 	// DataDir is the directory for data storage.
 	DataDir string
+	// SessionsDir is the directory for persisted agent sessions.
+	SessionsDir string
 	// ConfigFile is the path to the configuration file.
 	ConfigFile string
 	// WorkingDir is the current working directory.
