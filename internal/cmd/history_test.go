@@ -13,9 +13,42 @@ import (
 
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/exec"
+	dagutest "github.com/dagucloud/dagu/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+const expectedNoHistoryMessage = "No DAG runs found matching the specified filters.\n"
+
+func captureStdout(t *testing.T, run func() error) (string, error) {
+	t.Helper()
+
+	oldStdout := os.Stdout
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+
+	restored := false
+	defer func() {
+		if !restored {
+			os.Stdout = oldStdout
+		}
+	}()
+
+	os.Stdout = w
+	runErr := run()
+	closeErr := w.Close()
+	os.Stdout = oldStdout
+	restored = true
+
+	require.NoError(t, closeErr)
+
+	var buf bytes.Buffer
+	_, err = io.Copy(&buf, r)
+	require.NoError(t, err)
+	require.NoError(t, r.Close())
+
+	return buf.String(), runErr
+}
 
 func TestParseRelativeDuration(t *testing.T) {
 	t.Parallel()
@@ -739,6 +772,45 @@ func TestCSVOutput(t *testing.T) {
 	// Verify data rows
 	assert.Contains(t, output, "test-dag,run-001,Succeeded")
 	assert.Contains(t, output, "another-dag,run-002,Failed")
+}
+
+func TestHistoryCommand_EmptyResultsStreams(t *testing.T) {
+	tests := []struct {
+		name       string
+		args       []string
+		wantStdout string
+	}{
+		{
+			name:       "table writes message only to stderr",
+			args:       []string{"history", "non-existent-dag-xyz"},
+			wantStdout: "",
+		},
+		{
+			name:       "json writes empty array to stdout and message to stderr",
+			args:       []string{"history", "--run-id=missing-run", "--format=json"},
+			wantStdout: "[]\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			th := dagutest.SetupCommand(t)
+			command := History()
+			var stderr bytes.Buffer
+			command.SetErr(&stderr)
+
+			stdout, err := captureStdout(t, func() error {
+				return th.RunCommandWithError(t, command, dagutest.CmdTest{
+					Name: tt.name,
+					Args: tt.args,
+				})
+			})
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantStdout, stdout)
+			assert.Equal(t, expectedNoHistoryMessage, stderr.String())
+		})
+	}
 }
 
 func TestCSVEscaping(t *testing.T) {

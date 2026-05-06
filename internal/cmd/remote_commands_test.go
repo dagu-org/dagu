@@ -4,10 +4,11 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"io"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -18,6 +19,22 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (fn roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return fn(req)
+}
+
+func jsonResponse(body string) *http.Response {
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Header: http.Header{
+			"Content-Type": []string{"application/json"},
+		},
+		Body: io.NopCloser(bytes.NewBufferString(body)),
+	}
+}
 
 func TestToExecStatus_MapsRemoteFieldsExplicitly(t *testing.T) {
 	t.Parallel()
@@ -107,24 +124,74 @@ func TestBuildRemoteHistoryQueryParsesMultipleStatuses(t *testing.T) {
 func TestRemoteClientListDAGRunsUsesRepeatedStatusParams(t *testing.T) {
 	t.Parallel()
 
-	statusValues := make(chan []string, 1)
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		statusValues <- append([]string(nil), r.URL.Query()["status"]...)
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"dagRuns":[]}`))
-	}))
-	defer server.Close()
+	var statusValues []string
 
 	client := &remoteClient{
-		baseURL: server.URL,
-		client:  server.Client(),
+		baseURL: "http://dagu.test",
+		client: &http.Client{
+			Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+				statusValues = append([]string(nil), r.URL.Query()["status"]...)
+				return jsonResponse(`{"dagRuns":[]}`), nil
+			}),
+		},
 	}
 
 	_, err := client.listDAGRuns(context.Background(), remoteHistoryQuery{
 		Statuses: []int{int(core.Running), int(core.Queued)},
 	})
 	require.NoError(t, err)
-	assert.Equal(t, []string{"1", "5"}, <-statusValues)
+	assert.Equal(t, []string{"1", "5"}, statusValues)
+}
+
+func TestRemoteRunHistoryEmptyResultsStreams(t *testing.T) {
+	tests := []struct {
+		name       string
+		format     string
+		wantStdout string
+	}{
+		{
+			name:       "table writes message only to stderr",
+			wantStdout: "",
+		},
+		{
+			name:       "json writes empty array to stdout and message to stderr",
+			format:     "json",
+			wantStdout: "[]\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			command := &cobra.Command{Use: "history"}
+			initFlags(command, historyFlags...)
+			if tt.format != "" {
+				require.NoError(t, command.Flags().Set("format", tt.format))
+			}
+			var stderr bytes.Buffer
+			command.SetErr(&stderr)
+
+			ctx := &Context{
+				Context: context.Background(),
+				Command: command,
+				Remote: &remoteClient{
+					baseURL: "http://dagu.test",
+					client: &http.Client{
+						Transport: roundTripFunc(func(_ *http.Request) (*http.Response, error) {
+							return jsonResponse(`{"dagRuns":[]}`), nil
+						}),
+					},
+				},
+			}
+
+			stdout, err := captureStdout(t, func() error {
+				return remoteRunHistory(ctx, nil)
+			})
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantStdout, stdout)
+			assert.Equal(t, expectedNoHistoryMessage, stderr.String())
+		})
+	}
 }
 
 func TestWaitForRemoteStopHonorsContextCancellation(t *testing.T) {

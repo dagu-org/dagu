@@ -81,6 +81,8 @@ var historyFlags = []commandLineFlag{
 	historyLimitFlag,
 }
 
+const noHistoryMessage = "No DAG runs found matching the specified filters."
+
 func runHistory(ctx *Context, args []string) error {
 	if ctx.IsRemote() {
 		return remoteRunHistory(ctx, args)
@@ -109,8 +111,7 @@ func runHistory(ctx *Context, args []string) error {
 
 	// Handle empty results
 	if len(statuses) == 0 {
-		fmt.Println("No DAG runs found matching the specified filters.")
-		return nil
+		return renderEmptyHistory(ctx, format)
 	}
 
 	// Render output based on format
@@ -128,6 +129,29 @@ func validateFormat(format string) error {
 
 	if !validFormats[format] {
 		return fmt.Errorf("invalid format '%s'. Valid formats: table, json, csv", format)
+	}
+	return nil
+}
+
+func renderEmptyHistory(ctx *Context, format string) error {
+	if err := writeNoHistoryMessage(ctx); err != nil {
+		return err
+	}
+	if format == "json" {
+		return renderHistoryJSON(nil)
+	}
+	return nil
+}
+
+func writeNoHistoryMessage(ctx *Context) error {
+	if ctx != nil && ctx.Command != nil {
+		if _, err := fmt.Fprintln(ctx.Command.ErrOrStderr(), noHistoryMessage); err != nil {
+			return fmt.Errorf("failed to write no history message: %w", err)
+		}
+		return nil
+	}
+	if _, err := fmt.Fprintln(os.Stderr, noHistoryMessage); err != nil {
+		return fmt.Errorf("failed to write no history message: %w", err)
 	}
 	return nil
 }
