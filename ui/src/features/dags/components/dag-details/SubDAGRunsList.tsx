@@ -5,7 +5,8 @@ import { whenEnabled } from '@/hooks/queryUtils';
 import dayjs from '@/lib/dayjs';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useContext, useEffect, useMemo, useState } from 'react';
-import { STATUS_DISPLAY_LABELS, StatusDot } from '../common';
+import { StatusDot } from '../common/StatusDot';
+import { STATUS_DISPLAY_LABELS } from '../common/statusLabels';
 
 type SubDAGRun = components['schemas']['SubDAGRun'];
 type SubDAGRunDetail = components['schemas']['SubDAGRunDetail'];

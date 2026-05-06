@@ -14,6 +14,7 @@ import (
 	_ "github.com/dagucloud/dagu/internal/runtime/builtin/http"
 	_ "github.com/dagucloud/dagu/internal/runtime/builtin/jq"
 	_ "github.com/dagucloud/dagu/internal/runtime/builtin/kubernetes"
+	_ "github.com/dagucloud/dagu/internal/runtime/builtin/log"
 	_ "github.com/dagucloud/dagu/internal/runtime/builtin/mail"
 	_ "github.com/dagucloud/dagu/internal/runtime/builtin/noop"
 	_ "github.com/dagucloud/dagu/internal/runtime/builtin/redis"
