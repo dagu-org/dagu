@@ -24,7 +24,7 @@ function headingId(children: ReactNode): string {
 }
 
 function stripFrontmatter(content: string): string {
-  return content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '');
+  return content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, '');
 }
 
 export function DocMarkdownPreview({

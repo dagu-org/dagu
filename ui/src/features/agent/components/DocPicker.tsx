@@ -24,7 +24,7 @@ export interface DocRef {
 interface DocEntry {
   id: string;
   title: string;
-  description: string;
+  description?: string;
 }
 
 export interface DocPickerHandle {
@@ -80,7 +80,7 @@ export const DocPicker = forwardRef<DocPickerHandle, DocPickerProps>(
             data.items.map((item) => ({
               id: item.id,
               title: item.title,
-              description: item.description,
+              description: item.description || undefined,
             }))
           );
         } catch {
@@ -122,7 +122,7 @@ export const DocPicker = forwardRef<DocPickerHandle, DocPickerProps>(
         (d) =>
           d.id.toLowerCase().includes(q) ||
           d.title.toLowerCase().includes(q) ||
-          d.description.toLowerCase().includes(q)
+          (d.description?.toLowerCase().includes(q) ?? false)
       );
     }, [docs, filterQuery, selectedIds, currentPageDoc]);
 

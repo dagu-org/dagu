@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	apigen "github.com/dagucloud/dagu/api/v1"
 	"github.com/dagucloud/dagu/internal/agent"
@@ -412,8 +413,10 @@ func (m *mockDocStore) ListFlat(_ context.Context, opts agent.ListDocsOptions) (
 			continue
 		}
 		items = append(items, agent.DocMetadata{
-			ID:    doc.ID,
-			Title: doc.Title,
+			ID:          doc.ID,
+			Title:       doc.Title,
+			Description: doc.Description,
+			ModTime:     time.Unix(1700000000, 0),
 		})
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i].ID < items[j].ID })
