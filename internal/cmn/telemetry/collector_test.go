@@ -533,6 +533,7 @@ func TestCollector_Collect_WithWorkerHeartbeatMetrics(t *testing.T) {
 
 	now := time.Now().UTC()
 	collector := NewCollector("1.0.0", dagStore, dagRunStore, queueStore, nil)
+	collector.now = func() time.Time { return now }
 	collector.SetWorkerHeartbeatStore(&mockWorkerHeartbeatStore{
 		records: []exec.WorkerHeartbeatRecord{
 			{
@@ -624,6 +625,7 @@ func TestCollector_Collect_WithWorkerLabelKeySanitization(t *testing.T) {
 
 	now := time.Now().UTC()
 	collector := NewCollector("1.0.0", dagStore, dagRunStore, queueStore, nil)
+	collector.now = func() time.Time { return now }
 	collector.SetWorkerHeartbeatStore(&mockWorkerHeartbeatStore{
 		records: []exec.WorkerHeartbeatRecord{
 			{

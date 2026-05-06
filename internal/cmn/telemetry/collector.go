@@ -42,6 +42,7 @@ type Collector struct {
 	serviceRegistry      exec.ServiceRegistry
 	workerHeartbeatStore exec.WorkerHeartbeatStore
 	caches               []fileutil.CacheMetrics
+	now                  func() time.Time
 
 	// Metric descriptors (aggregate - backward compatible)
 	infoDesc              *prometheus.Desc
@@ -81,6 +82,7 @@ func NewCollector(
 		dagRunStore:     dagRunStore,
 		queueStore:      queueStore,
 		serviceRegistry: serviceRegistry,
+		now:             func() time.Time { return time.Now().UTC() },
 
 		// Initialize metric descriptors
 		infoDesc: prometheus.NewDesc(
@@ -480,7 +482,7 @@ func (c *Collector) collectWorkerMetrics(ctx context.Context, ch chan<- promethe
 	)
 
 	labelSpecs := workerMetricLabelSpecs(records)
-	now := time.Now().UTC()
+	now := c.now()
 
 	for _, record := range records {
 		c.collectWorkerRecordMetrics(ch, record, labelSpecs, now)
