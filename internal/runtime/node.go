@@ -399,8 +399,10 @@ func (n *Node) captureOutput(ctx context.Context) error {
 			return fmt.Errorf("failed to capture output: %w", err)
 		}
 		n.setVariable(step.Output, value)
-		n.setOutputValue(value)
-		return nil
+		if !step.HasStructuredOutput() && !step.HasOutputSchema() {
+			n.setOutputValue(value)
+			return nil
+		}
 	}
 
 	if step.HasStructuredOutput() {

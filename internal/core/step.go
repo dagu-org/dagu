@@ -194,7 +194,7 @@ func (s Step) HasStructuredOutput() bool {
 
 // HasOutputSchema reports whether the step validates stdout JSON with an output schema.
 func (s Step) HasOutputSchema() bool {
-	return len(s.OutputSchema) > 0
+	return s.OutputSchema != nil
 }
 
 // UsesStructuredOutputSource reports whether any structured output entry reads from source.

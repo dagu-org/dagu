@@ -122,6 +122,82 @@ steps:
 	assert.Contains(t, err.Error(), "output_schema must resolve to an object schema")
 }
 
+func TestCustomStepTypes_AllowsComposedObjectOutputSchema(t *testing.T) {
+	t.Parallel()
+
+	dag, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-composed-output-schema
+step_types:
+  classify:
+    type: command
+    input_schema:
+      type: object
+    output_schema:
+      anyOf:
+        - type: object
+          additionalProperties: false
+          properties:
+            category:
+              type: string
+        - type: object
+          additionalProperties: false
+          properties:
+            priority:
+              type: string
+    template:
+      command: echo '{"category":"bug"}'
+steps:
+  - type: classify
+`))
+	require.NoError(t, err)
+	require.Len(t, dag.Steps, 1)
+	require.NotNil(t, dag.Steps[0].OutputSchema)
+}
+
+func TestCustomStepTypes_RejectsMixedComposedOutputSchema(t *testing.T) {
+	t.Parallel()
+
+	_, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-mixed-composed-output-schema
+step_types:
+  classify:
+    type: command
+    input_schema:
+      type: object
+    output_schema:
+      anyOf:
+        - type: object
+        - type: string
+    template:
+      command: echo '{}'
+steps:
+  - type: classify
+`))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "output_schema must resolve to an object schema")
+}
+
+func TestCustomStepTypes_AllowsUnconstrainedOutputSchema(t *testing.T) {
+	t.Parallel()
+
+	dag, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-unconstrained-output-schema
+step_types:
+  classify:
+    type: command
+    input_schema:
+      type: object
+    output_schema: {}
+    template:
+      command: echo '{}'
+steps:
+  - type: classify
+`))
+	require.NoError(t, err)
+	require.Len(t, dag.Steps, 1)
+	assert.NotNil(t, dag.Steps[0].OutputSchema)
+}
+
 func TestCustomStepTypes_LegacyConfigAlias(t *testing.T) {
 	t.Parallel()
 

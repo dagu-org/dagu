@@ -194,7 +194,7 @@ func buildPublishedOutputContract(step Step) (publishedOutputContract, bool) {
 			Keys:     maps.Clone(step.StructuredOutput),
 		}, true
 	}
-	if len(step.OutputSchema) > 0 {
+	if step.HasOutputSchema() {
 		return publishedOutputContract{
 			StepName: step.Name,
 			Source:   "output_schema",
@@ -231,7 +231,7 @@ func validateLiteralOutputPath(value any, path []string) outputReferenceValidati
 	if len(path) == 0 {
 		return outputReferenceValid
 	}
-	m, ok := value.(map[string]any)
+	m, ok := schemaMap(value)
 	if !ok {
 		return outputReferenceUnknown
 	}
@@ -245,6 +245,9 @@ func validateLiteralOutputPath(value any, path []string) outputReferenceValidati
 func validateSchemaOutputPath(schema map[string]any, path []string) outputReferenceValidationStatus {
 	if len(path) == 0 {
 		return outputReferenceValid
+	}
+	if _, hasRef := schema["$ref"]; hasRef {
+		return outputReferenceUnknown
 	}
 	if hasSchemaComposition(schema) {
 		return validateComposedSchemaOutputPath(schema, path)
@@ -274,8 +277,7 @@ func hasSchemaComposition(schema map[string]any) bool {
 	_, hasAnyOf := schema["anyOf"]
 	_, hasOneOf := schema["oneOf"]
 	_, hasAllOf := schema["allOf"]
-	_, hasRef := schema["$ref"]
-	return hasAnyOf || hasOneOf || hasAllOf || hasRef
+	return hasAnyOf || hasOneOf || hasAllOf
 }
 
 func validateComposedSchemaOutputPath(schema map[string]any, path []string) outputReferenceValidationStatus {

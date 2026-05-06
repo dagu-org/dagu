@@ -327,7 +327,7 @@ func resolveOutputSchemaDeclaration(fieldName string, schemaDecl any) (map[strin
 		return nil, core.NewValidationError(fieldName, schemaDecl, err)
 	}
 	root := resolved.Schema()
-	if root == nil || !schemaDeclaresObject(root) {
+	if root == nil || !outputSchemaDeclaresObject(root) {
 		return nil, core.NewValidationError(
 			fieldName,
 			schemaDecl,
@@ -338,13 +338,54 @@ func resolveOutputSchemaDeclaration(fieldName string, schemaDecl any) (map[strin
 }
 
 func schemaDeclaresObject(root *jsonschema.Schema) bool {
-	if root == nil {
+	return schemaDeclaresObjectResolved(root, root, map[*jsonschema.Schema]struct{}{}, false)
+}
+
+func outputSchemaDeclaresObject(root *jsonschema.Schema) bool {
+	return schemaDeclaresObjectResolved(root, root, map[*jsonschema.Schema]struct{}{}, true)
+}
+
+func schemaDeclaresObjectResolved(root, schema *jsonschema.Schema, seen map[*jsonschema.Schema]struct{}, allowUnconstrained bool) bool {
+	if schema == nil {
 		return false
 	}
-	if root.Type == "object" {
+	if _, ok := seen[schema]; ok {
+		return false
+	}
+	seen[schema] = struct{}{}
+	if schema.Type == "object" {
 		return true
 	}
-	return len(root.Types) == 1 && root.Types[0] == "object"
+	if len(schema.Types) == 1 && schema.Types[0] == "object" {
+		return true
+	}
+	if schema.Ref != "" {
+		return schemaDeclaresObjectResolved(root, customStepRuntimeSchema(root, schema), seen, allowUnconstrained)
+	}
+	if len(schema.OneOf) > 0 {
+		return schemasDeclareObjects(root, schema.OneOf, seen, allowUnconstrained)
+	}
+	if len(schema.AnyOf) > 0 {
+		return schemasDeclareObjects(root, schema.AnyOf, seen, allowUnconstrained)
+	}
+	if len(schema.AllOf) > 0 {
+		return schemasDeclareObjects(root, schema.AllOf, seen, allowUnconstrained)
+	}
+	return allowUnconstrained && schema.Type == "" && len(schema.Types) == 0
+}
+
+func schemasDeclareObjects(root *jsonschema.Schema, schemas []*jsonschema.Schema, seen map[*jsonschema.Schema]struct{}, allowUnconstrained bool) bool {
+	if len(schemas) == 0 {
+		return false
+	}
+	for _, schema := range schemas {
+		branchSeen := make(map[*jsonschema.Schema]struct{}, len(seen))
+		maps.Copy(branchSeen, seen)
+		if !schemaDeclaresObjectResolved(root, schema, branchSeen, allowUnconstrained) {
+			return false
+		}
+	}
+	return true
 }
 
 func isBuiltinStepTypeName(name string) bool {
@@ -768,7 +809,7 @@ func buildCustomStepFromSpec(
 		builtStep.ExecutorConfig.Metadata = make(map[string]any, 1)
 	}
 	builtStep.ExecutorConfig.Metadata["custom_type"] = customType.Name
-	if len(customType.OutputSchema) > 0 && len(builtStep.OutputSchema) == 0 {
+	if customType.OutputSchema != nil && builtStep.OutputSchema == nil {
 		builtStep.OutputSchema = cloneMap(customType.OutputSchema)
 	}
 	if customType.Description != "" && builtStep.Description == "" {

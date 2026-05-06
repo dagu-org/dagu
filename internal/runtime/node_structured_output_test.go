@@ -488,6 +488,27 @@ func TestNodeCaptureOutputSchema(t *testing.T) {
 		require.NotNil(t, state.OutputValue)
 		assert.JSONEq(t, `{"category":"bug"}`, *state.OutputValue)
 	})
+
+	t.Run("LegacyOutputVariableDoesNotOverrideSchemaOutput", func(t *testing.T) {
+		t.Parallel()
+
+		workDir := t.TempDir()
+		ctx := structuredOutputTestContext(t, nil, workDir)
+		node := NodeWithData(NodeData{
+			Step: core.Step{
+				Output:       "CLASSIFY_RAW",
+				OutputSchema: validSchema,
+			},
+		})
+		node.outputs.outputCaptured = true
+		node.outputs.outputData = `{"category":"bug","confidence":0.9}`
+
+		require.NoError(t, node.captureOutput(ctx))
+		state := node.State()
+		require.NotNil(t, state.OutputValue)
+		assert.JSONEq(t, `{"category":"bug","confidence":0.9}`, *state.OutputValue)
+		assert.Equal(t, `{"category":"bug","confidence":0.9}`, node.OutputVariablesMap()["CLASSIFY_RAW"])
+	})
 }
 
 func TestNodeEvaluateStructuredOutput(t *testing.T) {

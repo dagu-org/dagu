@@ -89,6 +89,26 @@ steps:
 		require.NoError(t, err)
 		require.NoError(t, dag.Validate())
 	})
+
+	t.Run("AllowsReferenceWithUnconstrainedExplicitOutputSchema", func(t *testing.T) {
+		t.Parallel()
+
+		testDAG := createTempYAMLFile(t, `name: output-ref-empty-schema
+
+type: graph
+steps:
+  - id: classify
+    command: echo '{"category":"bug"}'
+    output_schema: {}
+  - id: route
+    depends: [classify]
+    command: echo ${classify.output.category}
+`)
+
+		dag, err := spec.Load(context.Background(), testDAG)
+		require.NoError(t, err)
+		require.NoError(t, dag.Validate())
+	})
 }
 
 func TestValidateOutputReferencesFromStructuredOutputMapping(t *testing.T) {
