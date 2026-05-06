@@ -118,23 +118,23 @@ func runAgentOnce(ctx *Context, prompt string) error {
 			return err
 		}
 		fmt.Fprintf(out, "Session: %s\n", resp.SessionId)
-		return followAgentSession(ctx, out, func(context.Context) (*agentSessionDetail, error) {
+		return followAgentSessionNonInteractive(ctx, out, resp.SessionId, func(context.Context) (*agentSessionDetail, error) {
 			return ctx.Remote.getAgentSessionDetail(ctx, resp.SessionId)
 		})
 	}
 
-	api, err := ctx.newAgentAPI()
+	agentAPI, err := ctx.newAgentAPI()
 	if err != nil {
 		return err
 	}
 	user := localAgentUser()
-	sessionID, _, err := api.CreateSession(ctx, user, toAgentChatRequest(req))
+	sessionID, _, err := agentAPI.CreateSession(ctx, user, toAgentChatRequest(req))
 	if err != nil {
 		return err
 	}
 	fmt.Fprintf(out, "Session: %s\n", sessionID)
-	return followAgentSession(ctx, out, func(context.Context) (*agentSessionDetail, error) {
-		return getLocalAgentSessionDetail(ctx, api, sessionID, user.UserID)
+	return followAgentSessionNonInteractive(ctx, out, sessionID, func(context.Context) (*agentSessionDetail, error) {
+		return getLocalAgentSessionDetail(ctx, agentAPI, sessionID, user.UserID)
 	})
 }
 
@@ -155,11 +155,11 @@ func runAgentHistory(ctx *Context, _ []string) error {
 		}
 		sessions = agentRowsFromAPI(resp.Sessions)
 	} else {
-		api, err := ctx.newAgentAPI()
+		agentAPI, err := ctx.newAgentAPI()
 		if err != nil {
 			return err
 		}
-		result := api.ListSessionsPaginated(ctx, localAgentUser().UserID, 1, limit)
+		result := agentAPI.ListSessionsPaginated(ctx, localAgentUser().UserID, 1, limit)
 		sessions = agentRowsFromLocal(result.Items)
 	}
 
@@ -188,21 +188,21 @@ func runAgentResume(ctx *Context, args []string) error {
 		if err := ctx.Remote.sendAgentMessage(ctx, sessionID, req); err != nil {
 			return err
 		}
-		return followAgentSession(ctx, out, func(context.Context) (*agentSessionDetail, error) {
+		return followAgentSessionNonInteractive(ctx, out, sessionID, func(context.Context) (*agentSessionDetail, error) {
 			return ctx.Remote.getAgentSessionDetail(ctx, sessionID)
 		})
 	}
 
-	api, err := ctx.newAgentAPI()
+	agentAPI, err := ctx.newAgentAPI()
 	if err != nil {
 		return err
 	}
 	user := localAgentUser()
-	if err := api.SendMessage(ctx, sessionID, user, toAgentChatRequest(req)); err != nil {
+	if err := agentAPI.SendMessage(ctx, sessionID, user, toAgentChatRequest(req)); err != nil {
 		return err
 	}
-	return followAgentSession(ctx, out, func(context.Context) (*agentSessionDetail, error) {
-		return getLocalAgentSessionDetail(ctx, api, sessionID, user.UserID)
+	return followAgentSessionNonInteractive(ctx, out, sessionID, func(context.Context) (*agentSessionDetail, error) {
+		return getLocalAgentSessionDetail(ctx, agentAPI, sessionID, user.UserID)
 	})
 }
 
@@ -249,7 +249,7 @@ func (c *Context) newAgentAPI() (*agent.API, error) {
 	referencesDir := fileagentskill.SeedReferences(filepath.Join(c.Config.Paths.DataDir, "agent", "references"))
 	hooks := agent.NewHooks()
 	hooks.OnBeforeToolExec(newCLIAgentPolicyHook(stores.ConfigStore))
-	api := agent.NewAPI(agent.APIConfig{
+	agentAPI := agent.NewAPI(agent.APIConfig{
 		ConfigStore:           stores.ConfigStore,
 		ModelStore:            stores.ModelStore,
 		SoulStore:             stores.SoulStore,
@@ -274,8 +274,8 @@ func (c *Context) newAgentAPI() (*agent.API, error) {
 			ReferencesDir:  referencesDir,
 		},
 	})
-	api.StartCleanup(c)
-	return api, nil
+	agentAPI.StartCleanup(c)
+	return agentAPI, nil
 }
 
 func newCLIAgentLogger() *slog.Logger {
@@ -402,8 +402,8 @@ type agentPromptOptionRow struct {
 	Description string
 }
 
-func getLocalAgentSessionDetail(ctx context.Context, api *agent.API, sessionID, userID string) (*agentSessionDetail, error) {
-	detail, err := api.GetSessionDetail(ctx, sessionID, userID)
+func getLocalAgentSessionDetail(ctx context.Context, agentAPI *agent.API, sessionID, userID string) (*agentSessionDetail, error) {
+	detail, err := agentAPI.GetSessionDetail(ctx, sessionID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -579,6 +579,22 @@ func followAgentSession(ctx context.Context, out io.Writer, fetch func(context.C
 	return err
 }
 
+func followAgentSessionNonInteractive(ctx context.Context, out io.Writer, sessionID string, fetch func(context.Context) (*agentSessionDetail, error)) error {
+	detail, err := followAgentSessionWithSeen(ctx, out, map[string]struct{}{}, fetch)
+	if err != nil {
+		return err
+	}
+	return renderAgentPendingPromptHint(out, sessionID, detail)
+}
+
+func renderAgentPendingPromptHint(out io.Writer, sessionID string, detail *agentSessionDetail) error {
+	if detail == nil || !detail.HasPendingPrompt {
+		return nil
+	}
+	_, err := fmt.Fprintf(out, "\nPending input required; run `dagu agent resume %s` to respond.\n", sessionID)
+	return err
+}
+
 func followAgentSessionWithSeen(ctx context.Context, out io.Writer, seen map[string]struct{}, fetch func(context.Context) (*agentSessionDetail, error)) (*agentSessionDetail, error) {
 	if seen == nil {
 		seen = map[string]struct{}{}
@@ -670,11 +686,11 @@ func runAgentInteractive(ctx *Context, sessionID string) error {
 		if localAPI != nil {
 			return localAPI, nil
 		}
-		api, err := ctx.newAgentAPI()
+		agentAPI, err := ctx.newAgentAPI()
 		if err != nil {
 			return nil, err
 		}
-		localAPI = api
+		localAPI = agentAPI
 		return localAPI, nil
 	}
 	fetch := func(context.Context) (*agentSessionDetail, error) {
@@ -684,11 +700,11 @@ func runAgentInteractive(ctx *Context, sessionID string) error {
 		if ctx.IsRemote() {
 			return ctx.Remote.getAgentSessionDetail(ctx, sessionID)
 		}
-		api, err := getLocalAPI()
+		agentAPI, err := getLocalAPI()
 		if err != nil {
 			return nil, err
 		}
-		return getLocalAgentSessionDetail(ctx, api, sessionID, user.UserID)
+		return getLocalAgentSessionDetail(ctx, agentAPI, sessionID, user.UserID)
 	}
 
 	fmt.Fprintln(out, "Dagu agent interactive. Type /exit or press Ctrl-D to quit.")
@@ -744,11 +760,11 @@ func runAgentInteractive(ctx *Context, sessionID string) error {
 				}
 				sessionID = resp.SessionId
 			} else {
-				api, err := getLocalAPI()
+				agentAPI, err := getLocalAPI()
 				if err != nil {
 					return err
 				}
-				createdID, _, err := api.CreateSession(ctx, user, toAgentChatRequest(req))
+				createdID, _, err := agentAPI.CreateSession(ctx, user, toAgentChatRequest(req))
 				if err != nil {
 					return err
 				}
@@ -765,11 +781,11 @@ func runAgentInteractive(ctx *Context, sessionID string) error {
 					return err
 				}
 			} else {
-				api, err := getLocalAPI()
+				agentAPI, err := getLocalAPI()
 				if err != nil {
 					return err
 				}
-				if err := api.SendMessage(ctx, sessionID, user, toAgentChatRequest(req)); err != nil {
+				if err := agentAPI.SendMessage(ctx, sessionID, user, toAgentChatRequest(req)); err != nil {
 					return err
 				}
 			}
@@ -823,11 +839,11 @@ func respondAgentPrompt(
 	if ctx.IsRemote() {
 		return ctx.Remote.respondAgentPrompt(ctx, sessionID, toAPIAgentPromptResponse(resp))
 	}
-	api, err := getLocalAPI()
+	agentAPI, err := getLocalAPI()
 	if err != nil {
 		return err
 	}
-	return api.SubmitUserResponse(ctx, sessionID, user.UserID, resp)
+	return agentAPI.SubmitUserResponse(ctx, sessionID, user.UserID, resp)
 }
 
 func buildAgentPromptResponse(prompt *agentPromptRow, input string) (agent.UserPromptResponse, error) {

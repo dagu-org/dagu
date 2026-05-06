@@ -2085,15 +2085,19 @@ install_skill() {
             ui_warn "--skills-dir is no longer supported by the Dagu installer: ${custom_dir}"
         done
         ui_warn "Install the skill with: gh skill install dagucloud/dagu dagu"
-        return 1
+        return 0
     fi
     if command -v gh >/dev/null 2>&1; then
-        gh skill install dagucloud/dagu dagu
-        return $?
+        if ! gh skill install dagucloud/dagu dagu; then
+            ui_warn "Failed to install the Dagu AI skill. Install manually with: gh skill install dagucloud/dagu dagu"
+        fi
+        return 0
     fi
     if command -v npx >/dev/null 2>&1; then
-        npx skills add https://github.com/dagucloud/dagu --skill dagu
-        return $?
+        if ! npx skills add https://github.com/dagucloud/dagu --skill dagu; then
+            ui_warn "Failed to install the Dagu AI skill. Install manually with: npx skills add https://github.com/dagucloud/dagu --skill dagu"
+        fi
+        return 0
     fi
     ui_warn "No shared skills installer was found. Install manually with: gh skill install dagucloud/dagu dagu"
 }

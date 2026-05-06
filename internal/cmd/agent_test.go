@@ -166,3 +166,17 @@ func TestCLIAgentLoggerDoesNotWriteToDefaultLogger(t *testing.T) {
 
 	assert.Empty(t, buf.String())
 }
+
+func TestFollowAgentSessionNonInteractivePrintsPendingPromptHint(t *testing.T) {
+	var out bytes.Buffer
+
+	err := followAgentSessionNonInteractive(context.Background(), &out, "session-1", func(context.Context) (*agentSessionDetail, error) {
+		return &agentSessionDetail{
+			Working:          true,
+			HasPendingPrompt: true,
+		}, nil
+	})
+
+	require.NoError(t, err)
+	assert.Contains(t, out.String(), "Pending input required; run `dagu agent resume session-1` to respond.")
+}
