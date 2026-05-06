@@ -1137,23 +1137,22 @@ function Install-AISkill {
             Write-WarnMessage "--SkillsDir is no longer supported by the Dagu installer: $dir"
         }
         Write-WarnMessage "Install the skill with: gh skill install dagucloud/dagu dagu"
-        return
     }
-    if ($SkillMode -eq "auto" -and (Get-Command gh -ErrorAction SilentlyContinue)) {
+    elseif ($SkillMode -eq "auto" -and (Get-Command gh -ErrorAction SilentlyContinue)) {
         & gh skill install dagucloud/dagu dagu
         if ($LASTEXITCODE -ne 0) {
             Write-WarnMessage "Failed to install the Dagu AI skill. Install manually with: gh skill install dagucloud/dagu dagu"
         }
-        return
     }
-    if ($SkillMode -eq "auto" -and (Get-Command npx -ErrorAction SilentlyContinue)) {
+    elseif ($SkillMode -eq "auto" -and (Get-Command npx -ErrorAction SilentlyContinue)) {
         & npx skills add https://github.com/dagucloud/dagu --skill dagu
         if ($LASTEXITCODE -ne 0) {
             Write-WarnMessage "Failed to install the Dagu AI skill. Install manually with: npx skills add https://github.com/dagucloud/dagu --skill dagu"
         }
-        return
     }
-    Write-WarnMessage "No shared skills installer was found. Install manually with: gh skill install dagucloud/dagu dagu"
+    else {
+        Write-WarnMessage "No shared skills installer was found. Install manually with: gh skill install dagucloud/dagu dagu"
+    }
 }
 
 function Open-BrowserIfRequested {
