@@ -14,9 +14,11 @@ import (
 	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dagucloud/dagu/internal/core/exec"
 	"github.com/dagucloud/dagu/internal/core/spec"
+	coordinatorv1 "github.com/dagucloud/dagu/proto/coordinator/v1"
 )
 
 var _ exec.DAGStore = (*mockDAGStore)(nil)
@@ -316,6 +318,32 @@ func (m *mockServiceRegistry) UpdateStatus(ctx context.Context, serviceName exec
 	return args.Error(0)
 }
 
+type mockWorkerHeartbeatStore struct {
+	records []exec.WorkerHeartbeatRecord
+	err     error
+}
+
+var _ exec.WorkerHeartbeatStore = (*mockWorkerHeartbeatStore)(nil)
+
+func (m *mockWorkerHeartbeatStore) Upsert(context.Context, exec.WorkerHeartbeatRecord) error {
+	panic("unimplemented")
+}
+
+func (m *mockWorkerHeartbeatStore) Get(context.Context, string) (*exec.WorkerHeartbeatRecord, error) {
+	panic("unimplemented")
+}
+
+func (m *mockWorkerHeartbeatStore) List(context.Context) ([]exec.WorkerHeartbeatRecord, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.records, nil
+}
+
+func (m *mockWorkerHeartbeatStore) DeleteStale(context.Context, time.Time) (int, error) {
+	panic("unimplemented")
+}
+
 // Tests
 
 func TestNewCollector(t *testing.T) {
@@ -352,8 +380,8 @@ func TestCollector_Describe(t *testing.T) {
 		count++
 	}
 
-	// 7 aggregate + 5 per-DAG + 1 cache metrics
-	assert.Equal(t, 13, count)
+	// 8 aggregate + 5 per-DAG + 1 cache metrics
+	assert.Equal(t, 14, count)
 }
 
 func TestCollector_Collect_BasicMetrics(t *testing.T) {
@@ -488,6 +516,147 @@ func TestCollector_Collect_WithDAGRuns(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestCollector_Collect_WithWorkerHeartbeatMetrics(t *testing.T) {
+	dagStore := &mockDAGStore{}
+	dagRunStore := &mockDAGRunStore{}
+	queueStore := &mockQueueStore{}
+
+	dagStore.On("List", mock.Anything, mock.Anything).Return(
+		exec.PaginatedResult[*core.DAG]{},
+		[]string{},
+		nil,
+	)
+	dagRunStore.On("ListStatuses", mock.Anything, mock.Anything).Return([]*exec.DAGRunStatus{}, nil)
+	queueStore.On("All", mock.Anything).Return([]exec.QueuedItemData{}, nil)
+
+	now := time.Now().UTC()
+	collector := NewCollector("1.0.0", dagStore, dagRunStore, queueStore, nil)
+	collector.SetWorkerHeartbeatStore(&mockWorkerHeartbeatStore{
+		records: []exec.WorkerHeartbeatRecord{
+			{
+				WorkerID: "worker-a",
+				Labels: map[string]string{
+					"pool":   "gpu",
+					"region": "ap-northeast-1",
+				},
+				Stats: &coordinatorv1.WorkerStats{
+					TotalPollers: 4,
+					BusyPollers:  2,
+					RunningTasks: []*coordinatorv1.RunningTask{
+						{DagRunId: "run-1", DagName: "dag-1", StartedAt: now.Add(-2 * time.Minute).Unix()},
+						{DagRunId: "run-2", DagName: "dag-2", StartedAt: now.Add(-30 * time.Second).Unix()},
+					},
+				},
+				LastHeartbeatAt: now.Add(-2 * time.Second).UnixMilli(),
+			},
+		},
+	})
+
+	registry := prometheus.NewRegistry()
+	registry.MustRegister(collector)
+
+	metrics, err := registry.Gather()
+	require.NoError(t, err)
+	metricMap := metricFamilyMap(metrics)
+
+	assertGaugeValue(t, metricMap["dagu_workers_registered"], nil, 1)
+	assertGaugeValue(t, metricMap["dagu_worker_heartbeat_timestamp_seconds"], map[string]string{
+		"worker_id": "worker-a",
+		"pool":      "gpu",
+		"region":    "ap-northeast-1",
+	}, float64(now.Add(-2*time.Second).UnixMilli())/1000)
+	assertGaugeValue(t, metricMap["dagu_worker_health_status"], map[string]string{
+		"worker_id": "worker-a",
+		"status":    "healthy",
+		"pool":      "gpu",
+		"region":    "ap-northeast-1",
+	}, 1)
+	assertGaugeValue(t, metricMap["dagu_worker_health_status"], map[string]string{
+		"worker_id": "worker-a",
+		"status":    "warning",
+		"pool":      "gpu",
+		"region":    "ap-northeast-1",
+	}, 0)
+	assertGaugeValue(t, metricMap["dagu_worker_pollers"], map[string]string{
+		"worker_id": "worker-a",
+		"state":     "total",
+		"pool":      "gpu",
+		"region":    "ap-northeast-1",
+	}, 4)
+	assertGaugeValue(t, metricMap["dagu_worker_pollers"], map[string]string{
+		"worker_id": "worker-a",
+		"state":     "busy",
+		"pool":      "gpu",
+		"region":    "ap-northeast-1",
+	}, 2)
+	assertGaugeValue(t, metricMap["dagu_worker_pollers"], map[string]string{
+		"worker_id": "worker-a",
+		"state":     "idle",
+		"pool":      "gpu",
+		"region":    "ap-northeast-1",
+	}, 2)
+	assertGaugeValue(t, metricMap["dagu_worker_running_tasks"], map[string]string{
+		"worker_id": "worker-a",
+		"pool":      "gpu",
+		"region":    "ap-northeast-1",
+	}, 2)
+	assertGaugeAtLeast(t, metricMap["dagu_worker_oldest_running_task_age_seconds"], map[string]string{
+		"worker_id": "worker-a",
+		"pool":      "gpu",
+		"region":    "ap-northeast-1",
+	}, 119)
+}
+
+func TestCollector_Collect_WithWorkerLabelKeySanitization(t *testing.T) {
+	dagStore := &mockDAGStore{}
+	dagRunStore := &mockDAGRunStore{}
+	queueStore := &mockQueueStore{}
+
+	dagStore.On("List", mock.Anything, mock.Anything).Return(
+		exec.PaginatedResult[*core.DAG]{},
+		[]string{},
+		nil,
+	)
+	dagRunStore.On("ListStatuses", mock.Anything, mock.Anything).Return([]*exec.DAGRunStatus{}, nil)
+	queueStore.On("All", mock.Anything).Return([]exec.QueuedItemData{}, nil)
+
+	now := time.Now().UTC()
+	collector := NewCollector("1.0.0", dagStore, dagRunStore, queueStore, nil)
+	collector.SetWorkerHeartbeatStore(&mockWorkerHeartbeatStore{
+		records: []exec.WorkerHeartbeatRecord{
+			{
+				WorkerID: "worker-a",
+				Labels: map[string]string{
+					"pool-name": "gpu",
+					"status":    "spot",
+					"9zone":     "a",
+					"a-b":       "one",
+					"a b":       "two",
+					"a_b":       "three",
+				},
+				LastHeartbeatAt: now.UnixMilli(),
+			},
+		},
+	})
+
+	registry := prometheus.NewRegistry()
+	registry.MustRegister(collector)
+
+	metrics, err := registry.Gather()
+	require.NoError(t, err)
+	metricMap := metricFamilyMap(metrics)
+
+	assertGaugeValue(t, metricMap["dagu_worker_running_tasks"], map[string]string{
+		"worker_id":           "worker-a",
+		"pool_name":           "gpu",
+		"worker_label_status": "spot",
+		"worker_label_9zone":  "a",
+		"a_b":                 "two",
+		"a_b_2":               "one",
+		"a_b_3":               "three",
+	}, 0)
 }
 
 func TestCollector_Collect_WithErrors(t *testing.T) {
@@ -651,4 +820,54 @@ func TestCollector_SchedulerStatus(t *testing.T) {
 		}
 		assert.True(t, schedulerRunningFound, "scheduler_running metric not found")
 	})
+}
+
+func metricFamilyMap(metrics []*dto.MetricFamily) map[string]*dto.MetricFamily {
+	result := make(map[string]*dto.MetricFamily, len(metrics))
+	for _, metric := range metrics {
+		result[metric.GetName()] = metric
+	}
+	return result
+}
+
+func assertGaugeValue(t *testing.T, family *dto.MetricFamily, labels map[string]string, expected float64) {
+	t.Helper()
+	metric := findMetric(t, family, labels)
+	require.NotNil(t, metric.Gauge)
+	assert.InDelta(t, expected, metric.Gauge.GetValue(), 0.001)
+}
+
+func assertGaugeAtLeast(t *testing.T, family *dto.MetricFamily, labels map[string]string, expectedMin float64) {
+	t.Helper()
+	metric := findMetric(t, family, labels)
+	require.NotNil(t, metric.Gauge)
+	assert.GreaterOrEqual(t, metric.Gauge.GetValue(), expectedMin)
+}
+
+func findMetric(t *testing.T, family *dto.MetricFamily, labels map[string]string) *dto.Metric {
+	t.Helper()
+	require.NotNil(t, family)
+	for _, metric := range family.GetMetric() {
+		if metricLabelsMatch(metric, labels) {
+			return metric
+		}
+	}
+	require.Failf(t, "metric not found", "metric %s with labels %v not found", family.GetName(), labels)
+	return nil
+}
+
+func metricLabelsMatch(metric *dto.Metric, expected map[string]string) bool {
+	actual := make(map[string]string, len(metric.GetLabel()))
+	for _, label := range metric.GetLabel() {
+		actual[label.GetName()] = label.GetValue()
+	}
+	if len(actual) != len(expected) {
+		return false
+	}
+	for name, value := range expected {
+		if actual[name] != value {
+			return false
+		}
+	}
+	return true
 }
