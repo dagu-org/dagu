@@ -9,6 +9,31 @@ import { schemaFormWidgets } from '../schemaFormWidgets';
 const TextareaWidget = schemaFormWidgets.TextareaWidget as ComponentType<any>;
 
 describe('schemaFormWidgets', () => {
+  it('renders schema textarea widgets at one-line height by default', () => {
+    render(
+      <TextareaWidget
+        id="root_message"
+        htmlName="message"
+        schema={{ type: 'string' }}
+        value=""
+        required={false}
+        disabled={false}
+        readonly={false}
+        autofocus={false}
+        options={{ emptyValue: undefined }}
+        onChange={vi.fn()}
+        onBlur={vi.fn()}
+        onFocus={vi.fn()}
+      />
+    );
+
+    const textarea = screen.getByRole('textbox');
+
+    expect(textarea).toHaveAttribute('rows', '1');
+    expect(textarea).toHaveClass('min-h-9');
+    expect(textarea).not.toHaveClass('min-h-16');
+  });
+
   it('auto-grows schema textarea widgets on input', () => {
     render(
       <TextareaWidget

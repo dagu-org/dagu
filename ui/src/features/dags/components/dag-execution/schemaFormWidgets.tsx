@@ -50,6 +50,10 @@ function SchemaTextareaWidget<
   F extends FormContextType = any,
 >(props: WidgetProps<T, S, F>) {
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const options = React.useMemo(
+    () => ({ ...props.options, rows: props.options.rows ?? 1 }),
+    [props.options]
+  );
 
   React.useLayoutEffect(() => {
     // RJSF's shadcn textarea widget does not expose a ref, so the wrapper
@@ -69,7 +73,14 @@ function SchemaTextareaWidget<
         }
       }}
     >
-      <TextareaWidget {...props} className={cn('bg-card', props.className)} />
+      <TextareaWidget
+        {...props}
+        options={options}
+        className={cn(
+          'bg-card min-h-9 resize-none overflow-hidden',
+          props.className
+        )}
+      />
     </div>
   );
 }
