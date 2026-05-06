@@ -4,6 +4,7 @@
 package spec
 
 import (
+	"errors"
 	"fmt"
 	"maps"
 	"math"
@@ -466,6 +467,9 @@ func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
 	}
 	if err := buildStepExecutor(ctx, s, result); err != nil {
 		errs = append(errs, wrapTransformError("executor", err))
+		if isStepTypeValidationError(err) {
+			return nil, errs
+		}
 	}
 	// LLM must be after executor so we know if type supports LLM
 	if err := buildStepLLM(ctx, s, result); err != nil {
@@ -1302,10 +1306,27 @@ func validateMultipleCommands(result *core.Step) error {
 		return core.NewValidationError(
 			"command",
 			result.Commands,
-			fmt.Errorf("%w: step type %q supports only one command", ErrExecutorDoesNotSupportMultipleCmd, result.ExecutorConfig.Type),
+			multipleCommandsUnsupportedError{stepType: result.ExecutorConfig.Type},
 		)
 	}
 	return nil
+}
+
+type multipleCommandsUnsupportedError struct {
+	stepType string
+}
+
+func (e multipleCommandsUnsupportedError) Error() string {
+	return fmt.Sprintf("step type %q supports only one command", e.stepType)
+}
+
+func (e multipleCommandsUnsupportedError) Unwrap() error {
+	return ErrExecutorDoesNotSupportMultipleCmd
+}
+
+func isStepTypeValidationError(err error) bool {
+	var validationErr *core.ValidationError
+	return errors.As(err, &validationErr) && validationErr.Field == "type"
 }
 
 // validateScript checks if the executor type supports the script field.

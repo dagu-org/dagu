@@ -79,7 +79,7 @@ func newExecutor(ctx context.Context, step core.Step) (executor.Executor, error)
 	}
 	op := strings.ToLower(strings.TrimSpace(command))
 	if op == "" {
-		return nil, fmt.Errorf("%w: command must specify archive operation", ErrConfig)
+		return nil, core.NewValidationError("command", nil, fmt.Errorf("%w: command must specify archive operation", ErrConfig))
 	}
 
 	switch op {

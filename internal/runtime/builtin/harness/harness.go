@@ -329,9 +329,6 @@ func newHarness(ctx context.Context, step core.Step) (executor.Executor, error) 
 	}
 
 	prompt := extractPrompt(step)
-	if prompt == "" {
-		return nil, fmt.Errorf("harness: command field (prompt) is required")
-	}
 
 	return &harnessExecutor{
 		stdout:  os.Stdout,

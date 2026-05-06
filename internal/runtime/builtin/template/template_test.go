@@ -23,6 +23,13 @@ func TestValidateTemplateRequiresScriptMessage(t *testing.T) {
 	assert.NotContains(t, err.Error(), "executor")
 }
 
+func TestNewTemplateRequiresScriptMessage(t *testing.T) {
+	_, err := newTemplate(context.Background(), core.Step{})
+	require.Error(t, err)
+	assert.Equal(t, "field 'script': script field is required", err.Error())
+	assert.NotContains(t, err.Error(), "executor")
+}
+
 func TestTemplateExec_BasicStdout(t *testing.T) {
 	t.Parallel()
 

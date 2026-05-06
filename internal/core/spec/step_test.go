@@ -5,6 +5,7 @@ package spec
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -2111,9 +2112,10 @@ func TestValidateMultipleCommands(t *testing.T) {
 
 			if tt.wantErr {
 				assert.Error(t, err)
-				assert.Contains(t, err.Error(), "step type does not support multiple commands")
-				assert.Contains(t, err.Error(), tt.executorType)
+				assert.Contains(t, err.Error(), `step type "`+tt.executorType+`" supports only one command`)
+				assert.NotContains(t, err.Error(), "step type does not support multiple commands")
 				assert.NotContains(t, err.Error(), "executor")
+				assert.True(t, errors.Is(err, ErrExecutorDoesNotSupportMultipleCmd))
 			} else {
 				assert.NoError(t, err)
 			}
@@ -2730,6 +2732,7 @@ steps:
 	_, err = Load(context.Background(), tmpFile)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unknown step type \"non-existent\"")
+	assert.NotContains(t, err.Error(), "does not support command field")
 	assert.NotContains(t, err.Error(), "executor")
 }
 
