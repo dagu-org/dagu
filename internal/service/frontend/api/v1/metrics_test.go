@@ -83,10 +83,13 @@ func TestMetrics_ExportsWorkerMetrics(t *testing.T) {
 
 	resp := server.Client().Get("/api/v1/metrics").ExpectStatus(http.StatusOK).Send(t)
 	require.Contains(t, resp.Body, "dagu_workers_registered")
+	require.Contains(t, resp.Body, "dagu_worker_info")
 	require.Contains(t, resp.Body, "dagu_worker_running_tasks")
 	require.Contains(t, resp.Body, `worker_id="worker-a"`)
-	require.Contains(t, resp.Body, `pool="gpu"`)
-	require.Contains(t, resp.Body, `region="ap-northeast-1"`)
+	require.Contains(t, resp.Body, `label_name="pool"`)
+	require.Contains(t, resp.Body, `label_value="gpu"`)
+	require.Contains(t, resp.Body, `label_name="region"`)
+	require.Contains(t, resp.Body, `label_value="ap-northeast-1"`)
 }
 
 func TestMetrics_DefaultsToPrivate(t *testing.T) {

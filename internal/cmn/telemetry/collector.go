@@ -7,8 +7,6 @@ import (
 	"context"
 	"runtime"
 	"sort"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -53,6 +51,7 @@ type Collector struct {
 	dagsTotalDesc         *prometheus.Desc
 	schedulerRunningDesc  *prometheus.Desc
 	workersRegisteredDesc *prometheus.Desc
+	workerInfoDesc        *prometheus.Desc
 
 	// Metric descriptors (per-DAG)
 	dagRunsCurrentlyByDAGDesc *prometheus.Desc
@@ -60,6 +59,13 @@ type Collector struct {
 	dagRunsTotalByDAGDesc     *prometheus.Desc
 	dagRunDurationDesc        *prometheus.Desc
 	queueWaitTimeDesc         *prometheus.Desc
+
+	// Metric descriptors (per-worker)
+	workerHeartbeatTimestampDesc   *prometheus.Desc
+	workerHealthStatusDesc         *prometheus.Desc
+	workerPollersDesc              *prometheus.Desc
+	workerRunningTasksDesc         *prometheus.Desc
+	workerOldestRunningTaskAgeDesc *prometheus.Desc
 
 	// Cache metrics
 	cacheEntriesDesc *prometheus.Desc
@@ -133,6 +139,12 @@ func NewCollector(
 			nil,
 			nil,
 		),
+		workerInfoDesc: prometheus.NewDesc(
+			"dagu_worker_info",
+			"Worker label reported by heartbeat as key/value metadata",
+			[]string{"worker_id", "label_name", "label_value"},
+			nil,
+		),
 
 		// Per-DAG metric descriptors
 		dagRunsCurrentlyByDAGDesc: prometheus.NewDesc(
@@ -163,6 +175,38 @@ func NewCollector(
 			"dagu_queue_wait_seconds",
 			"Time spent waiting in queue before execution starts",
 			[]string{"dag"},
+			nil,
+		),
+
+		// Per-worker metric descriptors
+		workerHeartbeatTimestampDesc: prometheus.NewDesc(
+			"dagu_worker_heartbeat_timestamp_seconds",
+			"Unix timestamp of the worker's last heartbeat",
+			[]string{"worker_id"},
+			nil,
+		),
+		workerHealthStatusDesc: prometheus.NewDesc(
+			"dagu_worker_health_status",
+			"Worker health status as a one-hot gauge",
+			[]string{"worker_id", "status"},
+			nil,
+		),
+		workerPollersDesc: prometheus.NewDesc(
+			"dagu_worker_pollers",
+			"Number of worker pollers by state",
+			[]string{"worker_id", "state"},
+			nil,
+		),
+		workerRunningTasksDesc: prometheus.NewDesc(
+			"dagu_worker_running_tasks",
+			"Number of tasks currently running on the worker",
+			[]string{"worker_id"},
+			nil,
+		),
+		workerOldestRunningTaskAgeDesc: prometheus.NewDesc(
+			"dagu_worker_oldest_running_task_age_seconds",
+			"Age of the oldest task currently running on the worker",
+			[]string{"worker_id"},
 			nil,
 		),
 
@@ -201,6 +245,7 @@ func (c *Collector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.dagsTotalDesc
 	ch <- c.schedulerRunningDesc
 	ch <- c.workersRegisteredDesc
+	ch <- c.workerInfoDesc
 
 	// Per-DAG metrics
 	ch <- c.dagRunsCurrentlyByDAGDesc
@@ -208,6 +253,13 @@ func (c *Collector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.dagRunsTotalByDAGDesc
 	ch <- c.dagRunDurationDesc
 	ch <- c.queueWaitTimeDesc
+
+	// Per-worker metrics
+	ch <- c.workerHeartbeatTimestampDesc
+	ch <- c.workerHealthStatusDesc
+	ch <- c.workerPollersDesc
+	ch <- c.workerRunningTasksDesc
+	ch <- c.workerOldestRunningTaskAgeDesc
 
 	// Cache metrics
 	ch <- c.cacheEntriesDesc
@@ -481,22 +533,19 @@ func (c *Collector) collectWorkerMetrics(ctx context.Context, ch chan<- promethe
 		float64(len(records)),
 	)
 
-	labelSpecs := workerMetricLabelSpecs(records)
 	now := c.now()
 
 	for _, record := range records {
-		c.collectWorkerRecordMetrics(ch, record, labelSpecs, now)
+		c.collectWorkerRecordMetrics(ch, record, now)
 	}
 }
 
 func (c *Collector) collectWorkerRecordMetrics(
 	ch chan<- prometheus.Metric,
 	record exec.WorkerHeartbeatRecord,
-	labelSpecs []workerMetricLabelSpec,
 	now time.Time,
 ) {
-	baseLabels := append([]string{"worker_id"}, workerMetricLabelNames(labelSpecs)...)
-	baseValues := append([]string{record.WorkerID}, workerMetricLabelValues(record, labelSpecs)...)
+	c.collectWorkerInfoMetrics(ch, record)
 
 	lastHeartbeat := record.LastHeartbeatTime()
 	lastHeartbeatSeconds := float64(0)
@@ -505,15 +554,10 @@ func (c *Collector) collectWorkerRecordMetrics(
 	}
 
 	ch <- prometheus.MustNewConstMetric(
-		prometheus.NewDesc(
-			"dagu_worker_heartbeat_timestamp_seconds",
-			"Unix timestamp of the worker's last heartbeat",
-			baseLabels,
-			nil,
-		),
+		c.workerHeartbeatTimestampDesc,
 		prometheus.GaugeValue,
 		lastHeartbeatSeconds,
-		baseValues...,
+		record.WorkerID,
 	)
 
 	health := workerHealthStatus(now.Sub(lastHeartbeat))
@@ -523,15 +567,11 @@ func (c *Collector) collectWorkerRecordMetrics(
 			value = 1
 		}
 		ch <- prometheus.MustNewConstMetric(
-			prometheus.NewDesc(
-				"dagu_worker_health_status",
-				"Worker health status as a one-hot gauge",
-				append([]string{"worker_id", "status"}, workerMetricLabelNames(labelSpecs)...),
-				nil,
-			),
+			c.workerHealthStatusDesc,
 			prometheus.GaugeValue,
 			value,
-			append([]string{record.WorkerID, status}, workerMetricLabelValues(record, labelSpecs)...)...,
+			record.WorkerID,
+			status,
 		)
 	}
 
@@ -549,41 +589,46 @@ func (c *Collector) collectWorkerRecordMetrics(
 		{state: "idle", value: idlePollers},
 	} {
 		ch <- prometheus.MustNewConstMetric(
-			prometheus.NewDesc(
-				"dagu_worker_pollers",
-				"Number of worker pollers by state",
-				append([]string{"worker_id", "state"}, workerMetricLabelNames(labelSpecs)...),
-				nil,
-			),
+			c.workerPollersDesc,
 			prometheus.GaugeValue,
 			item.value,
-			append([]string{record.WorkerID, item.state}, workerMetricLabelValues(record, labelSpecs)...)...,
+			record.WorkerID,
+			item.state,
 		)
 	}
 
 	ch <- prometheus.MustNewConstMetric(
-		prometheus.NewDesc(
-			"dagu_worker_running_tasks",
-			"Number of tasks currently running on the worker",
-			baseLabels,
-			nil,
-		),
+		c.workerRunningTasksDesc,
 		prometheus.GaugeValue,
 		stats.runningTasks,
-		baseValues...,
+		record.WorkerID,
 	)
 
 	ch <- prometheus.MustNewConstMetric(
-		prometheus.NewDesc(
-			"dagu_worker_oldest_running_task_age_seconds",
-			"Age of the oldest task currently running on the worker",
-			baseLabels,
-			nil,
-		),
+		c.workerOldestRunningTaskAgeDesc,
 		prometheus.GaugeValue,
 		stats.oldestRunningTaskAge,
-		baseValues...,
+		record.WorkerID,
 	)
+}
+
+func (c *Collector) collectWorkerInfoMetrics(ch chan<- prometheus.Metric, record exec.WorkerHeartbeatRecord) {
+	keys := make([]string, 0, len(record.Labels))
+	for key := range record.Labels {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		ch <- prometheus.MustNewConstMetric(
+			c.workerInfoDesc,
+			prometheus.GaugeValue,
+			1,
+			record.WorkerID,
+			key,
+			record.Labels[key],
+		)
+	}
 }
 
 type workerStatsSnapshot struct {
@@ -591,96 +636,6 @@ type workerStatsSnapshot struct {
 	busyPollers          float64
 	runningTasks         float64
 	oldestRunningTaskAge float64
-}
-
-type workerMetricLabelSpec struct {
-	source string
-	name   string
-}
-
-func workerMetricLabelSpecs(records []exec.WorkerHeartbeatRecord) []workerMetricLabelSpec {
-	keys := make(map[string]struct{})
-	for _, record := range records {
-		for key := range record.Labels {
-			keys[key] = struct{}{}
-		}
-	}
-
-	sources := make([]string, 0, len(keys))
-	for key := range keys {
-		sources = append(sources, key)
-	}
-	sort.Strings(sources)
-
-	reserved := map[string]struct{}{
-		"worker_id": {},
-		"state":     {},
-		"status":    {},
-	}
-	used := make(map[string]struct{}, len(sources))
-	specs := make([]workerMetricLabelSpec, 0, len(sources))
-	for _, source := range sources {
-		name := sanitizePrometheusLabelName(source)
-		if _, ok := reserved[name]; ok {
-			name = "worker_label_" + name
-		}
-		baseName := name
-		for suffix := 2; ; suffix++ {
-			if _, ok := used[name]; !ok {
-				break
-			}
-			name = baseName + "_" + strconv.Itoa(suffix)
-		}
-		used[name] = struct{}{}
-		specs = append(specs, workerMetricLabelSpec{source: source, name: name})
-	}
-	return specs
-}
-
-func workerMetricLabelNames(specs []workerMetricLabelSpec) []string {
-	names := make([]string, 0, len(specs))
-	for _, spec := range specs {
-		names = append(names, spec.name)
-	}
-	return names
-}
-
-func workerMetricLabelValues(record exec.WorkerHeartbeatRecord, specs []workerMetricLabelSpec) []string {
-	values := make([]string, 0, len(specs))
-	for _, spec := range specs {
-		values = append(values, record.Labels[spec.source])
-	}
-	return values
-}
-
-func sanitizePrometheusLabelName(name string) string {
-	var b strings.Builder
-	for _, r := range name {
-		switch {
-		case r >= 'a' && r <= 'z':
-			b.WriteRune(r)
-		case r >= 'A' && r <= 'Z':
-			b.WriteRune(r)
-		case r >= '0' && r <= '9':
-			b.WriteRune(r)
-		case r == '_':
-			b.WriteRune(r)
-		default:
-			b.WriteByte('_')
-		}
-	}
-
-	result := strings.Trim(b.String(), "_")
-	if result == "" {
-		result = "worker_label"
-	}
-	if result[0] >= '0' && result[0] <= '9' {
-		result = "worker_label_" + result
-	}
-	if strings.HasPrefix(result, "__") {
-		result = "worker_label_" + strings.TrimLeft(result, "_")
-	}
-	return result
 }
 
 func workerHealthStatus(sinceLastHeartbeat time.Duration) string {

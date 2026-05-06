@@ -594,6 +594,7 @@ Dagu exposes Prometheus-compatible metrics:
 - `dagu_dag_runs_currently_running` — Active DAG runs
 - `dagu_dag_runs_queued_total` — Queued runs
 - `dagu_workers_registered` — Registered distributed workers
+- `dagu_worker_info` — Worker heartbeat labels as key/value metadata
 - `dagu_worker_heartbeat_timestamp_seconds` — Last worker heartbeat timestamp
 - `dagu_worker_health_status` — Worker health by heartbeat freshness
 - `dagu_worker_pollers` — Worker poller capacity by state

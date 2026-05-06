@@ -371,7 +371,7 @@ func TestCollector_Describe(t *testing.T) {
 		nil,
 	)
 
-	ch := make(chan *prometheus.Desc, 20)
+	ch := make(chan *prometheus.Desc, 24)
 	collector.Describe(ch)
 	close(ch)
 
@@ -380,8 +380,8 @@ func TestCollector_Describe(t *testing.T) {
 		count++
 	}
 
-	// 8 aggregate + 5 per-DAG + 1 cache metrics
-	assert.Equal(t, 14, count)
+	// 9 aggregate/info + 5 per-DAG + 5 per-worker + 1 cache metrics
+	assert.Equal(t, 20, count)
 }
 
 func TestCollector_Collect_BasicMetrics(t *testing.T) {
@@ -563,54 +563,48 @@ func TestCollector_Collect_WithWorkerHeartbeatMetrics(t *testing.T) {
 	metricMap := metricFamilyMap(metrics)
 
 	assertGaugeValue(t, metricMap["dagu_workers_registered"], nil, 1)
+	assertGaugeValue(t, metricMap["dagu_worker_info"], map[string]string{
+		"worker_id":   "worker-a",
+		"label_name":  "pool",
+		"label_value": "gpu",
+	}, 1)
+	assertGaugeValue(t, metricMap["dagu_worker_info"], map[string]string{
+		"worker_id":   "worker-a",
+		"label_name":  "region",
+		"label_value": "ap-northeast-1",
+	}, 1)
 	assertGaugeValue(t, metricMap["dagu_worker_heartbeat_timestamp_seconds"], map[string]string{
 		"worker_id": "worker-a",
-		"pool":      "gpu",
-		"region":    "ap-northeast-1",
 	}, float64(now.Add(-2*time.Second).UnixMilli())/1000)
 	assertGaugeValue(t, metricMap["dagu_worker_health_status"], map[string]string{
 		"worker_id": "worker-a",
 		"status":    "healthy",
-		"pool":      "gpu",
-		"region":    "ap-northeast-1",
 	}, 1)
 	assertGaugeValue(t, metricMap["dagu_worker_health_status"], map[string]string{
 		"worker_id": "worker-a",
 		"status":    "warning",
-		"pool":      "gpu",
-		"region":    "ap-northeast-1",
 	}, 0)
 	assertGaugeValue(t, metricMap["dagu_worker_pollers"], map[string]string{
 		"worker_id": "worker-a",
 		"state":     "total",
-		"pool":      "gpu",
-		"region":    "ap-northeast-1",
 	}, 4)
 	assertGaugeValue(t, metricMap["dagu_worker_pollers"], map[string]string{
 		"worker_id": "worker-a",
 		"state":     "busy",
-		"pool":      "gpu",
-		"region":    "ap-northeast-1",
 	}, 2)
 	assertGaugeValue(t, metricMap["dagu_worker_pollers"], map[string]string{
 		"worker_id": "worker-a",
 		"state":     "idle",
-		"pool":      "gpu",
-		"region":    "ap-northeast-1",
 	}, 2)
 	assertGaugeValue(t, metricMap["dagu_worker_running_tasks"], map[string]string{
 		"worker_id": "worker-a",
-		"pool":      "gpu",
-		"region":    "ap-northeast-1",
 	}, 2)
 	assertGaugeAtLeast(t, metricMap["dagu_worker_oldest_running_task_age_seconds"], map[string]string{
 		"worker_id": "worker-a",
-		"pool":      "gpu",
-		"region":    "ap-northeast-1",
 	}, 119)
 }
 
-func TestCollector_Collect_WithWorkerLabelKeySanitization(t *testing.T) {
+func TestCollector_Collect_WithWorkerInfoLabels(t *testing.T) {
 	dagStore := &mockDAGStore{}
 	dagRunStore := &mockDAGRunStore{}
 	queueStore := &mockQueueStore{}
@@ -650,14 +644,22 @@ func TestCollector_Collect_WithWorkerLabelKeySanitization(t *testing.T) {
 	require.NoError(t, err)
 	metricMap := metricFamilyMap(metrics)
 
+	for name, value := range map[string]string{
+		"pool-name": "gpu",
+		"status":    "spot",
+		"9zone":     "a",
+		"a-b":       "one",
+		"a b":       "two",
+		"a_b":       "three",
+	} {
+		assertGaugeValue(t, metricMap["dagu_worker_info"], map[string]string{
+			"worker_id":   "worker-a",
+			"label_name":  name,
+			"label_value": value,
+		}, 1)
+	}
 	assertGaugeValue(t, metricMap["dagu_worker_running_tasks"], map[string]string{
-		"worker_id":           "worker-a",
-		"pool_name":           "gpu",
-		"worker_label_status": "spot",
-		"worker_label_9zone":  "a",
-		"a_b":                 "two",
-		"a_b_2":               "one",
-		"a_b_3":               "three",
+		"worker_id": "worker-a",
 	}, 0)
 }
 
