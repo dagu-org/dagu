@@ -35,8 +35,7 @@ This spec covers:
 
 This spec does not define:
 
-- the full list of available template functions beyond what a reader
-  needs to know that a hermetic sprig subset, plus overrides, is used
+- the full template function catalog
 - the value-reference syntax itself (`${env.NAME}`, `${steps.*.outputs.*}`,
   and so on) -- see [Spec 007: Value Resolution Steps](007-value-resolution-steps.md)
 - direct `type: template` authoring
