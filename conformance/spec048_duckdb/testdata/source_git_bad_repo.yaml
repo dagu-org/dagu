@@ -1,0 +1,7 @@
+env:
+  - SERVER_BASE: $HOST_SERVER_BASE
+steps:
+  - id: bad_repo
+    action: "source:$SERVER_BASE/no-such-repo@v1"
+    with:
+      message: hi

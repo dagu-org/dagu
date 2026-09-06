@@ -1,0 +1,5 @@
+steps:
+  - id: run_action
+    action: "source:git://127.0.0.1:1/unreachable-host-should-not-be-hit@v1"
+    with:
+      message: hi

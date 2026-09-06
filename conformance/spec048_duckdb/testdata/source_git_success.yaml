@@ -1,0 +1,7 @@
+env:
+  - SERVER_BASE: $HOST_SERVER_BASE
+steps:
+  - id: run_action
+    action: "source:$SERVER_BASE/echo-action@v1"
+    with:
+      message: hello-from-real-git-clone

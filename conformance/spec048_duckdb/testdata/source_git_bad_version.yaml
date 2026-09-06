@@ -1,0 +1,7 @@
+env:
+  - SERVER_BASE: $HOST_SERVER_BASE
+steps:
+  - id: bad_version
+    action: "source:$SERVER_BASE/echo-action@v99-does-not-exist"
+    with:
+      message: hi
