@@ -1,0 +1,4 @@
+steps:
+  - action: github-cli
+    with:
+      args: ["--version"]

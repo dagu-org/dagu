@@ -111,6 +111,22 @@ func preserveEnvMappingOrder(data []byte, parsed map[string]any) error {
 	return nil
 }
 
+// opaqueDataKeys holds step/DAG fields whose value is data owned by
+// something other than dagu's own DAG/step schema: an executor's with:
+// config, a step's or the DAG's own inline params: JSON Schema, and the
+// legacy config: field. None of dagu's own env: declarations (DAG-level,
+// defaults.env, step-level, or container.env) are ever nested inside one of
+// these, but arbitrary executor- or schema-owned data underneath them can
+// coincidentally use "env" as a field or property name (for example, a
+// remote action's own with.env input, or a params: schema property named
+// "env"). patchOrderedEnvValues must not descend into these keys, or it
+// rewrites that unrelated mapping into dagu's ordered env-list shape too.
+var opaqueDataKeys = map[string]bool{
+	"with":   true,
+	"params": true,
+	"config": true,
+}
+
 func patchOrderedEnvValues(node ast.Node, target any) error {
 	switch value := node.(type) {
 	case *ast.MappingNode:
@@ -133,6 +149,9 @@ func patchOrderedEnvValues(node ast.Node, target any) error {
 					targetMap[key] = env
 					continue
 				}
+			}
+			if opaqueDataKeys[key] {
+				continue
 			}
 			if err := patchOrderedEnvValues(item.Value, targetMap[key]); err != nil {
 				return err

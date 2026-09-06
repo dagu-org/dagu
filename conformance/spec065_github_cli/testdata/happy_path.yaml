@@ -1,0 +1,18 @@
+env:
+  - WORK_DIR: $HOST_WORK_DIR
+steps:
+  - id: version
+    action: github-cli@v1
+    with:
+      args: ["--version"]
+
+  - id: version_with_fields
+    depends: version
+    action: github-cli@v1
+    with:
+      args: ["--version"]
+      workdir: $WORK_DIR
+      repo: dagucloud/dagu
+      host: github.com
+      env:
+        EXTRA_VAR: hello

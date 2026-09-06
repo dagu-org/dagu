@@ -1,0 +1,11 @@
+steps:
+  - id: version
+    action: github-cli@v1
+    with:
+      args: ["--version"]
+  - id: print_bare
+    depends: version
+    run: echo "bare exit code is ${version.outputs.exitCode}"
+  - id: print_strict
+    depends: version
+    run: echo "strict=${steps.version.outputs.exitCode}"

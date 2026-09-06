@@ -1,0 +1,52 @@
+steps:
+  - id: missing_args
+    action: github-cli@v1
+    continue_on: failed
+    with: {}
+
+  - id: empty_args
+    depends: missing_args
+    action: github-cli@v1
+    continue_on: failed
+    with:
+      args: []
+
+  - id: bad_timeout
+    depends: empty_args
+    action: github-cli@v1
+    continue_on: failed
+    with:
+      args: ["--version"]
+      timeoutSeconds: 9999
+
+  - id: no_auth
+    depends: bad_timeout
+    action: github-cli@v1
+    continue_on: failed
+    with:
+      args: ["repo", "view", "dagucloud/dagu", "--json", "name"]
+
+  - id: bad_token
+    depends: no_auth
+    action: github-cli@v1
+    continue_on: failed
+    with:
+      args: ["repo", "view", "dagucloud/dagu", "--json", "name"]
+      env:
+        GH_TOKEN: definitely-not-a-real-token-123
+
+  - id: bad_host
+    depends: bad_token
+    action: github-cli@v1
+    continue_on: failed
+    with:
+      host: gh.invalid.example.test
+      args: ["repo", "view", "dagucloud/dagu", "--json", "name"]
+
+  - id: times_out
+    depends: bad_host
+    action: github-cli@v1
+    with:
+      host: 192.0.2.1
+      timeoutSeconds: 2
+      args: ["repo", "view", "dagucloud/dagu", "--json", "name"]
