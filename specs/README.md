@@ -64,7 +64,7 @@ It must not be treated as product behavior until implementation catches up.
 | [059: Chat Completion Action](059-chat-completion.md) | Partially implemented |
 | [060: Node Script Action](060-node-script.md) | Partially implemented |
 | [061: Python Script Action](061-python-script.md) | Partially implemented |
-| [062: dbt Action](062-dbt.md) | Partially implemented |
+| [062: dbt Action](062-dbt.md) | Implemented |
 | [063: Schedule Descriptors](063-schedule.md) | Implemented |
 
 **Writing guidelines:**
