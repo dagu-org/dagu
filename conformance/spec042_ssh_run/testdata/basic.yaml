@@ -1,0 +1,7 @@
+steps:
+  - action: ssh.run
+    with:
+      host: example.invalid
+      user: deploy
+      key: ~/.ssh/id_ed25519
+      command: echo hello
