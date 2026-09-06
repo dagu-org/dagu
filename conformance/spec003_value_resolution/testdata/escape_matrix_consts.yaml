@@ -1,0 +1,10 @@
+consts:
+  - name: prod
+working_dir: .
+steps:
+  - id: check
+    run: |
+      printf '%s\n' '${consts.name}' > matrix.txt
+      printf '%s\n' '\${consts.name}' >> matrix.txt
+      printf '%s\n' '\\${consts.name}' >> matrix.txt
+      printf '%s\n' '\\\${consts.name}' >> matrix.txt

@@ -1,0 +1,5 @@
+shell: sh
+working_dir: .
+steps:
+  - id: check
+    run: printf 'ok\n' > result.out

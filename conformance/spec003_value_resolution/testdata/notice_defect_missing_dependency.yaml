@@ -1,0 +1,11 @@
+working_dir: .
+steps:
+  - id: build
+    run: |
+      printf 'image=v1.2.3\n' >> "$DAGU_OUTPUT_FILE"
+    outputs:
+      - name: image
+  - id: deploy
+    env:
+      IMAGE: ${steps.build.outputs.image}
+    run: printf '%s\n' "$IMAGE" > deploy.txt

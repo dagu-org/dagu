@@ -4,6 +4,7 @@
 package dagrun
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagucloud/dagu/v2/internal/cmn/logger"
 	"github.com/dagucloud/dagu/v2/internal/ir"
 	"github.com/dagucloud/dagu/v2/internal/persis"
 	"github.com/stretchr/testify/assert"
@@ -272,6 +274,12 @@ func TestListLogFiles(t *testing.T) {
 	})
 }
 
+func TestUniquePaths(t *testing.T) {
+	paths := uniquePaths([]string{"", "first", "second", "first", "second"})
+
+	assert.Equal(t, map[string]struct{}{"first": {}, "second": {}}, paths)
+}
+
 func TestRemoveLogFiles(t *testing.T) {
 	t.Run("RemoveMainDAGRunLogFiles", func(t *testing.T) {
 		tmpDir := t.TempDir()
@@ -406,6 +414,82 @@ func TestRemoveLogFiles(t *testing.T) {
 			_, err := os.Stat(logFile)
 			assert.True(t, os.IsNotExist(err), "log file should be removed: %s", logFile)
 		}
+	})
+
+	t.Run("Idempotent", func(t *testing.T) {
+		dagRunLogDir := filepath.Join(t.TempDir(), "dag-run")
+		attemptLogDir := filepath.Join(dagRunLogDir, "attempt")
+		require.NoError(t, os.MkdirAll(attemptLogDir, 0750))
+
+		dagLog := filepath.Join(dagRunLogDir, "dag.log")
+		stdoutLog := filepath.Join(attemptLogDir, "stdout.log")
+		missingLog := filepath.Join(attemptLogDir, "missing.log")
+		require.NoError(t, os.WriteFile(dagLog, []byte("dag log"), 0600))
+		require.NoError(t, os.WriteFile(stdoutLog, []byte("stdout log"), 0600))
+
+		root := setupTestDataRoot(t)
+		run := root.CreateTestDAGRun(t, "test-dag-run", persis.NewUTC(time.Now()))
+		dagRunStatus := ir.InitialStatus(&ir.DAG{Name: "test-dag"})
+		dagRunStatus.DAGRunID = "test-dag-run"
+		dagRunStatus.Log = dagLog
+		dagRunStatus.Nodes = []*ir.Node{{
+			Step:   ir.Step{Name: "step"},
+			Stdout: stdoutLog,
+			Stderr: missingLog,
+		}}
+
+		startedAt := time.Now()
+		for i := range 2 {
+			att, err := run.CreateAttempt(run.Context, persis.NewUTC(startedAt.Add(time.Duration(i)*time.Second)), nil, "")
+			require.NoError(t, err)
+			require.NoError(t, att.Open(run.Context))
+			require.NoError(t, att.Write(run.Context, dagRunStatus))
+			require.NoError(t, att.Close(run.Context))
+		}
+
+		var logs bytes.Buffer
+		ctx := logger.WithFixedLogger(run.Context, logger.NewLogger(
+			logger.WithQuiet(),
+			logger.WithFormat("text"),
+			logger.WithWriter(&logs),
+		))
+
+		require.NoError(t, run.removeLogFiles(ctx))
+		require.NoError(t, run.removeLogFiles(ctx))
+
+		assert.NotContains(t, logs.String(), "Failed to remove log file")
+		assert.NoDirExists(t, attemptLogDir)
+		assert.NoDirExists(t, dagRunLogDir)
+	})
+
+	t.Run("LogsFailures", func(t *testing.T) {
+		logDir := filepath.Join(t.TempDir(), "non-empty")
+		require.NoError(t, os.MkdirAll(logDir, 0750))
+		require.NoError(t, os.WriteFile(filepath.Join(logDir, "content"), []byte("log"), 0600))
+
+		root := setupTestDataRoot(t)
+		run := root.CreateTestDAGRun(t, "test-dag-run", persis.NewUTC(time.Now()))
+		dagRunStatus := ir.InitialStatus(&ir.DAG{Name: "test-dag"})
+		dagRunStatus.DAGRunID = "test-dag-run"
+		dagRunStatus.Log = logDir
+
+		att, err := run.CreateAttempt(run.Context, persis.NewUTC(time.Now()), nil, "")
+		require.NoError(t, err)
+		require.NoError(t, att.Open(run.Context))
+		require.NoError(t, att.Write(run.Context, dagRunStatus))
+		require.NoError(t, att.Close(run.Context))
+
+		var logs bytes.Buffer
+		ctx := logger.WithFixedLogger(run.Context, logger.NewLogger(
+			logger.WithQuiet(),
+			logger.WithFormat("text"),
+			logger.WithWriter(&logs),
+		))
+
+		require.NoError(t, run.removeLogFiles(ctx))
+
+		assert.Contains(t, logs.String(), "Failed to remove log file")
+		assert.DirExists(t, logDir)
 	})
 }
 

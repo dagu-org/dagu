@@ -25,8 +25,12 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { AppBarContext } from '@/contexts/AppBarContext';
-import { useCanWrite } from '@/contexts/AuthContext';
+import { useCanWriteGitSync, useIsAdmin } from '@/contexts/AuthContext';
 import { useClient, useQuery } from '@/hooks/api';
+import { useI18n } from '@/i18n/I18nProvider';
+import { I18nProps } from '@/i18n/I18nProps';
+import { I18nText } from '@/i18n/I18nText';
+import { I18nTemplate } from '@/i18n/I18nTemplate';
 import dayjs from '@/lib/dayjs';
 import { cn } from '@/lib/utils';
 import ConfirmModal from '@/components/ui/confirm-dialog';
@@ -137,16 +141,20 @@ function StatusDot({ status }: { status: SyncStatus }) {
   return (
     <div className="flex items-center gap-1.5">
       <span className={cn('h-2 w-2 rounded-full', config.color)} />
-      <span className="text-xs text-muted-foreground">{config.label}</span>
+      <span className="text-xs text-muted-foreground">
+        <I18nText text={config.label} />
+      </span>
     </div>
   );
 }
 
 export default function GitSyncPage() {
+  const { locale, ts } = useI18n();
   const appBarContext = useContext(AppBarContext);
   const { setTitle } = appBarContext;
   const client = useClient();
-  const canWrite = useCanWrite();
+  const canWrite = useCanWriteGitSync();
+  const isAdmin = useIsAdmin();
   const { showToast } = useSimpleToast();
   const { showError } = useErrorModal();
 
@@ -187,7 +195,7 @@ export default function GitSyncPage() {
   const [selectedDags, setSelectedDags] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const userTouchedSelectionRef = useRef(false);
-  const prevPublishableRef = useRef<string>('');
+  const prevPublishableRef = useRef<string>('[]');
   const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
@@ -268,20 +276,21 @@ export default function GitSyncPage() {
   const deferredSearchQuery = useDeferredValue(searchQuery);
 
   const publishableKey = useMemo(() => {
-    return syncRows
-      .filter(
-        ({ item }) =>
-          item.status === SyncStatus.modified ||
-          item.status === SyncStatus.untracked
-      )
-      .map(({ itemId }) => itemId)
-      .sort()
-      .join(',');
+    return JSON.stringify(
+      syncRows
+        .filter(
+          ({ item }) =>
+            item.status === SyncStatus.modified ||
+            item.status === SyncStatus.untracked
+        )
+        .map(({ itemId }) => itemId)
+        .sort()
+    );
   }, [syncRows]);
 
   useEffect(() => {
     userTouchedSelectionRef.current = false;
-    prevPublishableRef.current = '';
+    prevPublishableRef.current = '[]';
     setSelectedDags(new Set());
   }, [remoteNode]);
 
@@ -292,10 +301,8 @@ export default function GitSyncPage() {
 
   // Auto-select publishable items without overriding manual choices on polling.
   useEffect(() => {
-    const next = publishableKey ? publishableKey.split(',') : [];
-    const prev = prevPublishableRef.current
-      ? prevPublishableRef.current.split(',')
-      : [];
+    const next = JSON.parse(publishableKey) as string[];
+    const prev = JSON.parse(prevPublishableRef.current) as string[];
     const prevSet = new Set(prev);
 
     setSelectedDags((current) => {
@@ -332,7 +339,9 @@ export default function GitSyncPage() {
       if (response.error) {
         showError(response.error.message || 'Pull failed');
       } else {
-        showToast(`Pulled ${response.data?.synced?.length || 0} items`);
+        showToast(
+          `Pulled ${response.data?.synced?.length || 0} items; removed ${response.data?.deleted?.length || 0}`
+        );
         mutateStatus();
       }
     } catch (err) {
@@ -349,14 +358,14 @@ export default function GitSyncPage() {
         ? await client.POST('/sync/items/{itemId}/publish', {
             params: { path: { itemId }, query: { remoteNode } },
             body: {
-              message: commitMessage || `Update ${itemId}`,
+              message: commitMessage || ts('Update {item}', { item: itemId }),
               force: force || false,
             },
           })
         : await client.POST('/sync/publish-all', {
             params: { query: { remoteNode } },
             body: {
-              message: commitMessage || 'Batch update',
+              message: commitMessage || ts('Batch update'),
               itemIds: publishableSelectedIds,
             },
           });
@@ -572,18 +581,31 @@ export default function GitSyncPage() {
   }, [selectedDags, rowByID]);
 
   const emptyStateMessage = useMemo(() => {
-    const typeLabel = syncKindLabels[typeFilter].plural;
+    const typeLabel = ts(syncKindLabels[typeFilter].plural);
+    const statusLabel = ts(
+      statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)
+    );
     if (searchQuery.trim()) {
       if (statusFilter === 'all') {
-        return `No ${typeLabel} matching "${searchQuery.trim()}"`;
+        return ts('No {type} matching "{query}"', {
+          type: typeLabel,
+          query: searchQuery.trim(),
+        });
       }
-      return `No ${typeLabel} with ${statusFilter} status matching "${searchQuery.trim()}"`;
+      return ts('No {type} with {status} status matching "{query}"', {
+        type: typeLabel,
+        status: statusLabel,
+        query: searchQuery.trim(),
+      });
     }
     if (statusFilter === 'all') {
-      return `No ${typeLabel}`;
+      return ts('No {type}', { type: typeLabel });
     }
-    return `No ${typeLabel} with ${statusFilter} status`;
-  }, [searchQuery, statusFilter, typeFilter]);
+    return ts('No {type} with {status} status', {
+      type: typeLabel,
+      status: statusLabel,
+    });
+  }, [searchQuery, statusFilter, ts, typeFilter]);
 
   const selectedCountText = useMemo(
     () =>
@@ -595,10 +617,13 @@ export default function GitSyncPage() {
             count === 1
               ? syncKindLabels[kind].selectionSingular
               : syncKindLabels[kind].selectionPlural;
-          return `${count} ${label}`;
+          return ts('{count} {type}', {
+            count,
+            type: ts(label),
+          });
         })
         .join(', '),
-    [selectedCounts]
+    [selectedCounts, ts]
   );
 
   const missingCount = status?.counts?.missing || 0;
@@ -608,10 +633,15 @@ export default function GitSyncPage() {
     return (
       <div className="flex flex-col items-center justify-center h-[60vh] text-center">
         <GitBranch className="h-16 w-16 text-muted-foreground/30 mb-4" />
-        <h2 className="text-xl font-semibold mb-2">Git Sync Not Configured</h2>
+        <h2 className="text-xl font-semibold mb-2">
+          <I18nText text={'Git Sync Not Configured'} />
+        </h2>
         <p className="text-muted-foreground max-w-md">
-          Git sync allows you to synchronize workflow definitions and Wiki pages
-          with a remote Git repository. Configure it in your server settings.
+          <I18nText
+            text={
+              'Git sync allows you to synchronize workflow definitions and Wiki pages with a remote Git repository. Configure it in your server settings.'
+            }
+          />
         </p>
       </div>
     );
@@ -622,7 +652,9 @@ export default function GitSyncPage() {
       {/* Compact Header */}
       <div className="flex items-center justify-between py-2">
         <div className="flex items-center gap-4">
-          <h1 className="text-lg font-semibold">Git Sync</h1>
+          <h1 className="text-lg font-semibold">
+            <I18nText text={'Git Sync'} />
+          </h1>
           <span className="text-xs text-muted-foreground font-mono">
             {status?.repository}:{status?.branch}
           </span>
@@ -633,7 +665,7 @@ export default function GitSyncPage() {
                 summaryConfig[status.summary]?.badgeClass
               )}
             >
-              {summaryConfig[status.summary]?.label}
+              <I18nText text={summaryConfig[status.summary]?.label ?? ''} />
             </span>
           )}
         </div>
@@ -644,7 +676,9 @@ export default function GitSyncPage() {
             className="h-8 w-8 p-0"
             onClick={handlePull}
             disabled={isPulling || !canWrite}
-            title={!canWrite ? 'Write permission required' : 'Pull from remote'}
+            title={ts(
+              !canWrite ? 'Write permission required' : 'Pull from remote'
+            )}
           >
             {isPulling ? (
               <RefreshCw className="h-4 w-4 animate-spin" />
@@ -664,10 +698,12 @@ export default function GitSyncPage() {
             }
             title={
               !canWrite
-                ? 'Write permission required'
+                ? ts('Write permission required')
                 : !config?.pushEnabled
-                  ? 'Push disabled in read-only mode'
-                  : `Publish ${publishableSelectedCount} selected`
+                  ? ts('Push disabled in read-only mode')
+                  : ts('Publish {count} selected', {
+                      count: publishableSelectedCount,
+                    })
             }
           >
             <Upload className="h-4 w-4" />
@@ -680,57 +716,68 @@ export default function GitSyncPage() {
                 size="sm"
                 className="h-8 px-2 text-xs text-destructive hover:text-destructive"
                 onClick={() => setBatchDeleteModal(true)}
-                title={`Delete ${deletableSelectedIds.length} selected`}
+                title={ts('Delete {count} selected', {
+                  count: deletableSelectedIds.length,
+                })}
               >
                 <Trash2 className="h-4 w-4 mr-1" />
-                Delete ({deletableSelectedIds.length})
+                <I18nText text={'Delete ('} />
+                {deletableSelectedIds.length})
               </Button>
             )}
           {missingCount > 0 && canWrite && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 px-2 text-xs"
-              onClick={() => setCleanupModal(true)}
-              title="Remove missing items from sync tracking"
-            >
-              <EyeOff className="h-4 w-4 mr-1" />
-              Cleanup
-            </Button>
+            <I18nProps>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 px-2 text-xs"
+                onClick={() => setCleanupModal(true)}
+                title="Remove missing items from sync tracking"
+              >
+                <EyeOff className="h-4 w-4 mr-1" />
+                <I18nText text={'Cleanup'} />
+              </Button>
+            </I18nProps>
           )}
           {missingCount > 0 && config?.pushEnabled && canWrite && (
+            <I18nProps>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 px-2 text-xs text-destructive hover:text-destructive"
+                onClick={() => setDeleteMissingModal(true)}
+                title="Delete all missing items from remote repository"
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                <I18nText text={'Delete Missing'} />
+              </Button>
+            </I18nProps>
+          )}
+          <I18nProps>
             <Button
               variant="ghost"
               size="sm"
-              className="h-8 px-2 text-xs text-destructive hover:text-destructive"
-              onClick={() => setDeleteMissingModal(true)}
-              title="Delete all missing items from remote repository"
+              className="h-8 w-8 p-0"
+              onClick={async () => {
+                await mutateStatus();
+                showToast('Status refreshed');
+              }}
+              title="Refresh status"
             >
-              <Trash2 className="h-4 w-4 mr-1" />
-              Delete Missing
+              <RefreshCw className="h-4 w-4" />
             </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 w-8 p-0"
-            onClick={async () => {
-              await mutateStatus();
-              showToast('Status refreshed');
-            }}
-            title="Refresh status"
-          >
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 w-8 p-0"
-            onClick={() => setShowConfig(true)}
-            title="Configuration"
-          >
-            <Settings className="h-4 w-4" />
-          </Button>
+          </I18nProps>
+          <I18nProps>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={() => setShowConfig(true)}
+              title="Configuration"
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
+          </I18nProps>
         </div>
       </div>
 
@@ -749,64 +796,70 @@ export default function GitSyncPage() {
                   : 'text-muted-foreground hover:text-foreground'
               )}
             >
-              {syncKindLabels[kind].plural} ({typeCounts[kind]})
+              <I18nText text={syncKindLabels[kind].plural} /> (
+              {typeCounts[kind]})
             </button>
           ))}
         </div>
         <div className="w-full max-w-sm">
-          <Input
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search items..."
-            className="h-8 text-xs"
-            aria-label="Search git sync items"
-          />
+          <I18nProps>
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search items..."
+              className="h-8 text-xs"
+              aria-label="Search git sync items"
+            />
+          </I18nProps>
         </div>
         {selectedCounts.total > 0 && (
           <span className="text-xs text-muted-foreground">
-            Selected: {selectedCountText}
+            <I18nText text={'Selected:'} /> {selectedCountText}
           </span>
         )}
       </div>
 
-      <div
-        className="flex items-center gap-1 text-xs border-b border-border/40"
-        role="tablist"
-        aria-label="Filter items by status"
-      >
-        {statusFilters.map((f, index) => (
-          <button
-            key={f}
-            role="tab"
-            aria-selected={statusFilter === f}
-            tabIndex={statusFilter === f ? 0 : -1}
-            onClick={() => setFilters({ status: f })}
-            onKeyDown={(e) => {
-              if (e.key === 'ArrowRight') {
-                e.preventDefault();
-                const nextFilter =
-                  statusFilters[(index + 1) % statusFilters.length];
-                if (nextFilter) setFilters({ status: nextFilter });
-              } else if (e.key === 'ArrowLeft') {
-                e.preventDefault();
-                const prevFilter =
-                  statusFilters[
-                    (index - 1 + statusFilters.length) % statusFilters.length
-                  ];
-                if (prevFilter) setFilters({ status: prevFilter });
-              }
-            }}
-            className={cn(
-              'px-3 py-1.5 border-b-2 -mb-px transition-colors focus:outline-none',
-              statusFilter === f
-                ? 'border-foreground text-foreground'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            )}
-          >
-            {f.charAt(0).toUpperCase() + f.slice(1)} ({statusCounts[f]})
-          </button>
-        ))}
-      </div>
+      <I18nProps>
+        <div
+          className="flex items-center gap-1 text-xs border-b border-border/40"
+          role="tablist"
+          aria-label="Filter items by status"
+        >
+          {statusFilters.map((f, index) => (
+            <button
+              key={f}
+              role="tab"
+              aria-selected={statusFilter === f}
+              tabIndex={statusFilter === f ? 0 : -1}
+              onClick={() => setFilters({ status: f })}
+              onKeyDown={(e) => {
+                if (e.key === 'ArrowRight') {
+                  e.preventDefault();
+                  const nextFilter =
+                    statusFilters[(index + 1) % statusFilters.length];
+                  if (nextFilter) setFilters({ status: nextFilter });
+                } else if (e.key === 'ArrowLeft') {
+                  e.preventDefault();
+                  const prevFilter =
+                    statusFilters[
+                      (index - 1 + statusFilters.length) % statusFilters.length
+                    ];
+                  if (prevFilter) setFilters({ status: prevFilter });
+                }
+              }}
+              className={cn(
+                'px-3 py-1.5 border-b-2 -mb-px transition-colors focus:outline-none',
+                statusFilter === f
+                  ? 'border-foreground text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <I18nText text={f.charAt(0).toUpperCase() + f.slice(1)} /> (
+              {statusCounts[f]})
+            </button>
+          ))}
+        </div>
+      </I18nProps>
 
       {/* Items Table */}
       <div className="bg-card border border-border rounded-md overflow-hidden shadow-sm">
@@ -818,13 +871,21 @@ export default function GitSyncPage() {
                   <Checkbox
                     checked={allVisibleSelected}
                     onCheckedChange={handleToggleSelectAll}
-                    aria-label={`Select all ${syncKindLabels[typeFilter].plural}`}
+                    aria-label={ts('Select all {type}', {
+                      type: ts(syncKindLabels[typeFilter].plural),
+                    })}
                   />
                 )}
               </TableHead>
-              <TableHead>Item</TableHead>
-              <TableHead className="w-24">Status</TableHead>
-              <TableHead className="w-28">Synced</TableHead>
+              <TableHead>
+                <I18nText text={'Item'} />
+              </TableHead>
+              <TableHead className="w-24">
+                <I18nText text={'Status'} />
+              </TableHead>
+              <TableHead className="w-28">
+                <I18nText text={'Synced'} />
+              </TableHead>
               <TableHead className="w-28"></TableHead>
             </TableRow>
           </TableHeader>
@@ -867,7 +928,7 @@ export default function GitSyncPage() {
                             syncKindBadgeClass[kind]
                           )}
                         >
-                          {syncKindLabels[kind].badge}
+                          <I18nText text={syncKindLabels[kind].badge} />
                         </span>
                       )}
                     </div>
@@ -877,66 +938,76 @@ export default function GitSyncPage() {
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {item.lastSyncedAt
-                      ? dayjs(item.lastSyncedAt).fromNow()
+                      ? dayjs(item.lastSyncedAt)
+                          .locale(locale === 'zh-CN' ? 'zh-cn' : locale)
+                          .fromNow()
                       : '-'}
                   </TableCell>
                   <TableCell onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-end gap-0.5">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 w-6 p-0"
-                        onClick={() => handleViewDiff(itemId)}
-                        title="View diff"
-                      >
-                        <FileCode className="h-3 w-3" />
-                      </Button>
+                      <I18nProps>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0"
+                          onClick={() => handleViewDiff(itemId)}
+                          title="View diff"
+                        >
+                          <FileCode className="h-3 w-3" />
+                        </Button>
+                      </I18nProps>
                       {(item.status === SyncStatus.modified ||
                         item.status === SyncStatus.untracked ||
                         item.status === SyncStatus.conflict) &&
                         config?.pushEnabled &&
                         canWrite && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0"
-                            onClick={() =>
-                              setPublishModal({ open: true, itemId })
-                            }
-                            title="Publish"
-                          >
-                            <Upload className="h-3 w-3" />
-                          </Button>
+                          <I18nProps>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0"
+                              onClick={() =>
+                                setPublishModal({ open: true, itemId })
+                              }
+                              title="Publish"
+                            >
+                              <Upload className="h-3 w-3" />
+                            </Button>
+                          </I18nProps>
                         )}
                       {item.status === SyncStatus.missing &&
                         config?.pushEnabled &&
                         canWrite && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0 text-muted-foreground hover:text-rose-600"
-                            onClick={() =>
-                              setDeleteModal({ open: true, itemId })
-                            }
-                            title="Delete from remote"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
+                          <I18nProps>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0 text-muted-foreground hover:text-rose-600"
+                              onClick={() =>
+                                setDeleteModal({ open: true, itemId })
+                              }
+                              title="Delete from remote"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </I18nProps>
                         )}
                       {(item.status === SyncStatus.modified ||
                         item.status === SyncStatus.conflict) &&
                         canWrite && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0 text-muted-foreground hover:text-rose-600"
-                            onClick={() =>
-                              setRevertModal({ open: true, itemId })
-                            }
-                            title="Discard"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
+                          <I18nProps>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0 text-muted-foreground hover:text-rose-600"
+                              onClick={() =>
+                                setRevertModal({ open: true, itemId })
+                              }
+                              title="Discard"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </I18nProps>
                         )}
                       <RowActionMenu
                         itemId={itemId}
@@ -967,45 +1038,67 @@ export default function GitSyncPage() {
         <DialogContent className="sm:max-w-sm">
           <div className="space-y-3 text-sm">
             <div>
-              <span className="text-muted-foreground text-xs">Repository</span>
+              <span className="text-muted-foreground text-xs">
+                <I18nText text={'Repository'} />
+              </span>
               <div className="font-mono text-xs mt-0.5 select-all overflow-x-auto whitespace-nowrap scrollbar-thin">
                 {config?.repository || '-'}
               </div>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Branch</span>
+              <span className="text-muted-foreground">
+                <I18nText text={'Branch'} />
+              </span>
               <span className="font-mono text-xs">{config?.branch || '-'}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Push</span>
+              <span className="text-muted-foreground">
+                <I18nText text={'Push'} />
+              </span>
               <span className="text-xs">
-                {config?.pushEnabled ? 'Enabled' : 'Disabled'}
+                {config?.pushEnabled ? (
+                  <I18nText text={'Enabled'} />
+                ) : (
+                  <I18nText text={'Disabled'} />
+                )}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Auto-sync</span>
+              <span className="text-muted-foreground">
+                <I18nText text={'Auto-sync'} />
+              </span>
               <span className="text-xs">
-                {config?.autoSync?.enabled
-                  ? `Every ${config.autoSync.interval || 300}s`
-                  : 'Off'}
+                {config?.autoSync?.enabled ? (
+                  ts('Every {count} seconds', {
+                    count: config.autoSync.interval || 300,
+                  })
+                ) : (
+                  <I18nText text="Off" />
+                )}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Last Sync</span>
+              <span className="text-muted-foreground">
+                <I18nText text={'Last Sync'} />
+              </span>
               <span className="text-xs">
-                {status?.lastSyncAt
-                  ? dayjs(status.lastSyncAt).format('MMM D, HH:mm')
-                  : 'Never'}
+                {status?.lastSyncAt ? (
+                  dayjs(status.lastSyncAt).format('MMM D, HH:mm')
+                ) : (
+                  <I18nText text={'Never'} />
+                )}
               </span>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full mt-2"
-              onClick={handleTestConnection}
-            >
-              Test Connection
-            </Button>
+            {isAdmin && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full mt-2"
+                onClick={handleTestConnection}
+              >
+                <I18nText text={'Test Connection'} />
+              </Button>
+            )}
           </div>
         </DialogContent>
       </Dialog>
@@ -1024,35 +1117,39 @@ export default function GitSyncPage() {
           <DialogHeader>
             <DialogTitle className="text-base">
               {publishModal.itemId
-                ? `Publish ${publishModal.itemId}`
-                : `Publish ${publishableSelectedCount} Selected`}
+                ? ts('Publish {item}', { item: publishModal.itemId })
+                : ts('Publish {count} selected', {
+                    count: publishableSelectedCount,
+                  })}
             </DialogTitle>
             <DialogDescription className="text-xs">
-              Enter a commit message for this change.
+              <I18nText text={'Enter a commit message for this change.'} />
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5">
               <Label htmlFor="commit-message" className="text-xs">
-                Commit Message
+                <I18nText text={'Commit Message'} />
               </Label>
-              <Input
-                id="commit-message"
-                className="h-8 text-sm"
-                placeholder={
-                  publishModal.itemId
-                    ? `Update ${publishModal.itemId}`
-                    : 'Batch update'
-                }
-                value={commitMessage}
-                onChange={(e) => setCommitMessage(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !isPublishing) {
-                    e.preventDefault();
-                    handlePublish(publishModal.itemId, publishForce);
+              <I18nProps>
+                <Input
+                  id="commit-message"
+                  className="h-8 text-sm"
+                  placeholder={
+                    publishModal.itemId
+                      ? ts('Update {item}', { item: publishModal.itemId })
+                      : ts('Batch update')
                   }
-                }}
-              />
+                  value={commitMessage}
+                  onChange={(e) => setCommitMessage(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !isPublishing) {
+                      e.preventDefault();
+                      handlePublish(publishModal.itemId, publishForce);
+                    }
+                  }}
+                />
+              </I18nProps>
             </div>
             {canForcePublish && (
               <div className="flex items-center gap-2">
@@ -1064,7 +1161,7 @@ export default function GitSyncPage() {
                   }
                 />
                 <Label htmlFor="publish-force" className="text-xs">
-                  Force publish (override conflict)
+                  <I18nText text={'Force publish (override conflict)'} />
                 </Label>
               </div>
             )}
@@ -1078,7 +1175,7 @@ export default function GitSyncPage() {
                 setPublishForce(false);
               }}
             >
-              Cancel
+              <I18nText text={'Cancel'} />
             </Button>
             <Button
               size="sm"
@@ -1088,12 +1185,12 @@ export default function GitSyncPage() {
               {isPublishing ? (
                 <>
                   <RefreshCw className="h-3.5 w-3.5 mr-1 animate-spin" />
-                  Publishing...
+                  <I18nText text={'Publishing...'} />
                 </>
               ) : (
                 <>
                   <Upload className="h-3.5 w-3.5 mr-1" />
-                  Publish
+                  <I18nText text={'Publish'} />
                 </>
               )}
             </Button>
@@ -1114,6 +1211,9 @@ export default function GitSyncPage() {
         remoteContent={diffData?.remoteContent}
         remoteCommit={diffData?.remoteCommit}
         remoteAuthor={diffData?.remoteAuthor}
+        remoteDeleted={diffData?.remoteDeleted}
+        localExecutable={diffData?.localExecutable}
+        remoteExecutable={diffData?.remoteExecutable}
         canPublish={
           canWrite &&
           config?.pushEnabled &&
@@ -1154,27 +1254,34 @@ export default function GitSyncPage() {
       />
 
       {/* Revert Confirmation Modal */}
-      <ConfirmModal
-        title="Discard Changes"
-        buttonText="Discard"
-        visible={revertModal.open}
-        dismissModal={() => setRevertModal({ open: false })}
-        onSubmit={() => {
-          if (revertModal.itemId) {
-            handleDiscard(revertModal.itemId);
-          }
-          setRevertModal({ open: false });
-          setDiffModal({ open: false });
-        }}
-      >
-        <p className="text-sm text-muted-foreground">
-          Discard local changes to{' '}
-          <span className="font-mono font-medium text-foreground">
-            {revertModal.itemId}
-          </span>
-          ? This cannot be undone.
-        </p>
-      </ConfirmModal>
+      <I18nProps>
+        <ConfirmModal
+          title="Discard Changes"
+          buttonText="Discard"
+          visible={revertModal.open}
+          dismissModal={() => setRevertModal({ open: false })}
+          onSubmit={() => {
+            if (revertModal.itemId) {
+              handleDiscard(revertModal.itemId);
+            }
+            setRevertModal({ open: false });
+            setDiffModal({ open: false });
+          }}
+        >
+          <p className="text-sm text-muted-foreground">
+            <I18nTemplate
+              text="Discard local changes to {item}? This cannot be undone."
+              values={{
+                item: (
+                  <span className="font-mono font-medium text-foreground">
+                    {revertModal.itemId}
+                  </span>
+                ),
+              }}
+            />
+          </p>
+        </ConfirmModal>
+      </I18nProps>
 
       {/* Forget Dialog */}
       <ForgetDialog
@@ -1219,11 +1326,6 @@ export default function GitSyncPage() {
       <MoveDialog
         open={moveModal.open}
         itemId={moveModal.itemId || ''}
-        itemKind={
-          moveModal.itemId
-            ? rowByID.get(moveModal.itemId)?.kind || 'dag'
-            : 'dag'
-        }
         itemStatus={
           moveModal.itemId
             ? rowByID.get(moveModal.itemId)?.item.status || SyncStatus.synced

@@ -14,6 +14,8 @@ import { useDebouncedValue } from '../../../../hooks/useDebouncedValue';
 import { useYamlCursorPath } from '../../../../hooks/useYamlCursorPath';
 import type { CursorPosition } from './DAGEditor';
 import { SchemaDocSidebar } from './SchemaDocSidebar';
+import { I18nProps } from '@/i18n/I18nProps';
+import { I18nText } from '@/i18n/I18nText';
 
 const DAGEditor = React.lazy(() => import('./DAGEditor'));
 
@@ -126,15 +128,15 @@ function DAGEditorWithDocs({
       {(showDocsButton || headerActions) && (
         <div className="flex-shrink-0 flex justify-between items-center p-2 border-b border-border">
           {showDocsButton ? (
-            <Button
+            <I18nProps><Button
               variant="secondary"
               size="xs"
               onClick={toggleSidebar}
               title="Toggle Schema Documentation (Ctrl+Shift+D)"
             >
               <BookOpen className="h-3.5 w-3.5" />
-              Docs
-            </Button>
+              <I18nText text={"Docs"} />
+            </Button></I18nProps>
           ) : (
             <div />
           )}

@@ -11,6 +11,8 @@ import {
   sanitizeWorkspaceSelection,
   WorkspaceKind,
 } from '../../../../lib/workspace';
+import { I18nProps } from '@/i18n/I18nProps';
+import { I18nText } from '@/i18n/I18nText';
 
 /**
  * CreateDAGModal displays a button that opens a modal to create a new DAG
@@ -77,10 +79,10 @@ function CreateDAGModal() {
 
   return (
     <>
-      <Button aria-label="Create new DAG" onClick={() => setIsOpen(true)}>
+      <I18nProps><Button aria-label="Create new DAG" onClick={() => setIsOpen(true)}>
         <Plus className="h-4 w-4" />
-        New
-      </Button>
+        <I18nText text={"New"} />
+      </Button></I18nProps>
 
       <DAGNameInputModal
         isOpen={isOpen}

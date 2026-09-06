@@ -30,6 +30,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { AlertCircle, Check, UserPlus, X } from 'lucide-react';
+import { I18nText } from '@/i18n/I18nText';
+import { I18nProps } from '@/i18n/I18nProps';
+import { useI18n } from '@/i18n/I18nProvider';
 
 type User = components['schemas']['User'];
 type WorkspaceAccess = components['schemas']['WorkspaceAccess'];
@@ -80,6 +83,7 @@ export function UserFormModal({
   onClose,
   onSuccess,
 }: UserFormModalProps) {
+  const { ts } = useI18n();
   const config = useConfig();
   const appBarContext = useContext(AppBarContext);
   const isEditing = !!user;
@@ -94,11 +98,13 @@ export function UserFormModal({
   const authorizationManaged = roleManaged || workspaceAccessManaged;
   const managedProviderLabel =
     user?.authProvider === UserAuthProvider.proxy ? 'Proxy' : 'SSO';
-  let managedBadgeLabel = `Workspace access managed by ${managedProviderLabel}`;
+  let managedBadgeLabel = ts('Workspace access managed by {provider}', {
+    provider: managedProviderLabel,
+  });
   if (roleManaged) {
     managedBadgeLabel = workspaceAccessManaged
-      ? `Managed by ${managedProviderLabel}`
-      : `Role managed by ${managedProviderLabel}`;
+      ? ts('Managed by {provider}', { provider: managedProviderLabel })
+      : ts('Role managed by {provider}', { provider: managedProviderLabel });
   }
 
   const [username, setUsername] = useState('');
@@ -190,7 +196,13 @@ export function UserFormModal({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <div className="flex items-center gap-2">
-            <DialogTitle>{isEditing ? 'Edit User' : 'Create User'}</DialogTitle>
+            <DialogTitle>
+              {isEditing ? (
+                <I18nText text={'Edit User'} />
+              ) : (
+                <I18nText text={'Create User'} />
+              )}
+            </DialogTitle>
             {authorizationManaged && (
               <Badge variant="info">{managedBadgeLabel}</Badge>
             )}
@@ -207,7 +219,7 @@ export function UserFormModal({
 
           <div className="space-y-1.5">
             <Label htmlFor="username" className="text-sm">
-              Username
+              <I18nText text={'Username'} />
             </Label>
             <Input
               id="username"
@@ -223,31 +235,35 @@ export function UserFormModal({
           {!isEditing && (
             <div className="space-y-1.5">
               <Label htmlFor="password" className="text-sm">
-                Password
+                <I18nText text={'Password'} />
               </Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                autoComplete="new-password"
-                className="h-9"
-                placeholder="Minimum 8 characters"
-              />
+              <I18nProps>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="new-password"
+                  className="h-9"
+                  placeholder="Minimum 8 characters"
+                />
+              </I18nProps>
             </div>
           )}
 
           <div className="space-y-1.5">
             <Label htmlFor="role" className="text-sm">
-              Role
+              <I18nText text={'Role'} />
             </Label>
             {roleManaged ? (
               <div
-                aria-label={`Role managed by ${managedProviderLabel}`}
+                aria-label={ts('Role managed by {provider}', {
+                  provider: managedProviderLabel,
+                })}
                 className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm capitalize"
               >
-                {user.role}
+                <I18nText text={user.role} />
               </div>
             ) : (
               <Select
@@ -262,9 +278,11 @@ export function UserFormModal({
                   {ROLES.map((r) => (
                     <SelectItem key={r.value} value={r.value}>
                       <div className="flex flex-col">
-                        <span>{r.label}</span>
+                        <span>
+                          <I18nText text={r.label} />
+                        </span>
                         <span className="text-xs text-muted-foreground">
-                          {r.description}
+                          <I18nText text={r.description} />
                         </span>
                       </div>
                     </SelectItem>
@@ -276,16 +294,20 @@ export function UserFormModal({
 
           {workspaceAccessManaged ? (
             <div className="space-y-1.5">
-              <Label className="text-sm">Workspace Access</Label>
+              <Label className="text-sm">
+                <I18nText text={'Workspace Access'} />
+              </Label>
               <WorkspaceAccessSummary
                 value={workspaceAccess}
                 workspaces={appBarContext.workspaces}
               />
               <p className="text-xs text-slate-500 dark:text-slate-500">
-                {roleManaged
-                  ? 'Role and workspace access are'
-                  : 'Workspace access is'}{' '}
-                updated by {managedProviderLabel} at sign-in.
+                {ts(
+                  roleManaged
+                    ? 'Role and workspace access are updated by {provider} at sign-in.'
+                    : 'Workspace access is updated by {provider} at sign-in.',
+                  { provider: managedProviderLabel }
+                )}
               </p>
             </div>
           ) : (
@@ -304,7 +326,7 @@ export function UserFormModal({
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="ghost" onClick={onClose}>
               <X className="h-4 w-4" />
-              Cancel
+              <I18nText text={'Cancel'} />
             </Button>
             <Button type="submit" disabled={isLoading}>
               {isEditing ? (
@@ -312,7 +334,13 @@ export function UserFormModal({
               ) : (
                 <UserPlus className="h-4 w-4" />
               )}
-              {isLoading ? 'Saving...' : isEditing ? 'Update' : 'Create'}
+              {isLoading ? (
+                <I18nText text={'Saving...'} />
+              ) : isEditing ? (
+                <I18nText text={'Update'} />
+              ) : (
+                <I18nText text={'Create'} />
+              )}
             </Button>
           </div>
         </form>

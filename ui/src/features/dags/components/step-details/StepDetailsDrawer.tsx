@@ -11,6 +11,8 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import NodeStatusChip from '../common/NodeStatusChip';
 import { StepDetails } from './StepDetails';
+import { I18nText } from '@/i18n/I18nText';
+import { I18nProps } from '@/i18n/I18nProps';
 
 type Step = components['schemas']['Step'];
 type Node = components['schemas']['Node'];
@@ -92,7 +94,8 @@ function StepRuntimeSection({
   if (finishedAt) infoRows.push(['Finished', finishedAt]);
   if (duration && duration !== '-') infoRows.push(['Duration', duration]);
   if (node.retryCount > 0) infoRows.push(['Retries', String(node.retryCount)]);
-  if (node.doneCount > 1) infoRows.push(['Completions', String(node.doneCount)]);
+  if (node.doneCount > 1)
+    infoRows.push(['Completions', String(node.doneCount)]);
   if (node.approvedBy) {
     infoRows.push([
       'Approved by',
@@ -126,7 +129,9 @@ function StepRuntimeSection({
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
           {infoRows.map(([label, value]) => (
             <React.Fragment key={label}>
-              <dt className="text-muted-foreground">{label}</dt>
+              <dt className="text-muted-foreground">
+                <I18nText text={label} />
+              </dt>
               <dd className="min-w-0 whitespace-normal break-words tabular-nums text-foreground">
                 {value}
               </dd>
@@ -142,7 +147,7 @@ function StepRuntimeSection({
             onClick={() => onViewLog('stdout')}
           >
             <ScrollText className="h-3.5 w-3.5" />
-            View stdout
+            <I18nText text={'View stdout'} />
           </button>
           <button
             type="button"
@@ -150,14 +155,14 @@ function StepRuntimeSection({
             onClick={() => onViewLog('stderr')}
           >
             <ScrollText className="h-3.5 w-3.5" />
-            View stderr
+            <I18nText text={'View stderr'} />
           </button>
         </div>
       )}
       {subRuns.length > 0 && (
         <div className="space-y-1">
           <div className="text-xs font-medium uppercase text-muted-foreground">
-            Sub-runs
+            <I18nText text={'Sub-runs'} />
           </div>
           {subRuns.map((subRun, index) => (
             <div
@@ -176,7 +181,7 @@ function StepRuntimeSection({
                   className="rounded-md border border-border bg-background px-2 py-0.5 text-xs font-medium hover:bg-muted"
                   onClick={() => onOpenSubRun(index)}
                 >
-                  Open
+                  <I18nText text={'Open'} />
                 </button>
               )}
             </div>
@@ -398,16 +403,18 @@ export function StepDetailsDrawer({
 
   return createPortal(
     <div className="fixed inset-0 z-[60] flex justify-end">
-      <button
-        type="button"
-        tabIndex={-1}
-        aria-label="Close step details"
-        className={cn(
-          'absolute inset-0 h-full w-full cursor-default bg-transparent transition-opacity duration-200 ease-out',
-          isVisible ? 'opacity-100' : 'opacity-0'
-        )}
-        onClick={onClose}
-      />
+      <I18nProps>
+        <button
+          type="button"
+          tabIndex={-1}
+          aria-label="Close step details"
+          className={cn(
+            'absolute inset-0 h-full w-full cursor-default bg-transparent transition-opacity duration-200 ease-out',
+            isVisible ? 'opacity-100' : 'opacity-0'
+          )}
+          onClick={onClose}
+        />
+      </I18nProps>
       <aside
         ref={drawerRef}
         role="dialog"
@@ -419,25 +426,27 @@ export function StepDetailsDrawer({
         )}
         style={{ width: `min(100vw, ${drawerWidth}px)` }}
       >
-        <div
-          role="separator"
-          aria-label="Resize step details"
-          aria-orientation="vertical"
-          aria-valuemin={MIN_DRAWER_WIDTH}
-          aria-valuemax={MAX_DRAWER_WIDTH}
-          aria-valuenow={drawerWidth}
-          tabIndex={0}
-          title="Resize step details"
-          className="group absolute left-0 top-0 z-20 h-full w-3 -translate-x-1.5 cursor-col-resize touch-none outline-none"
-          onMouseDown={handleResizeMouseDown}
-          onKeyDown={handleResizeKeyDown}
-        >
-          <div className="mx-auto h-full w-px bg-transparent transition-colors group-hover:bg-primary/60 group-focus:bg-primary" />
-        </div>
+        <I18nProps>
+          <div
+            role="separator"
+            aria-label="Resize step details"
+            aria-orientation="vertical"
+            aria-valuemin={MIN_DRAWER_WIDTH}
+            aria-valuemax={MAX_DRAWER_WIDTH}
+            aria-valuenow={drawerWidth}
+            tabIndex={0}
+            title="Resize step details"
+            className="group absolute left-0 top-0 z-20 h-full w-3 -translate-x-1.5 cursor-col-resize touch-none outline-none"
+            onMouseDown={handleResizeMouseDown}
+            onKeyDown={handleResizeKeyDown}
+          >
+            <div className="mx-auto h-full w-px bg-transparent transition-colors group-hover:bg-primary/60 group-focus:bg-primary" />
+          </div>
+        </I18nProps>
         <header className="flex items-start justify-between gap-4 border-b border-border bg-card px-4 py-3">
           <div className="min-w-0">
             <div className="text-xs font-medium uppercase text-muted-foreground">
-              {dagName || 'DAG'}
+              {dagName || <I18nText text={'DAG'} />}
             </div>
             <h2
               id="step-details-title"
@@ -451,20 +460,22 @@ export function StepDetailsDrawer({
                   {renderedNode.statusLabel}
                 </NodeStatusChip>
               ) : (
-                'Step definition'
+                <I18nText text={'Step definition'} />
               )}
             </div>
           </div>
-          <Button
-            ref={closeButtonRef}
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            title="Close step details"
-          >
-            <X className="h-4 w-4" />
-          </Button>
+          <I18nProps>
+            <Button
+              ref={closeButtonRef}
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              title="Close step details"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </I18nProps>
         </header>
         <div className="min-h-0 flex-1 overflow-auto bg-background p-5">
           {renderedNode && (

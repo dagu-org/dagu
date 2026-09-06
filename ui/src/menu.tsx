@@ -8,6 +8,7 @@ import {
 import { UserMenu } from '@/components/UserMenu';
 import {
   useCanAccessSystemStatus,
+  useCanAccessGitSync,
   useCanViewEventLogs,
   useCanManageWebhooks,
   useCanManageProfiles,
@@ -49,6 +50,8 @@ import { AppBarContext } from './contexts/AppBarContext';
 import { useViews } from '@/hooks/useViews';
 import { useUserPreferences } from './contexts/UserPreference';
 import { WorkspaceSelector } from './components/workspace/WorkspaceSelector';
+import { LanguageSelector } from './components/LanguageSelector';
+import { useI18n } from './i18n/I18nProvider';
 
 type NavItemProps = {
   to: string;
@@ -427,7 +430,7 @@ function NavGroup({
               onClick={() => setIsExpanded((prev) => !prev)}
               className="flex h-full w-8 flex-shrink-0 items-center justify-center focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring"
               aria-expanded={effectivelyExpanded}
-              aria-label={`Toggle ${label} section`}
+              aria-label={label}
             >
               <div style={chevronStyle}>
                 <ChevronDown size={14} />
@@ -441,7 +444,7 @@ function NavGroup({
             className={headerClassName}
             title={isOpen ? '' : label}
             aria-expanded={effectivelyExpanded}
-            aria-label={`${label} section`}
+            aria-label={label}
           >
             {activeIndicator}
             {labelNode}
@@ -505,11 +508,13 @@ export const mainListItems = React.forwardRef<
       : roleAtLeast(user?.role ?? null, UserRole.developer);
   const canManageIncidents = canManageNotifications;
   const canAccessSystemStatus = useCanAccessSystemStatus();
+  const canAccessGitSync = useCanAccessGitSync();
   const canManageWebhooks = useCanManageWebhooks();
   const canManageProfiles = useCanManageProfiles();
   const canViewEventLogs = useCanViewEventLogs();
   const canViewAuditLogs = useCanViewAuditLogs();
   const { preferences, updatePreference } = useUserPreferences();
+  const { t } = useI18n();
 
   const theme = preferences.theme || 'dark';
   const title = config.title || DEFAULT_TITLE;
@@ -530,7 +535,11 @@ export const mainListItems = React.forwardRef<
             'text-sidebar-foreground',
             sidebarItemClassName
           )}
-          aria-label={isOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+          aria-label={
+            isOpen
+              ? t('navigation.collapseSidebar')
+              : t('navigation.expandSidebar')
+          }
         >
           {/* Expand icon (character) - visible when collapsed */}
           <div
@@ -616,7 +625,7 @@ export const mainListItems = React.forwardRef<
                       onValueChange={selectRemoteNode}
                     >
                       <SelectTrigger
-                        aria-label="Remote node"
+                        aria-label={t('navigation.remoteNode')}
                         className={cn(
                           'h-9 text-xs text-sidebar-foreground rounded-md',
                           isOpen
@@ -684,7 +693,7 @@ export const mainListItems = React.forwardRef<
 
           <NavItem
             to="/"
-            text="Overview"
+            text={t('navigation.overview')}
             icon={<Gauge size={18} />}
             isOpen={isOpen}
             onClick={onNavItemClick}
@@ -695,7 +704,7 @@ export const mainListItems = React.forwardRef<
           <NavGroup
             groupKey="workflows"
             icon={<Network size={18} />}
-            label="Workflows"
+            label={t('navigation.workflows')}
             isOpen={isOpen}
             basePath={[
               '/dags',
@@ -711,7 +720,7 @@ export const mainListItems = React.forwardRef<
           >
             <NavItem
               to="/search"
-              text="Search"
+              text={t('navigation.search')}
               isOpen={isOpen}
               onClick={onNavItemClick}
               customColor={customColor}
@@ -719,7 +728,7 @@ export const mainListItems = React.forwardRef<
             {canWrite && (
               <NavItem
                 to="/base-config"
-                text="Base Config"
+                text={t('navigation.baseConfig')}
                 isOpen={isOpen}
                 onClick={onNavItemClick}
                 customColor={customColor}
@@ -727,15 +736,15 @@ export const mainListItems = React.forwardRef<
             )}
             <NavItem
               to="/wiki"
-              text="Wiki"
+              text={t('navigation.wiki')}
               isOpen={isOpen}
               onClick={onNavItemClick}
               customColor={customColor}
             />
-            {canWrite && config.gitSyncEnabled && (
+            {canAccessGitSync && config.gitSyncEnabled && (
               <NavItem
                 to="/git-sync"
-                text="Git Sync"
+                text={t('navigation.gitSync')}
                 isOpen={isOpen}
                 onClick={onNavItemClick}
                 customColor={customColor}
@@ -746,7 +755,7 @@ export const mainListItems = React.forwardRef<
           <NavGroup
             groupKey="execution"
             icon={<History size={18} />}
-            label="Executions"
+            label={t('navigation.executions')}
             isOpen={isOpen}
             basePath={['/dag-runs', '/queues']}
             to="/dag-runs"
@@ -755,7 +764,7 @@ export const mainListItems = React.forwardRef<
           >
             <NavItem
               to="/queues"
-              text="Queues"
+              text={t('navigation.queues')}
               isOpen={isOpen}
               onClick={onNavItemClick}
               customColor={customColor}
@@ -766,7 +775,7 @@ export const mainListItems = React.forwardRef<
             <NavGroup
               groupKey="monitor"
               icon={<Activity size={18} />}
-              label="Monitor"
+              label={t('navigation.monitor')}
               isOpen={isOpen}
               basePath={['/event-logs', '/audit-logs', '/system-status']}
               to="/system-status"
@@ -776,7 +785,7 @@ export const mainListItems = React.forwardRef<
               {canViewEventLogs && (
                 <NavItem
                   to="/event-logs"
-                  text="Events"
+                  text={t('navigation.events')}
                   isOpen={isOpen}
                   onClick={onNavItemClick}
                   customColor={customColor}
@@ -785,7 +794,7 @@ export const mainListItems = React.forwardRef<
               {canViewAuditLogs && (
                 <NavItem
                   to="/audit-logs"
-                  text="Audit Logs"
+                  text={t('navigation.auditLogs')}
                   isOpen={isOpen}
                   onClick={onNavItemClick}
                   customColor={customColor}
@@ -798,7 +807,7 @@ export const mainListItems = React.forwardRef<
             <NavGroup
               groupKey="notifications"
               icon={<Bell size={18} />}
-              label="Notifications"
+              label={t('navigation.notifications')}
               isOpen={isOpen}
               basePath={[
                 '/notifications',
@@ -811,14 +820,14 @@ export const mainListItems = React.forwardRef<
             >
               <NavItem
                 to="/notification-rules"
-                text="Rules"
+                text={t('navigation.rules')}
                 isOpen={isOpen}
                 onClick={onNavItemClick}
                 customColor={customColor}
               />
               <NavItem
                 to="/notification-channels"
-                text="Channels"
+                text={t('navigation.channels')}
                 isOpen={isOpen}
                 onClick={onNavItemClick}
                 customColor={customColor}
@@ -830,7 +839,7 @@ export const mainListItems = React.forwardRef<
             <NavGroup
               groupKey="incidents"
               icon={<AlertTriangle size={18} />}
-              label="Incidents"
+              label={t('navigation.incidents')}
               isOpen={isOpen}
               basePath={[
                 '/incidents',
@@ -843,14 +852,14 @@ export const mainListItems = React.forwardRef<
             >
               <NavItem
                 to="/incident-providers"
-                text="Connections"
+                text={t('navigation.connections')}
                 isOpen={isOpen}
                 onClick={onNavItemClick}
                 customColor={customColor}
               />
               <NavItem
                 to="/incident-policies"
-                text="Routing"
+                text={t('navigation.routing')}
                 isOpen={isOpen}
                 onClick={onNavItemClick}
                 customColor={customColor}
@@ -861,7 +870,7 @@ export const mainListItems = React.forwardRef<
           <NavGroup
             groupKey="integrations"
             icon={<Webhook size={18} />}
-            label="Integrations"
+            label={t('navigation.integrations')}
             isOpen={isOpen}
             basePath={['/integrations', '/webhooks', '/api-docs']}
             to="/integrations"
@@ -871,7 +880,7 @@ export const mainListItems = React.forwardRef<
             {canManageWebhooks && (
               <NavItem
                 to="/webhooks"
-                text="Webhooks"
+                text={t('navigation.webhooks')}
                 isOpen={isOpen}
                 onClick={onNavItemClick}
                 customColor={customColor}
@@ -879,7 +888,7 @@ export const mainListItems = React.forwardRef<
             )}
             <NavItem
               to="/api-docs"
-              text="API Reference"
+              text={t('navigation.apiReference')}
               isOpen={isOpen}
               onClick={onNavItemClick}
               customColor={customColor}
@@ -889,7 +898,7 @@ export const mainListItems = React.forwardRef<
           {canManageProfiles && (
             <NavItem
               to="/profiles"
-              text="Profiles & Secrets"
+              text={t('navigation.profilesSecrets')}
               icon={<SlidersHorizontal size={18} />}
               isOpen={isOpen}
               onClick={onNavItemClick}
@@ -901,7 +910,7 @@ export const mainListItems = React.forwardRef<
             <NavGroup
               groupKey="administration"
               icon={<Shield size={18} />}
-              label="Administration"
+              label={t('navigation.administration')}
               isOpen={isOpen}
               basePath={[
                 '/users',
@@ -919,7 +928,7 @@ export const mainListItems = React.forwardRef<
               {config.authMode === 'builtin' && (
                 <NavGroup
                   groupKey="administration-access"
-                  label="Access"
+                  label={t('navigation.access')}
                   isOpen={isOpen}
                   basePath={['/users', '/api-keys']}
                   customColor={customColor}
@@ -927,14 +936,14 @@ export const mainListItems = React.forwardRef<
                 >
                   <NavItem
                     to="/users"
-                    text="Users"
+                    text={t('navigation.users')}
                     isOpen={isOpen}
                     onClick={onNavItemClick}
                     customColor={customColor}
                   />
                   <NavItem
                     to="/api-keys"
-                    text="API Keys"
+                    text={t('navigation.apiKeys')}
                     isOpen={isOpen}
                     onClick={onNavItemClick}
                     customColor={customColor}
@@ -944,7 +953,7 @@ export const mainListItems = React.forwardRef<
 
               <NavGroup
                 groupKey="administration-infrastructure"
-                label="Infrastructure"
+                label={t('navigation.infrastructure')}
                 isOpen={isOpen}
                 basePath={['/remote-nodes', '/terminal', '/license']}
                 customColor={customColor}
@@ -952,7 +961,7 @@ export const mainListItems = React.forwardRef<
               >
                 <NavItem
                   to="/remote-nodes"
-                  text="Remote Nodes"
+                  text={t('navigation.remoteNodes')}
                   isOpen={isOpen}
                   onClick={onNavItemClick}
                   customColor={customColor}
@@ -960,7 +969,7 @@ export const mainListItems = React.forwardRef<
                 {config.terminalEnabled && (
                   <NavItem
                     to="/terminal"
-                    text="Terminal"
+                    text={t('navigation.terminal')}
                     isOpen={isOpen}
                     onClick={onNavItemClick}
                     customColor={customColor}
@@ -968,7 +977,7 @@ export const mainListItems = React.forwardRef<
                 )}
                 <NavItem
                   to="/license"
-                  text="License"
+                  text={t('navigation.license')}
                   isOpen={isOpen}
                   onClick={onNavItemClick}
                   customColor={customColor}
@@ -990,9 +999,12 @@ export const mainListItems = React.forwardRef<
           <SidebarButton
             onClick={toggleTheme}
             icon={theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-            label={theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+            label={
+              theme === 'dark' ? t('theme.lightMode') : t('theme.darkMode')
+            }
             isOpen={isOpen}
           />
+          <LanguageSelector variant="sidebar" compact={!isOpen} />
           <UserMenu isCollapsed={!isOpen} />
         </div>
         {config.version && (

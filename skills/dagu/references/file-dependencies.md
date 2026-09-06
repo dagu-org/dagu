@@ -17,4 +17,4 @@ Every item must match when the run workspace is prepared. Do not use `${...}` re
 
 Local execution materializes the bundle directly; distributed execution transfers it through the coordinator before worker materialization. The result is exposed as `DAG_RUN_WORK_DIR` and `${context.paths.work_dir}` and becomes the DAG process working directory. An explicit step working directory retains its normal precedence.
 
-Retries create a new snapshot. Separately fetched named child DAGs cannot add dependencies from a remote worker; use an inline multi-document child DAG or keep that child local.
+Retries create a new snapshot. Inline multi-document child DAGs reuse their parent's snapshot, while separately fetched named child DAGs create an independent snapshot from their authoritative source workspace. In shared-nothing distributed execution, the coordinator packages the named child's declared files before dispatch. If the named DAG changed after the worker fetched it, dispatch fails and instructs the caller to reload and retry.

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dagucloud/dagu/v2/internal/cmn/config"
+	persisfile "github.com/dagucloud/dagu/v2/internal/persis/file"
 	"github.com/dagucloud/dagu/v2/internal/service/scheduler/filenotify"
 	"github.com/fsnotify/fsnotify"
 )
@@ -22,6 +23,7 @@ const (
 	defaultAppStreamBufferSize = 32
 	appStreamDebounceInterval  = 200 * time.Millisecond
 	wikiPollingInterval        = 30 * time.Second
+	schedulerStateFileName     = "state.json"
 )
 
 type AppEventType string
@@ -30,6 +32,7 @@ const (
 	AppEventTypeReset      AppEventType = "reset"
 	AppEventTypeDAGChanged AppEventType = "dag.changed"
 	AppEventTypeQueue      AppEventType = "queue.changed"
+	AppEventTypeScheduler  AppEventType = "scheduler.state.changed"
 	AppEventTypeWiki       AppEventType = "wiki.page.changed"
 )
 
@@ -658,6 +661,14 @@ func NewAppStreamService(cfg AppStreamConfig) (*AppStreamService, error) {
 			service.publishReset,
 		))
 	}
+	if cfg.Paths.DataDir != "" {
+		service.watchers = append(service.watchers, newDirectoryWatcher(
+			persisfile.SchedulerStateDir(cfg.Paths),
+			true,
+			service.handleSchedulerStateEvent,
+			service.publishReset,
+		))
+	}
 	service.watchers = append(service.watchers,
 		newWikiDirectoryWatcher(cfg.Paths.WikiDir, true, service.handleWikiPageEvent, service.publishReset),
 		newDirectoryWatcher(cfg.Paths.SuspendFlagsDir, true, service.handleSuspendFlagEvent, service.publishReset),
@@ -732,6 +743,16 @@ func (s *AppStreamService) handleSuspendFlagEvent(_, relPath string, op fsnotify
 	s.coalescer.Enqueue(AppEvent{
 		Type:   AppEventTypeDAGChanged,
 		Reason: "suspend_flag_" + fileEventReason(op),
+	})
+}
+
+func (s *AppStreamService) handleSchedulerStateEvent(_, relPath string, op fsnotify.Op) {
+	if filepath.ToSlash(relPath) != schedulerStateFileName {
+		return
+	}
+	s.coalescer.Enqueue(AppEvent{
+		Type:   AppEventTypeScheduler,
+		Reason: fileEventReason(op),
 	})
 }
 

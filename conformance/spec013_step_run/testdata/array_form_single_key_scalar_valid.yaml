@@ -1,0 +1,7 @@
+working_dir: .
+steps:
+  - id: check
+    stdout: out.txt
+    run:
+      - echo first
+      - echo hello: world

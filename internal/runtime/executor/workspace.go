@@ -5,6 +5,7 @@ package executor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,6 +17,10 @@ import (
 )
 
 type workspaceSeedKey struct{}
+
+// ErrDAGWorkspaceSourceUnavailable indicates that the current host cannot
+// resolve a dependency-bearing DAG's source workspace.
+var ErrDAGWorkspaceSourceUnavailable = errors.New("DAG file dependencies require a local source workspace")
 
 // WithWorkspaceSeed carries an immutable workspace through inline child workflows.
 func WithWorkspaceSeed(ctx context.Context, seed WorkspaceSeed) context.Context {
@@ -76,7 +81,7 @@ func dagWorkspacePackOptions(ctx context.Context, dag *ir.DAG) (string, *workspa
 	root := dag.WorkingDir
 	if strings.TrimSpace(root) == "" {
 		if sourceFile == "" {
-			return "", nil, fmt.Errorf("DAG file dependencies require a source file or working directory")
+			return "", nil, ErrDAGWorkspaceSourceUnavailable
 		}
 		root = filepath.Dir(sourceFile)
 	} else {
@@ -123,6 +128,12 @@ func workspaceDAGPath(root, sourceFile string) (string, error) {
 			return "", fmt.Errorf("inspect workspace DAG path %q: %w", name, err)
 		}
 	}
+}
+
+// HasDAGFileDependencies reports whether a DAG or any inline child declares
+// files that must be included in its execution workspace.
+func HasDAGFileDependencies(dag *ir.DAG) bool {
+	return len(dagFileDependencies(dag)) > 0
 }
 
 func dagFileDependencies(dag *ir.DAG) []string {

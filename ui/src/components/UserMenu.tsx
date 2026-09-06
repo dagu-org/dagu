@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
 import { UserAuthProvider } from '@/api/v1/schema';
-import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,6 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { User, LogOut, Key } from 'lucide-react';
 import { ChangePasswordModal } from './ChangePasswordModal';
+import { useI18n } from '@/i18n/I18nProvider';
 
 type UserMenuProps = {
   isCollapsed?: boolean;
@@ -27,6 +27,7 @@ type UserMenuProps = {
  * @returns The user menu JSX element when shown, or `null` when authentication is not available.
  */
 export function UserMenu({ isCollapsed = false }: UserMenuProps) {
+  const { t } = useI18n();
   const { user, logout, isAuthenticated } = useAuth();
   const config = useConfig();
   const navigate = useNavigate();
@@ -85,7 +86,7 @@ export function UserMenu({ isCollapsed = false }: UserMenuProps) {
             <>
               <DropdownMenuItem onClick={() => setShowChangePassword(true)}>
                 <Key className="h-4 w-4 mr-2" />
-                Change Password
+                {t('auth.changePassword')}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
             </>
@@ -95,7 +96,7 @@ export function UserMenu({ isCollapsed = false }: UserMenuProps) {
             className="text-error focus:text-error"
           >
             <LogOut className="h-4 w-4 mr-2" />
-            Sign Out
+            {t('auth.signOut')}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

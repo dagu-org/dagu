@@ -492,7 +492,8 @@ export async function getStepStdout(
   token: string,
   dagName: string,
   dagRunId: string,
-  stepName: string
+  stepName: string,
+  options: { retryNotFound?: boolean } = {}
 ): Promise<string> {
   const response = await request.get(
     `/api/v1/dag-runs/${encodeURIComponent(dagName)}/${encodeURIComponent(
@@ -502,6 +503,11 @@ export async function getStepStdout(
       headers: authHeaders(token),
     }
   );
+  // Log metadata can lag queue completion briefly.
+  if (options.retryNotFound && response.status() === 404) {
+    return '';
+  }
+
   expect(response.ok()).toBeTruthy();
   return ((await response.json()) as LogResponse).content;
 }

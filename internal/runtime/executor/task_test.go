@@ -148,6 +148,19 @@ func TestPrepareDAGWorkspaceRejectsEmptyResolvedWorkingDirectory(t *testing.T) {
 	require.ErrorContains(t, err, "DAGU_TEST_EMPTY_WORKSPACE_ROOT")
 }
 
+func TestPrepareDAGWorkspaceReportsUnavailableSource(t *testing.T) {
+	t.Parallel()
+
+	dag := &ir.DAG{
+		Name:     "remote-child",
+		YamlData: []byte("name: remote-child\nsteps:\n  - run: cat input.txt\n"),
+		Steps:    []ir.Step{{Dependencies: []string{"input.txt"}}},
+	}
+
+	_, err := executor.PrepareDAGWorkspace(context.Background(), dag)
+	require.ErrorIs(t, err, executor.ErrDAGWorkspaceSourceUnavailable)
+}
+
 func TestDAG_CreateTask(t *testing.T) {
 	t.Parallel()
 

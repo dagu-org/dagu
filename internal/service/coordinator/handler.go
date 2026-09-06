@@ -29,9 +29,11 @@ import (
 	"github.com/dagucloud/dagu/v2/internal/eventstore"
 	"github.com/dagucloud/dagu/v2/internal/ir"
 	"github.com/dagucloud/dagu/v2/internal/persis"
+	profilepkg "github.com/dagucloud/dagu/v2/internal/profile"
 	"github.com/dagucloud/dagu/v2/internal/proto/convert"
 	"github.com/dagucloud/dagu/v2/internal/queue"
 	"github.com/dagucloud/dagu/v2/internal/runtime"
+	runtimeexec "github.com/dagucloud/dagu/v2/internal/runtime/executor"
 	"github.com/dagucloud/dagu/v2/internal/runtime/workspacebundle"
 	secretpkg "github.com/dagucloud/dagu/v2/internal/secret"
 	"github.com/dagucloud/dagu/v2/internal/spec"
@@ -161,6 +163,7 @@ type Handler struct {
 	logDir                    string                             // For log storage
 	artifactDir               string                             // For artifact storage
 	stateStore                dagrun.StateStore                  // For persistent DAG state shared across DAG runs
+	workspaceBundleDir        string                             // Root for immutable task workspace bundles and staging
 	workspaceBundleStore      *workspacebundle.Store             // For immutable task workspace bundles
 	dispatchTaskStore         dispatch.DispatchTaskStore         // Shared distributed dispatch queue
 	dispatchAdmissionStore    dispatch.DispatchAdmissionStore    // Shared distributed admission state
@@ -169,6 +172,7 @@ type Handler struct {
 	activeDistributedRunStore dispatch.ActiveDistributedRunStore // Shared active distributed attempt index
 	dagRepository             *persis.DAGRepository              // DAG definitions for the GetDAG RPC
 	secretStore               secretpkg.Store                    // Secret registry for workers
+	profileStore              profilepkg.Store                   // Runtime profiles for workers
 	agentSessionCleanupQueue  *agentsession.CleanupQueue         // Deferred provider cleanup owned by workers
 
 	// Open attempts cache for status persistence
@@ -240,6 +244,10 @@ type HandlerConfig struct {
 	// Optional - when nil, ResolveSecretReference returns FailedPrecondition.
 	SecretStore secretpkg.Store
 
+	// ProfileStore resolves runtime profiles for workers.
+	// Optional - when nil, ResolveRuntimeProfile returns FailedPrecondition.
+	ProfileStore profilepkg.Store
+
 	// AgentSessionCleanupQueue stores provider cleanup claimed by owning workers.
 	AgentSessionCleanupQueue *agentsession.CleanupQueue
 
@@ -293,6 +301,7 @@ func NewHandler(cfg HandlerConfig) *Handler {
 		logDir:                    cfg.LogDir,
 		artifactDir:               cfg.ArtifactDir,
 		stateStore:                cfg.StateStore,
+		workspaceBundleDir:        cfg.WorkspaceBundleDir,
 		workspaceBundleStore:      bundleStore,
 		dispatchTaskStore:         cfg.DispatchTaskStore,
 		dispatchAdmissionStore:    dispatchAdmissionStore,
@@ -301,6 +310,7 @@ func NewHandler(cfg HandlerConfig) *Handler {
 		activeDistributedRunStore: cfg.ActiveDistributedRunStore,
 		dagRepository:             cfg.DAGRepository,
 		secretStore:               cfg.SecretStore,
+		profileStore:              cfg.ProfileStore,
 		agentSessionCleanupQueue:  cfg.AgentSessionCleanupQueue,
 		staleHeartbeatThreshold:   cfg.StaleHeartbeatThreshold,
 		staleLeaseThreshold:       cfg.StaleLeaseThreshold,
@@ -506,6 +516,9 @@ func (h *Handler) Dispatch(ctx context.Context, req *coordinatorv1.DispatchReque
 		if err := h.ensureWaitingWorkerAvailability(req.Task.WorkerSelector, req.Task.TargetWorkerId); err != nil {
 			return nil, status.Error(dispatchErrorCode(err), err.Error())
 		}
+		if err := h.prepareDispatchTaskWorkspace(ctx, req.Task); err != nil {
+			return nil, err
+		}
 
 		var prepared *preparedDispatchAttempt
 		if h.dagRunRepository != nil {
@@ -540,6 +553,10 @@ func (h *Handler) Dispatch(ctx context.Context, req *coordinatorv1.DispatchReque
 	}
 	if !anyWorkerMatches(healthyWorkers, req.Task.WorkerSelector, req.Task.TargetWorkerId) {
 		return nil, status.Error(codes.FailedPrecondition, errNoMatchingWorkers.Error())
+	}
+	if err := h.prepareDispatchTaskWorkspace(ctx, req.Task); err != nil {
+		h.releaseAdmissionToken(ctx, admissionToken)
+		return nil, err
 	}
 
 	prepared, err := h.prepareAttemptForDispatch(ctx, req.Task)
@@ -596,6 +613,97 @@ func workspaceBundleTouchErrorCode(err error) codes.Code {
 	default:
 		return codes.Internal
 	}
+}
+
+func (h *Handler) prepareDispatchTaskWorkspace(ctx context.Context, task *coordinatorv1.Task) error {
+	if task == nil || task.WorkspaceBundleDigest != "" || strings.TrimSpace(task.Definition) == "" {
+		return nil
+	}
+
+	candidate, err := loadDispatchWorkspaceDAG(ctx, task, []byte(task.Definition), "")
+	if err != nil {
+		return status.Error(codes.InvalidArgument, "invalid dispatch DAG definition for workspace preparation: "+err.Error())
+	}
+	if !runtimeexec.HasDAGFileDependencies(candidate) {
+		return nil
+	}
+	if h.dagRepository == nil {
+		return status.Errorf(codes.FailedPrecondition, "DAG repository is not configured for dependency-bearing task %q", task.Target)
+	}
+	if h.workspaceBundleStore == nil || strings.TrimSpace(h.workspaceBundleDir) == "" {
+		return status.Error(codes.FailedPrecondition, "workspace bundle store is not configured")
+	}
+
+	authoritative, err := h.dagRepository.GetDetails(ctx, task.Target, persis.DAGLoadOptions{})
+	if err != nil {
+		code := codes.Internal
+		if errors.Is(err, persis.ErrDAGNotFound) {
+			code = codes.FailedPrecondition
+		}
+		return status.Error(code, fmt.Sprintf("failed to load authoritative DAG %q: %v", task.Target, err))
+	}
+	if !bytes.Equal(authoritative.YamlData, []byte(task.Definition)) {
+		return status.Errorf(codes.FailedPrecondition, "named DAG %q changed after remote resolution; reload the DAG and retry dispatch", task.Target)
+	}
+	authoritativeSource := strings.TrimSpace(authoritative.SourceFile)
+	if authoritativeSource == "" {
+		return status.Errorf(codes.FailedPrecondition, "authoritative DAG %q does not have a source file for dependency resolution", task.Target)
+	}
+
+	dag, err := loadDispatchWorkspaceDAG(ctx, task, authoritative.YamlData, authoritativeSource)
+	if err != nil {
+		return status.Error(codes.FailedPrecondition, "failed to rebuild authoritative DAG for workspace preparation: "+err.Error())
+	}
+	desc, archivePath, err := runtimeexec.PrepareDAGWorkspaceFile(ctx, dag, h.workspaceBundleDir)
+	if err != nil {
+		return status.Error(codes.FailedPrecondition, "failed to prepare authoritative DAG workspace: "+err.Error())
+	}
+	if desc == nil {
+		return nil
+	}
+	defer func() { _ = fileutil.Remove(archivePath) }()
+
+	archive, err := os.Open(archivePath) //nolint:gosec // archivePath is created by PrepareDAGWorkspaceFile.
+	if err != nil {
+		return status.Error(codes.Internal, "failed to open prepared DAG workspace: "+err.Error())
+	}
+	putErr := h.workspaceBundleStore.PutReader(ctx, *desc, archive)
+	closeErr := archive.Close()
+	if putErr != nil {
+		return status.Error(codes.Internal, "failed to store prepared DAG workspace: "+putErr.Error())
+	}
+	if closeErr != nil {
+		return status.Error(codes.Internal, "failed to close prepared DAG workspace: "+closeErr.Error())
+	}
+
+	task.WorkspaceBundleDigest = desc.Digest
+	task.WorkspaceBundleSize = desc.Size
+	task.WorkspaceBundleDagPath = desc.DAGPath
+	task.WorkspaceBundleOriginalRef = desc.OriginalRef
+	task.WorkspaceBundleResolvedRef = desc.ResolvedRef
+	return nil
+}
+
+func loadDispatchWorkspaceDAG(ctx context.Context, task *coordinatorv1.Task, definition []byte, sourceFile string) (*ir.DAG, error) {
+	loadOpts := []spec.LoadOption{spec.WithName(task.Target)}
+	if task.BaseConfig != "" {
+		loadOpts = append(loadOpts, spec.WithBaseConfigContent([]byte(task.BaseConfig)))
+	}
+	if task.Params != "" {
+		loadOpts = append(loadOpts, spec.WithParams(task.Params))
+	} else if task.Operation == coordinatorv1.Operation_OPERATION_RETRY && task.PreviousStatus != nil {
+		previousStatus, err := convert.ProtoToDAGRunStatus(task.PreviousStatus)
+		if err != nil {
+			return nil, fmt.Errorf("decode previous task status: %w", err)
+		}
+		if previousStatus != nil && len(previousStatus.ParamsList) > 0 {
+			loadOpts = append(loadOpts, spec.WithParams(spec.QuoteRuntimeParams(previousStatus.ParamsList, nil)))
+		}
+	}
+	if sourceFile != "" {
+		return spec.LoadYAMLAt(ctx, definition, sourceFile, loadOpts...)
+	}
+	return spec.LoadYAML(ctx, definition, loadOpts...)
 }
 
 func dispatchBindErrorCode(err error) codes.Code {
@@ -911,6 +1019,7 @@ func (h *Handler) writeInitialStatus(ctx context.Context, attempt dagrun.Attempt
 		TriggerActor: task.TriggerActor,
 		ScheduleTime: task.ScheduleTime,
 		DefinitionID: task.DefinitionId,
+		ProfileName:  task.ProfileName,
 	}
 	return attempt.Write(ctx, initialStatus)
 }
@@ -1783,10 +1892,11 @@ func (h *Handler) ReportStatus(ctx context.Context, req *coordinatorv1.ReportSta
 	if len(dagRunStatus.Labels) == 0 {
 		dagRunStatus.Labels = splitTaskLabels(req.Labels)
 	}
+	var activeLease *dispatch.DAGRunLease
 	leaseMissing := false
 	if h.dagRunLeaseStore != nil {
 		var validationErr error
-		leaseMissing, validationErr = h.validateStatusLease(ctx, req.WorkerId, dagRunStatus)
+		activeLease, leaseMissing, validationErr = h.validateStatusLease(ctx, req.WorkerId, dagRunStatus)
 		if validationErr != nil {
 			if status.Code(validationErr) == codes.FailedPrecondition {
 				return &coordinatorv1.ReportStatusResponse{Accepted: false, Error: status.Convert(validationErr).Message()}, nil
@@ -1807,6 +1917,16 @@ func (h *Handler) ReportStatus(ctx context.Context, req *coordinatorv1.ReportSta
 
 	latestAttempt, latestStatus, err := h.resolveLatestAttempt(ctx, dagRunStatus.Name, dagRunStatus.DAGRunID, dagRunStatus.Root)
 	if err != nil {
+		if errors.Is(err, dagrun.ErrDAGRunIDNotFound) {
+			profileErr := h.reconcileStatusProfile(ctx, activeLease, nil, dagRunStatus)
+			if errors.Is(profileErr, errProfileMismatch) {
+				logRejectedRemoteStatusUpdate(ctx, req.WorkerId, dagRunStatus, nil, remoteAttemptRejectedSuperseded)
+				return &coordinatorv1.ReportStatusResponse{Accepted: false, Error: remoteAttemptRejectedSuperseded}, nil
+			}
+			if profileErr != nil {
+				return nil, status.Error(codes.Internal, "failed to reconcile runtime profile: "+profileErr.Error())
+			}
+		}
 		bootstrappedAttempt, bootstrapped, bootstrapErr := h.bootstrapMissingSubAttempt(ctx, req.WorkerId, req.SourceFile, dagRunStatus, err)
 		if bootstrapErr != nil {
 			return nil, status.Error(codes.Internal, "failed to bootstrap sub-attempt: "+bootstrapErr.Error())
@@ -1846,6 +1966,14 @@ func (h *Handler) ReportStatus(ctx context.Context, req *coordinatorv1.ReportSta
 	if leaseMissing && latestStatus.Status != ir.NotStarted && !isTerminalRunStatus(latestStatus.Status) {
 		logRejectedRemoteStatusUpdate(ctx, req.WorkerId, dagRunStatus, latestStatus, remoteAttemptRejectedLeaseInactive)
 		return &coordinatorv1.ReportStatusResponse{Accepted: false, Error: remoteAttemptRejectedLeaseInactive}, nil
+	}
+	profileErr := h.reconcileStatusProfile(ctx, activeLease, latestStatus, dagRunStatus)
+	if errors.Is(profileErr, errProfileMismatch) {
+		logRejectedRemoteStatusUpdate(ctx, req.WorkerId, dagRunStatus, latestStatus, remoteAttemptRejectedSuperseded)
+		return &coordinatorv1.ReportStatusResponse{Accepted: false, Error: remoteAttemptRejectedSuperseded}, nil
+	}
+	if profileErr != nil {
+		return nil, status.Error(codes.Internal, "failed to reconcile runtime profile: "+profileErr.Error())
 	}
 	accepted, rejectReason := ownership.statusDecision(ctx, latestStatus, dagRunStatus, statusDecisionOptions{
 		CancellationRequested: h.sameAttemptCancellationRequested(ctx, latestAttempt, latestStatus, dagRunStatus),

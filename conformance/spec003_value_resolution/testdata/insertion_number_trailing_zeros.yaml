@@ -1,0 +1,13 @@
+params:
+  - name: ratio
+    type: number
+    default: 3.140000
+  - name: whole
+    type: number
+    default: 2.0
+working_dir: .
+steps:
+  - id: check
+    run: |
+      printf '%s\n' '${params.ratio}' > insertion.txt
+      printf '%s\n' '${params.whole}' >> insertion.txt

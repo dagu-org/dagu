@@ -1,5 +1,6 @@
 import React from 'react';
 import DAGDetailsSidePanel from './DAGDetailsSidePanel';
+import { I18nTemplate } from '@/i18n/I18nTemplate';
 
 type Props = {
   fileName: string;
@@ -19,12 +20,21 @@ function DAGDetailsModal({
       onClose={onClose}
       initialTab="status"
       toolbarHint={
-        <>
-          Use{' '}
-          <kbd className="px-1 py-0.5 bg-muted rounded text-xs font-mono">↑</kbd>{' '}
-          <kbd className="px-1 py-0.5 bg-muted rounded text-xs font-mono">↓</kbd>{' '}
-          to navigate DAGs
-        </>
+        <I18nTemplate
+          text="Use {up} {down} to navigate DAGs"
+          values={{
+            up: (
+              <kbd className="px-1 py-0.5 bg-muted rounded text-xs font-mono">
+                ↑
+              </kbd>
+            ),
+            down: (
+              <kbd className="px-1 py-0.5 bg-muted rounded text-xs font-mono">
+                ↓
+              </kbd>
+            ),
+          }}
+        />
       }
     />
   );

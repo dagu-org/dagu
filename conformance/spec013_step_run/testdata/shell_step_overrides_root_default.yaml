@@ -1,0 +1,7 @@
+shell: /nonexistent/poison-root-shell
+working_dir: .
+steps:
+  - id: check
+    with:
+      shell: sh
+    run: printf 'ok\n' > result.out

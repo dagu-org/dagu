@@ -1,0 +1,9 @@
+params:
+  - name: value
+    type: number
+    default: 1.5e2
+working_dir: .
+steps:
+  - id: check
+    run: |
+      printf '%s\n' '${params.value}' > insertion.txt

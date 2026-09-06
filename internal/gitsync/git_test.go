@@ -5,6 +5,7 @@ package gitsync
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -128,6 +129,46 @@ func TestGitClientListFilesUnderSkipsSymlinks(t *testing.T) {
 	require.Equal(t, []string{filepath.Join("docs", "page.md")}, files)
 }
 
+func TestGitClientListTrackedFilesRejectsWindowsVolumes(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Windows volume semantics are platform-specific")
+	}
+
+	repoPath := t.TempDir()
+	repo := initGitTestRepo(t, repoPath)
+	commitGitTestFile(t, repo, repoPath, "dag.yaml", "steps: []\n", "initial")
+
+	for _, repoSubpath := range []string{`C:\repo\dags`, `C:repo\dags`} {
+		t.Run(repoSubpath, func(t *testing.T) {
+			client := NewGitClient(&Config{Path: repoSubpath}, repoPath)
+			client.repo = repo
+
+			_, err := client.ListTrackedFiles()
+			var validationErr *ValidationError
+			require.ErrorAs(t, err, &validationErr)
+		})
+	}
+}
+
+func TestGitClientListTrackedFilesRejectsBackslashes(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows filenames cannot contain backslashes")
+	}
+
+	repoPath := t.TempDir()
+	repo := initGitTestRepo(t, repoPath)
+	require.NoError(t, os.Mkdir(filepath.Join(repoPath, "folder"), 0755))
+	commitGitTestFile(t, repo, repoPath, "folder/item.txt", "slash\n", "add slash path")
+	commitGitTestFile(t, repo, repoPath, `folder\item.txt`, "backslash\n", "add backslash path")
+
+	client := NewGitClient(&Config{}, repoPath)
+	client.repo = repo
+	_, err := client.ListTrackedFiles()
+	var validationErr *ValidationError
+	require.ErrorAs(t, err, &validationErr)
+	require.ErrorContains(t, err, "unsupported backslash")
+}
+
 func TestGitClient_AddAndCommit_NoChanges(t *testing.T) {
 	repoPath := t.TempDir()
 
@@ -195,6 +236,40 @@ func TestGitClient_CommitStaged_NoChanges(t *testing.T) {
 	hash, err := c2.CommitStaged("empty commit")
 	require.NoError(t, err)
 	require.Equal(t, firstHash, hash)
+}
+
+func TestGitClientCommitAndPushPreservesDirtyClone(t *testing.T) {
+	repoPath := t.TempDir()
+	repo := initGitTestRepo(t, repoPath)
+	commitGitTestFile(t, repo, repoPath, "dag.yaml", "base\n", "initial")
+
+	client := NewGitClient(&Config{
+		Enabled:     true,
+		Repository:  repoPath,
+		Branch:      "main",
+		PushEnabled: true,
+		Commit: CommitConfig{
+			AuthorName:  "Test User",
+			AuthorEmail: "test@example.com",
+		},
+	}, repoPath)
+	client.repo = repo
+	require.NoError(t, os.Chmod(filepath.Join(repoPath, "dag.yaml"), 0755))
+	require.NoError(t, client.addFileMode("dag.yaml", true))
+	_, err := client.CommitStaged("make executable")
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(repoPath, "dag.yaml"), []byte("local edit\n"), 0644))
+
+	stageCalled := false
+	_, err = client.commitAndPush(context.Background(), "mutation", func() error {
+		stageCalled = true
+		return errors.New("stage failed")
+	})
+	require.Error(t, err)
+	require.False(t, stageCalled)
+	content, err := os.ReadFile(filepath.Join(repoPath, "dag.yaml"))
+	require.NoError(t, err)
+	require.Equal(t, "local edit\n", string(content))
 }
 
 func TestGitClient_PullShallowRepoMultipleCommitsAhead(t *testing.T) {

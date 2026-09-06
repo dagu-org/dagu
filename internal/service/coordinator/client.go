@@ -126,6 +126,7 @@ var (
 	_ Client                    = (*clientImpl)(nil)
 	_ AgentSessionCleanupClient = (*clientImpl)(nil)
 	_ SecretReferenceClient     = (*clientImpl)(nil)
+	_ RuntimeProfileClient      = (*clientImpl)(nil)
 	_ dispatch.Dispatcher       = (*clientImpl)(nil)
 )
 
@@ -240,7 +241,9 @@ func (cli *clientImpl) Dispatch(ctx context.Context, req dispatch.DispatchReques
 		return fmt.Errorf("dispatch task is nil")
 	}
 	if err := cli.prepareTaskWorkspace(ctx, task); err != nil {
-		return err
+		if !errors.Is(err, runtimeexec.ErrDAGWorkspaceSourceUnavailable) {
+			return err
+		}
 	}
 	protoTask, err := convert.DispatchTaskToProto(task)
 	if err != nil {
@@ -346,6 +349,10 @@ func (cli *clientImpl) prepareTaskWorkspace(ctx context.Context, task *dispatch.
 	}
 	if err != nil {
 		return fmt.Errorf("load DAG for file dependency snapshot: %w", err)
+	}
+	// A configured working_dir does not establish that this host owns the DAG source.
+	if task.SourceFile == "" && task.SourceWorkDir == "" && runtimeexec.HasDAGFileDependencies(dag) {
+		return runtimeexec.ErrDAGWorkspaceSourceUnavailable
 	}
 	desc, archivePath, err := runtimeexec.PrepareDAGWorkspaceFile(ctx, dag, cli.config.WorkspaceBundleDir)
 	if err != nil {
