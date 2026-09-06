@@ -1,3 +1,4 @@
+working_dir: .
 steps:
   - action: data.pick
     with:
@@ -5,3 +6,4 @@ steps:
       data: { a: 1 }
       select: ".b.c"
       raw: true
+    stdout: result.out

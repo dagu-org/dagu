@@ -1,3 +1,4 @@
+working_dir: .
 steps:
   - action: data.pick
     with:
@@ -8,3 +9,4 @@ steps:
           age: 30
       select: ".user.name"
       raw: true
+    stdout: result.out
