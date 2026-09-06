@@ -1,3 +1,4 @@
+working_dir: .
 steps:
   - action: sqlite.query
     with:
@@ -6,3 +7,4 @@ steps:
       params:
         - 2
         - 3
+    stdout: result.json

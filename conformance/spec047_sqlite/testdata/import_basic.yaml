@@ -1,3 +1,4 @@
+working_dir: .
 steps:
   - name: setup
     action: sqlite.query
@@ -12,3 +13,10 @@ steps:
       import:
         input_file: import_basic.csv
         table: import_basic_test
+  - name: verify
+    depends: import
+    action: sqlite.query
+    with:
+      dsn: "file:import_basic.db"
+      query: "SELECT count(*) AS n FROM import_basic_test"
+    stdout: result.json
