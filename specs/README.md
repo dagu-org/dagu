@@ -39,7 +39,6 @@ It must not be treated as product behavior until implementation catches up.
 | [034: Wiki Page File Format](034-wiki-page-format.md) | Implemented |
 | [035: File Dependencies](035-file-dependencies.md) | Implemented |
 | [036: MCP Execute Tool](036-mcp-execute-tool.md) | Implemented |
-| [037: Docker Run Action](037-docker-run.md) | Implemented |
 | [039: Wait Actions](039-wait.md) | Implemented |
 | [041: Log Write Action](041-log-write.md) | Implemented |
 

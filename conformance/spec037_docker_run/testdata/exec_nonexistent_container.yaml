@@ -1,8 +1,0 @@
-env:
-  - CONTAINER_NAME: ${CONTAINER_NAME}
-steps:
-  - action: docker.run
-    timeout_sec: 3
-    with:
-      container_name: $CONTAINER_NAME
-      command: echo nope
