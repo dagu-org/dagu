@@ -1,5 +1,5 @@
 steps:
-  - action: node-script
+  - action: node-script@v1
     with:
       script: "return input.value;"
       input:
