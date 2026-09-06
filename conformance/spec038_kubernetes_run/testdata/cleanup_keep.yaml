@@ -1,8 +1,0 @@
-steps:
-  - action: kubernetes.run
-    with:
-      image: alpine:3
-      cleanup_policy: keep
-      labels:
-        dagu-conformance: kubernetes-run-cleanup-keep
-      command: echo kept

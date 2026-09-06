@@ -2,7 +2,11 @@
 
 ## Status
 
-Implemented.
+Partially implemented.
+
+Conformance covers configuration acceptance and rejection without a cluster.
+Job execution, Pod lifecycle, and Kubernetes API behavior belong in executor
+unit and integration tests.
 
 This spec defines conformance behavior for the built-in `kubernetes.run`
 action (alias: `k8s.run`).
@@ -30,8 +34,7 @@ This spec does not define:
   creates a new Job and never targets an existing one
 - resource requests/limits, node selectors, tolerations, affinity, security
   contexts, pod failure policies, service accounts, priority classes,
-  volumes, or image pull secrets, all of which this action accepts and
-  passes through to the Kubernetes API essentially unchanged
+  volumes, or image pull secrets
 - kubeconfig and cluster authentication and discovery
 - registry authentication for private images
 - signal delivery, timeout, and abort behavior beyond what already applies
@@ -66,11 +69,7 @@ as any other command-shaped action.
 ### Container environment
 
 `with.env` is a list of `{name, value}` (or `{name, value_from: ...}`)
-entries that become the container's own environment variables, visible to
-a shell running inside the Pod through normal `$VAR` expansion. This is a
-different mechanism from a plain command executor's environment: it is not
-resolved on the host before dispatch, but delivered to the Kubernetes API as
-part of the Pod spec and read by the container process itself.
+entries that set environment variables for the container process.
 
 ### Working directory
 
@@ -100,13 +99,8 @@ it reaches a terminal state:
 
 ## Errors
 
-- `with` has no field other than `command`: `command` is extracted into the
-  step's own command field, `with` becomes empty, and the step fails
-  before contacting the cluster with an error naming `with.image` as
-  required.
-- `with` has a field other than `command`, and `with.image` is not set: DAG
-  build fails config-schema validation before the DAG starts running, with
-  an error naming the missing `image` property.
+- Missing `with.image` causes validation or execution to fail before a
+  cluster workload starts, with an error identifying the missing image.
 - `with.cleanup_policy` is set to a value other than `delete` or `keep`: the
   step fails before contacting the cluster, with an error stating the
   allowed values.
