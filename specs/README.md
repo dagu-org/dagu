@@ -41,6 +41,7 @@ It must not be treated as product behavior until implementation catches up.
 | [036: MCP Execute Tool](036-mcp-execute-tool.md) | Implemented |
 | [039: Wait Actions](039-wait.md) | Implemented |
 | [040: Router Route Action](040-router-route.md) | Implemented |
+| [041: Log Write Action](041-log-write.md) | Implemented |
 
 **Writing guidelines:**
 
