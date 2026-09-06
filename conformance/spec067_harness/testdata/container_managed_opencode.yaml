@@ -1,0 +1,8 @@
+steps:
+  - action: harness.run
+    container:
+      image: alpine:3
+    with:
+      provider: opencode
+      managed: true
+      prompt: hello

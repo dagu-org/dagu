@@ -1,0 +1,14 @@
+env:
+  - PROJECT_DIR: $HOST_PROJECT_DIR
+working_dir: $PROJECT_DIR
+harnesses:
+  fake_arg:
+    binary: ./scripts/fake_ok.sh
+    prompt_mode: arg
+steps:
+  - action: harness.run
+    container:
+      image: alpine:3
+    with:
+      provider: fake_arg
+      prompt: hello
