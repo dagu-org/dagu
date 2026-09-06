@@ -13,16 +13,28 @@ fetch the action or provision external runtimes.
 Python execution, dependency installation, environment merging, timeout
 handling, and result diagnostics belong to the action repository’s tests.
 
-## Contract
+Remote input validation is outside this suite. Successful CLI validation
+alone does not establish that inputs are valid for the remote action.
 
-- `dagu validate` accepts a versioned `python-script@v1` reference and its
-  `with` mapping without fetching the remote action.
-- The unversioned `python-script` name is rejected as an unknown action.
-- Validation of remote action inputs requires the action's schema and occurs
-  when the action runs. Successful CLI validation alone does not establish
-  that those inputs are valid for the remote action.
+## Goal
 
-## Example
+Workflow authors can validate versioned remote action references without
+fetching action code or provisioning a runtime.
+
+## Behavior
+
+`dagu validate` accepts a versioned `python-script@v1` reference and its
+`with` mapping without fetching the remote action.
+
+## Errors
+
+The unversioned `python-script` name is rejected as an unknown action with a
+nonzero exit code.
+
+Runtime failures, timeout, abort, and cleanup are outside this configuration
+conformance scope and belong to action and lifecycle tests.
+
+## Examples
 
 ```yaml
 steps:
