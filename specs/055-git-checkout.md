@@ -2,7 +2,12 @@
 
 ## Status
 
-Implemented.
+Partially implemented.
+
+Conformance uses one small local repository to check fresh clone, unchanged
+recheckout, tag checkout, and configuration validation. Executor tests own
+ref-resolution permutations, shallow history, upstream updates, dirty
+worktrees, and transport behavior.
 
 This spec defines conformance behavior for the built-in `git.checkout`
 action.
@@ -66,8 +71,9 @@ URL.
 
 ### Ref resolution
 
-`with.ref` may be a branch name, a tag name, or a commit hash; it is
-resolved in that order of preference. Omitting it checks out the
+`with.ref` may be a branch name, a tag name, or a full commit hash. A full
+hash selects that commit directly. Ambiguous branch/tag names are outside
+this conformance scope. Omitting `with.ref` checks out the
 repository's default HEAD, re-resolved on every run -- so a later
 `git.checkout` with no `with.ref` against an existing target picks up
 new commits added upstream since the last run.
