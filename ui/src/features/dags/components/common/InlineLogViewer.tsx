@@ -6,6 +6,7 @@ import { useQuery } from '@/hooks/api';
 import { whenEnabled } from '@/hooks/queryUtils';
 import { AnsiLine } from '@/lib/ansi';
 import { components, Stream } from '../../../../api/v1/schema';
+import { I18nText } from '@/i18n/I18nText';
 
 /**
  * Simple inline log viewer - no controls, just logs
@@ -92,11 +93,11 @@ export function InlineLogViewer({
     <div className="bg-muted rounded overflow-hidden border border-border">
       {isLoading && !data ? (
         <div className="text-muted-foreground text-xs py-4 px-3">
-          Loading logs...
+          <I18nText text={'Loading logs...'} />
         </div>
       ) : lines.length === 0 ? (
         <div className="text-muted-foreground text-xs py-4 px-3">
-          &lt;No log output&gt;
+          <I18nText text={'<No log output>'} />
         </div>
       ) : (
         <div className="overflow-x-auto max-h-[400px] overflow-y-auto">

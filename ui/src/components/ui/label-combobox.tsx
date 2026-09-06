@@ -5,6 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { cn, parseLabelParts } from '@/lib/utils';
 import { ChevronDown, X } from 'lucide-react';
 import * as React from 'react';
+import { I18nProps } from '@/i18n/I18nProps';
+import { I18nText } from '@/i18n/I18nText';
 
 interface LabelComboboxProps {
   selectedLabels: string[];
@@ -226,17 +228,19 @@ function LabelCombobox({
         />
         <div className="flex items-center gap-1 ml-auto">
           {selectedLabels.length > 0 && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                clearAll();
-              }}
-              className="p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
-              title="Clear all labels"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
+            <I18nProps>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  clearAll();
+                }}
+                className="p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                title="Clear all labels"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </I18nProps>
           )}
           <ChevronDown
             className={cn(
@@ -266,7 +270,10 @@ function LabelCombobox({
                 )}
                 onClick={() => addLabel(inputValue)}
               >
-                Add "{inputValue.trim()}"
+                <I18nText
+                  text={'Add "{label}"'}
+                  values={{ label: inputValue.trim() }}
+                />
               </div>
             )}
           {filteredSuggestions.map((label, index) => (

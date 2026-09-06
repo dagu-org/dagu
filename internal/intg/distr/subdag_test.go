@@ -445,6 +445,128 @@ steps:
 	require.Equal(t, leafContent, nodeOutputValue(t, requireNodeByID(t, *leafStatus, "read_leaf_dependency"), "CONTENT"))
 }
 
+func TestSubDAG_DispatchedParentRunsInlineNamedChild(t *testing.T) {
+	f := newTestFixture(t, `
+name: nested-inline-root
+worker_selector:
+  layer: root
+steps:
+  - id: call_parent
+    action: dag.run
+    with:
+      dag: nested-inline-parent
+`, withWorkerCount(0), withLogPersistence())
+	defer f.cleanup()
+
+	f.coord.CreateDAGFile(t, f.coord.Config.Paths.DAGsDir, "nested-inline-parent", []byte(`
+name: nested-inline-parent
+worker_selector:
+  layer: parent
+steps:
+  - id: call_child
+    action: dag.run
+    with:
+      dag: nested-inline-child
+`))
+	f.coord.CreateDAGFile(t, f.coord.Config.Paths.DAGsDir, "nested-inline-child", []byte(`
+name: nested-inline-child
+steps:
+  - id: complete
+    run: echo inline child completed
+`))
+
+	f.workers = append(f.workers,
+		f.setupWorkerMode("root-worker", map[string]string{"layer": "root"}, "", true, nil),
+		f.setupWorkerMode("parent-worker", map[string]string{"layer": "parent"}, "", true, nil),
+	)
+
+	require.NoError(t, f.enqueue())
+	f.waitForQueued()
+	f.startScheduler(30 * time.Second)
+
+	rootStatus := f.waitForStatus(ir.Succeeded, executionStatusTimeout())
+	require.Equal(t, "root-worker", rootStatus.WorkerID)
+	rootCall := requireNodeByID(t, rootStatus, "call_parent")
+	require.Len(t, rootCall.SubRuns, 1)
+
+	rootRef := ir.NewDAGRunRef(rootStatus.Name, rootStatus.DAGRunID)
+	parentStatus := readDistributedSubAttemptStatus(t, f, rootRef, rootCall.SubRuns[0].DAGRunID)
+	require.Equal(t, ir.Succeeded, parentStatus.Status)
+	require.Equal(t, "parent-worker", parentStatus.WorkerID)
+	parentCall := requireNodeByID(t, *parentStatus, "call_child")
+	require.Len(t, parentCall.SubRuns, 1)
+
+	childStatus := readDistributedSubAttemptStatus(t, f, rootRef, parentCall.SubRuns[0].DAGRunID)
+	require.Equal(t, ir.Succeeded, childStatus.Status)
+	require.Equal(t, "parent-worker", childStatus.WorkerID)
+	require.Equal(t, ir.NewDAGRunRef(parentStatus.Name, parentStatus.DAGRunID), childStatus.Parent)
+}
+
+func TestSubDAG_DispatchedParentDefersSourceLessNamedChildDependencies(t *testing.T) {
+	const (
+		childDependency = "nested-inline-child.txt"
+		childContent    = "dependency packaged by the coordinator"
+	)
+
+	f := newTestFixture(t, `
+name: nested-dependency-root
+worker_selector:
+  layer: root
+steps:
+  - id: call_parent
+    action: dag.run
+    with:
+      dag: nested-dependency-parent
+`, withWorkerCount(0), withLogPersistence())
+	defer f.cleanup()
+
+	f.coord.CreateDAGFile(t, f.coord.Config.Paths.DAGsDir, "nested-dependency-parent", []byte(`
+name: nested-dependency-parent
+worker_selector:
+  layer: parent
+steps:
+  - id: call_child
+    action: dag.run
+    with:
+      dag: nested-dependency-child
+`))
+	f.coord.CreateDAGFile(t, f.coord.Config.Paths.DAGsDir, "nested-dependency-child", []byte(`
+name: nested-dependency-child
+steps:
+  - id: read_dependency
+    dependencies:
+      - `+childDependency+`
+    action: file.read
+    with:
+      path: `+childDependency+`
+    output: CONTENT
+`))
+	require.NoError(t, os.WriteFile(filepath.Join(f.coord.Config.Paths.DAGsDir, childDependency), []byte(childContent), 0o600))
+
+	f.workers = append(f.workers,
+		f.setupWorkerMode("root-worker", map[string]string{"layer": "root"}, "", true, nil),
+		f.setupWorkerMode("parent-worker", map[string]string{"layer": "parent"}, "", true, nil),
+	)
+
+	require.NoError(t, f.enqueue())
+	f.waitForQueued()
+	f.startScheduler(30 * time.Second)
+
+	rootStatus := f.waitForStatus(ir.Succeeded, executionStatusTimeout())
+	rootCall := requireNodeByID(t, rootStatus, "call_parent")
+	require.Len(t, rootCall.SubRuns, 1)
+
+	rootRef := ir.NewDAGRunRef(rootStatus.Name, rootStatus.DAGRunID)
+	parentStatus := readDistributedSubAttemptStatus(t, f, rootRef, rootCall.SubRuns[0].DAGRunID)
+	parentCall := requireNodeByID(t, *parentStatus, "call_child")
+	require.Len(t, parentCall.SubRuns, 1)
+
+	childStatus := readDistributedSubAttemptStatus(t, f, rootRef, parentCall.SubRuns[0].DAGRunID)
+	require.Equal(t, ir.Succeeded, childStatus.Status)
+	require.Equal(t, ir.NewDAGRunRef(parentStatus.Name, parentStatus.DAGRunID), childStatus.Parent)
+	require.Equal(t, childContent, nodeOutputValue(t, requireNodeByID(t, *childStatus, "read_dependency"), "CONTENT"))
+}
+
 func TestSubDAG_InSameFile(t *testing.T) {
 	t.Run("parentAndChildInSameYAMLFile", func(t *testing.T) {
 		f := newTestFixture(t, `

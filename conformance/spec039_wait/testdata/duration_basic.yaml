@@ -1,0 +1,4 @@
+steps:
+  - action: wait.duration
+    with:
+      duration: 300ms

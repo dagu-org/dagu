@@ -1,0 +1,5 @@
+steps:
+  - action: wait.file
+    with:
+      path: /tmp/dagu-wait-conformance-does-not-matter
+      state: bogus

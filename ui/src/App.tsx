@@ -19,7 +19,7 @@ import { QueryFeedback } from './components/QueryFeedback';
 import { ErrorModalProvider } from '@/components/ui/error-modal';
 import { ToastProvider } from '@/components/ui/simple-toast';
 import { AppBarContext } from './contexts/AppBarContext';
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useCanAccessGitSync } from './contexts/AuthContext';
 import {
   Config,
   ConfigContext,
@@ -51,6 +51,9 @@ import { UserRole } from './api/v1/schema';
 import LoginPage from './pages/login';
 import SetupPage from './pages/setup';
 import LoadingIndicator from '@/components/ui/loading-indicator';
+import { I18nProvider, useI18n } from '@/i18n/I18nProvider';
+import { translateStatic } from '@/i18n/staticMessages';
+import { I18nText } from '@/i18n/I18nText';
 
 const AdministrationPage = React.lazy(() => import('./pages/administration'));
 const APIKeysPage = React.lazy(() => import('./pages/api-keys'));
@@ -98,6 +101,36 @@ type Props = {
 };
 
 const REMOTE_NODE_STORAGE_KEY = 'dagu-selected-remote-node';
+const STATIC_PAGE_TITLES = new Set([
+  'API Docs',
+  'API Keys',
+  'Audit Logs',
+  'Base Config',
+  'Cockpit',
+  'Events',
+  'Executions',
+  'Git Sync',
+  'Incident Connections',
+  'Incident Routing',
+  'Incidents',
+  'License',
+  'Notification Channels',
+  'Notification Rules',
+  'Notifications',
+  'Profiles & Secrets',
+  'Queue',
+  'Queue Dashboard',
+  'Remote Nodes',
+  'Search',
+  'System Status',
+  'Terminal',
+  'Timeline',
+  'User Management',
+  'Webhooks',
+  'Wiki',
+  'Workers',
+  'Workflows',
+]);
 const WORKSPACE_SENSITIVE_TARGET_PATH_PREFIXES = [
   '/dags/{fileName}',
   '/dag-runs/{name}/{dagRunId}',
@@ -169,6 +202,16 @@ function AdminElement({
   );
 }
 
+function GitSyncElement({
+  children,
+}: {
+  children: React.ReactElement;
+}): React.ReactElement {
+  const canAccess = useCanAccessGitSync();
+  if (!canAccess) return <Navigate to="/" replace />;
+  return children;
+}
+
 function ManagerElement({
   children,
 }: {
@@ -221,16 +264,22 @@ function LicenseRequiredMessage(): React.ReactElement {
   return (
     <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
       <Shield size={48} className="text-muted-foreground" />
-      <h2 className="text-xl font-semibold">License Required</h2>
+      <h2 className="text-xl font-semibold">
+        <I18nText text={'License Required'} />
+      </h2>
       <p className="text-sm text-muted-foreground max-w-md">
-        This feature requires an active Dagu license or trial. Visit the{' '}
+        <I18nText
+          text={
+            'This feature requires an active Dagu license or trial. Visit the'
+          }
+        />{' '}
         <Link
           to="/license"
           className="text-primary underline underline-offset-2"
         >
-          License
+          <I18nText text={'License'} />
         </Link>{' '}
-        page to activate your license.
+        <I18nText text={'page to activate your license.'} />
       </p>
     </div>
   );
@@ -261,17 +310,22 @@ class LazyRouteErrorBoundary extends React.Component<
           role="alert"
           className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center"
         >
-          <h2 className="text-xl font-semibold">Unable to load this page</h2>
+          <h2 className="text-xl font-semibold">
+            <I18nText text={'Unable to load this page'} />
+          </h2>
           <p className="max-w-md text-sm text-muted-foreground">
-            The page may have changed since this tab was opened. Reload to use
-            the latest version.
+            <I18nText
+              text={
+                'The page may have changed since this tab was opened. Reload to use the latest version.'
+              }
+            />
           </p>
           <button
             type="button"
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
             onClick={() => window.location.reload()}
           >
-            Reload
+            <I18nText text={'Reload'} />
           </button>
         </div>
       );
@@ -326,6 +380,7 @@ function LicenseStatusSync({
 
 function AppInner({ config: initialConfig }: Props): React.ReactElement {
   const client = useClient();
+  const { locale } = useI18n();
   const [config, setConfig] = React.useState(initialConfig);
   const initialWorkspacesRef = React.useRef(initialConfig.initialWorkspaces);
   const updateConfig = React.useCallback((patch: Partial<Config>) => {
@@ -582,8 +637,11 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
 
   React.useEffect(() => {
     const base = config.title || 'Dagu';
-    document.title = title ? `${title} - ${base}` : base;
-  }, [title, config.title]);
+    const localizedTitle = STATIC_PAGE_TITLES.has(title)
+      ? translateStatic(locale, title)
+      : title;
+    document.title = localizedTitle ? `${localizedTitle} - ${base}` : base;
+  }, [title, config.title, locale]);
 
   return (
     <SWRConfig
@@ -860,9 +918,9 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
                                       <Route
                                         path="/git-sync"
                                         element={
-                                          <AdminElement>
+                                          <GitSyncElement>
                                             <GitSyncPage />
-                                          </AdminElement>
+                                          </GitSyncElement>
                                         }
                                       />
                                     </LazyRoutes>
@@ -888,7 +946,9 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
 function App({ config }: Props): React.ReactElement {
   return (
     <UserPreferencesProvider>
-      <AppInner config={config} />
+      <I18nProvider>
+        <AppInner config={config} />
+      </I18nProvider>
     </UserPreferencesProvider>
   );
 }

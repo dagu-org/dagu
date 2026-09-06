@@ -27,6 +27,8 @@ import {
 } from 'lucide-react';
 import React, { useCallback, useRef, useEffect } from 'react';
 import { NodeRendererProps } from 'react-arborist';
+import { I18nText } from '@/i18n/I18nText';
+import { useI18n } from '@/i18n/I18nProvider';
 
 type WikiPageTreeNodeResponse =
   components['schemas']['WikiPageTreeNodeResponse'];
@@ -69,6 +71,7 @@ function WikiPageTreeNode({
   selectedIds = [],
   selectedTargets = [],
 }: Props) {
+  const { ts } = useI18n();
   const isDir = node.data.type === WikiPageTreeNodeResponseType.directory;
   const displayTitle = node.data.title || node.data.name;
   const hasChildren = !!(node.data.children && node.data.children.length > 0);
@@ -226,7 +229,7 @@ function WikiPageTreeNode({
                 }}
               >
                 <Plus className="h-3.5 w-3.5 mr-2" />
-                New Wiki page
+                <I18nText text={'New Wiki page'} />
               </DropdownMenuItem>
             )}
             <DropdownMenuItem
@@ -243,7 +246,7 @@ function WikiPageTreeNode({
               }}
             >
               <Pencil className="h-3.5 w-3.5 mr-2" />
-              Rename
+              <I18nText text={'Rename'} />
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={(e) => {
@@ -272,9 +275,13 @@ function WikiPageTreeNode({
               }
             >
               <Trash2 className="h-3.5 w-3.5 mr-2" />
-              {selectedIds.length > 1 && node.isSelected
-                ? `Delete ${selectedTargets.length} items`
-                : 'Delete'}
+              {selectedIds.length > 1 && node.isSelected ? (
+                ts('Delete {count} items', {
+                  count: selectedTargets.length,
+                })
+              ) : (
+                <I18nText text={'Delete'} />
+              )}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

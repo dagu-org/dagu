@@ -224,6 +224,31 @@ func TestAttemptOwnershipSyncFromStatus(t *testing.T) {
 	assert.ErrorIs(t, err, dispatch.ErrActiveRunNotFound)
 }
 
+func TestAttemptOwnershipSyncFromStatusPersistsUnsetRoot(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	leaseStore := newTestDAGRunLeaseStore(filepath.Join(t.TempDir(), "distributed"))
+	ownership := newAttemptOwnership(attemptOwnershipConfig{
+		LeaseStore: leaseStore,
+		Now:        func() time.Time { return time.Unix(100, 0).UTC() },
+	})
+	root := ir.NewDAGRunRef("root", "root-run")
+
+	ownership.syncFromStatus(ctx, "worker-1", &ir.DAGRunStatus{
+		Name:       root.Name,
+		DAGRunID:   root.ID,
+		AttemptID:  "root-attempt",
+		AttemptKey: "root-claim",
+		Status:     ir.Running,
+		WorkerID:   "worker-1",
+	}, "")
+
+	lease, err := leaseStore.Get(ctx, "root-claim")
+	require.NoError(t, err)
+	assert.True(t, lease.Root.Zero())
+}
+
 func TestInlineRunSharesClaimLease(t *testing.T) {
 	t.Parallel()
 

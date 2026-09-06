@@ -1,0 +1,10 @@
+env:
+  - NAME=prod
+working_dir: .
+steps:
+  - id: check
+    run: |
+      printf '%s\n' '${env.NAME}' > matrix.txt
+      printf '%s\n' '\${env.NAME}' >> matrix.txt
+      printf '%s\n' '\\${env.NAME}' >> matrix.txt
+      printf '%s\n' '\\\${env.NAME}' >> matrix.txt

@@ -10,6 +10,8 @@ import { cn } from '@/lib/utils';
 import { Check, ChevronRight, Copy, Loader2, Wrench } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ToolDefinitionCard } from './ToolDefinitionCard';
+import { I18nText } from '@/i18n/I18nText';
+import { I18nProps } from '@/i18n/I18nProps';
 
 interface StepMessagesTableProps {
   dagName: string;
@@ -51,11 +53,16 @@ function getMessagePreview(msg: {
   if (msg.toolCalls && msg.toolCalls.length > 0) {
     return (
       <span className="text-purple-500">
-        Calling: {msg.toolCalls.map((tc) => tc.name).join(', ')}
+        <I18nText text={'Calling:'} />{' '}
+        {msg.toolCalls.map((tc) => tc.name).join(', ')}
       </span>
     );
   }
-  return <span className="italic">(empty)</span>;
+  return (
+    <span className="italic">
+      <I18nText text={'(empty)'} />
+    </span>
+  );
 }
 
 export function StepMessagesTable({
@@ -158,7 +165,7 @@ export function StepMessagesTable({
     return (
       <div className="text-xs text-muted-foreground p-2 flex items-center gap-2">
         <Loader2 className="h-3 w-3 animate-spin" />
-        Loading messages...
+        <I18nText text={'Loading messages...'} />
       </div>
     );
   }
@@ -166,7 +173,7 @@ export function StepMessagesTable({
   if (messages.length === 0) {
     return (
       <div className="text-xs text-muted-foreground p-2">
-        No messages recorded
+        <I18nText text={'No messages recorded'} />
       </div>
     );
   }
@@ -189,7 +196,10 @@ export function StepMessagesTable({
             />
             <Wrench className="h-3 w-3 text-purple-500" />
             <span className="text-xs font-medium">
-              Available Tools ({toolDefinitions.length})
+              <I18nText
+                text="Available Tools ({count})"
+                values={{ count: toolDefinitions.length }}
+              />
             </span>
           </button>
           {showTools && (
@@ -254,7 +264,7 @@ export function StepMessagesTable({
                     ) : msg.toolCalls && msg.toolCalls.length > 0 ? (
                       <div className="space-y-1">
                         <span className="text-xs text-purple-500 font-medium">
-                          Tool Calls:
+                          <I18nText text={'Tool Calls:'} />
                         </span>
                         {msg.toolCalls.map((tc, idx) => (
                           <div
@@ -272,7 +282,7 @@ export function StepMessagesTable({
                       </div>
                     ) : (
                       <span className="text-xs text-muted-foreground italic">
-                        (empty message)
+                        <I18nText text={'(empty message)'} />
                       </span>
                     )}
                   </div>
@@ -283,26 +293,29 @@ export function StepMessagesTable({
                           {msg.metadata.provider}/{msg.metadata.model}
                         </div>
                         <div>
-                          in:{msg.metadata.promptTokens} out:
+                          <I18nText text={'in:'} />
+                          {msg.metadata.promptTokens} <I18nText text={'out:'} />
                           {msg.metadata.completionTokens}
                         </div>
                       </div>
                     )}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleCopy(msg.content, i);
-                      }}
-                      className="p-1 hover:bg-accent rounded"
-                      type="button"
-                      title="Copy message"
-                    >
-                      {copiedIndex === i ? (
-                        <Check className="h-3 w-3 text-green-500" />
-                      ) : (
-                        <Copy className="h-3 w-3 text-muted-foreground" />
-                      )}
-                    </button>
+                    <I18nProps>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCopy(msg.content, i);
+                        }}
+                        className="p-1 hover:bg-accent rounded"
+                        type="button"
+                        title="Copy message"
+                      >
+                        {copiedIndex === i ? (
+                          <Check className="h-3 w-3 text-green-500" />
+                        ) : (
+                          <Copy className="h-3 w-3 text-muted-foreground" />
+                        )}
+                      </button>
+                    </I18nProps>
                   </div>
                 </div>
               </div>

@@ -109,6 +109,37 @@ func TestRunnerShouldRun(t *testing.T) {
 			req:    validReq,
 			want:   false,
 		},
+		{
+			name:   "source-less dependencies use distributed path in local mode",
+			runner: subflow.New(dispatcher, config.ExecutionModeLocal),
+			req: runtimeexec.SubWorkflowRequest{
+				DAG: &ir.DAG{
+					Name: "child",
+					Steps: []ir.Step{{
+						Dependencies: []string{"input.txt"},
+					}},
+				},
+				RootDAGRun: ir.NewDAGRunRef("parent", "root-1"),
+				RunID:      "child-1",
+			},
+			want: true,
+		},
+		{
+			name:   "workspace keeps source-less dependencies local",
+			runner: subflow.New(dispatcher, config.ExecutionModeLocal),
+			req: runtimeexec.SubWorkflowRequest{
+				DAG: &ir.DAG{
+					Name: "child",
+					Steps: []ir.Step{{
+						Dependencies: []string{"input.txt"},
+					}},
+				},
+				RootDAGRun: ir.NewDAGRunRef("parent", "root-1"),
+				RunID:      "child-1",
+				Workspace:  &runtimeexec.SubWorkflowWorkspace{},
+			},
+			want: false,
+		},
 	}
 
 	for _, tt := range tests {

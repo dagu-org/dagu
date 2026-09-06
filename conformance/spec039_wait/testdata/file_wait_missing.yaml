@@ -1,0 +1,7 @@
+working_dir: .
+steps:
+  - action: wait.file
+    with:
+      path: present.txt
+      state: missing
+      poll_interval: 100ms
