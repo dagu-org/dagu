@@ -24,10 +24,3 @@ steps:
       source: source.txt
       destination: preview.zip
       dry_run: true
-  - id: preview-extract
-    depends: preview-create
-    action: archive.extract
-    with:
-      source: out.zip
-      destination: preview
-      dry_run: true

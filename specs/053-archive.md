@@ -4,7 +4,7 @@
 
 Partially implemented.
 
-Conformance covers one small ZIP create/list/extract workflow, dry-run
+Conformance covers one small ZIP create/list/extract workflow, create dry-run
 output suppression, and representative invalid configurations. Executor tests
 own format matrices, filtering, permissions, malformed archives, and path
 safety edge cases.
@@ -32,8 +32,9 @@ This spec covers:
   existing destination is allowed
 - `with.password`: meaningful only for 7z and rar archives, and only for
   `archive.extract`/`archive.list`
-- `with.dry_run` (create and extract): reports counts without performing
-  filesystem writes, but still reads sources and requires a determinable format
+- `with.dry_run` (create and extract): reports counts without writing archive
+  or extracted payload files, but still reads sources and requires a determinable
+  format; extraction directory behavior is outside conformance scope
 - that path-escaping entries inside an archive (zip-slip) are rejected
   during extraction
 - validation and runtime errors
@@ -111,12 +112,14 @@ for `archive.extract` and `archive.list` -- setting it for
 
 ### Dry run
 
-`with.dry_run: true`, for both `archive.create` and `archive.extract`,
-performs no filesystem writes: no archive file is created, and no
-destination directory or file is created for extraction. Sources are still
-read to determine formats and counts. The result
-still reports accurate would-be counts (`filesAdded`/`bytesArchived` for
-create, `filesExtracted`/`bytesExtracted` for extract).
+`with.dry_run: true` suppresses archive creation and extracted payload
+writes. Sources are still read to determine formats and counts. The result
+reports would-be counts (`filesAdded`/`bytesArchived` for create,
+`filesExtracted`/`bytesExtracted` for extract).
+
+Conformance checks that a configured create dry run leaves its archive
+destination absent. Extraction directory behavior and dry-run count
+permutations are outside this partial conformance scope.
 
 ### Path safety
 

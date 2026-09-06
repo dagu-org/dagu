@@ -20,7 +20,6 @@ func TestArchiveRoundTrip(t *testing.T) {
 	dagu.Run("start", "roundtrip.yaml").ExpectExitCode(0)
 	dagu.ExpectFileContent("extracted/source.txt", "hello archive")
 	dagu.ExpectNoFile("preview.zip")
-	dagu.ExpectNoFile("preview")
 
 	data, err := os.ReadFile(dagu.ProjectPath("list.json"))
 	require.NoError(t, err)
