@@ -71,9 +71,9 @@ steps:
 	{
 		ID:          3,
 		Name:        "schedule-params-env",
-		Description: "Schedule a DAG with params and env vars",
+		Description: "Schedule a daily DAG with params and env vars",
 		Content: `type: graph
-schedule: "0 2 * * *"
+schedule: "@daily" # Midnight; equivalent to "0 0 * * *"
 catchup_window: "12h"
 defaults:
   retry_policy:

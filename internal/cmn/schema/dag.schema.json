@@ -72,11 +72,11 @@
       }
     },
     "schedule": {
-      "examples": ["0 * * * *", "*/15 8-18 * * MON-FRI"],
+      "examples": ["@daily", "0 * * * *", "*/15 8-18 * * MON-FRI"],
       "oneOf": [
         {
           "type": "string",
-          "description": "Single cron expression for starting the DAG (e.g., '5 4 * * *' runs daily at 04:05)"
+          "description": "Single cron expression or schedule alias for starting the DAG (e.g., '@daily' runs at midnight)"
         },
         {
           "type": "array",
