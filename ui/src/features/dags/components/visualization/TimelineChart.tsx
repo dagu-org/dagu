@@ -40,6 +40,7 @@ import {
   hasTimelineSubRuns,
   TimelineRow,
 } from './timelineItems';
+import { I18nText } from '@/i18n/I18nText';
 
 /**
  * Props for the TimelineChart component
@@ -439,7 +440,7 @@ function TimelineChart({ status, onOpenSubRun }: Props) {
   if (items.length === 0) {
     return (
       <div className="text-sm text-muted-foreground p-4">
-        No step execution data available.
+        <I18nText text={'No step execution data available.'} />
       </div>
     );
   }
@@ -529,27 +530,33 @@ function TimelineChart({ status, onOpenSubRun }: Props) {
                       </div>
                     )}
                     {item.dagName && (
-                      <div className="text-xs">DAG: {item.dagName}</div>
+                      <div className="text-xs">
+                        <I18nText text={'DAG:'} /> {item.dagName}
+                      </div>
                     )}
                     {item.dagRunId && (
-                      <div className="text-xs">Run ID: {item.dagRunId}</div>
+                      <div className="text-xs">
+                        <I18nText text={'Run ID:'} /> {item.dagRunId}
+                      </div>
                     )}
                     {item.params && (
-                      <div className="text-xs">Params: {item.params}</div>
+                      <div className="text-xs">
+                        <I18nText text={'Params:'} /> {item.params}
+                      </div>
                     )}
                     {item.parentStepName && (
                       <div className="text-xs text-muted-foreground">
-                        Parent: {item.parentStepName}
+                        <I18nText text={'Parent:'} /> {item.parentStepName}
                       </div>
                     )}
                     <div className="text-xs">
-                      Status:{' '}
+                      <I18nText text={'Status:'} />{' '}
                       <span className="font-medium">
-                        {getStatusLabel(item)}
+                        <I18nText text={getStatusLabel(item)} />
                       </span>
                     </div>
                     <div className="text-xs">
-                      Duration:{' '}
+                      <I18nText text={'Duration:'} />{' '}
                       <span className="font-mono">
                         {calculateDuration(item.startMs, item.endMs)}
                       </span>
@@ -560,7 +567,7 @@ function TimelineChart({ status, onOpenSubRun }: Props) {
                     </div>
                     {item.error && (
                       <div className="text-xs text-destructive">
-                        Error: {item.error}
+                        <I18nText text={'Error:'} /> {item.error}
                       </div>
                     )}
                   </div>

@@ -6,6 +6,8 @@ import {
   PaginationItem,
 } from '@/components/ui/pagination'; // Import shadcn Pagination components
 import React from 'react';
+import { I18nText } from '@/i18n/I18nText';
+import { I18nProps } from '@/i18n/I18nProps';
 
 /**
  * Props for the DAGPagination component
@@ -64,7 +66,9 @@ const generatePaginationItems = (
         >
           <path d="m15 18-6-6 6-6" />
         </svg>
-        <span className="sr-only">Previous page</span>
+        <span className="sr-only">
+          <I18nText text={'Previous page'} />
+        </span>
       </Button>
     </PaginationItem>
   );
@@ -85,7 +89,9 @@ const generatePaginationItems = (
             }}
           >
             {i}
-            <span className="sr-only">Page {i}</span>
+            <span className="sr-only">
+              <I18nText text="Page {page}" values={{ page: i }} />
+            </span>
           </Button>
         </PaginationItem>
       );
@@ -103,7 +109,10 @@ const generatePaginationItems = (
             onPageChange(1);
           }}
         >
-          1<span className="sr-only">Page 1</span>
+          1
+          <span className="sr-only">
+            <I18nText text={'Page 1'} />
+          </span>
         </Button>
       </PaginationItem>
     );
@@ -136,7 +145,9 @@ const generatePaginationItems = (
             }}
           >
             {i}
-            <span className="sr-only">Page {i}</span>
+            <span className="sr-only">
+              <I18nText text="Page {page}" values={{ page: i }} />
+            </span>
           </Button>
         </PaginationItem>
       );
@@ -166,7 +177,9 @@ const generatePaginationItems = (
           }}
         >
           {totalPages}
-          <span className="sr-only">Page {totalPages}</span>
+          <span className="sr-only">
+            <I18nText text="Page {page}" values={{ page: totalPages }} />
+          </span>
         </Button>
       </PaginationItem>
     );
@@ -198,7 +211,9 @@ const generatePaginationItems = (
         >
           <path d="m9 18 6-6-6-6" />
         </svg>
-        <span className="sr-only">Next page</span>
+        <span className="sr-only">
+          <I18nText text={'Next page'} />
+        </span>
       </Button>
     </PaginationItem>
   );
@@ -304,16 +319,18 @@ const DAGPagination = ({
                 </div>
               ))}
               <div className="px-2 py-1 border-t border-border">
-                <Input
-                  type="number"
-                  min="1"
-                  className="h-6 text-xs"
-                  value={inputValue}
-                  onChange={handleLimitChange}
-                  onBlur={commitChange}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Custom"
-                />
+                <I18nProps>
+                  <Input
+                    type="number"
+                    min="1"
+                    className="h-6 text-xs"
+                    value={inputValue}
+                    onChange={handleLimitChange}
+                    onBlur={commitChange}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Custom"
+                  />
+                </I18nProps>
               </div>
             </div>
           </div>

@@ -129,6 +129,11 @@ irm https://raw.githubusercontent.com/dagucloud/dagu/main/scripts/installer.ps1 
 docker run --rm -v ~/.dagu:/var/lib/dagu -p 8080:8080 ghcr.io/dagucloud/dagu:latest dagu start-all
 ```
 
+> This command does not expose the host Docker daemon to Dagu. Workflows that
+> use `container:` or `action: docker.run` need the
+> [container-step Docker setup](https://docs.dagu.sh/getting-started/installation/docker#run-container-steps-when-dagu-runs-in-docker).
+> Mounting the Docker socket grants workflows control of the host daemon.
+
 **Kubernetes (Helm):**
 
 ```sh
@@ -322,6 +327,10 @@ steps:
 ## Workflow Examples
 
 ### Docker step
+
+When Dagu itself runs in Docker, enable
+[Docker daemon access](https://docs.dagu.sh/getting-started/installation/docker#run-container-steps-when-dagu-runs-in-docker)
+before using container steps.
 
 Pass standard `docker run` options directly in YAML, including the image, pull policy, platform, volume mounts, working directory, and resource limits:
 

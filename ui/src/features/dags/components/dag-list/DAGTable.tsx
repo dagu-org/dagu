@@ -106,6 +106,9 @@ import {
   withoutWorkspaceLabels,
 } from '../../../../lib/workspace';
 import { WorkflowViewSelector } from './WorkflowViewSelector';
+import { I18nText } from '@/i18n/I18nText';
+import { I18nProps } from '@/i18n/I18nProps';
+import { useI18n } from '@/i18n/I18nProvider';
 
 // Threshold in pixels below which we switch to card view
 // Set higher than table's comfortable minimum width (~700px for all columns)
@@ -135,16 +138,18 @@ function RenameDAGButton({
   onRename: (dag: components['schemas']['DAGFile']) => void;
 }) {
   return (
-    <Button
-      type="button"
-      variant="secondary"
-      size="icon-sm"
-      aria-label={`Rename workflow ${dag.dag.name}`}
-      title="Rename workflow"
-      onClick={() => onRename(dag)}
-    >
-      <PencilLine className="h-4 w-4" />
-    </Button>
+    <I18nProps>
+      <Button
+        type="button"
+        variant="secondary"
+        size="icon-sm"
+        aria-label={`Rename workflow ${dag.dag.name}`}
+        title="Rename workflow"
+        onClick={() => onRename(dag)}
+      >
+        <PencilLine className="h-4 w-4" />
+      </Button>
+    </I18nProps>
   );
 }
 
@@ -156,17 +161,19 @@ function DeleteDAGButton({
   onDelete: (dag: components['schemas']['DAGFile']) => void;
 }) {
   return (
-    <Button
-      type="button"
-      variant="secondary"
-      size="icon-sm"
-      className="text-muted-foreground hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive focus-visible:text-destructive"
-      aria-label={`Delete workflow ${dag.dag.name}`}
-      title="Delete workflow"
-      onClick={() => onDelete(dag)}
-    >
-      <Trash2 className="h-4 w-4" />
-    </Button>
+    <I18nProps>
+      <Button
+        type="button"
+        variant="secondary"
+        size="icon-sm"
+        className="text-muted-foreground hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive focus-visible:text-destructive"
+        aria-label={`Delete workflow ${dag.dag.name}`}
+        title="Delete workflow"
+        onClick={() => onDelete(dag)}
+      >
+        <Trash2 className="h-4 w-4" />
+      </Button>
+    </I18nProps>
   );
 }
 
@@ -272,13 +279,23 @@ function DAGCard({
               {() => {
                 const ms = nextRun.getTime() - new Date().getTime();
                 if (ms <= 0) {
-                  return <span>Due now</span>;
+                  return (
+                    <span>
+                      <I18nText text={'Due now'} />
+                    </span>
+                  );
                 }
-                return <span>Run in {formatMs(ms)}</span>;
+                return (
+                  <span>
+                    <I18nText text={'Run in'} /> {formatMs(ms)}
+                  </span>
+                );
               }}
             </Ticker>
           ) : (
-            <span>No upcoming run</span>
+            <span>
+              <I18nText text={'No upcoming run'} />
+            </span>
           )}
         </div>
       )}
@@ -313,7 +330,13 @@ function DAGCard({
         >
           <LiveSwitch dag={dag} refresh={refreshFn} />
           <span className="text-xs text-muted-foreground truncate">
-            {dag.suspended ? 'Suspended' : hasSchedule ? 'Live' : 'No schedule'}
+            {dag.suspended ? (
+              <I18nText text={'Suspended'} />
+            ) : hasSchedule ? (
+              <I18nText text={'Live'} />
+            ) : (
+              <I18nText text={'No schedule'} />
+            )}
           </span>
         </div>
         <div
@@ -474,13 +497,15 @@ const deleteSelectionColumn = columnHelper.display({
   maxSize: 40,
   header: ({ table }) => (
     <div className="flex h-8 items-center justify-center">
-      <Checkbox
-        aria-label="Select all loaded workflows"
-        checked={table.options.meta?.getDeleteSelectionState?.() ?? false}
-        onCheckedChange={(checked) =>
-          table.options.meta?.onToggleAllDeleteSelection?.(checked === true)
-        }
-      />
+      <I18nProps>
+        <Checkbox
+          aria-label="Select all loaded workflows"
+          checked={table.options.meta?.getDeleteSelectionState?.() ?? false}
+          onCheckedChange={(checked) =>
+            table.options.meta?.onToggleAllDeleteSelection?.(checked === true)
+          }
+        />
+      </I18nProps>
     </div>
   ),
   cell: ({ row, table }) => {
@@ -524,12 +549,16 @@ const defaultColumns = [
       >
         {table.getIsAllRowsExpanded() ? (
           <>
-            <VisuallyHidden>Compress rows</VisuallyHidden>
+            <VisuallyHidden>
+              <I18nText text={'Compress rows'} />
+            </VisuallyHidden>
             <ChevronUp className="h-4 w-4" />
           </>
         ) : (
           <>
-            <VisuallyHidden>Expand rows</VisuallyHidden>
+            <VisuallyHidden>
+              <I18nText text={'Expand rows'} />
+            </VisuallyHidden>
             <ChevronDown className="h-4 w-4" />
           </>
         )}
@@ -572,9 +601,11 @@ const defaultColumns = [
     id: 'Name',
     header: () => (
       <div className="flex flex-col py-1">
-        <span className="text-xs">Name</span>
+        <span className="text-xs">
+          <I18nText text={'Name'} />
+        </span>
         <span className="text-xs font-normal text-muted-foreground">
-          Description
+          <I18nText text={'Description'} />
         </span>
       </div>
     ),
@@ -725,9 +756,11 @@ const defaultColumns = [
     minSize: 80,
     header: () => (
       <div className="flex flex-col py-1">
-        <span className="text-xs">Status</span>
+        <span className="text-xs">
+          <I18nText text={'Status'} />
+        </span>
         <span className="text-xs font-normal text-muted-foreground">
-          Latest status
+          <I18nText text={'Latest status'} />
         </span>
       </div>
     ),
@@ -752,9 +785,11 @@ const defaultColumns = [
     minSize: 90,
     header: () => (
       <div className="flex flex-col py-1">
-        <span className="text-xs">Last Run</span>
+        <span className="text-xs">
+          <I18nText text={'Last Run'} />
+        </span>
         <span className="text-xs font-normal text-muted-foreground">
-          {getConfig().tz || 'Local Timezone'}
+          {getConfig().tz || <I18nText text={'Local Timezone'} />}
         </span>
       </div>
     ),
@@ -790,7 +825,9 @@ const defaultColumns = [
         }
       } else if (status === Status.Running) {
         durationContent = (
-          <div className="text-xs text-muted-foreground">(Running)</div>
+          <div className="text-xs text-muted-foreground">
+            <I18nText text={'(Running)'} />
+          </div>
         );
       }
 
@@ -810,9 +847,11 @@ const defaultColumns = [
     minSize: 120,
     header: () => (
       <div className="flex flex-col py-1">
-        <span className="text-xs">Live / Schedule</span>
+        <span className="text-xs">
+          <I18nText text={'Live / Schedule'} />
+        </span>
         <span className="text-xs font-normal text-muted-foreground">
-          Toggle & next run
+          <I18nText text={'Toggle & next run'} />
         </span>
       </div>
     ),
@@ -843,7 +882,9 @@ const defaultColumns = [
         return (
           <div className="flex items-center gap-2">
             {liveSwitch}
-            <span className="text-xs text-muted-foreground">No schedule</span>
+            <span className="text-xs text-muted-foreground">
+              <I18nText text={'No schedule'} />
+            </span>
           </div>
         );
       }
@@ -874,9 +915,17 @@ const defaultColumns = [
                 {() => {
                   const ms = nextRun.getTime() - new Date().getTime();
                   if (ms <= 0) {
-                    return <span>Due now</span>;
+                    return (
+                      <span>
+                        <I18nText text={'Due now'} />
+                      </span>
+                    );
                   }
-                  return <span>Run in {formatMs(ms)}</span>;
+                  return (
+                    <span>
+                      <I18nText text={'Run in'} /> {formatMs(ms)}
+                    </span>
+                  );
                 }}
               </Ticker>
             </div>
@@ -884,14 +933,14 @@ const defaultColumns = [
         } else {
           nextRunContent = (
             <div className="text-xs text-muted-foreground font-normal leading-tight">
-              No upcoming run
+              <I18nText text={'No upcoming run'} />
             </div>
           );
         }
       } else if (data.dag.suspended) {
         nextRunContent = (
           <div className="text-xs text-muted-foreground font-normal leading-tight">
-            Suspended
+            <I18nText text={'Suspended'} />
           </div>
         );
       }
@@ -914,9 +963,11 @@ const defaultColumns = [
     maxSize: 160,
     header: () => (
       <div className="flex flex-col items-center py-1">
-        <span className="text-xs">Actions</span>
+        <span className="text-xs">
+          <I18nText text={'Actions'} />
+        </span>
         <span className="text-xs font-normal text-muted-foreground">
-          Operations
+          <I18nText text={'Operations'} />
         </span>
       </div>
     ),
@@ -1008,7 +1059,7 @@ function WorkflowsEmptyState({
       <div className="flex flex-wrap items-center justify-center gap-2">
         {showAllButton && (
           <Button type="button" variant="outline" onClick={onShowAllWorkflows}>
-            Show all workflows
+            <I18nText text={'Show all workflows'} />
           </Button>
         )}
         <CreateDAGModal />
@@ -1113,7 +1164,9 @@ const SortableHeader = ({
       <Tooltip>
         <TooltipTrigger asChild>{button}</TooltipTrigger>
         <TooltipContent className="bg-muted text-muted-foreground border">
-          <p className="text-xs">Sorts current page only</p>
+          <p className="text-xs">
+            <I18nText text={'Sorts current page only'} />
+          </p>
         </TooltipContent>
       </Tooltip>
     );
@@ -1163,6 +1216,7 @@ function DAGTable({
   selectedDAG = null,
   onSelectDAG,
 }: Props) {
+  const { ts } = useI18n();
   const navigate = useNavigate();
   const columns = useMemo(
     () =>
@@ -1623,7 +1677,10 @@ function DAGTable({
     (view) => view.id === activeWorkflowViewId
   )?.name;
   const isPristineAllView =
-    isAllWorkflowsView && !searchText && searchLabels.length === 0 && !activeOnly;
+    isAllWorkflowsView &&
+    !searchText &&
+    searchLabels.length === 0 &&
+    !activeOnly;
   const emptyState = activeWorkflowViewName
     ? {
         icon: '🔍',
@@ -1672,37 +1729,45 @@ function DAGTable({
           />
 
           {/* Search input */}
-          <Input
-            type="text"
-            placeholder="Filter by workflow name..."
-            value={searchText}
-            onChange={(e) => handleSearchTextChange(e.target.value)}
-            className="w-[200px]"
-          />
+          <I18nProps>
+            <Input
+              type="text"
+              placeholder="Filter by workflow name..."
+              value={searchText}
+              onChange={(e) => handleSearchTextChange(e.target.value)}
+              className="w-[200px]"
+            />
+          </I18nProps>
           <Button asChild variant="outline" className="px-4 font-medium">
             <Link to={buildGrepSearchUrl(searchText)}>
               <Search className="mr-1.5 h-4 w-4" />
-              Grep
+              <I18nText text={'Grep'} />
             </Link>
           </Button>
 
           {/* Label filter */}
-          <LabelCombobox
-            selectedLabels={searchLabels}
-            onLabelsChange={handleSearchLabelsChange}
-            availableLabels={availableLabels}
-            placeholder="Filter by labels..."
-            className="h-9 min-w-[170px] max-w-[220px]"
-          />
+          <I18nProps>
+            <LabelCombobox
+              selectedLabels={searchLabels}
+              onLabelsChange={handleSearchLabelsChange}
+              availableLabels={availableLabels}
+              placeholder="Filter by labels..."
+              className="h-9 min-w-[170px] max-w-[220px]"
+            />
+          </I18nProps>
 
           <label className="flex h-9 cursor-pointer items-center gap-2 rounded-md border border-input bg-card px-3 text-sm font-medium text-foreground shadow-sm transition-colors hover:border-border-strong hover:bg-muted">
-            <span>Active only</span>
-            <Switch
-              checked={activeOnly}
-              onCheckedChange={handleActiveOnlyChange}
-              aria-label="Active only"
-              className="focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            />
+            <span>
+              <I18nText text={'Active only'} />
+            </span>
+            <I18nProps>
+              <Switch
+                checked={activeOnly}
+                onCheckedChange={handleActiveOnlyChange}
+                aria-label="Active only"
+                className="focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              />
+            </I18nProps>
           </label>
 
           {canDeleteDAGs && selectedDAGsForDelete.length > 0 && (
@@ -1717,7 +1782,8 @@ function DAGTable({
               }}
             >
               <Trash2 className="h-4 w-4" />
-              Delete ({selectedDAGsForDelete.length})
+              <I18nText text={'Delete ('} />
+              {selectedDAGsForDelete.length})
             </Button>
           )}
 
@@ -1743,8 +1809,9 @@ function DAGTable({
 
         {resultCount !== undefined && (
           <div className="text-xs text-muted-foreground">
-            {resultCount.toLocaleString()} workflow
-            {resultCount === 1 ? '' : 's'}
+            {ts(resultCount === 1 ? '{count} workflow' : '{count} workflows', {
+              count: resultCount.toLocaleString(),
+            })}
           </div>
         )}
 
@@ -1752,7 +1819,7 @@ function DAGTable({
           <div className="flex flex-wrap items-center gap-2 pt-1 pl-1">
             <div className="flex flex-wrap items-center gap-2 min-w-0">
               <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
-                Sort
+                <I18nText text={'Sort'} />
               </span>
               <Select
                 value={sortField}
@@ -1763,14 +1830,18 @@ function DAGTable({
                   )
                 }
               >
-                <SelectTrigger
-                  className="h-8 min-w-[132px] max-w-full text-xs"
-                  aria-label="Sort DAG cards"
-                >
-                  <SelectValue placeholder="Sort by">
-                    {getCardSortLabel(sortField)}
-                  </SelectValue>
-                </SelectTrigger>
+                <I18nProps>
+                  <SelectTrigger
+                    className="h-8 min-w-[132px] max-w-full text-xs"
+                    aria-label="Sort DAG cards"
+                  >
+                    <I18nProps>
+                      <SelectValue placeholder="Sort by">
+                        <I18nText text={getCardSortLabel(sortField)} />
+                      </SelectValue>
+                    </I18nProps>
+                  </SelectTrigger>
+                </I18nProps>
                 <SelectContent>
                   {cardSortOptions.map((option) => (
                     <SelectItem
@@ -1778,7 +1849,7 @@ function DAGTable({
                       value={option.value}
                       className="text-xs"
                     >
-                      {option.label}
+                      <I18nText text={option.label} />
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1791,11 +1862,11 @@ function DAGTable({
                 onClick={() =>
                   onSortChange(sortField, sortOrder === 'asc' ? 'desc' : 'asc')
                 }
-                aria-label={
+                aria-label={ts(
                   sortOrder === 'asc'
                     ? 'Switch to descending sort'
                     : 'Switch to ascending sort'
-                }
+                )}
               >
                 {sortOrder === 'asc' ? (
                   <ArrowUp className="h-3.5 w-3.5" />
@@ -1803,7 +1874,11 @@ function DAGTable({
                   <ArrowDown className="h-3.5 w-3.5" />
                 )}
                 <span className="ml-1">
-                  {sortOrder === 'asc' ? 'Asc' : 'Desc'}
+                  {sortOrder === 'asc' ? (
+                    <I18nText text={'Asc'} />
+                  ) : (
+                    <I18nText text={'Desc'} />
+                  )}
                 </span>
               </Button>
             </div>
@@ -2068,10 +2143,12 @@ function DAGTable({
       <ConfirmDialog
         title={
           deleteTargets?.length === 1
-            ? 'Delete workflow?'
-            : `Delete ${deleteTargets?.length ?? 0} workflows?`
+            ? ts('Delete workflow?')
+            : ts('Delete {count} workflows?', {
+                count: deleteTargets?.length ?? 0,
+              })
         }
-        buttonText={isDeleting ? 'Deleting...' : 'Delete'}
+        buttonText={ts(isDeleting ? 'Deleting...' : 'Delete')}
         visible={deleteTargets !== null}
         dismissModal={() => {
           if (!isDeleting) {
@@ -2085,10 +2162,20 @@ function DAGTable({
       >
         <div className="space-y-3 text-sm">
           <p>
-            {deleteTargets?.length === 1
-              ? 'The workflow definition file will be removed.'
-              : 'The selected workflow definition files will be removed.'}{' '}
-            Past run history will be kept. This action cannot be undone.
+            {deleteTargets?.length === 1 ? (
+              <I18nText
+                text={'The workflow definition file will be removed.'}
+              />
+            ) : (
+              <I18nText
+                text={'The selected workflow definition files will be removed.'}
+              />
+            )}{' '}
+            <I18nText
+              text={
+                'Past run history will be kept. This action cannot be undone.'
+              }
+            />
           </p>
           <ul className="max-h-48 space-y-1 overflow-y-auto rounded-md border bg-muted/30 p-2">
             {(deleteTargets ?? []).map((dag) => (

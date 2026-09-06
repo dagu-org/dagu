@@ -48,6 +48,9 @@ import {
   readMigratedLocalStorage,
   writeLocalStorage,
 } from '@/lib/local-storage-migration';
+import { I18nText } from '@/i18n/I18nText';
+import { I18nProps } from '@/i18n/I18nProps';
+import { useI18n } from '@/i18n/I18nProvider';
 
 type Props = {
   tabId: string;
@@ -68,6 +71,7 @@ function WikiPageEditor({
   onDeleteWikiPage,
   onContentChange,
 }: Props) {
+  const { ts } = useI18n();
   const client = useClient();
   const appBarContext = useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
@@ -418,8 +422,12 @@ function WikiPageEditor({
             type="button"
             onClick={() => copyName(title)}
             className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-all shrink-0"
-            title={nameCopied ? 'Name copied' : `Copy name: ${title}`}
-            aria-label={nameCopied ? 'Name copied' : 'Copy name'}
+            title={
+              nameCopied
+                ? ts('Name copied')
+                : ts('Copy name: {name}', { name: title })
+            }
+            aria-label={ts(nameCopied ? 'Name copied' : 'Copy name')}
           >
             {nameCopied ? (
               <Check className="h-3.5 w-3.5 text-green-500" />
@@ -435,31 +443,39 @@ function WikiPageEditor({
         <div className="flex-1" />
 
         {/* History */}
-        <button
-          type="button"
-          onClick={() => setHistoryOpen(true)}
-          className="flex items-center gap-1 px-2 py-0.5 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
-          title="Revision history"
-        >
-          <History className="h-3 w-3" />
-          <span>History</span>
-        </button>
+        <I18nProps>
+          <button
+            type="button"
+            onClick={() => setHistoryOpen(true)}
+            className="flex items-center gap-1 px-2 py-0.5 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+            title="Revision history"
+          >
+            <History className="h-3 w-3" />
+            <span>
+              <I18nText text={'History'} />
+            </span>
+          </button>
+        </I18nProps>
 
         {/* Copy content */}
-        <button
-          type="button"
-          onClick={() => copyContent(currentValue ?? '')}
-          disabled={!currentValue}
-          className="flex items-center gap-1 px-2 py-0.5 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-          title="Copy content"
-        >
-          {copiedContent ? (
-            <Check className="h-3 w-3 text-green-500" />
-          ) : (
-            <ClipboardCopy className="h-3 w-3" />
-          )}
-          <span>Copy</span>
-        </button>
+        <I18nProps>
+          <button
+            type="button"
+            onClick={() => copyContent(currentValue ?? '')}
+            disabled={!currentValue}
+            className="flex items-center gap-1 px-2 py-0.5 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            title="Copy content"
+          >
+            {copiedContent ? (
+              <Check className="h-3 w-3 text-green-500" />
+            ) : (
+              <ClipboardCopy className="h-3 w-3" />
+            )}
+            <span>
+              <I18nText text={'Copy'} />
+            </span>
+          </button>
+        </I18nProps>
 
         {/* Mode toggle */}
         <div className="flex rounded-md border border-border overflow-hidden">
@@ -474,7 +490,7 @@ function WikiPageEditor({
             onClick={() => setMode('edit')}
             aria-pressed={mode === 'edit'}
           >
-            Edit
+            <I18nText text={'Edit'} />
           </button>
           <button
             type="button"
@@ -487,25 +503,27 @@ function WikiPageEditor({
             onClick={() => setMode('preview')}
             aria-pressed={mode === 'preview'}
           >
-            Preview
+            <I18nText text={'Preview'} />
           </button>
         </div>
 
         {/* Discard button */}
         {canEdit && hasUnsavedChanges && (
-          <button
-            type="button"
-            onClick={() => {
-              discardChanges();
-              clearPersistedDraft();
-              markTabSaved(tabId);
-            }}
-            className="flex items-center gap-1 px-2 py-1 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            title="Discard changes"
-          >
-            <Undo2 className="h-3 w-3" />
-            Discard
-          </button>
+          <I18nProps>
+            <button
+              type="button"
+              onClick={() => {
+                discardChanges();
+                clearPersistedDraft();
+                markTabSaved(tabId);
+              }}
+              className="flex items-center gap-1 px-2 py-1 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              title="Discard changes"
+            >
+              <Undo2 className="h-3 w-3" />
+              <I18nText text={'Discard'} />
+            </button>
+          </I18nProps>
         )}
 
         {/* Save button */}
@@ -522,19 +540,25 @@ function WikiPageEditor({
             )}
           >
             <Save className="h-3 w-3" />
-            {isSaving ? 'Saving...' : 'Save'}
+            {isSaving ? (
+              <I18nText text={'Saving...'} />
+            ) : (
+              <I18nText text={'Save'} />
+            )}
           </button>
         )}
         {canEdit && onDeleteWikiPage && (
-          <button
-            type="button"
-            onClick={onDeleteWikiPage}
-            className="flex items-center gap-1 px-2 py-1 text-xs rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-            title="Delete Wiki page"
-            aria-label="Delete Wiki page"
-          >
-            <Trash2 className="h-3 w-3" />
-          </button>
+          <I18nProps>
+            <button
+              type="button"
+              onClick={onDeleteWikiPage}
+              className="flex items-center gap-1 px-2 py-1 text-xs rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+              title="Delete Wiki page"
+              aria-label="Delete Wiki page"
+            >
+              <Trash2 className="h-3 w-3" />
+            </button>
+          </I18nProps>
         )}
       </div>
 

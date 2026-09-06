@@ -64,6 +64,9 @@ import DAGEditorWithDocs from './DAGEditorWithDocs';
 import { parseValidationMarkers } from './validationMarkers';
 import { AgentSpecOverview } from './AgentSpecOverview';
 import ExternalChangeDialog from './ExternalChangeDialog';
+import { I18nText } from '@/i18n/I18nText';
+import { I18nProps } from '@/i18n/I18nProps';
+import { useI18n } from '@/i18n/I18nProvider';
 
 /**
  * Props for the DAGSpec component
@@ -82,6 +85,7 @@ type Props = {
  * including visualization, attributes, steps, and YAML definition
  */
 function DAGSpec({ fileName, localDags, editorHints }: Props) {
+  const { ts } = useI18n();
   const remoteNode = useRemoteNode();
   const client = useClient();
   const { schema: baseSchema } = useSchema();
@@ -535,7 +539,7 @@ function DAGSpec({ fileName, localDags, editorHints }: Props) {
             {errors.map((e, i) => (
               <div
                 key={i}
-                className="p-3 bg-danger-highlight rounded-md text-danger font-mono text-sm break-words flex items-start gap-2"
+                className="p-3 bg-destructive/10 rounded-md text-destructive font-mono text-sm break-words flex items-start gap-2"
               >
                 <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
                 {e}
@@ -552,10 +556,12 @@ function DAGSpec({ fileName, localDags, editorHints }: Props) {
               <div className="py-8 px-4 text-center">
                 <AlertTriangle className="h-12 w-12 text-warning mx-auto mb-4" />
                 <p className="text-muted-foreground mb-2">
-                  No steps to render
+                  <I18nText text={'No steps to render'} />
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Define at least one step to view the graph
+                  <I18nText
+                    text={'Define at least one step to view the graph'}
+                  />
                 </p>
               </div>
             ) : (
@@ -576,13 +582,15 @@ function DAGSpec({ fileName, localDags, editorHints }: Props) {
                     <TooltipTrigger asChild>
                       <div
                         className="flex h-7 w-7 items-center justify-center rounded bg-muted text-muted-foreground cursor-help"
-                        aria-label="Graph interactions"
+                        aria-label={ts('Graph interactions')}
                       >
                         <MousePointerClick className="h-3.5 w-3.5" />
                       </div>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Click: Inspect step details</p>
+                      <p>
+                        <I18nText text={'Click: Inspect step details'} />
+                      </p>
                     </TooltipContent>
                   </Tooltip>
                 </div>
@@ -621,30 +629,42 @@ function DAGSpec({ fileName, localDags, editorHints }: Props) {
         // Update refresh callback ref directly (safe in render)
         refreshCallbackRef.current = props.refresh;
         const editorHeaderActions = (
-            <div className="flex items-center gap-2">
-              {editable && localHasUnsavedChanges && (
-                <span
-                  className={
-                    !isValidating && liveValidation?.errors.length
-                      ? 'text-xs text-destructive'
-                      : 'text-xs text-muted-foreground'
-                  }
-                >
-                  {isValidating
-                    ? 'Validating...'
-                    : liveValidation
-                      ? liveValidation.errors.length > 0
-                        ? `${liveValidation.errors.length} issue${liveValidation.errors.length === 1 ? '' : 's'}`
-                        : 'Valid'
-                      : ''}
-                </span>
-              )}
-              {valueReferenceNotices.length > 0 && (
+          <div className="flex items-center gap-2">
+            {editable && localHasUnsavedChanges && (
+              <span
+                className={
+                  !isValidating && liveValidation?.errors.length
+                    ? 'text-xs text-destructive'
+                    : 'text-xs text-muted-foreground'
+                }
+              >
+                {isValidating ? (
+                  <I18nText text={'Validating...'} />
+                ) : liveValidation ? (
+                  liveValidation.errors.length > 0 ? (
+                    ts(
+                      liveValidation.errors.length === 1
+                        ? '{count} issue'
+                        : '{count} issues',
+                      { count: liveValidation.errors.length }
+                    )
+                  ) : (
+                    <I18nText text={'Valid'} />
+                  )
+                ) : (
+                  ''
+                )}
+              </span>
+            )}
+            {valueReferenceNotices.length > 0 && (
+              <I18nProps>
                 <ValueReferenceNoticesButton
                   notices={valueReferenceNotices}
                   description="Value-reference notices produced while loading this spec."
                 />
-              )}
+              </I18nProps>
+            )}
+            <I18nProps>
               <Button
                 variant="ghost"
                 title="Copy YAML"
@@ -656,20 +676,24 @@ function DAGSpec({ fileName, localDags, editorHints }: Props) {
                 ) : (
                   <Copy className="h-4 w-4" />
                 )}
-                Copy
+                <I18nText text={'Copy'} />
               </Button>
-              {editable && (
-                <>
-                  {localHasUnsavedChanges && (
+            </I18nProps>
+            {editable && (
+              <>
+                {localHasUnsavedChanges && (
+                  <I18nProps>
                     <Button
                       variant="ghost"
                       title="Discard changes"
                       onClick={discardChanges}
                     >
                       <Undo2 className="h-4 w-4" />
-                      Discard
+                      <I18nText text={'Discard'} />
                     </Button>
-                  )}
+                  </I18nProps>
+                )}
+                <I18nProps>
                   <Button
                     id="save-config"
                     title="Save changes (Ctrl+S / Cmd+S)"
@@ -680,12 +704,13 @@ function DAGSpec({ fileName, localDags, editorHints }: Props) {
                     }}
                   >
                     <Save className="h-4 w-4" />
-                    Save
+                    <I18nText text={'Save'} />
                   </Button>
-                </>
-              )}
-            </div>
-          );
+                </I18nProps>
+              </>
+            )}
+          </div>
+        );
 
         return (
           data?.dag && (
@@ -710,7 +735,7 @@ function DAGSpec({ fileName, localDags, editorHints }: Props) {
                           onClick={() => handleActiveTabChange('parent')}
                           className="cursor-pointer whitespace-nowrap"
                         >
-                          {data?.dag?.name} (Parent)
+                          {data?.dag?.name} <I18nText text={'(Parent)'} />
                         </Tab>
                         {localDags?.map(
                           (localDag: components['schemas']['LocalDag']) => (
@@ -765,7 +790,7 @@ function DAGSpec({ fileName, localDags, editorHints }: Props) {
 
                 <section className="flex-shrink-0 space-y-3">
                   <h2 className="text-lg font-semibold text-foreground">
-                    YAML
+                    <I18nText text={'YAML'} />
                   </h2>
                   <DAGEditorWithDocs
                     value={

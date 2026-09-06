@@ -24,6 +24,8 @@ import { AnsiLine } from '@/lib/ansi';
 import { parseSchedulerLogLine } from '@/lib/scheduler-log';
 import LoadingIndicator from '@/components/ui/loading-indicator';
 import { ActivityLine } from './ActivityLine';
+import { I18nText } from '@/i18n/I18nText';
+import { I18nProps } from '@/i18n/I18nProps';
 
 // Extended Log type with pagination fields
 interface LogWithPagination {
@@ -308,7 +310,8 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
       return (
         <div className="w-full h-full flex items-center justify-center">
           <div className="text-error">
-            Error loading log data: {error.message || 'Unknown error'}
+            <I18nText text={'Error loading log data:'} />{' '}
+            {error.message || <I18nText text={'Unknown error'} />}
           </div>
         </div>
       );
@@ -357,7 +360,7 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
               onClick={() => setDisplayMode('activity')}
               aria-pressed={displayMode === 'activity'}
             >
-              Activity
+              <I18nText text={'Activity'} />
             </Button>
             <Button
               size="sm"
@@ -365,7 +368,7 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
               onClick={() => setDisplayMode('raw')}
               aria-pressed={displayMode === 'raw'}
             >
-              Raw
+              <I18nText text={'Raw'} />
             </Button>
           </div>
 
@@ -378,7 +381,7 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
                   onClick={() => handleViewModeChange('tail')}
                   disabled={isNavigating}
                 >
-                  Show End
+                  <I18nText text={'Show End'} />
                 </Button>
                 <Button
                   size="sm"
@@ -386,7 +389,7 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
                   onClick={() => handleViewModeChange('head')}
                   disabled={isNavigating}
                 >
-                  Show Beginning
+                  <I18nText text={'Show Beginning'} />
                 </Button>
                 <Button
                   size="sm"
@@ -394,7 +397,7 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
                   onClick={() => handleViewModeChange('page')}
                   disabled={isNavigating}
                 >
-                  Page View
+                  <I18nText text={'Page View'} />
                 </Button>
               </div>
 
@@ -404,11 +407,21 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
                 onChange={(e) => setPageSize(Number(e.target.value))}
                 disabled={isNavigating}
               >
-                <option value="100">100 lines</option>
-                <option value="500">500 lines</option>
-                <option value="1000">1000 lines</option>
-                <option value="5000">5000 lines</option>
-                <option value="10000">10000 lines</option>
+                <option value="100">
+                  <I18nText text={'100 lines'} />
+                </option>
+                <option value="500">
+                  <I18nText text={'500 lines'} />
+                </option>
+                <option value="1000">
+                  <I18nText text={'1000 lines'} />
+                </option>
+                <option value="5000">
+                  <I18nText text={'5000 lines'} />
+                </option>
+                <option value="10000">
+                  <I18nText text={'10000 lines'} />
+                </option>
               </select>
             </>
           )}
@@ -416,7 +429,9 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
           <div className="ml-auto flex items-center gap-2">
             {displayMode === 'raw' && (
               <div className="flex items-center gap-1.5">
-                <span className="text-xs text-muted-foreground">Wrap</span>
+                <span className="text-xs text-muted-foreground">
+                  <I18nText text={'Wrap'} />
+                </span>
                 <Switch
                   checked={preferences.logWrap}
                   onCheckedChange={(checked) =>
@@ -427,26 +442,30 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
             )}
 
             {/* Reload button */}
-            <ReloadButton
-              onReload={async () => {
-                if (mutate) {
-                  await mutate();
-                }
-              }}
-              isLoading={isNavigating || isLoading}
-              title="Reload logs"
-            />
+            <I18nProps>
+              <ReloadButton
+                onReload={async () => {
+                  if (mutate) {
+                    await mutate();
+                  }
+                }}
+                isLoading={isNavigating || isLoading}
+                title="Reload logs"
+              />
+            </I18nProps>
 
             {/* Download button */}
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleDownload}
-              disabled={isNavigating}
-              title="Download full log"
-            >
-              <Download className="h-4 w-4" />
-            </Button>
+            <I18nProps>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleDownload}
+                disabled={isNavigating}
+                title="Download full log"
+              >
+                <Download className="h-4 w-4" />
+              </Button>
+            </I18nProps>
 
             {/* Live mode toggle - only visible when DAG is running */}
             {isRunning && (
@@ -458,17 +477,28 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
                 <span
                   className={`inline-block w-2 h-2 rounded-full ${isLiveMode ? 'bg-white animate-pulse' : 'bg-muted-foreground'}`}
                 />
-                LIVE
+                <I18nText text={'LIVE'} />
               </Button>
             )}
           </div>
         </div>
 
         <div className="text-xs text-muted-foreground flex items-center">
-          {showNavigation
-            ? `Showing ${lines.length} of ${effectiveTotalLines} lines`
-            : `${effectiveTotalLines} ${effectiveTotalLines === 1 ? 'line' : 'lines'}`}{' '}
-          {isEstimate ? '(estimated)' : ''} {hasMore ? '(more available)' : ''}
+          {showNavigation ? (
+            <I18nText
+              text="Showing {visible} of {total} lines"
+              values={{ visible: lines.length, total: effectiveTotalLines }}
+            />
+          ) : (
+            <I18nText
+              text={
+                effectiveTotalLines === 1 ? '{count} line' : '{count} lines'
+              }
+              values={{ count: effectiveTotalLines }}
+            />
+          )}{' '}
+          {isEstimate ? <I18nText text={'(estimated)'} /> : ''}{' '}
+          {hasMore ? <I18nText text={'(more available)'} /> : ''}
         </div>
 
         {/* Page navigation controls */}
@@ -479,10 +509,13 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
               onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
               disabled={currentPage <= 1 || isNavigating}
             >
-              Previous
+              <I18nText text={'Previous'} />
             </Button>
             <span className="text-xs">
-              Page {currentPage} of {totalPages}
+              <I18nText
+                text="Page {page} of {total}"
+                values={{ page: currentPage, total: totalPages }}
+              />
             </span>
             <Button
               size="sm"
@@ -491,14 +524,16 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
               }
               disabled={currentPage >= totalPages || isNavigating}
             >
-              Next
+              <I18nText text={'Next'} />
             </Button>
           </div>
         )}
 
         {showNavigation && (
           <div className="flex items-center gap-2 mt-2">
-            <span className="text-xs text-muted-foreground">Jump to line:</span>
+            <span className="text-xs text-muted-foreground">
+              <I18nText text={'Jump to line:'} />
+            </span>
             <Input
               type="number"
               min={1}
@@ -534,7 +569,7 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
                 (jumpToLine as number) > effectiveTotalLines
               }
             >
-              Go
+              <I18nText text={'Go'} />
             </Button>
           </div>
         )}

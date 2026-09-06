@@ -7,6 +7,9 @@ import React, { useCallback, useState } from 'react';
 import ConfirmModal from '@/components/ui/confirm-dialog';
 import WikiPageEditor from './WikiPageEditor';
 import WikiPageTabBar from './WikiPageTabBar';
+import { I18nText } from '@/i18n/I18nText';
+import { I18nProps } from '@/i18n/I18nProps';
+import { I18nTemplate } from '@/i18n/I18nTemplate';
 
 type Props = {
   onDeleteWikiPage?: (
@@ -117,7 +120,7 @@ function WikiPageTabEditorPanel({
       <div className="flex flex-col items-center justify-center h-full gap-3">
         <FileText className="h-8 w-8 text-muted-foreground/50" />
         <p className="text-sm text-muted-foreground">
-          Select a Wiki page to start editing.
+          <I18nText text={'Select a Wiki page to start editing.'} />
         </p>
       </div>
     );
@@ -166,56 +169,75 @@ function WikiPageTabEditorPanel({
         ) : (
           <div className="flex items-center justify-center h-full">
             <p className="text-sm text-muted-foreground">
-              Select a tab to continue editing.
+              <I18nText text={'Select a tab to continue editing.'} />
             </p>
           </div>
         )}
       </div>
 
       {/* Confirm close unsaved tab */}
-      <ConfirmModal
-        title="Unsaved Changes"
-        buttonText="Discard"
-        visible={!!confirmCloseTabId}
-        dismissModal={() => setConfirmCloseTabId(null)}
-        onSubmit={handleConfirmClose}
-      >
-        <p className="text-sm text-muted-foreground">
-          You have unsaved changes in{' '}
-          <strong>
-            {confirmTab?.title || confirmTab?.wikiPagePath || 'this Wiki page'}
-          </strong>
-          . Discard changes?
-        </p>
-      </ConfirmModal>
+      <I18nProps>
+        <ConfirmModal
+          title="Unsaved Changes"
+          buttonText="Discard"
+          visible={!!confirmCloseTabId}
+          dismissModal={() => setConfirmCloseTabId(null)}
+          onSubmit={handleConfirmClose}
+        >
+          <p className="text-sm text-muted-foreground">
+            <I18nTemplate
+              text="You have unsaved changes in {page}. Discard changes?"
+              values={{
+                page: (
+                  <strong>
+                    {confirmTab?.title || confirmTab?.wikiPagePath || (
+                      <I18nText text="this Wiki page" />
+                    )}
+                  </strong>
+                ),
+              }}
+            />
+          </p>
+        </ConfirmModal>
+      </I18nProps>
 
       {/* Confirm close all tabs */}
-      <ConfirmModal
-        title="Close All Tabs"
-        buttonText="Discard & Close All"
-        visible={confirmCloseAll}
-        dismissModal={() => setConfirmCloseAll(false)}
-        onSubmit={handleConfirmCloseAll}
-      >
-        <p className="text-sm text-muted-foreground">
-          Some tabs have unsaved changes. Discard all changes and close all
-          tabs?
-        </p>
-      </ConfirmModal>
+      <I18nProps>
+        <ConfirmModal
+          title="Close All Tabs"
+          buttonText="Discard & Close All"
+          visible={confirmCloseAll}
+          dismissModal={() => setConfirmCloseAll(false)}
+          onSubmit={handleConfirmCloseAll}
+        >
+          <p className="text-sm text-muted-foreground">
+            <I18nText
+              text={
+                'Some tabs have unsaved changes. Discard all changes and close all tabs?'
+              }
+            />
+          </p>
+        </ConfirmModal>
+      </I18nProps>
 
       {/* Confirm close other tabs */}
-      <ConfirmModal
-        title="Close Other Tabs"
-        buttonText="Discard & Close Others"
-        visible={!!confirmCloseOthersKeepId}
-        dismissModal={() => setConfirmCloseOthersKeepId(null)}
-        onSubmit={handleConfirmCloseOthers}
-      >
-        <p className="text-sm text-muted-foreground">
-          Some other tabs have unsaved changes. Discard their changes and close
-          them?
-        </p>
-      </ConfirmModal>
+      <I18nProps>
+        <ConfirmModal
+          title="Close Other Tabs"
+          buttonText="Discard & Close Others"
+          visible={!!confirmCloseOthersKeepId}
+          dismissModal={() => setConfirmCloseOthersKeepId(null)}
+          onSubmit={handleConfirmCloseOthers}
+        >
+          <p className="text-sm text-muted-foreground">
+            <I18nText
+              text={
+                'Some other tabs have unsaved changes. Discard their changes and close them?'
+              }
+            />
+          </p>
+        </ConfirmModal>
+      </I18nProps>
     </div>
   );
 }

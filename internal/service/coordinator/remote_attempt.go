@@ -245,14 +245,18 @@ func (h *Handler) attemptLease(ctx context.Context, identity attemptIdentity) (*
 }
 
 func (h *Handler) validateAttemptLease(lease *dispatch.DAGRunLease, identity attemptIdentity) error {
-	if !lease.MatchesClaim(identity.claimKey, identity.workerID) ||
-		(!lease.Root.Zero() && lease.Root != identity.root) {
+	if !lease.MatchesClaim(identity.claimKey, identity.workerID) {
+		return status.Error(codes.FailedPrecondition, remoteAttemptRejectedSuperseded)
+	}
+	leaseRoot := lease.Root
+	if leaseRoot.Zero() {
+		leaseRoot = lease.DAGRun
+	}
+	if leaseRoot != identity.root {
 		return status.Error(codes.FailedPrecondition, remoteAttemptRejectedSuperseded)
 	}
 	if identity.claimKey != identity.attemptKey {
-		if lease.DAGRun != identity.root {
-			return status.Error(codes.FailedPrecondition, remoteAttemptRejectedSuperseded)
-		}
+		// Inline descendants inherit their dispatching ancestor's worker claim.
 		return nil
 	}
 	if lease.DAGRun != identity.dagRun ||

@@ -1,0 +1,12 @@
+params:
+  - name: name
+    type: string
+    default: prod
+working_dir: .
+steps:
+  - id: check
+    run: |
+      printf '%s\n' '${params.name}' > matrix.txt
+      printf '%s\n' '\${params.name}' >> matrix.txt
+      printf '%s\n' '\\${params.name}' >> matrix.txt
+      printf '%s\n' '\\\${params.name}' >> matrix.txt

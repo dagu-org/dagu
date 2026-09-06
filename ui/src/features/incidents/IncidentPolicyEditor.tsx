@@ -40,6 +40,8 @@ import {
   severityLabel,
   withIncidentRoutingMode,
 } from './incidentDrafts';
+import { I18nText } from '@/i18n/I18nText';
+import { I18nProps } from '@/i18n/I18nProps';
 
 type IncidentPolicyEditorProps = {
   draft: DraftIncidentPolicySet;
@@ -120,24 +122,28 @@ export function IncidentPolicyEditor({
               <h2 className="text-sm font-semibold text-foreground">
                 {inheritTitle}
               </h2>
-              <Badge variant={statusBadgeVariant}>{modeLabels[mode]}</Badge>
+              <Badge variant={statusBadgeVariant}>
+                <I18nText text={modeLabels[mode]} />
+              </Badge>
             </div>
             <p className="text-sm text-muted-foreground">
               {inheritDescription}
             </p>
           </div>
-          <ToggleGroup aria-label="Incident routing mode">
-            {modeOptions.map((option) => (
-              <ToggleButton
-                key={option}
-                value={option}
-                groupValue={mode}
-                onClick={() => setMode(option)}
-              >
-                {modeLabels[option]}
-              </ToggleButton>
-            ))}
-          </ToggleGroup>
+          <I18nProps>
+            <ToggleGroup aria-label="Incident routing mode">
+              {modeOptions.map((option) => (
+                <ToggleButton
+                  key={option}
+                  value={option}
+                  groupValue={mode}
+                  onClick={() => setMode(option)}
+                >
+                  <I18nText text={modeLabels[option]} />
+                </ToggleButton>
+              ))}
+            </ToggleGroup>
+          </I18nProps>
         </div>
       </div>
 
@@ -147,10 +153,12 @@ export function IncidentPolicyEditor({
             <RotateCcw className="mt-0.5 h-4 w-4 text-muted-foreground" />
             <div>
               <h3 className="text-sm font-medium text-foreground">
-                Parent routing is active.
+                <I18nText text={'Parent routing is active.'} />
               </h3>
               <p className="mt-1 text-sm text-muted-foreground">
-                This scope uses the next configured parent route.
+                <I18nText
+                  text={'This scope uses the next configured parent route.'}
+                />
               </p>
             </div>
           </div>
@@ -163,10 +171,14 @@ export function IncidentPolicyEditor({
             <CheckCircle2 className="mt-0.5 h-4 w-4 text-muted-foreground" />
             <div>
               <h3 className="text-sm font-medium text-foreground">
-                No new incidents from this scope.
+                <I18nText text={'No new incidents from this scope.'} />
               </h3>
               <p className="mt-1 text-sm text-muted-foreground">
-                Existing open incidents still resolve when the DAG recovers.
+                <I18nText
+                  text={
+                    'Existing open incidents still resolve when the DAG recovers.'
+                  }
+                />
               </p>
             </div>
           </div>
@@ -179,12 +191,16 @@ export function IncidentPolicyEditor({
           <AlertDescription>
             {emptyProviderMessage || (
               <>
-                Add an incident connection before configuring routing.{' '}
+                <I18nText
+                  text={
+                    'Add an incident connection before configuring routing.'
+                  }
+                />{' '}
                 <Link
                   to="/incident-providers"
                   className="font-medium underline underline-offset-2"
                 >
-                  Open connections
+                  <I18nText text={'Open connections'} />
                 </Link>
               </>
             )}
@@ -197,11 +213,14 @@ export function IncidentPolicyEditor({
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-sm font-semibold text-foreground">
-                Send Incidents To
+                <I18nText text={'Send Incidents To'} />
               </h2>
               <p className="text-sm text-muted-foreground">
-                Final failures open incidents. Later successful runs resolve
-                them.
+                <I18nText
+                  text={
+                    'Final failures open incidents. Later successful runs resolve them.'
+                  }
+                />
               </p>
             </div>
             <Button
@@ -211,13 +230,13 @@ export function IncidentPolicyEditor({
               disabled={!addableProvider}
             >
               <Plus className="h-4 w-4" />
-              Add connection
+              <I18nText text={'Add connection'} />
             </Button>
           </div>
 
           {draft.policies.length === 0 ? (
             <div className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-              No incident connections selected.
+              <I18nText text={'No incident connections selected.'} />
             </div>
           ) : null}
 
@@ -233,7 +252,9 @@ export function IncidentPolicyEditor({
                     <div className="min-w-0 space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-sm font-semibold text-foreground">
-                          {provider?.name || 'Missing connection'}
+                          {provider?.name || (
+                            <I18nText text={'Missing connection'} />
+                          )}
                         </span>
                         <Badge
                           className={cn(
@@ -241,38 +262,46 @@ export function IncidentPolicyEditor({
                             severityBadgeClass(policy.severity)
                           )}
                         >
-                          {severityLabel(policy.severity)}
+                          <I18nText text={severityLabel(policy.severity)} />
                         </Badge>
                         {provider && !provider.enabled ? (
-                          <Badge variant="default">Connection disabled</Badge>
+                          <Badge variant="default">
+                            <I18nText text={'Connection disabled'} />
+                          </Badge>
                         ) : null}
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        Opens on final failure and resolves on recovery.
+                        <I18nText
+                          text={
+                            'Opens on final failure and resolves on recovery.'
+                          }
+                        />
                       </p>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      className="text-destructive hover:text-destructive"
-                      onClick={() =>
-                        onChange({
-                          ...draft,
-                          policies: draft.policies.filter(
-                            (_, policyIndex) => policyIndex !== index
-                          ),
-                        })
-                      }
-                      aria-label="Remove incident connection"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <I18nProps>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() =>
+                          onChange({
+                            ...draft,
+                            policies: draft.policies.filter(
+                              (_, policyIndex) => policyIndex !== index
+                            ),
+                          })
+                        }
+                        aria-label="Remove incident connection"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </I18nProps>
                   </div>
 
                   <div className="mt-4 grid gap-4 lg:grid-cols-2">
                     <div className="space-y-2">
                       <label className="text-xs font-medium text-muted-foreground">
-                        Connection
+                        <I18nText text={'Connection'} />
                       </label>
                       <Select
                         value={policy.providerId}
@@ -284,7 +313,9 @@ export function IncidentPolicyEditor({
                         }
                       >
                         <SelectTrigger className="h-7">
-                          <SelectValue placeholder="Select connection" />
+                          <I18nProps>
+                            <SelectValue placeholder="Select connection" />
+                          </I18nProps>
                         </SelectTrigger>
                         <SelectContent>
                           {providers.map((candidate) => {
@@ -309,7 +340,7 @@ export function IncidentPolicyEditor({
 
                     <div className="space-y-2">
                       <label className="text-xs font-medium text-muted-foreground">
-                        Severity
+                        <I18nText text={'Severity'} />
                       </label>
                       <Select
                         value={policy.severity}
@@ -326,7 +357,7 @@ export function IncidentPolicyEditor({
                         <SelectContent>
                           {INCIDENT_SEVERITIES.map((severity) => (
                             <SelectItem key={severity} value={severity}>
-                              {severityLabel(severity)}
+                              <I18nText text={severityLabel(severity)} />
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -337,7 +368,7 @@ export function IncidentPolicyEditor({
                   <div className="mt-4 grid gap-4">
                     <div className="space-y-2">
                       <label className="text-xs font-medium text-muted-foreground">
-                        Message
+                        <I18nText text={'Message'} />
                       </label>
                       <Input
                         value={policy.messageTemplate}
@@ -352,7 +383,7 @@ export function IncidentPolicyEditor({
 
                     <div className="space-y-2">
                       <label className="text-xs font-medium text-muted-foreground">
-                        Details
+                        <I18nText text={'Details'} />
                       </label>
                       <Textarea
                         className="min-h-28 resize-y"

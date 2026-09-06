@@ -1,0 +1,14 @@
+working_dir: .
+steps:
+  - id: build
+    run: |
+      printf 'image=v1.2.3\n' >> "$DAGU_OUTPUT_FILE"
+    outputs:
+      - name: image
+  - id: check
+    depends: build
+    run: |
+      printf '%s\n' '${steps.build.outputs.image}' > matrix.txt
+      printf '%s\n' '\${steps.build.outputs.image}' >> matrix.txt
+      printf '%s\n' '\\${steps.build.outputs.image}' >> matrix.txt
+      printf '%s\n' '\\\${steps.build.outputs.image}' >> matrix.txt

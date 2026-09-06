@@ -1,0 +1,12 @@
+type: agent
+working_dir: .
+llm:
+  provider: local
+  model: fake-model
+  base_url: ${env.DAGU_TEST_LLM_URL}
+steps:
+  - id: risky_action
+    run: exit 1
+tasks:
+  - name: finish
+    description: The risky action was attempted, whether or not it succeeded.

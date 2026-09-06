@@ -130,6 +130,10 @@ func (r *Runner) ShouldRun(_ context.Context, req executor.SubWorkflowRequest) b
 	if len(req.WorkerSelector) > 0 {
 		return true
 	}
+	// A source-less child with dependencies must be packaged by the coordinator.
+	if req.Workspace == nil && strings.TrimSpace(req.DAG.SourceFile) == "" && executor.HasDAGFileDependencies(req.DAG) {
+		return true
+	}
 	return r.defaultMode == config.ExecutionModeDistributed
 }
 
