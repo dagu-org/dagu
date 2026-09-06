@@ -1,0 +1,7 @@
+steps:
+  - action: postgres.import
+    with:
+      dsn: postgres://localhost/example
+      import:
+        input_file: input.csv
+        table: events
