@@ -31,8 +31,8 @@ This spec covers:
 - `file.stat`'s `with.missing_ok` (succeed, reporting `exists: false`,
   instead of failing when the path is absent)
 - `file.copy` and `file.move`'s required `with.source` and
-  `with.destination`, `with.recursive` (required to copy or move a
-  directory), and that a destination inside the source is rejected
+  `with.destination`, `with.recursive` (required to copy a directory),
+  and that a copy destination inside the source is rejected
 - `file.move`'s default requirement that the destination not already
   exist, and that the source no longer exists afterward
 - `file.delete`'s `with.recursive` (required to delete a directory) and
@@ -48,7 +48,7 @@ This spec does not define:
 
 - `with.follow_symlinks`, or symlink handling generally, beyond what a
   reader needs to know that it exists
-- cross-filesystem move behavior
+- directory moves and cross-filesystem move behavior
 - refusing to delete the filesystem root, beyond noting that the
   behavior exists (this spec does not exercise it directly, since doing
   so live would require actually attempting that deletion)
@@ -98,9 +98,9 @@ false`, instead of failing.
 ### Copy and move
 
 `file.copy` and `file.move` require `with.source` and
-`with.destination`; the two must differ. Copying or moving a directory
-requires `with.recursive: true`; a destination inside the source is
-rejected. `file.move`, without `with.overwrite`, fails if the destination
+`with.destination`; the two must differ. Copying a directory requires
+`with.recursive: true`; a copy destination inside the source is rejected.
+`file.move`, without `with.overwrite`, fails if the destination
 already exists; on success, the source no longer exists.
 `with.create_dirs: true` creates missing destination parent directories
 first. `with.dry_run: true` reports the intended operation without
@@ -145,9 +145,8 @@ validate`), not only when the step runs:
   containing `"exceeds max_bytes"`.
 - `file.read` on a directory: an error containing `"cannot read a
   directory"`.
-- `file.copy`/`file.move` on a directory without `with.recursive`: an
-  error containing `"recursive is required to copy a directory"` (or
-  `"...move..."`).
+- `file.copy` on a directory without `with.recursive`: an error
+  containing `"recursive is required to copy a directory"`.
 - `file.copy` with a destination inside the source: an error containing
   `"destination must not be inside source"`.
 - `file.move` to an existing destination without `with.overwrite`: an

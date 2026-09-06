@@ -44,6 +44,7 @@ This spec does not define:
   only
 - linked worktree management (`git.worktree.add`, `git.worktree.remove`)
   -- see [Spec 030: Git Worktree Action](030-git-worktree-action.md)
+- replacing an existing checkout's origin with a different repository
 - submodules, LFS, or sparse checkout
 
 ## Goal
@@ -60,8 +61,8 @@ directly.
 If `with.path` does not yet contain a repository, `git.checkout` clones
 `with.repository` there (creating missing parent directories) and
 checks out `with.ref`, or the default HEAD if `with.ref` is unset. If
-`with.path` already contains a repository, it fetches from
-`with.repository` instead of cloning, then checks out the same way. The
+`with.path` already contains a checkout of the same repository, it fetches
+from that checkout's `origin`, then checks out the same way. The
 result reports `cloned` (true only on a fresh clone) and `changed` (true
 when the checked-out commit differs from what was checked out before, or
 on a fresh clone), along with the resolved `commit` hash.
