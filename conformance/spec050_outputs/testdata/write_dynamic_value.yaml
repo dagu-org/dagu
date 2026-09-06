@@ -1,3 +1,4 @@
+working_dir: .
 env:
   - MY_ENV_VAR: from-env
 steps:
@@ -9,3 +10,4 @@ steps:
   - id: read
     depends: write
     run: printf '%s' "${write.outputs.echoed}"
+    stdout: result.out

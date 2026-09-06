@@ -18,8 +18,7 @@ This spec covers:
   have no empty keys
 - that each entry in `with.values` is resolved the same way any other
   `with:` field is (env vars, and so on), before being published
-- that the published values are readable from a later step the same way
-  any other step's outputs are, as `${<step id>.outputs.<key>}`
+- that the published values are readable from a later step as `${<step id>.outputs.<key>}`
 - that this spec's `dagu validate` checks are enforced at DAG-build time,
   not only at runtime
 - validation errors
@@ -44,8 +43,7 @@ is required (the object must be non-empty, and no key may be empty).
 Each value is resolved the same way any other `with:` field is (for
 example, a bare `$VAR` or `${VAR}` referencing an `env:` entry) before
 being published as that step's output. A later step reads a published
-value as `${<step id>.outputs.<name>}`, the same reference form used for
-any other step's output.
+value as `${<step id>.outputs.<name>}`.
 
 ## Errors
 

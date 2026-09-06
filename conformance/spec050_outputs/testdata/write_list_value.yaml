@@ -1,3 +1,4 @@
+working_dir: .
 steps:
   - id: write
     action: outputs.write
@@ -9,3 +10,4 @@ steps:
   - id: read
     depends: write
     run: printf '%s' "${write.outputs.items}"
+    stdout: result.out
