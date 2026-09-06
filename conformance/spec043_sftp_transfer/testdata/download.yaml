@@ -1,0 +1,7 @@
+steps:
+  - action: sftp.download
+    with:
+      host: example.invalid
+      user: deploy
+      source: source.txt
+      destination: target.txt
