@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RefreshCw, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { I18nText } from '@/i18n/I18nText';
 
 interface DeleteMissingDialogProps {
   open: boolean;
@@ -44,18 +45,23 @@ export function DeleteMissingDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-base">
-            Delete All Missing Items
+            <I18nText text={'Delete All Missing Items'} />
           </DialogTitle>
           <DialogDescription className="text-xs">
-            This will remove {missingCount} missing item
-            {missingCount !== 1 ? 's' : ''} from the remote repository and sync
-            state. This action cannot be undone.
+            <I18nText
+              text={
+                missingCount === 1
+                  ? 'This will remove {count} missing item from the remote repository and sync state. This action cannot be undone.'
+                  : 'This will remove {count} missing items from the remote repository and sync state. This action cannot be undone.'
+              }
+              values={{ count: missingCount }}
+            />
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1.5">
             <Label htmlFor="delete-missing-msg" className="text-xs">
-              Commit Message
+              <I18nText text={'Commit Message'} />
             </Label>
             <Input
               id="delete-missing-msg"
@@ -74,7 +80,7 @@ export function DeleteMissingDialog({
         </div>
         <DialogFooter>
           <Button variant="outline" size="sm" onClick={onCancel}>
-            Cancel
+            <I18nText text={'Cancel'} />
           </Button>
           <Button
             variant="destructive"
@@ -85,12 +91,12 @@ export function DeleteMissingDialog({
             {isDeletingMissing ? (
               <>
                 <RefreshCw className="h-3.5 w-3.5 mr-1 animate-spin" />
-                Deleting...
+                <I18nText text={'Deleting...'} />
               </>
             ) : (
               <>
                 <Trash2 className="h-3.5 w-3.5 mr-1" />
-                Delete All Missing
+                <I18nText text={'Delete All Missing'} />
               </>
             )}
           </Button>

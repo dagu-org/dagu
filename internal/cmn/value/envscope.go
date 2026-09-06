@@ -101,17 +101,7 @@ func (e *EnvScope) WithEntryOrigin(key, value string, source EnvSource, origin s
 // WithEntries returns a new EnvScope with the given entries added.
 // The original scope is not modified (immutable).
 func (e *EnvScope) WithEntries(entries map[string]string, source EnvSource) *EnvScope {
-	if len(entries) == 0 {
-		return e
-	}
-	newScope := &EnvScope{
-		entries: make(map[string]EnvEntry, len(entries)),
-		parent:  e,
-	}
-	for k, v := range entries {
-		newScope.entries[k] = EnvEntry{Key: k, Value: v, Source: source}
-	}
-	return newScope
+	return e.WithEntriesOrigin(entries, source, "")
 }
 
 // WithStepOutputs returns a new EnvScope with step output variables added.
@@ -166,6 +156,31 @@ func (e *EnvScope) ToSlice() []string {
 		result = append(result, k+"="+v)
 	}
 	return result
+}
+
+// ToSliceWithoutOrigin returns variables except entries from one origin.
+func (e *EnvScope) ToSliceWithoutOrigin(origin string) []string {
+	if e == nil {
+		return nil
+	}
+	all := e.collectAll(func(entry EnvEntry) bool { return entry.Origin != origin })
+	result := make([]string, 0, len(all))
+	for key, value := range all {
+		result = append(result, key+"="+value)
+	}
+	return result
+}
+
+// WithEntriesOrigin returns a new scope with source and origin metadata.
+func (e *EnvScope) WithEntriesOrigin(entries map[string]string, source EnvSource, origin string) *EnvScope {
+	if len(entries) == 0 {
+		return e
+	}
+	newScope := &EnvScope{entries: make(map[string]EnvEntry, len(entries)), parent: e}
+	for key, value := range entries {
+		newScope.entries[key] = EnvEntry{Key: key, Value: value, Source: source, Origin: origin}
+	}
+	return newScope
 }
 
 // ToMap returns all variables as a map, with child entries overriding parent entries.

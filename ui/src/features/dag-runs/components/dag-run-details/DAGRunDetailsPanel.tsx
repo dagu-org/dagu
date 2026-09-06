@@ -13,6 +13,8 @@ import { matchesRequestedDAGRunDetails } from '../../hooks/dagRunDetailsRequest'
 import { useBoundedDAGRunDetails } from '../../hooks/useBoundedDAGRunDetails';
 import { buildDAGRunPageURL } from '../../lib/dagRunUrls';
 import DAGRunDetailsContent from './DAGRunDetailsContent';
+import { I18nProps } from '@/i18n/I18nProps';
+import { I18nText } from '@/i18n/I18nText';
 
 type Props = {
   name: string;
@@ -157,7 +159,7 @@ function DAGRunDetailsPanel({
       return (
         <div className="flex h-full items-start justify-center p-4">
           <div className="w-full rounded-lg border border-error/30 bg-error-muted p-4 text-sm text-error">
-            {error.message || 'Failed to load DAG run details'}
+            {error.message || <I18nText text={"Failed to load DAG run details"} />}
           </div>
         </div>
       );
@@ -180,26 +182,26 @@ function DAGRunDetailsPanel({
       <div className="p-4 w-full flex flex-col h-full overflow-hidden">
         <div className="flex justify-between items-center mb-3 flex-shrink-0">
           <p className="text-xs text-muted-foreground">
-            Use{' '}
+            <I18nText text={"Use"} />{' '}
             <kbd className="px-1 py-0.5 bg-muted rounded text-xs font-mono">
               ↑
             </kbd>{' '}
             <kbd className="px-1 py-0.5 bg-muted rounded text-xs font-mono">
               ↓
             </kbd>{' '}
-            to navigate runs
+            <I18nText text={"to navigate runs"} />
           </p>
           <div className="flex gap-2 items-center">
-            <Button
+            <I18nProps><Button
               size="icon"
               onClick={handleFullscreenClick}
               title="Open in fullscreen (F) - Cmd/Ctrl+Click to open in new tab"
             >
               <Maximize2 className="h-4 w-4" />
-            </Button>
-            <Button size="icon" onClick={onClose} title="Close (Esc)">
+            </Button></I18nProps>
+            <I18nProps><Button size="icon" onClick={onClose} title="Close (Esc)">
               <X className="h-4 w-4" />
-            </Button>
+            </Button></I18nProps>
           </div>
         </div>
 

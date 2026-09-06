@@ -1,0 +1,8 @@
+params:
+  - name: environment
+    type: string
+    required: true
+working_dir: .
+steps:
+  - id: check
+    run: printf '%s\n' ${params.environment} > runtime.txt

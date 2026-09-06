@@ -17,6 +17,7 @@ import { workspaceWikiQueryForWorkspace } from '@/lib/workspace';
 import { DiffEditor } from '@monaco-editor/react';
 import { History, RotateCcw } from 'lucide-react';
 import { useContext, useMemo, useRef, useState } from 'react';
+import { I18nText } from '@/i18n/I18nText';
 
 type WikiPageRevision = components['schemas']['WikiPageRevisionResponse'];
 
@@ -110,18 +111,17 @@ export function WikiPageHistoryModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <History className="h-4 w-4" />
-            History: {wikiPagePath}
+            <I18nText text={"History:"} /> {wikiPagePath}
           </DialogTitle>
           <DialogDescription>
-            Stored versions of this Wiki page, newest first. Loading a revision
-            into the editor marks it unsaved; save to restore it.
+            <I18nText text={"Stored versions of this Wiki page, newest first. Loading a revision into the editor marks it unsaved; save to restore it."} />
           </DialogDescription>
         </DialogHeader>
         {revisions.length === 0 ? (
           <div className="text-sm text-muted-foreground py-6 text-center">
             {isLoading
-              ? 'Loading revisions…'
-              : 'No stored revisions yet. Revisions are captured on each save.'}
+              ? <I18nText text={"Loading revisions…"} />
+              : <I18nText text={"No stored revisions yet. Revisions are captured on each save."} />}
           </div>
         ) : (
           <div className="flex gap-3 min-h-0 flex-1">
@@ -137,7 +137,7 @@ export function WikiPageHistoryModal({
                 >
                   <div>{formatSavedAt(revision.savedAt)}</div>
                   <div className="text-muted-foreground">
-                    {revision.size} bytes
+                    {revision.size} <I18nText text={"bytes"} />
                   </div>
                 </button>
               ))}
@@ -173,13 +173,13 @@ export function WikiPageHistoryModal({
                       }}
                     >
                       <RotateCcw className="h-3.5 w-3.5" />
-                      Load into editor
+                      <I18nText text={"Load into editor"} />
                     </Button>
                   </div>
                 </>
               ) : (
                 <div className="text-sm text-muted-foreground py-6 text-center">
-                  {selectedRev ? 'Loading…' : 'Select a revision to compare.'}
+                  {selectedRev ? <I18nText text={"Loading…"} /> : <I18nText text={"Select a revision to compare."} />}
                 </div>
               )}
             </div>

@@ -51,6 +51,10 @@ import { normalizeWikiPagePathFromURL } from './lib/wiki-page-url';
 import type { WikiPageMutationTarget } from './lib/wiki-page-mutation';
 import { useWikiPageMutations } from './hooks/useWikiPageMutations';
 import type { ContextAction } from './components/WikiPageTreeNode';
+import { I18nText } from '@/i18n/I18nText';
+import { I18nProps } from '@/i18n/I18nProps';
+import { I18nTemplate } from '@/i18n/I18nTemplate';
+import { useI18n } from '@/i18n/I18nProvider';
 
 function titleFromPath(wikiPagePath: string): string {
   const segments = wikiPagePath.split('/');
@@ -78,6 +82,7 @@ function normalizedWikiWorkspace(workspace?: string | null): string | null {
 }
 
 function WikiContent() {
+  const { ts } = useI18n();
   const appBarContext = useContext(AppBarContext);
   const { setTitle } = appBarContext;
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
@@ -582,30 +587,42 @@ function WikiContent() {
         isLoading={renameLoading}
         externalError={renameError}
       />
-      <ConfirmModal
-        title="Delete Wiki page"
-        buttonText="Delete"
-        visible={deleteConfirmOpen}
-        dismissModal={() => setDeleteConfirmOpen(false)}
-        onSubmit={handleDelete}
-      >
-        <p className="text-sm text-muted-foreground">
-          Are you sure you want to delete <strong>{deleteWikiPageTitle}</strong>
-          ? This action cannot be undone.
-        </p>
-      </ConfirmModal>
-      <ConfirmModal
-        title="Delete Wiki"
-        buttonText={`Delete ${batchDeleteTargets.length} items`}
-        visible={batchDeleteConfirmOpen}
-        dismissModal={() => setBatchDeleteConfirmOpen(false)}
-        onSubmit={handleBatchDelete}
-      >
-        <p className="text-sm text-muted-foreground">
-          Are you sure you want to delete {batchDeleteTargets.length} items?
-          This cannot be undone.
-        </p>
-      </ConfirmModal>
+      <I18nProps>
+        <ConfirmModal
+          title="Delete Wiki page"
+          buttonText="Delete"
+          visible={deleteConfirmOpen}
+          dismissModal={() => setDeleteConfirmOpen(false)}
+          onSubmit={handleDelete}
+        >
+          <p className="text-sm text-muted-foreground">
+            <I18nTemplate
+              text="Are you sure you want to delete {name}? This action cannot be undone."
+              values={{ name: <strong>{deleteWikiPageTitle}</strong> }}
+            />
+          </p>
+        </ConfirmModal>
+      </I18nProps>
+      <I18nProps>
+        <ConfirmModal
+          title="Delete Wiki"
+          buttonText={ts('Delete {count} items', {
+            count: batchDeleteTargets.length,
+          })}
+          visible={batchDeleteConfirmOpen}
+          dismissModal={() => setBatchDeleteConfirmOpen(false)}
+          onSubmit={handleBatchDelete}
+        >
+          <p className="text-sm text-muted-foreground">
+            {ts(
+              'Are you sure you want to delete {count} items? This cannot be undone.',
+              {
+                count: batchDeleteTargets.length,
+              }
+            )}
+          </p>
+        </ConfirmModal>
+      </I18nProps>
     </>
   );
 
@@ -623,13 +640,13 @@ function WikiContent() {
               onClick={() => setMobileView('tree')}
             >
               <ChevronLeft className="h-4 w-4" />
-              Wiki
+              <I18nText text={'Wiki'} />
             </button>
             <div className="flex-1 overflow-hidden min-h-0">
               {rightPanel || (
                 <div className="flex items-center justify-center h-full">
                   <p className="text-sm text-muted-foreground">
-                    Select a Wiki page to start editing.
+                    <I18nText text={'Select a Wiki page to start editing.'} />
                   </p>
                 </div>
               )}

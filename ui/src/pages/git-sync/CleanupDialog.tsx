@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import ConfirmModal from '@/components/ui/confirm-dialog';
+import { I18nProps } from '@/i18n/I18nProps';
+import { I18nText } from '@/i18n/I18nText';
 
 interface CleanupDialogProps {
   open: boolean;
@@ -19,17 +21,25 @@ export function CleanupDialog({
   onCancel,
 }: CleanupDialogProps) {
   return (
-    <ConfirmModal
-      title="Cleanup Missing Items"
-      buttonText={isCleaningUp ? 'Cleaning up...' : 'Cleanup'}
-      visible={open}
-      dismissModal={onCancel}
-      onSubmit={onConfirm}
-    >
-      <p className="text-sm text-muted-foreground">
-        Remove {missingCount} missing item{missingCount !== 1 ? 's' : ''} from
-        sync tracking? Files remain in the remote repository.
-      </p>
-    </ConfirmModal>
+    <I18nProps>
+      <ConfirmModal
+        title="Cleanup Missing Items"
+        buttonText={isCleaningUp ? 'Cleaning up...' : 'Cleanup'}
+        visible={open}
+        dismissModal={onCancel}
+        onSubmit={onConfirm}
+      >
+        <p className="text-sm text-muted-foreground">
+          <I18nText
+            text={
+              missingCount === 1
+                ? 'Remove {count} missing item from sync tracking? Files remain in the remote repository.'
+                : 'Remove {count} missing items from sync tracking? Files remain in the remote repository.'
+            }
+            values={{ count: missingCount }}
+          />
+        </p>
+      </ConfirmModal>
+    </I18nProps>
   );
 }

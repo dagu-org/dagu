@@ -4,12 +4,15 @@
 package gitsync
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"sync"
 	"testing"
+	"testing/iotest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -155,6 +158,37 @@ func TestService_StatusReadsAreConcurrentSafe(t *testing.T) {
 	assert.Equal(t, dagYMLExtension, freshStatus.FileExtension)
 }
 
+func TestIsBinaryReader(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		content []byte
+		binary  bool
+	}{
+		{name: "text", content: []byte("hello, 世界\n")},
+		{name: "nul", content: []byte("hello\x00world"), binary: true},
+		{name: "invalid UTF-8", content: []byte{0xff}, binary: true},
+		{name: "replacement rune", content: []byte("\ufffd")},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			binary, err := isBinaryReader(iotest.OneByteReader(bytes.NewReader(tc.content)))
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.binary, binary)
+		})
+	}
+
+	readErr := errors.New("read past binary marker")
+	binary, err := isBinaryReader(io.MultiReader(
+		bytes.NewReader([]byte{0}),
+		iotest.ErrReader(readErr),
+	))
+	require.NoError(t, err)
+	assert.True(t, binary)
+}
+
 func TestService_PathHelpers(t *testing.T) {
 	s := &serviceImpl{
 		cfg: &Config{
@@ -269,12 +303,14 @@ func TestNormalizeTrackedItemsKeepsAssetKind(t *testing.T) {
 	state := &State{Items: map[string]*SyncItemState{
 		"wiki/.attachments/page/logo.png": {Kind: SyncItemKindWikiPageAsset, Status: StatusSynced},
 		"wiki/guides/deploy":              {Kind: SyncItemKindWikiPage, Status: StatusSynced},
+		"scripts/run.sh":                  {Kind: SyncItemKindFile, Status: StatusSynced},
 		"bogus":                           {Kind: SyncItemKind("mystery"), Status: StatusSynced},
 	}}
 	normalizeTrackedItems(state)
 
 	require.Contains(t, state.Items, "wiki/.attachments/page/logo.png")
 	assert.Equal(t, SyncItemKindWikiPageAsset, state.Items["wiki/.attachments/page/logo.png"].Kind)
+	assert.Equal(t, SyncItemKindFile, state.Items["scripts/run.sh"].Kind)
 	assert.NotContains(t, state.Items, "bogus")
 }
 
@@ -1022,6 +1058,19 @@ func TestCleanup_NoMissingItems(t *testing.T) {
 	assert.Len(t, forgotten, 0)
 }
 
+func TestScanLocalItemsIgnoresSupportingFiles(t *testing.T) {
+	t.Parallel()
+
+	impl, dagsDir := newTestService(t, testCfgReadOnly)
+	filePath := filepath.Join(dagsDir, "scripts", "local.sh")
+	require.NoError(t, os.MkdirAll(filepath.Dir(filePath), 0750))
+	require.NoError(t, os.WriteFile(filePath, []byte("echo local\n"), 0700))
+	state := &State{Items: make(map[string]*SyncItemState)}
+
+	require.NoError(t, impl.scanLocalItems(state))
+	assert.NotContains(t, state.Items, "scripts/local.sh")
+}
+
 // --- Phase 4: Remote deletion detection tests ---
 
 func TestReconcileAfterPull_AutoForget_BothAbsent(t *testing.T) {
@@ -1288,6 +1337,13 @@ func TestMove_RequiresMatchingItemKinds(t *testing.T) {
 	err := impl.Move(context.Background(), "workflow", "wiki/workflow", "", false)
 	require.Error(t, err)
 	var validationErr *ValidationError
+	require.ErrorAs(t, err, &validationErr)
+	assert.Equal(t, "newItemId", validationErr.Field)
+
+	require.NoError(t, impl.stateManager.Save(&State{Version: 1, Items: map[string]*SyncItemState{
+		"task": {Kind: SyncItemKindDAG, Status: StatusSynced},
+	}}))
+	err = impl.Move(context.Background(), "task", "wiki/.attachments/page/task", "", false)
 	require.ErrorAs(t, err, &validationErr)
 	assert.Equal(t, "newItemId", validationErr.Field)
 }

@@ -130,6 +130,7 @@ func mergeDAGRunLease(current, incoming dispatch.DAGRunLease) (dispatch.DAGRunLe
 		(!current.Root.Zero() && !incoming.Root.Zero() && current.Root != incoming.Root) ||
 		(current.AttemptID != "" && incoming.AttemptID != "" && current.AttemptID != incoming.AttemptID) ||
 		(current.WorkerID != "" && incoming.WorkerID != "" && current.WorkerID != incoming.WorkerID) ||
+		(current.ProfileName != "" && incoming.ProfileName != "" && current.ProfileName != incoming.ProfileName) ||
 		(current.ClaimToken != "" && incoming.ClaimToken != "" && current.ClaimToken != incoming.ClaimToken) ||
 		(current.WorkspaceBundleDigest != "" && incoming.WorkspaceBundleDigest != "" && current.WorkspaceBundleDigest != incoming.WorkspaceBundleDigest) {
 		return dispatch.DAGRunLease{}, dispatch.ErrDAGRunLeaseConflict
@@ -145,6 +146,9 @@ func mergeDAGRunLease(current, incoming dispatch.DAGRunLease) (dispatch.DAGRunLe
 	}
 	if current.QueueName == "" {
 		current.QueueName = incoming.QueueName
+	}
+	if current.ProfileName == "" {
+		current.ProfileName = incoming.ProfileName
 	}
 	if current.WorkerID == "" {
 		current.WorkerID = incoming.WorkerID

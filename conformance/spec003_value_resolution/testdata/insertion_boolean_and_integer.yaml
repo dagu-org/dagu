@@ -1,0 +1,17 @@
+params:
+  - name: enabled
+    type: boolean
+    default: true
+  - name: disabled
+    type: boolean
+    default: false
+  - name: count
+    type: integer
+    default: -7
+working_dir: .
+steps:
+  - id: check
+    run: |
+      printf '%s\n' '${params.enabled}' > insertion.txt
+      printf '%s\n' '${params.disabled}' >> insertion.txt
+      printf '%s\n' '${params.count}' >> insertion.txt

@@ -7,8 +7,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
+	"path"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -16,6 +19,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/filemode"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
@@ -29,6 +33,12 @@ type GitClient struct {
 	repoPath string
 	repo     *git.Repository
 	mu       sync.Mutex
+}
+
+// TrackedFile describes a regular file at HEAD.
+type TrackedFile struct {
+	Path       string
+	Executable bool
 }
 
 // shallowRepairDepth asks go-git to deepen a broken shallow checkout far
@@ -251,13 +261,31 @@ func (c *GitClient) Pull(ctx context.Context) (*PullResult, error) {
 }
 
 func (c *GitClient) pullWorktree(ctx context.Context, wt *git.Worktree, auth transport.AuthMethod) error {
-	return wt.PullContext(ctx, &git.PullOptions{
+	clean, err := c.cleanWorktree(wt)
+	if err != nil {
+		return err
+	}
+	if !clean {
+		return git.ErrUnstagedChanges
+	}
+
+	err = wt.PullContext(ctx, &git.PullOptions{
 		Auth:          auth,
 		RemoteName:    "origin",
 		ReferenceName: plumbing.NewBranchReferenceName(c.cfg.Branch),
 		SingleBranch:  true,
 		Force:         true,
 	})
+	if runtime.GOOS != "windows" || !errors.Is(err, git.ErrUnstagedChanges) {
+		return err
+	}
+
+	// The worktree was verified before go-git's mode-sensitive reset.
+	head, headErr := c.repo.Head()
+	if headErr != nil {
+		return headErr
+	}
+	return wt.Reset(&git.ResetOptions{Mode: git.HardReset, Commit: head.Hash()})
 }
 
 func (c *GitClient) isShallow() bool {
@@ -378,6 +406,45 @@ func (c *GitClient) AddAndCommit(filePath, message string) (string, error) {
 	return commit.String(), nil
 }
 
+func (c *GitClient) addFile(filePath string) error {
+	if err := c.requireRepo(); err != nil {
+		return err
+	}
+
+	worktree, err := c.repo.Worktree()
+	if err != nil {
+		return fmt.Errorf("failed to get worktree: %w", err)
+	}
+	if _, err := worktree.Add(filePath); err != nil {
+		return fmt.Errorf("failed to stage file: %w", err)
+	}
+	return nil
+}
+
+func (c *GitClient) addFileMode(filePath string, executable bool) error {
+	if err := c.addFile(filePath); err != nil {
+		return err
+	}
+
+	idx, err := c.repo.Storer.Index()
+	if err != nil {
+		return fmt.Errorf("failed to read Git index: %w", err)
+	}
+	entry, err := idx.Entry(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to find staged file: %w", err)
+	}
+	entry.Mode = filemode.Regular
+	if executable {
+		entry.Mode = filemode.Executable
+	}
+	if err := c.repo.Storer.SetIndex(idx); err != nil {
+		return fmt.Errorf("failed to update Git index: %w", err)
+	}
+
+	return nil
+}
+
 // RemoveFile stages a file removal (does not commit).
 func (c *GitClient) RemoveFile(filePath string) error {
 	if err := c.requireRepo(); err != nil {
@@ -443,6 +510,103 @@ func (c *GitClient) CommitStaged(message string) (string, error) {
 	}
 
 	return commit.String(), nil
+}
+
+func (c *GitClient) commitAndPush(ctx context.Context, message string, stage func() error) (string, error) {
+	if err := c.requireRepo(); err != nil {
+		return "", err
+	}
+
+	worktree, err := c.repo.Worktree()
+	if err != nil {
+		return "", fmt.Errorf("failed to get worktree: %w", err)
+	}
+	clean, err := c.cleanWorktree(worktree)
+	if err != nil {
+		return "", fmt.Errorf("failed to inspect worktree: %w", err)
+	}
+	if !clean {
+		return "", errors.New("cannot mutate dirty Git sync clone; pull to reconcile")
+	}
+
+	head, err := c.repo.Head()
+	if err != nil {
+		return "", fmt.Errorf("failed to get HEAD: %w", err)
+	}
+	rollback := func(operationErr error) error {
+		if resetErr := worktree.Reset(&git.ResetOptions{Mode: git.HardReset, Commit: head.Hash()}); resetErr != nil {
+			return errors.Join(operationErr, fmt.Errorf("failed to roll back Git mutation: %w", resetErr))
+		}
+		return operationErr
+	}
+
+	if err := stage(); err != nil {
+		return "", rollback(err)
+	}
+	commitHash, err := c.CommitStaged(message)
+	if err != nil {
+		return "", rollback(err)
+	}
+	if err := c.Push(ctx); err != nil {
+		return "", rollback(err)
+	}
+
+	return commitHash, nil
+}
+
+func (c *GitClient) cleanWorktree(worktree *git.Worktree) (bool, error) {
+	status, err := worktree.Status()
+	if err != nil {
+		return false, err
+	}
+	if runtime.GOOS != "windows" || status.IsClean() {
+		return status.IsClean(), nil
+	}
+
+	idx, err := c.repo.Storer.Index()
+	if err != nil {
+		return false, err
+	}
+	// Windows reports tracked executable files as mode-only modifications.
+	for filePath, fileStatus := range status {
+		if fileStatus.Staging == git.Unmodified && fileStatus.Worktree == git.Unmodified {
+			continue
+		}
+		if fileStatus.Staging != git.Unmodified || fileStatus.Worktree != git.Modified {
+			return false, nil
+		}
+
+		entry, err := idx.Entry(filePath)
+		if err != nil || entry.Mode != filemode.Executable {
+			return false, nil
+		}
+		info, err := worktree.Filesystem.Lstat(filePath)
+		if err != nil {
+			return false, err
+		}
+		if !info.Mode().IsRegular() {
+			return false, nil
+		}
+
+		file, err := worktree.Filesystem.Open(filePath)
+		if err != nil {
+			return false, err
+		}
+		hasher := plumbing.NewHasher(plumbing.BlobObject, info.Size())
+		_, copyErr := io.Copy(&hasher, file)
+		closeErr := file.Close()
+		if copyErr != nil {
+			return false, copyErr
+		}
+		if closeErr != nil {
+			return false, closeErr
+		}
+		if hasher.Sum() != entry.Hash {
+			return false, nil
+		}
+	}
+
+	return true, nil
 }
 
 // Push pushes commits to the remote.
@@ -518,6 +682,69 @@ func (c *GitClient) FileExists(filePath string) bool {
 // GetFilePath returns the full path to a file in the repository.
 func (c *GitClient) GetFilePath(relativePath string) string {
 	return filepath.Join(c.repoPath, relativePath)
+}
+
+// ListTrackedFiles returns regular files at HEAD below the configured path.
+func (c *GitClient) ListTrackedFiles() ([]TrackedFile, error) {
+	if err := c.requireRepo(); err != nil {
+		return nil, err
+	}
+
+	head, err := c.repo.Head()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get HEAD: %w", err)
+	}
+	commit, err := c.repo.CommitObject(head.Hash())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get commit: %w", err)
+	}
+	tree, err := commit.Tree()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tree: %w", err)
+	}
+
+	if filepath.IsAbs(c.cfg.Path) || filepath.VolumeName(c.cfg.Path) != "" {
+		return nil, &ValidationError{Field: "path", Message: "must stay within the repository"}
+	}
+
+	root := path.Clean(filepath.ToSlash(c.cfg.Path))
+	if root == "." {
+		root = ""
+	}
+	if path.IsAbs(root) || root == ".." || strings.HasPrefix(root, "../") {
+		return nil, &ValidationError{Field: "path", Message: "must stay within the repository"}
+	}
+	prefix := strings.TrimSuffix(root, "/")
+	if prefix != "" {
+		prefix += "/"
+	}
+
+	var files []TrackedFile
+	err = tree.Files().ForEach(func(file *object.File) error {
+		if prefix != "" && !strings.HasPrefix(file.Name, prefix) {
+			return nil
+		}
+		switch file.Mode {
+		case filemode.Regular, filemode.Deprecated, filemode.Executable:
+			if strings.Contains(file.Name, `\`) {
+				return &ValidationError{
+					Field:   "path",
+					Message: fmt.Sprintf("tracked path %q contains an unsupported backslash", file.Name),
+				}
+			}
+			files = append(files, TrackedFile{
+				Path:       file.Name,
+				Executable: file.Mode == filemode.Executable,
+			})
+		case filemode.Empty, filemode.Dir, filemode.Symlink, filemode.Submodule:
+			return nil
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list tracked files: %w", err)
+	}
+	return files, nil
 }
 
 // ListFiles returns all DAG files in the repository.
@@ -608,23 +835,9 @@ func (c *GitClient) ListFilesUnder(subDir string) ([]string, error) {
 // GetFileSizeAtCommit returns the blob size of a file at a specific commit
 // without decoding its content.
 func (c *GitClient) GetFileSizeAtCommit(filePath, commitHash string) (int64, error) {
-	if err := c.requireRepo(); err != nil {
+	file, err := c.fileAtCommit(filePath, commitHash)
+	if err != nil {
 		return 0, err
-	}
-
-	commit, err := c.repo.CommitObject(plumbing.NewHash(commitHash))
-	if err != nil {
-		return 0, fmt.Errorf("failed to get commit: %w", err)
-	}
-
-	tree, err := commit.Tree()
-	if err != nil {
-		return 0, fmt.Errorf("failed to get tree: %w", err)
-	}
-
-	file, err := tree.File(filePath)
-	if err != nil {
-		return 0, fmt.Errorf("failed to get file: %w", err)
 	}
 	return file.Size, nil
 }
@@ -650,6 +863,42 @@ func (c *GitClient) TestConnection(_ context.Context) error {
 
 // GetFileContentAtCommit returns the content of a file at a specific commit.
 func (c *GitClient) GetFileContentAtCommit(filePath, commitHash string) ([]byte, error) {
+	file, err := c.fileAtCommit(filePath, commitHash)
+	if err != nil {
+		return nil, err
+	}
+
+	content, err := file.Contents()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file content: %w", err)
+	}
+
+	return []byte(content), nil
+}
+
+func (c *GitClient) inspectFileAtCommit(filePath, commitHash string, detectBinary bool) (int64, bool, error) {
+	file, err := c.fileAtCommit(filePath, commitHash)
+	if err != nil {
+		return 0, false, err
+	}
+	if !detectBinary {
+		return file.Size, false, nil
+	}
+	reader, err := file.Reader()
+	if err != nil {
+		return 0, false, fmt.Errorf("failed to read file content: %w", err)
+	}
+	defer func() {
+		_ = reader.Close()
+	}()
+	binary, err := isBinaryReader(reader)
+	if err != nil {
+		return 0, false, fmt.Errorf("failed to inspect file content: %w", err)
+	}
+	return file.Size, binary, nil
+}
+
+func (c *GitClient) fileAtCommit(filePath, commitHash string) (*object.File, error) {
 	if err := c.requireRepo(); err != nil {
 		return nil, err
 	}
@@ -668,13 +917,7 @@ func (c *GitClient) GetFileContentAtCommit(filePath, commitHash string) ([]byte,
 	if err != nil {
 		return nil, fmt.Errorf("failed to get file: %w", err)
 	}
-
-	content, err := file.Contents()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read file content: %w", err)
-	}
-
-	return []byte(content), nil
+	return file, nil
 }
 
 // SetupRemote ensures the remote is configured correctly.

@@ -1,0 +1,3 @@
+steps:
+  - action: wait.duration
+    with: {}

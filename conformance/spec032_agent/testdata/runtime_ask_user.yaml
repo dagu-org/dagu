@@ -1,0 +1,13 @@
+name: spec032_runtime_ask_user
+type: agent
+working_dir: .
+llm:
+  provider: local
+  model: fake-model
+  base_url: ${env.DAGU_TEST_LLM_URL}
+steps:
+  - id: do_work
+    run: printf 'run\n' >> work.out
+tasks:
+  - name: finish
+    description: The user answered and the do_work action has run.

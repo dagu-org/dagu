@@ -7,6 +7,9 @@ import type { YamlPathSegment } from '@/hooks/useYamlCursorPath';
 import { SchemaPathBreadcrumb } from './SchemaPathBreadcrumb';
 import { SchemaPropertyInfo } from './SchemaPropertyInfo';
 import { NestedPropertiesTree } from './NestedPropertiesTree';
+import { I18nText } from '@/i18n/I18nText';
+import { I18nProps } from '@/i18n/I18nProps';
+import { useI18n } from '@/i18n/I18nProvider';
 
 interface SchemaDocSidebarProps {
   isOpen: boolean;
@@ -29,6 +32,7 @@ export function SchemaDocSidebar({
   yamlContent,
   schema: schemaOverride,
 }: SchemaDocSidebarProps) {
+  const { ts } = useI18n();
   const {
     schema: baseSchema,
     loading: schemaLoading,
@@ -61,16 +65,18 @@ export function SchemaDocSidebar({
         <div className="flex items-center gap-1.5">
           <BookOpen className="w-4 h-4 text-muted-foreground" />
           <span className="text-xs font-medium text-foreground">
-            Schema Docs
+            <I18nText text={'Schema Docs'} />
           </span>
         </div>
-        <button
-          onClick={onClose}
-          className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-          title="Close (Ctrl+Shift+D)"
-        >
-          <X className="w-4 h-4" />
-        </button>
+        <I18nProps>
+          <button
+            onClick={onClose}
+            className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+            title="Close (Ctrl+Shift+D)"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </I18nProps>
       </div>
 
       {/* Content */}
@@ -79,7 +85,9 @@ export function SchemaDocSidebar({
         {isLoading && (
           <div className="flex items-center justify-center py-8 text-muted-foreground">
             <RefreshCw className="w-4 h-4 animate-spin mr-2" />
-            <span className="text-xs">Loading schema...</span>
+            <span className="text-xs">
+              <I18nText text={'Loading schema...'} />
+            </span>
           </div>
         )}
 
@@ -93,10 +101,14 @@ export function SchemaDocSidebar({
 
             {/* Message */}
             <p className="text-sm font-medium text-foreground mb-1">
-              Schema unavailable
+              <I18nText text={'Schema unavailable'} />
             </p>
             <p className="text-xs text-muted-foreground text-center mb-4 max-w-[200px]">
-              Documentation couldn't be loaded. The editor still works normally.
+              <I18nText
+                text={
+                  "Documentation couldn't be loaded. The editor still works normally."
+                }
+              />
             </p>
 
             {/* Retry button */}
@@ -114,7 +126,7 @@ export function SchemaDocSidebar({
               "
             >
               <RefreshCw className="w-3 h-3" />
-              Try again
+              <I18nText text={'Try again'} />
             </button>
           </div>
         )}
@@ -134,7 +146,7 @@ export function SchemaDocSidebar({
               // Root level - show all top-level properties
               <div>
                 <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
-                  DAG Properties
+                  <I18nText text={'DAG Properties'} />
                 </h4>
                 <div className="border border-border rounded p-1">
                   <NestedPropertiesTree
@@ -176,7 +188,9 @@ export function SchemaDocSidebar({
               </div>
             ) : (
               <div className="text-xs text-muted-foreground text-center py-4 italic">
-                Move cursor to a property to see documentation
+                <I18nText
+                  text={'Move cursor to a property to see documentation'}
+                />
               </div>
             )}
 
@@ -184,7 +198,9 @@ export function SchemaDocSidebar({
             {siblingProperties.length > 0 && path.length > 0 && (
               <div className="mt-4 pt-3 border-t border-border">
                 <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-                  Sibling Properties ({siblingProperties.length})
+                  {ts('Sibling Properties ({count})', {
+                    count: siblingProperties.length,
+                  })}
                 </h4>
                 <div className="flex flex-wrap gap-1">
                   {siblingProperties
@@ -200,7 +216,9 @@ export function SchemaDocSidebar({
                     ))}
                   {siblingProperties.length > 21 && (
                     <span className="text-xs text-muted-foreground">
-                      +{siblingProperties.length - 20} more
+                      {ts('+{count} more', {
+                        count: siblingProperties.length - 20,
+                      })}
                     </span>
                   )}
                 </div>
@@ -213,19 +231,19 @@ export function SchemaDocSidebar({
       {/* Footer */}
       <div className="px-3 py-1.5 border-t border-border bg-muted/20">
         <span className="text-xs text-muted-foreground">
-          Press{' '}
+          <I18nText text={'Press'} />{' '}
           <kbd className="px-1 py-0.5 bg-muted text-foreground rounded text-xs">
-            Ctrl
+            <I18nText text={'Ctrl'} />
           </kbd>
           +
           <kbd className="px-1 py-0.5 bg-muted text-foreground rounded text-xs">
-            Shift
+            <I18nText text={'Shift'} />
           </kbd>
           +
           <kbd className="px-1 py-0.5 bg-muted text-foreground rounded text-xs">
-            D
+            <I18nText text={'D'} />
           </kbd>{' '}
-          to toggle
+          <I18nText text={'to toggle'} />
         </span>
       </div>
     </div>

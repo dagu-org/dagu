@@ -12,13 +12,13 @@ This spec defines:
 - dependency path matching and validation
 - local and distributed workspace snapshot and materialization behavior
 - retry and inline child-DAG behavior
+- coordinator-owned snapshots for separately fetched named child DAGs
 
 This spec does not define:
 
 - external tool installation
 - build-workflow input materialization or reuse
 - artifact persistence after a DAG-run finishes
-- remote retrieval of files belonging to a separately stored child DAG
 
 ## Goal
 
@@ -54,7 +54,8 @@ A DAG can use declared files from its working directory with the same isolated w
 ### Child DAGs and retries
 
 - Inline multi-document child DAGs reuse the root DAG's snapshot.
-- A separately fetched named child DAG with file dependencies cannot be dispatched from a remote worker without an available source workspace.
+- A separately fetched named child DAG creates an independent snapshot from its authoritative source workspace and does not inherit its parent's snapshot.
+- When the dispatching host cannot access that source workspace, the coordinator verifies that the fetched definition still matches the authoritative stored DAG before creating the snapshot. If the definition changed, dispatch fails so the caller can reload and retry.
 - Each independently executed retry creates a fresh snapshot from the DAG working directory.
 
 ## Errors
@@ -66,6 +67,8 @@ A DAG can use declared files from its working directory with the same isolated w
 | Declaration with no match | workspace preparation fails naming the unmatched declaration |
 | Unsupported filesystem entry | workspace preparation fails naming the entry type and path |
 | Bundle limit exceeded | workspace preparation fails naming the exceeded limit |
+| Named child changed after remote resolution | dispatch fails and instructs the caller to reload and retry |
+| Authoritative named-child source unavailable | dispatch fails before worker execution |
 | Worker download, verification, or extraction failure | DAG-run fails before step execution |
 
 ## Examples

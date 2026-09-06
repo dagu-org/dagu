@@ -2629,7 +2629,7 @@ export interface paths {
         put?: never;
         /**
          * Move a sync item
-         * @description Atomically renames a sync item across local filesystem, remote repository, and sync state
+         * @description Renames a tracked sync item
          */
         post: operations["moveSyncItem"];
         delete?: never;
@@ -5422,7 +5422,7 @@ export interface components {
             outputs?: components["schemas"]["StepOutputDeclaration"][];
             /** @description Named regular-file inputs used for build fingerprints and inferred dependencies. Steps that declare inputs must also define id. */
             inputs?: components["schemas"]["StepInputDeclaration"][];
-            /** @description DAG-local files, directories, or glob patterns to snapshot for distributed execution */
+            /** @description Files, directories, or glob patterns relative to the DAG working directory to snapshot for local or distributed execution */
             dependencies?: string[];
             /** @description The name of the DAG to execute as a sub DAG-run */
             call?: string;
@@ -5827,8 +5827,10 @@ export interface components {
             maxConcurrency?: number;
             /** @description Number of currently running DAG-runs */
             runningCount: number;
-            /** @description Number of queued DAG-runs waiting to execute */
+            /** @description Number of queued DAG-runs waiting to execute. When queuedCountCapped is true this is a lower bound, not an exact total. */
             queuedCount: number;
+            /** @description True when counting stopped at the server-side scan cap, so queuedCount is a lower bound rather than an exact total */
+            queuedCountCapped?: boolean;
             /** @description List of currently running DAG-runs (bounded by maxConcurrency) */
             running: components["schemas"]["DAGRunSummary"][];
         };
@@ -5845,8 +5847,10 @@ export interface components {
             totalQueues: number;
             /** @description Total DAG-runs currently executing */
             totalRunning: number;
-            /** @description Total DAG-runs waiting in queues */
+            /** @description Total DAG-runs waiting in queues. When totalQueuedCapped is true this is a lower bound, not an exact total. */
             totalQueued: number;
+            /** @description True when at least one queue's count reached the server-side scan cap, so totalQueued is a lower bound */
+            totalQueuedCapped?: boolean;
             /** @description Sum of all queue maxConcurrency values */
             totalCapacity: number;
             /**
@@ -6151,7 +6155,7 @@ export interface components {
         SyncItemKind: SyncItemKind;
         /** @description Sync state for a single item */
         SyncItem: {
-            /** @description Stable sync item identifier (file path without extension) */
+            /** @description Stable sync item identifier. Supporting file IDs include their extension. */
             itemId: string;
             /** @description Relative file path with extension */
             filePath: string;
@@ -6261,6 +6265,12 @@ export interface components {
             remoteAuthor?: string;
             /** @description Commit message of the remote version */
             remoteMessage?: string;
+            /** @description Whether the remote file was deleted */
+            remoteDeleted?: boolean;
+            /** @description Whether the local supporting file is executable */
+            localExecutable?: boolean;
+            /** @description Whether the remote supporting file is executable */
+            remoteExecutable?: boolean;
         };
         /** @description Result of a sync operation */
         SyncResultResponse: {
@@ -6268,6 +6278,8 @@ export interface components {
             message?: string;
             /** @description Sync item IDs that were synced */
             synced?: string[];
+            /** @description Sync item IDs deleted locally after remote deletion */
+            deleted?: string[];
             /** @description Sync item IDs that were modified */
             modified?: string[];
             /** @description Sync item IDs with conflicts */
@@ -14668,7 +14680,7 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description The sync item identifier (file path without extension) */
+                /** @description The sync item identifier. Supporting file IDs include their extension. */
                 itemId: string;
             };
             cookie?: never;
@@ -14712,7 +14724,7 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description The sync item identifier (file path without extension) */
+                /** @description The sync item identifier. Supporting file IDs include their extension. */
                 itemId: string;
             };
             cookie?: never;
@@ -14769,7 +14781,7 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description The sync item identifier (file path without extension) */
+                /** @description The sync item identifier. Supporting file IDs include their extension. */
                 itemId: string;
             };
             cookie?: never;
@@ -14813,7 +14825,7 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description The sync item identifier (file path without extension) */
+                /** @description The sync item identifier. Supporting file IDs include their extension. */
                 itemId: string;
             };
             cookie?: never;
@@ -14866,7 +14878,7 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description The sync item identifier (file path without extension) */
+                /** @description The sync item identifier. Supporting file IDs include their extension. */
                 itemId: string;
             };
             cookie?: never;
@@ -14928,7 +14940,7 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description The current sync item identifier (file path without extension) */
+                /** @description The current sync item identifier. Supporting file IDs include their extension. */
                 itemId: string;
             };
             cookie?: never;
@@ -19001,7 +19013,8 @@ export enum SyncSummary {
 export enum SyncItemKind {
     dag = "dag",
     doc = "doc",
-    doc_asset = "doc-asset"
+    doc_asset = "doc-asset",
+    file = "file"
 }
 export enum SyncAuthConfigType {
     token = "token",

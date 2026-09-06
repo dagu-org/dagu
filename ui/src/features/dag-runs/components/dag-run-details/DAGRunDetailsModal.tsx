@@ -17,6 +17,8 @@ import { useBoundedDAGRunDetails } from '../../hooks/useBoundedDAGRunDetails';
 import { matchesRequestedDAGRunDetails } from '../../hooks/dagRunDetailsRequest';
 import { buildDAGRunPageURL } from '../../lib/dagRunUrls';
 import DAGRunDetailsContent from './DAGRunDetailsContent';
+import { I18nText } from '@/i18n/I18nText';
+import { I18nProps } from '@/i18n/I18nProps';
 
 type DAGRunDetailsModalProps = {
   name: string;
@@ -229,17 +231,17 @@ function DAGRunDetailsModal({
           <div className="p-6 w-full flex flex-col h-full dagRun-modal-content">
             <div className="flex justify-between items-center mb-4">
               <p className="text-xs text-muted-foreground">
-                Use{' '}
+                <I18nText text={"Use"} />{' '}
                 <kbd className="px-1 py-0.5 bg-muted rounded text-xs font-mono">
                   ↑
                 </kbd>{' '}
                 <kbd className="px-1 py-0.5 bg-muted rounded text-xs font-mono">
                   ↓
                 </kbd>{' '}
-                to navigate histories
+                <I18nText text={"to navigate histories"} />
               </p>
               <div className="flex gap-2 items-center">
-                <Button
+                <I18nProps><Button
                   variant="outline"
                   size="icon"
                   onClick={handleFullscreenClick}
@@ -248,10 +250,10 @@ function DAGRunDetailsModal({
                 >
                   <Maximize2 className="h-4 w-4" />
                   <span className="absolute -bottom-1 -right-1 bg-muted text-muted-foreground text-xs font-medium px-1 rounded-sm border opacity-0 group-hover:opacity-100 transition-opacity">
-                    F
+                    <I18nText text={"F"} />
                   </span>
-                </Button>
-                <Button
+                </Button></I18nProps>
+                <I18nProps><Button
                   variant="outline"
                   size="icon"
                   onClick={onClose}
@@ -260,9 +262,9 @@ function DAGRunDetailsModal({
                 >
                   <X className="h-4 w-4" />
                   <span className="absolute -bottom-1 -right-1 bg-muted text-muted-foreground text-xs font-medium px-1 rounded-sm border opacity-0 group-hover:opacity-100 transition-opacity">
-                    Esc
+                    <I18nText text={"Esc"} />
                   </span>
-                </Button>
+                </Button></I18nProps>
               </div>
             </div>
 
@@ -281,7 +283,7 @@ function DAGRunDetailsModal({
               {!isInitialLoading && error && !displayData && (
                 <div className="p-4">
                   <div className="rounded-lg border border-error/30 bg-error-muted p-4 text-sm text-error">
-                    {error.message || 'Failed to load DAG run details'}
+                    {error.message || <I18nText text={"Failed to load DAG run details"} />}
                   </div>
                 </div>
               )}

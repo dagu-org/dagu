@@ -103,7 +103,13 @@ vi.mock('../pages/profiles', () => ({
 }));
 vi.mock('../pages/queues', () => ({ default: () => <h1>Queues</h1> }));
 vi.mock('../pages/queues/queue', () => ({
-  default: () => <h1>Queue Details</h1>,
+  default: () => {
+    const { setTitle } = React.useContext(AppBarContext);
+    React.useEffect(() => {
+      setTitle('Queue name is missing.');
+    }, [setTitle]);
+    return <h1>Queue Details</h1>;
+  },
 }));
 vi.mock('../pages/search', () => ({
   default: () => {
@@ -212,6 +218,24 @@ describe('App document title', () => {
 
     await waitFor(() => {
       expect(document.title).toBe('Search - Dagu');
+    });
+  });
+
+  it('localizes the page title', async () => {
+    localStorage.setItem('user_preferences', JSON.stringify({ locale: 'ja' }));
+    renderAt('/search');
+
+    await waitFor(() => {
+      expect(document.title).toBe('検索 - Dagu');
+    });
+  });
+
+  it('preserves user-defined page titles', async () => {
+    localStorage.setItem('user_preferences', JSON.stringify({ locale: 'ja' }));
+    renderAt('/queues/name%20is%20missing.');
+
+    await waitFor(() => {
+      expect(document.title).toBe('Queue name is missing. - Dagu');
     });
   });
 

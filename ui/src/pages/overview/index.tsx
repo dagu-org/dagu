@@ -10,6 +10,8 @@ import { Clock3, Gauge, LayoutGrid, Pencil, Plus } from 'lucide-react';
 import React from 'react';
 import Dashboard from '..';
 import CockpitPage from '../cockpit';
+import { I18nProps } from '@/i18n/I18nProps';
+import { I18nText } from '@/i18n/I18nText';
 
 type BuiltinTab = 'timeline' | 'cockpit';
 export type OverviewTab = BuiltinTab | `view:${string}`;
@@ -120,7 +122,7 @@ export default function OverviewPage({
               onClick={() => openEdit(activeView)}
               className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
             >
-              <Pencil className="h-3 w-3" /> Edit
+              <Pencil className="h-3 w-3" /> <I18nText text={"Edit"} />
             </button>
           )}
         </div>
@@ -137,7 +139,7 @@ export default function OverviewPage({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <Tabs
+      <I18nProps><Tabs
         role="tablist"
         aria-label="Overview views"
         className="mb-3 shrink-0 overflow-x-auto"
@@ -152,7 +154,7 @@ export default function OverviewPage({
           className="cursor-pointer gap-2"
         >
           <Clock3 className="h-4 w-4" />
-          Timeline
+          <I18nText text={"Timeline"} />
         </Tab>
         <Tab
           id={tabElementId('cockpit')}
@@ -164,7 +166,7 @@ export default function OverviewPage({
           className="cursor-pointer gap-2"
         >
           <Gauge className="h-4 w-4" />
-          Cockpit
+          <I18nText text={"Cockpit"} />
         </Tab>
         {views.map((view) => {
           const tab = viewTabId(view.id);
@@ -185,17 +187,17 @@ export default function OverviewPage({
           );
         })}
         {canWrite && (
-          <button
+          <I18nProps><button
             type="button"
             onClick={openCreate}
             aria-label="Create view"
             className="inline-flex h-12 cursor-pointer items-center gap-1 px-3 text-sm font-medium text-text-secondary hover:text-foreground"
           >
             <Plus className="h-4 w-4" />
-            New
-          </button>
+            <I18nText text={"New"} />
+          </button></I18nProps>
         )}
-      </Tabs>
+      </Tabs></I18nProps>
 
       <div
         id="overview-panel"

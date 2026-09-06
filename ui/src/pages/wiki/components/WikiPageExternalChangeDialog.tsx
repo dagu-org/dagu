@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { AlertTriangle, RefreshCw, X } from 'lucide-react';
+import { I18nText } from '@/i18n/I18nText';
 
 type Props = {
   visible: boolean;
@@ -24,25 +25,22 @@ function WikiPageExternalChangeDialog({ visible, onDiscard, onIgnore }: Props) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-warning" />
-            External Changes Detected
+            <I18nText text={"External Changes Detected"} />
           </DialogTitle>
         </DialogHeader>
 
         <div className="py-4 space-y-3">
           <p className="text-sm text-muted-foreground">
-            This Wiki page has been modified externally, possibly by another
-            process or user.
+            <I18nText text={"This Wiki page has been modified externally, possibly by another process or user."} />
           </p>
           <div className="text-sm space-y-1">
-            <p className="font-medium">What would you like to do?</p>
+            <p className="font-medium"><I18nText text={"What would you like to do?"} /></p>
             <ul className="text-muted-foreground space-y-1 ml-4 list-disc">
               <li>
-                <strong>Discard & Reload:</strong> Lose your changes and load
-                the latest version
+                <strong><I18nText text={"Discard & Reload:"} /></strong> <I18nText text={"Lose your changes and load the latest version"} />
               </li>
               <li>
-                <strong>Ignore:</strong> Keep your changes (you may overwrite
-                external changes when saving)
+                <strong><I18nText text={"Ignore:"} /></strong> <I18nText text={"Keep your changes (you may overwrite external changes when saving)"} />
               </li>
             </ul>
           </div>
@@ -51,11 +49,11 @@ function WikiPageExternalChangeDialog({ visible, onDiscard, onIgnore }: Props) {
         <DialogFooter>
           <Button variant="ghost" onClick={onIgnore}>
             <X className="h-4 w-4" />
-            Ignore
+            <I18nText text={"Ignore"} />
           </Button>
           <Button variant="primary" onClick={onDiscard}>
             <RefreshCw className="h-4 w-4" />
-            Discard & Reload
+            <I18nText text={"Discard & Reload"} />
           </Button>
         </DialogFooter>
       </DialogContent>

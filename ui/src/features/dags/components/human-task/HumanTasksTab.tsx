@@ -19,6 +19,7 @@ import type { JSONSchema } from '../../../../lib/schema-utils';
 import { buildParamSchemaUiSchema } from '../dag-execution/paramSchemaForm';
 import { schemaFormTemplates } from '../dag-execution/schemaFormTemplates';
 import { schemaFormWidgets } from '../dag-execution/schemaFormWidgets';
+import { I18nText } from '@/i18n/I18nText';
 
 type DAGRunDetails = components['schemas']['DAGRunDetails'];
 type HumanTaskNode = components['schemas']['Node'];
@@ -170,7 +171,7 @@ function HumanTaskCard({
               disabled={completionDisabled}
             >
               <Check className="h-4 w-4" />
-              {submitting ? 'Completing…' : 'Complete task'}
+              {submitting ? <I18nText text={"Completing…"} /> : <I18nText text={"Complete task"} />}
             </Button>
           </div>
         </Form>
@@ -183,14 +184,14 @@ function HumanTaskCard({
             onClick={() => void complete({})}
           >
             <Check className="h-4 w-4" />
-            {submitting ? 'Completing…' : 'Complete task'}
+            {submitting ? <I18nText text={"Completing…"} /> : <I18nText text={"Complete task"} />}
           </Button>
         </div>
       )}
 
       {!canExecute && (
         <p className="text-xs text-muted-foreground">
-          Execute permission is required to complete this task.
+          <I18nText text={"Execute permission is required to complete this task."} />
         </p>
       )}
     </div>
@@ -237,7 +238,7 @@ export function HumanTasksTab({ dagRun, onChanged }: HumanTasksTabProps) {
   if (waitingTasks.length === 0 && !dagRun.humanTaskResumePending) {
     return (
       <div className="py-8 text-center text-sm text-muted-foreground">
-        No human tasks are waiting.
+        <I18nText text={"No human tasks are waiting."} />
       </div>
     );
   }
@@ -249,8 +250,7 @@ export function HumanTasksTab({ dagRun, onChanged }: HumanTasksTabProps) {
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
             <span>
-              Task input is safely stored, but the DAG-run still needs to be
-              queued for resume.
+              <I18nText text={"Task input is safely stored, but the DAG-run still needs to be queued for resume."} />
             </span>
             <Button
               type="button"
@@ -260,7 +260,7 @@ export function HumanTasksTab({ dagRun, onChanged }: HumanTasksTabProps) {
               onClick={() => void resume()}
             >
               <RefreshCcw className="h-4 w-4" />
-              {resuming ? 'Queueing…' : 'Retry queue'}
+              {resuming ? <I18nText text={"Queueing…"} /> : <I18nText text={"Retry queue"} />}
             </Button>
           </AlertDescription>
         </Alert>

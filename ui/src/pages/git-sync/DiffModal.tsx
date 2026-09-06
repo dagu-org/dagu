@@ -11,6 +11,8 @@ import { SyncStatus } from '@/api/v1/schema';
 import { useUserPreferences } from '@/contexts/UserPreference';
 import { Upload, RotateCcw, Trash2, EyeOff, RefreshCw, X } from 'lucide-react';
 import { DialogClose } from '@/components/ui/dialog';
+import { useI18n } from '@/i18n/I18nProvider';
+import { I18nText } from '@/i18n/I18nText';
 
 interface DiffModalProps {
   open: boolean;
@@ -24,6 +26,9 @@ interface DiffModalProps {
   remoteContent?: string;
   remoteCommit?: string;
   remoteAuthor?: string;
+  remoteDeleted?: boolean;
+  localExecutable?: boolean;
+  remoteExecutable?: boolean;
   canPublish?: boolean;
   canRevert?: boolean;
   onPublish?: () => void;
@@ -46,6 +51,9 @@ export function DiffModal({
   remoteContent,
   remoteCommit,
   remoteAuthor,
+  remoteDeleted,
+  localExecutable,
+  remoteExecutable,
   canPublish,
   canRevert,
   onPublish,
@@ -55,6 +63,7 @@ export function DiffModal({
   isForgetting,
   isDeleting,
 }: DiffModalProps) {
+  const { ts } = useI18n();
   const { preferences } = useUserPreferences();
   const isDarkMode = preferences.theme === 'dark';
 
@@ -71,7 +80,11 @@ export function DiffModal({
         };
       case SyncStatus.conflict:
         return {
-          left: remoteAuthor ? `Remote (${remoteAuthor})` : 'Remote',
+          left: remoteDeleted
+            ? 'Remote (deleted)'
+            : remoteAuthor
+              ? `Remote (${remoteAuthor})`
+              : 'Remote',
           right: 'Local (conflicting)',
         };
       case SyncStatus.untracked:
@@ -108,14 +121,32 @@ export function DiffModal({
           <DialogTitle className="text-sm font-mono">{dagId}</DialogTitle>
           <DialogClose className="p-1.5 rounded-md opacity-70 transition-opacity hover:opacity-100 hover:bg-muted">
             <X className="h-4 w-4" />
-            <span className="sr-only">Close</span>
+            <span className="sr-only">
+              <I18nText text={'Close'} />
+            </span>
           </DialogClose>
         </DialogHeader>
         <div className="flex-1 overflow-auto">
+          {(remoteDeleted ||
+            (localExecutable !== undefined &&
+              remoteExecutable !== undefined)) && (
+            <div className="border-b border-border/40 px-3 py-2 text-xs text-muted-foreground">
+              {remoteDeleted ? (
+                <I18nText text={'The remote file was deleted.'} />
+              ) : (
+                ts('Mode: remote {remoteMode}, local {localMode}', {
+                  remoteMode: ts(remoteExecutable ? 'executable' : 'regular'),
+                  localMode: ts(localExecutable ? 'executable' : 'regular'),
+                })
+              )}
+            </div>
+          )}
           {binary ? (
             <div className="p-3 text-sm bg-muted/30">
               <div className="text-muted-foreground mb-3">
-                Binary attachment. Content comparison is not available.
+                <I18nText
+                  text={'Binary file. Content comparison is not available.'}
+                />
               </div>
               <table className="text-xs">
                 <tbody>
@@ -211,7 +242,7 @@ export function DiffModal({
                 ) : (
                   <EyeOff className="h-3.5 w-3.5 mr-1.5" />
                 )}
-                Forget
+                <I18nText text={'Forget'} />
               </Button>
             )}
             {onDelete && (
@@ -226,7 +257,7 @@ export function DiffModal({
                 ) : (
                   <Trash2 className="h-3.5 w-3.5 mr-1.5" />
                 )}
-                Delete from Remote
+                <I18nText text={'Delete from Remote'} />
               </Button>
             )}
           </DialogFooter>
@@ -240,13 +271,13 @@ export function DiffModal({
                 className="text-destructive hover:text-destructive"
               >
                 <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
-                Revert
+                <I18nText text={'Revert'} />
               </Button>
             )}
             {canPublish && onPublish && (
               <Button size="sm" onClick={onPublish}>
                 <Upload className="h-3.5 w-3.5 mr-1.5" />
-                Push
+                <I18nText text={'Push'} />
               </Button>
             )}
           </DialogFooter>

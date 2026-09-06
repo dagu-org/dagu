@@ -44,6 +44,7 @@ import {
 } from '../../lib/workspace';
 import LoadingIndicator from '@/components/ui/loading-indicator';
 import { useViews, type View, type ViewSpec } from '@/hooks/useViews';
+import { I18nText } from '@/i18n/I18nText';
 
 type DAGDefinitionsFilters = WorkflowFilterSet;
 
@@ -1168,7 +1169,7 @@ function DAGsContent() {
                 <div ref={loadMoreSentinelRef} className="h-4 w-full" />
                 {isLoadingMore ? (
                   <div className="text-sm text-muted-foreground">
-                    Loading more workflows...
+                    <I18nText text={"Loading more workflows..."} />
                   </div>
                 ) : (
                   <Button
@@ -1178,14 +1179,14 @@ function DAGsContent() {
                     onClick={() => void handleLoadMore()}
                   >
                     {loadMoreError
-                      ? 'Retry loading more'
-                      : 'Load more workflows'}
+                      ? <I18nText text={"Retry loading more"} />
+                      : <I18nText text={"Load more workflows"} />}
                   </Button>
                 )}
               </>
             ) : dagFiles.length > 0 ? (
               <div className="text-sm text-muted-foreground">
-                All workflows are displayed.
+                <I18nText text={"All workflows are displayed."} />
               </div>
             ) : null}
           </div>

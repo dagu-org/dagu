@@ -1,0 +1,6 @@
+consts:
+  - known: value
+working_dir: .
+steps:
+  - id: check
+    run: printf '%s\n' ${consts.unknown_name} > defect.txt

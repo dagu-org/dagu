@@ -24,6 +24,8 @@ import {
   components,
   NodeStatus,
 } from '../../../../api/v1/schema';
+import { I18nText } from '@/i18n/I18nText';
+import { I18nProps } from '@/i18n/I18nProps';
 
 type DAGRunDetails = components['schemas']['DAGRunDetails'];
 type AgentInteraction = components['schemas']['AgentInteraction'];
@@ -62,7 +64,7 @@ function AgentTimeline({ events }: { events: AgentSessionEvent[] }) {
   if (events.length === 0) {
     return (
       <div className="rounded-md border border-dashed border-border p-5 text-center text-sm text-muted-foreground">
-        OpenCode has not emitted any timeline events yet.
+        <I18nText text={"OpenCode has not emitted any timeline events yet."} />
       </div>
     );
   }
@@ -133,7 +135,7 @@ function InteractionCard({
         <div>
           <div className="flex items-center gap-2 font-medium">
             <ShieldAlert className="h-4 w-4 text-warning" />
-            Permission requested
+            <I18nText text={"Permission requested"} />
           </div>
           <div className="mt-1 text-sm">{interaction.permission}</div>
           {interaction.patterns && interaction.patterns.length > 0 && (
@@ -145,7 +147,7 @@ function InteractionCard({
           )}
           {!!interaction.allowForSessionPatterns?.length && (
             <div className="mt-2 text-xs text-muted-foreground">
-              Session scope:{' '}
+              <I18nText text={"Session scope:"} />{' '}
               <span className="font-mono">
                 {interaction.allowForSessionPatterns.join(', ')}
               </span>
@@ -160,7 +162,7 @@ function InteractionCard({
               onPermission(AgentInteractionResponseRequestDecision.once)
             }
           >
-            <Check className="h-4 w-4" /> Allow once
+            <Check className="h-4 w-4" /> <I18nText text={"Allow once"} />
           </Button>
           {!!interaction.allowForSessionPatterns?.length && (
             <Button
@@ -172,7 +174,7 @@ function InteractionCard({
                 onPermission(AgentInteractionResponseRequestDecision.session)
               }
             >
-              Allow for this Dagu session
+              <I18nText text={"Allow for this Dagu session"} />
             </Button>
           )}
           <Button
@@ -183,7 +185,7 @@ function InteractionCard({
               onPermission(AgentInteractionResponseRequestDecision.reject)
             }
           >
-            <X className="h-4 w-4" /> Reject
+            <X className="h-4 w-4" /> <I18nText text={"Reject"} />
           </Button>
         </div>
       </div>
@@ -220,7 +222,7 @@ function InteractionCard({
   return (
     <div className="space-y-4 rounded-lg border border-warning/40 bg-warning/5 p-4">
       <div className="flex items-center gap-2 font-medium">
-        <Bot className="h-4 w-4 text-warning" /> OpenCode needs an answer
+        <Bot className="h-4 w-4 text-warning" /> <I18nText text={"OpenCode needs an answer"} />
       </div>
       {questions.map((question, questionIndex) => (
         <div key={`${interaction.id}-${questionIndex}`} className="space-y-2">
@@ -265,7 +267,7 @@ function InteractionCard({
             })}
           </div>
           {question.custom && (
-            <input
+            <I18nProps><input
               type="text"
               disabled={busy}
               placeholder="Type a custom answer"
@@ -277,7 +279,7 @@ function InteractionCard({
                   [questionIndex]: event.target.value,
                 }))
               }
-            />
+            /></I18nProps>
           )}
         </div>
       ))}
@@ -289,7 +291,7 @@ function InteractionCard({
             onQuestion(questions.map((_, index) => questionAnswers(index)))
           }
         >
-          <Check className="h-4 w-4" /> Submit answer
+          <Check className="h-4 w-4" /> <I18nText text={"Submit answer"} />
         </Button>
         <Button
           size="sm"
@@ -297,7 +299,7 @@ function InteractionCard({
           disabled={busy}
           onClick={() => onQuestion()}
         >
-          <X className="h-4 w-4" /> Reject
+          <X className="h-4 w-4" /> <I18nText text={"Reject"} />
         </Button>
       </div>
     </div>
@@ -412,14 +414,14 @@ function AgentSessionCard({
             </span>
             {session.generation && session.generation > 1 && (
               <span className="text-xs text-muted-foreground">
-                Session {session.generation}
+                <I18nText text={"Session"} /> {session.generation}
               </span>
             )}
           </div>
           <div className="mt-1 text-xs text-muted-foreground">
             {[session.agent, session.model, session.variant]
               .filter(Boolean)
-              .join(' · ') || 'OpenCode managed session'}
+              .join(' · ') || <I18nText text={"OpenCode managed session"} />}
             {session.providerVersion &&
               ` · OpenCode ${session.providerVersion}`}
           </div>
@@ -431,7 +433,7 @@ function AgentSessionCard({
             disabled={busy}
             onClick={() => setConfirmRestart(true)}
           >
-            <RotateCcw className="h-4 w-4" /> Start clean session
+            <RotateCcw className="h-4 w-4" /> <I18nText text={"Start clean session"} />
           </Button>
         )}
       </div>
@@ -474,7 +476,7 @@ function AgentSessionCard({
           <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
             <CircleDollarSign className="h-4 w-4" />
             <span>
-              {(session.usage.totalTokens || 0).toLocaleString()} tokens
+              {(session.usage.totalTokens || 0).toLocaleString()} <I18nText text={"tokens"} />
             </span>
             {(session.usage.cost || 0) > 0 && (
               <span>${session.usage.cost!.toFixed(4)}</span>
@@ -483,11 +485,11 @@ function AgentSessionCard({
         )}
 
       <div>
-        <h4 className="mb-2 text-sm font-medium">Session timeline</h4>
+        <h4 className="mb-2 text-sm font-medium"><I18nText text={"Session timeline"} /></h4>
         <AgentTimeline events={session.events || []} />
       </div>
 
-      <ConfirmDialog
+      <I18nProps><ConfirmDialog
         title="Start a clean OpenCode session?"
         buttonText="Start clean session"
         visible={confirmRestart}
@@ -495,10 +497,8 @@ function AgentSessionCard({
         onSubmit={restart}
         submitDisabled={busy}
       >
-        This starts a new conversation and retries this step with its original
-        prompt. The previous conversation is retained until this DAG run is
-        deleted. Files already changed in the workspace are not reverted.
-      </ConfirmDialog>
+        <I18nText text={"This starts a new conversation and retries this step with its original prompt. The previous conversation is retained until this DAG run is deleted. Files already changed in the workspace are not reverted."} />
+      </ConfirmDialog></I18nProps>
     </section>
   );
 }
@@ -542,7 +542,7 @@ export function AgentSessionTab({
   if (!selectedNode) {
     return (
       <div className="py-8 text-center text-sm text-muted-foreground">
-        No managed agent sessions in this run.
+        <I18nText text={"No managed agent sessions in this run."} />
       </div>
     );
   }
@@ -584,7 +584,7 @@ export function AgentSessionTab({
   return (
     <div className="space-y-4">
       {nodes.length > 1 && (
-        <Tabs
+        <I18nProps><Tabs
           role="tablist"
           aria-label="Agent conversations"
           className="flex w-full overflow-x-auto overflow-y-hidden"
@@ -615,7 +615,7 @@ export function AgentSessionTab({
               </Tab>
             );
           })}
-        </Tabs>
+        </Tabs></I18nProps>
       )}
       <div
         {...(nodes.length > 1
