@@ -1,0 +1,36 @@
+env:
+  - SRC_DIR: $HOST_SRC_DIR
+  - DST_DIR: $HOST_DST_DIR
+steps:
+  - id: list_files
+    action: rclone@v1
+    with:
+      command: lsf
+      source: $SRC_DIR
+
+  - id: sync_dry_run
+    depends: list_files
+    action: rclone@v1
+    with:
+      command: sync
+      source: $SRC_DIR
+      destination: $DST_DIR
+      dryRun: true
+
+  - id: copy_real
+    depends: sync_dry_run
+    action: rclone@v1
+    with:
+      command: copy
+      source: $SRC_DIR
+      destination: $DST_DIR
+      allowDestructive: true
+      checksum: true
+      fastList: true
+      transfers: 2
+      checkers: 2
+      filter: ["+ *.txt", "- *"]
+      extraArgs: ["--create-empty-src-dirs"]
+      stats: "0"
+      env:
+        EXTRA_VAR: hello

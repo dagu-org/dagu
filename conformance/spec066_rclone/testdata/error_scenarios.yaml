@@ -1,0 +1,49 @@
+env:
+  - SRC_DIR: $HOST_SRC_DIR
+  - DST_DIR: $HOST_DST_DIR
+steps:
+  - id: missing_command
+    action: rclone@v1
+    with: {}
+
+  - id: bad_command_enum
+    action: rclone@v1
+    with:
+      command: bogus
+
+  - id: unknown_field
+    action: rclone@v1
+    with:
+      command: lsf
+      source: $SRC_DIR
+      timeoutSeconds: 5
+
+  - id: missing_source
+    action: rclone@v1
+    continue_on: failed
+    with:
+      command: lsf
+
+  - id: missing_destination
+    depends: missing_source
+    action: rclone@v1
+    continue_on: failed
+    with:
+      command: copy
+      source: $SRC_DIR
+
+  - id: destructive_without_allow
+    depends: missing_destination
+    action: rclone@v1
+    continue_on: failed
+    with:
+      command: sync
+      source: $SRC_DIR
+      destination: $DST_DIR
+
+  - id: real_failure
+    depends: destructive_without_allow
+    action: rclone@v1
+    with:
+      command: lsf
+      source: /tmp/does/not/exist-rclone-conformance-xyz

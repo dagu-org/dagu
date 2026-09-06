@@ -1,0 +1,14 @@
+env:
+  - SRC_DIR: $HOST_SRC_DIR
+steps:
+  - id: list_files
+    action: rclone@v1
+    with:
+      command: lsf
+      source: $SRC_DIR
+  - id: print_bare
+    depends: list_files
+    run: echo "bare exit code is ${list_files.outputs.exitCode}"
+  - id: print_strict
+    depends: list_files
+    run: echo "strict=${steps.list_files.outputs.exitCode}"

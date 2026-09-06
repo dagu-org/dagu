@@ -66,6 +66,7 @@ It must not be treated as product behavior until implementation catches up.
 | [061: Python Script Action](061-python-script.md) | Partially implemented |
 | [062: dbt Action](062-dbt.md) | Partially implemented |
 | [063: Schedule Descriptors](063-schedule.md) | Implemented |
+| [066: Rclone Action](066-rclone.md) | Partially implemented |
 
 **Writing guidelines:**
 
