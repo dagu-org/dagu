@@ -6,48 +6,17 @@
 package spec040_router_route_test
 
 import (
-	"os"
-	"regexp"
 	"testing"
 
 	"github.com/dagucloud/dagu/v2/conformance/harness"
-	"github.com/stretchr/testify/require"
 )
-
-// stdoutLogPattern matches the per-step captured-stdout log path dagu start
-// prints in its tree render, e.g. "└─stdout: /path/to/step.<ts>.<run>.out".
-// Captures through the line ending rather than \S+, so a project path
-// containing spaces isn't truncated.
-var stdoutLogPattern = regexp.MustCompile(`stdout: ([^\r\n]+)`)
-
-// stepStdout reads the exact bytes a step wrote to stdout, by locating its
-// captured-output log file from dagu start's own tree render and reading it
-// directly. This is the only way to check the router step's diagnostic
-// output verbatim: the tree render dagu start prints to its own stdout
-// re-indents an inlined step's output with its own tree-drawing prefix, so
-// checking result.Stdout() directly could not distinguish the diagnostic's
-// own two-space route-line indent from the tree renderer's.
-func stepStdout(t *testing.T, daguStartOutput string) string {
-	t.Helper()
-
-	match := stdoutLogPattern.FindStringSubmatch(daguStartOutput)
-	require.Lenf(t, match, 2, "expected a stdout log path in output:\n%s", daguStartOutput)
-	data, err := os.ReadFile(match[1]) // #nosec G304 -- path comes from the harness's own trusted output.
-	require.NoError(t, err)
-	return string(data)
-}
 
 type routeFile struct {
 	path    string
 	content string
 }
 
-// TestRouteRuntime proves router.route's runtime contract: routing is
-// precondition injection per target, not first-match-wins branching, so
-// multiple patterns (or multiple targets under one pattern) can all match
-// and run at once, a value matching nothing skips every target without
-// failing the DAG-run, and a step depending on a skipped target still runs
-// (continueOn.skipped, injected on every target).
+// Route matching controls target execution independently for each pattern.
 func TestRouteRuntime(t *testing.T) {
 	t.Parallel()
 
@@ -60,7 +29,7 @@ func TestRouteRuntime(t *testing.T) {
 		{
 			name:   "exact match rejects a substring",
 			file:   "basic_route.yaml",
-			want:   []routeFile{{"b.out", "ran-b\n"}},
+			want:   []routeFile{{"b.out", "ran-b\n"}, {"route.txt", "Router evaluating: ab\n  a -> [branch_a]\n  ab -> [branch_b]\n"}},
 			absent: []string{"a.out"},
 		},
 		{
@@ -86,7 +55,7 @@ func TestRouteRuntime(t *testing.T) {
 		{
 			name: "unresolved literal matches a catch-all",
 			file: "unresolved_value.yaml",
-			want: []routeFile{{"matched.out", "matched\n"}},
+			want: []routeFile{{"matched.out", "matched\n"}, {"route.txt", "Router evaluating: $DAGU_CONFORMANCE_UNDEFINED_ROUTE\n  re:.* -> [matched]\n"}},
 		},
 		{
 			name:   "no matching pattern skips every target and still succeeds",
@@ -117,21 +86,6 @@ func TestRouteRuntime(t *testing.T) {
 			}
 		})
 	}
-}
-
-// TestRouteDiagnosticOutput proves the router step's own diagnostic output
-// is exactly "Router evaluating: <value>" followed by one two-space-indented
-// "<pattern> -> [<targets>]" line per route, in order, as one contiguous
-// block -- not just that those pieces appear somewhere in the output, which
-// would also pass if the lines were reordered or interleaved with other
-// content.
-func TestRouteDiagnosticOutput(t *testing.T) {
-	t.Parallel()
-
-	dagu := harness.NewRunner(t)
-	result := dagu.Run("start", "basic_route.yaml")
-	result.ExpectExitCode(0)
-	require.Equal(t, "Router evaluating: ab\n  a -> [branch_a]\n  ab -> [branch_b]\n", stepStdout(t, result.Stdout()))
 }
 
 // TestRouteValidation proves the errors DAG-build-time validation rejects
