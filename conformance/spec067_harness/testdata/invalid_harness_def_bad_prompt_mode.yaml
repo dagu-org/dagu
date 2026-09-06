@@ -1,0 +1,10 @@
+harnesses:
+  bad_mode:
+    binary: ./scripts/fake_ok.sh
+    prompt_mode: bogus
+steps:
+  - id: x
+    action: harness.run
+    with:
+      provider: bad_mode
+      prompt: hi

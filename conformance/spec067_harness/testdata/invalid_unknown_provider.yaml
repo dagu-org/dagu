@@ -1,0 +1,6 @@
+steps:
+  - id: unknown_provider
+    action: harness.run
+    with:
+      provider: totally-bogus-provider
+      prompt: hi
