@@ -2,7 +2,11 @@
 
 ## Status
 
-Implemented.
+Partially implemented.
+
+Conformance covers inline and referenced templates, data resolution, stdout
+and file output, and representative validation/render errors. Function
+permutations and filesystem failure cases belong in executor tests.
 
 This spec defines conformance behavior for the built-in `template.render`
 action.
@@ -24,9 +28,7 @@ This spec covers:
   passed to the template as `.`
 - `with.output`: a file path to write the rendered result to, instead of
   stdout, creating missing parent directories
-- the template function set: a hermetic subset of sprig, plus Dagu's own
-  pipeline-friendly overrides, with non-hermetic functions (environment
-  access, real time, randomness, key generation) removed
+- deterministic template functions and pipeline-friendly argument ordering
 - `missingkey=error` behavior: referencing an undeclared data key fails
   the step
 - validation and runtime errors
@@ -81,13 +83,9 @@ parent directories first.
 
 ### Template functions
 
-The function set is a hermetic subset of sprig -- functions that read
-environment variables, perform network I/O, return the current time,
-generate randomness, or generate cryptographic keys are removed, so a
-template's output depends only on its text and `with.data`. Dagu
-overrides several functions to take a pipeline-friendly argument order
-(the pipeline value last), including `split`, `join`, `count`, `add`,
-`empty`, `upper`, `lower`, `trim`, and `default`.
+Template functions support deterministic rendering from template text and
+`with.data`. Pipeline functions take the pipeline value as their last
+argument. The full function catalog is outside this conformance scope.
 
 ## Errors
 
@@ -109,8 +107,14 @@ validate`), not only when the step runs:
   an error containing `"map has no entry for key"`.
 - A template with invalid `{{ }}` syntax: an error containing
   `"template: parse error"`.
-- A template calling a function that has been removed (for example,
-  `env` or `now`): an error containing `function "<name>" not defined`.
+
+### Lifecycle and cleanup
+
+Timeout and abort are owned by the step-run lifecycle. This spec adds no
+stronger interruption or rollback guarantee. Parsing and data evaluation
+complete before rendered output is emitted. A parse or missing-key error
+therefore produces no rendered output. Output-directory or file-write
+failures fail the step.
 
 ## Related Specs
 

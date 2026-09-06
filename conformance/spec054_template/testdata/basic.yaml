@@ -1,6 +1,0 @@
-steps:
-  - action: template.render
-    with:
-      template: "Hello, {{ .name }}!"
-      data:
-        name: World

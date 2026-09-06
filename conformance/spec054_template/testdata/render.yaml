@@ -1,0 +1,28 @@
+working_dir: .
+env:
+  - FOO: bar
+  - TPL: "Hi {{ .who }}"
+steps:
+  - id: inline
+    action: template.render
+    stdout: inline.txt
+    with:
+      template: "literal: ${FOO}, rendered: {{ .name }}"
+      data:
+        name: $FOO
+  - id: reference
+    depends: inline
+    action: template.render
+    stdout: reference.txt
+    with:
+      template_ref: "${env.TPL}"
+      data:
+        who: Ref
+  - id: file
+    depends: reference
+    action: template.render
+    with:
+      template: "Hello, {{ .name }}!"
+      data:
+        name: File
+      output: nested/dir/rendered.txt
