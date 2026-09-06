@@ -1,5 +1,5 @@
 steps:
-  - action: python-script
+  - action: python-script@v1
     with:
       script: "return input['value']"
       input:
