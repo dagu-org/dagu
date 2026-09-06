@@ -17,7 +17,7 @@ steps:
     with:
       source: out.zip
       destination: extracted
-  - id: preview-create
+  - id: preview_create
     depends: extract
     action: archive.create
     with:

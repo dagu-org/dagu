@@ -1,4 +1,5 @@
 steps:
   - action: wait.until
+    timeout_sec: 5
     with:
       until: "2020-01-01T00:00:00Z"
