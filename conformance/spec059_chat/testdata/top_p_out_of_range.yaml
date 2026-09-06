@@ -1,7 +1,0 @@
-steps:
-  - action: chat.completion
-    with:
-      prompt: "hi"
-      provider: local
-      model: test-model
-      top_p: 1.5

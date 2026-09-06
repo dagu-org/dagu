@@ -2,8 +2,12 @@ env:
   - LLM_BASE_URL: ${LLM_BASE_URL}
 steps:
   - action: chat.completion
+    stdout: result.out
     with:
-      prompt: "hello"
+      system: Be concise
+      messages:
+        - role: user
+          content: hello
       provider: local
       model: test-model
       base_url: $LLM_BASE_URL

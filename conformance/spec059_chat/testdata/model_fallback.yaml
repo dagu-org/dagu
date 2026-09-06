@@ -2,6 +2,7 @@ env:
   - LLM_BASE_URL: ${LLM_BASE_URL}
 steps:
   - action: chat.completion
+    stdout: result.out
     with:
       prompt: "hello"
       model:
