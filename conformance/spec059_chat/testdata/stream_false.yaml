@@ -1,3 +1,4 @@
+working_dir: .
 env:
   - LLM_BASE_URL: ${LLM_BASE_URL}
 steps:
