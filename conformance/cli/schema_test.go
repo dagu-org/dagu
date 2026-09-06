@@ -11,27 +11,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSchemaShowsDAGRootFields(t *testing.T) {
-	t.Parallel()
-
-	dagu := harness.NewRunner(t)
-	result := dagu.Run("schema", "dag")
-	result.ExpectExitCode(0)
-	require.Contains(t, result.Stdout(), "steps")
-}
-
-// The nested result must describe the selected steps field.
+// Nested navigation returns the selected property from the root schema.
 func TestSchemaDrillsIntoNestedPath(t *testing.T) {
 	t.Parallel()
 
 	dagu := harness.NewRunner(t)
-	result := dagu.Run("schema", "dag", "steps")
-	result.ExpectExitCode(0)
+	root := dagu.Run("schema", "dag")
+	root.ExpectExitCode(0)
 	var schema struct {
-		Description string `json:"description"`
+		Properties map[string]json.RawMessage `json:"properties"`
 	}
-	require.NoError(t, json.Unmarshal([]byte(result.Stdout()), &schema))
-	require.Contains(t, schema.Description, "List of steps that define the DAG")
+	require.NoError(t, json.Unmarshal([]byte(root.Stdout()), &schema))
+	require.Contains(t, schema.Properties, "steps")
+
+	nested := dagu.Run("schema", "dag", "steps")
+	nested.ExpectExitCode(0)
+	require.JSONEq(t, string(schema.Properties["steps"]), nested.Stdout())
 }
 
 // TestSchemaShowsConfigRootFields asserts on "coordinator", a property that
