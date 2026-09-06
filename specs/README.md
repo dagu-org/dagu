@@ -39,8 +39,33 @@ It must not be treated as product behavior until implementation catches up.
 | [034: Wiki Page File Format](034-wiki-page-format.md) | Implemented |
 | [035: File Dependencies](035-file-dependencies.md) | Implemented |
 | [036: MCP Execute Tool](036-mcp-execute-tool.md) | Implemented |
+| [037: Docker Run Action](037-docker-run.md) | Partially implemented |
+| [038: Kubernetes Run Action](038-kubernetes-run.md) | Partially implemented |
 | [039: Wait Actions](039-wait.md) | Implemented |
+| [040: Router Route Action](040-router-route.md) | Implemented |
 | [041: Log Write Action](041-log-write.md) | Implemented |
+| [042: SSH Run Action](042-ssh-run.md) | Partially implemented |
+| [043: SFTP Transfer Actions](043-sftp-transfer.md) | Partially implemented |
+| [044: Mail Send Action](044-mail-send.md) | Partially implemented |
+| [045: HTTP Request Action](045-http-request.md) | Partially implemented |
+| [046: PostgreSQL Actions](046-postgres.md) | Partially implemented |
+| [047: SQLite Actions](047-sqlite.md) | Partially implemented |
+| [048: DuckDB and Action Bundles](048-duckdb-action.md) | Partially implemented |
+| [049: Data Convert and Pick Actions](049-data.md) | Partially implemented |
+| [050: Outputs Write Action](050-outputs.md) | Implemented |
+| [051: Artifact Actions](051-artifact.md) | Partially implemented |
+| [052: File Actions](052-file.md) | Partially implemented |
+| [053: Archive Actions](053-archive.md) | Partially implemented |
+| [054: Template Action](054-template.md) | Partially implemented |
+| [055: Git Checkout Action](055-git-checkout.md) | Partially implemented |
+| [056: S3 Actions](056-s3.md) | Partially implemented |
+| [057: Redis Actions](057-redis.md) | Partially implemented |
+| [058: JQ Filter Action](058-jq-filter.md) | Partially implemented |
+| [059: Chat Completion Action](059-chat-completion.md) | Partially implemented |
+| [060: Node Script Action](060-node-script.md) | Partially implemented |
+| [061: Python Script Action](061-python-script.md) | Partially implemented |
+| [062: dbt Action](062-dbt.md) | Partially implemented |
+| [063: Schedule Descriptors](063-schedule.md) | Implemented |
 
 **Writing guidelines:**
 

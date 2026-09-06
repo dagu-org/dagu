@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package spec037_schedule_test
+package spec063_schedule_test
 
 import (
 	"strings"
@@ -41,11 +41,11 @@ func TestScheduleDescriptors(t *testing.T) {
 	})
 }
 
-func TestHourlyDescriptorMatchesEquivalentCronExpression(t *testing.T) {
+func TestHourlyMatchesCron(t *testing.T) {
 	t.Parallel()
 
 	dagu := harness.NewRunner(t)
-	result := dagu.Run("ls", "-n")
+	result := dagu.RunWithEnv([]string{"DAGU_DAGS_DIR=."}, "ls", "-n")
 	result.ExpectExitCode(0)
 
 	nextRun := parseNextRunColumn(result.Stdout())

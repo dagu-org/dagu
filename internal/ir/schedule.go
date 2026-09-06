@@ -280,6 +280,20 @@ func parseScheduleMap(m map[string]any, opts ScheduleParseOptions) (Schedule, er
 
 func parseCronExpression(expr string) (cron.Schedule, string, error) {
 	normalized := strings.Join(strings.Fields(expr), " ")
+	// Canonical expressions keep equivalent schedules identical in durable state.
+	switch normalized {
+	case "@hourly":
+		normalized = "0 * * * *"
+	case "@daily":
+		normalized = "0 0 * * *"
+	case "@weekly":
+		normalized = "0 0 * * 0"
+	case "@monthly":
+		normalized = "0 0 1 * *"
+	case "@yearly":
+		normalized = "0 0 1 1 *"
+	}
+
 	if normalized == "" {
 		return nil, "", fmt.Errorf("cron expression must not be empty")
 	}

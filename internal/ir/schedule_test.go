@@ -5,6 +5,7 @@ package ir
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -67,6 +68,33 @@ func TestCheckMisleadingStepValues(t *testing.T) {
 			}
 
 			require.Empty(t, warnings)
+		})
+	}
+}
+
+func TestCronDescriptors(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.September, 6, 10, 25, 0, 0, time.UTC)
+	cases := []struct {
+		descriptor string
+		expression string
+		next       string
+	}{
+		{"@hourly", "0 * * * *", "2026-09-06T11:00:00Z"},
+		{"@daily", "0 0 * * *", "2026-09-07T00:00:00Z"},
+		{"@weekly", "0 0 * * 0", "2026-09-13T00:00:00Z"},
+		{"@monthly", "0 0 1 * *", "2026-10-01T00:00:00Z"},
+		{"@yearly", "0 0 1 1 *", "2027-01-01T00:00:00Z"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.descriptor, func(t *testing.T) {
+			t.Parallel()
+
+			schedule, err := NewCronSchedule(tc.descriptor)
+			require.NoError(t, err)
+			require.Equal(t, tc.expression, schedule.Expression)
+			require.Equal(t, tc.next, schedule.Next(now).Format(time.RFC3339))
 		})
 	}
 }
