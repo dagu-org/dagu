@@ -1,3 +1,4 @@
+working_dir: .
 steps:
   - action: jq.filter
     stdout: result.out
