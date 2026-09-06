@@ -1,0 +1,24 @@
+steps:
+  - id: write
+    action: artifact.write
+    stdout: write.json
+    with:
+      path: hello.txt
+      content: hello
+  - id: read
+    depends: write
+    action: artifact.read
+    stdout: read.txt
+    with:
+      path: hello.txt
+  - id: inspect
+    depends: read
+    action: artifact.read
+    stdout: read.json
+    with:
+      path: hello.txt
+      format: json
+  - id: list
+    depends: inspect
+    action: artifact.list
+    stdout: list.json

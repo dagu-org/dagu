@@ -2,7 +2,11 @@
 
 ## Status
 
-Implemented.
+Partially implemented.
+
+Conformance covers one local write/read/list round trip, path boundaries,
+and representative validation errors. Executor tests own option permutations,
+metadata details, overwrite behavior, and filesystem edge cases.
 
 This spec defines conformance behavior for the built-in `artifact.write`,
 `artifact.read`, and `artifact.list` actions.
@@ -65,7 +69,8 @@ segment is rejected, regardless of which action uses it.
 
 `artifact.write` requires `with.content` (the file's new content) and
 `with.path`. `with.mode` sets the file's permission bits (an octal
-string such as `"0640"`); it defaults to `0600`. Without
+string such as `"0640"`); it defaults to `0600`. The process umask may
+restrict permissions when creating a file. Without
 `with.overwrite`, writing to a path that already exists fails; with
 `with.overwrite: true`, the existing file is replaced. `with.atomic`
 (default `true`) governs how a replacement is written; `with.overwrite:
@@ -90,6 +95,22 @@ descends into subdirectories; otherwise only direct children are listed.
 `with.include_dirs: true` includes directory entries in the result;
 otherwise only regular files are listed. `with.pattern`, when set, is a
 glob matched against each candidate's slash-separated relative path.
+
+### JSON output
+
+The following members define action stdout. Extra members are allowed.
+
+| Action | Members |
+| --- | --- |
+| `artifact.write` | `operation`: `"write"`; `path`: relative path string; `created`: boolean; `bytes`: integer byte count, omitted when zero. |
+| `artifact.read` with `format: json` | `operation`: `"read"`; `path`: relative path string; `exists`: `true`; `type`: file type string; `mode`: permission string; `modTime`: RFC 3339 timestamp, optionally with fractional seconds; `size` and `bytes`: integer byte counts, omitted when zero; `content`: string, omitted when empty. |
+| `artifact.list` | `operation`: `"list"`; `path`: relative directory string (`"."` for the root); `files`: integer regular-file count, omitted when zero; `entries`: array, omitted when empty. |
+
+Each list entry has `path`, `type`, and `mode` strings; integer `size`;
+`modTime` in the timestamp format above; and boolean `isDir`, `isRegular`,
+and `isSymlink`. Paths use `/` separators. The smoke test checks action
+identity, content, and listed paths; detailed metadata coverage belongs to
+executor tests.
 
 ## Errors
 
