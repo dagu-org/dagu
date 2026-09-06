@@ -1,0 +1,42 @@
+steps:
+  - id: set_create_only
+    action: state.set
+    with:
+      key: co_key
+      value: 1
+      create_only: true
+
+  - id: set_create_only_again
+    depends: set_create_only
+    action: state.set
+    with:
+      key: co_key
+      value: 2
+      create_only: true
+
+  - id: set_bad_version
+    depends: set_create_only
+    action: state.set
+    with:
+      key: co_key
+      value: 3
+      expected_version: 99
+
+  - id: get_required_missing
+    action: state.get
+    with:
+      key: does-not-exist
+      required: true
+
+  - id: custom_scope_missing_namespace
+    action: state.set
+    with:
+      scope: custom
+      key: k
+      value: 1
+
+  - id: invalid_key_chars
+    action: state.set
+    with:
+      key: "../escape"
+      value: 1

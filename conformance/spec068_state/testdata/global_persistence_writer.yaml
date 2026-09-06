@@ -1,0 +1,7 @@
+steps:
+  - id: set_val
+    action: state.set
+    with:
+      scope: global
+      key: shared_key
+      value: "persisted-across-runs"

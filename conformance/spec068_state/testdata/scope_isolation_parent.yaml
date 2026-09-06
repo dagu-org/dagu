@@ -1,0 +1,22 @@
+name: scope_isolation_parent
+steps:
+  - id: run_child
+    action: dag.run
+    with:
+      dag: scope_isolation_child
+
+  - id: get_dag_scope
+    depends: run_child
+    action: state.get
+    with:
+      scope: dag
+      key: k
+      default: "MISSING"
+
+  - id: get_root_scope
+    depends: get_dag_scope
+    action: state.get
+    with:
+      scope: root_dag
+      key: k
+      default: "MISSING"

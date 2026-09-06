@@ -1,0 +1,5 @@
+steps:
+  - id: missing_value_set
+    action: state.set
+    with:
+      key: k2

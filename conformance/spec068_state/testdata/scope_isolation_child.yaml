@@ -1,0 +1,16 @@
+name: scope_isolation_child
+steps:
+  - id: set_dag_scope
+    action: state.set
+    with:
+      scope: dag
+      key: k
+      value: "from-child"
+
+  - id: set_root_scope
+    depends: set_dag_scope
+    action: state.set
+    with:
+      scope: root_dag
+      key: k
+      value: "from-child-root-scope"

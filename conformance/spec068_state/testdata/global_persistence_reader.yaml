@@ -1,0 +1,6 @@
+steps:
+  - id: get_val
+    action: state.get
+    with:
+      scope: global
+      key: shared_key

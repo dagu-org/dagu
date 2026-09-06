@@ -1,0 +1,4 @@
+steps:
+  - id: missing_key_get
+    action: state.get
+    with: {}

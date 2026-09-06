@@ -1,0 +1,31 @@
+steps:
+  - id: set_val
+    action: state.set
+    with:
+      key: ref_key
+      value: 42
+
+  - id: get_val
+    depends: set_val
+    action: state.get
+    with:
+      key: ref_key
+
+  - id: get_named
+    depends: get_val
+    action: state.get
+    with:
+      key: ref_key
+    output: GET_RESULT
+
+  - id: print_named
+    depends: get_named
+    run: echo "named=${GET_RESULT}"
+
+  - id: print_bare
+    depends: get_val
+    run: echo "bare value is ${get_val.outputs.value}"
+
+  - id: print_strict
+    depends: get_val
+    run: echo "strict=${steps.get_val.outputs.value}"

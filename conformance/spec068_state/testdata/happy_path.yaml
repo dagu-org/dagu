@@ -1,0 +1,59 @@
+steps:
+  - id: set_val
+    action: state.set
+    with:
+      key: mykey
+      value: {"hello": "world", "n": 1}
+
+  - id: get_val
+    depends: set_val
+    action: state.get
+    with:
+      key: mykey
+
+  - id: get_missing_default
+    depends: get_val
+    action: state.get
+    with:
+      key: does-not-exist
+      default: {"fallback": true}
+
+  - id: diff_create
+    depends: get_missing_default
+    action: state.diff
+    with:
+      key: diff_key
+      value: {"v": 1}
+
+  - id: diff_same
+    depends: diff_create
+    action: state.diff
+    with:
+      key: diff_key
+      value: {"v": 1}
+
+  - id: diff_changed_no_update
+    depends: diff_same
+    action: state.diff
+    with:
+      key: diff_key
+      value: {"v": 2}
+      update: false
+
+  - id: diff_changed_update
+    depends: diff_changed_no_update
+    action: state.diff
+    with:
+      key: diff_key
+      value: {"v": 2}
+
+  - id: list_all
+    depends: diff_changed_update
+    action: state.list
+
+  - id: list_prefix_values
+    depends: list_all
+    action: state.list
+    with:
+      prefix: diff
+      include_values: true
