@@ -1,5 +1,5 @@
 steps:
-  - action: dbt
+  - action: dbt@v1
     with:
       projectDir: .
       command: build
