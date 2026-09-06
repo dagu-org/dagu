@@ -1,0 +1,60 @@
+steps:
+  - id: missing_args
+    action: ffmpeg@v1
+    continue_on: failed
+    with:
+      command: ffprobe
+
+  - id: bad_command
+    depends: missing_args
+    action: ffmpeg@v1
+    continue_on: failed
+    with:
+      command: foobar
+      args: -version
+
+  - id: env_as_object
+    depends: bad_command
+    action: ffmpeg@v1
+    continue_on: failed
+    with:
+      args: -version
+      env:
+        FOO: bar
+
+  - id: bad_quoting
+    depends: env_as_object
+    action: ffmpeg@v1
+    continue_on: failed
+    with:
+      args: -i "unterminated
+
+  - id: bad_env_line
+    depends: bad_quoting
+    action: ffmpeg@v1
+    continue_on: failed
+    with:
+      args: -version
+      env: "NOEQUALSIGN"
+
+  - id: bad_input_file
+    depends: bad_env_line
+    action: ffmpeg@v1
+    continue_on: failed
+    with:
+      args: -i /tmp/does/not/exist-ffmpeg-conformance-xyz.mp4 -f null -
+
+  - id: times_out
+    depends: bad_input_file
+    action: ffmpeg@v1
+    continue_on: failed
+    with:
+      timeoutSeconds: 1
+      args: -f lavfi -i "color=size=1280x720:rate=25:duration=30" -c:v libx264 -preset veryslow -f null -
+
+  - id: truncated
+    depends: times_out
+    action: ffmpeg@v1
+    with:
+      maxOutputBytes: 1024
+      args: -f lavfi -i "color=size=32x32:d=1" -c:v libx264 -v verbose -f null -

@@ -1,0 +1,11 @@
+steps:
+  - id: convert
+    action: ffmpeg@v1
+    with:
+      args: -f lavfi -i "color=size=32x32:d=1" -c:v libx264 -f null -
+  - id: print_bare
+    depends: convert
+    run: echo "bare exit code is ${convert.outputs.exitCode}"
+  - id: print_strict
+    depends: convert
+    run: echo "strict=${steps.convert.outputs.exitCode}"

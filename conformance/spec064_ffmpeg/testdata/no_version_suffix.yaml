@@ -1,0 +1,4 @@
+steps:
+  - action: ffmpeg
+    with:
+      args: -version

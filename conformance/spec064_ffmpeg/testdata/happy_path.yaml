@@ -1,0 +1,28 @@
+env:
+  - OUT_DIR: $HOST_OUT_DIR
+  - WORK_DIR: $HOST_WORK_DIR
+steps:
+  - id: convert
+    action: ffmpeg@v1
+    with:
+      overwrite: true
+      args: -f lavfi -i "color=c=blue:s=32x32:d=1" -c:v libx264 -t 1 $OUT_DIR/clip.mp4
+
+  - id: probe
+    depends: convert
+    action: ffmpeg@v1
+    with:
+      command: ffprobe
+      args: -v error -print_format json -show_format -show_streams $OUT_DIR/clip.mp4
+
+  - id: structured
+    depends: probe
+    action: ffmpeg@v1
+    with:
+      workdir: $WORK_DIR
+      hideBanner: false
+      nostdin: false
+      env: |
+        FOO=bar
+        BAZ=qux
+      args: '["-f","lavfi","-i","color=c=red:s=16x16:d=1","-c:v","libx264","rel_out.mp4"]'
