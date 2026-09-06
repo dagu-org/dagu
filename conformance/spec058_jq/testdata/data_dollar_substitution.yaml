@@ -1,8 +1,0 @@
-env:
-  - PRICE: "9.99"
-steps:
-  - action: jq.filter
-    with:
-      filter: "."
-      data:
-        note: "cost is $PRICE dollars"

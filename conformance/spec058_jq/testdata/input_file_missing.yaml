@@ -1,6 +1,0 @@
-working_dir: .
-steps:
-  - action: jq.filter
-    with:
-      filter: "."
-      input: does-not-exist.json

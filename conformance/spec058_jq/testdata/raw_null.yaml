@@ -1,5 +1,6 @@
 steps:
   - action: jq.filter
+    stdout: result.out
     with:
       filter: ".missing"
       raw: true
