@@ -1,0 +1,11 @@
+steps:
+  - id: query
+    action: duckdb@v1
+    with:
+      query: "SELECT 42 AS answer;"
+  - id: print_bare
+    depends: query
+    run: echo "bare result is ${query.outputs.result}"
+  - id: print_strict
+    depends: query
+    run: echo "strict=${steps.query.outputs.result}"

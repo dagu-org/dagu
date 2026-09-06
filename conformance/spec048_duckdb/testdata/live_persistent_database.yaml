@@ -1,0 +1,34 @@
+env:
+  - DB_PATH: $HOST_DB_PATH
+  - DATA_DIR: $HOST_DATA_DIR
+steps:
+  - id: create_table
+    action: duckdb@v1
+    with:
+      database: $DB_PATH
+      query: "CREATE TABLE t(id INTEGER, name VARCHAR); INSERT INTO t VALUES (1,'a'),(2,'b');"
+
+  - id: read_csv
+    depends: create_table
+    action: duckdb@v1
+    with:
+      database: $DB_PATH
+      readonly: true
+      format: csv
+      query: "SELECT * FROM t ORDER BY id;"
+
+  - id: read_table_format
+    depends: read_csv
+    action: duckdb@v1
+    with:
+      database: $DB_PATH
+      readonly: true
+      format: table
+      query: "SELECT count(*) AS n FROM t;"
+
+  - id: workdir_query
+    depends: read_table_format
+    action: duckdb@v1
+    with:
+      workdir: $DATA_DIR
+      query: "SELECT 1 AS ok;"

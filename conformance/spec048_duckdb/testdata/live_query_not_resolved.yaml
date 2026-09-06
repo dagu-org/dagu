@@ -1,0 +1,8 @@
+env:
+  - MY_VAR: from-env
+steps:
+  - id: query
+    action: duckdb@v1
+    with:
+      format: list
+      query: "SELECT '$MY_VAR' AS val;"

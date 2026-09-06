@@ -50,7 +50,7 @@ It must not be treated as product behavior until implementation catches up.
 | [045: HTTP Request Action](045-http-request.md) | Partially implemented |
 | [046: PostgreSQL Actions](046-postgres.md) | Partially implemented |
 | [047: SQLite Actions](047-sqlite.md) | Partially implemented |
-| [048: DuckDB and Action Bundles](048-duckdb-action.md) | Partially implemented |
+| [048: DuckDB and Action Bundles](048-duckdb-action.md) | Implemented |
 | [049: Data Convert and Pick Actions](049-data.md) | Partially implemented |
 | [050: Outputs Write Action](050-outputs.md) | Implemented |
 | [051: Artifact Actions](051-artifact.md) | Partially implemented |
