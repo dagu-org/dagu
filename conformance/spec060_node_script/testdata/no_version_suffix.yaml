@@ -1,0 +1,6 @@
+steps:
+  - action: node-script
+    with:
+      script: "return input.value;"
+      input:
+        value: 42

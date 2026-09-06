@@ -1,0 +1,8 @@
+working_dir: .
+steps:
+  - action: data.convert
+    with:
+      from: text
+      to: text
+      data: hello text
+    stdout: result.out

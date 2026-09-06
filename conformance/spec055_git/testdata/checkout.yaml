@@ -1,0 +1,25 @@
+working_dir: .
+env:
+  - GIT_ORIGIN: ${GIT_ORIGIN}
+steps:
+  - id: clone
+    action: git.checkout
+    stdout: clone.json
+    with:
+      repository: $GIT_ORIGIN
+      path: work
+  - id: repeat
+    depends: clone
+    action: git.checkout
+    stdout: repeat.json
+    with:
+      repository: $GIT_ORIGIN
+      path: work
+  - id: tag
+    depends: repeat
+    action: git.checkout
+    stdout: tag.json
+    with:
+      repository: $GIT_ORIGIN
+      path: work
+      ref: first

@@ -1,0 +1,12 @@
+working_dir: .
+steps:
+  - id: write
+    action: outputs.write
+    with:
+      values:
+        greeting: hello
+        count: 3
+  - id: read
+    depends: write
+    run: printf 'greeting=%s count=%s' "${write.outputs.greeting}" "${write.outputs.count}"
+    stdout: result.out

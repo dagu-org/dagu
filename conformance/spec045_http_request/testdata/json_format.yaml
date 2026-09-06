@@ -1,0 +1,14 @@
+working_dir: .
+env:
+  - HTTP_URL: ${HTTP_URL}
+steps:
+  - action: http.request
+    with:
+      method: GET
+      url: $HTTP_URL/json
+      format: json
+      headers:
+        X-Test-Header: header-value
+      query:
+        q: query-value
+    stdout: response.json

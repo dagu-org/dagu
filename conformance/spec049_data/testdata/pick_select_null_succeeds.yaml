@@ -1,0 +1,9 @@
+working_dir: .
+steps:
+  - action: data.pick
+    with:
+      from: json
+      data: { a: 1 }
+      select: ".b.c"
+      raw: true
+    stdout: result.out

@@ -1,0 +1,4 @@
+steps:
+  - action: file.copy
+    with:
+      destination: example.txt

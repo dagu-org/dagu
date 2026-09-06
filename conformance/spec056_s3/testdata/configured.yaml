@@ -1,0 +1,18 @@
+s3:
+  bucket: conformance
+  region: us-east-1
+steps:
+  - action: s3.upload
+    with:
+      source: source.txt
+      key: result.txt
+  - action: s3.download
+    with:
+      key: result.txt
+      destination: downloaded.txt
+  - action: s3.list
+    with:
+      prefix: results/
+  - action: s3.delete
+    with:
+      key: result.txt

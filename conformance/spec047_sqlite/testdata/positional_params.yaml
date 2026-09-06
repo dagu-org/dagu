@@ -1,0 +1,10 @@
+working_dir: .
+steps:
+  - action: sqlite.query
+    with:
+      dsn: ":memory:"
+      query: "SELECT ? + ? AS sum"
+      params:
+        - 2
+        - 3
+    stdout: result.json

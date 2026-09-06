@@ -1,0 +1,5 @@
+steps:
+  - action: postgres.query
+    with:
+      dsn: postgres://localhost/example
+      query: SELECT 1

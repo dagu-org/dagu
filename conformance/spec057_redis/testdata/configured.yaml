@@ -1,0 +1,11 @@
+redis:
+  host: redis.example.invalid
+  port: 6379
+steps:
+  - action: redis.set
+    with:
+      key: greeting
+      value: hello
+  - action: redis.get
+    with:
+      key: greeting

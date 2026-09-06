@@ -1,0 +1,7 @@
+steps:
+  - action: sftp.upload
+    with:
+      host: example.invalid
+      user: deploy
+      source: source.txt
+      destination: target.txt

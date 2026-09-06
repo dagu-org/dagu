@@ -1,0 +1,4 @@
+steps:
+  - action: file.move
+    with:
+      source: example.txt

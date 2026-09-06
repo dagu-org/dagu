@@ -1,0 +1,56 @@
+# Spec: Redis Actions
+
+## Status
+
+Partially implemented.
+
+## Scope
+
+This spec covers Redis action configuration acceptance, command agreement,
+and representative configuration errors. Conformance requires no Redis
+service.
+
+Command execution, response formats, scripts, pipelines, locks, credential
+transport, and connection lifecycle belong to executor unit and integration
+coverage.
+
+## Goal
+
+Workflow authors can configure Redis actions and identify invalid
+configuration before commands reach a Redis service.
+
+## Behavior
+
+`redis.<command>` selects the Redis command. An explicit `with.command`
+must agree with that action name. Configured `redis.set` and `redis.get`
+actions with DAG-level connection settings pass `dagu validate` without
+contacting Redis.
+
+## Errors
+
+`dagu validate` rejects a conflicting `with.command` and an unrecognized
+`with.mode` with a nonzero exit code.
+
+When the step starts, cluster mode without `with.cluster_addrs` fails with
+`cluster_addrs is required for cluster mode`. A client certificate without
+its matching key fails with `both tls_cert and tls_key must be provided
+together`. These failures occur before connecting to Redis.
+
+Timeout, abort, lock cleanup, and service failures are outside this
+configuration conformance scope.
+
+## Example
+
+```yaml
+redis:
+  host: redis.example.com
+  port: 6379
+steps:
+  - action: redis.set
+    with:
+      key: greeting
+      value: hello
+  - action: redis.get
+    with:
+      key: greeting
+```
