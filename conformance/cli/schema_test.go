@@ -4,6 +4,7 @@
 package cli_test
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/dagucloud/dagu/v2/conformance/harness"
@@ -19,21 +20,18 @@ func TestSchemaShowsDAGRootFields(t *testing.T) {
 	require.Contains(t, result.Stdout(), "steps")
 }
 
-// TestSchemaDrillsIntoNestedPath proves the command actually traverses into
-// the "steps" sub-schema rather than falling back to the full root schema
-// (which is also non-empty and would satisfy a bare NotEmpty check): it
-// asserts on the steps property's own description text, which only the
-// drilled-down output emits on its own, and asserts the root-schema-only
-// "$schema" marker is absent, since the full root document always starts
-// with one.
+// The nested result must describe the selected steps field.
 func TestSchemaDrillsIntoNestedPath(t *testing.T) {
 	t.Parallel()
 
 	dagu := harness.NewRunner(t)
 	result := dagu.Run("schema", "dag", "steps")
 	result.ExpectExitCode(0)
-	require.Contains(t, result.Stdout(), "List of steps that define the DAG")
-	require.NotContains(t, result.Stdout(), `"$schema"`)
+	var schema struct {
+		Description string `json:"description"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(result.Stdout()), &schema))
+	require.Contains(t, schema.Description, "List of steps that define the DAG")
 }
 
 // TestSchemaShowsConfigRootFields asserts on "coordinator", a property that

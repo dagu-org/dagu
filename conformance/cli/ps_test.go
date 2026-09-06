@@ -21,22 +21,6 @@ func TestPsShowsNothingWhenIdle(t *testing.T) {
 	require.Contains(t, result.Stdout(), "No running processes")
 }
 
-func TestPsShowsRunningProcess(t *testing.T) {
-	t.Parallel()
-
-	dagu := harness.NewRunner(t)
-	env := sharedEnv(t)
-	const runID = "cli-ps-run"
-
-	proc := startBackgroundAndWaitFor(t, dagu, env, "started.out", "start", "--run-id="+runID, "long_running.yaml")
-	defer proc.Stop()
-
-	result := dagu.RunWithEnv(env, "ps")
-	result.ExpectExitCode(0)
-	require.Contains(t, result.Stdout(), "long_running")
-	require.Contains(t, result.Stdout(), runID)
-}
-
 func TestPsFiltersByDAGNameAndRunID(t *testing.T) {
 	t.Parallel()
 
@@ -46,6 +30,11 @@ func TestPsFiltersByDAGNameAndRunID(t *testing.T) {
 
 	proc := startBackgroundAndWaitFor(t, dagu, env, "started.out", "start", "--run-id="+runID, "long_running.yaml")
 	defer proc.Stop()
+
+	all := dagu.RunWithEnv(env, "ps")
+	all.ExpectExitCode(0)
+	require.Contains(t, all.Stdout(), "long_running")
+	require.Contains(t, all.Stdout(), runID)
 
 	byName := dagu.RunWithEnv(env, "ps", "-d", "long_running")
 	byName.ExpectExitCode(0)

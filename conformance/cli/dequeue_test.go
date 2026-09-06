@@ -10,19 +10,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestDequeueFirstFromQueue proves the bare `dagu dequeue <queue>` form
-// removes the head of the queue and aborts it. Dequeuing hides the attempt
-// entirely (its stored attempt is renamed to a hidden entry) rather than
-// leaving it visible with status Aborted, so the observable proof is that
-// `dagu status` for that run ID no longer finds any record at all.
+// Dequeue removes the oldest run and leaves the successor queued.
 func TestDequeueFirstFromQueue(t *testing.T) {
 	t.Parallel()
 
 	dagu := harness.NewRunner(t)
 	env := sharedEnv(t)
 	const runID = "cli-dequeue-first"
+	const nextRunID = "cli-dequeue-next"
 
 	dagu.RunWithEnv(env, "enqueue", "--run-id="+runID, "simple.yaml").ExpectExitCode(0)
+	dagu.RunWithEnv(env, "enqueue", "--run-id="+nextRunID, "simple.yaml").ExpectExitCode(0)
 
 	result := dagu.RunWithEnv(env, "dequeue", "simple")
 	result.ExpectExitCode(0)
@@ -30,6 +28,10 @@ func TestDequeueFirstFromQueue(t *testing.T) {
 	status := dagu.RunWithEnv(env, "status", "--run-id="+runID, "simple.yaml")
 	status.ExpectNonZeroExitCode()
 	status.ExpectStderrContains("dag-run ID not found")
+
+	next := dagu.RunWithEnv(env, "status", "--run-id="+nextRunID, "simple.yaml")
+	next.ExpectExitCode(0)
+	require.Equal(t, "Queued", resultStatus(next.Stdout()))
 }
 
 // TestDequeueSpecificDAGRun proves `--dag-run` selects exactly one queued

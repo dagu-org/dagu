@@ -73,19 +73,6 @@ func TestProfileSetVarAppliesToRun(t *testing.T) {
 	dagu.ExpectFileContent("profile_var.out", "hello-from-profile\n")
 }
 
-// TestProfileSetSecretMasksValueInShow proves a secret entry's value is
-// masked when displayed, unlike a plain variable. `profile set-secret` only
-// accepts its value via --value-stdin, and the harness has no way to feed a
-// subprocess's stdin, so this test cannot actually supply a known value to
-// assert is excluded from `show` output -- it is skipped unconditionally
-// rather than asserting on a literal that was never the real secret value
-// (a `show` bug that leaked the actual stored value would still have passed
-// that check). Unskip this once the harness can inject stdin, and assert
-// that exact injected value is excluded from `show`'s output.
-func TestProfileSetSecretMasksValueInShow(t *testing.T) {
-	t.Skip("profile set-secret only accepts a value via --value-stdin, which the harness cannot supply")
-}
-
 func TestProfileEnableDisable(t *testing.T) {
 	t.Parallel()
 

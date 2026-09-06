@@ -16,14 +16,8 @@ import (
 // `msg="Dag-run restart initiated" dag=restartable run-id=<new-id> file=...`
 var restartedRunIDPattern = regexp.MustCompile(`Dag-run restart initiated" dag=\S+ run-id=(\S+)`)
 
-// TestRestartReplacesRunningAttempt proves `dagu restart` stops the active
-// run and immediately starts a fresh one with a new run ID: the step marker
-// (appended, not overwritten) shows exactly two executions -- the original
-// and the restarted one -- the restarted run has a genuinely different run
-// ID from the original (a restart that reused the original ID would still
-// satisfy the marker-count assertion alone), and the original run ID is no
-// longer reported running once restart has taken over.
-func TestRestartReplacesRunningAttempt(t *testing.T) {
+// Restart aborts the original run and completes a distinct replacement.
+func TestRestartReplacesRun(t *testing.T) {
 	t.Parallel()
 
 	dagu := harness.NewRunner(t)
