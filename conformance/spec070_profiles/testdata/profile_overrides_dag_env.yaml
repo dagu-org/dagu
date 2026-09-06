@@ -1,0 +1,4 @@
+env:
+  - SHARED: from-dag-env
+steps:
+  - command: echo "value is $SHARED"
