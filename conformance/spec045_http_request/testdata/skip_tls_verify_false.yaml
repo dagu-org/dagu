@@ -5,3 +5,4 @@ steps:
     with:
       method: GET
       url: $HTTPS_URL/get
+      skip_tls_verify: false

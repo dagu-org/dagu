@@ -7,3 +7,4 @@ steps:
       method: GET
       url: $HTTP_URL/get
       output: response_body.out
+    stdout: failure.out
