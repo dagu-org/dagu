@@ -1,6 +1,0 @@
-working_dir: .
-steps:
-  - action: archive.extract
-    with:
-      source: evil.zip
-      destination: safe_dest

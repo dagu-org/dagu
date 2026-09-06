@@ -2,7 +2,12 @@
 
 ## Status
 
-Implemented.
+Partially implemented.
+
+Conformance covers one small ZIP create/list/extract workflow, dry-run
+output suppression, and representative invalid configurations. Executor tests
+own format matrices, filtering, permissions, malformed archives, and path
+safety edge cases.
 
 This spec defines conformance behavior for the built-in `archive.create`,
 `archive.extract`, and `archive.list` actions.
@@ -28,11 +33,9 @@ This spec covers:
 - `with.password`: meaningful only for 7z and rar archives, and only for
   `archive.extract`/`archive.list`
 - `with.dry_run` (create and extract): reports counts without performing
-  file I/O, but still requires a determinable format
+  filesystem writes, but still reads sources and requires a determinable format
 - that path-escaping entries inside an archive (zip-slip) are rejected
   during extraction
-- the split between build-time and runtime validation for this executor,
-  which differs from other built-in actions
 - validation and runtime errors
 
 This spec does not define:
@@ -63,13 +66,9 @@ Without `with.format`, the format is inferred from `with.destination`'s
 extension (`.zip`, `.tar.gz`, `.tgz`, `.tar.bz2`, `.tar.xz`,
 `.tar.zst`, `.gz`, `.bz2`, `.xz`, `.zst`, `.lz4`, and others).
 
-For `archive.extract` and `archive.list`, the format is detected by
-sniffing the source file's content (using a filename hint), not solely
-by its extension. A file bearing a `.zip` extension that is not
-actually a valid zip file fails with a parse error from the underlying
-format library (for example, `"zip: not a valid zip file"`), not a
-generic "format detection failed" message -- the extension is trusted
-enough to attempt parsing, and the failure surfaces at the parse stage.
+For `archive.extract` and `archive.list`, format detection uses source
+content and the filename. Invalid or unsupported archives fail. Exact
+third-party parser diagnostics are outside this contract.
 
 ### Create
 
@@ -113,8 +112,9 @@ for `archive.extract` and `archive.list` -- setting it for
 ### Dry run
 
 `with.dry_run: true`, for both `archive.create` and `archive.extract`,
-performs no actual file I/O: no archive file is created, and no
-destination directory or file is created for extraction. The result
+performs no filesystem writes: no archive file is created, and no
+destination directory or file is created for extraction. Sources are still
+read to determine formats and counts. The result
 still reports accurate would-be counts (`filesAdded`/`bytesArchived` for
 create, `filesExtracted`/`bytesExtracted` for extract).
 
@@ -122,40 +122,30 @@ create, `filesExtracted`/`bytesExtracted` for extract).
 
 Extracting an archive containing an entry whose name would resolve
 outside `with.destination` (a "zip-slip" entry, such as one named
-`../escape.txt`) is rejected before any file is written, regardless of
-what the archive format itself permits.
+`../escape.txt`) is rejected without writing that entry outside the
+destination. This contract does not require transactional extraction or
+rollback of entries already extracted.
 
 ## Errors
 
 ### Validation
 
-The registered step validator for `archive.*` checks only that the
-operation name (`command`) is non-empty; it does not rerun the full
-custom configuration validation. As a result, only the following are
-rejected at DAG-build-time validation (`dagu validate`), enforced by
-JSON Schema:
+Invalid configurations fail with a nonzero exit status:
 
-- Any `archive.*` action without `with.source`: an error mentioning
-  `missing properties: ["source"]`.
-- `with.strip_components` set to a negative integer: an error
-  mentioning the schema's `minimum` constraint.
+- Any `archive.*` action without `with.source` fails `dagu validate`.
+- Negative `with.strip_components` fails `dagu validate`.
+- `archive.create` requires `with.destination` unless `with.dry_run: true`.
+- `with.password` is valid only for extract/list operations.
 
-All other configuration errors below pass `dagu validate` and surface
-only when the step actually runs:
-
-- `archive.create` without `with.destination` and without
-  `with.dry_run: true`: an error containing `"destination is required
-  for create"`.
-- `with.password` set on `archive.create`: an error containing
-  `"password is only supported for extract/list operations"`.
+This spec does not require invalid configurations to pass validation before
+failing at runtime.
 
 ### Runtime
 
 - `archive.extract`/`archive.list` on a source that does not exist: an
   error containing `"source not found"`.
-- `archive.extract`/`archive.list` on a source whose content does not
-  match its apparent format: a parse error from the underlying archive
-  library (for example, `"zip: not a valid zip file"`).
+- `archive.extract`/`archive.list` on invalid archive content fails with a
+  nonzero exit status.
 - `archive.create` with neither `with.format` nor a destination
   extension to infer from (including under `with.dry_run`): an error
   containing `"could not infer format"`.
@@ -167,7 +157,6 @@ only when the step actually runs:
 
 ## Related Specs
 
-- File actions: [Spec 052: File Actions](052-file.md)
 - Run context: [Spec 017: Built-In Run Context](017-built-in-run-context.md)
 
 ## Examples

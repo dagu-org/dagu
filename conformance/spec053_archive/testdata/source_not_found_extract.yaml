@@ -1,6 +1,0 @@
-working_dir: .
-steps:
-  - action: archive.extract
-    with:
-      source: does-not-exist.zip
-      destination: extracted
