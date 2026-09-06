@@ -1,0 +1,47 @@
+working_dir: .
+steps:
+  - id: mkdir
+    action: file.mkdir
+    with:
+      path: files/nested
+  - id: write
+    depends: mkdir
+    action: file.write
+    with:
+      path: files/source.txt
+      content: moved-content
+  - id: copy
+    depends: write
+    action: file.copy
+    with:
+      source: files/source.txt
+      destination: files/copy.txt
+  - id: move
+    depends: copy
+    action: file.move
+    with:
+      source: files/copy.txt
+      destination: files/destination.txt
+  - id: read
+    depends: move
+    action: file.read
+    stdout: read.txt
+    with:
+      path: files/destination.txt
+  - id: stat
+    depends: read
+    action: file.stat
+    stdout: stat.json
+    with:
+      path: files/destination.txt
+  - id: list
+    depends: stat
+    action: file.list
+    stdout: list.json
+    with:
+      path: files
+  - id: delete
+    depends: list
+    action: file.delete
+    with:
+      path: files/destination.txt

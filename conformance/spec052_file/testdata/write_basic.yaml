@@ -1,6 +1,0 @@
-working_dir: .
-steps:
-  - action: file.write
-    with:
-      path: hello.txt
-      content: "hello world"

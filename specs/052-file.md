@@ -2,7 +2,11 @@
 
 ## Status
 
-Implemented.
+Partially implemented.
+
+Conformance covers one local workflow using each action and required-field
+validation. Executor tests own permission modes, overwrite and dry-run
+options, recursive traversal, metadata details, and filesystem edge cases.
 
 This spec defines conformance behavior for the built-in `file.stat`,
 `file.read`, `file.write`, `file.copy`, `file.move`, `file.delete`,
@@ -11,8 +15,7 @@ This spec defines conformance behavior for the built-in `file.stat`,
 ## Scope
 
 This spec defines the `file.*` actions, which operate on ordinary local
-filesystem paths -- unlike [Spec 051: Artifact Actions](051-artifact.md),
-which confines every path to an isolated per-DAG-run directory.
+filesystem paths relative to the step working directory or an absolute path.
 
 This spec covers:
 
@@ -72,7 +75,8 @@ inside any particular directory.
 
 `file.write` requires `with.content` and `with.path`. `with.mode` sets
 the new file's permission bits (an octal string such as `"0640"`);
-it defaults to `0600`. Without `with.overwrite`, writing to a path that
+it defaults to `0600`. The process umask may restrict permissions on
+new files. Without `with.overwrite`, writing to a path that
 already exists fails; with `with.overwrite: true`, the existing file is
 replaced (`with.atomic`, default `true`, governs how). `with.create_dirs:
 true` creates missing parent directories first. `with.dry_run: true`
@@ -107,7 +111,8 @@ performing it.
 `file.delete` requires `with.path`. Deleting a directory requires
 `with.recursive: true`. `with.missing_ok: true` makes a missing path
 succeed, with `deleted: false`, instead of failing. `file.mkdir` creates
-`with.path` (and any missing parents), applying `with.mode` when set.
+`with.path` (and any missing parents), applying `with.mode` when set,
+subject to the process umask.
 
 ### List
 
@@ -152,8 +157,6 @@ validate`), not only when the step runs:
 
 ## Related Specs
 
-- Artifact-scoped file actions: [Spec 051: Artifact
-  Actions](051-artifact.md)
 - Run context: [Spec 017: Built-In Run Context](017-built-in-run-context.md)
 
 ## Examples
