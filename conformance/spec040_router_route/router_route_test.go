@@ -58,7 +58,7 @@ func TestRouteRuntime(t *testing.T) {
 		absent []string
 	}{
 		{
-			name:   "exact match runs only the matching target",
+			name:   "exact match rejects a substring",
 			file:   "basic_route.yaml",
 			want:   []routeFile{{"b.out", "ran-b\n"}},
 			absent: []string{"a.out"},
@@ -82,6 +82,11 @@ func TestRouteRuntime(t *testing.T) {
 			name: "one pattern with multiple targets fans out to all of them",
 			file: "fanout_single_route.yaml",
 			want: []routeFile{{"t1.out", "t1\n"}, {"t2.out", "t2\n"}},
+		},
+		{
+			name: "unresolved literal matches a catch-all",
+			file: "unresolved_value.yaml",
+			want: []routeFile{{"matched.out", "matched\n"}},
 		},
 		{
 			name:   "no matching pattern skips every target and still succeeds",
@@ -126,7 +131,7 @@ func TestRouteDiagnosticOutput(t *testing.T) {
 	dagu := harness.NewRunner(t)
 	result := dagu.Run("start", "basic_route.yaml")
 	result.ExpectExitCode(0)
-	require.Equal(t, "Router evaluating: b\n  a -> [branch_a]\n  b -> [branch_b]\n", stepStdout(t, result.Stdout()))
+	require.Equal(t, "Router evaluating: ab\n  a -> [branch_a]\n  ab -> [branch_b]\n", stepStdout(t, result.Stdout()))
 }
 
 // TestRouteValidation proves the errors DAG-build-time validation rejects
@@ -148,6 +153,11 @@ func TestRouteValidation(t *testing.T) {
 			name:        "missing with.routes",
 			file:        "missing_routes.yaml",
 			stderrParts: []string{"with.routes is required"},
+		},
+		{
+			name:        "empty routes",
+			file:        "empty_routes.yaml",
+			stderrParts: []string{"requires at least one route"},
 		},
 		{
 			name:        "same step targeted by more than one route",

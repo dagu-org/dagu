@@ -1,0 +1,10 @@
+working_dir: .
+steps:
+  - name: pick
+    action: router.route
+    with:
+      value: "$DAGU_CONFORMANCE_UNDEFINED_ROUTE"
+      routes:
+        "re:.*": [matched]
+  - name: matched
+    run: echo matched > matched.out

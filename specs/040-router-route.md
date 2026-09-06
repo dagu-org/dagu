@@ -16,8 +16,7 @@ matches.
 This spec covers:
 
 - the `with.value` and `with.routes` fields
-- how routing decisions are expressed as preconditions injected onto target
-  steps, not as an executor-level branch
+- matching targets run after the router step completes
 - that route matching is independent per target, not first-match-wins
 - fan-out: multiple targets under one pattern, and multiple patterns
   matching the same value at once
@@ -58,19 +57,12 @@ names: `{pattern: [step1, step2, ...]}`. Each pattern is matched against the
 resolved value the same way a step `precondition`'s `expected` matches its
 `condition` -- an exact string, or a `re:`-prefixed regular expression.
 
-### Routing is precondition injection, not branching
+### Target execution
 
-`router.route` does not choose a single branch. At DAG build time, for
-every `pattern: [targets]` entry, each named target step gets:
-
-- a precondition added requiring `with.value`'s resolved value to match
-  that pattern
-- a dependency on the router step (if it does not already have one)
-- `continueOn.skipped: true`, so a step that depends on this target still
-  runs normally even when this target itself is skipped
-
-Each target's precondition is evaluated independently, the same way any
-other step's `precondition` is evaluated when that step is about to run.
+Each target runs after the router when its pattern matches the resolved value
+and its own preconditions pass. Matching is independent for every target.
+Steps depending on a skipped target may still run; authors do not need to add
+`continue_on: skipped` to routed targets.
 
 ### Fan-out and "no match" are both normal outcomes
 
@@ -88,7 +80,7 @@ Because each target's match is independent:
 The router step's own run writes exactly this to its stdout, which is the
 step output the DAG-run's own tree render inlines:
 
-```
+```text
 Router evaluating: <resolved value>
   <pattern 1> -> [<targets 1>]
   <pattern 2> -> [<targets 2>]
@@ -97,7 +89,7 @@ Router evaluating: <resolved value>
 
 The first line is the literal text `Router evaluating:` followed by a
 space and the resolved value verbatim (no quoting), then a newline. Each
-route prints two leading spaces, its literal pattern text, ` -> `, then its
+route prints two leading spaces, its literal pattern text, `->` surrounded by spaces, then its
 targets as a Go string-slice literal (`[target1 target2]`, brackets,
 space-separated, no quotes or commas), each on its own line. Exact-pattern
 routes are printed before
@@ -112,7 +104,8 @@ starts running. Each condition's error text is normative and must contain
 the quoted wording below (exact surrounding phrasing may vary):
 
 - `with.value` is missing: `"with.value is required"`.
-- `with.routes` is missing, or is empty: `"with.routes is required"`.
+- `with.routes` is missing: `"with.routes is required"`.
+- `with.routes` is empty: `"router step requires at least one route"`.
 - A route's pattern is empty: `"route pattern cannot be empty"`.
 - A route lists no targets: `"has no targets"`.
 - A route lists an empty target name: `"has empty target"`.
