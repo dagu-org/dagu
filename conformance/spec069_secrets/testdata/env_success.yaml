@@ -1,0 +1,6 @@
+secrets:
+  - name: MY_SECRET
+    provider: env
+    key: SOURCE_SECRET_VALUE
+steps:
+  - command: echo "value is $MY_SECRET"

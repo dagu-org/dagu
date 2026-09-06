@@ -1,0 +1,6 @@
+secrets:
+  - name: MY_SECRET
+    provider: kubernetes
+    key: no-slash-here
+steps:
+  - command: echo hi

@@ -1,0 +1,6 @@
+secrets:
+  - name: MY_SECRET
+    provider: gcp
+    key: bare-id-no-options
+steps:
+  - command: echo hi

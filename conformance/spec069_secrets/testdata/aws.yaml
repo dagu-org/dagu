@@ -1,0 +1,8 @@
+secrets:
+  - name: MY_SECRET
+    provider: aws
+    key: mysecret
+    options:
+      region: us-east-1
+steps:
+  - command: echo "value is $MY_SECRET"

@@ -1,0 +1,6 @@
+secrets:
+  - name: MY_SECRET
+    provider: file
+    key: file_secret.txt
+steps:
+  - command: echo "value is $MY_SECRET"

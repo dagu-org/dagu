@@ -1,0 +1,5 @@
+secrets:
+  - name: MY_SECRET
+    ref: Bad_Ref!
+steps:
+  - command: echo hi

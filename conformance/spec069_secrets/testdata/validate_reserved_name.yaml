@@ -1,0 +1,6 @@
+secrets:
+  - name: DAG_NAME
+    provider: env
+    key: X
+steps:
+  - command: echo hi

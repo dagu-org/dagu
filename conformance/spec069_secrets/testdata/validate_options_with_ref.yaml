@@ -1,0 +1,7 @@
+secrets:
+  - name: MY_SECRET
+    ref: foo/bar
+    options:
+      x: "1"
+steps:
+  - command: echo hi

@@ -1,0 +1,9 @@
+secrets:
+  - name: MY_SECRET
+    provider: env
+    key: A
+  - name: MY_SECRET
+    provider: env
+    key: B
+steps:
+  - command: echo hi

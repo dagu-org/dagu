@@ -1,0 +1,6 @@
+secrets:
+  - name: MY_SECRET
+    provider: nope
+    key: something
+steps:
+  - command: echo hi

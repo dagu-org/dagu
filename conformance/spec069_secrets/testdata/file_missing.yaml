@@ -1,0 +1,6 @@
+secrets:
+  - name: MY_SECRET
+    provider: file
+    key: does-not-exist.txt
+steps:
+  - command: echo hi

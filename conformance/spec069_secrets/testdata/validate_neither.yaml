@@ -1,0 +1,4 @@
+secrets:
+  - name: MY_SECRET
+steps:
+  - command: echo hi

@@ -1,0 +1,6 @@
+secrets:
+  - name: "123bad"
+    provider: env
+    key: X
+steps:
+  - command: echo hi

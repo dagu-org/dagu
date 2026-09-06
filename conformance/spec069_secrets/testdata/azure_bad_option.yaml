@@ -1,0 +1,8 @@
+secrets:
+  - name: MY_SECRET
+    provider: azure
+    key: my-secret
+    options:
+      bogus: x
+steps:
+  - command: echo hi

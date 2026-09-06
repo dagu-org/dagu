@@ -1,0 +1,5 @@
+secrets:
+  - provider: env
+    key: X
+steps:
+  - command: echo hi

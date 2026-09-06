@@ -1,0 +1,6 @@
+secrets:
+  - name: MY_SECRET
+    provider: env
+    key: DAGU_CONFORMANCE_UNSET_SECRET_VAR
+steps:
+  - command: echo hi
