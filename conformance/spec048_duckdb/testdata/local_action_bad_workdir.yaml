@@ -1,3 +1,0 @@
-working_dir: .
-steps:
-  - action: "source:./bad_workdir_action@v1"

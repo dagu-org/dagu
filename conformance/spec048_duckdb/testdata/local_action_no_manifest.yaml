@@ -1,3 +1,0 @@
-working_dir: .
-steps:
-  - action: "source:./no_manifest_action@v1"

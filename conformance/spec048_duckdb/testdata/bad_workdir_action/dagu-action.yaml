@@ -1,3 +1,0 @@
-apiVersion: v1alpha1
-name: bad-workdir-action
-dag: workflow.yaml

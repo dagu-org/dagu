@@ -1,6 +1,0 @@
-type: graph
-working_dir: /tmp
-
-steps:
-  - id: noop
-    run: "true"
