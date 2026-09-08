@@ -5,6 +5,7 @@ package spec070_profiles_test
 
 import (
 	"net/http"
+	"os"
 	"testing"
 
 	api "github.com/dagucloud/dagu/v2/api/v1"
@@ -15,7 +16,7 @@ import (
 // A webhook caller selects a runtime profile with the X-Dagu-Profile header,
 // restricted to the profiles ConfigureDAGWebhookProfileSelection allowed for
 // that webhook.
-func TestWebhookProfileSelectionApplies(t *testing.T) {
+func TestWebhookProfile(t *testing.T) {
 	t.Parallel()
 
 	server, adminToken := setupBuiltinAuthServer(t)
@@ -49,22 +50,18 @@ func TestWebhookProfileSelectionApplies(t *testing.T) {
 
 	test.ProcessQueuedInlineRun(t, server, dagName)
 
-	getResp := server.Client().Get("/api/v1/dag-runs/" + dagName + "/" + string(trigger.DagRunId)).
-		WithBearerToken(adminToken).ExpectStatus(http.StatusOK).Send(t)
-	var details struct {
-		DAGRunDetails struct {
-			StatusLabel string `json:"statusLabel"`
-			ProfileName string `json:"profileName"`
-		} `json:"dagRunDetails"`
-	}
-	getResp.Unmarshal(t, &details)
-	require.Equal(t, "succeeded", details.DAGRunDetails.StatusLabel, "body: %s", getResp.Body)
-	require.Equal(t, "webhookprof", details.DAGRunDetails.ProfileName)
+	details := waitForRun(t, server, adminToken, dagName, string(trigger.DagRunId))
+	require.NotNil(t, details.ProfileName)
+	require.Equal(t, api.RuntimeProfileName("webhookprof"), *details.ProfileName)
+	require.Len(t, details.Nodes, 1)
+	output, err := os.ReadFile(details.Nodes[0].Stdout)
+	require.NoError(t, err)
+	require.Contains(t, string(output), "from-webhook-profile")
 }
 
 // A webhook caller naming a profile outside the configured allow-list is
 // rejected before any DAG-run is created.
-func TestWebhookProfileSelectionRejectsDisallowedProfile(t *testing.T) {
+func TestDisallowedWebhookProfile(t *testing.T) {
 	t.Parallel()
 
 	server, adminToken := setupBuiltinAuthServer(t)
@@ -79,6 +76,9 @@ func TestWebhookProfileSelectionRejectsDisallowedProfile(t *testing.T) {
 	server.Client().Post("/api/v1/profiles", api.CreateRuntimeProfileRequest{Name: "allowedprof"}).
 		WithBearerToken(adminToken).ExpectStatus(http.StatusCreated).Send(t)
 
+	server.Client().Post("/api/v1/profiles", api.CreateRuntimeProfileRequest{Name: "disallowedprof"}).
+		WithBearerToken(adminToken).ExpectStatus(http.StatusCreated).Send(t)
+
 	createHookResp := server.Client().Post("/api/v1/dags/"+dagName+"/webhook", nil).
 		WithBearerToken(adminToken).ExpectStatus(http.StatusCreated).Send(t)
 	var hookCreate api.WebhookCreateResponse
@@ -90,7 +90,13 @@ func TestWebhookProfileSelectionRejectsDisallowedProfile(t *testing.T) {
 
 	rejectResp := server.Client().Post("/api/v1/webhooks/"+dagName, api.WebhookRequest{}).
 		WithBearerToken(hookCreate.Token).
-		WithHeader("X-Dagu-Profile", "not-allowed").
+		WithHeader("X-Dagu-Profile", "disallowedprof").
 		ExpectStatus(http.StatusForbidden).Send(t)
 	require.Contains(t, rejectResp.Body, "runtime profile selection is not allowed for this webhook")
+
+	response := server.Client().Get("/api/v1/dag-runs/" + dagName).
+		WithBearerToken(adminToken).ExpectStatus(http.StatusOK).Send(t)
+	var runs api.DAGRunsPageResponse
+	response.Unmarshal(t, &runs)
+	require.Empty(t, runs.DagRuns)
 }

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	api "github.com/dagucloud/dagu/v2/api/v1"
+	"github.com/dagucloud/dagu/v2/conformance/harness"
 	"github.com/dagucloud/dagu/v2/internal/cmn/config"
 	"github.com/dagucloud/dagu/v2/internal/license"
 	"github.com/dagucloud/dagu/v2/internal/service/frontend"
@@ -81,23 +82,27 @@ func runInlineSpec(t *testing.T, server test.Server, token, spec, name, profile 
 	}
 	startResp.Unmarshal(t, &started)
 
-	getResp := withAuth(server.Client().Get("/api/v1/dag-runs/"+name+"/"+started.DagRunID), token).
-		ExpectStatus(http.StatusOK).Send(t)
-	var details struct {
-		DAGRunDetails struct {
-			StatusLabel string `json:"statusLabel"`
-			Nodes       []struct {
-				Stdout string `json:"stdout"`
-			} `json:"nodes"`
-		} `json:"dagRunDetails"`
-	}
-	getResp.Unmarshal(t, &details)
-	require.Equal(t, "succeeded", details.DAGRunDetails.StatusLabel, "body: %s", getResp.Body)
-	require.Len(t, details.DAGRunDetails.Nodes, 1)
+	details := waitForRun(t, server, token, name, started.DagRunID)
+	require.Len(t, details.Nodes, 1)
 
-	content, err := os.ReadFile(details.DAGRunDetails.Nodes[0].Stdout)
+	content, err := os.ReadFile(details.Nodes[0].Stdout)
 	require.NoError(t, err)
 	return string(content)
+}
+
+// waitForRun waits for asynchronous execution before reading its final output.
+func waitForRun(t *testing.T, server test.Server, token, name, runID string) api.DAGRunDetails {
+	t.Helper()
+
+	var details api.GetDAGRunDetails200JSONResponse
+	require.Eventually(t, func() bool {
+		response := withAuth(server.Client().Get("/api/v1/dag-runs/"+name+"/"+runID), token).
+			ExpectStatus(http.StatusOK).Send(t)
+		response.Unmarshal(t, &details)
+		return details.DagRunDetails.FinishedAt != ""
+	}, harness.WaitTimeout(t), 50*time.Millisecond)
+	require.Equal(t, api.StatusLabelSucceeded, details.DagRunDetails.StatusLabel)
+	return details.DagRunDetails
 }
 
 // setupBuiltinAuthServer starts a server with builtin auth and webhook

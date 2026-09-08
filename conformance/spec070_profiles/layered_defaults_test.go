@@ -43,7 +43,7 @@ func TestLayeredDefaultsPrecedence(t *testing.T) {
 
 // A run naming a workspace with no configured defaults, or naming none at
 // all, still applies global defaults and the selected profile.
-func TestLayeredDefaultsWithoutWorkspace(t *testing.T) {
+func TestAbsentWorkspaceDefaults(t *testing.T) {
 	t.Parallel()
 
 	server := test.SetupServer(t)
@@ -51,10 +51,23 @@ func TestLayeredDefaultsWithoutWorkspace(t *testing.T) {
 
 	setVariable(t, server, noAuth, "_global", "GLOBAL_VAR", "global-value")
 
-	spec := "steps:\n  - command: echo \"$GLOBAL_VAR\"\n"
-	output := runInlineSpec(t, server, noAuth, spec, "no-workspace-dag", "", nil)
+	server.Client().Post("/api/v1/profiles", api.CreateRuntimeProfileRequest{Name: "selected"}).
+		ExpectStatus(http.StatusCreated).Send(t)
+	setVariable(t, server, noAuth, "selected", "SELECTED_VAR", "selected-value")
 
-	require.Contains(t, output, "global-value")
+	spec := "steps:\n  - command: echo \"$GLOBAL_VAR $SELECTED_VAR\"\n"
+	for _, tc := range []struct {
+		name   string
+		labels []string
+	}{
+		{"no-workspace", nil},
+		{"unconfigured-workspace", []string{"workspace=unconfigured"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			output := runInlineSpec(t, server, noAuth, spec, tc.name, "selected", tc.labels)
+			require.Contains(t, output, "global-value selected-value")
+		})
+	}
 }
 
 // A profile secret entry resolves and is masked in run output the same way a
