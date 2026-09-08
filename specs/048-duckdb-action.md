@@ -5,31 +5,18 @@
 Partially implemented.
 
 Conformance accepts a `duckdb@v1` reference and exercises Dagu's action
-input/output boundary with a local bundle. It does not download or run
-DuckDB itself. Conformance does exercise the generic `source:<target>@version`
-reference form's real git-clone transport, against a custom (non-official,
-non-`dagucloud/*`) git-hosted action -- not just the local-directory
-shortcut. SQL behavior and tool provisioning belong in action and executor
-tests.
+input/output boundary with local bundles and a loopback Git repository.
+It does not download or run DuckDB. SQL behavior, tool provisioning, Git
+server policy, and cache mechanics belong in action and executor tests.
 
 ## Scope
 
 This spec covers versioned action references and manifest input/output
-validation, including:
+validation. `source:./directory@version` selects a local bundle;
+`source:<git-url>@version` selects an action from a Git repository.
 
-- `source:./directory@version` and `source:file://...@version`, both of
-  which resolve to a local directory tree directly, with no git operation
-  at all
-- `source:<git-url>@version`, where `<git-url>` is any git-clonable
-  target that does *not* resolve to an existing local directory (an
-  `http://`, `https://`, `ssh://`, `git://`, or SCP-like `user@host:path`
-  URL, or a bare `owner/repo`/`name` official short name) -- this clones
-  the repository for real, checks out the requested tag/branch/commit, and
-  caches the result by its resolved commit SHA, regardless of whether the
-  host is `github.com/dagucloud/*` or an arbitrary custom git remote
-
-It does not define DuckDB's SQL dialect, tool installation, or any specific
-git host's own availability or authentication requirements.
+It does not define DuckDB's SQL dialect, tool installation, or a Git host's
+availability and authentication requirements.
 
 ## Goal
 
@@ -54,14 +41,8 @@ git-hosted action as for an official one: the manifest and workflow files
 `dagu-action.yaml`/`dag:` name inside the cloned repository play the exact
 same role regardless of where the repository came from.
 
-For `source:<git-url>@version` specifically: the version is resolved to a
-commit the same way for any git host -- `git ls-remote` against
-`refs/tags/<version>` (preferring the peeled/annotated-tag commit),
-`refs/tags/<version>` unpeeled, then `refs/heads/<version>`, falling back to
-treating `<version>` itself as a full commit SHA. The resolved commit is
-then checked out and cached under a directory keyed by the repository URL
-and that commit SHA, so a later reference to the same repository and
-version reuses the cached checkout rather than cloning again.
+A Git source action executes the requested tag, branch, or commit using the
+same manifest input/output contract as a local action.
 
 ## Errors
 
@@ -69,15 +50,9 @@ A source reference without a version fails validation. Input and output schema
 violations fail execution with diagnostics identifying the corresponding action
 schema. Schema-library wording beyond that identification is not normative.
 
-For `source:<git-url>@version` specifically:
-
-- A version that names no tag, branch, or commit the repository has: the
-  step fails with an error containing `did not match any file(s) known to
-  git`.
-- A repository the git host does not export, or does not exist: the step
-  fails with an error containing `repository not exported` (or an
-  equivalent transport-level failure) -- not a Dagu-specific message, since
-  this is the underlying `git` command's own output.
+An unavailable repository or revision fails execution with a diagnostic
+identifying the action clone or checkout failure. Git's diagnostic wording
+is not normative.
 
 ## Examples
 

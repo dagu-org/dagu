@@ -45,74 +45,19 @@ func stepStdout(t *testing.T, daguStartOutput string, n int) string {
 // configuration.
 var gitEnv = []string{"GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=" + os.DevNull}
 
-// gitActionServer serves a real echo-action bundle (the same shape as
-// testdata/echo_action) over the git:// protocol via a real git daemon, so
-// tests can reference it with a genuine "source:git://...@version" URL --
-// a target resolveSourceBundle cannot mistake for a local directory (unlike
-// a plain path or a file:// URL), forcing it through the real
-// clone-over-network code path (cloneGitSource in
-// internal/runtime/builtin/action/resolver.go), the same as it would for
-// any non-official, custom git-hosted action.
-type gitActionServer struct {
-	Port int
-}
-
-// RepoURL returns the git:// URL for the named repo this server exports.
-func (s gitActionServer) RepoURL(name string) string {
-	return fmt.Sprintf("git://127.0.0.1:%d/%s", s.Port, name)
-}
-
-// startGitActionServer creates a one-commit, tag "v1" git repository shaped
-// like an echo-action bundle (dagu-action.yaml + workflow.yaml, requiring
-// with.message and echoing it back as outputs.echoed) under a fresh temp
-// directory, then serves it (and anything else placed under the same base
-// directory before this call returns) with a real "git daemon" process on
-// a free loopback port. The daemon is killed via t.Cleanup.
-func startGitActionServer(t *testing.T, repoName string) gitActionServer {
+// startGitActionServer serves the local action fixture over Git transport.
+func startGitActionServer(t *testing.T) int {
 	t.Helper()
 
 	basePath := t.TempDir()
-	repoDir := filepath.Join(basePath, repoName)
+	repoDir := filepath.Join(basePath, "echo-action")
 	require.NoError(t, os.MkdirAll(repoDir, 0o750))
 
 	runGit(t, repoDir, "init", "-q", "-b", "main")
 	runGit(t, repoDir, "config", "user.email", "conformance@example.com")
 	runGit(t, repoDir, "config", "user.name", "Conformance Test")
 
-	require.NoError(t, os.WriteFile(filepath.Join(repoDir, "dagu-action.yaml"), []byte(`apiVersion: v1alpha1
-name: echo-action
-dag: workflow.yaml
-inputs:
-  type: object
-  additionalProperties: false
-  required: [message]
-  properties:
-    message:
-      type: string
-      minLength: 1
-outputs:
-  type: object
-  additionalProperties: false
-  required: [echoed]
-  properties:
-    echoed:
-      type: string
-`), 0o600))
-	require.NoError(t, os.WriteFile(filepath.Join(repoDir, "workflow.yaml"), []byte(`type: graph
-params:
-  type: object
-  additionalProperties: false
-  required: [message]
-  properties:
-    message:
-      type: string
-steps:
-  - id: echo
-    run: printf '%s' "$message"
-    stdout:
-      outputs:
-        field: echoed
-`), 0o600))
+	require.NoError(t, os.CopyFS(repoDir, os.DirFS("testdata/echo_action")))
 
 	runGit(t, repoDir, "add", "-A")
 	runGit(t, repoDir, "-c", "commit.gpgsign=false", "commit", "-q", "-m", "initial")
@@ -136,7 +81,7 @@ steps:
 	})
 
 	waitForPort(t, port)
-	return gitActionServer{Port: port}
+	return port
 }
 
 func runGit(t *testing.T, dir string, args ...string) string {

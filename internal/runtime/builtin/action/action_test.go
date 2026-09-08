@@ -86,6 +86,13 @@ func TestResolveSourceBundleCachesByResolvedSHA(t *testing.T) {
 	assert.Equal(t, filepath.Join(toolsDir, "actions", "source", repoKey, sha), root)
 	assert.Equal(t, sha, resolved)
 	assert.FileExists(t, filepath.Join(root, manifestFileName))
+
+	// A pinned commit remains usable when the source repository is unavailable.
+	require.NoError(t, os.Rename(filepath.Join(repoDir, ".git"), filepath.Join(repoDir, ".git-offline")))
+	cached, cachedSHA, err := cloneGitSource(ctx, repoDir, sha, resolveOptions{ToolsDir: toolsDir})
+	require.NoError(t, err)
+	assert.Equal(t, root, cached)
+	assert.Equal(t, sha, cachedSHA)
 }
 
 func TestResolvePackagePrefixRejectsTraversal(t *testing.T) {
