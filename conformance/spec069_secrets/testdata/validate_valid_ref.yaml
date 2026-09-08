@@ -1,0 +1,5 @@
+secrets:
+  - name: MY_SECRET
+    ref: 0/env-1-/2--x
+steps:
+  - command: echo hi

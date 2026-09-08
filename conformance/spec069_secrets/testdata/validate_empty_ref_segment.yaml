@@ -1,0 +1,5 @@
+secrets:
+  - name: MY_SECRET
+    ref: a//b
+steps:
+  - command: echo hi

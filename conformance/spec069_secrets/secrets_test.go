@@ -4,11 +4,14 @@
 package spec069_secrets_test
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/dagucloud/dagu/v2/conformance/harness"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -36,7 +39,7 @@ func TestEnvProviderMissingVariable(t *testing.T) {
 }
 
 // The file provider resolves relative paths against the DAG's own directory.
-func TestFileProviderResolvesAndMasksValue(t *testing.T) {
+func TestFileProviderMasksValue(t *testing.T) {
 	t.Parallel()
 
 	dagu := harness.NewRunner(t)
@@ -66,7 +69,7 @@ func TestUnknownProvider(t *testing.T) {
 
 // Build-time validation rejects malformed secret declarations before any
 // provider is contacted.
-func TestValidateRejectsMalformedSecrets(t *testing.T) {
+func TestSecretValidation(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -82,6 +85,8 @@ func TestValidateRejectsMalformedSecrets(t *testing.T) {
 		{"validate_neither.yaml", "exactly one of 'ref' or 'provider' plus 'key' is required"},
 		{"validate_options_with_ref.yaml", "'options' cannot be used with registry ref"},
 		{"validate_bad_ref_pattern.yaml", "registry ref must be a slash-separated lowercase slug path"},
+		{"validate_empty_ref_segment.yaml", "registry ref must be a slash-separated lowercase slug path"},
+		{"validate_valid_ref.yaml", ""},
 	}
 
 	for _, tc := range tests {
@@ -90,6 +95,10 @@ func TestValidateRejectsMalformedSecrets(t *testing.T) {
 
 			dagu := harness.NewRunner(t)
 			result := dagu.Run("validate", tc.fixture)
+			if tc.errText == "" {
+				result.ExpectExitCode(0)
+				return
+			}
 			result.ExpectNonZeroExitCode()
 			result.ExpectStderrContains(tc.errText)
 		})
@@ -98,7 +107,7 @@ func TestValidateRejectsMalformedSecrets(t *testing.T) {
 
 // Providers whose parsing fails before any network client is created report
 // a provider-specific diagnostic. No provider here ever dials out.
-func TestProviderSpecificValidationFailsWithoutNetwork(t *testing.T) {
+func TestProviderValidation(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -123,14 +132,12 @@ func TestProviderSpecificValidationFailsWithoutNetwork(t *testing.T) {
 	}
 }
 
-// The AWS Secrets Manager provider uses the standard AWS SDK, which honors
-// AWS_ENDPOINT_URL. A local mock server proves the real client, request
-// signing, and JSON 1.1 response parsing all work end-to-end.
+// A local endpoint checks AWS provider dispatch and secret masking.
 func TestAWSProviderLiveResolve(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, "secretsmanager.GetSecretValue", r.Header.Get("X-Amz-Target"))
+		checkAWSRequest(t, r)
 		w.Header().Set("Content-Type", "application/x-amz-json-1.1")
 		_, _ = w.Write([]byte(`{"Name":"mysecret","SecretString":"awssecretvalue456"}`))
 	}))
@@ -147,6 +154,7 @@ func TestAWSProviderNotFound(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		checkAWSRequest(t, r)
 		w.Header().Set("Content-Type", "application/x-amz-json-1.1")
 		w.Header().Set("X-Amzn-Errortype", "ResourceNotFoundException")
 		w.WriteHeader(http.StatusBadRequest)
@@ -160,9 +168,28 @@ func TestAWSProviderNotFound(t *testing.T) {
 	result.ExpectStderrContains(`AWS Secrets Manager secret "mysecret" was not found`)
 }
 
+func checkAWSRequest(t *testing.T, r *http.Request) {
+	t.Helper()
+	assert.Equal(t, "secretsmanager.GetSecretValue", r.Header.Get("X-Amz-Target"))
+	var request struct {
+		SecretID string `json:"SecretId"`
+	}
+	if assert.NoError(t, json.NewDecoder(r.Body).Decode(&request)) {
+		assert.Equal(t, "mysecret", request.SecretID)
+	}
+}
+
 func awsMockEnv(endpoint string) []string {
 	return []string{
 		"AWS_ENDPOINT_URL=" + endpoint,
+		"AWS_ENDPOINT_URL_SECRETS_MANAGER=" + endpoint,
+		"AWS_IGNORE_CONFIGURED_ENDPOINT_URLS=false",
+		"AWS_PROFILE=",
+		"AWS_DEFAULT_PROFILE=",
+		"AWS_CONFIG_FILE=" + os.DevNull,
+		"AWS_SHARED_CREDENTIALS_FILE=" + os.DevNull,
+		"AWS_SESSION_TOKEN=",
+		"AWS_EC2_METADATA_DISABLED=true",
 		"AWS_ACCESS_KEY_ID=conformance-test",
 		"AWS_SECRET_ACCESS_KEY=conformance-test",
 		"AWS_REGION=us-east-1",

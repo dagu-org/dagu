@@ -56,7 +56,11 @@ Build-time validation, independent of any provider:
 - Names must be unique within a DAG.
 - Exactly one of `ref` or `provider` plus `key` must be set.
 - `options` is rejected alongside `ref`.
-- `ref` must be a slash-separated lowercase slug path.
+- `ref` must match `[a-z0-9][a-z0-9-]*(/[a-z0-9][a-z0-9-]*)*` in full.
+  Each nonempty segment starts with an ASCII lowercase letter or digit,
+  followed by ASCII lowercase letters, digits, or hyphens. Internal and
+  trailing hyphens are allowed. Empty segments, leading or trailing slashes,
+  uppercase letters, underscores, and Unicode characters are rejected.
 
 All secrets are resolved once, before any step runs. A DAG run fails
 immediately if any secret fails to resolve; no steps execute.
