@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/dagucloud/dagu/v2/conformance/harness"
+	"github.com/dagucloud/dagu/v2/internal/cmn/cmdutil"
 	"github.com/stretchr/testify/require"
 )
 
@@ -43,7 +44,14 @@ func stepStdout(t *testing.T, daguStartOutput string, n int) string {
 // spec055_git's own git fixtures do, so the git commands this file's setup
 // and dagu's own action source resolver run see a clean, predictable git
 // configuration.
-var gitEnv = []string{"GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=" + os.DevNull}
+var gitEnv = []string{
+	"GIT_CONFIG_NOSYSTEM=1",
+	"GIT_CONFIG_GLOBAL=" + os.DevNull,
+	// Git must support nested action-cache paths on Windows.
+	"GIT_CONFIG_COUNT=1",
+	"GIT_CONFIG_KEY_0=core.longpaths",
+	"GIT_CONFIG_VALUE_0=true",
+}
 
 // startGitActionServer serves the local action fixture over Git transport.
 func startGitActionServer(t *testing.T) int {
@@ -74,10 +82,15 @@ func startGitActionServer(t *testing.T) int {
 		basePath,
 	)
 	cmd.Env = append(os.Environ(), gitEnv...)
-	require.NoError(t, cmd.Start())
+	proc, err := cmdutil.StartManagedProcess(cmd)
+	require.NoError(t, err)
 	t.Cleanup(func() {
-		_ = cmd.Process.Kill()
-		_ = cmd.Wait()
+		_, _ = proc.Stop(cmdutil.StopRequest{
+			Intent: cmdutil.ForceTermination(),
+			Reason: cmdutil.StopReasonShutdown,
+		})
+		_ = proc.Wait()
+		_ = proc.Release()
 	})
 
 	waitForPort(t, port)
