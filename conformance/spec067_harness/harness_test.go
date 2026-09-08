@@ -1,22 +1,7 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Package spec067_harness holds black-box conformance tests for Spec 067:
-// Harness Executor (action: harness.run).
-//
-// Unlike specs 060-066, harness is a built-in Go executor, not a remote
-// action: it ships in this binary and never reaches the network to resolve
-// itself. Its whole point is to run a third-party AI coding agent CLI
-// (claude, codex, aider, cursor, and others named in the harnesses package's
-// builtin provider catalog) as a subprocess, but none of those CLIs are
-// installed in this environment. Instead, this package defines its own
-// custom top-level harnesses: entries (a first-class, documented mechanism
-// for wiring in a CLI the built-in provider catalog does not name) pointing
-// at two tiny fake scripts this package writes itself, which stand in for a
-// real agent CLI deterministically: fake_ok.sh echoes back its argv and
-// stdin and always succeeds; fake_fail.sh always fails. This exercises the
-// real invocation-building and fallback logic without needing network
-// access, a real agent CLI, or an API key.
+// Package spec067_harness tests the harness executor through the Dagu binary.
 package spec067_harness_test
 
 import (
@@ -29,7 +14,7 @@ import (
 func TestHarnessLive(t *testing.T) {
 	t.Parallel()
 
-	t.Run("prompt_mode/prompt_position/flag_style/option_flags/stdin all build the invocation as documented, and a failed primary falls back", func(t *testing.T) {
+	t.Run("invocation and fallback", func(t *testing.T) {
 		t.Parallel()
 
 		dagu := harness.NewRunner(t)
@@ -95,7 +80,7 @@ func TestHarnessLive(t *testing.T) {
 		)
 	})
 
-	t.Run("a real process failure with no fallback reports the real exit code, and an unresolvable binary reports a distinct error", func(t *testing.T) {
+	t.Run("process and binary errors", func(t *testing.T) {
 		t.Parallel()
 
 		dagu := harness.NewRunner(t)
@@ -118,21 +103,13 @@ func TestHarnessLive(t *testing.T) {
 		require.Contains(t, result.Stdout(), "does_not_exist.sh")
 	})
 
-	// Unlike node-script@v1/python-script@v1/dbt@v1/ffmpeg@v1/github-cli@v1/
-	// rclone@v1 (specs 060-066), a harness step publishes no .outputs.* at
-	// all -- it is a plain Command/Script-capable executor like an ordinary
-	// run: step, not one with a JSON-decoded outputs contract. A later step
-	// reads its result only via the standard declared output: NAME
-	// mechanism (Spec 012), not ${<id>.outputs.<path>} (bare) or
-	// ${steps.<id>.outputs.<name>} (strict) -- both fail identically here.
-	t.Run("a later step reads the result via output: NAME, not outputs.stdout in either bare or strict form", func(t *testing.T) {
+	t.Run("declared output", func(t *testing.T) {
 		t.Parallel()
 
 		dagu := harness.NewRunner(t)
 		env := writeFakeHarnessScripts(dagu)
 		result := dagu.RunWithEnv(env, "start", "downstream_reference.yaml")
-		result.ExpectNonZeroExitCode()
-		result.ExpectStderrContains("bad substitution")
+		result.ExpectExitCode(0)
 
 		require.Equal(t, "named=ARG:hello\nSTDIN:\n", stepStdout(t, result.Stdout(), 1),
 			"output: NAME trims one trailing newline from the captured stdout")

@@ -15,7 +15,7 @@ import (
 
 // requireLines asserts that content, split on newlines, equals exactly the
 // given lines (with a trailing empty line implied by the final newline, as
-// every fake_ok.sh invocation produces).
+// each fixture script produces).
 func requireLines(t *testing.T, content string, lines ...string) {
 	t.Helper()
 	want := strings.Join(lines, "\n") + "\n"
@@ -77,22 +77,13 @@ exit 0
 `
 
 // fakeFailScript is a fake harness CLI that always fails: it writes a fixed
-// message to stderr and exits 7 (an arbitrary non-zero code distinct from
-// the wrapper's own forced exit codes elsewhere in this session's specs).
+// message to stderr and exits 7 to exercise process failure.
 const fakeFailScript = `#!/bin/sh
 echo "fake_fail: simulated failure" >&2
 exit 7
 `
 
-// writeFakeHarnessScripts writes the two fake CLI scripts this package's
-// live fixtures reference (as ./scripts/fake_ok.sh and
-// ./scripts/fake_fail.sh, relative to the DAG's own working_dir: field) and
-// returns the host environment entry the fixtures resolve their DAG-level
-// working_dir: from. A harnesses.<name>.binary value does not go through
-// Dagu's own value resolution (unlike almost every other field), so the
-// fixtures cannot embed the isolated project's own runtime path directly in
-// binary: -- only working_dir: does, which is why binary: is always a
-// static relative path here.
+// writeFakeHarnessScripts supplies local scripts invoked through sh on every OS.
 func writeFakeHarnessScripts(dagu *harness.Runner) []string {
 	dagu.WriteExecutable("scripts/fake_ok.sh", fakeOkScript)
 	dagu.WriteExecutable("scripts/fake_fail.sh", fakeFailScript)

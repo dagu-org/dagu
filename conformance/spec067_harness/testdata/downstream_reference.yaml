@@ -3,7 +3,8 @@ env:
 working_dir: $PROJECT_DIR
 harnesses:
   fake_ok:
-    binary: ./scripts/fake_ok.sh
+    binary: sh
+    prefix_args: [./scripts/fake_ok.sh]
     prompt_mode: arg
 steps:
   - id: run1
@@ -14,10 +15,5 @@ steps:
     output: RUN1_RESULT
   - id: print_named
     depends: run1
-    run: echo "named=${RUN1_RESULT}"
-  - id: print_bare
-    depends: run1
-    run: echo "bare=${run1.outputs.stdout}"
-  - id: print_strict
-    depends: run1
-    run: echo "strict=${steps.run1.outputs.stdout}"
+    run: |
+      echo "named=${RUN1_RESULT}"

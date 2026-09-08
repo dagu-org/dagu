@@ -3,7 +3,8 @@ env:
 working_dir: $PROJECT_DIR
 harnesses:
   fake_fail:
-    binary: ./scripts/fake_fail.sh
+    binary: sh
+    prefix_args: [./scripts/fake_fail.sh]
     prompt_mode: arg
   missing_bin:
     binary: ./scripts/does_not_exist.sh

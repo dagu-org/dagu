@@ -3,27 +3,33 @@ env:
 working_dir: $PROJECT_DIR
 harnesses:
   fake_arg:
-    binary: ./scripts/fake_ok.sh
+    binary: sh
+    prefix_args: [./scripts/fake_ok.sh]
     prompt_mode: arg
     option_flags:
       label: --tag
   fake_flag:
-    binary: ./scripts/fake_ok.sh
+    binary: sh
+    prefix_args: [./scripts/fake_ok.sh]
     prompt_mode: flag
     prompt_flag: --prompt
     prompt_position: after_flags
   fake_stdin:
-    binary: ./scripts/fake_ok.sh
+    binary: sh
+    prefix_args: [./scripts/fake_ok.sh]
     prompt_mode: stdin
   fake_dash:
-    binary: ./scripts/fake_ok.sh
+    binary: sh
+    prefix_args: [./scripts/fake_ok.sh]
     prompt_mode: arg
     flag_style: single_dash
   fake_primary:
-    binary: ./scripts/fake_fail.sh
+    binary: sh
+    prefix_args: [./scripts/fake_fail.sh]
     prompt_mode: arg
   fake_backup:
-    binary: ./scripts/fake_ok.sh
+    binary: sh
+    prefix_args: [./scripts/fake_ok.sh]
     prompt_mode: arg
 steps:
   - id: arg_mode

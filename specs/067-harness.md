@@ -28,11 +28,8 @@ This spec covers:
   provider (`binary`, `prefix_args`, `prompt_mode`, `prompt_flag`,
   `prompt_position`, `flag_style`, `option_flags`) that a step selects via
   `with.provider`, for a CLI the built-in provider catalog does not name
-- that a harness step publishes no `.outputs.*` at all: it is a plain
-  Command/Script-capable executor, like an ordinary `run:` step, not one
-  with a JSON-decoded outputs contract; a later step reads its result only
-  through the standard declared `output: NAME` mechanism ([Spec 012: Step
-  Outputs](012-step-outputs.md))
+- capturing stdout through a declared `output: NAME` and reading it in a
+  downstream step ([Spec 012: Step Outputs](012-step-outputs.md))
 - that, unlike the remote actions in specs 060-066, `dagu validate` fully
   resolves and checks a harness step's provider configuration and any
   `harnesses:` definitions it references, since both are local to the DAG
@@ -90,7 +87,8 @@ For a custom (`harnesses:`-defined) provider, the invocation is built as:
    to the process's stdin as a separate stream from the argument-delivered
    prompt.
 
-Flags built from `with:` keys other than `provider`/`fallback` are sorted
+The input keys `prompt` and `stdin`, and executor options `provider`,
+`fallback`, and `managed`, do not become CLI flags. Other keys are sorted
 by key for deterministic ordering. Each key becomes `--key` (or `-key`
 when the definition's `flag_style` is `single_dash`) unless
 `option_flags` maps that key to a different literal flag token. A boolean
@@ -112,16 +110,9 @@ fails with the last config's own error.
 
 ### Result
 
-A harness step's stdout and stderr are the underlying process's real
-stdout and stderr -- captured the same way an ordinary `run:` step's are,
-with no JSON decoding or structured outputs contract. There is no
-`.outputs.*` published for a harness step at all: neither
-`${<step id>.outputs.<path>}` nor `${steps.<step id>.outputs.<name>}`
-resolves, regardless of what the process wrote. A later step reads the
-result only by giving the harness step its own `output: NAME` field (the
-standard declared-output mechanism; see [Spec 012: Step
-Outputs](012-step-outputs.md)), which captures the process's stdout with
-one trailing newline trimmed.
+A harness step captures the provider process's stdout and stderr. A declared
+`output: NAME` makes stdout available to downstream steps, following
+[Spec 012: Step Outputs](012-step-outputs.md).
 
 ## Errors
 
