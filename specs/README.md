@@ -67,6 +67,9 @@ It must not be treated as product behavior until implementation catches up.
 | [062: dbt Action](062-dbt.md) | Partially implemented |
 | [063: Schedule Descriptors](063-schedule.md) | Implemented |
 | [067: Harness Executor](067-harness.md) | Partially implemented |
+| [068: State Executor](068-state.md) | Implemented |
+| [069: Secrets Providers](069-secrets-providers.md) | Partially implemented |
+| [070: Runtime Profiles](070-runtime-profiles.md) | Partially implemented |
 
 **Writing guidelines:**
 
