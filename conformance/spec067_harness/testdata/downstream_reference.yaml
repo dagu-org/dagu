@@ -1,0 +1,19 @@
+env:
+  - PROJECT_DIR: $HOST_PROJECT_DIR
+working_dir: $PROJECT_DIR
+harnesses:
+  fake_ok:
+    binary: sh
+    prefix_args: [./scripts/fake_ok.sh]
+    prompt_mode: arg
+steps:
+  - id: run1
+    action: harness.run
+    with:
+      provider: fake_ok
+      prompt: hello
+    output: RUN1_RESULT
+  - id: print_named
+    depends: run1
+    run: |
+      echo "named=${RUN1_RESULT}"

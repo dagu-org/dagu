@@ -1,0 +1,9 @@
+harnesses:
+  bad_def:
+    prompt_mode: arg
+steps:
+  - id: x
+    action: harness.run
+    with:
+      provider: bad_def
+      prompt: hi

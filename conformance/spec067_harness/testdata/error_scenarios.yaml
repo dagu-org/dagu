@@ -1,0 +1,23 @@
+env:
+  - PROJECT_DIR: $HOST_PROJECT_DIR
+working_dir: $PROJECT_DIR
+harnesses:
+  fake_fail:
+    binary: sh
+    prefix_args: [./scripts/fake_fail.sh]
+    prompt_mode: arg
+  missing_bin:
+    binary: ./scripts/does_not_exist.sh
+    prompt_mode: arg
+steps:
+  - id: no_fallback_fail
+    action: harness.run
+    with:
+      provider: fake_fail
+      prompt: this will fail
+
+  - id: missing_binary
+    action: harness.run
+    with:
+      provider: missing_bin
+      prompt: hi
