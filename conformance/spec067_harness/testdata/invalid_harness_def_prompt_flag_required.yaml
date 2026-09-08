@@ -1,0 +1,10 @@
+harnesses:
+  bad_flag:
+    binary: ./scripts/fake_ok.sh
+    prompt_mode: flag
+steps:
+  - id: x
+    action: harness.run
+    with:
+      provider: bad_flag
+      prompt: hi

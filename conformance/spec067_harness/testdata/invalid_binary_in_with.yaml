@@ -1,0 +1,11 @@
+harnesses:
+  fake_ok:
+    binary: ./scripts/fake_ok.sh
+    prompt_mode: arg
+steps:
+  - id: binary_in_with
+    action: harness.run
+    with:
+      provider: fake_ok
+      binary: /bin/true
+      prompt: hi

@@ -1,0 +1,75 @@
+env:
+  - PROJECT_DIR: $HOST_PROJECT_DIR
+working_dir: $PROJECT_DIR
+harnesses:
+  fake_arg:
+    binary: sh
+    prefix_args: [./scripts/fake_ok.sh]
+    prompt_mode: arg
+    option_flags:
+      label: --tag
+  fake_flag:
+    binary: sh
+    prefix_args: [./scripts/fake_ok.sh]
+    prompt_mode: flag
+    prompt_flag: --prompt
+    prompt_position: after_flags
+  fake_stdin:
+    binary: sh
+    prefix_args: [./scripts/fake_ok.sh]
+    prompt_mode: stdin
+  fake_dash:
+    binary: sh
+    prefix_args: [./scripts/fake_ok.sh]
+    prompt_mode: arg
+    flag_style: single_dash
+  fake_primary:
+    binary: sh
+    prefix_args: [./scripts/fake_fail.sh]
+    prompt_mode: arg
+  fake_backup:
+    binary: sh
+    prefix_args: [./scripts/fake_ok.sh]
+    prompt_mode: arg
+steps:
+  - id: arg_mode
+    action: harness.run
+    with:
+      provider: fake_arg
+      prompt: hello from arg mode
+      label: build
+      verbose: true
+
+  - id: flag_mode
+    depends: arg_mode
+    action: harness.run
+    with:
+      provider: fake_flag
+      prompt: flag prompt text
+      stdin: piped script text
+      priority: 5
+
+  - id: stdin_mode
+    depends: flag_mode
+    action: harness.run
+    with:
+      provider: fake_stdin
+      prompt: stdin-mode prompt
+      stdin: stdin-mode script
+
+  - id: dash_mode
+    depends: stdin_mode
+    action: harness.run
+    with:
+      provider: fake_dash
+      prompt: dash prompt
+      count: 3
+
+  - id: fallback_success
+    depends: dash_mode
+    action: harness.run
+    with:
+      provider: fake_primary
+      prompt: trying fallback
+      fallback:
+        - provider: fake_backup
