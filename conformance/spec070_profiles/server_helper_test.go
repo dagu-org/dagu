@@ -99,7 +99,15 @@ func waitForRun(t *testing.T, server test.Server, token, name, runID string) api
 		response := withAuth(server.Client().Get("/api/v1/dag-runs/"+name+"/"+runID), token).
 			ExpectStatus(http.StatusOK).Send(t)
 		response.Unmarshal(t, &details)
-		return details.DagRunDetails.FinishedAt != ""
+		switch details.DagRunDetails.StatusLabel {
+		case api.StatusLabelSucceeded, api.StatusLabelPartiallySucceeded,
+			api.StatusLabelFailed, api.StatusLabelAborted, api.StatusLabelRejected:
+			return true
+		case api.StatusLabelNotStarted, api.StatusLabelQueued,
+			api.StatusLabelRunning, api.StatusLabelWaiting:
+			return false
+		}
+		return false
 	}, harness.WaitTimeout(t), 50*time.Millisecond)
 	require.Equal(t, api.StatusLabelSucceeded, details.DagRunDetails.StatusLabel)
 	return details.DagRunDetails
