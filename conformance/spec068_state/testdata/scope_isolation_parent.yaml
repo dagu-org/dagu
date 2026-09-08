@@ -20,3 +20,37 @@ steps:
       scope: root_dag
       key: k
       default: "MISSING"
+
+  - id: set_first
+    depends: get_root_scope
+    action: state.set
+    with:
+      scope: custom
+      namespace: first
+      key: k
+      value: first
+
+  - id: set_second
+    depends: set_first
+    action: state.set
+    with:
+      scope: custom
+      namespace: second
+      key: k
+      value: second
+
+  - id: get_first
+    depends: set_second
+    action: state.get
+    with:
+      scope: custom
+      namespace: first
+      key: k
+
+  - id: get_second
+    depends: get_first
+    action: state.get
+    with:
+      scope: custom
+      namespace: second
+      key: k

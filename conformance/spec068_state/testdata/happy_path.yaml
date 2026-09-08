@@ -57,3 +57,19 @@ steps:
     with:
       prefix: diff
       include_values: true
+
+  - id: delete_val
+    depends: list_prefix_values
+    action: state.delete
+    with:
+      key: mykey
+
+  - id: get_deleted
+    depends: delete_val
+    action: state.get
+    with:
+      key: mykey
+
+  - id: list_after_delete
+    depends: get_deleted
+    action: state.list

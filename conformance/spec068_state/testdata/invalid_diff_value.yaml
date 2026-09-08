@@ -1,0 +1,5 @@
+steps:
+  - id: missing_value_diff
+    action: state.diff
+    with:
+      key: k2

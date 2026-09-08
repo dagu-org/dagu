@@ -27,11 +27,8 @@ This spec covers:
 - optimistic concurrency (`with.expected_version`, `with.create_only`) and
   `state.diff`'s change-detection and conditional-write behavior
   (`with.update`)
-- that a state step publishes no `.outputs.*` at all: it is a plain
-  Command-capable executor like an ordinary `run:` step, not one with a
-  JSON-decoded outputs contract; a later step reads its JSON result only
-  through the standard declared `output: NAME` mechanism ([Spec 012: Step
-  Outputs](012-step-outputs.md))
+- capturing JSON stdout through a declared `output: NAME` and consuming it
+  in a downstream step
 - that, unlike the remote actions in specs 060-066 and like the harness
   executor, `dagu validate` checks some of a state step's configuration
   (that `with.key` is present for `get`/`set`/`delete`/`diff`, and
@@ -105,14 +102,9 @@ volume) for data that only needs to outlive one step.
 
 ### Result
 
-A state step's stdout is one JSON object, its shape depending on the
-operation (`operation`, `scope`, `namespace`, `key`, plus the
-operation-specific fields listed above). There is no `.outputs.*`
-published for a state step at all: neither `${<step id>.outputs.<path>}`
-nor `${steps.<step id>.outputs.<name>}` resolves. A later step reads the
-result only by giving the state step its own `output: NAME` field (the
-standard declared-output mechanism; see [Spec 012: Step
-Outputs](012-step-outputs.md)), which captures the full JSON line.
+A state step writes one JSON object to stdout, containing the fields listed
+for its operation above. A declared `output: NAME` makes that JSON available
+to downstream steps, following [Spec 012: Step Outputs](012-step-outputs.md).
 
 ## Errors
 
@@ -144,8 +136,7 @@ checks (below).
 
 ## Related Specs
 
-- Harness executor, the other built-in executor in this family with no
-  `.outputs.*` contract: [Spec 067: Harness Executor](067-harness.md)
+- Harness executor: [Spec 067: Harness Executor](067-harness.md)
 - Step outputs and reference syntax, for the standard `output: NAME`
   mechanism this executor uses instead of a JSON outputs contract: [Spec
   012: Step Outputs](012-step-outputs.md)

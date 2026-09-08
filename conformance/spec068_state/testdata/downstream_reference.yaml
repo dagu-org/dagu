@@ -20,12 +20,5 @@ steps:
 
   - id: print_named
     depends: get_named
-    run: echo "named=${GET_RESULT}"
-
-  - id: print_bare
-    depends: get_val
-    run: echo "bare value is ${get_val.outputs.value}"
-
-  - id: print_strict
-    depends: get_val
-    run: echo "strict=${steps.get_val.outputs.value}"
+    run: |
+      printf '%s\n' "${GET_RESULT}"

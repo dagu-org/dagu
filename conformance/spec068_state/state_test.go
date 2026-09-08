@@ -1,22 +1,13 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Package spec068_state holds black-box conformance tests for Spec 068:
-// State Executor (action: state.get/set/delete/list/diff).
-//
-// Unlike specs 060-067, state is a built-in Go executor with no external
-// process at all: it reads and writes Dagu's own persistent state store
-// directly, so every test here runs fully offline and fast. Its state is
-// durable across separate dagu invocations (not just across steps within
-// one run), which the harness's own per-invocation isolated $HOME would
-// normally hide -- TestStateGlobalPersistsAcrossSeparateRuns works around
-// that by pinning HOME/DAGU_HOME to a directory this test creates itself,
-// via RunWithEnv, across two separate dagu start invocations.
+// Package spec068_state tests persistent state through the Dagu binary.
 package spec068_state_test
 
 import (
 	"encoding/json"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/dagucloud/dagu/v2/conformance/harness"
@@ -70,14 +61,16 @@ func TestStateHappyPath(t *testing.T) {
 	require.False(t, diffCreate.FoundPrevious, "the first state.diff against a new key has no previous value")
 
 	var diffSame struct {
-		Changed         bool  `json:"changed"`
-		FoundPrevious   bool  `json:"foundPrevious"`
-		PreviousVersion int64 `json:"previousVersion"`
-		Version         int64 `json:"version"`
+		Changed         bool            `json:"changed"`
+		FoundPrevious   bool            `json:"foundPrevious"`
+		PreviousVersion int64           `json:"previousVersion"`
+		Previous        json.RawMessage `json:"previous"`
+		Version         int64           `json:"version"`
 	}
 	require.NoError(t, json.Unmarshal([]byte(stepStdout(t, result.Stdout(), 4)), &diffSame))
 	require.False(t, diffSame.Changed, "state.diff against an identical value reports changed: false")
 	require.True(t, diffSame.FoundPrevious)
+	require.JSONEq(t, `{"v":1}`, string(diffSame.Previous))
 	require.Equal(t, diffSame.PreviousVersion, diffSame.Version, "an unchanged diff does not bump the version")
 
 	var diffNoUpdate struct {
@@ -118,6 +111,22 @@ func TestStateHappyPath(t *testing.T) {
 	require.Len(t, listPrefixValues.Entries, 1)
 	require.Equal(t, "diff_key", listPrefixValues.Entries[0].Key)
 	require.EqualValues(t, map[string]any{"v": float64(2)}, listPrefixValues.Entries[0].Value)
+
+	var deleted struct {
+		Deleted bool `json:"deleted"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(stepStdout(t, result.Stdout(), 9)), &deleted))
+	require.True(t, deleted.Deleted)
+
+	var afterDelete struct {
+		Found bool `json:"found"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(stepStdout(t, result.Stdout(), 10)), &afterDelete))
+	require.False(t, afterDelete.Found)
+	require.NoError(t, json.Unmarshal([]byte(stepStdout(t, result.Stdout(), 11)), &listAll))
+	require.Len(t, listAll.Entries, 1)
+	require.Equal(t, "diff_key", listAll.Entries[0].Key)
+
 }
 
 // TestStateScopeIsolation proves the difference between scope: dag (which
@@ -148,6 +157,17 @@ func TestStateScopeIsolation(t *testing.T) {
 	require.True(t, rootScope.Found,
 		"scope: root_dag namespaces by the root dag-run's name, so the parent sees what the child wrote under root_dag scope")
 	require.Equal(t, "from-child-root-scope", rootScope.Value)
+
+	for i, want := range []string{"first", "second"} {
+		var custom struct {
+			Found bool   `json:"found"`
+			Value string `json:"value"`
+		}
+		require.NoError(t, json.Unmarshal([]byte(stepStdout(t, result.Stdout(), 5+i)), &custom))
+		require.True(t, custom.Found)
+		require.Equal(t, want, custom.Value)
+	}
+
 }
 
 func TestStateErrorScenarios(t *testing.T) {
@@ -157,32 +177,34 @@ func TestStateErrorScenarios(t *testing.T) {
 	result := dagu.Run("start", "error_scenarios.yaml")
 	result.ExpectNonZeroExitCode()
 
-	require.Contains(t, result.Stdout(), "dag state: conflict",
-		"state.set create_only: true against an existing key, and a state.set with a stale expected_version, both fail with a conflict")
+	// Both writes must fail independently after the initial value is stored.
+	for _, step := range []string{"set_create_only_again", "set_bad_version"} {
+		require.Regexp(t, step+`[^\n]*\[failed\]`, result.Stdout())
+	}
+	require.Equal(t, 2, strings.Count(result.Stdout(), "dag state: conflict"))
 	require.Contains(t, result.Stdout(), "dag state: not found",
 		"state.get required: true against a missing key fails instead of reporting found: false")
 	require.Contains(t, result.Stdout(), "namespace is required for custom")
 	require.Contains(t, result.Stdout(), `invalid key "../escape"`)
 }
 
-// Unlike the remote actions in specs 060-066, and like the harness executor
-// (spec 067), a state step publishes no .outputs.* at all: neither the
-// bare-step-id nor the strict form resolves. A later step reads its result
-// only via the standard declared output: NAME mechanism (Spec 012).
 func TestStateDownstreamReference(t *testing.T) {
 	t.Parallel()
 
 	dagu := harness.NewRunner(t)
 	result := dagu.Run("start", "downstream_reference.yaml")
-	result.ExpectNonZeroExitCode()
-	result.ExpectStderrContains("bad substitution")
+	result.ExpectExitCode(0)
 
-	require.Equal(t, `named={"operation":"get","scope":"dag","namespace":"downstream_reference","key":"ref_key","found":true,"version":1,"hash":"`,
-		stepStdout(t, result.Stdout(), 3)[:len(`named={"operation":"get","scope":"dag","namespace":"downstream_reference","key":"ref_key","found":true,"version":1,"hash":"`)],
-		"output: NAME captures the step's full JSON line verbatim")
+	var output struct {
+		Found bool `json:"found"`
+		Value int  `json:"value"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(stepStdout(t, result.Stdout(), 3)), &output))
+	require.True(t, output.Found)
+	require.Equal(t, 42, output.Value)
 }
 
-func TestStateGlobalPersistsAcrossSeparateRuns(t *testing.T) {
+func TestStatePersistence(t *testing.T) {
 	t.Parallel()
 
 	dagu := harness.NewRunner(t)
@@ -228,6 +250,7 @@ func TestStateValidation(t *testing.T) {
 	}{
 		{"invalid_missing_key.yaml", "key is required"},
 		{"invalid_missing_value.yaml", "value is required for set"},
+		{"invalid_diff_value.yaml", "value is required for diff"},
 	} {
 		t.Run(tc.file, func(t *testing.T) {
 			t.Parallel()
