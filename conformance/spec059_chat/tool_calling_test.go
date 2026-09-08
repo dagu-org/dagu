@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sync/atomic"
 	"testing"
 
 	"github.com/dagucloud/dagu/v2/conformance/harness"
@@ -24,8 +25,18 @@ func TestToolCallingBasic(t *testing.T) {
 	requests := make(chan toolChatRequest, 2)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var req toolChatRequest
-		require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
-		requests <- req
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Errorf("decode request: %v", err)
+			http.Error(w, "invalid request", http.StatusBadRequest)
+			return
+		}
+		select {
+		case requests <- req:
+		default:
+			t.Error("unexpected extra request")
+			http.Error(w, "unexpected request", http.StatusBadRequest)
+			return
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if len(req.Messages) == 1 {
@@ -63,6 +74,7 @@ func TestToolCallingBasic(t *testing.T) {
 
 	// Second request carries the assistant tool call and the tool's result,
 	// which is the sub-DAG's declared output JSON-encoded as the tool content.
+	require.Equal(t, captured[0].Tools, captured[1].Tools)
 	require.Len(t, captured[1].Messages, 3)
 	toolMsg := captured[1].Messages[2]
 	require.Equal(t, "tool", toolMsg.Role)
@@ -73,34 +85,40 @@ func TestToolCallingBasic(t *testing.T) {
 // A tool call naming a DAG outside with.tools is a non-fatal error: its
 // result content tells the LLM the tool was not found, and the loop
 // continues to a final response rather than failing the run.
-func TestToolCallingUnknownToolIsNonFatal(t *testing.T) {
+func TestUnknownTool(t *testing.T) {
 	t.Parallel()
 
-	requestCount := 0
+	var requestCount atomic.Int32
 	var secondRequest toolChatRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requestCount++
+		count := requestCount.Add(1)
 		w.Header().Set("Content-Type", "application/json")
-		if requestCount == 1 {
+		if count == 1 {
 			_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"",
 				"tool_calls":[{"id":"call_1","type":"function","function":{"name":"not-a-real-tool","arguments":"{}"}}]},
 				"finish_reason":"tool_calls"}]}`))
 			return
 		}
-		require.NoError(t, json.NewDecoder(r.Body).Decode(&secondRequest))
+		if err := json.NewDecoder(r.Body).Decode(&secondRequest); err != nil {
+			t.Errorf("decode request: %v", err)
+			http.Error(w, "invalid request", http.StatusBadRequest)
+			return
+		}
 		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"tool was unavailable"},"finish_reason":"stop"}]}`))
 	}))
 	t.Cleanup(srv.Close)
 
 	dagu := harness.NewRunner(t)
 	result := dagu.RunWithEnv([]string{"LLM_BASE_URL=" + srv.URL}, "start", "tool_calling_unknown_tool.yaml")
+	srv.Close()
 	result.ExpectExitCode(0)
 
 	data, err := os.ReadFile(dagu.ProjectPath("result.out"))
 	require.NoError(t, err)
 	require.Equal(t, "tool was unavailable\n", string(data))
 
-	require.Equal(t, 2, requestCount)
+	require.EqualValues(t, 2, requestCount.Load())
+	require.Len(t, secondRequest.Messages, 3)
 	toolMsg := secondRequest.Messages[2]
 	require.Equal(t, "tool", toolMsg.Role)
 	require.Equal(t, `Error: tool "not-a-real-tool" not found`, toolMsg.Content)
@@ -108,34 +126,40 @@ func TestToolCallingUnknownToolIsNonFatal(t *testing.T) {
 
 // A tool DAG that itself fails is also non-fatal: the failure is reported as
 // the tool's result content, and the loop continues.
-func TestToolCallingFailedToolDAG(t *testing.T) {
+func TestFailedTool(t *testing.T) {
 	t.Parallel()
 
-	requestCount := 0
+	var requestCount atomic.Int32
 	var secondRequest toolChatRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requestCount++
+		count := requestCount.Add(1)
 		w.Header().Set("Content-Type", "application/json")
-		if requestCount == 1 {
+		if count == 1 {
 			_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"",
 				"tool_calls":[{"id":"call_1","type":"function","function":{"name":"broken-tool","arguments":"{}"}}]},
 				"finish_reason":"tool_calls"}]}`))
 			return
 		}
-		require.NoError(t, json.NewDecoder(r.Body).Decode(&secondRequest))
+		if err := json.NewDecoder(r.Body).Decode(&secondRequest); err != nil {
+			t.Errorf("decode request: %v", err)
+			http.Error(w, "invalid request", http.StatusBadRequest)
+			return
+		}
 		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"the tool failed"},"finish_reason":"stop"}]}`))
 	}))
 	t.Cleanup(srv.Close)
 
 	dagu := harness.NewRunner(t)
 	result := dagu.RunWithEnv([]string{"LLM_BASE_URL=" + srv.URL}, "start", "tool_calling_failed_tool.yaml")
+	srv.Close()
 	result.ExpectExitCode(0)
 
 	data, err := os.ReadFile(dagu.ProjectPath("result.out"))
 	require.NoError(t, err)
 	require.Equal(t, "the tool failed\n", string(data))
 
-	require.Equal(t, 2, requestCount)
+	require.EqualValues(t, 2, requestCount.Load())
+	require.Len(t, secondRequest.Messages, 3)
 	toolMsg := secondRequest.Messages[2]
 	require.Equal(t, "tool", toolMsg.Role)
 	require.Equal(t, "Error: execution failed: exit status 1", toolMsg.Content)
@@ -144,7 +168,7 @@ func TestToolCallingFailedToolDAG(t *testing.T) {
 // max_tool_iterations bounds the tool loop: reaching it still succeeds the
 // step (it is not a failure), stopping after exactly that many requests.
 // With no override, the default is 10.
-func TestToolCallingMaxIterationsReached(t *testing.T) {
+func TestToolIterationLimit(t *testing.T) {
 	t.Parallel()
 
 	for _, tc := range []struct {
@@ -157,22 +181,23 @@ func TestToolCallingMaxIterationsReached(t *testing.T) {
 		t.Run(tc.fixture, func(t *testing.T) {
 			t.Parallel()
 
-			requestCount := 0
+			var requestCount atomic.Int32
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-				requestCount++
+				requestCount.Add(1)
 				w.Header().Set("Content-Type", "application/json")
-				// Always request another tool call; the LLM never finishes on its own.
+				// Unknown calls keep the request loop active without spawning tool DAGs.
 				_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"still working",
-					"tool_calls":[{"id":"call_X","type":"function","function":{"name":"loop-tool","arguments":"{}"}}]},
+					"tool_calls":[{"id":"call_X","type":"function","function":{"name":"unknown-tool","arguments":"{}"}}]},
 					"finish_reason":"tool_calls"}]}`))
 			}))
 			t.Cleanup(srv.Close)
 
 			dagu := harness.NewRunner(t)
 			result := dagu.RunWithEnv([]string{"LLM_BASE_URL=" + srv.URL}, "start", tc.fixture)
+			srv.Close()
 			result.ExpectExitCode(0)
 
-			require.Equal(t, tc.maxIterations, requestCount)
+			require.EqualValues(t, tc.maxIterations, requestCount.Load())
 
 			data, err := os.ReadFile(dagu.ProjectPath("result.out"))
 			require.NoError(t, err)
