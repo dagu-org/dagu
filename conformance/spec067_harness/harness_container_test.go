@@ -9,15 +9,8 @@ import (
 	"github.com/dagucloud/dagu/v2/conformance/harness"
 )
 
-// Containerized harness execution (a harness.run step with a step-level
-// container: block) is excluded from live coverage: it requires a working
-// container daemon and an image, neither guaranteed in every environment
-// this suite runs in. These tests instead cover the deterministic
-// configuration and dispatch failures that are reachable without ever
-// reaching a daemon (or, for the last case, reachable identically whether or
-// not one is even installed), matching the same restraint spec037/spec038
-// already apply to their own container-dependent behavior.
-func TestHarnessContainerConfigErrors(t *testing.T) {
+// Container configuration failures require no daemon or downloaded image.
+func TestContainerConfig(t *testing.T) {
 	t.Parallel()
 
 	for _, tc := range []struct {
@@ -47,9 +40,7 @@ func TestHarnessContainerConfigErrors(t *testing.T) {
 		})
 	}
 
-	// None of the above is caught at validate time: provider resolution (and
-	// so the container-specific checks above) happens only once the step
-	// actually runs.
+	// General validation accepts these runtime-only container restrictions.
 	for _, fixture := range []string{
 		"container_stdin_prompt_mode.yaml",
 		"container_name_image_mode.yaml",
@@ -65,15 +56,8 @@ func TestHarnessContainerConfigErrors(t *testing.T) {
 	}
 }
 
-// A containerized harness step's daemon dispatch is real: pointing the
-// engine's container-runtime selection at a socket that does not exist
-// fails the step with a connection error, proving the container path
-// genuinely attempts to reach a daemon rather than silently no-op'ing.
-// DAGU_CONTAINER_RUNTIME/DAGU_PODMAN_HOST select the daemon socket from the
-// engine's own process environment (never overridable by DAG/step env:), so
-// this reproduces the same way whether or not a real container daemon is
-// installed on the machine running this test.
-func TestHarnessContainerDaemonUnreachable(t *testing.T) {
+// An unavailable daemon must fail dispatch without pulling an image.
+func TestContainerUnavailable(t *testing.T) {
 	t.Parallel()
 
 	dagu := harness.NewRunner(t)

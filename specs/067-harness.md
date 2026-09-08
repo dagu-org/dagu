@@ -106,25 +106,17 @@ array value repeats `flag value` once per element.
 
 ### Containerized execution
 
-A step-level `container:` block runs the resolved provider's binary inside a
-container (via Dagu's own Moby SDK client; no `docker`/`podman` CLI
-subprocess is involved), with the agent binary as the container's
-entrypoint. This is resolved only once the step actually runs, after the
-provider is known, so `dagu validate` accepts a harness step with
-`container:` regardless of the provider's configuration -- the checks below
-are all runtime-only.
+A step-level `container:` block runs the resolved provider's binary inside
+an image-created container, using that binary as its entrypoint.
+`dagu validate` checks the general harness configuration. The following
+container-specific restrictions are checked at runtime:
 
-A provider whose `prompt_mode` is `stdin` has no way to deliver the prompt
-inside a container (the SDK's `Client.Run` has no stdin), so it fails with
-`harness: containerized harness does not support stdin input`.
-`container.name` (targeting an already-running container by name) is
-rejected for a harness step -- an image-mode container has no ENTRYPOINT to
-override with the agent binary the way a fresh, image-created container
-does, so only `container.exec` (executing inside an existing container) is
-supported. A `provider: opencode` step with `managed: true` fails with
-`harness: managed OpenCode is not supported inside containers`, since the
-managed execution path depends on a Dagu-hosted session a containerized
-step has no access to.
+- `prompt_mode: stdin` fails with `harness: containerized harness does not
+  support stdin input`.
+- `container.name` is rejected for image-mode harness steps. Running inside
+  an existing container uses `container.exec`.
+- `provider: opencode` with `managed: true` fails with `harness: managed
+  OpenCode is not supported inside containers`.
 
 ### Fallback
 
@@ -187,8 +179,7 @@ exists on disk or in `PATH` -- that is deferred to run time.
   contacted.
 - A containerized step whose configured container daemon cannot be reached
   (wrong socket, daemon not running): the step fails with `harness: failed
-  to initialize container client: ...`, proving the containerized path
-  genuinely attempts to dispatch to a daemon.
+  to initialize container client: ...`.
 
 ## Related Specs
 
