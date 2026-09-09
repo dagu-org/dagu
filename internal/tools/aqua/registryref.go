@@ -15,9 +15,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dagucloud/dagu/v2/internal/cmn/fileutil"
 	"github.com/dagucloud/dagu/v2/internal/cmn/logger"
 	"github.com/dagucloud/dagu/v2/internal/ir"
 	"github.com/dagucloud/dagu/v2/internal/tools"
+	"github.com/gofrs/flock"
 )
 
 const (
@@ -62,12 +64,59 @@ func (i *Installer) resolveStandardRegistryRef(ctx context.Context, opts tools.I
 		}
 	}
 
+	if cachePath != "" {
+		unlock, err := i.lockRegistryRef(ctx, cachePath)
+		if err != nil {
+			if ctx.Err() != nil {
+				return i.fallbackRegistryRef(ctx, cachePath, err)
+			}
+			// Caching is best-effort; an unwritable cache must not prevent
+			// resolution when the registry itself is reachable.
+			i.logger.Debug("lock aqua latest registry cache", "err", err)
+		} else {
+			defer unlock()
+			// Another installer or process may have populated the shared cache
+			// while this caller waited. Explicit refreshes still bypass it.
+			if !forceRefresh {
+				if cached, ok := readLatestRefCache(cachePath, i.now()); ok {
+					return resolvedRegistryRef{cached, registryRefSourceCache}
+				}
+			}
+		}
+	}
+
 	ref, err := i.fetchLatestRegistryRef(ctx)
 	if err == nil {
 		i.writeLatestRefCache(cachePath, ref)
 		return resolvedRegistryRef{ref, registryRefSourceLive}
 	}
+	return i.fallbackRegistryRef(ctx, cachePath, err)
+}
 
+func (i *Installer) lockRegistryRef(ctx context.Context, cachePath string) (func(), error) {
+	if err := os.MkdirAll(filepath.Dir(cachePath), 0o750); err != nil {
+		return nil, err
+	}
+	// Keep the lock file separate from the atomically replaced cache. The OS
+	// releases it on process exit, so no stale-lock reclamation is needed.
+	lock := flock.New(cachePath + ".lock")
+	locked, err := lock.TryLockContext(ctx, lockRetryInterval)
+	if err != nil {
+		_ = lock.Close()
+		return nil, err
+	}
+	if !locked {
+		_ = lock.Close()
+		return nil, fmt.Errorf("aqua registry cache lock was not acquired")
+	}
+	return func() {
+		if err := lock.Close(); err != nil {
+			i.logger.Debug("unlock aqua latest registry cache", "err", err)
+		}
+	}, nil
+}
+
+func (i *Installer) fallbackRegistryRef(ctx context.Context, cachePath string, err error) resolvedRegistryRef {
 	if cached, ok := readLatestRefCacheAnyAge(cachePath); ok {
 		logger.Info(ctx, "Using the cached aqua registry release; latest release resolution failed",
 			slog.String("registry", cached.Tag), slog.Any("err", err))
@@ -143,12 +192,7 @@ func (i *Installer) writeLatestRefCache(path string, ref latestRegistryRef) {
 		i.logger.Debug("write aqua latest registry cache", "err", err)
 		return
 	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o600); err != nil {
-		i.logger.Debug("write aqua latest registry cache", "err", err)
-		return
-	}
-	if err := os.Rename(tmp, path); err != nil {
+	if err := fileutil.WriteFileAtomic(path, data, 0o600); err != nil {
 		i.logger.Debug("write aqua latest registry cache", "err", err)
 	}
 }

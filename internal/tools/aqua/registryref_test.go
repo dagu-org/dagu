@@ -5,10 +5,14 @@ package aqua
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -19,6 +23,252 @@ import (
 )
 
 const testLatestSHA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+type registryRequestCounts struct {
+	releases atomic.Int32
+	commits  atomic.Int32
+}
+
+type registryTestServer struct {
+	url     string
+	calls   *registryRequestCounts
+	started <-chan struct{}
+	finish  func()
+}
+
+// Hold the cold response until callers overlap, without making the test depend
+// on the resolver's synchronization implementation.
+func blockedRegistryServer(t *testing.T, callers int) *registryTestServer {
+	t.Helper()
+	var calls registryRequestCounts
+	started := make(chan struct{})
+	allStarted := make(chan struct{})
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	unblock := func() { releaseOnce.Do(func() { close(release) }) }
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/repos/aquaproj/aqua-registry/releases/latest":
+			n := calls.releases.Add(1)
+			if n == 1 {
+				close(started)
+			}
+			if n == int32(callers) {
+				close(allStarted)
+			}
+			select {
+			case <-release:
+			case <-r.Context().Done():
+				return
+			}
+			_, _ = w.Write([]byte(`{"tag_name":"v4.999.0"}`))
+		case "/repos/aquaproj/aqua-registry/commits/v4.999.0":
+			calls.commits.Add(1)
+			_, _ = w.Write([]byte(testLatestSHA))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(func() {
+		unblock()
+		server.Close()
+	})
+	finish := func() {
+		select {
+		case <-allStarted:
+		case <-time.After(250 * time.Millisecond):
+		}
+		unblock()
+	}
+	return &registryTestServer{url: server.URL, calls: &calls, started: started, finish: finish}
+}
+
+func TestRegistryRefConcurrent(t *testing.T) {
+	t.Parallel()
+	const callers = 8
+	server := blockedRegistryServer(t, callers)
+	opts := tools.InstallOptions{ToolsDir: t.TempDir()}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	results := make(chan resolvedRegistryRef, callers)
+	for range callers {
+		go func() {
+			installer := New()
+			installer.githubAPIBase = server.url
+			results <- installer.resolveStandardRegistryRef(ctx, opts, false)
+		}()
+	}
+	select {
+	case <-server.started:
+	case <-ctx.Done():
+		t.Fatal(ctx.Err())
+	}
+	server.finish()
+	for range callers {
+		assert.Equal(t, testLatestSHA, (<-results).SHA)
+	}
+	assert.EqualValues(t, 1, server.calls.releases.Load(), "cold callers must share the release lookup")
+	assert.EqualValues(t, 1, server.calls.commits.Load(), "cold callers must share the commit lookup")
+}
+
+func TestRegistryRefProcesses(t *testing.T) {
+	t.Parallel()
+	const callers = 4
+	server := blockedRegistryServer(t, callers)
+	dir := t.TempDir()
+	start := filepath.Join(dir, "start")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	results := make(chan error, callers)
+	for n := range callers {
+		ready := filepath.Join(dir, fmt.Sprintf("ready-%d", n))
+		cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestRegistryRefProcessHelper$", "--", server.url, dir, ready, start)
+		cmd.Env = append(os.Environ(), "DAGU_TEST_REGISTRY_HELPER=1", "GITHUB_TOKEN=", "GH_TOKEN=")
+		go func() {
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				err = fmt.Errorf("registry helper: %w: %s", err, output)
+			}
+			results <- err
+		}()
+	}
+	require.Eventually(t, func() bool {
+		for n := range callers {
+			if _, err := os.Stat(filepath.Join(dir, fmt.Sprintf("ready-%d", n))); err != nil {
+				return false
+			}
+		}
+		return true
+	}, 10*time.Second, 10*time.Millisecond)
+	require.NoError(t, os.WriteFile(start, nil, 0o600))
+	select {
+	case <-server.started:
+	case <-ctx.Done():
+		t.Fatal(ctx.Err())
+	}
+	server.finish()
+	for range callers {
+		require.NoError(t, <-results)
+	}
+	assert.EqualValues(t, 1, server.calls.releases.Load(), "processes sharing a tools directory must resolve once")
+	assert.EqualValues(t, 1, server.calls.commits.Load())
+}
+
+func TestRegistryRefWaitCanceled(t *testing.T) {
+	t.Parallel()
+	server := blockedRegistryServer(t, 2)
+	opts := tools.InstallOptions{ToolsDir: t.TempDir()}
+	installer := New()
+	installer.githubAPIBase = server.url
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	first := make(chan resolvedRegistryRef, 1)
+	go func() { first <- installer.resolveStandardRegistryRef(ctx, opts, false) }()
+	select {
+	case <-server.started:
+	case <-ctx.Done():
+		t.Fatal(ctx.Err())
+	}
+	waiter := New()
+	waiter.githubAPIBase = server.url
+	waitCtx, stopWaiting := context.WithTimeout(ctx, 50*time.Millisecond)
+	defer stopWaiting()
+	resolved := waiter.resolveStandardRegistryRef(waitCtx, opts, false)
+	require.ErrorIs(t, waitCtx.Err(), context.DeadlineExceeded)
+	assert.Equal(t, registryRefSourceBootstrap, resolved.Source)
+	assert.EqualValues(t, 1, server.calls.releases.Load(), "a canceled waiter must not start another fetch")
+	server.finish()
+	assert.Equal(t, testLatestSHA, (<-first).SHA, "canceling a waiter must not cancel the owner")
+	assert.Equal(t, registryRefSourceCache, waiter.resolveStandardRegistryRef(ctx, opts, false).Source)
+}
+
+func TestRegistryRefCacheUnavailable(t *testing.T) {
+	t.Parallel()
+	calls := 0
+	server := newLatestRefServer(t, &calls)
+	installer := New()
+	installer.githubAPIBase = server.URL
+	blocked := filepath.Join(t.TempDir(), "not-a-directory")
+	require.NoError(t, os.WriteFile(blocked, nil, 0o600))
+	resolved := installer.resolveStandardRegistryRef(context.Background(), tools.InstallOptions{ToolsDir: blocked}, false)
+	assert.Equal(t, registryRefSourceLive, resolved.Source)
+	assert.Equal(t, testLatestSHA, resolved.SHA)
+	assert.Equal(t, 2, calls, "cache failure must not disable live resolution")
+}
+
+func TestRegistryRefLockUnavailable(t *testing.T) {
+	t.Parallel()
+	calls := 0
+	server := newLatestRefServer(t, &calls)
+	installer := New()
+	installer.githubAPIBase = server.URL
+	opts := tools.InstallOptions{ToolsDir: t.TempDir()}
+	cachePath := installer.latestRefCachePath(opts)
+	require.NoError(t, os.MkdirAll(cachePath+".lock", 0o750))
+	resolved := installer.resolveStandardRegistryRef(context.Background(), opts, false)
+	assert.Equal(t, registryRefSourceLive, resolved.Source)
+	assert.Equal(t, testLatestSHA, resolved.SHA)
+	assert.Equal(t, 2, calls)
+	cached, ok := readLatestRefCache(cachePath, time.Now())
+	assert.True(t, ok, "a failed lock must not disable a writable cache")
+	assert.Equal(t, testLatestSHA, cached.SHA)
+}
+
+func TestRegistryRefOwnerExit(t *testing.T) {
+	t.Parallel()
+	calls := 0
+	server := newLatestRefServer(t, &calls)
+	dir := t.TempDir()
+	ready := filepath.Join(dir, "ready")
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestRegistryRefProcessHelper$", "--", "hold-lock", dir, ready, "unused")
+	cmd.Env = append(os.Environ(), "DAGU_TEST_REGISTRY_HELPER=1", "GITHUB_TOKEN=", "GH_TOKEN=")
+	require.NoError(t, cmd.Start())
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+	require.Eventually(t, func() bool {
+		_, err := os.Stat(ready)
+		return err == nil
+	}, 10*time.Second, 10*time.Millisecond)
+	require.NoError(t, cmd.Process.Kill())
+	require.Error(t, <-done)
+	installer := New()
+	installer.githubAPIBase = server.URL
+	resolveCtx, stop := context.WithTimeout(ctx, 2*time.Second)
+	defer stop()
+	resolved := installer.resolveStandardRegistryRef(resolveCtx, tools.InstallOptions{ToolsDir: dir}, false)
+	assert.Equal(t, registryRefSourceLive, resolved.Source)
+	assert.Equal(t, testLatestSHA, resolved.SHA)
+	assert.Equal(t, 2, calls, "the next process must recover without a stale-lock delay")
+}
+
+func TestRegistryRefProcessHelper(t *testing.T) {
+	if os.Getenv("DAGU_TEST_REGISTRY_HELPER") != "1" {
+		return
+	}
+	args := os.Args[len(os.Args)-4:]
+	installer := New()
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	opts := tools.InstallOptions{ToolsDir: args[1]}
+	if args[0] == "hold-lock" {
+		unlock, err := installer.lockRegistryRef(ctx, installer.latestRefCachePath(opts))
+		require.NoError(t, err)
+		defer unlock()
+		require.NoError(t, os.WriteFile(args[2], nil, 0o600))
+		<-ctx.Done()
+		return
+	}
+	require.NoError(t, os.WriteFile(args[2], nil, 0o600))
+	require.Eventually(t, func() bool {
+		_, err := os.Stat(args[3])
+		return err == nil
+	}, 10*time.Second, 10*time.Millisecond)
+	installer.githubAPIBase = args[0]
+	resolved := installer.resolveStandardRegistryRef(ctx, opts, false)
+	require.Equal(t, testLatestSHA, resolved.SHA)
+}
 
 func newLatestRefServer(t *testing.T, calls *int) *httptest.Server {
 	t.Helper()
