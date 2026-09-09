@@ -178,12 +178,13 @@ jobs:
             --set deploymentMode=distributed \
             --set persistence.accessMode=ReadWriteMany \
             --set persistence.storageClass=nfs-client \
-            --set-string priorityClassName=dagu-global \
-            --set-string 'workerPools.general.priorityClassName=dagu-worker-high' \
+            --set-string priorityClassName=true \
+            --set-string 'workerPools.general.priorityClassName=null' \
             >/tmp/dagu-priority-render.yaml
 
-          test "$(grep -Fc 'priorityClassName: dagu-global' /tmp/dagu-priority-render.yaml)" -eq 3
-          grep -Fq 'priorityClassName: dagu-worker-high' /tmp/dagu-priority-render.yaml
+          # Class names that resemble YAML literals must remain strings.
+          test "$(grep -Fc 'priorityClassName: "true"' /tmp/dagu-priority-render.yaml)" -eq 3
+          grep -Fq 'priorityClassName: "null"' /tmp/dagu-priority-render.yaml
 
       - name: Smoke-render optional configurations
         run: |
