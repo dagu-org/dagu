@@ -300,11 +300,16 @@ func TestRegistryRefCacheUnavailable(t *testing.T) {
 
 func TestRegistryRefCacheWriteUnavailable(t *testing.T) {
 	t.Parallel()
-	const callers = 4
+	const (
+		callers        = 4
+		resolveTimeout = 30 * time.Second
+	)
 	server := blockedRegistryServer(t, callers)
 	opts := tools.InstallOptions{ToolsDir: t.TempDir()}
 	require.NoError(t, os.MkdirAll(New().latestRefCachePath(opts), 0o750))
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// Windows retries each failed replacement while holding the cache lock.
+	// Allow every caller to exhaust those retries before the test deadline.
+	ctx, cancel := context.WithTimeout(context.Background(), resolveTimeout)
 	defer cancel()
 	results := make(chan resolvedRegistryRef, callers)
 	for range callers {
