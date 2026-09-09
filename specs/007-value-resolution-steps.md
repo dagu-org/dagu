@@ -89,7 +89,7 @@ Explicit inspection surfaces report a passive notice for that preserved referenc
 
 - A failed attempt publishes no outputs, so its references stay unresolved.
 
-- Step output references do not read singular `output` captured into a variable, stdout, stderr, logs, artifacts, or nested output paths.
+- Step output references do not read string-form `output: VAR`, which captures a variable rather than a named output, nor stdout, stderr, logs, artifacts, or nested output paths.
 
 ### Foreach Body Scope
 

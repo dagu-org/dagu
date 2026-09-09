@@ -17,7 +17,9 @@ steps:
       - name: image_tag
 ```
 
-It does not define the existing singular `output` field, `stdout.outputs`, `outputs.write`, or the `outputs` schema in `dagu-action.yaml`. Those mechanisms publish named outputs of their own, and Spec 007 defines how references read them.
+It does not define the existing singular `output` field, `stdout.outputs`, `outputs.write`, or the `outputs` schema in `dagu-action.yaml`.
+
+Object-form `output`, `stdout.outputs`, `outputs.write`, and the `outputs` schema in `dagu-action.yaml` publish named outputs of their own, and Spec 007 defines how references read them. String-form `output: VAR` captures a variable rather than a named step output, so Spec 007 does not read it.
 
 Value-resolution references to published outputs are defined by [Spec 007: Value Resolution Steps](007-value-resolution-steps.md).
 
