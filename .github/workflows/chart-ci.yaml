@@ -172,6 +172,19 @@ jobs:
           grep -Fq 'maxUnavailable: 1' /tmp/dagu-coordinator-render.yaml
           grep -Fq 'maxSurge: 0' /tmp/dagu-coordinator-render.yaml
 
+          helm template dagu ./charts/dagu \
+            --namespace dagu \
+            --kube-version 1.35.0 \
+            --set deploymentMode=distributed \
+            --set persistence.accessMode=ReadWriteMany \
+            --set persistence.storageClass=nfs-client \
+            --set-string priorityClassName=dagu-global \
+            --set-string 'workerPools.general.priorityClassName=dagu-worker-high' \
+            >/tmp/dagu-priority-render.yaml
+
+          test "$(grep -Fc 'priorityClassName: dagu-global' /tmp/dagu-priority-render.yaml)" -eq 3
+          grep -Fq 'priorityClassName: dagu-worker-high' /tmp/dagu-priority-render.yaml
+
       - name: Smoke-render optional configurations
         run: |
           helm template dagu ./charts/dagu \

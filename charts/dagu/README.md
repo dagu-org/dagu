@@ -507,7 +507,7 @@ workerPools:
         ephemeral-storage: "2Gi"
 ```
 
-Use `nodeSelector`, `tolerations`, and `affinity` for scheduling all Dagu pods. Non-empty scheduling values on a worker pool override the corresponding global value for that pool. `imagePullSecrets` and `podAnnotations` are also applied to every Dagu pod.
+Use `nodeSelector`, `tolerations`, `affinity`, and `priorityClassName` for scheduling all Dagu pods. Non-empty scheduling values on a worker pool override the corresponding global value for that pool. `priorityClassName` names an existing PriorityClass; the chart does not create it. `imagePullSecrets` and `podAnnotations` are also applied to every Dagu pod.
 
 `worker.maxActiveRuns` controls the maximum concurrent runs handled by each distributed worker process.
 
