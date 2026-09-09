@@ -1,7 +1,7 @@
 working_dir: .
 steps:
   - id: build
-    run: printf '{"image":"legacy-v1"}'
+    run: printf '{"image":"published-v1"}'
     stdout:
       outputs:
         fields:
@@ -12,4 +12,4 @@ steps:
   - id: deploy
     depends: build
     run: |
-      printf '%s\n' '${steps.build.outputs.image}' > legacy-not-step-output.txt
+      printf '%s\n' '${steps.build.outputs.image}' > stdout-outputs.txt

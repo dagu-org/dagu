@@ -15,6 +15,10 @@ func TestValidateStepOutputReferenceNotices(t *testing.T) {
 	validCases := []string{
 		"valid_reference.yaml",
 		"quiet_unsupported_escaped.yaml",
+		"stdout_outputs_publish_step_outputs.yaml",
+		"output_schema_publishes_step_outputs.yaml",
+		"object_output_publishes_step_outputs.yaml",
+		"outputs_write_publishes_step_outputs.yaml",
 	}
 	for _, file := range validCases {
 		t.Run(file, func(t *testing.T) {
@@ -55,10 +59,6 @@ func TestValidateStepOutputReferenceNotices(t *testing.T) {
 		{
 			file:        "namespace_handler.yaml",
 			stderrParts: []string{"${steps.build.outputs.image}", "reason=namespace_unavailable", "handler_on.success.run"},
-		},
-		{
-			file:        "legacy_outputs_not_step_outputs.yaml",
-			stderrParts: []string{"${steps.build.outputs.image}", "reason=unknown_output_name", "steps[1].run"},
 		},
 	}
 	for _, tc := range noticeCases {
@@ -114,10 +114,28 @@ func TestRuntimeStepOutputReferenceResolution(t *testing.T) {
 			content: "${steps.build.outputs.image}\n",
 		},
 		{
-			name:    "legacy outputs are not spec 007 outputs",
-			file:    "legacy_outputs_not_step_outputs.yaml",
-			output:  "legacy-not-step-output.txt",
-			content: "${steps.build.outputs.image}\n",
+			name:    "stdout outputs publish step outputs",
+			file:    "stdout_outputs_publish_step_outputs.yaml",
+			output:  "stdout-outputs.txt",
+			content: "published-v1\n",
+		},
+		{
+			name:    "output schema publishes step outputs",
+			file:    "output_schema_publishes_step_outputs.yaml",
+			output:  "output-schema.txt",
+			content: "schema-v1\n",
+		},
+		{
+			name:    "object form output publishes step outputs",
+			file:    "object_output_publishes_step_outputs.yaml",
+			output:  "object-output.txt",
+			content: "object-v1\n",
+		},
+		{
+			name:    "outputs write publishes step outputs",
+			file:    "outputs_write_publishes_step_outputs.yaml",
+			output:  "outputs-write.txt",
+			content: "write-v1\n",
 		},
 		{
 			name:    "escaped and unsupported text is preserved",
@@ -136,4 +154,16 @@ func TestRuntimeStepOutputReferenceResolution(t *testing.T) {
 			dagu.ExpectFileContent(tc.output, tc.content)
 		})
 	}
+}
+
+// A preserved reference explains itself in the run log, so the failure a shell
+// reports later is traceable to the reference that never resolved.
+func TestRuntimeStepOutputReferenceNotice(t *testing.T) {
+	t.Parallel()
+
+	dagu := harness.NewRunner(t)
+	result := dagu.Run("start", "runtime_notice_unresolved.yaml")
+	result.ExpectExitCode(0)
+	result.ExpectStderrContains("${steps.build.outputs.tag}", "was left unchanged", "step=deploy")
+	dagu.ExpectFileContent("runtime-notice.txt", "${steps.build.outputs.tag}\n")
 }

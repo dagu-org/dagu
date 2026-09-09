@@ -135,7 +135,7 @@ func deprecatedSyntaxWarningsForStepMap(path string, step map[string]any) []stri
 	return warnings
 }
 
-func sortedKeys(m map[string]any) []string {
+func sortedKeys[V any](m map[string]V) []string {
 	keys := make([]string, 0, len(m))
 	for key := range m {
 		keys = append(keys, key)

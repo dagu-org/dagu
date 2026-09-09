@@ -30,7 +30,7 @@ var (
 )
 
 var _ executor.Executor = (*executorImpl)(nil)
-var _ executor.OutputsProvider = (*executorImpl)(nil)
+var _ executor.DeclaredOutputsProvider = (*executorImpl)(nil)
 
 type executorImpl struct {
 	mu      sync.Mutex
@@ -140,6 +140,12 @@ func (e *executorImpl) Run(context.Context) error {
 	e.outputs = make(map[string]any, len(e.values))
 	maps.Copy(e.outputs, e.values)
 	return nil
+}
+
+// PublishesDeclaredOutputs exposes the written values to strict step output
+// references.
+func (e *executorImpl) PublishesDeclaredOutputs() bool {
+	return e.op == opWrite
 }
 
 func (e *executorImpl) GetOutputs() map[string]any {

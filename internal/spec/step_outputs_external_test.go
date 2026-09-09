@@ -154,3 +154,137 @@ steps:
 		})
 	}
 }
+
+// Mechanisms that publish from captured output declare their names so strict
+// step-output references can be validated without running the workflow.
+func TestStepCapturedOutputsDeclaration(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name     string
+		yaml     string
+		expected []ir.StepOutputDeclaration
+	}{
+		{
+			name: "output schema",
+			yaml: `
+steps:
+  - id: build
+    run: echo ok
+    output_schema:
+      type: object
+      properties:
+        image: {type: string}
+        meta: {type: object}
+`,
+			expected: []ir.StepOutputDeclaration{
+				{Name: "image", Type: ir.StepDeclaredOutputTypeString, Source: ir.StepDeclaredOutputSourceCapture},
+				{Name: "meta", Type: ir.StepDeclaredOutputTypeJSON, Source: ir.StepDeclaredOutputSourceCapture},
+			},
+		},
+		{
+			name: "object form output",
+			yaml: `
+steps:
+  - id: build
+    run: echo ok
+    output:
+      image:
+        from: stdout
+        decode: json
+        select: .image
+`,
+			expected: []ir.StepOutputDeclaration{
+				{Name: "image", Source: ir.StepDeclaredOutputSourceCapture},
+			},
+		},
+		{
+			name: "stdout outputs fields",
+			yaml: `
+steps:
+  - id: build
+    run: echo ok
+    stdout:
+      outputs:
+        fields:
+          image: {decode: json, select: .image}
+`,
+			expected: []ir.StepOutputDeclaration{
+				{Name: "image", Source: ir.StepDeclaredOutputSourceCapture},
+			},
+		},
+		{
+			name: "outputs write values",
+			yaml: `
+steps:
+  - id: build
+    action: outputs.write
+    with:
+      values:
+        image: v1
+`,
+			expected: []ir.StepOutputDeclaration{
+				{Name: "image", Source: ir.StepDeclaredOutputSourceCapture},
+			},
+		},
+		{
+			name: "custom action output schema",
+			yaml: `
+actions:
+  build.image:
+    input_schema: {type: object, additionalProperties: false, properties: {}}
+    output_schema:
+      type: object
+      properties:
+        image: {type: string}
+    template:
+      run: echo ok
+steps:
+  - id: build
+    action: build.image
+    with: {}
+`,
+			expected: []ir.StepOutputDeclaration{
+				{Name: "image", Type: ir.StepDeclaredOutputTypeString, Source: ir.StepDeclaredOutputSourceCapture},
+			},
+		},
+		{
+			name: "authored declaration wins over derived name",
+			yaml: `
+steps:
+  - id: build
+    run: echo ok
+    outputs:
+      - name: image
+    output_schema:
+      type: object
+      properties:
+        image: {type: string}
+`,
+			expected: []ir.StepOutputDeclaration{
+				{Name: "image", Type: ir.StepDeclaredOutputTypeString},
+			},
+		},
+		{
+			name: "schema without inline properties declares nothing",
+			yaml: `
+steps:
+  - id: build
+    run: echo ok
+    output_schema: {}
+`,
+			expected: nil,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			dag, err := spec.LoadYAML(context.Background(), []byte("name: test\n"+tc.yaml), spec.WithoutEval())
+			require.NoError(t, err)
+			require.Len(t, dag.Steps, 1)
+			require.Equal(t, tc.expected, dag.Steps[0].Outputs)
+		})
+	}
+}

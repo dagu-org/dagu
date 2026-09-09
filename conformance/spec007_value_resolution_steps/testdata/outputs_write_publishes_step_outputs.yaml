@@ -1,0 +1,12 @@
+working_dir: .
+steps:
+  - id: build
+    action: outputs.write
+    with:
+      values:
+        image: write-v1
+
+  - id: deploy
+    depends: build
+    run: |
+      printf '%s\n' '${steps.build.outputs.image}' > outputs-write.txt

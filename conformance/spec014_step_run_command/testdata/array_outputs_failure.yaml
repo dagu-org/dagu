@@ -5,7 +5,7 @@ steps:
     outputs:
       - name: leaked
     run:
-      - printf 'leaked=value\n' >> "$DAGU_OUTPUT_FILE"
+      - printf 'leaked=leakedpayload\n' >> "$DAGU_OUTPUT_FILE"
       - false
   - id: consume
     depends: [produce]

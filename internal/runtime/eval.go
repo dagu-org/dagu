@@ -7,11 +7,14 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"log/slog"
 	"maps"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/dagucloud/dagu/v2/internal/cmn/logger"
+	"github.com/dagucloud/dagu/v2/internal/cmn/logger/tag"
 	"github.com/dagucloud/dagu/v2/internal/cmn/runenv"
 
 	"github.com/dagucloud/dagu/v2/internal/cmn/stringutil"
@@ -29,7 +32,7 @@ func EvalBool(ctx context.Context, value any) (bool, error) {
 // with the variables within the execution context.
 func EvalObject[T any](ctx context.Context, obj T) (T, error) {
 	env := GetEnv(ctx)
-	resolver := resolverFromEnv(env)
+	resolver := resolverFromEnv(ctx, env)
 	got, err := resolver.Object(ctx, obj, cmnvalue.WorkflowObjectField("object"))
 	if err != nil {
 		return obj, err
@@ -41,7 +44,7 @@ func EvalObject[T any](ctx context.Context, obj T) (T, error) {
 	return val, nil
 }
 
-func resolverFromEnv(env Env) cmnvalue.Resolver {
+func resolverFromEnv(ctx context.Context, env Env) cmnvalue.Resolver {
 	var consts cmnvalue.Values
 	var params cmnvalue.Values
 	var paramsJSON string
@@ -63,7 +66,37 @@ func resolverFromEnv(env Env) cmnvalue.Resolver {
 		Outputs:        env.Outputs,
 		BuiltinContext: builtinContextFromEnv(env),
 	}
-	return cmnvalue.NewResolver(cmnvalue.StaticScope{Consts: consts, Params: paramDeclarations}, scope)
+	return cmnvalue.NewResolver(
+		cmnvalue.StaticScope{Consts: consts, Params: paramDeclarations},
+		scope,
+		cmnvalue.WithValueReferenceNotices(stepOutputNoticeLogger{ctx: ctx, reported: env.reportedRefs}),
+	)
+}
+
+// stepOutputNoticeLogger warns when a strict step-output reference survives value
+// resolution. Without it a run only shows the shell error caused by the
+// reference text reaching the command unchanged.
+type stepOutputNoticeLogger struct {
+	ctx      context.Context
+	reported map[string]struct{}
+}
+
+func (l stepOutputNoticeLogger) Report(notice cmnvalue.ValueReferenceNotice) {
+	if notice.Message == "" || !cmnvalue.IsStepOutputReferenceToken(notice.Token) {
+		return
+	}
+	if l.reported != nil {
+		key := notice.FieldPath + "\x00" + notice.Token
+		if _, seen := l.reported[key]; seen {
+			return
+		}
+		l.reported[key] = struct{}{}
+	}
+	var fields []slog.Attr
+	if notice.Reason != "" {
+		fields = append(fields, tag.Reason(string(notice.Reason)))
+	}
+	logger.Warn(l.ctx, notice.Message, fields...)
 }
 
 func builtinContextFromEnv(env Env) cmnvalue.BuiltinContext {
@@ -137,33 +170,33 @@ func addBuiltinContextEnvValue(values map[string]string, path string, scope *cmn
 }
 
 func resolveRuntimeString(ctx context.Context, raw string, field cmnvalue.Field) (string, error) {
-	return resolverFromEnv(GetEnv(ctx)).String(ctx, raw, field)
+	return resolverFromEnv(ctx, GetEnv(ctx)).String(ctx, raw, field)
 }
 
 func resolveRuntimeObject(ctx context.Context, obj any, field cmnvalue.Field) (any, error) {
-	return resolverFromEnv(GetEnv(ctx)).Object(ctx, obj, field)
+	return resolverFromEnv(ctx, GetEnv(ctx)).Object(ctx, obj, field)
 }
 
 func resolveRuntimeInt(ctx context.Context, raw string, field cmnvalue.Field) (int, error) {
-	return resolverFromEnv(GetEnv(ctx)).Int(ctx, raw, field)
+	return resolverFromEnv(ctx, GetEnv(ctx)).Int(ctx, raw, field)
 }
 
 func resolveWithEnvScope(ctx context.Context, env Env, scope *cmnvalue.EnvScope, raw string, field cmnvalue.Field) (string, error) {
 	copy := env
 	copy.Scope = scope
-	return resolverFromEnv(copy).String(ctx, raw, field)
+	return resolverFromEnv(ctx, copy).String(ctx, raw, field)
 }
 
 // ValueResolver returns a semantic value resolver for the runtime environment in ctx.
 func ValueResolver(ctx context.Context) cmnvalue.Resolver {
-	return resolverFromEnv(GetEnv(ctx))
+	return resolverFromEnv(ctx, GetEnv(ctx))
 }
 
 // ValueResolverWithScope returns a semantic value resolver using scope as the runtime env scope.
 func ValueResolverWithScope(ctx context.Context, scope *cmnvalue.EnvScope) cmnvalue.Resolver {
 	env := GetEnv(ctx)
 	env.Scope = scope
-	return resolverFromEnv(env)
+	return resolverFromEnv(ctx, env)
 }
 
 // ResolveString resolves raw with the semantic field in the runtime environment.

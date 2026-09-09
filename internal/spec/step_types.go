@@ -984,6 +984,9 @@ func buildCustomStepFromSpecWithStack(
 	if customType.Description != "" && builtStep.Description == "" {
 		builtStep.Description = customType.Description
 	}
+	// The definition's output schema arrives after the expanded step was built,
+	// so its published names are derived here.
+	deriveCapturedStepOutputs(builtStep)
 	return builtStep, nil
 }
 

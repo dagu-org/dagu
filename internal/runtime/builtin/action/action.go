@@ -29,7 +29,7 @@ const (
 var _ runtimeexec.Executor = (*Executor)(nil)
 var _ runtimeexec.DAGExecutor = (*Executor)(nil)
 var _ runtimeexec.SubRunProvider = (*Executor)(nil)
-var _ runtimeexec.OutputsProvider = (*Executor)(nil)
+var _ runtimeexec.DeclaredOutputsProvider = (*Executor)(nil)
 
 type config struct {
 	Ref   string
@@ -303,6 +303,13 @@ func (e *Executor) setOutputs(outputs map[string]any) {
 	}
 	e.outputs = make(map[string]any, len(outputs))
 	maps.Copy(e.outputs, outputs)
+}
+
+// PublishesDeclaredOutputs exposes the action's published outputs to strict step
+// output references. The names come from the action manifest, which is resolved
+// during the run, so they are known only after the run.
+func (e *Executor) PublishesDeclaredOutputs() bool {
+	return true
 }
 
 func (e *Executor) GetOutputs() map[string]any {

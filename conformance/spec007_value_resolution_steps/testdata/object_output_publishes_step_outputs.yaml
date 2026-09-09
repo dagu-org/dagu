@@ -1,0 +1,14 @@
+working_dir: .
+steps:
+  - id: build
+    run: printf '{"image":"object-v1"}'
+    output:
+      image:
+        from: stdout
+        decode: json
+        select: .image
+
+  - id: deploy
+    depends: build
+    run: |
+      printf '%s\n' '${steps.build.outputs.image}' > object-output.txt

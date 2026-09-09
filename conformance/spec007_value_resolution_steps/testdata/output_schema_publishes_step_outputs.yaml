@@ -1,0 +1,16 @@
+working_dir: .
+steps:
+  - id: build
+    output_schema:
+      type: object
+      additionalProperties: false
+      required: [image]
+      properties:
+        image:
+          type: string
+    run: printf '{"image":"schema-v1"}'
+
+  - id: deploy
+    depends: build
+    run: |
+      printf '%s\n' '${steps.build.outputs.image}' > output-schema.txt

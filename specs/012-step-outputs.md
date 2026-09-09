@@ -17,7 +17,7 @@ steps:
       - name: image_tag
 ```
 
-It does not define the existing singular `output` field, `stdout.outputs`, `outputs.write`, or the `outputs` schema in `dagu-action.yaml`.
+It does not define the existing singular `output` field, `stdout.outputs`, `outputs.write`, or the `outputs` schema in `dagu-action.yaml`. Those mechanisms publish named outputs of their own, and Spec 007 defines how references read them.
 
 Value-resolution references to published outputs are defined by [Spec 007: Value Resolution Steps](007-value-resolution-steps.md).
 

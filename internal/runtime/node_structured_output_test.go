@@ -694,3 +694,62 @@ func TestNodeEvaluateStructuredOutput(t *testing.T) {
 		assert.Contains(t, err.Error(), `payload: unsupported output source "network"`)
 	})
 }
+
+// Capture-published outputs must reach the strict ${steps.<id>.outputs.<name>}
+// channel, which reads StepOutputsValue, not just the legacy output channels.
+func TestNodeCaptureOutputPublishesStrictStepOutputs(t *testing.T) {
+	t.Parallel()
+
+	schema := map[string]any{
+		"type":     "object",
+		"required": []any{"value"},
+		"properties": map[string]any{
+			"value": map[string]any{"type": "string"},
+		},
+	}
+
+	cases := []struct {
+		name   string
+		step   ir.Step
+		stdout string
+	}{
+		{
+			name:   "OutputSchema",
+			step:   ir.Step{OutputSchema: schema},
+			stdout: `{"value":"hello"}`,
+		},
+		{
+			name: "StructuredOutput",
+			step: ir.Step{StructuredOutput: map[string]ir.StepOutputEntry{
+				"value": {From: ir.StepOutputSourceStdout, Decode: ir.StepOutputDecodeJSON, Select: ".value"},
+			}},
+			stdout: `{"value":"hello"}`,
+		},
+		{
+			name: "StdoutOutputs",
+			step: ir.Step{StdoutOutputs: &ir.StepOutputsConfig{
+				Fields: map[string]ir.StepOutputEntry{
+					"value": {From: ir.StepOutputSourceStdout, Decode: ir.StepOutputDecodeJSON, Select: ".value"},
+				},
+			}},
+			stdout: `{"value":"hello"}`,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			workDir := t.TempDir()
+			ctx := structuredOutputTestContext(t, nil, workDir)
+			node := NodeWithData(NodeData{Step: tc.step})
+			node.outputs.outputCaptured = true
+			node.outputs.outputData = tc.stdout
+
+			require.NoError(t, node.captureOutput(ctx))
+			state := node.State()
+			require.NotNil(t, state.StepOutputsValue)
+			assert.JSONEq(t, `{"value":"hello"}`, *state.StepOutputsValue)
+		})
+	}
+}

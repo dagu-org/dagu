@@ -83,9 +83,13 @@ Explicit inspection surfaces report a passive notice for that preserved referenc
 
 - Step output values are inserted into string fields according to Spec 003 string insertion rules.
 
-- Step output references read only top-level outputs declared by the referenced step and published through `DAGU_OUTPUT_FILE`.
+- Step output references read the named outputs a step publishes, whatever mechanism publishes them.
 
-- Step output references do not read singular `output`, `stdout.outputs`, legacy DAG/action outputs, stdout, stderr, logs, artifacts, or nested output paths.
+- A step publishes named outputs through its top-level `outputs` contract and `DAGU_OUTPUT_FILE`, through `output_schema`, through object-form `output`, through `stdout.outputs`, or through an action that publishes named outputs.
+
+- A failed attempt publishes no outputs, so its references stay unresolved.
+
+- Step output references do not read singular `output` captured into a variable, stdout, stderr, logs, artifacts, or nested output paths.
 
 ### Foreach Body Scope
 
@@ -127,7 +131,9 @@ Rules:
 
 - An unknown `steps.<step_id>` reference must use reason `unknown_step_id`.
 
-- An unknown `steps.<step_id>.outputs.<name>` reference must use reason `unknown_output_name` when the referenced step is known but the referenced output name is not declared by the step's top-level `outputs` contract, or the referenced step has no top-level `outputs` contract.
+- An unknown `steps.<step_id>.outputs.<name>` reference must use reason `unknown_output_name` when the referenced step is known, publishes a statically known output contract, and the referenced output name is not in it.
+
+- A step whose published output names are known only during a run has no statically known contract, so a reference to it must not use reason `unknown_output_name`. A sub-DAG step and an action step resolved from a manifest publish such names.
 
 - A step output reference without a direct or transitive dependency on the producing step must use reason `missing_dependency`.
 

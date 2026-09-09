@@ -626,6 +626,8 @@ func (s *step) build(ctx stepBuildContext) (*ir.Step, error) {
 		errs = append(errs, err)
 	}
 
+	deriveCapturedStepOutputs(result)
+
 	if len(errs) > 0 {
 		return nil, errs
 	}

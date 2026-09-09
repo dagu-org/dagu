@@ -52,6 +52,11 @@ type Env struct {
 	// Outputs contains attempt staging paths scoped to the current step.
 	Outputs cmnvalue.Values
 
+	// reportedRefs records strict step-output references already warned about,
+	// so one unresolved reference in a step logs once even though the command
+	// text is resolved more than once. A nil map disables the deduplication.
+	reportedRefs map[string]struct{}
+
 	// Resolved absolute path for the step's working directory, determined by:
 	// 1. Step's Dir field if specified (resolved to absolute path)
 	// 2. Current working directory if Dir is not specified
@@ -118,12 +123,13 @@ func newEnv(ctx context.Context, step ir.Step, rCtx Context, workingDir string) 
 	scope = scope.WithEntries(stepEnvs, cmnvalue.EnvSourceStepEnv)
 
 	return Env{
-		Context:    rCtx,
-		Scope:      scope,
-		Step:       step,
-		StepMap:    make(map[string]cmnvalue.StepInfo),
-		Foreach:    foreach,
-		WorkingDir: workingDir,
+		Context:      rCtx,
+		Scope:        scope,
+		Step:         step,
+		StepMap:      make(map[string]cmnvalue.StepInfo),
+		Foreach:      foreach,
+		WorkingDir:   workingDir,
+		reportedRefs: make(map[string]struct{}),
 	}
 }
 
@@ -534,7 +540,7 @@ func (e Env) MailerConfig(ctx context.Context) (mailer.Config, error) {
 	if e.DAG.SMTP == nil {
 		return mailer.Config{}, nil
 	}
-	resolver := resolverFromEnv(e)
+	resolver := resolverFromEnv(ctx, e)
 	got, err := resolver.Object(ctx, *e.DAG.SMTP, cmnvalue.HostConfigObjectField("smtp"))
 	if err != nil {
 		return mailer.Config{}, err
@@ -550,7 +556,7 @@ func (e Env) MailerConfig(ctx context.Context) (mailer.Config, error) {
 func (e Env) EvalBool(ctx context.Context, value any) (bool, error) {
 	switch v := value.(type) {
 	case string:
-		s, err := resolverFromEnv(e).String(ctx, v, cmnvalue.WorkflowField("bool"))
+		s, err := resolverFromEnv(ctx, e).String(ctx, v, cmnvalue.WorkflowField("bool"))
 		if err != nil {
 			return false, err
 		}

@@ -117,8 +117,8 @@ func TestCommandFormFailuresUnix(t *testing.T) {
 		dagu := harness.NewRunner(t)
 		result := dagu.Run("start", "array_outputs_failure.yaml")
 		result.ExpectExitCode(1)
-		result.ExpectStderrNotContains("value")
-		dagu.ExpectFileNotContains("array-output-failure.txt", "value")
+		result.ExpectStderrNotContains("leakedpayload")
+		dagu.ExpectFileNotContains("array-output-failure.txt", "leakedpayload")
 	})
 
 	t.Run("resolved command text with line break fails before shell starts", func(t *testing.T) {

@@ -362,6 +362,10 @@ func (n *Node) captureOutput(ctx context.Context) error {
 		}
 	}
 
+	// The last mechanism to publish wins, matching the order the legacy outputs
+	// object is built below.
+	var capturedOutputs string
+
 	if step.HasStructuredOutput() {
 		value, err := n.evaluateStructuredOutput(ctx, stdout, stdoutCaptured)
 		if err != nil {
@@ -369,10 +373,12 @@ func (n *Node) captureOutput(ctx context.Context) error {
 		}
 		n.setOutputValue(value)
 		n.setOutputsValue(value)
+		capturedOutputs = value
 	}
 
 	if step.HasOutputSchema() && !step.HasStructuredOutput() {
 		n.setOutputValue(schemaOutput)
+		capturedOutputs = schemaOutput
 	}
 	if step.HasStdoutOutputs() {
 		value, err := n.evaluateStdoutOutputs(ctx, stdout, stdoutCaptured)
@@ -380,7 +386,40 @@ func (n *Node) captureOutput(ctx context.Context) error {
 			return fmt.Errorf("failed to evaluate stdout outputs: %w", err)
 		}
 		n.setOutputsValue(value)
+		capturedOutputs = value
 	}
+	return n.publishCapturedStepOutputs(ctx, capturedOutputs)
+}
+
+// publishCapturedStepOutputs merges capture-published values into the strict
+// step-output channel behind ${steps.<id>.outputs.<name>}. A failed attempt
+// publishes nothing, matching outputs declared through DAGU_OUTPUT_FILE.
+func (n *Node) publishCapturedStepOutputs(ctx context.Context, payload string) error {
+	if payload == "" || n.Error() != nil {
+		return nil
+	}
+
+	values := make(map[string]any)
+	if err := json.Unmarshal([]byte(payload), &values); err != nil {
+		return fmt.Errorf("failed to decode captured step outputs: %w", err)
+	}
+	if len(values) == 0 {
+		return nil
+	}
+
+	merged := make(map[string]any, len(values))
+	if raw := n.State().StepOutputsValue; raw != nil && *raw != "" {
+		if err := json.Unmarshal([]byte(*raw), &merged); err != nil {
+			return fmt.Errorf("failed to decode step outputs before publishing captured outputs: %w", err)
+		}
+	}
+	maps.Copy(merged, values)
+
+	serialized, err := serializeOutputsValue(ctx, merged)
+	if err != nil {
+		return err
+	}
+	n.setStepOutputsValue(serialized)
 	return nil
 }
 
@@ -931,7 +970,7 @@ func evalTemplateConfig(ctx context.Context, config map[string]any) (map[string]
 		return nil, fmt.Errorf("with.template_ref must be a string")
 	}
 	env.Scope = scope
-	templateText, err := resolverFromEnv(env).ResolveRef(
+	templateText, err := resolverFromEnv(ctx, env).ResolveRef(
 		ctx,
 		ref,
 		cmnvalue.TemplateConfigField("with.template_ref"),
@@ -957,7 +996,7 @@ func scriptField(ctx context.Context, step ir.Step) cmnvalue.Field {
 func resolveRuntimeObjectWithScope(ctx context.Context, env Env, scope *cmnvalue.EnvScope, obj any, field cmnvalue.Field) (any, error) {
 	copy := env
 	copy.Scope = scope
-	return resolverFromEnv(copy).Object(ctx, obj, field)
+	return resolverFromEnv(ctx, copy).Object(ctx, obj, field)
 }
 
 func objectAsConfig(obj any) (map[string]any, error) {

@@ -8,5 +8,5 @@ steps:
         count: 3
   - id: read
     depends: write
-    run: printf 'greeting=%s count=%s' "${write.outputs.greeting}" "${write.outputs.count}"
+    run: printf 'greeting=%s count=%s strict=%s' "${write.outputs.greeting}" "${write.outputs.count}" "${steps.write.outputs.greeting}"
     stdout: result.out

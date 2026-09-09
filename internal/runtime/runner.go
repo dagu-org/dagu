@@ -981,7 +981,7 @@ func addResolvedEnvVars(ctx context.Context, env *Env, envList []string, fieldPr
 		if !found {
 			return fmt.Errorf("invalid environment variable format %q", v)
 		}
-		evaluatedValue, err := resolverFromEnv(*env).String(ctx, value, fieldForKey(fieldPrefix+key))
+		evaluatedValue, err := resolverFromEnv(ctx, *env).String(ctx, value, fieldForKey(fieldPrefix+key))
 		if err != nil {
 			return fmt.Errorf("failed to evaluate environment variable %q: %w", v, err)
 		}

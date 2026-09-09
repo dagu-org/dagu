@@ -13,7 +13,7 @@ func TestOutputsWrite(t *testing.T) {
 	t.Parallel()
 
 	for _, tc := range []struct{ file, want string }{
-		{"write_and_read.yaml", "greeting=hello count=3"},
+		{"write_and_read.yaml", "greeting=hello count=3 strict=hello"},
 		{"write_dynamic_value.yaml", "from-env"},
 		{"write_list_value.yaml", `["a","b"]`},
 	} {

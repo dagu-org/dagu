@@ -24,7 +24,7 @@ import (
 
 var _ executor.DAGExecutor = (*dagExecutor)(nil)
 var _ executor.NodeStatusDeterminer = (*dagExecutor)(nil)
-var _ executor.OutputsProvider = (*dagExecutor)(nil)
+var _ executor.DeclaredOutputsProvider = (*dagExecutor)(nil)
 
 type dagExecutor struct {
 	child     *executor.SubDAGExecutor
@@ -56,6 +56,13 @@ func (e *dagExecutor) setOutputs(outputs map[string]any) {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 	e.outputs = outputs
+}
+
+// PublishesDeclaredOutputs exposes the child run's published outputs to strict
+// step output references. The names come from the child DAG, so they are known
+// only after the run.
+func (e *dagExecutor) PublishesDeclaredOutputs() bool {
+	return true
 }
 
 // GetOutputs implements executor.OutputsProvider.
@@ -244,6 +251,6 @@ func init() {
 		SubDAG:         true,
 		WorkerSelector: true,
 	}
-	executor.RegisterExecutor("subworkflow", newDAGExecutor, nil, caps)
-	executor.RegisterExecutor("dag", newDAGExecutor, nil, caps)
+	executor.RegisterExecutor(ir.ExecutorTypeSubworkflow, newDAGExecutor, nil, caps)
+	executor.RegisterExecutor(ir.ExecutorTypeDAG, newDAGExecutor, nil, caps)
 }
