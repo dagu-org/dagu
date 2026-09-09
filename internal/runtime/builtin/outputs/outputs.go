@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	executorType = "outputs"
+	executorType = ir.ExecutorTypeOutputs
 	opWrite      = "write"
 )
 

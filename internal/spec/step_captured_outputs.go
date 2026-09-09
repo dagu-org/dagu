@@ -5,9 +5,6 @@ package spec
 
 import "github.com/dagucloud/dagu/v2/internal/ir"
 
-// outputsExecutorType is the executor behind `action: outputs.write`.
-const outputsExecutorType = "outputs"
-
 // deriveCapturedStepOutputs records the names a step publishes outside
 // DAGU_OUTPUT_FILE so strict step-output references can be validated against
 // them. Declarations authored in YAML take precedence, and a step whose
@@ -83,7 +80,7 @@ func outputsWriteNames(config map[string]any) []string {
 }
 
 func isOutputsWriteStep(step *ir.Step) bool {
-	return step.ExecutorConfig.Type == outputsExecutorType
+	return step.ExecutorConfig.Type == ir.ExecutorTypeOutputs
 }
 
 // outputSchemaDeclarations reads the top-level property names of an output

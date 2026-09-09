@@ -504,6 +504,9 @@ const (
 
 	// ExecutorTypeAction is the executor type for external Dagu actions.
 	ExecutorTypeAction = "action"
+
+	// ExecutorTypeOutputs is the executor type for publishing named outputs.
+	ExecutorTypeOutputs = "outputs"
 )
 
 // RouterConfig contains routing configuration for router-type steps.
