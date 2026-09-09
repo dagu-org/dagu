@@ -37,6 +37,11 @@ type latestRegistryRef struct {
 	FetchedAt time.Time `json:"fetchedAt"`
 }
 
+type latestRefCacheEntry struct {
+	latestRegistryRef
+	FailedAt time.Time `json:"failedAt,omitzero"`
+}
+
 type registryRefSource int
 
 const (
@@ -57,7 +62,9 @@ type resolvedRegistryRef struct {
 // previously cached ref of any age is used, then the compiled-in bootstrap
 // ref, so resolution never fails.
 func (i *Installer) resolveStandardRegistryRef(ctx context.Context, opts tools.InstallOptions, forceRefresh bool) resolvedRegistryRef {
+	startedAt := i.now()
 	cachePath := i.latestRefCachePath(opts)
+	cacheLockHeld := false
 	if !forceRefresh {
 		if cached, ok := readLatestRefCache(cachePath, i.now()); ok {
 			return resolvedRegistryRef{cached, registryRefSourceCache}
@@ -74,12 +81,18 @@ func (i *Installer) resolveStandardRegistryRef(ctx context.Context, opts tools.I
 			// resolution when the registry itself is reachable.
 			i.logger.Debug("lock aqua latest registry cache", "err", err)
 		} else {
+			cacheLockHeld = true
 			defer unlock()
 			// Another installer or process may have populated the shared cache
 			// while this caller waited. Explicit refreshes still bypass it.
 			if !forceRefresh {
 				if cached, ok := readLatestRefCache(cachePath, i.now()); ok {
 					return resolvedRegistryRef{cached, registryRefSourceCache}
+				}
+				if registryRefFailedSince(cachePath, startedAt, i.now()) {
+					// Share a failed attempt that completed after this call began.
+					// Later independent callers can retry immediately.
+					return i.fallbackRegistryRef(ctx, cachePath, fmt.Errorf("concurrent aqua registry resolution failed"))
 				}
 			}
 		}
@@ -89,6 +102,10 @@ func (i *Installer) resolveStandardRegistryRef(ctx context.Context, opts tools.I
 	if err == nil {
 		i.writeLatestRefCache(cachePath, ref)
 		return resolvedRegistryRef{ref, registryRefSourceLive}
+	}
+	if cacheLockHeld {
+		cached, _ := readLatestRefCacheAnyAge(cachePath)
+		i.writeLatestRefCacheEntry(cachePath, latestRefCacheEntry{latestRegistryRef: cached, FailedAt: i.now()})
 	}
 	return i.fallbackRegistryRef(ctx, cachePath, err)
 }
@@ -180,11 +197,24 @@ func readLatestRefCacheAnyAge(path string) (latestRegistryRef, bool) {
 	return cached, true
 }
 
+func registryRefFailedSince(path string, startedAt, now time.Time) bool {
+	data, err := os.ReadFile(path) //nolint:gosec
+	if err != nil {
+		return false
+	}
+	var entry latestRefCacheEntry
+	return json.Unmarshal(data, &entry) == nil && entry.FailedAt.After(startedAt) && !entry.FailedAt.After(now)
+}
+
 func (i *Installer) writeLatestRefCache(path string, ref latestRegistryRef) {
+	i.writeLatestRefCacheEntry(path, latestRefCacheEntry{latestRegistryRef: ref})
+}
+
+func (i *Installer) writeLatestRefCacheEntry(path string, entry latestRefCacheEntry) {
 	if path == "" {
 		return
 	}
-	data, err := json.Marshal(ref)
+	data, err := json.Marshal(entry)
 	if err != nil {
 		return
 	}
