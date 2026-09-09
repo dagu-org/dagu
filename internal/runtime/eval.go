@@ -44,7 +44,22 @@ func EvalObject[T any](ctx context.Context, obj T) (T, error) {
 	return val, nil
 }
 
+// resolverFromEnv builds a resolver that reports preserved strict step-output
+// references. Use resolverWithoutNotices for phases where an unresolved
+// reference is expected.
 func resolverFromEnv(ctx context.Context, env Env) cmnvalue.Resolver {
+	return newResolver(env, cmnvalue.WithValueReferenceNotices(
+		stepOutputNoticeLogger{ctx: ctx, reported: env.reportedRefs},
+	))
+}
+
+// resolverWithoutNotices builds a resolver for phases that accept an unresolved
+// reference, so deferring one does not warn about a value that resolves later.
+func resolverWithoutNotices(env Env) cmnvalue.Resolver {
+	return newResolver(env)
+}
+
+func newResolver(env Env, opts ...cmnvalue.ResolverOption) cmnvalue.Resolver {
 	var consts cmnvalue.Values
 	var params cmnvalue.Values
 	var paramsJSON string
@@ -69,7 +84,7 @@ func resolverFromEnv(ctx context.Context, env Env) cmnvalue.Resolver {
 	return cmnvalue.NewResolver(
 		cmnvalue.StaticScope{Consts: consts, Params: paramDeclarations},
 		scope,
-		cmnvalue.WithValueReferenceNotices(stepOutputNoticeLogger{ctx: ctx, reported: env.reportedRefs}),
+		opts...,
 	)
 }
 

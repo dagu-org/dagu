@@ -175,7 +175,12 @@ func validateBuildRedirectAliases(
 		redirects = append(redirects, buildRedirect{field: "stderr.artifact", path: step.StderrArtifact, artifact: true})
 	}
 
+	// A deferred alias may legitimately carry a reference that only resolves
+	// once the producing step has run, so it must not warn here.
 	resolver := resolverFromEnv(ctx, env)
+	if deferUnresolved {
+		resolver = resolverWithoutNotices(env)
+	}
 	for _, redirect := range redirects {
 		if redirect.path == "" {
 			continue
