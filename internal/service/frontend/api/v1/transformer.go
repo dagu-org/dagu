@@ -141,18 +141,10 @@ func toStep(obj ir.Step) api.Step {
 	if len(obj.Dependencies) > 0 {
 		step.Dependencies = ptrOf(obj.Dependencies)
 	}
-	if len(obj.Outputs) > 0 {
-		outputs := make([]api.StepOutputDeclaration, len(obj.Outputs))
-		for i, output := range obj.Outputs {
-			outputs[i].Name = output.Name
-			if output.Type != "" {
-				outputType := api.StepOutputDeclarationType(output.Type)
-				outputs[i].Type = &outputType
-			}
-			if output.Path != "" {
-				outputs[i].Path = &output.Path
-			}
-		}
+	// Only authored declarations belong here. Names derived from a step's
+	// capture configuration are not published through DAGU_OUTPUT_FILE and are
+	// already visible in the field that configures them.
+	if outputs := authoredOutputDeclarations(obj.Outputs); len(outputs) > 0 {
 		step.Outputs = &outputs
 	}
 
@@ -998,4 +990,23 @@ func toToolDefinitions(defs []ir.ToolDefinition) *[]api.ToolDefinition {
 	}
 
 	return &result
+}
+
+func authoredOutputDeclarations(declarations []ir.StepOutputDeclaration) []api.StepOutputDeclaration {
+	outputs := make([]api.StepOutputDeclaration, 0, len(declarations))
+	for _, declaration := range declarations {
+		if declaration.Source == ir.StepDeclaredOutputSourceCapture {
+			continue
+		}
+		output := api.StepOutputDeclaration{Name: declaration.Name}
+		if declaration.Type != "" {
+			outputType := api.StepOutputDeclarationType(declaration.Type)
+			output.Type = &outputType
+		}
+		if declaration.Path != "" {
+			output.Path = &declaration.Path
+		}
+		outputs = append(outputs, output)
+	}
+	return outputs
 }

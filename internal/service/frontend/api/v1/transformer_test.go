@@ -668,3 +668,58 @@ func TestToDAGRunDetailsPrefersLegacyStateOverNullAgentState(t *testing.T) {
 	require.Len(t, *details.AgentTasks, 1)
 	assert.Equal(t, "vocabulary", (*details.AgentTasks)[0].Name)
 }
+
+// The step outputs field describes the authored output contract, so names
+// derived from a step's capture configuration must not appear there.
+func TestStepOutputsExcludeCapturedDeclarations(t *testing.T) {
+	t.Parallel()
+
+	status := ir.DAGRunStatus{
+		Name:     "capture-dag",
+		DAGRunID: "run-1",
+		Status:   ir.Succeeded,
+		Nodes: []*ir.Node{{
+			Step: ir.Step{
+				ID:   "build",
+				Name: "build",
+				Outputs: []ir.StepOutputDeclaration{
+					{Name: "authored"},
+					{Name: "derived", Source: ir.StepDeclaredOutputSourceCapture},
+				},
+			},
+			Status: ir.NodeSucceeded,
+		}},
+	}
+
+	details := ToDAGRunDetails(status)
+	require.Len(t, details.Nodes, 1)
+	require.NotNil(t, details.Nodes[0].Step.Outputs)
+	names := make([]string, 0, len(*details.Nodes[0].Step.Outputs))
+	for _, output := range *details.Nodes[0].Step.Outputs {
+		names = append(names, output.Name)
+	}
+	assert.Equal(t, []string{"authored"}, names)
+}
+
+// A step that only derives output names has no authored contract to report.
+func TestStepOutputsOmittedWhenOnlyCaptured(t *testing.T) {
+	t.Parallel()
+
+	status := ir.DAGRunStatus{
+		Name:     "capture-dag",
+		DAGRunID: "run-2",
+		Status:   ir.Succeeded,
+		Nodes: []*ir.Node{{
+			Step: ir.Step{
+				ID:      "build",
+				Name:    "build",
+				Outputs: []ir.StepOutputDeclaration{{Name: "derived", Source: ir.StepDeclaredOutputSourceCapture}},
+			},
+			Status: ir.NodeSucceeded,
+		}},
+	}
+
+	details := ToDAGRunDetails(status)
+	require.Len(t, details.Nodes, 1)
+	assert.Nil(t, details.Nodes[0].Step.Outputs)
+}
