@@ -243,20 +243,18 @@ func (e *StepExecutor) captureExecutorSideChannels(
 		if declared, ok := cmd.(executor.DeclaredOutputsProvider); ok {
 			hasDeclaredOutputs = declared.PublishesDeclaredOutputs()
 		}
+		// An executor that published nothing declares nothing, so the step
+		// output channels stay empty rather than holding a null payload.
 		if len(outputs) == 0 {
 			node.clearOutputsValue()
-			if !hasDeclaredOutputs {
-				return "", false, nil
-			}
+			return "", false, nil
 		}
 
 		declaredOutputsValue, err := serializeOutputsValue(ctx, outputs)
 		if err != nil {
 			return "", false, err
 		}
-		if len(outputs) > 0 {
-			node.setOutputsValue(declaredOutputsValue)
-		}
+		node.setOutputsValue(declaredOutputsValue)
 		return declaredOutputsValue, hasDeclaredOutputs, nil
 	}
 

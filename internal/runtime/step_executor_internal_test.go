@@ -45,6 +45,14 @@ func (e *declaredSideChannelExecutor) PublishesDeclaredOutputs() bool {
 	return true
 }
 
+type emptyDeclaredSideChannelExecutor struct {
+	emptySideChannelExecutor
+}
+
+func (e *emptyDeclaredSideChannelExecutor) PublishesDeclaredOutputs() bool {
+	return true
+}
+
 type invalidDeclaredSideChannelExecutor struct {
 	emptySideChannelExecutor
 }
@@ -171,4 +179,26 @@ func TestStepExecutorRecordsTimeoutBeforeCommandStarts(t *testing.T) {
 
 func newTestStepExecutorContext() context.Context {
 	return NewContext(context.Background(), &ir.DAG{}, "run-1", "dag.log")
+}
+
+// An executor that declares outputs but publishes none must leave the step
+// output channels empty rather than storing a null payload.
+func TestStepExecutorSkipsEmptyExecutorDeclaredOutputs(t *testing.T) {
+	executorType := "test-step-executor-empty-declared-outputs"
+	runtimeexec.RegisterExecutor(executorType, func(context.Context, ir.Step) (runtimeexec.Executor, error) {
+		return &emptyDeclaredSideChannelExecutor{}, nil
+	}, nil, registry.ExecutorCapabilities{})
+	t.Cleanup(func() { runtimeexec.UnregisterExecutor(executorType) })
+
+	node := NewNode(ir.Step{
+		Name: "empty-declared-outputs-step",
+		ExecutorConfig: ir.ExecutorConfig{
+			Type: executorType,
+		},
+	}, NodeState{})
+
+	require.NoError(t, NewStepExecutor().Execute(newTestStepExecutorContext(), node))
+
+	require.Nil(t, node.State().StepOutputsValue)
+	require.Nil(t, node.State().OutputsValue)
 }
