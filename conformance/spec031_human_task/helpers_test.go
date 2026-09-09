@@ -21,6 +21,18 @@ func sharedEnv(t *testing.T) []string {
 
 func startWaiting(t *testing.T, dagu *harness.Runner, env []string, runID, file string, extraArgs ...string) {
 	t.Helper()
+	_ = startWaitingWithScheduler(t, dagu, env, runID, file, extraArgs...)
+}
+
+func startWaitingWithScheduler(
+	t *testing.T,
+	dagu *harness.Runner,
+	env []string,
+	runID string,
+	file string,
+	extraArgs ...string,
+) *harness.Process {
+	t.Helper()
 	queueProcessor := dagu.StartWithEnv(env, "scheduler", "--dags="+dagu.ProjectPath("."))
 	select {
 	case <-queueProcessor.Done():
@@ -36,6 +48,7 @@ func startWaiting(t *testing.T, dagu *harness.Runner, env []string, runID, file 
 
 	status := waitForStatus(t, dagu, env, runID, file, "Waiting")
 	status.ExpectStderr("")
+	return queueProcessor
 }
 
 func complete(t *testing.T, dagu *harness.Runner, env []string, runID, step, file string, inputs ...string) *harness.Result {

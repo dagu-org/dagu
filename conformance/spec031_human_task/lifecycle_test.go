@@ -184,7 +184,8 @@ func TestConcurrentCompletion(t *testing.T) {
 		dagu := harness.NewRunner(t)
 		env := sharedEnv(t)
 		const runID = "spec031-concurrent-same"
-		startWaiting(t, dagu, env, runID, "concurrent.yaml")
+		scheduler := startWaitingWithScheduler(t, dagu, env, runID, "concurrent.yaml")
+		defer scheduler.Stop()
 
 		results := runConcurrentCompletions(t, dagu, env, runID, "blue", "blue")
 		for _, result := range results {
@@ -199,7 +200,8 @@ func TestConcurrentCompletion(t *testing.T) {
 		dagu := harness.NewRunner(t)
 		env := sharedEnv(t)
 		const runID = "spec031-concurrent-different"
-		startWaiting(t, dagu, env, runID, "concurrent.yaml")
+		scheduler := startWaitingWithScheduler(t, dagu, env, runID, "concurrent.yaml")
+		defer scheduler.Stop()
 
 		results := runConcurrentCompletions(t, dagu, env, runID, "blue", "green")
 		successes := 0
