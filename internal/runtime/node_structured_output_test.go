@@ -780,3 +780,21 @@ func TestNodeCaptureOutputKeepsPublishedStepOutputs(t *testing.T) {
 	require.NotNil(t, state.StepOutputsValue)
 	assert.JSONEq(t, `{"value":"from-output-file","extra":"captured"}`, *state.StepOutputsValue)
 }
+
+// An unconstrained output schema accepts any JSON. A payload that is not an
+// object carries no addressable names, so the step still succeeds.
+func TestNodeCaptureOutputAcceptsNonObjectSchemaOutput(t *testing.T) {
+	t.Parallel()
+
+	workDir := t.TempDir()
+	ctx := structuredOutputTestContext(t, nil, workDir)
+	node := NodeWithData(NodeData{Step: ir.Step{OutputSchema: map[string]any{}}})
+	node.outputs.outputCaptured = true
+	node.outputs.outputData = `[1,2,3]`
+
+	require.NoError(t, node.captureOutput(ctx))
+	state := node.State()
+	require.NotNil(t, state.OutputValue)
+	assert.JSONEq(t, `[1,2,3]`, *state.OutputValue)
+	assert.Nil(t, state.StepOutputsValue)
+}

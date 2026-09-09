@@ -288,3 +288,61 @@ steps:
 		})
 	}
 }
+
+// A step whose published names only a run reveals declares none, so nothing
+// claims a contract the build cannot check.
+func TestStepCapturedOutputsStayUndeclaredWhenDynamic(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		yaml string
+	}{
+		{
+			name: "stdout outputs decode whole object",
+			yaml: `
+steps:
+  - id: build
+    run: echo ok
+    stdout:
+      outputs:
+        decode: json
+`,
+		},
+		{
+			name: "output schema without inline properties",
+			yaml: `
+steps:
+  - id: build
+    run: echo ok
+    output_schema:
+      $ref: '#/$defs/result'
+      $defs:
+        result:
+          type: object
+          properties:
+            image: {type: string}
+`,
+		},
+		{
+			name: "unconstrained output schema",
+			yaml: `
+steps:
+  - id: build
+    run: echo ok
+    output_schema: {}
+`,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			dag, err := spec.LoadYAML(context.Background(), []byte("name: test\n"+tc.yaml), spec.WithoutEval())
+			require.NoError(t, err)
+			require.Len(t, dag.Steps, 1)
+			require.Nil(t, dag.Steps[0].Outputs)
+		})
+	}
+}

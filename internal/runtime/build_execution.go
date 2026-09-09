@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"maps"
 
 	"github.com/dagucloud/dagu/v2/internal/cmn/runenv"
 
@@ -257,14 +256,18 @@ func publishBuildOutputs(ctx context.Context, node *Node, outputs map[string]str
 	if len(outputs) == 0 {
 		return nil
 	}
-	merged := make(map[string]string)
+	// Decode into any-valued entries because a step may also publish typed
+	// values from its captured output alongside these materialized paths.
+	merged := make(map[string]any, len(outputs))
 	if raw := node.State().StepOutputsValue; raw != nil && *raw != "" {
 		if err := json.Unmarshal([]byte(*raw), &merged); err != nil {
 			return fmt.Errorf("decode step outputs before publishing materialization: %w", err)
 		}
 	}
-	maps.Copy(merged, outputs)
-	serialized, err := serializeDeclaredStepOutputs(ctx, merged)
+	for name, path := range outputs {
+		merged[name] = path
+	}
+	serialized, err := serializeOutputsValue(ctx, merged)
 	if err != nil {
 		return err
 	}

@@ -1,0 +1,27 @@
+type: build
+working_dir: .
+shell: [sh]
+
+steps:
+  - id: build
+    name: build
+    inputs:
+      - name: source
+        path: source.txt
+    outputs:
+      - name: artifact
+        path: artifact.txt
+    output_schema:
+      type: object
+      additionalProperties: false
+      required: [count]
+      properties:
+        count:
+          type: integer
+    script: |
+      printf 'built\n' > "${outputs.artifact}"
+      echo '{"count":3}'
+
+  - id: report
+    depends: build
+    run: printf '%s\n' '${steps.build.outputs.count}' > typed-capture.txt

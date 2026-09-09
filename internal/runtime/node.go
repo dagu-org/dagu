@@ -402,11 +402,14 @@ func (n *Node) publishCapturedStepOutputs(ctx context.Context, payload string) e
 		return nil
 	}
 
-	merged := make(map[string]any)
-	if err := json.Unmarshal([]byte(payload), &merged); err != nil {
+	var decoded any
+	if err := json.Unmarshal([]byte(payload), &decoded); err != nil {
 		return fmt.Errorf("failed to decode captured step outputs: %w", err)
 	}
-	if len(merged) == 0 {
+	// A payload that is not an object carries no addressable names, so an
+	// unconstrained schema keeps validating whatever a step prints.
+	merged, ok := decoded.(map[string]any)
+	if !ok || len(merged) == 0 {
 		return nil
 	}
 

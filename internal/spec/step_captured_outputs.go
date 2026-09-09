@@ -26,7 +26,7 @@ func deriveCapturedStepOutputs(result *ir.Step) {
 		taken[output.Name] = struct{}{}
 	}
 
-	for _, derived := range capturedOutputDeclarations(result) {
+	for _, derived := range capturedOutputs(result).declarations {
 		if _, exists := taken[derived.Name]; exists {
 			continue
 		}
@@ -41,57 +41,64 @@ func deriveCapturedStepOutputs(result *ir.Step) {
 	result.Outputs = authored
 }
 
-// capturedOutputDeclarations returns the names published by the mechanism that
-// wins at run time, mirroring the precedence in Node.captureOutput.
-func capturedOutputDeclarations(step *ir.Step) []ir.StepOutputDeclaration {
+// capturedOutputContract describes the names a step publishes outside
+// DAGU_OUTPUT_FILE.
+type capturedOutputContract struct {
+	declarations []ir.StepOutputDeclaration
+	// dynamic reports that the step publishes names inspection cannot list, so
+	// a reference to one of them cannot be checked before the step runs.
+	dynamic bool
+}
+
+// capturedOutputs describes the names published by the mechanism that wins at
+// run time, mirroring the precedence in Node.captureOutput.
+func capturedOutputs(step *ir.Step) capturedOutputContract {
 	switch {
 	case step.HasStdoutOutputs():
-		return capturedNames(stdoutOutputNames(step.StdoutOutputs))
+		names, ok := stdoutOutputNames(step.StdoutOutputs)
+		if !ok {
+			return capturedOutputContract{dynamic: true}
+		}
+		return capturedOutputContract{declarations: capturedNames(names)}
 	case step.HasStructuredOutput():
-		return capturedNames(sortedKeys(step.StructuredOutput))
+		return capturedOutputContract{declarations: capturedNames(sortedKeys(step.StructuredOutput))}
 	case step.HasOutputSchema():
-		return outputSchemaDeclarations(step.OutputSchema)
+		properties, ok := step.OutputSchema["properties"].(map[string]any)
+		if !ok {
+			return capturedOutputContract{dynamic: true}
+		}
+		return capturedOutputContract{declarations: outputSchemaDeclarations(properties)}
 	case isOutputsWriteStep(step):
-		return capturedNames(outputsWriteNames(step.ExecutorConfig.Config))
+		values, ok := step.ExecutorConfig.Config["values"].(map[string]any)
+		if !ok {
+			return capturedOutputContract{dynamic: true}
+		}
+		return capturedOutputContract{declarations: capturedNames(sortedKeys(values))}
 	}
-	return nil
+	return capturedOutputContract{}
 }
 
-// stdoutOutputNames returns the field names a stdout outputs config publishes,
-// or nil when the published object is only known after decoding stdout.
-func stdoutOutputNames(cfg *ir.StepOutputsConfig) []string {
+// stdoutOutputNames returns the field names a stdout outputs config publishes.
+// It reports false when the config decodes stdout into an object whose keys
+// only a run reveals.
+func stdoutOutputNames(cfg *ir.StepOutputsConfig) ([]string, bool) {
 	switch {
 	case len(cfg.Fields) > 0:
-		return sortedKeys(cfg.Fields)
+		return sortedKeys(cfg.Fields), true
 	case cfg.Field != "":
-		return []string{cfg.Field}
+		return []string{cfg.Field}, true
 	default:
-		return nil
+		return nil, false
 	}
-}
-
-// outputsWriteNames returns the keys an outputs.write step publishes.
-func outputsWriteNames(config map[string]any) []string {
-	values, ok := config["values"].(map[string]any)
-	if !ok {
-		return nil
-	}
-	return sortedKeys(values)
 }
 
 func isOutputsWriteStep(step *ir.Step) bool {
 	return step.ExecutorConfig.Type == ir.ExecutorTypeOutputs
 }
 
-// outputSchemaDeclarations reads the top-level property names of an output
-// schema. A schema without inline properties, such as one built from `$ref` or
-// a composition keyword, publishes names that are only known at run time.
-func outputSchemaDeclarations(schema map[string]any) []ir.StepOutputDeclaration {
-	properties, ok := schema["properties"].(map[string]any)
-	if !ok {
-		return nil
-	}
-
+// outputSchemaDeclarations converts the top-level property names of an output
+// schema into declarations.
+func outputSchemaDeclarations(properties map[string]any) []ir.StepOutputDeclaration {
 	declarations := make([]ir.StepOutputDeclaration, 0, len(properties))
 	for _, name := range sortedKeys(properties) {
 		if !declaredOutputNamePattern.MatchString(name) {

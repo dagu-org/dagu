@@ -84,3 +84,22 @@ func TestBuildWorkflowRejectsDuplicateOutputProducers(t *testing.T) {
 	result.ExpectNonZeroExitCode()
 	result.ExpectStderrContains("multiple producers", "shared.txt")
 }
+
+// A build step may publish a materialized path alongside typed values captured
+// from its own output, so materialization must tolerate non-string entries.
+func TestBuildStepPublishesTypedCapturedOutputs(t *testing.T) {
+	dagu := harness.NewRunner(t)
+	dagu.Mkdir(".home")
+	dagu.Mkdir(".xdg")
+	env := []string{
+		"DAGU_HOME=" + dagu.ProjectPath(".dagu"),
+		"HOME=" + dagu.ProjectPath(".home"),
+		"XDG_CONFIG_HOME=" + dagu.ProjectPath(".xdg"),
+		"APPDATA=" + dagu.ProjectPath(".home"),
+		"USERPROFILE=" + dagu.ProjectPath(".home"),
+	}
+
+	result := dagu.RunWithEnv(env, "start", "typed-capture-output.yaml")
+	result.ExpectExitCode(0)
+	dagu.ExpectTextFileContent("typed-capture.txt", "3\n")
+}

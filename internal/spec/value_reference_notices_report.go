@@ -325,14 +325,14 @@ func fixedActionOutputs(step ir.Step) []ir.StepOutputDeclaration {
 // publishesRuntimeOnlyOutputs reports whether a step's published output names
 // come from a definition that inspection cannot read. A sub-DAG's names belong
 // to the child document, and an action's names come from a manifest resolved
-// during the run, so neither can be checked without executing the workflow.
+// during the run. A step that decodes its whole stdout into outputs, or whose
+// output schema carries no inline properties, reveals its names the same way.
 func publishesRuntimeOnlyOutputs(step ir.Step) bool {
 	switch step.ExecutorConfig.Type {
 	case ir.ExecutorTypeDAG, ir.ExecutorTypeSubworkflow, ir.ExecutorTypeAction:
 		return true
-	default:
-		return false
 	}
+	return capturedOutputs(&step).dynamic
 }
 
 func (c *stepOutputNoticeContext) report(
