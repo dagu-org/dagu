@@ -992,6 +992,8 @@ func toToolDefinitions(defs []ir.ToolDefinition) *[]api.ToolDefinition {
 	return &result
 }
 
+// authoredOutputDeclarations converts the declarations a workflow author wrote,
+// dropping names the build derived from a step's capture configuration.
 func authoredOutputDeclarations(declarations []ir.StepOutputDeclaration) []api.StepOutputDeclaration {
 	outputs := make([]api.StepOutputDeclaration, 0, len(declarations))
 	for _, declaration := range declarations {

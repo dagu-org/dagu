@@ -59,6 +59,7 @@ func resolverWithoutNotices(env Env) cmnvalue.Resolver {
 	return newResolver(env)
 }
 
+// newResolver builds a resolver over the scopes reachable from env.
 func newResolver(env Env, opts ...cmnvalue.ResolverOption) cmnvalue.Resolver {
 	var consts cmnvalue.Values
 	var params cmnvalue.Values

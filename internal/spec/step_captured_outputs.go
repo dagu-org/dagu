@@ -73,6 +73,7 @@ func stdoutOutputNames(cfg *ir.StepOutputsConfig) []string {
 	}
 }
 
+// outputsWriteNames returns the keys an outputs.write step publishes.
 func outputsWriteNames(config map[string]any) []string {
 	values, ok := config["values"].(map[string]any)
 	if !ok {
@@ -108,6 +109,8 @@ func outputSchemaDeclarations(schema map[string]any) []ir.StepOutputDeclaration 
 	return declarations
 }
 
+// schemaOutputType maps a schema property to a declared output type. Only a
+// string property carries a string value; every other shape is JSON text.
 func schemaOutputType(property any) string {
 	object, ok := property.(map[string]any)
 	if !ok {
