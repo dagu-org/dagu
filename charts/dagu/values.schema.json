@@ -38,6 +38,9 @@
       "type": "object",
       "additionalProperties": true
     },
+    "priorityClassName": {
+      "type": "string"
+    },
     "volumeName": {
       "type": "string",
       "minLength": 1,
@@ -147,6 +150,9 @@
     },
     "affinity": {
       "$ref": "#/definitions/affinity"
+    },
+    "priorityClassName": {
+      "$ref": "#/definitions/priorityClassName"
     },
     "extraVolumes": {
       "type": "array",
@@ -377,6 +383,9 @@
           },
           "affinity": {
             "$ref": "#/definitions/affinity"
+          },
+          "priorityClassName": {
+            "$ref": "#/definitions/priorityClassName"
           }
         },
         "required": ["replicas"]

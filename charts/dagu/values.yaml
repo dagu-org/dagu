@@ -33,6 +33,7 @@ podAnnotations: {}
 nodeSelector: {}
 tolerations: []
 affinity: {}
+priorityClassName: ""
 
 # Additional Kubernetes volumes and mounts applied to every Dagu container.
 # Use these for file-backed configuration such as custom CA certificates,
@@ -126,6 +127,7 @@ workerPools:
     nodeSelector: {}
     tolerations: []
     affinity: {}
+    priorityClassName: ""
 
 # Server and UI configuration. In standalone mode this configures the combined
 # start-all pod and replicas must remain 1.

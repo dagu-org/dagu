@@ -5,6 +5,7 @@
 {{- $nodeSelector := default $.Values.nodeSelector $pool.nodeSelector }}
 {{- $tolerations := default $.Values.tolerations $pool.tolerations }}
 {{- $affinity := default $.Values.affinity $pool.affinity }}
+{{- $priorityClassName := default $.Values.priorityClassName $pool.priorityClassName }}
 {{- $podAnnotations := deepCopy $.Values.podAnnotations }}
 {{- $_ := set $podAnnotations "checksum/config" (include "dagu.distributedConfigChecksum" $) }}
 {{- if $.Values.serviceAccount.create }}
@@ -117,6 +118,9 @@ spec:
       {{- with $affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $priorityClassName }}
+      priorityClassName: {{ . | quote }}
       {{- end }}
       volumes:
         - name: data
