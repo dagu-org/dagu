@@ -391,29 +391,32 @@ func (n *Node) captureOutput(ctx context.Context) error {
 	return n.publishCapturedStepOutputs(ctx, capturedOutputs)
 }
 
-// publishCapturedStepOutputs merges capture-published values into the strict
+// publishCapturedStepOutputs adds capture-published values to the strict
 // step-output channel behind ${steps.<id>.outputs.<name>}. A failed attempt
 // publishes nothing, matching outputs declared through DAGU_OUTPUT_FILE.
+//
+// A name already published by the step's own output contract keeps its value,
+// so the contract the build derived and the values a run publishes agree.
 func (n *Node) publishCapturedStepOutputs(ctx context.Context, payload string) error {
 	if payload == "" || n.Error() != nil {
 		return nil
 	}
 
-	values := make(map[string]any)
-	if err := json.Unmarshal([]byte(payload), &values); err != nil {
+	merged := make(map[string]any)
+	if err := json.Unmarshal([]byte(payload), &merged); err != nil {
 		return fmt.Errorf("failed to decode captured step outputs: %w", err)
 	}
-	if len(values) == 0 {
+	if len(merged) == 0 {
 		return nil
 	}
 
-	merged := make(map[string]any, len(values))
 	if raw := n.State().StepOutputsValue; raw != nil && *raw != "" {
-		if err := json.Unmarshal([]byte(*raw), &merged); err != nil {
+		published := make(map[string]any)
+		if err := json.Unmarshal([]byte(*raw), &published); err != nil {
 			return fmt.Errorf("failed to decode step outputs before publishing captured outputs: %w", err)
 		}
+		maps.Copy(merged, published)
 	}
-	maps.Copy(merged, values)
 
 	serialized, err := serializeOutputsValue(ctx, merged)
 	if err != nil {

@@ -753,3 +753,30 @@ func TestNodeCaptureOutputPublishesStrictStepOutputs(t *testing.T) {
 		})
 	}
 }
+
+// A name already published by the step's own output contract keeps its value,
+// so the contract derived at build time and the run agree on where it came from.
+func TestNodeCaptureOutputKeepsPublishedStepOutputs(t *testing.T) {
+	t.Parallel()
+
+	workDir := t.TempDir()
+	ctx := structuredOutputTestContext(t, nil, workDir)
+	node := NodeWithData(NodeData{
+		Step: ir.Step{
+			Outputs: []ir.StepOutputDeclaration{{Name: "value"}},
+			OutputSchema: map[string]any{
+				"type":       "object",
+				"required":   []any{"value", "extra"},
+				"properties": map[string]any{"value": map[string]any{"type": "string"}, "extra": map[string]any{"type": "string"}},
+			},
+		},
+	})
+	node.setStepOutputsValue(`{"value":"from-output-file"}`)
+	node.outputs.outputCaptured = true
+	node.outputs.outputData = `{"value":"from-stdout","extra":"captured"}`
+
+	require.NoError(t, node.captureOutput(ctx))
+	state := node.State()
+	require.NotNil(t, state.StepOutputsValue)
+	assert.JSONEq(t, `{"value":"from-output-file","extra":"captured"}`, *state.StepOutputsValue)
+}
