@@ -227,6 +227,24 @@ func TestReadLatestRefCacheRejectsStaleAndInvalid(t *testing.T) {
 	assert.False(t, ok)
 }
 
+func TestWriteLatestRefCacheSkipsDirectoryPath(t *testing.T) {
+	t.Parallel()
+
+	installer := New()
+	cachePath := filepath.Join(t.TempDir(), "latest-standard-registry.json")
+	require.NoError(t, os.MkdirAll(cachePath, 0o750))
+
+	installer.writeLatestRefCache(cachePath, latestRegistryRef{
+		Tag:       "v4.999.0",
+		SHA:       testLatestSHA,
+		FetchedAt: time.Now(),
+	})
+
+	assert.NoFileExists(t, cachePath+".tmp")
+	_, ok := readLatestRefCacheAnyAge(cachePath)
+	assert.False(t, ok)
+}
+
 func TestIsCommitSHA(t *testing.T) {
 	t.Parallel()
 
