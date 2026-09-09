@@ -6,14 +6,103 @@ package scheduler
 import (
 	"context"
 	"os"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
 
 	"github.com/dagucloud/dagu/v2/internal/cmn/config"
 	"github.com/dagucloud/dagu/v2/internal/ir"
+	"github.com/dagucloud/dagu/v2/internal/schedulerstate"
 	"github.com/stretchr/testify/require"
 )
+
+func TestCronLoopWakeGap(t *testing.T) {
+	for _, mode := range []string{"catchup", "disabled", "queues-disabled"} {
+		t.Run(mode, func(t *testing.T) {
+			base := time.Date(2026, 1, 2, 12, 0, 0, 0, time.UTC)
+			wake := base.Add(5 * time.Minute)
+			var now atomic.Int64
+			now.Store(base.UnixNano())
+			clock := func() time.Time { return time.Unix(0, now.Load()).UTC() }
+			store := &mockStateStore{state: newMockState(base)}
+			planner, _ := newTestTickPlanner(store)
+			planner.cfg.Clock = clock
+			planner.cfg.Location = time.UTC
+			planner.cfg.QueuesEnabled = mode != "queues-disabled"
+			dag := &ir.DAG{Name: "wake", OverlapPolicy: ir.OverlapPolicyLatest,
+				Schedule: []ir.Schedule{mustParseSchedule(t, "2,4,5 * * * *")}}
+			if mode != "disabled" {
+				dag.CatchupWindow = time.Hour
+			}
+			require.NoError(t, planner.Init(t.Context(), testDAGEntries(dag)))
+			runs := make(chan PlannedRun, 10)
+			record := func(_ context.Context, entry DAGEntry, id string, trigger ir.TriggerType, scheduled time.Time) error {
+				runs <- PlannedRun{DAGEntry: entry, RunID: id, TriggerType: trigger, ScheduledTime: scheduled}
+				return nil
+			}
+			planner.cfg.Dispatch = record
+			planner.cfg.Enqueue = record
+			// Jump after the first completed tick, without waiting or suspending the host.
+			store.onSave = func(state *schedulerstate.State) {
+				if state.LastTick.Equal(base) {
+					now.Store(wake.UnixNano())
+				}
+			}
+			sc := &Scheduler{planner: planner, clock: clock, quit: make(chan any)}
+			ctx, cancel := context.WithCancel(t.Context())
+			done := make(chan struct{})
+			go func() { defer close(done); sc.cronLoop(ctx, make(chan os.Signal)) }()
+			t.Cleanup(func() { cancel(); <-done })
+			select {
+			case run := <-runs:
+				require.True(t, wake.Equal(run.ScheduledTime), "unexpected scheduled time: %s", run.ScheduledTime)
+				want := ir.TriggerTypeScheduler
+				if mode == "catchup" {
+					want = ir.TriggerTypeCatchUp
+				}
+				require.Equal(t, want, run.TriggerType)
+			case <-time.After(time.Second):
+				t.Fatal("scheduler did not process the wake gap")
+			}
+		})
+	}
+}
+
+func TestCronLoopBackwardClock(t *testing.T) {
+	base := time.Date(2026, 1, 2, 12, 0, 0, 0, time.UTC)
+	planner, _ := newTestTickPlanner(&mockStateStore{state: newMockState(base)})
+	planner.cfg.Clock = func() time.Time { return base }
+	planner.cfg.Location = time.UTC
+	runs := make(chan struct{}, 10)
+	planner.cfg.Dispatch = func(context.Context, DAGEntry, string, ir.TriggerType, time.Time) error {
+		runs <- struct{}{}
+		return nil
+	}
+	require.NoError(t, planner.Init(t.Context(), testDAGEntries(&ir.DAG{Name: "backward",
+		Schedule: []ir.Schedule{mustParseSchedule(t, "* * * * *")}})))
+	var reads atomic.Int32
+	clock := func() time.Time {
+		if reads.Add(1) == 1 {
+			return base.Add(5 * time.Minute)
+		}
+		return base
+	}
+	sc := &Scheduler{planner: planner, clock: clock, quit: make(chan any)}
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	go func() { defer close(done); sc.cronLoop(ctx, make(chan os.Signal)) }()
+	t.Cleanup(func() { cancel(); <-done })
+	select {
+	case <-runs:
+		t.Fatal("a clock rollback dispatched a future slot")
+	case <-time.After(50 * time.Millisecond):
+	}
+	// The planner checkpoint remains at the last real wall-clock slot.
+	planner.mu.RLock()
+	defer planner.mu.RUnlock()
+	require.True(t, planner.watermarkState.LastTick.Equal(base))
+}
 
 func TestWaitForTickSignalStopsScheduler(t *testing.T) {
 	t.Parallel()
@@ -109,7 +198,7 @@ func newPanickingScheduler(t *testing.T) (*Scheduler, <-chan struct{}) {
 	})
 	require.NoError(t, planner.Init(t.Context(), testDAGEntries(&ir.DAG{Name: "panic-dag"})))
 
-	return &Scheduler{planner: planner}, panicTriggered
+	return &Scheduler{planner: planner, clock: time.Now}, panicTriggered
 }
 
 func requirePanicTriggered(t *testing.T, panicTriggered <-chan struct{}) {

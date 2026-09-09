@@ -804,7 +804,13 @@ func (s *Scheduler) cronLoop(ctx context.Context, sig chan os.Signal) {
 	defer s.running.Store(false)
 
 	for s.waitForTick(ctx, sig, timer) {
-		s.runTickSafely(ctx, tickTime)
+		now := s.clock()
+		if now.Before(tickTime) {
+			// A clock adjustment must not dispatch a future scheduled slot.
+			timer.Reset(tickTime.Sub(now))
+			continue
+		}
+		tickTime = s.runTickSafely(ctx, tickTime)
 		tickTime = s.NextTick(tickTime)
 		timer.Reset(tickTime.Sub(s.clock()))
 	}
@@ -825,7 +831,8 @@ func (s *Scheduler) waitForTick(ctx context.Context, sig chan os.Signal, timer *
 	}
 }
 
-func (s *Scheduler) runTickSafely(ctx context.Context, tickTime time.Time) {
+func (s *Scheduler) runTickSafely(ctx context.Context, tickTime time.Time) (processed time.Time) {
+	processed = tickTime
 	defer func() {
 		if r := recover(); r != nil {
 			logger.Error(ctx, "Scheduler tick panicked",
@@ -834,7 +841,13 @@ func (s *Scheduler) runTickSafely(ctx context.Context, tickTime time.Time) {
 			)
 		}
 	}()
-	s.runTick(ctx, tickTime)
+	if current := s.clock().Truncate(time.Minute); current.After(tickTime) {
+		// Recover missed slots before the next tick advances the checkpoint.
+		s.planner.resume(ctx, current)
+		processed = current
+	}
+	s.runTick(ctx, processed)
+	return processed
 }
 
 func (s *Scheduler) runTick(ctx context.Context, tickTime time.Time) {

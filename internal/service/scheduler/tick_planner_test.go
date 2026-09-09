@@ -23,6 +23,7 @@ type mockStateStore struct {
 	saveErr error
 	mu      sync.Mutex
 	saved   []*schedulerstate.State
+	onSave  func(*schedulerstate.State)
 }
 
 func (m *mockStateStore) Load(_ context.Context) (*schedulerstate.State, error) {
@@ -46,6 +47,9 @@ func (m *mockStateStore) Save(_ context.Context, state *schedulerstate.State) er
 		return m.saveErr
 	}
 	m.saved = append(m.saved, schedulerstate.Clone(state))
+	if m.onSave != nil {
+		m.onSave(state)
+	}
 	return nil
 }
 
@@ -128,9 +132,90 @@ func newTestTickPlanner(store schedulerstate.Store) (*TickPlanner, chan DAGChang
 		Clock: func() time.Time {
 			return time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
 		},
-		Events: eventCh,
+		Location: time.UTC,
+		Events:   eventCh,
 	})
 	return tp, eventCh
+}
+
+func TestResumePreservesPending(t *testing.T) {
+	for _, policy := range []ir.OverlapPolicy{ir.OverlapPolicyAll, ir.OverlapPolicyLatest} {
+		t.Run(string(policy), func(t *testing.T) {
+			base := time.Date(2026, 1, 2, 12, 0, 0, 0, time.UTC)
+			wake := base.Add(10 * time.Minute)
+			store := &mockStateStore{state: newMockState(base.Add(-2 * time.Minute))}
+			planner, _ := newTestTickPlanner(store)
+			planner.cfg.Clock = func() time.Time { return base }
+			planner.cfg.Location = time.UTC
+			running := true
+			planner.cfg.IsRunning = func(context.Context, *ir.DAG) (bool, error) { return running, nil }
+			planner.cfg.Enqueue = func(context.Context, DAGEntry, string, ir.TriggerType, time.Time) error { return nil }
+			dag := &ir.DAG{Name: "pending", CatchupWindow: 3 * time.Minute, OverlapPolicy: policy,
+				Schedule: []ir.Schedule{mustParseSchedule(t, "* * * * *")}}
+			require.NoError(t, planner.Init(t.Context(), testDAGEntries(dag)))
+			planner.resume(t.Context(), wake)
+			planner.resume(t.Context(), wake)
+			require.Empty(t, planner.Plan(t.Context(), wake), "active work must defer catchup")
+			planner.Advance(wake)
+			running = false
+			want := []time.Time{base.Add(-time.Minute), base, wake.Add(-2 * time.Minute), wake.Add(-time.Minute), wake}
+			if policy == ir.OverlapPolicyLatest {
+				want = []time.Time{wake}
+			}
+			for i, scheduled := range want {
+				tick := wake.Add(time.Duration(i+1) * time.Minute)
+				runs := planner.Plan(t.Context(), tick)
+				require.Len(t, runs, 1)
+				require.Equal(t, ir.TriggerTypeCatchUp, runs[0].TriggerType)
+				require.True(t, scheduled.Equal(runs[0].ScheduledTime), "slot %d: %s", i, runs[0].ScheduledTime)
+				planner.DispatchRun(t.Context(), runs[0])
+				planner.Advance(tick)
+			}
+			// All recovered slots were consumed once; the next run is a new live slot.
+			next := wake.Add(time.Duration(len(want)+1) * time.Minute)
+			runs := planner.Plan(t.Context(), next)
+			require.Len(t, runs, 1)
+			require.Equal(t, ir.TriggerTypeScheduler, runs[0].TriggerType)
+			require.True(t, next.Equal(runs[0].ScheduledTime))
+		})
+	}
+}
+
+func TestCatchupTimezone(t *testing.T) {
+	location, err := time.LoadLocation("Asia/Tokyo")
+	require.NoError(t, err)
+	wake := time.Date(2026, 1, 2, 10, 0, 0, 0, location).UTC()
+	checkpoint := wake.Add(-2 * time.Hour)
+	for _, path := range []string{"init", "update", "resume"} {
+		for _, expression := range []string{"0 9 * * *", "CRON_TZ=UTC 0 0 * * *"} {
+			t.Run(path+"/"+expression, func(t *testing.T) {
+				now := checkpoint
+				if path == "init" {
+					now = wake
+				}
+				planner, _ := newTestTickPlanner(&mockStateStore{state: newMockState(checkpoint)})
+				planner.cfg.Clock = func() time.Time { return now }
+				planner.cfg.Location = location
+				dag := &ir.DAG{Name: "local-morning", CatchupWindow: 4 * time.Hour, OverlapPolicy: ir.OverlapPolicyLatest,
+					Schedule: []ir.Schedule{mustParseSchedule(t, expression)}}
+				require.NoError(t, planner.Init(t.Context(), testDAGEntries(dag)))
+				now = wake
+				switch path {
+				case "update":
+					planner.entryMu.Lock()
+					planner.handleEvent(t.Context(), DAGChangeEvent{Type: DAGChangeUpdated, DAGEntry: DAGEntry{DAG: dag}})
+					planner.entryMu.Unlock()
+				case "resume":
+					planner.resume(t.Context(), now)
+				}
+				// A UTC checkpoint at 08:00 JST must recover the missed 09:00 JST run.
+				runs := planner.Plan(t.Context(), now)
+				require.Len(t, runs, 1)
+				require.Equal(t, ir.TriggerTypeCatchUp, runs[0].TriggerType)
+				require.True(t, wake.Add(-time.Hour).Equal(runs[0].ScheduledTime))
+			})
+		}
+	}
 }
 
 func TestTickPlanner_InitNoStateStore(t *testing.T) {
@@ -605,6 +690,73 @@ func TestTickPlanner_HandleEvent_Updated(t *testing.T) {
 	entry, ok := tp.entries["upd-dag"]
 	require.True(t, ok)
 	assert.Equal(t, "*/30 * * * *", entry.DAG.Schedule[0].Expression)
+}
+
+func TestUpdatePreservesPending(t *testing.T) {
+	for _, change := range []string{"timeout", "latest", "latest-gap", "disabled", "removed", "schedule"} {
+		t.Run(change, func(t *testing.T) {
+			base := time.Date(2026, 1, 2, 12, 0, 0, 0, time.UTC)
+			now := base
+			planner, _ := newTestTickPlanner(&mockStateStore{state: newMockState(base.Add(-2 * time.Minute))})
+			planner.cfg.Clock = func() time.Time { return now }
+			planner.cfg.Location = time.UTC
+			planner.cfg.Enqueue = func(context.Context, DAGEntry, string, ir.TriggerType, time.Time) error { return nil }
+			dag := &ir.DAG{Name: "updated", CatchupWindow: time.Hour, OverlapPolicy: ir.OverlapPolicyAll,
+				Schedule: []ir.Schedule{mustParseSchedule(t, "* * * * *")}}
+			if change == "schedule" {
+				dag.Schedule = []ir.Schedule{mustParseSchedule(t, "59 * * * *"), mustParseSchedule(t, "0 * * * *")}
+			}
+			require.NoError(t, planner.Init(t.Context(), testDAGEntries(dag)))
+			// Pending work survives later global checkpoints and unrelated definition edits.
+			now = base.Add(time.Minute)
+			planner.Advance(now)
+			updated := *dag
+			updated.Timeout = 10 * time.Minute
+			want := []time.Time{base.Add(-time.Minute), base}
+			switch change {
+			case "latest":
+				updated.OverlapPolicy = ir.OverlapPolicyLatest
+				want = []time.Time{base}
+			case "latest-gap":
+				updated.OverlapPolicy = ir.OverlapPolicyLatest
+				updated.CatchupWindow = 48 * time.Hour
+				now = base.Add(updated.CatchupWindow)
+				want = []time.Time{now}
+			case "disabled":
+				updated.CatchupWindow = 0
+				want = nil
+			case "removed":
+				updated.Schedule = nil
+				want = nil
+			case "schedule":
+				updated.Schedule = []ir.Schedule{mustParseSchedule(t, "0 * * * *")}
+				want = []time.Time{base}
+			}
+			planner.entryMu.Lock()
+			planner.handleEvent(t.Context(), DAGChangeEvent{Type: DAGChangeUpdated,
+				DAGEntry: DAGEntry{DAG: &updated, DefinitionID: "updated"}})
+			planner.entryMu.Unlock()
+			for _, scheduled := range want {
+				now = now.Add(time.Minute)
+				runs := planner.Plan(t.Context(), now)
+				require.Len(t, runs, 1)
+				require.Equal(t, ir.TriggerTypeCatchUp, runs[0].TriggerType)
+				require.True(t, scheduled.Equal(runs[0].ScheduledTime))
+				require.Same(t, &updated, runs[0].DAG)
+				planner.DispatchRun(t.Context(), runs[0])
+				planner.Advance(now)
+			}
+			now = now.Add(time.Minute)
+			runs := planner.Plan(t.Context(), now)
+			if change == "removed" || change == "schedule" {
+				require.Empty(t, runs)
+			} else {
+				require.Len(t, runs, 1)
+				require.Equal(t, ir.TriggerTypeScheduler, runs[0].TriggerType)
+				require.True(t, now.Equal(runs[0].ScheduledTime))
+			}
+		})
+	}
 }
 
 func TestTickPlanner_HandleEvent_UpdatedFlushesWatermarkMutationsImmediately(t *testing.T) {
@@ -1717,6 +1869,7 @@ func TestTickPlanner_ProfileChangeDropsInactiveCatchupSchedules(t *testing.T) {
 		IsRunning: func(_ context.Context, _ *ir.DAG) (bool, error) { return false, nil },
 		GenRunID:  func(_ context.Context) (string, error) { return "run-1", nil },
 		Clock:     func() time.Time { return now },
+		Location:  time.UTC,
 		Events:    make(chan DAGChangeEvent, 1),
 	})
 	dag := &ir.DAG{
@@ -2109,7 +2262,8 @@ func TestTickPlanner_PlanLatestNotRunning(t *testing.T) {
 		Clock: func() time.Time {
 			return time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
 		},
-		Events: eventCh,
+		Location: time.UTC,
+		Events:   eventCh,
 	})
 
 	dag := &ir.DAG{
@@ -2163,7 +2317,8 @@ func TestTickPlanner_PlanLatestRunning(t *testing.T) {
 		Clock: func() time.Time {
 			return time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
 		},
-		Events: eventCh,
+		Location: time.UTC,
+		Events:   eventCh,
 	})
 
 	dag := &ir.DAG{
