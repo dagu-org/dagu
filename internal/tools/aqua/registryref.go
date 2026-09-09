@@ -89,11 +89,11 @@ func (i *Installer) resolveStandardRegistryRef(ctx context.Context, opts tools.I
 				if cached, ok := readLatestRefCache(cachePath, i.now()); ok {
 					return resolvedRegistryRef{cached, registryRefSourceCache}
 				}
-				if registryRefFailedSince(cachePath, startedAt, i.now()) {
-					// Share a failed attempt that completed after this call began.
-					// Later independent callers can retry immediately.
-					return i.fallbackRegistryRef(ctx, cachePath, fmt.Errorf("concurrent aqua registry resolution failed"))
-				}
+			}
+			if registryRefFailedSince(cachePath, startedAt, i.now()) {
+				// Share a failed attempt that completed after this call began.
+				// Later independent callers can retry immediately.
+				return i.fallbackRegistryRef(ctx, cachePath, fmt.Errorf("concurrent aqua registry resolution failed"))
 			}
 		}
 	}

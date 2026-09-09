@@ -119,8 +119,16 @@ func TestRegistryRefConcurrent(t *testing.T) {
 
 func TestRegistryRefFailedConcurrent(t *testing.T) {
 	t.Parallel()
-	for _, stale := range []bool{false, true} {
-		t.Run(fmt.Sprintf("stale=%t", stale), func(t *testing.T) {
+	for _, tc := range []struct {
+		stale        bool
+		forceRefresh bool
+	}{
+		{},
+		{stale: true},
+		{forceRefresh: true},
+		{stale: true, forceRefresh: true},
+	} {
+		t.Run(fmt.Sprintf("stale=%t/force=%t", tc.stale, tc.forceRefresh), func(t *testing.T) {
 			const callers = 8
 			server := blockedRegistryServer(t, callers)
 			server.fail.Store(true)
@@ -129,7 +137,7 @@ func TestRegistryRefFailedConcurrent(t *testing.T) {
 			installer.githubAPIBase = server.url
 			wantSHA := ir.DefaultAquaStandardRegistryRef
 			wantSource := registryRefSourceBootstrap
-			if stale {
+			if tc.stale {
 				installer.writeLatestRefCache(installer.latestRefCachePath(opts), latestRegistryRef{
 					Tag: "v4.999.0", SHA: testLatestSHA, FetchedAt: time.Now().Add(-48 * time.Hour),
 				})
@@ -153,7 +161,7 @@ func TestRegistryRefFailedConcurrent(t *testing.T) {
 						})
 						return now
 					}
-					results <- caller.resolveStandardRegistryRef(ctx, opts, false)
+					results <- caller.resolveStandardRegistryRef(ctx, opts, tc.forceRefresh)
 				}()
 			}
 			for range callers {
@@ -182,7 +190,7 @@ func TestRegistryRefFailedConcurrent(t *testing.T) {
 			assert.False(t, fresh, "a failed lookup must not make the registry cache fresh")
 
 			server.fail.Store(false)
-			resolved := installer.resolveStandardRegistryRef(ctx, opts, false)
+			resolved := installer.resolveStandardRegistryRef(ctx, opts, tc.forceRefresh)
 			assert.Equal(t, registryRefSourceLive, resolved.Source, "a later independent caller must be able to retry")
 			assert.Equal(t, testLatestSHA, resolved.SHA)
 			assert.EqualValues(t, 2, server.calls.releases.Load())
