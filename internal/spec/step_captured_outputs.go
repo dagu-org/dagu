@@ -67,7 +67,12 @@ func capturedOutputs(step *ir.Step) capturedOutputContract {
 		if !ok {
 			return capturedOutputContract{dynamic: true}
 		}
-		return capturedOutputContract{declarations: outputSchemaDeclarations(properties)}
+		// An open schema validates names it never lists, and a run publishes
+		// whatever it accepted, so the listed names are only a lower bound.
+		return capturedOutputContract{
+			declarations: outputSchemaDeclarations(properties),
+			dynamic:      !schemaForbidsExtraProperties(step.OutputSchema),
+		}
 	case isOutputsWriteStep(step):
 		values, ok := step.ExecutorConfig.Config["values"].(map[string]any)
 		if !ok {
@@ -111,6 +116,17 @@ func outputSchemaDeclarations(properties map[string]any) []ir.StepOutputDeclarat
 		})
 	}
 	return declarations
+}
+
+// schemaForbidsExtraProperties reports whether a schema accepts only the names
+// it lists. A pattern-matched property is unlisted, so it opens the schema the
+// same way an additional property does.
+func schemaForbidsExtraProperties(schema map[string]any) bool {
+	if _, ok := schema["patternProperties"]; ok {
+		return false
+	}
+	additional, ok := schema["additionalProperties"].(bool)
+	return ok && !additional
 }
 
 // schemaOutputType maps a schema property to a declared output type. Only a

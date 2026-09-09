@@ -336,6 +336,21 @@ steps:
 `,
 		},
 		{
+			name: "output schema accepting extra properties",
+			yaml: `
+steps:
+  - id: build
+    run: echo ok
+    output_schema:
+      type: object
+      properties:
+        image: {type: string}
+  - id: deploy
+    depends: build
+    run: echo ${steps.build.outputs.tag}
+`,
+		},
+		{
 			name: "sub DAG child names",
 			yaml: `
 steps:
@@ -366,4 +381,32 @@ steps:
 			}
 		})
 	}
+}
+
+// A schema that accepts only the names it lists is a complete contract, so a
+// misspelled name is still reported.
+func TestUnknownOutputNoticeForClosedOutputSchema(t *testing.T) {
+	t.Parallel()
+
+	result, err := spec.LoadYAMLWithResult(context.Background(), []byte(`
+name: notices
+steps:
+  - id: build
+    run: echo ok
+    output_schema:
+      type: object
+      additionalProperties: false
+      properties:
+        image: {type: string}
+  - id: deploy
+    depends: build
+    run: echo ${steps.build.outputs.tag}
+`))
+	require.NoError(t, err)
+
+	var reasons []cmnvalue.ValueReferenceNoticeReason
+	for _, notice := range result.ValueReferenceNotices {
+		reasons = append(reasons, notice.Reason)
+	}
+	assert.Contains(t, reasons, cmnvalue.ValueReferenceReasonUnknownOutputName)
 }

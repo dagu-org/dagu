@@ -798,3 +798,19 @@ func TestNodeCaptureOutputAcceptsNonObjectSchemaOutput(t *testing.T) {
 	assert.JSONEq(t, `[1,2,3]`, *state.OutputValue)
 	assert.Nil(t, state.StepOutputsValue)
 }
+
+// A published output may be typed, so rendering the map must not drop entries
+// the way a string-only decode would.
+func TestStepOutputsValueMapRendersTypedValues(t *testing.T) {
+	t.Parallel()
+
+	value := `{"name":"api","count":3,"ready":true,"meta":{"tag":"v1"}}`
+	data := NodeData{State: NodeState{StepOutputsValue: &value}}
+
+	assert.Equal(t, map[string]string{
+		"name":  "api",
+		"count": "3",
+		"ready": "true",
+		"meta":  `{"tag":"v1"}`,
+	}, data.StepOutputsValueMap())
+}

@@ -463,15 +463,25 @@ func (d NodeData) OutputsValueStringMap() map[string]string {
 	return result
 }
 
+// StepOutputsValueMap returns the step's published outputs as text. A published
+// value may be a number, a boolean, or a nested object, so each is rendered the
+// same way a strict step-output reference renders it.
 func (d NodeData) StepOutputsValueMap() map[string]string {
 	if d.State.StepOutputsValue == nil {
 		return nil
 	}
-	var values map[string]string
+	var values map[string]any
 	if err := json.Unmarshal([]byte(*d.State.StepOutputsValue), &values); err != nil {
 		return nil
 	}
-	return values
+	if len(values) == 0 {
+		return nil
+	}
+	result := make(map[string]string, len(values))
+	for key, value := range values {
+		result[key] = outputValueToString(value)
+	}
+	return result
 }
 
 func outputValueToString(value any) string {
