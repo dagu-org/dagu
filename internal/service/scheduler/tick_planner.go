@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"maps"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -433,7 +434,7 @@ func (tp *TickPlanner) initBuffers(ctx context.Context, entries []DAGEntry, acti
 		}
 
 		replayFrom := ComputeReplayFrom(dag.CatchupWindow, lastTick, lastScheduledTime, now)
-		missed := computeMissedScheduleIntervals(active.start, replayFrom, now)
+		missed := computeMissedScheduleIntervals(active.start, replayFrom.In(tp.cfg.Location), now)
 
 		if len(missed) == 0 {
 			continue
@@ -1235,10 +1236,10 @@ func (tp *TickPlanner) handleEvent(ctx context.Context, event DAGChangeEvent) {
 		active, activeOK := tp.activeDAGSchedules(ctx, event.DAGEntry)
 		delete(tp.deletedGrace, dagName)
 		tp.entries[dagName] = &plannerEntry{DAGEntry: event.DAGEntry}
-		// Remove existing buffer and recompute if catchupWindow > 0
-		delete(tp.buffers, dagName)
 		if activeOK && event.DAG.CatchupWindow > 0 {
 			flushNow = tp.recomputeBuffer(ctx, event.DAGEntry, active)
+		} else {
+			delete(tp.buffers, dagName)
 		}
 		if activeOK {
 			flushNow = tp.reconcileStartScheduleState(event.DAG, active) || flushNow
@@ -1418,15 +1419,75 @@ func (tp *TickPlanner) reinsertCatchupItem(ctx context.Context, run PlannedRun) 
 	}
 }
 
-// recomputeBuffer creates a new catch-up buffer for a DAG using the existing watermark.
-func (tp *TickPlanner) recomputeBuffer(ctx context.Context, entry DAGEntry, active activeDAGSchedules) bool {
+// resume retains pending work and adds slots missed while the scheduler was paused.
+func (tp *TickPlanner) resume(ctx context.Context, now time.Time) {
+	tp.entryMu.Lock()
+	defer tp.entryMu.Unlock()
 	if !tp.cfg.QueuesEnabled {
-		return false
+		return
 	}
-	if len(active.start) == 0 {
-		return false
+	for name, entry := range tp.entries {
+		dag := entry.DAG
+		if dag.CatchupWindow <= 0 {
+			continue
+		}
+		active, ok := tp.activeDAGSchedules(ctx, entry.DAGEntry)
+		if !ok {
+			continue
+		}
+		tp.mu.RLock()
+		from := ComputeReplayFrom(dag.CatchupWindow, tp.watermarkState.LastTick,
+			tp.watermarkState.DAGs[name].LastScheduledTime, now)
+		tp.mu.RUnlock()
+		buffer := tp.buffers[name]
+		if buffer != nil && buffer.Len() > 0 {
+			// Pending buffers already cover their interval, including gaps between cron slots.
+			last := buffer.items[len(buffer.items)-1].ScheduledTime
+			if last.After(from) {
+				from = last
+			}
+		}
+		missed := computeMissedScheduleIntervals(active.start, from.In(tp.cfg.Location), now)
+		if len(missed) == 0 {
+			continue
+		}
+		if buffer == nil {
+			buffer = NewScheduleBuffer(name, dag.OverlapPolicy)
+			tp.buffers[name] = buffer
+		}
+		for _, interval := range missed {
+			buffer.items = append(buffer.items, QueueItem{DAGEntry: entry.DAGEntry, ScheduledTime: interval.ScheduledTime,
+				TriggerType: ir.TriggerTypeCatchUp, ScheduleType: ScheduleTypeStart, Schedule: interval.Schedule})
+		}
+		tp.trimBuffer(buffer)
 	}
+}
+
+// trimBuffer retains the newest slots after pending and recovered work are merged.
+func (tp *TickPlanner) trimBuffer(buffer *ScheduleBuffer) bool {
+	slices.SortFunc(buffer.items, func(a, b QueueItem) int {
+		return a.ScheduledTime.Compare(b.ScheduledTime)
+	})
+	if buffer.overlapPolicy == ir.OverlapPolicyLatest && buffer.Len() > 1 {
+		dropped := buffer.DropAllButLast()
+		return tp.advanceDAGWatermark(buffer.dagName, dropped[len(dropped)-1].ScheduledTime)
+	}
+	if buffer.maxItems > 0 && buffer.Len() > buffer.maxItems {
+		dropped := buffer.Len() - buffer.maxItems
+		lastDropped := buffer.items[dropped-1].ScheduledTime
+		buffer.items = slices.Delete(buffer.items, 0, dropped)
+		return tp.advanceDAGWatermark(buffer.dagName, lastDropped)
+	}
+	return false
+}
+
+// recomputeBuffer refreshes pending runs and adds missed slots from the watermark.
+func (tp *TickPlanner) recomputeBuffer(ctx context.Context, entry DAGEntry, active activeDAGSchedules) bool {
 	dag := entry.DAG
+	if !tp.cfg.QueuesEnabled || len(active.start) == 0 {
+		delete(tp.buffers, dag.Name)
+		return false
+	}
 
 	// Snapshot needed values under the lock to avoid reading the shared map
 	// after releasing it (Advance and handleEvent can modify DAGs concurrently).
@@ -1441,30 +1502,42 @@ func (tp *TickPlanner) recomputeBuffer(ctx context.Context, entry DAGEntry, acti
 	now := tp.cfg.Clock().In(tp.cfg.Location)
 
 	replayFrom := ComputeReplayFrom(dag.CatchupWindow, lastTick, lastScheduledTime, now)
-	missed := computeMissedScheduleIntervals(active.start, replayFrom, now)
+	missed := computeMissedScheduleIntervals(active.start, replayFrom.In(tp.cfg.Location), now)
 
-	if len(missed) == 0 {
-		return false
-	}
-
-	watermarkAdvanced := false
 	q := NewScheduleBuffer(dag.Name, dag.OverlapPolicy)
+	seen := make(map[time.Time]bool)
+	if pending := tp.buffers[dag.Name]; pending != nil {
+		// Keep compatible pending slots and execute the updated definition.
+		schedules := make(map[string]ir.Schedule, len(active.start))
+		for _, schedule := range active.start {
+			schedules[schedule.Fingerprint()] = schedule
+		}
+		for _, item := range pending.items {
+			if schedule, ok := schedules[item.Schedule.Fingerprint()]; ok {
+				item.DAGEntry = entry
+				item.Schedule = schedule
+				q.items = append(q.items, item)
+				seen[item.ScheduledTime.UTC()] = true
+			}
+		}
+	}
 	for _, interval := range missed {
-		if !q.Send(QueueItem{
+		if seen[interval.ScheduledTime.UTC()] {
+			continue
+		}
+		q.items = append(q.items, QueueItem{
 			DAGEntry:      entry,
 			ScheduledTime: interval.ScheduledTime,
 			TriggerType:   ir.TriggerTypeCatchUp,
 			ScheduleType:  ScheduleTypeStart,
 			Schedule:      interval.Schedule,
-		}) {
-			break
-		}
+		})
 	}
-
-	if dag.OverlapPolicy == ir.OverlapPolicyLatest && q.Len() > 1 {
-		dropped := q.DropAllButLast()
-		watermarkAdvanced = tp.advanceDAGWatermark(dag.Name, dropped[len(dropped)-1].ScheduledTime)
+	if q.Len() == 0 {
+		delete(tp.buffers, dag.Name)
+		return false
 	}
+	watermarkAdvanced := tp.trimBuffer(q)
 
 	tp.buffers[dag.Name] = q
 

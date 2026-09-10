@@ -52,18 +52,25 @@ steps:
 	require.NoError(t, err)
 
 	var dispatchCount atomic.Int32
-	schedulerInstance.SetDispatchFunc(func(_ context.Context, entry scheduler.DAGEntry, _ string, trigger ir.TriggerType, _ time.Time) error {
+	var dispatchMu sync.Mutex
+	var dispatchTimes []time.Time
+	schedulerInstance.SetDispatchFunc(func(_ context.Context, entry scheduler.DAGEntry, _ string, trigger ir.TriggerType, scheduled time.Time) error {
 		dag := entry.DAG
 		if dag != nil && dag.Name == "cron-test" && trigger == ir.TriggerTypeScheduler {
+			dispatchMu.Lock()
+			dispatchTimes = append(dispatchTimes, scheduled)
+			dispatchMu.Unlock()
 			dispatchCount.Add(1)
 		}
 		return nil
 	})
 
 	clockBase := time.Date(2026, 1, 1, 0, 0, 59, 0, time.UTC)
-	// Keep the simulated clock stable so scheduler startup latency cannot skip
-	// the initial tick. The cron loop advances its tick cursor independently.
+	// Keep startup time stable, then advance after the first scheduled dispatch.
 	schedulerInstance.SetClock(func() time.Time {
+		if dispatchCount.Load() > 0 {
+			return clockBase.Add(time.Minute)
+		}
 		return clockBase
 	})
 
@@ -81,7 +88,13 @@ steps:
 	})
 	probe.Stop(context.Background(), cancel, 5*time.Second)
 
-	require.GreaterOrEqual(t, dispatchCount.Load(), int32(2))
+	dispatchMu.Lock()
+	defer dispatchMu.Unlock()
+	require.Len(t, dispatchTimes, 2)
+	for i, scheduled := range dispatchTimes {
+		want := clockBase.Truncate(time.Minute).Add(time.Duration(i) * time.Minute)
+		require.True(t, want.Equal(scheduled), "unexpected scheduled time: %s", scheduled)
+	}
 }
 
 func TestScheduleEditWhileSuspendedDoesNotSuppressNewSlot(t *testing.T) {
