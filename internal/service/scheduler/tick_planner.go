@@ -1468,14 +1468,17 @@ func (tp *TickPlanner) trimBuffer(buffer *ScheduleBuffer) bool {
 	slices.SortFunc(buffer.items, func(a, b QueueItem) int {
 		return a.ScheduledTime.Compare(b.ScheduledTime)
 	})
+	if buffer.overlapPolicy == ir.OverlapPolicyLatest && buffer.Len() > 1 {
+		dropped := buffer.DropAllButLast()
+		return tp.advanceDAGWatermark(buffer.dagName, dropped[len(dropped)-1].ScheduledTime)
+	}
 	if buffer.maxItems > 0 && buffer.Len() > buffer.maxItems {
-		buffer.items = slices.Delete(buffer.items, 0, buffer.Len()-buffer.maxItems)
+		dropped := buffer.Len() - buffer.maxItems
+		lastDropped := buffer.items[dropped-1].ScheduledTime
+		buffer.items = slices.Delete(buffer.items, 0, dropped)
+		return tp.advanceDAGWatermark(buffer.dagName, lastDropped)
 	}
-	if buffer.overlapPolicy != ir.OverlapPolicyLatest || buffer.Len() <= 1 {
-		return false
-	}
-	dropped := buffer.DropAllButLast()
-	return tp.advanceDAGWatermark(buffer.dagName, dropped[len(dropped)-1].ScheduledTime)
+	return false
 }
 
 // recomputeBuffer refreshes pending runs and adds missed slots from the watermark.

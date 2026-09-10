@@ -189,7 +189,8 @@ func TestCatchupBufferLimit(t *testing.T) {
 				t.Run(fmt.Sprintf("%s/%s/%d", path, policy, pending), func(t *testing.T) {
 					base := time.Date(2026, 1, 2, 12, 0, 0, 0, time.UTC)
 					now := base
-					planner, _ := newTestTickPlanner(&mockStateStore{state: newMockState(base.Add(-time.Duration(pending) * time.Minute))})
+					store := &mockStateStore{state: newMockState(base.Add(-time.Duration(pending) * time.Minute))}
+					planner, _ := newTestTickPlanner(store)
 					planner.cfg.Clock = func() time.Time { return now }
 					planner.cfg.Enqueue = func(context.Context, DAGEntry, string, ir.TriggerType, time.Time) error {
 						return errors.New("enqueue failed")
@@ -217,6 +218,15 @@ func TestCatchupBufferLimit(t *testing.T) {
 					if policy == ir.OverlapPolicyLatest {
 						count = 1
 					}
+					if path == "resume" {
+						planner.Flush(t.Context())
+					}
+					if count < pending+gap {
+						// Persist discarded slots without consuming the retained backlog.
+						want := now.Add(-time.Duration(count) * time.Minute)
+						require.True(t, want.Equal(store.lastSaved().DAGs[dag.Name].LastScheduledTime), "discarded slots must advance the checkpoint to %s", want)
+					}
+
 					// A failed enqueue must preserve the first retained slot for retry.
 					runs := planner.Plan(t.Context(), now)
 					require.Len(t, runs, 1)
