@@ -181,6 +181,68 @@ func TestResumePreservesPending(t *testing.T) {
 	}
 }
 
+func TestCatchupBufferLimit(t *testing.T) {
+	const gap = 10
+	for _, path := range []string{"resume", "update"} {
+		for _, policy := range []ir.OverlapPolicy{ir.OverlapPolicyAll, ir.OverlapPolicySkip, ir.OverlapPolicyLatest} {
+			for _, pending := range []int{2, DefaultMaxBufferItems - gap, DefaultMaxBufferItems - 1, DefaultMaxBufferItems} {
+				t.Run(fmt.Sprintf("%s/%s/%d", path, policy, pending), func(t *testing.T) {
+					base := time.Date(2026, 1, 2, 12, 0, 0, 0, time.UTC)
+					now := base
+					planner, _ := newTestTickPlanner(&mockStateStore{state: newMockState(base.Add(-time.Duration(pending) * time.Minute))})
+					planner.cfg.Clock = func() time.Time { return now }
+					planner.cfg.Enqueue = func(context.Context, DAGEntry, string, ir.TriggerType, time.Time) error {
+						return errors.New("enqueue failed")
+					}
+					dag := &ir.DAG{Name: "buffer-limit", CatchupWindow: 48 * time.Hour, OverlapPolicy: policy,
+						Schedule: []ir.Schedule{mustParseSchedule(t, "* * * * *")}}
+					require.NoError(t, planner.Init(t.Context(), testDAGEntries(dag)))
+					planner.Advance(base)
+					now = base.Add(gap * time.Minute)
+					for range 2 {
+						switch path {
+						case "resume":
+							planner.resume(t.Context(), now)
+						case "update":
+							updated := *dag
+							updated.Timeout = time.Minute
+							planner.entryMu.Lock()
+							planner.handleEvent(t.Context(), DAGChangeEvent{Type: DAGChangeUpdated, DAGEntry: DAGEntry{DAG: &updated}})
+							planner.entryMu.Unlock()
+						}
+					}
+
+					// Recovery retains the newest slots once, including when the buffer fills.
+					count := min(pending+gap, DefaultMaxBufferItems)
+					if policy == ir.OverlapPolicyLatest {
+						count = 1
+					}
+					// A failed enqueue must preserve the first retained slot for retry.
+					runs := planner.Plan(t.Context(), now)
+					require.Len(t, runs, 1)
+					planner.DispatchRun(t.Context(), runs[0])
+					planner.Advance(now)
+					planner.cfg.Enqueue = func(context.Context, DAGEntry, string, ir.TriggerType, time.Time) error { return nil }
+
+					for i := range count {
+						tick := now.Add(time.Duration(i+1) * time.Minute)
+						runs := planner.Plan(t.Context(), tick)
+						require.Len(t, runs, 1)
+						require.Equal(t, ir.TriggerTypeCatchUp, runs[0].TriggerType)
+						want := now.Add(time.Duration(i-count+1) * time.Minute)
+						require.True(t, want.Equal(runs[0].ScheduledTime), "slot %d: got %s, want %s", i, runs[0].ScheduledTime, want)
+						planner.DispatchRun(t.Context(), runs[0])
+						planner.Advance(tick)
+					}
+					runs = planner.Plan(t.Context(), now.Add(time.Duration(count+1)*time.Minute))
+					require.Len(t, runs, 1)
+					require.Equal(t, ir.TriggerTypeScheduler, runs[0].TriggerType)
+				})
+			}
+		}
+	}
+}
+
 func TestCatchupTimezone(t *testing.T) {
 	location, err := time.LoadLocation("Asia/Tokyo")
 	require.NoError(t, err)

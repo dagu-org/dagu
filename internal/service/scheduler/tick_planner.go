@@ -1447,28 +1447,33 @@ func (tp *TickPlanner) resume(ctx context.Context, now time.Time) {
 				from = last
 			}
 		}
-		for _, interval := range computeMissedScheduleIntervals(active.start, from.In(tp.cfg.Location), now) {
-			if buffer == nil {
-				buffer = NewScheduleBuffer(name, dag.OverlapPolicy)
-				tp.buffers[name] = buffer
-			}
-			if !buffer.Send(QueueItem{DAGEntry: entry.DAGEntry, ScheduledTime: interval.ScheduledTime,
-				TriggerType: ir.TriggerTypeCatchUp, ScheduleType: ScheduleTypeStart, Schedule: interval.Schedule}) {
-				logger.Warn(ctx, "Catch-up buffer full after scheduler pause", tag.DAG(name))
-				break
-			}
-			tp.trimLatest(buffer)
+		missed := computeMissedScheduleIntervals(active.start, from.In(tp.cfg.Location), now)
+		if len(missed) == 0 {
+			continue
 		}
+		if buffer == nil {
+			buffer = NewScheduleBuffer(name, dag.OverlapPolicy)
+			tp.buffers[name] = buffer
+		}
+		for _, interval := range missed {
+			buffer.items = append(buffer.items, QueueItem{DAGEntry: entry.DAGEntry, ScheduledTime: interval.ScheduledTime,
+				TriggerType: ir.TriggerTypeCatchUp, ScheduleType: ScheduleTypeStart, Schedule: interval.Schedule})
+		}
+		tp.trimBuffer(buffer)
 	}
 }
 
-func (tp *TickPlanner) trimLatest(buffer *ScheduleBuffer) bool {
-	if buffer.overlapPolicy != ir.OverlapPolicyLatest || buffer.Len() <= 1 {
-		return false
-	}
+// trimBuffer retains the newest slots after pending and recovered work are merged.
+func (tp *TickPlanner) trimBuffer(buffer *ScheduleBuffer) bool {
 	slices.SortFunc(buffer.items, func(a, b QueueItem) int {
 		return a.ScheduledTime.Compare(b.ScheduledTime)
 	})
+	if buffer.maxItems > 0 && buffer.Len() > buffer.maxItems {
+		buffer.items = slices.Delete(buffer.items, 0, buffer.Len()-buffer.maxItems)
+	}
+	if buffer.overlapPolicy != ir.OverlapPolicyLatest || buffer.Len() <= 1 {
+		return false
+	}
 	dropped := buffer.DropAllButLast()
 	return tp.advanceDAGWatermark(buffer.dagName, dropped[len(dropped)-1].ScheduledTime)
 }
@@ -1496,7 +1501,6 @@ func (tp *TickPlanner) recomputeBuffer(ctx context.Context, entry DAGEntry, acti
 	replayFrom := ComputeReplayFrom(dag.CatchupWindow, lastTick, lastScheduledTime, now)
 	missed := computeMissedScheduleIntervals(active.start, replayFrom.In(tp.cfg.Location), now)
 
-	watermarkAdvanced := false
 	q := NewScheduleBuffer(dag.Name, dag.OverlapPolicy)
 	seen := make(map[time.Time]bool)
 	if pending := tp.buffers[dag.Name]; pending != nil {
@@ -1509,9 +1513,8 @@ func (tp *TickPlanner) recomputeBuffer(ctx context.Context, entry DAGEntry, acti
 			if schedule, ok := schedules[item.Schedule.Fingerprint()]; ok {
 				item.DAGEntry = entry
 				item.Schedule = schedule
-				q.Send(item)
+				q.items = append(q.items, item)
 				seen[item.ScheduledTime.UTC()] = true
-				watermarkAdvanced = tp.trimLatest(q) || watermarkAdvanced
 			}
 		}
 	}
@@ -1519,24 +1522,19 @@ func (tp *TickPlanner) recomputeBuffer(ctx context.Context, entry DAGEntry, acti
 		if seen[interval.ScheduledTime.UTC()] {
 			continue
 		}
-		if !q.Send(QueueItem{
+		q.items = append(q.items, QueueItem{
 			DAGEntry:      entry,
 			ScheduledTime: interval.ScheduledTime,
 			TriggerType:   ir.TriggerTypeCatchUp,
 			ScheduleType:  ScheduleTypeStart,
 			Schedule:      interval.Schedule,
-		}) {
-			break
-		}
-		watermarkAdvanced = tp.trimLatest(q) || watermarkAdvanced
+		})
 	}
 	if q.Len() == 0 {
 		delete(tp.buffers, dag.Name)
 		return false
 	}
-	slices.SortFunc(q.items, func(a, b QueueItem) int {
-		return a.ScheduledTime.Compare(b.ScheduledTime)
-	})
+	watermarkAdvanced := tp.trimBuffer(q)
 
 	tp.buffers[dag.Name] = q
 
