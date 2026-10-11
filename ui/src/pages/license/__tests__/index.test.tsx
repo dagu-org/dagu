@@ -970,7 +970,7 @@ describe('LicensePage', () => {
         'Sends the Dagu version, OS, architecture, process start time, and service counts: schedulers holding the scheduler lock, and registered coordinators.'
       );
       expect(runs).toHaveAccessibleDescription(
-        'Sends the health fields, plus each reportable status change of a top-level DAG run: event ID, type, DAG name, run ID, attempt ID, status, the event’s time, and the run’s queued, started, and finished times; on a finished run, up to 50 failed step names.'
+        'Sends the health fields, plus the status of each top-level DAG run that finishes, with its failed step names (up to 50) and how it was triggered, and the list of runs queued, running, or waiting. Each run is sent as its DAG name, run ID, attempt ID, status, trigger, and queued, started, and finished times. No parameters, logs, or outputs.'
       );
       expect(dialog).toHaveTextContent(
         'Never sent: logs, outputs, parameters, environment, step commands, DAG YAML, the values of workflow secrets, and error message text.'

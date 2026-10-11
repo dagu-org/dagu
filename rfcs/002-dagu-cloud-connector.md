@@ -39,8 +39,8 @@ Today they:
 1. **One step.** Activating an online license connects the server.
 2. **Nothing without consent.** Upgrading or connecting sends nothing new.
    Reporting starts only when the server's admin chooses it, and then sends
-   metadata only: health, version, and run status transitions. No logs,
-   outputs, parameters, or secrets.
+   metadata only: health, version, and run status. No logs, outputs,
+   parameters, or secrets.
 3. **Outbound only.** Remote access rides a connection the server opens.
 4. **The server decides.** Remote access is opt-in per server, capped by a
    local role, and can be paused from the server at any time.
@@ -116,11 +116,11 @@ events were lost, the time they were lost from.
 | Level | Fields | When |
 | --- | --- | --- |
 | `health` | Dagu version, OS, architecture, process start time, and service counts: schedulers holding the scheduler lock, and registered coordinators | Every report |
-| `runs` | The `health` fields, plus each reportable status change of a top-level DAG run: event ID, type, DAG name, run ID, attempt ID, status, the event's time, and the run's queued, started, and finished times; on a finished run, up to 50 failed step names | At most 500 events and 512 KiB of them per report, with the next report; within 5 seconds of a failure or a step waiting for a person |
+| `runs` | The `health` fields, plus the status of each top-level DAG run that finishes, with its failed step names (up to 50) and how it was triggered, and the list of runs queued, running, or waiting. Each run is sent as its DAG name, run ID, attempt ID, status, trigger, and queued, started, and finished times | Each finished run once, at most 500 and 512 KiB of them per report; the runs in progress with every report, at most 200 of them and a count of all; within 5 seconds of a failed, aborted, or rejected run or a change to the runs in progress |
 
-A status change is reportable unless its event has no valid status snapshot,
-or names a DAG longer than 512 bytes or a run, attempt, or event ID longer than
-256 bytes, which Dagu Cloud would not keep. Those events are left out.
+A run is reported unless its event has no valid status snapshot, or it names
+a DAG longer than 512 bytes or a run or attempt ID longer than 256 bytes,
+which Dagu Cloud would not keep. Those runs are left out.
 
 **Planned, not sent by any level yet:** queue depth, worker counts, the list
 of DAGs, and the remote access level. Each joins the table above, under its
@@ -138,7 +138,7 @@ them sensitive chooses `health`, which sends neither.
 | --- | --- |
 | unset or `off` (default) | Nothing beyond the license check-in |
 | `health` | Dagu version, OS, architecture, start time, and which services run |
-| `runs` | Also run status changes: DAG names, run IDs, status, times, failed step names |
+| `runs` | Also the status of finished runs and the runs in progress: DAG names, run IDs, status, triggers, times, failed step names |
 
 - **Upgrading changes nothing.** A server licensed before reporting existed
   keeps sending only its license check-in.
@@ -155,21 +155,29 @@ them sensitive chooses `health`, which sends neither.
   report in flight, and Dagu Cloud can delete what a server reported.
 - **No catching up.** When the level drops below `runs` while the server
   runs, the reporter moves its cursor to the newest event, so choosing `runs`
-  again never sends the run status changes from the time in between.
+  again never sends the runs that finished in between. It lists the runs in
+  progress anew.
 - **The server decides.** Dagu Cloud cannot turn reporting on; it shows a
   server that checks in without reporting as not monitored.
 
 ### Cadence
 
-The server reports every 60 seconds, and within 5 seconds of a `failed`,
-`aborted`, `rejected`, or `waiting` event. Dagu Cloud can lengthen the interval
-in its response (`next_report_seconds`) to shed load.
+The server reports every 60 seconds. It reports early, within 5 seconds and
+at most every 5 seconds, when a run fails, is aborted, or is rejected, and when
+the runs in progress changed since the last report Dagu Cloud accepted: a run
+was queued, started, began waiting, or finished. Once a report is throttled,
+rejected, or fails, nothing is reported early until one is accepted, and news
+that an accepted report carried calls for no further early report. Dagu Cloud
+can lengthen the interval in its response (`next_report_seconds`) to shed
+load.
 
 Many workflows run at the top of the hour, so reports are spread out:
 
-- the first report waits a random 0 to 60 seconds after start;
+- the first report waits a random 0 to 60 seconds after start, and changes to
+  the runs in progress do not cut it short;
 - each interval varies randomly by up to 10 percent;
-- an early report after a failure waits a random 0 to 5 seconds.
+- an early report waits for the next check, a random 0 to 5 seconds after the
+  change.
 
 ### Where it runs
 
@@ -183,8 +191,14 @@ built like `chatbridge.NotificationMonitor`:
 - `ReadDAGRunEvents` from the persisted cursor
   (`eventstore/dagrun_events.go`).
 
-Event IDs are deterministic (`DAGRunEventID`), so a resent batch is harmless:
-Dagu Cloud de-duplicates by ID.
+A resent batch is harmless: Dagu Cloud stores each finished run once, by
+server, run ID, and attempt ID.
+
+**Runs in progress.** The reporter follows the runs queued, running, or
+waiting through the same events, and saves the list with its cursor. When it
+has no saved list, and after a gap, it lists them anew from the run history
+(`DAGRunRepository.ListStatuses`, runs of the last 30 days) in the background.
+Reports leave the list out until it is known.
 
 **Retention.** The event store keeps one day by default
 (`event_store.retention_days`). A server cut off for longer loses the events in
@@ -199,7 +213,7 @@ activation's credentials, as the heartbeat is.
 
 ```json
 {
-  "protocol": 1,
+  "protocol": 2,
   "license_id": "…",
   "server_id": "…",
   "heartbeat_secret": "…",
@@ -207,11 +221,16 @@ activation's credentials, as the heartbeat is.
               "started_at": "2026-10-09T12:00:00Z",
               "services": [{ "name": "scheduler", "instances": 1 },
                            { "name": "coordinator", "instances": 0 }] },
-  "events": [{ "id": "dag_…", "type": "dag.run.failed", "dag_name": "etl",
-               "dag_run_id": "…", "attempt_id": "…", "status": "failed",
-               "occurred_at": "2026-10-10T01:02:03Z",
-               "queued_at": "…", "started_at": "…", "finished_at": "…",
-               "failed_steps": ["load", "notify"] }],
+  "finished": [{ "workflow": "etl", "dag_run_id": "…", "attempt_id": "…",
+                 "status": "failed", "trigger_type": "scheduler",
+                 "queued_at": "2026-10-10T01:00:00Z",
+                 "started_at": "2026-10-10T01:00:01Z",
+                 "finished_at": "2026-10-10T01:02:03Z",
+                 "failed_steps": ["load", "notify"] }],
+  "active": [{ "workflow": "report", "dag_run_id": "…", "attempt_id": "…",
+               "status": "running", "trigger_type": "manual",
+               "queued_at": null, "started_at": "2026-10-10T01:01:00Z" }],
+  "active_total": 1,
   "cursor": "opaque",
   "gap": { "since": "2026-10-08T00:00:00Z" }
 }
@@ -220,22 +239,45 @@ activation's credentials, as the heartbeat is.
 A scheduler count of zero means no scheduler holds the lock; leaving
 `services` out means the count is unknown.
 
-`events` are oldest first. `cursor`, at most 4096 bytes, identifies the
-position after them; it comes with every `events`, which is empty when the
-cursor moves only past events that reports leave out. `gap` comes after
-events were lost, with the time of the last acknowledged event, and always
-with a cursor; it repeats until the console acknowledges that cursor.
-Reporting continues from the newest event. The response is:
+`finished` holds top-level runs that succeeded, partially succeeded, failed,
+were aborted, or were rejected, oldest first. `workflow` is the DAG name.
+`status` is `succeeded`, `partially_succeeded`, `failed`, `aborted`, or
+`rejected`; `trigger_type` is `scheduler`, `manual`, `webhook`, `retry`, or
+`catchup`, and empty when unknown. Times are RFC 3339; `queued_at` and
+`started_at` are null when unknown. `failed_steps` names failed steps and
+handlers, at most 50 of at most 512 bytes each.
+
+`cursor`, at most 4096 bytes, identifies the position after `finished`; it
+comes with every `finished`, which is empty when the cursor moves only past
+events that end no run. `gap` comes after events were lost, with the time of
+the last acknowledged event, and always with a cursor; it repeats until the
+console acknowledges that cursor. Reporting continues from the newest event.
+
+`active` lists the runs in progress, with `status` `queued`, `running`, or
+`waiting` and the same fields up to `started_at`: at most 200, the most
+recently started or queued first. `active_total` counts them all. Each
+report's list replaces the one before. Both are left out at `health`, and at
+`runs` until the reporter knows the runs in progress; a report without them
+says nothing about the runs in progress.
+
+The response is:
 
 ```json
-{ "ack": "opaque", "next_report_seconds": 60 }
+{ "ack": "opaque", "next_report_seconds": 60,
+  "runs_paused_until": "2026-10-11T00:00:00Z", "reporting": "on" }
 ```
+
+`runs_paused_until` comes while Dagu Cloud pauses storing finished runs, after
+the workspace reached its daily limit. The reporter keeps sending them, since
+Dagu Cloud still counts them, and the license settings page shows until when
+storing is paused. Dagu ignores `reporting`: what a server reports is decided
+on the server.
 
 | Response | Reporter behavior |
 | --- | --- |
-| `200` | Persist the cursor when `ack` equals the cursor sent. |
-| `401`, `410` | Stop. The license manager handles the activation as it does for heartbeats. |
-| `413` | Halve the batch and retry. |
+| `2xx` | Persist the cursor when `ack` equals the cursor sent. Keep `runs_paused_until`, or no pause when it is absent. |
+| `401`, `410` | Keep the schedule. The license manager handles the activation as it does for heartbeats. |
+| Other `4xx`, such as `400` or `413` | Keep the schedule and the cursor, and log the rejection. Reports stay under 1 MiB, so `413` is not expected. |
 | `429` | Wait for `Retry-After`, keeping the cursor. |
 | `5xx`, network error | Back off exponentially up to 5 minutes, keeping the cursor. |
 
