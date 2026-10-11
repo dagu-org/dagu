@@ -836,7 +836,9 @@ var operationSchema = &jsonschema.Schema{
 				"ai":          aiSchema(),
 				"max_rows":    positiveInteger(),
 				"schema":      {Type: "object"},
-				"fields":      pinnedBySystem(func() *jsonschema.Schema { return &jsonschema.Schema{Type: "object", AdditionalProperties: pinnedFieldSchema()} }),
+				"fields": pinnedBySystem(func() *jsonschema.Schema {
+					return &jsonschema.Schema{Type: "object", AdditionalProperties: pinnedFieldSchema()}
+				}),
 			},
 		},
 		opExpect:     conditionSchema(),

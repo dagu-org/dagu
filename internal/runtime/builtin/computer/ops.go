@@ -81,6 +81,8 @@ type run struct {
 	// for a person in a remote session.
 	remoteNoted bool
 	variables   map[string]string
+	// system is which pinned block this device runs; see the executor field.
+	system string
 	// answers holds the values people gave to ask operations.
 	answers map[string]string
 	outputs map[string]any
@@ -135,6 +137,7 @@ func newRun(ctx context.Context, e *computerExecutor) (*run, error) {
 		models:      models,
 		artifacts:   agentstep.NewArtifactStore(artifactsDir, artifactsSubdir, stepKey),
 		variables:   maps.Clone(e.cfg.Variables),
+		system:      e.system,
 		answers:     map[string]string{},
 		outputs:     map[string]any{},
 	}
@@ -326,7 +329,7 @@ func (r *run) extract(ctx context.Context, index int, spec extractSpec, timeout 
 
 	// Pinned fields, authored into the step, read on every device of the
 	// system ahead of this device's own binding.
-	pins := pinnedBindings(spec, hostSystem())
+	pins := pinnedBindings(spec, r.system)
 	if choice != aiEveryRun {
 		entry, ok := r.cache.Lookup(key)
 		if ok && entry.Version != recordingVersion {

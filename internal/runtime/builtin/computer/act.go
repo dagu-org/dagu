@@ -84,7 +84,7 @@ func (r *run) act(ctx context.Context, index int, spec actSpec, timeout time.Dur
 	// A pinned act runs its authored steps first on every device of its
 	// system, ahead of this device's own recording.
 	if choice != aiEveryRun {
-		if steps := spec.Recorded[hostSystem()]; len(steps) > 0 {
+		if steps := spec.Recorded[r.system]; len(steps) > 0 {
 			pinned = true
 			findWithin, err := r.cfg.findWithin(spec, r.exec.findWithin)
 			if err != nil {

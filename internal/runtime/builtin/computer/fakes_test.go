@@ -749,6 +749,9 @@ func (r *testRun) execute(withJSON string, session *ir.AgentSession) *stepExecut
 		return session, nil
 	}
 	execution.exec.settle = settleTiming{timeout: time.Millisecond}
+	// The fake backend models a Windows desktop, so pins are keyed windows
+	// regardless of the OS the test runs on.
+	execution.exec.system = systemWindows
 	execution.exec.desktopLock = r.desktopLock
 	execution.exec.idlePoll = time.Millisecond
 	if r.personWait > 0 {
