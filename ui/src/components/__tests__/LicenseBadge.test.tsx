@@ -15,6 +15,7 @@ import {
   type Config,
   type LicenseStatus,
 } from '@/contexts/ConfigContext';
+import { LicenseContext } from '@/contexts/LicenseContext';
 import { useClient } from '@/hooks/api';
 import type { LicenseMonitoring } from '@/hooks/useLicenseMonitoring';
 import { LicenseBadge } from '../LicenseBadge';
@@ -347,6 +348,26 @@ describe('sidebar license line', () => {
     expect(menu).toHaveTextContent('Team · Active');
     expect(menu).not.toHaveTextContent('Monitoring');
     expect(get).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['while the status loads', undefined, 'Checking license…'],
+    [
+      'when the status cannot be read',
+      new Error('unreachable'),
+      'License status unavailable',
+    ],
+  ])('says so %s', (_case, error, text) => {
+    render(
+      <MemoryRouter>
+        <LicenseContext.Provider value={{ error, mutate: vi.fn() }}>
+          <LicenseBadge />
+        </LicenseContext.Provider>
+      </MemoryRouter>
+    );
+
+    expect(sidebarLink()).toHaveTextContent(new RegExp(`^${text}$`));
+    expect(sidebarLink()).toHaveClass('text-muted-foreground');
   });
 
   describe('collapsed', () => {

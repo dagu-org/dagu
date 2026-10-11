@@ -107,12 +107,17 @@ function makeConfig(licenseOverrides: Partial<LicenseStatus> = {}): Config {
 
 function renderPage(
   licenseOverrides: Partial<LicenseStatus> = {},
-  { path = '/license' } = {}
+  {
+    path = '/license',
+    authMode = 'builtin',
+  }: { path?: string; authMode?: Config['authMode'] } = {}
 ) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
-        <ConfigContext.Provider value={makeConfig(licenseOverrides)}>
+        <ConfigContext.Provider
+          value={{ ...makeConfig(licenseOverrides), authMode }}
+        >
           <AppBarContext.Provider
             value={{
               title: '',
@@ -421,6 +426,53 @@ describe('LicensePage', () => {
     });
   });
 
+  it('says why a check-in failed', async () => {
+    useClientMock.mockReturnValue({
+      POST: vi.fn().mockResolvedValue({ error: { message: '' } }),
+      GET: vi.fn().mockReturnValue(new Promise(() => {})),
+    } as never);
+    renderPage(online);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Check now' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Dagu Console could not be reached. Try again later.'
+    );
+  });
+
+  it('says why a deactivation failed and keeps the license', async () => {
+    useClientMock.mockReturnValue({
+      POST: vi.fn().mockResolvedValue({ error: { message: 'disk is full' } }),
+      GET: vi.fn().mockReturnValue(new Promise(() => {})),
+    } as never);
+    renderPage();
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Deactivate License' })
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Deactivate' }));
+
+    const zone = screen.getByRole('region', { name: 'Danger zone' });
+    expect(await within(zone).findByRole('alert')).toHaveTextContent(
+      'disk is full'
+    );
+    expect(row('Plan')).toHaveTextContent('Pro plan');
+  });
+
+  it('links role-based access to its setup guide without built-in auth', () => {
+    renderPage({}, { authMode: 'basic' });
+
+    const rbac = screen
+      .getByRole('heading', { name: 'Role-based access' })
+      .closest('li')!;
+    expect(
+      within(rbac).getByRole('link', { name: 'Setup guide' })
+    ).toHaveAttribute(
+      'href',
+      'https://docs.dagu.sh/server-admin/authentication/builtin'
+    );
+  });
+
   it('warns when disconnecting could not free the console slot', async () => {
     const post = vi.fn().mockResolvedValue({
       data: { message: 'License deactivated', releaseFailed: true },
@@ -716,6 +768,62 @@ describe('LicensePage', () => {
       ).not.toBeInTheDocument();
     });
 
+    it('shows the countdown and why a request expired', async () => {
+      vi.spyOn(window, 'open').mockReturnValue(null);
+      let expired = false;
+      const get = vi.fn((path: string) =>
+        Promise.resolve({
+          data:
+            path === '/license/connect'
+              ? expired
+                ? { state: 'expired', error: 'The request expired.' }
+                : pending
+              : community(),
+        })
+      );
+      useClientMock.mockReturnValue({
+        POST: vi.fn().mockResolvedValue({ data: pending }),
+        GET: get,
+      } as never);
+      renderPage(community());
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Connect to Dagu Console' })
+      );
+      const request = await screen.findByRole('region', {
+        name: 'Waiting for approval',
+      });
+      expect(within(request).getByText(/^Expires in \d+:\d{2}$/)).toBeVisible();
+
+      expired = true;
+      const callout = await screen.findByRole('alert', undefined, {
+        timeout: 5000,
+      });
+      expect(callout).toHaveTextContent(
+        'Could not connect to Dagu Console' + 'The request expired.'
+      );
+      expect(
+        within(callout).getByRole('button', { name: 'Try again' })
+      ).toBeEnabled();
+    });
+
+    it('waits for an activation before connecting', async () => {
+      useClientMock.mockReturnValue({
+        POST: vi.fn().mockReturnValue(new Promise(() => {})),
+        GET: vi.fn().mockReturnValue(new Promise(() => {})),
+      } as never);
+      renderPage(community());
+
+      await userEvent.type(await openKeyForm('Use a license key'), 'key');
+      await userEvent.click(screen.getByRole('button', { name: 'Activate' }));
+
+      expect(
+        screen.getByRole('button', { name: 'Connect to Dagu Console' })
+      ).toBeDisabled();
+      expect(
+        screen.getByRole('button', { name: 'Activating...' })
+      ).toBeDisabled();
+    });
+
     it('cancels a pending request', async () => {
       vi.spyOn(window, 'open').mockReturnValue(null);
       const del = vi.fn().mockResolvedValue({ data: { state: 'idle' } });
@@ -922,6 +1030,54 @@ describe('LicensePage', () => {
       }
     });
 
+    it('says why turning reporting off failed', async () => {
+      serveMonitoring({
+        ...unchosen,
+        level: LicenseMonitoringLevel.health,
+        chosen: true,
+      }).put.mockResolvedValue({
+        error: { message: 'config is read-only' },
+      } as never);
+      const card = await findMonitoringCard();
+
+      await userEvent.click(
+        await within(card).findByRole('button', { name: 'Turn off' })
+      );
+
+      expect(await within(card).findByRole('alert')).toHaveTextContent(
+        'config is read-only'
+      );
+      expect(within(card).getByText('Health only')).toBeVisible();
+    });
+
+    it('offers a retry when monitoring cannot be read', async () => {
+      let fail = true;
+      const get = vi.fn((path: string) =>
+        Promise.resolve(
+          path === '/license/monitoring'
+            ? fail
+              ? { error: { message: 'unreachable' } }
+              : { data: { ...unchosen, chosen: true } }
+            : { data: makeConfig(online).license }
+        )
+      );
+      useClientMock.mockReturnValue({ GET: get, POST: vi.fn() } as never);
+      renderPage(online);
+      const card = await findMonitoringCard();
+
+      expect(
+        await within(card).findByText('Monitoring status unavailable')
+      ).toBeVisible();
+      fail = false;
+      await userEvent.click(
+        within(card).getByRole('button', { name: 'Retry' })
+      );
+
+      expect(
+        await within(card).findByRole('button', { name: 'Turn on' })
+      ).toBeVisible();
+    });
+
     it('says when the server stopped reporting', async () => {
       serveMonitoring({
         level: LicenseMonitoringLevel.runs,
@@ -1042,6 +1198,9 @@ describe('LicensePage', () => {
         screen.queryByRole('link', { name: 'Manage in Dagu Console' })
       ).not.toBeInTheDocument();
       expect(row('Status')).toHaveTextContent('Community');
+      expect(
+        within(row('Status')).getByRole('link', { name: 'View plans' })
+      ).toHaveAttribute('href', expect.stringContaining('dagu.sh/pricing'));
       expect(row('Connection')).toHaveTextContent('Not connected');
       expect(callouts()).toHaveLength(0);
       expect(
