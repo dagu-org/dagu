@@ -115,7 +115,7 @@ export function MonitoringSection({
       ) : (
         monitoring && (
           <>
-            <dl className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4 gap-y-1.5 text-sm">
+            <dl className="grid grid-cols-[7.5rem_minmax(0,1fr)] items-center gap-x-4 gap-y-1.5 text-sm">
               <Row label={ts('Reports')}>
                 <span className="flex flex-wrap items-center justify-between gap-2">
                   {ts(monitoringLevelLabels[monitoring.level])}

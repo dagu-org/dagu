@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { ExternalLink, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -47,7 +47,6 @@ export default function LicensePage() {
   const { hash } = useLocation();
   const [key, setKey] = useState('');
   const [keyOpen, setKeyOpen] = useState(false);
-  const keyInput = useRef<HTMLInputElement>(null);
   const [pendingAction, setPendingAction] = useState<
     'activate' | 'deactivate' | null
   >(null);
@@ -78,15 +77,12 @@ export default function LicensePage() {
     setTitle(ts('Plan & features'));
   }, [setTitle, ts]);
 
-  // Links to #activate open the key form and bring it into view.
+  // A link to #activate opens the key form, which takes focus, in view.
   useEffect(() => {
-    if (hash === '#activate') setKeyOpen(true);
-  }, [hash]);
-  useEffect(() => {
-    if (!keyOpen || hash !== '#activate') return;
+    if (hash !== '#activate') return;
+    setKeyOpen(true);
     document.getElementById('activate')?.scrollIntoView({ block: 'start' });
-    keyInput.current?.focus();
-  }, [keyOpen, hash]);
+  }, [hash]);
 
   useEffect(() => {
     if (!granted) return;
@@ -373,7 +369,6 @@ export default function LicensePage() {
             className="flex flex-wrap gap-2"
           >
             <Input
-              ref={keyInput}
               type="password"
               autoComplete="off"
               autoFocus

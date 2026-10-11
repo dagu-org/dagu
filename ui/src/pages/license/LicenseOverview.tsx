@@ -127,8 +127,10 @@ export function LicenseOverview({
     }
   }
 
+  // A fixed label width lines values up across both columns and with the
+  // Monitoring section, also when the columns stack.
   const grid =
-    'grid grid-cols-[auto_minmax(0,1fr)] content-start gap-x-4 gap-y-1.5 text-sm';
+    'grid grid-cols-[7.5rem_minmax(0,1fr)] content-start gap-x-4 gap-y-1.5 text-sm';
   return (
     <section
       className="card-obsidian p-4 space-y-3"
