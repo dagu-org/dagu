@@ -1625,28 +1625,39 @@ func TestWaitingForPersonIsNotTaskTime(t *testing.T) {
 func TestPersonInputSkipsStaleTurn(t *testing.T) {
 	t.Parallel()
 
+	keyS := computeruse.Action{CallID: "c", Kind: computeruse.KindKey, Keys: []string{"ctrl", "s"}}
 	for _, tc := range []struct {
-		name    string
-		changed bool
-		focus   bool
-		inputs  []string
+		name      string
+		changed   bool
+		focus     bool
+		firstKeys bool
+		skip      bool
+		inputs    []string
 	}{
-		{name: "screen changed", changed: true, inputs: []string{"move 20,20", "left down #1"}},
+		// A changed screen sends any turn back to the model.
+		{name: "screen changed", changed: true, skip: true, inputs: []string{"move 20,20", "left down #1"}},
 		// A person who only touched the mouse leaves the screen as the model
 		// saw it, so the actions run without another model turn.
-		{name: "screen unchanged", changed: false, inputs: []string{"move 10,10", "left down #1", "move 20,20", "left down #1"}},
-		// A person who clicked another window changed nothing a screenshot
-		// shows, but moved where keys would go; the turn goes back to the
-		// model.
-		{name: "focus moved", focus: true, inputs: []string{"move 20,20", "left down #1"}},
+		{name: "screen unchanged", inputs: []string{"move 10,10", "left down #1", "move 20,20", "left down #1"}},
+		// A person who moved the keyboard focus to another window would send
+		// a turn's keys there, so a turn that types or presses keys goes back
+		// to the model.
+		{name: "focus moved with keys", focus: true, firstKeys: true, skip: true, inputs: []string{"move 20,20", "left down #1"}},
+		// A plain click lands by position, not by focus, and the screen is
+		// unchanged, so a moved focus does not hold it back.
+		{name: "focus moved, pointer only", focus: true, inputs: []string{"move 10,10", "left down #1", "move 20,20", "left down #1"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			run := newTestRun(t)
 			run.backend.focusOn(desktop.WindowID{Handle: 1, Title: "Expense", PID: 7})
+			first := clickAt(10, 10)
+			if tc.firstKeys {
+				first = keyS
+			}
 			used := false
 			session := &scriptedSession{
-				turns: []*computeruse.Turn{actions(clickAt(10, 10)), actions(clickAt(20, 20)), done("Clicked")},
+				turns: []*computeruse.Turn{actions(first), actions(clickAt(20, 20)), done("Clicked")},
 				onNext: func() {
 					if !used {
 						used = true
@@ -1666,7 +1677,7 @@ func TestPersonInputSkipsStaleTurn(t *testing.T) {
 
 			assert.Equal(t, tc.inputs, run.backend.inputs())
 			require.Len(t, session.observations, 3)
-			if tc.changed || tc.focus {
+			if tc.skip {
 				assert.Equal(t, []computeruse.Result{{CallID: "c", Skipped: true}}, session.observations[1].Results)
 				assert.Equal(t, personNote, session.observations[1].Note)
 				assert.Contains(t, execution.stderr.String(), "Clicked (1 actions)")
@@ -1678,6 +1689,38 @@ func TestPersonInputSkipsStaleTurn(t *testing.T) {
 			assert.Contains(t, execution.stderr.String(), "Clicked (2 actions)")
 		})
 	}
+}
+
+// A window that came to the front after the screenshot, with no person
+// input at all, still sends the turn back to the model instead of letting
+// its actions land on the wrong window. This is the remote-session case,
+// where nothing reports a person but the foreground can still change under
+// the step.
+func TestDivergedScreenSkipsTurnWithoutPerson(t *testing.T) {
+	t.Parallel()
+
+	run := newTestRun(t)
+	run.remote = true
+	changed := false
+	session := &scriptedSession{
+		turns: []*computeruse.Turn{actions(clickAt(10, 10)), actions(clickAt(20, 20)), done("Clicked")},
+		onNext: func() {
+			if !changed {
+				changed = true
+				run.backend.show(pattern(400, 200, 150))
+			}
+		},
+	}
+	run.sessions = []*scriptedSession{session}
+	execution := run.execute(`{"do": [{"act": "Close the window"}]}`, nil)
+	require.NoError(t, execution.err)
+
+	assert.Equal(t, []string{"move 20,20", "left down #1"}, run.backend.inputs(), "the stale click never ran")
+	require.Len(t, session.observations, 3)
+	assert.Equal(t, []computeruse.Result{{CallID: "c", Skipped: true}}, session.observations[1].Results)
+	assert.Equal(t, divergedNote, session.observations[1].Note)
+	assert.Contains(t, execution.stderr.String(), "the screen changed before the actions ran")
+	assert.Contains(t, execution.stderr.String(), "Clicked (1 actions)")
 }
 
 // The step that last held the desktop leaves when it sent input, so the next
