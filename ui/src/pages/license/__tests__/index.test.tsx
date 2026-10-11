@@ -77,7 +77,8 @@ function makeConfig(licenseOverrides: Partial<LicenseStatus> = {}): Config {
     license: {
       valid: true,
       plan: 'pro',
-      expiry: '2026-04-30T00:00:00Z',
+      // Far enough ahead that no expiry warning applies.
+      expiry: '2099-04-30T00:00:00Z',
       features: ['audit', 'rbac'],
       gracePeriod: false,
       graceEndsAt: '',
@@ -221,7 +222,7 @@ describe('LicensePage', () => {
         'License token verification failed. Check the configured token and server logs.',
     });
 
-    expect(screen.getByText('License Error')).toBeInTheDocument();
+    expect(screen.getByText('License error')).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent(
       'License token verification failed'
     );
@@ -923,8 +924,6 @@ describe('LicensePage', () => {
       resolve({ data: status });
       await pending;
     });
-    expect(
-      await screen.findByText('Team · License needs attention')
-    ).toBeVisible();
+    expect(await screen.findByText('Team · Needs attention')).toBeVisible();
   });
 });

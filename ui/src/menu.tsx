@@ -1192,7 +1192,7 @@ export const mainListItems = React.forwardRef<
           </div>
         )}
         <div className={cn('pb-3 min-w-0', isOpen ? 'px-3' : 'text-center')}>
-          <LicenseBadge onNavigate={onNavItemClick} />
+          <LicenseBadge onNavigate={onNavItemClick} compact={!isOpen} />
         </div>
       </div>
     </div>
