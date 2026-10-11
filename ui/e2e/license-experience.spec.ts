@@ -62,7 +62,7 @@ test('shows activation, benefits, and deactivation on desktop and mobile', async
   const sidebar = page.getByTestId('app-sidebar');
   const badge = sidebar
     .getByRole('link', { name: 'Plan & features', exact: true })
-    .filter({ hasText: /^(Community|Team)$/ });
+    .filter({ hasText: /^(Community|Team plan)$/ });
   await expect(badge).toHaveText('Community');
   await badge.click();
   await expect(
@@ -75,14 +75,13 @@ test('shows activation, benefits, and deactivation on desktop and mobile', async
   );
   expect(trialURL.pathname).toBe('/signup');
   expect(trialURL.searchParams.get('content')).toBe('plan-page');
+  await page.getByRole('button', { name: 'Use a license key' }).click();
   await page
     .getByLabel('License key', { exact: true })
     .fill('DAGU-E2E-EXAMPLE');
   await page.getByRole('button', { name: 'Activate', exact: true }).click();
-  await expect(badge).toHaveText('Team');
-  await expect(
-    page.getByText('Team activated. Explore your included features below.')
-  ).toBeVisible();
+  await expect(badge).toHaveText('Team plan');
+  await expect(page.getByText('License activated.')).toBeVisible();
   await expect(page.getByText('Included', { exact: true })).toHaveCount(5);
   await expect(page.getByRole('link', { name: 'Setup guide' })).toHaveAttribute(
     'href',
@@ -103,12 +102,9 @@ test('shows activation, benefits, and deactivation on desktop and mobile', async
   await expect(page.getByRole('tooltip')).toContainText('Team · Active');
   await page.keyboard.press('Escape');
   await expect(page.getByRole('tooltip')).toBeHidden();
+  // Collapsed, the sidebar shows the license only when it needs attention.
   await sidebar.getByRole('button', { name: 'Collapse sidebar' }).click();
-  await expect(badge).toBeVisible();
-  await badge.focus();
-  await expect(page.getByRole('tooltip')).toContainText('Team · Active');
-  await page.keyboard.press('Escape');
-  await expect(page.getByRole('tooltip')).toBeHidden();
+  await expect(badge).toHaveCount(0);
   await page.screenshot({
     path: testInfo.outputPath('license-active-collapsed.png'),
     fullPage: true,
@@ -117,7 +113,7 @@ test('shows activation, benefits, and deactivation on desktop and mobile', async
   const mobileBadge = page
     .locator('header')
     .getByRole('link', { name: 'Plan & features' });
-  await expect(mobileBadge).toHaveText('Team');
+  await expect(mobileBadge).toHaveText('Team plan');
   await mobileBadge.click();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('tooltip')).toBeHidden();
@@ -225,9 +221,7 @@ test('connects a community server through Dagu Console', async ({
     consoleUrl: 'https://console.dagu.test/servers?server=srv-123',
   };
   approved = true;
-  await expect(
-    page.getByText('Team connected. Explore your included features below.')
-  ).toBeVisible();
+  await expect(page.getByText('Connected to acme.')).toBeVisible();
 
   // A server just connected is offered failure emails.
   const dialog = page.getByRole('dialog', {
@@ -245,11 +239,11 @@ test('connects a community server through Dagu Console', async ({
   await dialog.getByRole('button', { name: 'Turn on' }).click();
   await expect(dialog).toBeHidden();
 
-  const panel = page.getByRole('region', { name: 'This server' });
+  const panel = page.getByRole('region', { name: 'Overview' });
   await expect(panel).toContainText('build-01');
   await expect(panel).toContainText('acme');
   await expect(
-    panel.getByRole('link', { name: 'Manage in Dagu Console' })
+    page.getByRole('link', { name: 'Manage in Dagu Console' })
   ).toHaveAttribute('href', 'https://console.dagu.test/servers?server=srv-123');
 
   const card = page.getByRole('region', { name: 'Monitoring' });
@@ -264,6 +258,41 @@ test('connects a community server through Dagu Console', async ({
     path: testInfo.outputPath('monitoring-last-report.png'),
     fullPage: true,
   });
+});
+
+test('shows a license that needs attention in the sidebar and on the page', async ({
+  page,
+}, testInfo) => {
+  const stack = await loadStack();
+  // Ends an hour inside two days, so the count does not depend on the time.
+  const expiry = new Date(Date.now() + 2 * 86_400_000 - 3_600_000);
+  await page.route('**/api/v1/license/status*', (route) =>
+    route.fulfill({
+      json: { ...team, plan: 'trial', expiry: expiry.toISOString() },
+    })
+  );
+  await loginViaUI(page, stack.auth.adminUsername, stack.auth.adminPassword);
+  const sidebar = page.getByTestId('app-sidebar');
+  const line = sidebar
+    .getByRole('link', { name: 'Plan & features', exact: true })
+    .filter({ hasText: /^Trial plan/ });
+  await expect(line).toHaveText('Trial plan · Expires in 2 days');
+  await line.click();
+  await expect(
+    page.getByRole('status').filter({ hasText: 'License expires in 2 days' })
+  ).toContainText('View plans');
+  await page.screenshot({
+    path: testInfo.outputPath('license-trial-ending.png'),
+    fullPage: true,
+  });
+
+  await sidebar.getByRole('button', { name: 'Collapse sidebar' }).click();
+  const icon = sidebar.locator('a[href="/license"]').filter({ hasText: /^$/ });
+  await expect(icon).toHaveCount(1);
+  await icon.focus();
+  await expect(page.getByRole('tooltip')).toContainText(
+    'Trial · Expires in 2 days'
+  );
 });
 
 test('gives non-admins status and administrator guidance', async ({ page }) => {
