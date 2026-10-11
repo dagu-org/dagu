@@ -7853,6 +7853,12 @@
           "description": "How long a replayed action waits for its element, or a replayed turn for its screen, before it is a miss, such as 10s. 0 looks once. The wait counts toward the operation timeout."
         },
         "input": { "$ref": "#/definitions/computerInput" },
+        "max_rows": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 10000,
+          "description": "Most rows an extract reads from a table bound to a grid, table, or list. Defaults to 10000."
+        },
         "llm": {
           "$ref": "#/definitions/standardLLMConfig",
           "description": "Model for this step. Replaces the DAG-level llm block entirely."
@@ -7941,7 +7947,7 @@
       "properties": {
         "role": {
           "type": "string",
-          "enum": ["button", "text_field", "text", "checkbox", "radio", "combo_box", "list_item", "menu_item", "tab", "link", "cell", "group", "window", "other"],
+          "enum": ["button", "text_field", "text", "checkbox", "radio", "combo_box", "list_item", "menu_item", "tab", "link", "cell", "list", "group", "window", "other"],
           "description": "The element's role."
         },
         "name": {
@@ -8065,7 +8071,12 @@
             "instruction": { "type": "string", "minLength": 1 },
             "ai": {
               "$ref": "#/definitions/computerAI",
-              "description": "How much the model decides for this extract, in place of with.ai. every_run reads with the model every run; on_miss reads the bound elements and asks the model only when one is missing; never reads the bound elements with no model and fails when one is missing. A field that reads from an element binds on a successful run; an object, array, or boolean field needs the model."
+              "description": "How much the model decides for this extract, in place of with.ai. every_run reads with the model every run; on_miss reads the bound elements and asks the model only when one is missing; never reads the bound elements with no model and fails when one is missing. A scalar field, or a table field that is an array of objects, binds to the window's elements on a successful run; a plain object or a free array needs the model."
+            },
+            "max_rows": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Most rows this extract reads from a table, in place of with.max_rows."
             },
             "schema": { "$ref": "#/definitions/extractSchema" }
           },
