@@ -43,7 +43,7 @@ Each operation sets exactly one of:
   the step ends.
 - `act`: a task described in natural language. The value is an instruction
   string or an object with `instruction` and optional `ai`, `cache`,
-  `max_actions`, and `find_within`.
+  `max_actions`, `find_within`, and `input`.
 - `extract`: `{instruction, schema}`, with optional `ai`. The schema must be
   a JSON Schema with `type: object`.
 - `expect`: a statement about the screen that must hold; otherwise the step
@@ -301,6 +301,28 @@ replay whose turns all ran by elements needs its landmarks in front, when
 the recording has some; any other replay needs the screen to look as
 recorded.
 
+`with.input`, or `act.input` for one act, says how a replayed action
+reaches the application. `screen`, the default, sends the pointer and keys
+as the model did. `direct` has the element act itself through its
+automation pattern, which moves no pointer and needs no window in front: a
+plain click on a `button`, `menu_item`, `link`, or a control of role
+`other` invokes it, on a `checkbox` toggles it, on a `radio`, `list_item`,
+`tab`, or `cell` selects it, on a `combo_box` opens it, and on a
+`text_field` focuses it; a typing
+sets the field's value at once when the recording proved it could, which is
+when the field showed the typed text once the model had typed it, so an
+append to existing text, a text with a line break, or a field that
+reformats what was typed is typed again. Any other action keeps the pointer
+and keys. An element that offers no pattern for the action replays it on
+the screen, and the turn is still a replay by element. An element that is
+disabled or gone is looked at again until `find_within` passes; any other
+refusal is a miss naming the element and why: `button "保存" could not be
+invoked at turn 2 of 5: the field is read-only`. An application that reacts
+to each key press or to the pointer alone sees nothing of a direct action,
+so `screen` stays the default and `direct` is chosen per step or act. The
+model's own turns always use the screen; a recording keeps whether a typing
+proved it sets the value as `sets_value`.
+
 When an element or a screen is not found, or an action fails, the model
 continues the task from the current screen and the new actions are
 recorded; the timeline marks the operation `healed`. When the step
@@ -421,7 +443,12 @@ Elements are read on 64-bit Windows through UI Automation, so Win32,
 WinForms, WPF, UWP, Office, and Chromium windows expose them; a Chromium
 window builds its tree when first asked. A window of a process run as
 administrator, or one that draws its own controls, gives `no_elements`.
-Other systems give `unsupported`.
+Other systems give `unsupported`. Direct input uses the control patterns
+the same elements offer: Invoke, Toggle, SelectionItem, ExpandCollapse, and
+Value, with ScrollItem to bring an item into view first. A pattern call
+runs on a thread of its own, so an application that opens a dialog inside
+the call holds only that call, which comes back as a miss after five
+seconds while the elements stay readable.
 
 ## Errors
 

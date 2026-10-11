@@ -186,6 +186,109 @@ func TestWindowsElements(t *testing.T) {
 	assert.Equal(t, "1200", filled.Value)
 }
 
+// Elements perform their patterns when asked: a button invokes, a checkbox
+// toggles, a field takes a value, a list item selects, a combo box expands;
+// a disabled control and a label refuse; and an application that holds the
+// call inside a dialog does not stop the reader.
+func TestWindowsDirectInput(t *testing.T) {
+	driver := e2eDesktop(t)
+	els := e2eElements(t)
+	window := elementsWindow(t, driver, els)
+	ctx := t.Context()
+
+	outline, err := els.Outline(window, 0)
+	require.NoError(t, err)
+	byID := map[string]Element{}
+	for _, e := range outline {
+		if e.ID != "" {
+			byID[e.ID] = e
+		}
+	}
+	for _, id := range []string{"statusLabel", "saveButton", "agreeBox", "amountBox", "methodBox", "tierList", "submitButton", "confirmButton"} {
+		require.Contains(t, byID, id, "outline: %+v", outline)
+	}
+	statusAt := centre(byID["statusLabel"].Bounds)
+	status := func() string {
+		e, err := els.At(statusAt.X, statusAt.Y)
+		if err != nil {
+			return err.Error()
+		}
+		return e.Name
+	}
+	expectStatus := func(want string) {
+		t.Helper()
+		assert.Eventually(t, func() bool { return status() == want }, 3*time.Second, 100*time.Millisecond, "status reads %q", status())
+	}
+	assert.Equal(t, "待機中", status())
+
+	began := time.Now()
+	require.NoError(t, els.Apply(byID["saveButton"], PatternInvoke, ""))
+	t.Logf("elements: invoke in %s", time.Since(began))
+	expectStatus("保存しました")
+
+	require.NoError(t, els.Apply(byID["agreeBox"], PatternToggle, ""))
+	expectStatus("同意: True")
+	require.NoError(t, els.Apply(byID["agreeBox"], PatternToggle, ""))
+	expectStatus("同意: False")
+
+	began = time.Now()
+	require.NoError(t, els.Apply(byID["amountBox"], PatternSetValue, "１２００"))
+	t.Logf("elements: set value in %s", time.Since(began))
+	field := centre(byID["amountBox"].Bounds)
+	filled, err := els.At(field.X, field.Y)
+	require.NoError(t, err)
+	assert.Equal(t, "１２００", filled.Value, "the value is set as given")
+
+	var items []Element
+	require.Eventually(t, func() bool {
+		items, err = els.Find(Selector{Role: RoleListItem, Name: "優先"})
+		return err == nil && len(items) == 1
+	}, 3*time.Second, 100*time.Millisecond, "list item: %+v %v", items, err)
+	require.NoError(t, els.Apply(items[0], PatternSelect, ""))
+	expectStatus("区分: 優先")
+
+	// A Win32 combo box offers no expand pattern of its own, only an open
+	// button; the list it opens is a window of its own, and the item under
+	// a point below the box belongs to it.
+	assert.ErrorIs(t, els.Apply(byID["methodBox"], PatternExpand, ""), ErrNoPattern)
+	open, err := els.Find(Selector{Role: RoleButton, In: &Selector{Role: RoleComboBox, Name: "支払方法"}})
+	require.NoError(t, err)
+	require.Len(t, open, 1, "%+v", open)
+	require.NoError(t, els.Apply(open[0], PatternInvoke, ""))
+	box := byID["methodBox"].Bounds
+	var item Element
+	require.Eventually(t, func() bool {
+		item, err = els.At(box.Min.X+20, box.Max.Y+12)
+		return err == nil && item.Role == RoleListItem
+	}, 3*time.Second, 100*time.Millisecond, "no list item below the combo box: %+v %v", item, err)
+	require.NoError(t, driver.PressKeys(ctx, []Key{KeyEscape}, 1))
+
+	assert.ErrorIs(t, els.Apply(byID["submitButton"], PatternInvoke, ""), ErrDisabled)
+	assert.ErrorIs(t, els.Apply(byID["lblAmount"], PatternInvoke, ""), ErrNoPattern, "a label has nothing to invoke")
+	assert.ErrorIs(t, els.Apply(Element{Role: RoleButton, Name: "nope", Path: []PathStep{{Role: RoleButton, Name: "nope"}}}, PatternInvoke, ""), ErrNotFound)
+	assert.ErrorIs(t, els.Apply(byID["submitButton"], PatternSetValue, "x"), ErrDisabled)
+
+	// A handler that opens a dialog holds the call; the answer still comes
+	// within the deadline, the reader still answers, and the next call
+	// works once the dialog is gone.
+	began = time.Now()
+	err = els.Apply(byID["confirmButton"], PatternInvoke, "")
+	t.Logf("elements: invoke that opens a dialog answered %v in %s", err, time.Since(began))
+	assert.Less(t, time.Since(began), elementsTimeout+time.Second)
+	var front Element
+	require.Eventually(t, func() bool {
+		front, err = els.FrontWindow()
+		return err == nil && front.Name == "確認"
+	}, 3*time.Second, 100*time.Millisecond, "the dialog is not in front: %+v %v", front, err)
+	require.NoError(t, driver.PressKeys(ctx, []Key{KeyEnter}, 1))
+	require.Eventually(t, func() bool {
+		front, err = els.FrontWindow()
+		return err == nil && front.Name == elementsWindowTitle
+	}, 3*time.Second, 100*time.Millisecond, "the window is not back in front: %+v %v", front, err)
+	require.NoError(t, els.Apply(byID["agreeBox"], PatternToggle, ""))
+	expectStatus("同意: True")
+}
+
 // TestWindowsElementTimings logs how long reading elements takes in common
 // applications. It asserts nothing about time; the numbers inform the
 // replay design.

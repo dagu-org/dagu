@@ -61,6 +61,9 @@ func TestValidateStep(t *testing.T) {
 		{name: "find within", with: `{"find_within": "5s", "do": [{"act": {"instruction": "x", "find_within": "0"}}]}`, llm: model},
 		{name: "bad find within", with: `{"find_within": "soon", "do": [{"act": "x"}]}`, llm: model, want: `find_within "soon" must be a duration`},
 		{name: "negative find within on act", with: `{"do": [{"act": {"instruction": "x", "find_within": "-1s"}}]}`, llm: model, want: `act: find_within "-1s"`},
+		{name: "input", with: `{"input": "direct", "do": [{"act": {"instruction": "x", "input": "screen"}}]}`, llm: model},
+		{name: "bad input", with: `{"input": "mouse", "do": [{"act": "x"}]}`, llm: model, want: "input"},
+		{name: "bad input on act", with: `{"do": [{"act": {"instruction": "x", "input": "keys"}}]}`, llm: model, want: "input"},
 		{name: "empty do", with: `{"do": []}`, llm: model, want: "do"},
 		{name: "unknown field", with: `{"url": "https://example.com", "do": [{"act": "x"}]}`, llm: model, want: "url"},
 		{name: "two operations", with: `{"do": [{"act": "x", "wait": "1s"}]}`, llm: model, want: "do"},
@@ -119,6 +122,17 @@ func TestConfigShorthands(t *testing.T) {
 	assert.Equal(t, time.Duration(0), wait, "the act's setting wins")
 	_, err = config{FindWithin: "${WAIT}"}.findWithin(actSpec{}, 10*time.Second)
 	require.ErrorContains(t, err, "must be a duration")
+	direct, err := config{}.direct(actSpec{})
+	require.NoError(t, err)
+	assert.False(t, direct, "the screen is the default")
+	direct, err = config{Input: "direct"}.direct(actSpec{})
+	require.NoError(t, err)
+	assert.True(t, direct)
+	direct, err = config{Input: "direct"}.direct(actSpec{Input: "screen"})
+	require.NoError(t, err)
+	assert.False(t, direct, "the act's setting wins")
+	_, err = config{Input: "mouse"}.direct(actSpec{})
+	require.ErrorContains(t, err, "must be screen or direct")
 	assert.Equal(t, "Saved", cfg.Do[2].Expect.Statement)
 	assert.Equal(t, "30s", cfg.Do[2].Expect.Within)
 

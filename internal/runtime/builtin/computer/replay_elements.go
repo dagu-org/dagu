@@ -51,6 +51,12 @@ type recordedElement struct {
 	// element's bounds, from 0 to 1. They are zero for typing and keys.
 	FractionX float64 `json:"fx"`
 	FractionY float64 `json:"fy"`
+	// SetsValue marks a typed field whose value, read back after the
+	// typing, was the text typed, so a replay under input: direct may set
+	// the value at once in place of typing. An append to existing text, a
+	// text with a line break, or a field that reformats what was typed is
+	// typed again.
+	SetsValue bool `json:"sets_value,omitempty"`
 }
 
 // recordElement describes an element for a recording, or returns nil for
@@ -347,9 +353,140 @@ func (r *run) bringForward(ctx context.Context, index int, app, title string) {
 	_ = sleep(ctx, foregroundSettle)
 }
 
-// replayByElement replays one turn on the elements it recorded. It returns
-// the reason the turn missed, or "" when every action ran.
-func (r *run) replayByElement(ctx context.Context, index, position, total int, turn recordedTurn, els desktop.Elements, findWithin time.Duration, outcome *replayOutcome) (string, error) {
+// proveValue marks a typed field whose value, read back after the typing,
+// is the text typed; see recordedElement.SetsValue. The field must still
+// be the one the typing began in.
+func (r *run) proveValue(element *recordedElement, text string) {
+	if element.Selector.Role != desktop.RoleTextField || strings.TrimSpace(text) == "" || strings.ContainsAny(text, "\r\n") {
+		return
+	}
+	e, err := r.focusedElement()
+	if err != nil {
+		return
+	}
+	same := r.recordElement(e, nil, "")
+	element.SetsValue = same != nil && same.Selector == element.Selector &&
+		desktop.NormalizeText(e.Value) == desktop.NormalizeText(r.substitute(text))
+}
+
+// plainClick reports a single left click without modifiers: the one
+// click an element can perform itself.
+func plainClick(action computeruse.Action) bool {
+	return action.Kind == computeruse.KindClick && (action.Button == "" || action.Button == "left") && action.Count <= 1 && len(action.Modifiers) == 0
+}
+
+// directInput names the pattern a recorded action replays through under
+// input: direct, when it has one: a plain click presses, toggles, selects,
+// or opens by the element's role, and a typing proven to set the field's
+// value sets it. Anything else keeps the pointer and keys.
+func directInput(rec recordedAction) (desktop.Pattern, bool) {
+	if rec.Element == nil {
+		return "", false
+	}
+	role := rec.Element.Selector.Role
+	switch {
+	case rec.Action.Kind == computeruse.KindType:
+		return desktop.PatternSetValue, rec.Element.SetsValue && role == desktop.RoleTextField
+	case !plainClick(rec.Action):
+		return "", false
+	}
+	switch role {
+	case desktop.RoleButton, desktop.RoleMenuItem, desktop.RoleLink, desktop.RoleOther:
+		return desktop.PatternInvoke, true
+	case desktop.RoleCheckbox:
+		return desktop.PatternToggle, true
+	case desktop.RoleRadio, desktop.RoleListItem, desktop.RoleTab, desktop.RoleCell:
+		return desktop.PatternSelect, true
+	case desktop.RoleComboBox:
+		return desktop.PatternExpand, true
+	}
+	return "", false
+}
+
+// patternVerbs say what a pattern did, or could not do, to an element.
+var patternVerbs = map[desktop.Pattern]string{
+	desktop.PatternInvoke: "invoked", desktop.PatternToggle: "toggled", desktop.PatternSelect: "selected",
+	desktop.PatternExpand: "opened", desktop.PatternSetValue: "set",
+}
+
+// describeDirect summarizes a recorded action an element performed itself.
+func describeDirect(pattern desktop.Pattern, rec recordedAction) string {
+	if pattern == desktop.PatternSetValue {
+		return fmt.Sprintf("set %s to %q", rec.Element.describe(), rec.Action.Text)
+	}
+	return fmt.Sprintf("%s %s", pattern, rec.Element.describe())
+}
+
+// directReason says why an element could not perform a pattern.
+func directReason(err error) string {
+	switch {
+	case errors.Is(err, desktop.ErrDisabled):
+		return "it is disabled"
+	case errors.Is(err, desktop.ErrNotFound):
+		return "it is not there"
+	}
+	return err.Error()
+}
+
+// direct has an element perform a recorded action itself, under input:
+// direct, when the action and the element allow it: a plain click on a
+// button presses it, on a checkbox toggles it, on a list item selects it,
+// on a combo box opens it, and on a field focuses it; a typing proven to
+// set the field's value sets it. It reports done when the action ran and
+// a reason when it could not; neither means the element offers no pattern
+// for the action, which then runs on the screen. An element that is
+// disabled or gone is looked at again within findWithin, as a missing one
+// is, since the application may still be getting ready.
+func (r *run) direct(ctx context.Context, index, position, total int, els desktop.Elements, rec recordedAction, found desktop.Element, findWithin time.Duration) (bool, string, error) {
+	pattern, ok := directInput(rec)
+	if !ok {
+		if plainClick(rec.Action) && rec.Element.Selector.Role == desktop.RoleTextField {
+			if err := els.Focus(found); err != nil {
+				return false, fmt.Sprintf("%s could not take the focus at turn %d of %d: %v", rec.Element.describe(), position+1, total, err), nil
+			}
+			logAction(r.timeline, index, "replay by element: focus "+rec.Element.describe())
+			return true, "", nil
+		}
+		return false, "", nil
+	}
+	value := ""
+	if pattern == desktop.PatternSetValue {
+		value = r.substitute(rec.Action.Text)
+	}
+	deadline := time.Now().Add(findWithin)
+	for {
+		err := els.Apply(found, pattern, value)
+		switch {
+		case err == nil:
+			logAction(r.timeline, index, "replay by element: "+describeDirect(pattern, rec))
+			return true, "", nil
+		case errors.Is(err, desktop.ErrNoPattern):
+			logAction(r.timeline, index, fmt.Sprintf("%s offers no %s pattern; using the screen", rec.Element.describe(), pattern))
+			return false, "", nil
+		case errors.Is(err, desktop.ErrDisabled) || errors.Is(err, desktop.ErrNotFound):
+			if !time.Now().Before(deadline) {
+				return false, fmt.Sprintf("%s could not be %s within %s at turn %d of %d: %s", rec.Element.describe(), patternVerbs[pattern], findWithin, position+1, total, directReason(err)), nil
+			}
+			if err := sleep(ctx, min(exactPollInterval, time.Until(deadline))); err != nil {
+				return false, "", err
+			}
+			again, reason, err := r.resolveElement(ctx, index, els, *rec.Element, 0)
+			if err != nil {
+				return false, "", err
+			}
+			if reason == "" {
+				found = again
+			}
+		default:
+			return false, fmt.Sprintf("%s could not be %s at turn %d of %d: %v", rec.Element.describe(), patternVerbs[pattern], position+1, total, err), nil
+		}
+	}
+}
+
+// replayByElement replays one turn on the elements it recorded, through
+// their own patterns under direct when the action and element allow it.
+// It returns the reason the turn missed, or "" when every action ran.
+func (r *run) replayByElement(ctx context.Context, index, position, total int, turn recordedTurn, els desktop.Elements, findWithin time.Duration, direct bool, outcome *replayOutcome) (string, error) {
 	for _, rec := range turn.Actions {
 		action := rec.Action
 		if rec.Element == nil {
@@ -361,6 +498,16 @@ func (r *run) replayByElement(ctx context.Context, index, position, total int, t
 			}
 			if reason != "" {
 				return fmt.Sprintf("%s was not found within %s at turn %d of %d: %s", rec.Element.describe(), findWithin, position+1, total, reason), nil
+			}
+			if direct {
+				done, reason, err := r.direct(ctx, index, position, total, els, rec, found, findWithin)
+				if err != nil || reason != "" {
+					return reason, err
+				}
+				if done {
+					outcome.actions++
+					continue
+				}
 			}
 			var at image.Point
 			switch action.Kind {

@@ -68,6 +68,13 @@ const (
 	defaultFindWithin = 10 * time.Second
 )
 
+// How a replayed action reaches the application: through the pointer and
+// keys, as the model's did, or through the element's own automation.
+const (
+	inputScreen = "screen"
+	inputDirect = "direct"
+)
+
 func init() {
 	registry.RegisterExecutorConfigSchema(executorType, configSchema)
 	executor.RegisterExecutor(executorType, newExecutor, validateStep, registry.ExecutorCapabilities{LLM: true})
@@ -85,8 +92,11 @@ type config struct {
 	Idle           string            `json:"idle,omitempty"`
 	// FindWithin is how long a replayed action waits for its element, or a
 	// replayed turn for its screen, before it is a miss.
-	FindWithin string      `json:"find_within,omitempty"`
-	Do         []operation `json:"do"`
+	FindWithin string `json:"find_within,omitempty"`
+	// Input is how a replayed action reaches the application: screen, the
+	// default, or direct.
+	Input string      `json:"input,omitempty"`
+	Do    []operation `json:"do"`
 }
 
 // operation is one item of with.do. Exactly one operation field is set.
@@ -113,6 +123,7 @@ type actSpec struct {
 	Cache       *bool  `json:"cache,omitempty"`
 	MaxActions  int    `json:"max_actions,omitempty"`
 	FindWithin  string `json:"find_within,omitempty"`
+	Input       string `json:"input,omitempty"`
 }
 
 type extractSpec struct {
@@ -319,6 +330,25 @@ func (c config) findWithin(spec actSpec, fallback time.Duration) (time.Duration,
 		return d, nil
 	}
 	return fallback, nil
+}
+
+// direct reports whether a replay of an act drives elements through their
+// own patterns: the act's input setting, the step's, or the screen. The
+// schema admits only the two values; anything else is an error.
+func (c config) direct(spec actSpec) (bool, error) {
+	for _, value := range []string{spec.Input, c.Input} {
+		switch value {
+		case "":
+			continue
+		case inputScreen:
+			return false, nil
+		case inputDirect:
+			return true, nil
+		default:
+			return false, fmt.Errorf("input %q must be screen or direct", value)
+		}
+	}
+	return false, nil
 }
 
 // maxActions returns the action budget of an act.
@@ -572,6 +602,11 @@ func aiSchema() *jsonschema.Schema {
 	return &jsonschema.Schema{Type: "string", Enum: []any{aiEveryRun, aiOnMiss, aiNever}}
 }
 
+// inputSchema accepts how a replayed action reaches the application.
+func inputSchema() *jsonschema.Schema {
+	return &jsonschema.Schema{Type: "string", Enum: []any{inputScreen, inputDirect}}
+}
+
 // conditionSchema accepts a statement or an object with exactly one of a
 // statement, a text, an element, or a window.
 func conditionSchema() *jsonschema.Schema {
@@ -660,6 +695,7 @@ var operationSchema = &jsonschema.Schema{
 				"cache":       {Type: "boolean"},
 				"max_actions": positiveInteger(),
 				"find_within": agentstep.StringSchema(),
+				"input":       inputSchema(),
 			},
 		},
 		opExtract: {
@@ -713,6 +749,7 @@ var configSchema = &jsonschema.Schema{
 		"on_confirmation": {Type: "string", Enum: []any{confirmationFail, confirmationAllow}},
 		"idle":            agentstep.StringSchema(),
 		"find_within":     agentstep.StringSchema(),
+		"input":           inputSchema(),
 		"do":              {Type: "array", MinItems: new(1), Items: operationSchema},
 	},
 	Defs: map[string]*jsonschema.Schema{"selector": selectorSchema()},

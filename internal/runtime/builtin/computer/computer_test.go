@@ -1026,6 +1026,164 @@ func TestFindWithinMustResolve(t *testing.T) {
 	require.ErrorContains(t, failed.err, `find_within "${WAIT}" must be a duration`)
 }
 
+// Under input: direct, a recorded click on a button replays by having the
+// button invoke itself: no pointer moves, the window need not be where it
+// was, and the act still reports a replay by element.
+func TestDirectReplayInvokesButton(t *testing.T) {
+	t.Parallel()
+
+	const steps = `{"do": [{"act": "Save the invoice"}]}`
+	run := elementRun(t)
+	run.sessions = []*scriptedSession{{turns: []*computeruse.Turn{actions(clickAt(235, 194)), done("Saved")}}}
+	require.NoError(t, run.execute(steps, nil).err)
+
+	run.backend.show(pattern(800, 600, 150))
+	run.elements.shift(37, 11)
+	run.backend.events = nil
+	replayed := run.execute(`{"input": "direct", "do": [{"act": "Save the invoice"}]}`, nil)
+	require.NoError(t, replayed.err)
+	events := operationEvents(replayed.exec.GetAgentSession())
+	require.Len(t, events, 1)
+	assert.Equal(t, agentstep.StatusCacheHit, events[0].Status)
+	assert.Equal(t, agentstep.ViaElement, events[0].Via)
+	assert.Equal(t, []string{"invoke saveButton"}, run.backend.inputs(), "the button is invoked, not clicked")
+	assert.Contains(t, replayed.stderr.String(), `replay by element: invoke button "保存"`)
+}
+
+// A typing whose text became the field's value is recorded as setting it,
+// so a direct replay sets the value at once; one whose text did not is
+// typed again, after a focus.
+func TestDirectReplaySetsValue(t *testing.T) {
+	t.Parallel()
+
+	const steps = `{"do": [{"act": "Enter the amount"}]}`
+	run := elementRun(t)
+	run.focusOn("amountBox")
+	run.sessions = []*scriptedSession{{turns: []*computeruse.Turn{actions(clickAt(290, 152), typing("12,000")), done("Entered")}}}
+	require.NoError(t, run.execute(steps, nil).err)
+	entry := lookupRecording(t, run, "Enter the amount")
+	require.Len(t, entry.Turns[0].Actions, 2)
+	assert.False(t, entry.Turns[0].Actions[0].Element.SetsValue, "a click sets nothing")
+	assert.True(t, entry.Turns[0].Actions[1].Element.SetsValue, "the field showed the typed text")
+
+	run.backend.events = nil
+	replayed := run.execute(`{"input": "direct", "do": [{"act": "Enter the amount"}]}`, nil)
+	require.NoError(t, replayed.err)
+	assert.Equal(t, []string{"act:cache-hit"}, eventNames(replayed.exec.GetAgentSession()))
+	assert.Equal(t, []string{"focus amountBox", "set amountBox=12,000"}, run.backend.inputs(), "the click focuses the field and the typing sets it")
+	assert.Contains(t, replayed.stderr.String(), `replay by element: set text_field id=amountBox to "12,000"`)
+
+	appended := elementRun(t)
+	appended.focusOn("amountBox")
+	appended.sessions = []*scriptedSession{{turns: []*computeruse.Turn{actions(clickAt(290, 152), typing("000")), done("Entered")}}}
+	require.NoError(t, appended.execute(steps, nil).err)
+	assert.False(t, lookupRecording(t, appended, "Enter the amount").Turns[0].Actions[1].Element.SetsValue, "the field showed more than the typed text")
+	appended.backend.events = nil
+	require.NoError(t, appended.execute(`{"input": "direct", "do": [{"act": "Enter the amount"}]}`, nil).err)
+	assert.Equal(t, []string{"focus amountBox", "focus amountBox", "type 000"}, appended.backend.inputs(), "the typing is typed again")
+}
+
+// A typed placeholder is set with the run's own value.
+func TestDirectReplaySetsPlaceholderValue(t *testing.T) {
+	t.Parallel()
+
+	run := elementRun(t)
+	run.focusOn("amountBox")
+	run.sessions = []*scriptedSession{{turns: []*computeruse.Turn{actions(typing("12,000")), done("Entered")}}}
+	require.NoError(t, run.execute(`{"variables": {"amount": "12,000"}, "do": [{"act": "Enter the amount"}]}`, nil).err)
+	entry := lookupRecording(t, run, "Enter the amount")
+	assert.Equal(t, "%amount%", entry.Turns[0].Actions[0].Action.Text)
+	assert.True(t, entry.Turns[0].Actions[0].Element.SetsValue)
+
+	run.backend.events = nil
+	replayed := run.execute(`{"input": "direct", "variables": {"amount": "8,500"}, "do": [{"act": "Enter the amount"}]}`, nil)
+	require.NoError(t, replayed.err)
+	assert.Equal(t, []string{"set amountBox=8,500"}, run.backend.inputs())
+	assert.Contains(t, replayed.stderr.String(), `set text_field id=amountBox to "%amount%"`, "the log keeps the placeholder")
+}
+
+// An element that offers no pattern for the action replays it on the
+// screen, and the turn is still a replay by element.
+func TestDirectReplayFallsBackWithoutPattern(t *testing.T) {
+	t.Parallel()
+
+	const steps = `{"do": [{"act": "Save the invoice"}]}`
+	run := elementRun(t)
+	run.sessions = []*scriptedSession{{turns: []*computeruse.Turn{actions(clickAt(235, 194)), done("Saved")}}}
+	require.NoError(t, run.execute(steps, nil).err)
+
+	run.elements.withoutPattern("saveButton")
+	run.elements.shift(37, 11)
+	run.backend.events = nil
+	replayed := run.execute(`{"input": "direct", "do": [{"act": "Save the invoice"}]}`, nil)
+	require.NoError(t, replayed.err)
+	events := operationEvents(replayed.exec.GetAgentSession())
+	assert.Equal(t, agentstep.ViaElement, events[0].Via)
+	assert.Equal(t, []string{"move 272,205", "left down #1"}, run.backend.inputs(), "the click follows the button")
+	assert.Contains(t, replayed.stderr.String(), `button "保存" offers no invoke pattern; using the screen`)
+}
+
+// A disabled element is looked at again within find_within, and under
+// never the miss names the element and why.
+func TestDirectReplayNamesDisabledElement(t *testing.T) {
+	t.Parallel()
+
+	const steps = `{"do": [{"act": "Save the invoice"}]}`
+	run := elementRun(t)
+	run.sessions = []*scriptedSession{{turns: []*computeruse.Turn{actions(clickAt(235, 194)), done("Saved")}}}
+	require.NoError(t, run.execute(steps, nil).err)
+
+	run.elements.failPattern("saveButton", desktop.ErrDisabled)
+	run.backend.events = nil
+	failed := run.execute(`{"ai": "never", "input": "direct", "do": [{"act": "Save the invoice"}]}`, nil)
+	require.ErrorContains(t, failed.err, `the act cannot run without AI: button "保存" could not be invoked within 0s at turn 1 of 1: it is disabled`)
+	assert.Equal(t, agentstep.ViaElement, operationEvents(failed.exec.GetAgentSession())[0].Via)
+	assert.Empty(t, run.backend.inputs(), "nothing is clicked in its place")
+
+	run.elements.failPattern("saveButton", errors.New("Invoke: UIA_E_TIMEOUT (0x80131505)"))
+	failed = run.execute(`{"ai": "never", "input": "direct", "do": [{"act": "Save the invoice"}]}`, nil)
+	require.ErrorContains(t, failed.err, `button "保存" could not be invoked at turn 1 of 1: Invoke: UIA_E_TIMEOUT`)
+
+	// The button enables after a moment.
+	run.elements.failPattern("saveButton", desktop.ErrDisabled)
+	go func() {
+		time.Sleep(300 * time.Millisecond)
+		run.elements.mu.Lock()
+		delete(run.elements.applyErr, "saveButton")
+		run.elements.mu.Unlock()
+	}()
+	replayed := run.execute(`{"ai": "never", "input": "direct", "find_within": "3s", "do": [{"act": "Save the invoice"}]}`, nil)
+	require.NoError(t, replayed.err)
+	assert.Equal(t, []string{"invoke saveButton"}, run.backend.inputs())
+}
+
+// The act's input setting wins over the step's.
+func TestDirectInputPerAct(t *testing.T) {
+	t.Parallel()
+
+	const steps = `{"do": [{"act": "Save the invoice"}]}`
+	run := elementRun(t)
+	run.sessions = []*scriptedSession{{turns: []*computeruse.Turn{actions(clickAt(235, 194)), done("Saved")}}}
+	require.NoError(t, run.execute(steps, nil).err)
+
+	run.backend.events = nil
+	require.NoError(t, run.execute(`{"input": "direct", "do": [{"act": {"instruction": "Save the invoice", "input": "screen"}}]}`, nil).err)
+	assert.Equal(t, []string{"move 235,194", "left down #1"}, run.backend.inputs(), "the act keeps the screen")
+	run.backend.events = nil
+	require.NoError(t, run.execute(`{"do": [{"act": {"instruction": "Save the invoice", "input": "direct"}}]}`, nil).err)
+	assert.Equal(t, []string{"invoke saveButton"}, run.backend.inputs(), "the act goes direct")
+}
+
+// The model's own turns always use the screen, whatever input says.
+func TestDirectInputLeavesModelTurnsAlone(t *testing.T) {
+	t.Parallel()
+
+	run := elementRun(t)
+	run.sessions = []*scriptedSession{{turns: []*computeruse.Turn{actions(clickAt(235, 194)), done("Saved")}}}
+	require.NoError(t, run.execute(`{"input": "direct", "do": [{"act": "Save the invoice"}]}`, nil).err)
+	assert.Equal(t, []string{"move 235,194", "left down #1"}, run.backend.inputs())
+}
+
 // A recording of an older format is ignored once and replaced.
 func TestOldRecordingIgnoredOnce(t *testing.T) {
 	t.Parallel()

@@ -7852,6 +7852,7 @@
           "default": "10s",
           "description": "How long a replayed action waits for its element, or a replayed turn for its screen, before it is a miss, such as 10s. 0 looks once. The wait counts toward the operation timeout."
         },
+        "input": { "$ref": "#/definitions/computerInput" },
         "llm": {
           "$ref": "#/definitions/standardLLMConfig",
           "description": "Model for this step. Replaces the DAG-level llm block entirely."
@@ -7876,6 +7877,12 @@
       "enum": ["every_run", "on_miss", "never"],
       "default": "on_miss",
       "description": "How much the model decides: every_run asks it every run; on_miss replays the acts of a step that succeeded while the screens match and lets the model repair the recording from the first screen that differs; never replays only, fails the step when the screen differs or there is no recording, and needs no llm when nothing in the step can call the model."
+    },
+    "computerInput": {
+      "type": "string",
+      "enum": ["screen", "direct"],
+      "default": "screen",
+      "description": "How a replayed action reaches the application. screen sends the pointer and keys as the model did. direct has the element act itself through its automation pattern: a click invokes a button, toggles a checkbox, selects a list item, opens a combo box, or focuses a field, and a typing sets the field's value at once when the recording showed the typed text became the value. An element without the pattern replays that action on the screen. An application that reacts to each key or to the pointer alone sees nothing, so screen stays the default. Model turns always use the screen."
     },
     "computerCondition": {
       "oneOf": [
@@ -8040,6 +8047,10 @@
                 "find_within": {
                   "type": "string",
                   "description": "How long a replay of this act waits for an element or its screen, in place of with.find_within."
+                },
+                "input": {
+                  "$ref": "#/definitions/computerInput",
+                  "description": "How a replay of this act reaches the application, in place of with.input."
                 }
               }
             }
