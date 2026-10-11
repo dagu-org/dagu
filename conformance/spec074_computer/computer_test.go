@@ -43,6 +43,7 @@ func TestComputerValidation(t *testing.T) {
 		{"duplicate_output.yaml", `output "invoice" is already extracted by do[0]`},
 		{"native_mode.yaml", `provider "openrouter" has no native computer use`},
 		{"unknown_variable.yaml", "act references %password%"},
+		{"unknown_input.yaml", "mouse does not equal any of: [screen direct]"},
 	} {
 		t.Run(tc.fixture, func(t *testing.T) {
 			t.Parallel()
