@@ -57,6 +57,18 @@ type recording struct {
 	App       string            `json:"app,omitempty"`
 	Window    string            `json:"window,omitempty"`
 	Landmarks []recordedElement `json:"landmarks,omitempty"`
+	// Fields are what an extract bound: for each output the element it read
+	// the value from, so a later run reads it again with no model. An act
+	// has none; an extract has no turns.
+	Fields []fieldBinding `json:"fields,omitempty"`
+}
+
+// fieldBinding ties one extract output to the element its value was read
+// from, with the type to convert the element's text to.
+type fieldBinding struct {
+	Name    string          `json:"name"`
+	Kind    string          `json:"kind"`
+	Element recordedElement `json:"element"`
 }
 
 // recordedTurn is a screen the model saw and the actions it chose.

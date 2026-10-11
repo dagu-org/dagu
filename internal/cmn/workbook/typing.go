@@ -249,6 +249,15 @@ func numericText(s string) any {
 	return f
 }
 
+// CoerceValue applies a column type to a value read from anywhere, such as
+// the text of a desktop element: a string is trimmed, a number loses its
+// grouping and currency symbols and folds full-width digits, an integer
+// must be whole, and a boolean reads a word or a mark. It is coerce without
+// a date epoch, for callers outside a workbook.
+func CoerceValue(v any, t ColumnType) (any, error) {
+	return coerce(v, t, false)
+}
+
 // coerce applies a pinned column type to a typed cell value. date1904 says
 // which epoch a numeric date serial counts from.
 func coerce(v any, t ColumnType, date1904 bool) (any, error) {
