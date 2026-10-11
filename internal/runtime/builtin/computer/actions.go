@@ -24,41 +24,31 @@ const maxActionPause = time.Minute
 // positionMapper converts a position an action names into display pixels.
 type positionMapper func(computeruse.Point) image.Point
 
-// perform runs a turn's actions in order on the screen the model saw,
-// stopping at the first failure. It returns one result per action and the
-// actions that completed, in display pixels, for the replay cache.
-func (r *run) perform(ctx context.Context, index int, actions []computeruse.Action, seen screen, limit computeruse.ImageLimit) ([]computeruse.Result, []recordedAction) {
-	results := make([]computeruse.Result, 0, len(actions))
-	var recorded []recordedAction
-	failed := false
-	for _, action := range actions {
-		if failed {
-			results = append(results, computeruse.Result{CallID: action.CallID, Skipped: true})
-			continue
-		}
-		logAction(r.timeline, index, describeAction(action))
-		// The element the action lands on is read before the action
-		// changes the screen; the pointer has not moved yet either.
-		display, replayable := r.toDisplay(action, seen)
-		var element *recordedElement
-		if replayable {
-			element = r.elementOf(display)
-		}
-		result := r.runAction(ctx, action, seen.toFull, &seen, limit)
-		results = append(results, result)
-		if result.Failed() {
-			failed = true
-			logAction(r.timeline, index, "  failed: "+result.Error)
-			continue
-		}
-		if replayable {
-			if element != nil && action.Kind == computeruse.KindType {
-				r.proveValue(element, action.Text)
-			}
-			recorded = append(recorded, recordAction(display, seen.full, element))
-		}
+// performOne runs one action on the screen the model saw and records it for
+// the replay cache when it completed and can be replayed. The recorded
+// action is nil when the action only read the screen or failed.
+func (r *run) performOne(ctx context.Context, index int, action computeruse.Action, seen screen, limit computeruse.ImageLimit) (computeruse.Result, *recordedAction) {
+	logAction(r.timeline, index, describeAction(action))
+	// The element the action lands on is read before the action changes the
+	// screen; the pointer has not moved yet either.
+	display, replayable := r.toDisplay(action, seen)
+	var element *recordedElement
+	if replayable {
+		element = r.elementOf(display)
 	}
-	return results, recorded
+	result := r.runAction(ctx, action, seen.toFull, &seen, limit)
+	if result.Failed() {
+		logAction(r.timeline, index, "  failed: "+result.Error)
+		return result, nil
+	}
+	if !replayable {
+		return result, nil
+	}
+	if element != nil && action.Kind == computeruse.KindType {
+		r.proveValue(element, action.Text)
+	}
+	rec := recordAction(display, seen.full, element)
+	return result, &rec
 }
 
 // elementOf reads the element a replayable action lands on, in display

@@ -1625,28 +1625,39 @@ func TestWaitingForPersonIsNotTaskTime(t *testing.T) {
 func TestPersonInputSkipsStaleTurn(t *testing.T) {
 	t.Parallel()
 
+	keyS := computeruse.Action{CallID: "c", Kind: computeruse.KindKey, Keys: []string{"ctrl", "s"}}
 	for _, tc := range []struct {
-		name    string
-		changed bool
-		focus   bool
-		inputs  []string
+		name      string
+		changed   bool
+		focus     bool
+		firstKeys bool
+		skip      bool
+		inputs    []string
 	}{
-		{name: "screen changed", changed: true, inputs: []string{"move 20,20", "left down #1"}},
+		// A changed screen sends any turn back to the model.
+		{name: "screen changed", changed: true, skip: true, inputs: []string{"move 20,20", "left down #1"}},
 		// A person who only touched the mouse leaves the screen as the model
 		// saw it, so the actions run without another model turn.
-		{name: "screen unchanged", changed: false, inputs: []string{"move 10,10", "left down #1", "move 20,20", "left down #1"}},
-		// A person who clicked another window changed nothing a screenshot
-		// shows, but moved where keys would go; the turn goes back to the
-		// model.
-		{name: "focus moved", focus: true, inputs: []string{"move 20,20", "left down #1"}},
+		{name: "screen unchanged", inputs: []string{"move 10,10", "left down #1", "move 20,20", "left down #1"}},
+		// A person who moved the keyboard focus to another window would send
+		// a turn's keys there, so a turn that types or presses keys goes back
+		// to the model.
+		{name: "focus moved with keys", focus: true, firstKeys: true, skip: true, inputs: []string{"move 20,20", "left down #1"}},
+		// A plain click lands by position, not by focus, and the screen is
+		// unchanged, so a moved focus does not hold it back.
+		{name: "focus moved, pointer only", focus: true, inputs: []string{"move 10,10", "left down #1", "move 20,20", "left down #1"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			run := newTestRun(t)
 			run.backend.focusOn(desktop.WindowID{Handle: 1, Title: "Expense", PID: 7})
+			first := clickAt(10, 10)
+			if tc.firstKeys {
+				first = keyS
+			}
 			used := false
 			session := &scriptedSession{
-				turns: []*computeruse.Turn{actions(clickAt(10, 10)), actions(clickAt(20, 20)), done("Clicked")},
+				turns: []*computeruse.Turn{actions(first), actions(clickAt(20, 20)), done("Clicked")},
 				onNext: func() {
 					if !used {
 						used = true
@@ -1666,7 +1677,7 @@ func TestPersonInputSkipsStaleTurn(t *testing.T) {
 
 			assert.Equal(t, tc.inputs, run.backend.inputs())
 			require.Len(t, session.observations, 3)
-			if tc.changed || tc.focus {
+			if tc.skip {
 				assert.Equal(t, []computeruse.Result{{CallID: "c", Skipped: true}}, session.observations[1].Results)
 				assert.Equal(t, personNote, session.observations[1].Note)
 				assert.Contains(t, execution.stderr.String(), "Clicked (1 actions)")
@@ -1678,6 +1689,38 @@ func TestPersonInputSkipsStaleTurn(t *testing.T) {
 			assert.Contains(t, execution.stderr.String(), "Clicked (2 actions)")
 		})
 	}
+}
+
+// A window that came to the front after the screenshot, with no person
+// input at all, still sends the turn back to the model instead of letting
+// its actions land on the wrong window. This is the remote-session case,
+// where nothing reports a person but the foreground can still change under
+// the step.
+func TestDivergedScreenSkipsTurnWithoutPerson(t *testing.T) {
+	t.Parallel()
+
+	run := newTestRun(t)
+	run.remote = true
+	changed := false
+	session := &scriptedSession{
+		turns: []*computeruse.Turn{actions(clickAt(10, 10)), actions(clickAt(20, 20)), done("Clicked")},
+		onNext: func() {
+			if !changed {
+				changed = true
+				run.backend.show(pattern(400, 200, 150))
+			}
+		},
+	}
+	run.sessions = []*scriptedSession{session}
+	execution := run.execute(`{"do": [{"act": "Close the window"}]}`, nil)
+	require.NoError(t, execution.err)
+
+	assert.Equal(t, []string{"move 20,20", "left down #1"}, run.backend.inputs(), "the stale click never ran")
+	require.Len(t, session.observations, 3)
+	assert.Equal(t, []computeruse.Result{{CallID: "c", Skipped: true}}, session.observations[1].Results)
+	assert.Equal(t, divergedNote, session.observations[1].Note)
+	assert.Contains(t, execution.stderr.String(), "the screen changed before the actions ran")
+	assert.Contains(t, execution.stderr.String(), "Clicked (1 actions)")
 }
 
 // The step that last held the desktop leaves when it sent input, so the next
@@ -1920,8 +1963,9 @@ func TestOpenDesktopFailure(t *testing.T) {
 	require.ErrorContains(t, err, "open the desktop: Screen Recording permission is missing")
 }
 
-// The model may click an element the observation lists by id, which the
-// executor finds exactly and clicks at its centre, instead of a pixel.
+// The model may click an element the observation lists by id. A button is
+// invoked through the element itself, which works wherever the window is and
+// does not depend on a pixel another window might cover.
 func TestModelActsOnElementById(t *testing.T) {
 	t.Parallel()
 
@@ -1938,6 +1982,47 @@ func TestModelActsOnElementById(t *testing.T) {
 	require.NotEmpty(t, session.observations)
 	assert.Contains(t, session.observations[0].Elements, computeruse.Element{ID: "e1", Role: desktop.RoleButton, Name: "保存"},
 		"the observation offers the button as an element")
+	assert.Equal(t, []string{"invoke saveButton"}, run.backend.inputs(), "the button is invoked, not clicked at a pixel")
+}
+
+// A click the model aims at a text field element gives it the keyboard focus
+// through the element itself, so the typing that follows reaches it even if
+// the field moved since the screenshot.
+func TestModelFocusesFieldElement(t *testing.T) {
+	t.Parallel()
+
+	run := newTestRun(t)
+	run.elements = newFakeElements()
+	// Give the amount field a name so the observation offers it; it is then
+	// e1, before the two 保存 buttons.
+	run.elements.elements[2].Name = "金額"
+	session := &scriptedSession{turns: []*computeruse.Turn{
+		actions(computeruse.Action{CallID: "x", Kind: computeruse.KindClick, ElementID: "e1"}),
+		done("Focused the field"),
+	}}
+	run.sessions = []*scriptedSession{session}
+	execution := run.execute(`{"idle": "0", "do": [{"act": "Click the amount field"}]}`, nil)
+	require.NoError(t, execution.err)
+
+	assert.Equal(t, []string{"focus amountBox"}, run.backend.inputs(), "the field takes the focus, no pixel click")
+}
+
+// An element that offers no pattern for the click, such as a custom control,
+// falls back to a click at its position on the screen.
+func TestModelElementFallsBackToClick(t *testing.T) {
+	t.Parallel()
+
+	run := newTestRun(t)
+	run.elements = newFakeElements()
+	run.elements.withoutPattern("saveButton")
+	session := &scriptedSession{turns: []*computeruse.Turn{
+		actions(computeruse.Action{CallID: "x", Kind: computeruse.KindClick, ElementID: "e1"}),
+		done("Clicked save"),
+	}}
+	run.sessions = []*scriptedSession{session}
+	execution := run.execute(`{"idle": "0", "do": [{"act": "Save the form"}]}`, nil)
+	require.NoError(t, execution.err)
+
 	// e1 is the 保存 button at (190,180)-(280,208); its centre is 235,194.
 	assert.Equal(t, []string{"move 235,194", "left down #1"}, run.backend.inputs())
 }
