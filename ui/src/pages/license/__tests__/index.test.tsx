@@ -105,9 +105,12 @@ function makeConfig(licenseOverrides: Partial<LicenseStatus> = {}): Config {
   };
 }
 
-function renderPage(licenseOverrides: Partial<LicenseStatus> = {}) {
+function renderPage(
+  licenseOverrides: Partial<LicenseStatus> = {},
+  { path = '/license' } = {}
+) {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[path]}>
       <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
         <ConfigContext.Provider value={makeConfig(licenseOverrides)}>
           <AppBarContext.Provider
@@ -146,6 +149,21 @@ const unchosen: LicenseMonitoring = {
   chosen: false,
   noticeDismissed: false,
 };
+
+function overview() {
+  return screen.getByRole('region', { name: 'Overview' });
+}
+
+// Reads the value of a row in the overview by its label.
+function row(label: string) {
+  const term = within(overview()).getByText(label, { selector: 'dt' });
+  return term.nextElementSibling as HTMLElement;
+}
+
+async function openKeyForm(name = 'Use a different license key') {
+  await userEvent.click(screen.getByRole('button', { name }));
+  return screen.getByLabelText('License key');
+}
 
 function monitoringCard() {
   return screen.getByRole('region', { name: 'Monitoring' });
@@ -222,7 +240,7 @@ describe('LicensePage', () => {
         'License token verification failed. Check the configured token and server logs.',
     });
 
-    expect(screen.getByText('License error')).toBeInTheDocument();
+    expect(row('Status')).toHaveTextContent('License error');
     expect(screen.getByRole('alert')).toHaveTextContent(
       'License token verification failed'
     );
@@ -256,28 +274,31 @@ describe('LicensePage', () => {
     useClientMock.mockReturnValue({ POST: post, GET: get } as never);
     renderPage();
 
-    await user.type(screen.getByLabelText('License key'), 'key');
+    await user.type(await openKeyForm(), 'key');
     await user.click(screen.getByRole('button', { name: 'Activate' }));
 
     await waitFor(() => {
       expect(get).toHaveBeenCalledWith('/license/status', {
         params: { query: { remoteNode: 'local' } },
       });
-      expect(screen.getByText('Enterprise · Active')).toBeVisible();
+      expect(row('Plan')).toHaveTextContent('Enterprise plan');
     });
+    expect(row('Status')).toHaveTextContent('Active');
+    expect(screen.getByRole('status')).toHaveTextContent('License activated.');
   });
   it('shows only entitled features as included', () => {
     renderPage({ features: ['audit'] });
     const audit = screen
       .getByRole('heading', { name: 'Audit logs' })
-      .closest('article')!;
+      .closest('li')!;
     const sso = screen
       .getByRole('heading', { name: 'Single sign-on' })
-      .closest('article')!;
+      .closest('li')!;
     expect(within(audit).getByText('Included')).toBeVisible();
     expect(
-      within(sso).getByText('Requires a license with this feature')
-    ).toBeVisible();
+      within(audit).getByRole('link', { name: 'Open feature' })
+    ).toHaveAttribute('href', '/audit-logs');
+    expect(within(sso).getByText('Not included')).toBeVisible();
     expect(
       within(sso).queryByRole('link', { name: 'Setup guide' })
     ).not.toBeInTheDocument();
@@ -293,12 +314,13 @@ describe('LicensePage', () => {
       GET: vi.fn().mockResolvedValue({ data: makeConfig().license }),
     } as never);
     renderPage();
-    await userEvent.type(screen.getByLabelText('License key'), 'invalid');
+    await userEvent.type(await openKeyForm(), 'invalid');
     await userEvent.click(screen.getByRole('button', { name: 'Activate' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Invalid license key'
     );
-    expect(screen.getByText('Pro · Active')).toBeVisible();
+    expect(row('Plan')).toHaveTextContent('Pro plan');
+    expect(row('Status')).toHaveTextContent('Active');
   });
 
   it('updates status and benefits after deactivation', async () => {
@@ -325,9 +347,7 @@ describe('LicensePage', () => {
       await screen.findByText('License deactivated. Running in community mode.')
     ).toBeVisible();
     expect(screen.getByText('Community', { exact: true })).toBeVisible();
-    expect(
-      screen.getAllByText('Requires a license with this feature')
-    ).toHaveLength(5);
+    expect(screen.getAllByText('Not included')).toHaveLength(5);
   });
   it('labels a pending deactivation without claiming activation', async () => {
     let resolve!: (value: object) => void;
@@ -339,6 +359,7 @@ describe('LicensePage', () => {
       GET: vi.fn().mockResolvedValue({ data: makeConfig().license }),
     } as never);
     renderPage();
+    await openKeyForm();
     await userEvent.click(
       screen.getByRole('button', { name: 'Deactivate License' })
     );
@@ -366,18 +387,14 @@ describe('LicensePage', () => {
       consoleUrl: 'https://console.dagu.sh/servers?server=srv-123',
     });
 
-    const panel = screen
-      .getByRole('heading', { name: 'This server' })
-      .closest('section')!;
-    expect(within(panel).getByText('build-01')).toBeVisible();
-    expect(within(panel).getByText('acme')).toBeVisible();
-    expect(within(panel).getByText('Connected via Dagu Console')).toBeVisible();
-    expect(within(panel).getByText('srv-123')).toBeVisible();
-    expect(within(panel).getByText('lic-456')).toBeVisible();
+    expect(row('Server')).toHaveTextContent('build-01');
+    expect(row('Workspace')).toHaveTextContent('acme');
+    expect(row('Connection')).toHaveTextContent('Connected via Dagu Console');
+    expect(row('Server ID')).toHaveTextContent('srv-123');
+    expect(row('License ID')).toHaveTextContent('lic-456');
     expect(
-      within(panel).getByRole('link', { name: 'Manage in Dagu Console' })
+      screen.getByRole('link', { name: 'Manage in Dagu Console' })
     ).toHaveAttribute('href', 'https://console.dagu.sh/servers?server=srv-123');
-    expect(screen.getByText('Server: build-01')).toBeVisible();
   });
 
   it('checks in with Dagu Console on demand', async () => {
@@ -504,13 +521,12 @@ describe('LicensePage', () => {
 
       approved = true;
       expect(
-        await screen.findByText(
-          'Team connected. Explore your included features below.',
-          undefined,
-          { timeout: 5000 }
-        )
+        await screen.findByText('Connected to Dagu Console.', undefined, {
+          timeout: 5000,
+        })
       ).toBeVisible();
-      expect(screen.getByText('Team · Active')).toBeVisible();
+      expect(row('Plan')).toHaveTextContent('Team plan');
+      expect(row('Status')).toHaveTextContent('Active');
     });
 
     // After approval, the server checks in with Dagu Console and can report.
@@ -614,11 +630,9 @@ describe('LicensePage', () => {
       await approve();
 
       expect(
-        await screen.findByText(
-          'Team connected. Explore your included features below.',
-          undefined,
-          { timeout: 5000 }
-        )
+        await screen.findByText('Connected to Dagu Console.', undefined, {
+          timeout: 5000,
+        })
       ).toBeVisible();
       expect(await screen.findByText('Set in configuration')).toBeVisible();
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -666,6 +680,40 @@ describe('LicensePage', () => {
       );
       expect(tab.close).toHaveBeenCalled();
       expect(screen.getByRole('button', { name: 'Try again' })).toBeEnabled();
+    });
+
+    it('retries a failed request from its callout alone', async () => {
+      vi.spyOn(window, 'open').mockReturnValue(null);
+      const post = vi
+        .fn()
+        .mockResolvedValueOnce({ error: { message: 'Dagu Console is down' } })
+        .mockResolvedValue({ data: pending });
+      useClientMock.mockReturnValue({
+        POST: post,
+        GET: vi.fn().mockReturnValue(new Promise(() => {})),
+      } as never);
+      renderPage(community());
+
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Connect to Dagu Console' })
+      );
+      const callout = await screen.findByRole('alert');
+      expect(callout).toHaveTextContent('Could not connect to Dagu Console');
+      expect(
+        screen.queryByRole('button', { name: 'Connect to Dagu Console' })
+      ).not.toBeInTheDocument();
+
+      await userEvent.click(
+        within(callout).getByRole('button', { name: 'Try again' })
+      );
+      const request = await screen.findByRole('region', {
+        name: 'Waiting for approval',
+      });
+      expect(within(request).getByText('ABCD1234')).toBeVisible();
+      expect(post).toHaveBeenCalledTimes(2);
+      expect(
+        screen.queryByRole('button', { name: 'Connect to Dagu Console' })
+      ).not.toBeInTheDocument();
     });
 
     it('cancels a pending request', async () => {
@@ -874,6 +922,37 @@ describe('LicensePage', () => {
       }
     });
 
+    it('says when the server stopped reporting', async () => {
+      serveMonitoring({
+        level: LicenseMonitoringLevel.runs,
+        configured: false,
+        chosen: true,
+        noticeDismissed: false,
+        lastReportAt: new Date(Date.now() - 11 * 60_000).toISOString(),
+      });
+      const card = await findMonitoringCard();
+
+      expect(
+        await within(card).findByText(
+          /^Not reporting since \d{4}-\d{2}-\d{2} \d{2}:\d{2}$/
+        )
+      ).toBeVisible();
+    });
+
+    it('shows when the last report arrived while reports arrive', async () => {
+      serveMonitoring({
+        level: LicenseMonitoringLevel.runs,
+        configured: false,
+        chosen: true,
+        noticeDismissed: false,
+        lastReportAt: new Date(Date.now() - 9 * 60_000).toISOString(),
+      });
+      const card = await findMonitoringCard();
+
+      expect(await within(card).findByText('9 minutes ago')).toBeVisible();
+      expect(within(card).queryByText(/Not reporting/)).not.toBeInTheDocument();
+    });
+
     it('is not offered for a license that does not check in', () => {
       const get = vi.fn().mockReturnValue(new Promise(() => {}));
       useClientMock.mockReturnValue({ GET: get, POST: vi.fn() } as never);
@@ -916,7 +995,7 @@ describe('LicensePage', () => {
     } as never);
     renderPage(community);
     await waitFor(() => expect(get).toHaveBeenCalledTimes(1));
-    await userEvent.type(screen.getByLabelText('License key'), 'key');
+    await userEvent.type(await openKeyForm('Use a license key'), 'key');
     await userEvent.click(screen.getByRole('button', { name: 'Activate' }));
     await waitFor(() => expect(get).toHaveBeenCalledTimes(2));
     expect(screen.getByText('Community', { exact: true })).toBeVisible();
@@ -924,6 +1003,236 @@ describe('LicensePage', () => {
       resolve({ data: status });
       await pending;
     });
-    expect(await screen.findByText('Team · Needs attention')).toBeVisible();
+    await waitFor(() =>
+      expect(row('Status')).toHaveTextContent('Needs attention')
+    );
+    expect(row('Plan')).toHaveTextContent('Team plan');
+  });
+
+  describe('by state', () => {
+    const day = 86_400_000;
+    // Ends an hour inside the given number of days, so the count of days
+    // left does not depend on when the test runs.
+    const inDays = (days: number) =>
+      new Date(Date.now() + days * day - 3_600_000).toISOString();
+
+    function callouts() {
+      return screen
+        .queryAllByRole('heading', { level: 5 })
+        .map((title) => title.closest<HTMLElement>('[role]')!);
+    }
+
+    it('offers a community server a connection and a trial', () => {
+      renderPage({
+        valid: false,
+        community: true,
+        plan: '',
+        features: [],
+        expiry: '',
+        source: '',
+      });
+
+      expect(
+        screen.getAllByRole('button', { name: 'Connect to Dagu Console' })
+      ).toHaveLength(1);
+      expect(
+        screen.getByRole('link', { name: 'Start free trial' })
+      ).toHaveAttribute('href', expect.stringContaining('content=plan-page'));
+      expect(
+        screen.queryByRole('link', { name: 'Manage in Dagu Console' })
+      ).not.toBeInTheDocument();
+      expect(row('Status')).toHaveTextContent('Community');
+      expect(row('Connection')).toHaveTextContent('Not connected');
+      expect(callouts()).toHaveLength(0);
+      expect(
+        screen.queryByRole('region', { name: 'Danger zone' })
+      ).not.toBeInTheDocument();
+    });
+
+    it('links a licensed server to Dagu Console and nothing else', () => {
+      renderPage({
+        ...online,
+        consoleUrl: 'https://console.dagu.sh/servers?server=srv-123',
+      });
+
+      expect(
+        screen.getByRole('link', { name: 'Manage in Dagu Console' })
+      ).toHaveAttribute(
+        'href',
+        'https://console.dagu.sh/servers?server=srv-123'
+      );
+      expect(
+        screen.queryByRole('button', { name: 'Connect to Dagu Console' })
+      ).not.toBeInTheDocument();
+      expect(callouts()).toHaveLength(0);
+      expect(row('Status')).toHaveTextContent('Active');
+    });
+
+    it('stays quiet more than 30 days before a paid license expires', () => {
+      renderPage({ ...online, expiry: inDays(31) });
+
+      expect(callouts()).toHaveLength(0);
+      expect(row('Status')).toHaveTextContent('Active');
+    });
+
+    it.each([
+      [
+        'a trial within three days',
+        { plan: 'trial', expiry: inDays(2) },
+        'status',
+        'License expires in 2 days',
+        'Licensed features stop working when it expires.',
+        'View plans',
+      ],
+      [
+        'a paid license within 30 days',
+        { expiry: inDays(30) },
+        'status',
+        'License expires in 30 days',
+        'Licensed features stop working when it expires.',
+        'Renew license',
+      ],
+      [
+        'the grace period',
+        {
+          valid: false,
+          gracePeriod: true,
+          graceEndsAt: '2099-05-14T00:00:00Z',
+        },
+        'status',
+        'License expired',
+        'Licensed features keep working until 2099-05-14.',
+        'Renew license',
+      ],
+      [
+        'an expired license',
+        { valid: false },
+        'alert',
+        'License expired',
+        'Licensed features are unavailable.',
+        'Renew license',
+      ],
+      [
+        'a warning from Dagu Console',
+        { warningCode: 'MACHINE_LIMIT_EXCEEDED' },
+        'status',
+        'License needs attention',
+        'This license is active on more machines than allowed. Deactivate extra machines in Dagu Console.',
+        'Manage in Dagu Console',
+      ],
+      [
+        'a license error',
+        { error: 'License token verification failed.' },
+        'alert',
+        'License error',
+        'License token verification failed.',
+        'Manage license',
+      ],
+    ])(
+      'calls out %s with one action',
+      (_case, license, role, title, detail, action) => {
+        renderPage({ ...online, ...license });
+
+        const shown = callouts();
+        expect(shown).toHaveLength(1);
+        const callout = shown[0]!;
+        expect(callout).toHaveAttribute('role', role);
+        expect(callout).toHaveTextContent(title + detail + action);
+        const links = within(callout).getAllByRole('link');
+        expect(links).toHaveLength(1);
+        expect(links[0]).toHaveTextContent(action);
+        // Only the header's link to Dagu Console may repeat the action.
+        expect(screen.getAllByRole('link', { name: action })).toHaveLength(
+          action === 'Manage in Dagu Console' ? 2 : 1
+        );
+      }
+    );
+
+    it('states each fact once', () => {
+      renderPage({
+        ...online,
+        plan: 'team',
+        serverName: 'build-01',
+        workspace: 'acme',
+        licenseId: 'lic-456',
+      });
+
+      for (const fact of [
+        'Team plan',
+        'Active',
+        '2099-04-30',
+        'acme',
+        'build-01',
+        'Connected via Dagu Console',
+        'srv-123',
+        'lic-456',
+      ]) {
+        expect(screen.getAllByText(fact)).toHaveLength(1);
+      }
+    });
+
+    it('offers a retry when the status cannot be read', async () => {
+      const get = vi
+        .fn()
+        .mockResolvedValueOnce({ error: { message: 'unreachable' } })
+        .mockResolvedValue({ data: makeConfig().license });
+      useClientMock.mockReturnValue({ GET: get, POST: vi.fn() } as never);
+      renderPage();
+
+      const callout = await screen.findByRole('status');
+      expect(callout).toHaveTextContent('License status unavailable');
+      expect(
+        screen.queryByRole('region', { name: 'Overview' })
+      ).not.toBeInTheDocument();
+      await userEvent.click(
+        within(callout).getByRole('button', { name: 'Retry' })
+      );
+
+      await waitFor(() => expect(row('Status')).toHaveTextContent('Active'));
+      expect(get).toHaveBeenCalledTimes(2);
+    });
+
+    it('keeps disconnecting apart in the danger zone', () => {
+      renderPage(online);
+
+      const zone = screen.getByRole('region', { name: 'Danger zone' });
+      expect(zone).toHaveTextContent('Disconnect this server');
+      expect(
+        within(zone).getByRole('button', { name: 'Disconnect' })
+      ).toBeEnabled();
+    });
+  });
+
+  describe('license key', () => {
+    it('stays collapsed until asked for', async () => {
+      renderPage();
+      expect(screen.queryByLabelText('License key')).not.toBeInTheDocument();
+      const open = screen.getByRole('button', {
+        name: 'Use a different license key',
+      });
+      expect(open).toHaveAttribute('aria-expanded', 'false');
+
+      await userEvent.click(open);
+      expect(screen.getByLabelText('License key')).toHaveFocus();
+      expect(screen.getByRole('button', { name: 'Activate' })).toBeDisabled();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      expect(screen.queryByLabelText('License key')).not.toBeInTheDocument();
+    });
+
+    it('offers a key to a community server', async () => {
+      renderPage({ valid: false, community: true, plan: '', features: [] });
+
+      expect(await openKeyForm('Use a license key')).toBeVisible();
+    });
+
+    it('opens from a link to #activate', () => {
+      renderPage(
+        { valid: false, community: true, plan: '', features: [] },
+        { path: '/license#activate' }
+      );
+
+      expect(screen.getByLabelText('License key')).toHaveFocus();
+    });
   });
 });
