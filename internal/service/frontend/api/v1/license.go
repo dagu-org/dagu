@@ -320,6 +320,9 @@ func (a *API) licenseMonitoring(ctx context.Context) (api.LicenseMonitoring, err
 		monitoring.LastReportAt = ptrOf(stringutil.FormatTime(status.LastReportAt))
 		monitoring.LastReport = ptrOf(string(status.LastReport))
 	}
+	if !status.RunsPausedUntil.IsZero() {
+		monitoring.RunsPausedUntil = ptrOf(status.RunsPausedUntil)
+	}
 	return monitoring, nil
 }
 

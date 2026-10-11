@@ -6757,6 +6757,11 @@ export interface components {
             lastReportAt?: string;
             /** @description JSON body of the last report, as sent, with heartbeat_secret replaced by "[redacted]" */
             lastReport?: string;
+            /**
+             * Format: date-time
+             * @description When Dagu Console stores this server's finished runs again, after its workspace reached the daily limit; absent when the last accepted report was not told of a pause
+             */
+            runsPausedUntil?: string;
         };
         /** @description Request body for changing password */
         ChangePasswordRequest: {

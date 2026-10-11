@@ -687,15 +687,16 @@ func TestLicenseMonitoring_Unavailable(t *testing.T) {
 	server.Client().Get("/api/v1/license/monitoring").ExpectStatus(http.StatusBadRequest).Send(t)
 }
 
-// stubCloudReport has sent one report.
+// stubCloudReport has sent one report, whose answer paused storing runs.
 type stubCloudReport struct{}
 
 func (stubCloudReport) Status(context.Context) (cloudreport.Status, error) {
 	return cloudreport.Status{
-		Level:        config.ReportHealth,
-		Chosen:       true,
-		LastReportAt: time.Date(2026, 10, 10, 9, 0, 0, 0, time.UTC),
-		LastReport:   []byte(`{"protocol":1,"heartbeat_secret":"[redacted]"}`),
+		Level:           config.ReportRuns,
+		Chosen:          true,
+		LastReportAt:    time.Date(2026, 10, 10, 9, 0, 0, 0, time.UTC),
+		LastReport:      []byte(`{"protocol":2,"heartbeat_secret":"[redacted]"}`),
+		RunsPausedUntil: time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC),
 	}, nil
 }
 
@@ -711,9 +712,11 @@ func TestLicenseMonitoring_LastReport(t *testing.T) {
 	var monitoring api.LicenseMonitoring
 	server.Client().Get("/api/v1/license/monitoring").ExpectStatus(http.StatusOK).Send(t).Unmarshal(t, &monitoring)
 	require.NotNil(t, monitoring.LastReport)
-	assert.Equal(t, `{"protocol":1,"heartbeat_secret":"[redacted]"}`, *monitoring.LastReport)
+	assert.Equal(t, `{"protocol":2,"heartbeat_secret":"[redacted]"}`, *monitoring.LastReport)
 	require.NotNil(t, monitoring.LastReportAt)
 	assert.Equal(t, "2026-10-10T09:00:00Z", *monitoring.LastReportAt)
+	require.NotNil(t, monitoring.RunsPausedUntil)
+	assert.True(t, time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC).Equal(*monitoring.RunsPausedUntil))
 }
 
 // Changing the level is audited with the level it replaced.

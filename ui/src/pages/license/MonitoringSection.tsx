@@ -39,7 +39,8 @@ function formatReport(report: string): string {
 /**
  * Shows what this server reports to Dagu Console, when it last did, and the
  * last report itself, and lets an administrator change or stop it unless the
- * configuration fixes it. A server that stopped reporting is called out.
+ * configuration fixes it. A server that stopped reporting is called out, and
+ * so is a pause in Dagu Console storing its finished runs.
  */
 export function MonitoringSection({
   monitoring,
@@ -63,6 +64,10 @@ export function MonitoringSection({
   const reporting =
     monitoring !== undefined && monitoring.level !== LicenseMonitoringLevel.off;
   const stale = monitoringStale(monitoring, now);
+  const runsPaused =
+    monitoring?.level === LicenseMonitoringLevel.runs &&
+    monitoring.runsPausedUntil !== undefined &&
+    dayjs(monitoring.runsPausedUntil).valueOf() > now;
 
   async function turnOff() {
     setTurningOff(true);
@@ -183,6 +188,15 @@ export function MonitoringSection({
                 </Row>
               )}
             </dl>
+            {runsPaused && (
+              <p className="text-sm text-warning">
+                {ts('Run history paused until {time}', {
+                  time: dayjs(monitoring.runsPausedUntil).format(
+                    'YYYY-MM-DD HH:mm'
+                  ),
+                })}
+              </p>
+            )}
             {monitoring.configured && (
               <p className="text-sm text-muted-foreground flex items-start gap-2">
                 <Info className="h-4 w-4 shrink-0 mt-0.5" />
