@@ -52,6 +52,9 @@ func (r *run) perform(ctx context.Context, index int, actions []computeruse.Acti
 			continue
 		}
 		if replayable {
+			if element != nil && action.Kind == computeruse.KindType {
+				r.proveValue(element, action.Text)
+			}
 			recorded = append(recorded, recordAction(display, seen.full, element))
 		}
 	}

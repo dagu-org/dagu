@@ -95,7 +95,11 @@ func (r *run) act(ctx context.Context, index int, spec actSpec, timeout time.Dur
 			if err != nil {
 				return err
 			}
-			replay, err := r.replay(ctx, index, entry, r.cfg.maxActions(spec), findWithin)
+			direct, err := r.cfg.direct(spec)
+			if err != nil {
+				return err
+			}
+			replay, err := r.replay(ctx, index, entry, r.cfg.maxActions(spec), findWithin, direct)
 			if err != nil {
 				return err
 			}

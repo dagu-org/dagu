@@ -137,12 +137,13 @@ func (o replayOutcome) via() string {
 // turn whose pointer actions all landed on elements replays on those
 // elements, wherever they are now; any other turn replays on the pixels
 // it recorded, which need the same display. Each waits up to findWithin
-// for what it needs. The replay stops, leaving the desktop as it is, when
+// for what it needs; under direct, an element performs an action itself
+// when it can. The replay stops, leaving the desktop as it is, when
 // a turn misses, an action fails, or the step's settings would stop a
 // model's turn: the turn needs more than budget actions in all, or a
 // confirmation on_confirmation does not allow. The model then continues
 // from there under the same settings.
-func (r *run) replay(ctx context.Context, index int, entry recording, budget int, findWithin time.Duration) (replayOutcome, error) {
+func (r *run) replay(ctx context.Context, index int, entry recording, budget int, findWithin time.Duration, direct bool) (replayOutcome, error) {
 	var outcome replayOutcome
 	total := len(entry.Turns)
 	var els desktop.Elements
@@ -164,7 +165,7 @@ func (r *run) replay(ctx context.Context, index int, entry recording, budget int
 			}
 			if els != nil {
 				outcome.elementTurns++
-				reason, err := r.replayByElement(ctx, index, i, total, turn, els, findWithin, &outcome)
+				reason, err := r.replayByElement(ctx, index, i, total, turn, els, findWithin, direct, &outcome)
 				if err != nil || reason != "" {
 					outcome.reason = reason
 					return outcome, err

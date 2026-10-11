@@ -13,6 +13,7 @@ import (
 	"image/color"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -161,6 +162,13 @@ type fakeElements struct {
 	hasFocus bool
 	// onFocus sees every element the executor focuses.
 	onFocus func(desktop.Element)
+	// patterns lists the patterns an element offers, by id or name; an
+	// element not listed offers what its role suggests. applyErr fails a
+	// pattern on an element.
+	patterns map[string][]desktop.Pattern
+	applyErr map[string]error
+	// onApply sees every pattern the executor applies.
+	onApply func(desktop.Element, desktop.Pattern, string)
 }
 
 // expenseWindow and expenseElements are a form in an expense app: a saved
@@ -272,6 +280,76 @@ func (f *fakeElements) Focus(e desktop.Element) error {
 		onFocus(e)
 	}
 	return nil
+}
+
+// rolePatterns are the patterns an element of a role offers, as common
+// controls do.
+func rolePatterns(role string) []desktop.Pattern {
+	switch role {
+	case desktop.RoleButton, desktop.RoleMenuItem, desktop.RoleLink, desktop.RoleOther:
+		return []desktop.Pattern{desktop.PatternInvoke}
+	case desktop.RoleCheckbox:
+		return []desktop.Pattern{desktop.PatternToggle}
+	case desktop.RoleRadio, desktop.RoleListItem, desktop.RoleTab, desktop.RoleCell:
+		return []desktop.Pattern{desktop.PatternSelect}
+	case desktop.RoleComboBox:
+		return []desktop.Pattern{desktop.PatternExpand}
+	case desktop.RoleTextField:
+		return []desktop.Pattern{desktop.PatternSetValue}
+	}
+	return nil
+}
+
+// Apply performs a pattern when the element offers it, setting a field's
+// value, and reports what it did through onApply.
+func (f *fakeElements) Apply(e desktop.Element, pattern desktop.Pattern, value string) error {
+	f.mu.Lock()
+	id := focusedID(e)
+	if err, ok := f.applyErr[id]; ok {
+		f.mu.Unlock()
+		return err
+	}
+	offered, listed := f.patterns[id]
+	if !listed {
+		offered = rolePatterns(e.Role)
+	}
+	if !slices.Contains(offered, pattern) {
+		f.mu.Unlock()
+		return desktop.ErrNoPattern
+	}
+	if pattern == desktop.PatternSetValue {
+		for i := range f.elements {
+			if focusedID(f.elements[i]) == id {
+				f.elements[i].Value = value
+			}
+		}
+	}
+	onApply := f.onApply
+	f.mu.Unlock()
+	if onApply != nil {
+		onApply(e, pattern, value)
+	}
+	return nil
+}
+
+// withoutPattern makes an element offer no pattern at all.
+func (f *fakeElements) withoutPattern(id string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.patterns == nil {
+		f.patterns = map[string][]desktop.Pattern{}
+	}
+	f.patterns[id] = nil
+}
+
+// failPattern makes every pattern on an element fail with err.
+func (f *fakeElements) failPattern(id string, err error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.applyErr == nil {
+		f.applyErr = map[string]error{}
+	}
+	f.applyErr[id] = err
 }
 
 // shift moves the window and everything in it, as a person dragging it
@@ -592,6 +670,15 @@ func (r *testRun) execute(withJSON string, session *ir.AgentSession) *stepExecut
 		r.elements.opens++
 		if r.elements.onFocus == nil {
 			r.elements.onFocus = func(e desktop.Element) { r.backend.record("focus " + focusedID(e)) }
+		}
+		if r.elements.onApply == nil {
+			r.elements.onApply = func(e desktop.Element, pattern desktop.Pattern, value string) {
+				if pattern == desktop.PatternSetValue {
+					r.backend.record(fmt.Sprintf("set %s=%s", focusedID(e), value))
+					return
+				}
+				r.backend.record(string(pattern) + " " + focusedID(e))
+			}
 		}
 		r.elements.mu.Unlock()
 		return r.elements, nil
