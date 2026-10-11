@@ -44,6 +44,7 @@ func TestComputerValidation(t *testing.T) {
 		{"native_mode.yaml", `provider "openrouter" has no native computer use`},
 		{"unknown_variable.yaml", "act references %password%"},
 		{"unknown_input.yaml", "mouse does not equal any of: [screen direct]"},
+		{"extract_never_object.yaml", "has no field that reads from an element"},
 	} {
 		t.Run(tc.fixture, func(t *testing.T) {
 			t.Parallel()

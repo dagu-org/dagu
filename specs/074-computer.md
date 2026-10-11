@@ -45,7 +45,9 @@ Each operation sets exactly one of:
   string or an object with `instruction` and optional `ai`, `cache`,
   `max_actions`, `find_within`, and `input`.
 - `extract`: `{instruction, schema}`, with optional `ai`. The schema must be
-  a JSON Schema with `type: object`.
+  a JSON Schema with `type: object`. A successful extract binds each scalar
+  field to the element its value came from, so a later run reads it without
+  the model (see Extract binding).
 - `expect`: a statement about the screen that must hold; otherwise the step
   fails with the model's reason.
 - `wait`: a duration such as `2s`.
@@ -254,10 +256,11 @@ that operation:
 
 `with.cache: false` and `act.cache: false`, from before the choice existed,
 mean `every_run`. Setting both `ai` and `cache` on the step, or on an act,
-fails validation. A statement is judged by the model, and an `extract` has
-no form that reads the screen without one, so a step whose `ai` is `never`
-fails validation with an `expect` or `when` that is a statement, or an
-`extract` that does not set its own `ai`. An exact check is allowed.
+fails validation. A statement is judged by the model, so a step whose `ai`
+is `never` fails validation with an `expect` or `when` that is a statement.
+An exact check is allowed, and so is an `extract` whose fields all read from
+an element; an `extract` under `never` that lists an object, array, or
+boolean field, which need the model, fails validation.
 
 Each operation's timeline event records `position`, its place in `do` from
 1, and `via`, how it ran: `element` for a replay by the window's elements,
@@ -371,6 +374,37 @@ extracted before the pause. Rejecting the question fails the step. An answer
 after `ask.timeout` (default one hour) fails the step. The pending question
 carries that deadline as `expiresAt`. Restarting the session runs the step
 from its first operation.
+
+### Extract binding
+
+An `extract` reads structured data from the screen into the step's outputs.
+Under `every_run` and `on_miss` the model receives the screenshot and, when
+the host can read elements, an outline of the window in front: up to 400
+elements, each an id, role, name, and value. The model returns each field's
+value and the id of the element it read it from, or no id when it read from
+the screen.
+
+A scalar field, one whose schema type is `string`, `number`, or `integer`,
+binds to an element when the model named one, the element's value converted
+to the field's type equals the model's value converted the same way, and
+exactly one element in the window gives that value. A value that matches
+two elements, or that the model read from the screen, does not bind, so a
+coincidental match is never guessed. An object or an array field does not
+bind (an array of objects binds to a table, described below); a boolean
+field binds with tables.
+
+A later run reads each bound element and converts its value to the field's
+type: a string is trimmed and compared folding full-width characters and
+whitespace; a number or integer drops grouping and currency symbols and
+folds full-width digits. The window in front must be the recorded
+application, as a replay by elements requires; a field whose element is
+missing, ambiguous, or whose value does not convert is a miss. Each read
+waits up to `with.find_within`. `every_run` always reads with the model and
+rebinds. `on_miss` reads the bindings and, on any miss, reads the whole
+extract with the model again and rebinds. `never` reads the bindings alone
+and fails, naming the field, when one is missing. The timeline event's
+`via` is `element` when every field was read from its binding, `model` when
+the model read it.
 
 ### Elements
 

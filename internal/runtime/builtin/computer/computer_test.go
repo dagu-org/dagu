@@ -145,6 +145,120 @@ func TestExtractPublishesOutputs(t *testing.T) {
 	assert.Len(t, run.vision.requests[0].Messages[1].Images, 1, "the model reads a screenshot")
 }
 
+// extractStep reads the invoice amount into a number output.
+const extractStep = `{"do": [{"extract": {"instruction": "The invoice amount", "schema": {"type": "object", "properties": {"amount": {"type": "number"}}}}}]}`
+
+// A successful extract binds each field to the element it read from, so a
+// later run under never reads it with no model and reports via element.
+func TestExtractBindsAndReadsWithoutAModel(t *testing.T) {
+	t.Parallel()
+
+	run := elementRun(t)
+	// amountBox is the third element of the window, value 12,000.
+	run.vision.extract = `{"amount": {"value": 12000, "element": "e3"}}`
+	first := run.execute(extractStep, nil)
+	require.NoError(t, first.err)
+	assert.EqualValues(t, 12000, first.exec.GetOutputs()["amount"])
+	assert.Equal(t, agentstep.ViaModel, operationEvents(first.exec.GetAgentSession())[0].Via)
+	entry := lookupRecording(t, run, "The invoice amount")
+	require.Len(t, entry.Fields, 1)
+	assert.Equal(t, "amountBox", entry.Fields[0].Element.Selector.ID)
+	assert.Equal(t, "number", entry.Fields[0].Kind)
+
+	run.vision.extract = ""
+	run.vision.requests = nil
+	replayed := run.execute(`{"ai": "never", "do": [{"extract": {"instruction": "The invoice amount", "schema": {"type": "object", "properties": {"amount": {"type": "number"}}}}}]}`, nil)
+	require.NoError(t, replayed.err)
+	assert.EqualValues(t, 12000, replayed.exec.GetOutputs()["amount"])
+	events := operationEvents(replayed.exec.GetAgentSession())
+	require.Len(t, events, 1)
+	assert.Equal(t, agentstep.StatusCacheHit, events[0].Status)
+	assert.Equal(t, agentstep.ViaElement, events[0].Via)
+	assert.Empty(t, run.vision.requests, "no model request")
+}
+
+// A value the model read from an element binds; one it read from the
+// screen, naming no element, does not, and cannot run under never.
+func TestExtractDoesNotBindAScreenReadField(t *testing.T) {
+	t.Parallel()
+
+	run := elementRun(t)
+	run.vision.extract = `{"amount": {"value": 999, "element": ""}}`
+	require.NoError(t, run.execute(extractStep, nil).err)
+
+	// Nothing bound, so a later never run has no binding to read.
+	failed := run.execute(`{"ai": "never", "do": [{"extract": {"instruction": "The invoice amount", "schema": {"type": "object", "properties": {"amount": {"type": "number"}}}}}]}`, nil)
+	require.ErrorContains(t, failed.err, `the extract cannot run without AI: there is no binding`)
+	assert.Equal(t, agentstep.ViaScreen, operationEvents(failed.exec.GetAgentSession())[0].Via)
+}
+
+// A value two elements share does not bind, since the binding would be
+// ambiguous, so a never run cannot read it.
+func TestExtractDoesNotBindAnAmbiguousValue(t *testing.T) {
+	t.Parallel()
+
+	const label = `{"do": [{"extract": {"instruction": "The button label", "schema": {"type": "object", "properties": {"label": {"type": "string"}}}}}]}`
+	run := elementRun(t)
+	// Both save buttons carry the same name 保存.
+	run.vision.extract = `{"label": {"value": "保存", "element": "e4"}}`
+	require.NoError(t, run.execute(label, nil).err)
+
+	failed := run.execute(`{"ai": "never", "do": [{"extract": {"instruction": "The button label", "schema": {"type": "object", "properties": {"label": {"type": "string"}}}}}]}`, nil)
+	require.ErrorContains(t, failed.err, `the extract cannot run without AI: there is no binding`)
+}
+
+// Under on_miss, a binding whose element is gone is reread by the model.
+func TestExtractHealsAMissingBinding(t *testing.T) {
+	t.Parallel()
+
+	run := elementRun(t)
+	run.vision.extract = `{"amount": {"value": 12000, "element": "e3"}}`
+	require.NoError(t, run.execute(extractStep, nil).err)
+
+	// The field is gone, so the binding no longer resolves; on_miss asks the
+	// model again, which reads it from the screen this time.
+	run.elements.elements = withoutElement(expenseElements(), "amountBox")
+	run.vision.extract = `{"amount": {"value": 8500, "element": ""}}`
+	run.vision.requests = nil
+	healed := run.execute(extractStep, nil)
+	require.NoError(t, healed.err)
+	assert.EqualValues(t, 8500, healed.exec.GetOutputs()["amount"])
+	assert.Equal(t, agentstep.ViaModel, operationEvents(healed.exec.GetAgentSession())[0].Via)
+	assert.Len(t, run.vision.requests, 1, "the model reread the extract")
+}
+
+// A model that answers the plain value, ignoring the reading schema's
+// {value, element} wrapper, still publishes; the field just does not bind.
+func TestExtractToleratesAPlainAnswer(t *testing.T) {
+	t.Parallel()
+
+	run := elementRun(t)
+	run.vision.extract = `{"amount": 42}`
+	published := run.execute(extractStep, nil)
+	require.NoError(t, published.err)
+	assert.EqualValues(t, 42, published.exec.GetOutputs()["amount"])
+
+	failed := run.execute(`{"ai": "never", "do": [{"extract": {"instruction": "The invoice amount", "schema": {"type": "object", "properties": {"amount": {"type": "number"}}}}}]}`, nil)
+	require.ErrorContains(t, failed.err, "there is no binding", "a plain answer binds nothing")
+}
+
+// A full-width value reads as the number a person sees.
+func TestExtractConvertsFullWidthValue(t *testing.T) {
+	t.Parallel()
+
+	run := elementRun(t)
+	run.elements.elements[2].Value = "１２，３４５"
+	run.vision.extract = `{"amount": {"value": 12345, "element": "e3"}}`
+	bound := run.execute(extractStep, nil)
+	require.NoError(t, bound.err)
+	assert.EqualValues(t, 12345, bound.exec.GetOutputs()["amount"])
+
+	run.vision.extract = ""
+	replayed := run.execute(`{"ai": "never", "do": [{"extract": {"instruction": "The invoice amount", "schema": {"type": "object", "properties": {"amount": {"type": "number"}}}}}]}`, nil)
+	require.NoError(t, replayed.err)
+	assert.EqualValues(t, 12345, replayed.exec.GetOutputs()["amount"])
+}
+
 func TestExpectAndWhen(t *testing.T) {
 	t.Parallel()
 

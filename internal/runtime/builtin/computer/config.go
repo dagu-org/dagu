@@ -519,7 +519,12 @@ func (c config) validateChoice(o operation) error {
 	case o.Act != nil && o.Act.AI != "" && o.Act.Cache != nil:
 		return errors.New("act: set ai or cache, not both; cache: false means ai: every_run")
 	case o.Extract != nil && c.extractChoice(*o.Extract) == aiNever:
-		return errors.New("extract needs AI; set ai: on_miss or ai: every_run on it")
+		if len(bindableFields(o.Extract.Schema)) == 0 {
+			return errors.New("extract under never has no field that reads from an element; every field is an object, an array, or a boolean, which need the model")
+		}
+		if unbindable := unbindableFields(o.Extract.Schema); len(unbindable) > 0 {
+			return fmt.Errorf("extract under never cannot read %s without the model; an object, array, or boolean field needs ai: on_miss or every_run", strings.Join(unbindable, ", "))
+		}
 	}
 	return nil
 }

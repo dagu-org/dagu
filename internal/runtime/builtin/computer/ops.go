@@ -200,11 +200,14 @@ func (r *run) reportFailure(index int, kind, subject string, cause error, began 
 	via := ""
 	var unmet *conditionFailure
 	var miss replayMiss
+	var bindMiss extractMiss
 	switch {
 	case tokens > 0:
 		via = agentstep.ViaModel
 	case errors.As(cause, &miss):
 		via = miss.via
+	case errors.As(cause, &bindMiss):
+		via = bindMiss.via
 	case errors.As(cause, &unmet):
 		via = unmet.via
 	}
@@ -305,10 +308,97 @@ func (r *run) launch(ctx context.Context, index int, spec launchSpec) error {
 	return nil
 }
 
+// extract reads structured data from the screen. A successful read binds
+// each field to the element its value came from, so a later run reads it
+// again with no model: every_run always asks the model and rebinds; on_miss
+// reads the bindings first and asks the model only when one is missing;
+// never reads the bindings and fails when one is missing.
 func (r *run) extract(ctx context.Context, index int, spec extractSpec, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	began, before := time.Now(), r.usage
+	choice := r.cfg.extractChoice(spec)
+	key := replayKey(index, spec.Instruction)
+	findWithin, err := r.cfg.findWithin(actSpec{}, r.exec.findWithin)
+	if err != nil {
+		return err
+	}
+
+	if choice != aiEveryRun {
+		entry, ok := r.cache.Lookup(key)
+		switch {
+		case ok && entry.Version != recordingVersion:
+			r.cache.Drop(key)
+			if choice == aiNever {
+				return extractMiss{err: errors.New("its binding on this host is from an older version and was ignored"), via: agentstep.ViaScreen}
+			}
+		case !ok || len(entry.Fields) == 0:
+			if choice == aiNever {
+				return extractMiss{err: errors.New("there is no binding of it on this host"), via: agentstep.ViaScreen}
+			}
+		default:
+			done, err := r.replayExtract(ctx, index, spec, key, entry, findWithin, choice, began)
+			if done || err != nil {
+				return err
+			}
+		}
+	}
+
+	return r.modelExtract(ctx, index, spec, key, began, before)
+}
+
+// replayExtract reads an extract from its bindings. It returns done when the
+// read published every field; otherwise, under never it fails, and under
+// on_miss it returns not done so the model reruns and rebinds.
+func (r *run) replayExtract(ctx context.Context, index int, spec extractSpec, key string, entry recording, findWithin time.Duration, choice string, began time.Time) (bool, error) {
+	els, err := r.elementsReader()
+	if err != nil {
+		if choice == aiNever {
+			return true, extractMiss{err: err, via: agentstep.ViaScreen}
+		}
+		return false, nil
+	}
+	// A field that cannot bind, such as an object or a boolean, needs the
+	// model, so a schema with one never reads from bindings alone. Never
+	// refuses such a schema at validation, so this only defers on_miss.
+	if modelOnly := unbindableFields(spec.Schema); len(modelOnly) > 0 {
+		logAction(r.timeline, index, fmt.Sprintf("extract reread: %q needs the model", modelOnly[0]))
+		return false, nil
+	}
+	if missing := missingBindings(spec.Schema, entry); len(missing) > 0 {
+		reason := fmt.Sprintf("field %q is not bound", missing[0])
+		if choice == aiNever {
+			return true, extractMiss{err: errors.New(reason), via: agentstep.ViaElement}
+		}
+		logAction(r.timeline, index, "extract reread: "+reason)
+		return false, nil
+	}
+	values, reason, err := r.readBinding(ctx, index, els, entry, findWithin)
+	if err != nil {
+		return true, err
+	}
+	if reason != "" {
+		if choice == aiNever {
+			return true, extractMiss{err: errors.New(reason), via: agentstep.ViaElement}
+		}
+		logAction(r.timeline, index, "extract reread: "+reason)
+		return false, nil
+	}
+	r.publishExtract(spec.Schema, values)
+	if entry.Op != index {
+		entry.Op = index
+		r.cache.Stage(key, entry)
+	}
+	r.report(ctx, agentstep.Report{
+		Index: index, Kind: opExtract, Subject: spec.Instruction, Status: agentstep.StatusCacheHit, Via: agentstep.ViaElement,
+		Detail: fmt.Sprintf("read %s from elements", strings.Join(boundNames(entry), ", ")), Duration: time.Since(began),
+	})
+	return true, nil
+}
+
+// modelExtract reads an extract with the model and binds each field it read
+// to the element it came from, when the host can read elements.
+func (r *run) modelExtract(ctx context.Context, index int, spec extractSpec, key string, began time.Time, before tokenUsage) error {
 	full, err := r.settle(ctx)
 	if err != nil {
 		return err
@@ -317,7 +407,21 @@ func (r *run) extract(ctx context.Context, index int, spec extractSpec, timeout 
 	if err != nil {
 		return err
 	}
-	data, err := r.query(ctx, spec.Instruction, spec.Schema, shot.image())
+	instruction, schema := spec.Instruction, spec.Schema
+	var outline []desktop.Element
+	var front desktop.Element
+	wrapped := false
+	if els, err := r.elementsIfAvailable(); err == nil {
+		if f, err := els.FrontWindow(); err == nil {
+			if o, err := els.Outline(f, maxExtractOutline); err == nil && len(o) > 0 {
+				front, outline = f, o
+				schema = readingSchema(spec.Schema)
+				instruction = r.extractInstruction(spec.Instruction, f, o)
+				wrapped = true
+			}
+		}
+	}
+	data, err := r.query(ctx, instruction, schema, shot.image())
 	if err != nil {
 		return err
 	}
@@ -325,15 +429,21 @@ func (r *run) extract(ctx context.Context, index int, spec extractSpec, timeout 
 	if err := json.Unmarshal(data, &values); err != nil {
 		return fmt.Errorf("extract returned a non-object value: %w", err)
 	}
-	// Only the fields a schema lists are published, matching the output
-	// names known when the DAG loads.
-	properties, listed := spec.Schema["properties"].(map[string]any)
-	for name, value := range values {
-		if _, ok := properties[name]; listed && !ok {
-			continue
+	out, scalars, sources := unwrapAnswer(values, spec.Schema, wrapped)
+	if wrapped {
+		fields, bound := r.bindExtract(scalars, sources, spec.Schema, outline, front)
+		// A bound field publishes the element's converted value, so the
+		// model run reads the same as every later run.
+		maps.Copy(out, bound)
+		if len(fields) > 0 {
+			r.cache.Stage(key, recording{Op: index, Version: recordingVersion, Fields: fields})
+		} else {
+			// Nothing bound; forget any stale binding so a later on_miss run
+			// does not wait for an element that is gone before it asks again.
+			r.cache.Drop(key)
 		}
-		r.outputs[name] = value
 	}
+	r.publishExtract(spec.Schema, out)
 	r.report(ctx, agentstep.Report{
 		Index: index, Kind: opExtract, Subject: spec.Instruction, Status: agentstep.StatusCompleted, Via: agentstep.ViaModel,
 		Detail: string(data), Tokens: r.usage.sub(before).total(), Duration: time.Since(began),
@@ -686,7 +796,7 @@ func (r *run) awaitPerson(ctx context.Context) error {
 func (r *run) forgetReplays(ctx context.Context, index int, kind string, cause error) {
 	if index < 0 || ctx.Err() != nil || kind == opAsk || kind == opLaunch ||
 		errors.Is(cause, errCapture) || errors.Is(cause, errDesktopInUse) || errors.Is(cause, desktop.ErrElementsUnsupported) ||
-		errors.As(cause, new(modelFailure)) || errors.As(cause, new(replayMiss)) {
+		errors.As(cause, new(modelFailure)) || errors.As(cause, new(replayMiss)) || errors.As(cause, new(extractMiss)) {
 		r.cache.Discard()
 		return
 	}
