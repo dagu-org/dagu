@@ -54,7 +54,7 @@ type Reporter struct {
 	credentials func() (license.CloudCredentials, bool)
 	registry    serviceregistry.ServiceRegistry
 	monitoring  *Monitoring
-	// events is nil when reports carry no events.
+	// events is nil when reports carry no runs.
 	events    *eventFeed
 	client    *http.Client
 	startedAt time.Time
@@ -80,7 +80,7 @@ type Reporter struct {
 	level config.ReportLevel
 	// levelWarned records that the level could not be read.
 	levelWarned bool
-	// noEventsLogged records that reports were said to carry no events.
+	// noEventsLogged records that reports were said to carry no runs.
 	noEventsLogged bool
 }
 

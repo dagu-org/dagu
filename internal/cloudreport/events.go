@@ -56,9 +56,10 @@ const (
 	warnActive          = "Failed to list the DAG runs in progress; reports to Dagu Console leave them out until listing succeeds"
 )
 
-// Events configures the DAG-run events that reports carry.
+// Events configures the DAG runs that reports carry: the runs that finish,
+// read from the event store, and the runs in progress.
 type Events struct {
-	// Reader is the event store. A nil Reader leaves events out of reports.
+	// Reader is the event store. A nil Reader leaves runs out of reports.
 	Reader eventstore.DAGRunReader
 	// RetentionDays is how many days the event store keeps events; 0 keeps
 	// them forever.
