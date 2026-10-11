@@ -80,7 +80,49 @@ func (r *run) act(ctx context.Context, index int, spec actSpec, timeout time.Dur
 	// the healed recording keeps, and spent the actions it performed.
 	var replayed []recordedTurn
 	spent := 0
+	pinned := false
+	// A pinned act runs its authored steps first on every device of its
+	// system, ahead of this device's own recording.
 	if choice != aiEveryRun {
+		if steps := spec.Recorded[r.system]; len(steps) > 0 {
+			pinned = true
+			// A pinned step's placeholders, like the instruction's, must
+			// have a value; a missing one means its ask was skipped.
+			for _, step := range steps {
+				for _, name := range step.references() {
+					if _, ok := r.variables[name]; !ok {
+						return fmt.Errorf("a pinned step uses %%%s%%, but the ask that sets it did not run", name)
+					}
+				}
+			}
+			findWithin, err := r.cfg.findWithin(spec, r.exec.findWithin)
+			if err != nil {
+				return err
+			}
+			direct, err := r.cfg.direct(spec)
+			if err != nil {
+				return err
+			}
+			done, performed, reason, err := r.replayPinned(ctx, index, steps, direct, findWithin)
+			if err != nil {
+				return err
+			}
+			if done {
+				r.report(ctx, agentstep.Report{
+					Index: index, Kind: opAct, Subject: spec.Instruction, Status: agentstep.StatusCacheHit, Via: agentstep.ViaElement,
+					Detail: fmt.Sprintf("replayed %d pinned steps", len(steps)), Duration: time.Since(began),
+				})
+				return nil
+			}
+			if choice == aiNever {
+				return replayMiss{err: errors.New(reason), via: agentstep.ViaElement}
+			}
+			logAction(r.timeline, index, "pinned steps stopped: "+reason)
+			status = agentstep.StatusHealed
+			spent = performed
+		}
+	}
+	if !pinned && choice != aiEveryRun {
 		key = replayKey(index, spec.Instruction)
 		entry, ok := r.cache.Lookup(key)
 		switch {

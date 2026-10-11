@@ -45,6 +45,7 @@ func TestComputerValidation(t *testing.T) {
 		{"unknown_variable.yaml", "act references %password%"},
 		{"unknown_input.yaml", "mouse does not equal any of: [screen direct]"},
 		{"extract_never_object.yaml", "has no field that reads from an element"},
+		{"bad_pin.yaml", "linux"},
 	} {
 		t.Run(tc.fixture, func(t *testing.T) {
 			t.Parallel()
@@ -281,6 +282,26 @@ func TestComputerTypesIntoWindow(t *testing.T) {
 }
 
 const testWindowFilter = "WINDOWTITLE eq Dagu desktop test"
+
+// A pinned act runs its authored step with no model configured: it clicks
+// the 保存 button named by its pin, and the status label it updates is read
+// by the exact check that follows.
+func TestComputerPinnedAct(t *testing.T) {
+	if runtime.GOOS != "windows" || os.Getenv("DAGU_DESKTOP_E2E") != "1" {
+		t.Skip("set DAGU_DESKTOP_E2E=1 on an interactive Windows desktop to run")
+	}
+	dagu := harness.NewRunner(t).WithCommandTimeout(desktopCommandTimeout)
+	t.Cleanup(func() {
+		_ = exec.Command("taskkill", "/F", "/FI", "WINDOWTITLE eq "+elementsWindowTitle).Run()
+	})
+	result := dagu.Run("start", "pinned.yaml")
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Logf("stdout:\n%s\nstderr:\n%s", result.Stdout(), result.Stderr())
+		}
+	})
+	result.ExpectExitCode(0)
+}
 
 // closeTestWindow ends the test window and waits for its process to exit.
 func closeTestWindow(t *testing.T) {

@@ -786,6 +786,137 @@ func TestEveryRunRecords(t *testing.T) {
 
 // elementRun is a desktop with the expense form, on a screen big enough
 // to hold it, for recording and replaying by element.
+// A pinned act replays its authored steps on a device with no recording of
+// its own, with no model, reporting a cache hit by element.
+func TestPinnedActReplays(t *testing.T) {
+	t.Parallel()
+
+	const steps = `{"ai": "never", "do": [{"act": {"instruction": "Save the invoice", "recorded": {"windows": [{"click": {"role": "button", "name": "保存", "id": "saveButton"}}]}}}]}`
+	run := elementRun(t)
+	replayed := run.execute(steps, nil)
+	require.NoError(t, replayed.err, "the pin runs with no recording and no model")
+	events := operationEvents(replayed.exec.GetAgentSession())
+	require.Len(t, events, 1)
+	assert.Equal(t, agentstep.StatusCacheHit, events[0].Status)
+	assert.Equal(t, agentstep.ViaElement, events[0].Via)
+	assert.Equal(t, []string{"move 235,194", "left down #1"}, run.backend.inputs())
+}
+
+// A pinned act substitutes a variable into a typed step and waits.
+func TestPinnedActTypesAndWaits(t *testing.T) {
+	t.Parallel()
+
+	run := elementRun(t)
+	run.focusOn("amountBox")
+	const steps = `{"ai": "never", "variables": {"amount": "12,000"}, "do": [{"act": {"instruction": "Enter the amount", "recorded": {"windows": [{"type": {"into": {"role": "text_field", "id": "amountBox"}, "text": "%amount%"}}, {"wait": "10ms"}, {"key": "ctrl+s"}]}}}]}`
+	replayed := run.execute(steps, nil)
+	require.NoError(t, replayed.err)
+	assert.Equal(t, []string{"focus amountBox", "type 12,000", "key ctrl", "key s"}, run.backend.inputs())
+}
+
+// A pinned act under input: direct drives the element's pattern.
+func TestPinnedActDirect(t *testing.T) {
+	t.Parallel()
+
+	const steps = `{"ai": "never", "input": "direct", "do": [{"act": {"instruction": "Save the invoice", "recorded": {"windows": [{"click": {"role": "button", "name": "保存", "id": "saveButton"}}]}}}]}`
+	run := elementRun(t)
+	replayed := run.execute(steps, nil)
+	require.NoError(t, replayed.err)
+	assert.Equal(t, []string{"invoke saveButton"}, run.backend.inputs())
+}
+
+// A pinned step that misses fails under never, naming why, and clicks
+// nothing.
+func TestPinnedActMissFailsUnderNever(t *testing.T) {
+	t.Parallel()
+
+	const steps = `{"ai": "never", "do": [{"act": {"instruction": "Save the invoice", "recorded": {"windows": [{"click": {"role": "button", "name": "送信", "id": "submit"}}]}}}]}`
+	run := elementRun(t)
+	failed := run.execute(steps, nil)
+	require.ErrorContains(t, failed.err, "the act cannot run without AI")
+	assert.Equal(t, agentstep.ViaElement, operationEvents(failed.exec.GetAgentSession())[0].Via)
+	assert.Empty(t, run.backend.inputs())
+}
+
+// Under on_miss, a pinned step that misses hands off to the model.
+func TestPinnedActHealsUnderOnMiss(t *testing.T) {
+	t.Parallel()
+
+	const steps = `{"do": [{"act": {"instruction": "Save the invoice", "recorded": {"windows": [{"click": {"role": "button", "name": "送信", "id": "submit"}}]}}}]}`
+	run := elementRun(t)
+	run.sessions = []*scriptedSession{{turns: []*computeruse.Turn{actions(clickAt(235, 194)), done("Saved")}}}
+	healed := run.execute(steps, nil)
+	require.NoError(t, healed.err)
+	assert.Equal(t, agentstep.StatusHealed, operationEvents(healed.exec.GetAgentSession())[0].Status)
+}
+
+// A pin for another system is ignored, so a never act with only a macos pin
+// misses on this Windows host as if unpinned.
+func TestPinnedActIgnoresOtherSystem(t *testing.T) {
+	t.Parallel()
+
+	const steps = `{"ai": "never", "do": [{"act": {"instruction": "Save the invoice", "recorded": {"macos": [{"click": {"role": "button", "name": "保存", "id": "saveButton"}}]}}}]}`
+	run := elementRun(t)
+	failed := run.execute(steps, nil)
+	require.ErrorContains(t, failed.err, "there is no recording of it on this host")
+}
+
+// A pinned extract reads its fields with no model under never.
+func TestPinnedExtractReads(t *testing.T) {
+	t.Parallel()
+
+	const steps = `{"ai": "never", "do": [{"extract": {"instruction": "The amount", "schema": {"type": "object", "properties": {"amount": {"type": "number"}}}, "fields": {"windows": {"amount": {"role": "text_field", "id": "amountBox"}}}}}]}`
+	run := elementRun(t)
+	replayed := run.execute(steps, nil)
+	require.NoError(t, replayed.err)
+	assert.EqualValues(t, 12000, replayed.exec.GetOutputs()["amount"])
+	assert.Equal(t, agentstep.ViaElement, operationEvents(replayed.exec.GetAgentSession())[0].Via)
+	assert.Empty(t, run.vision.requests, "no model request")
+}
+
+// A host that reads no elements, macOS until phase 8 or a 32-bit Windows,
+// misses a pinned act rather than failing it: under never it reports the miss
+// naming the cause, so on_miss can still hand the act to the model.
+func TestPinnedActMissesWithoutElements(t *testing.T) {
+	t.Parallel()
+
+	const steps = `{"ai": "never", "do": [{"act": {"instruction": "Save the invoice", "recorded": {"windows": [{"click": {"role": "button", "name": "保存", "id": "saveButton"}}]}}}]}`
+	run := newTestRun(t) // no elements reader on this host
+	failed := run.execute(steps, nil)
+	require.ErrorContains(t, failed.err, "pinned steps need the window's elements")
+	assert.Equal(t, agentstep.ViaElement, operationEvents(failed.exec.GetAgentSession())[0].Via)
+}
+
+// Under on_miss, a pinned act on a host that reads no elements hands off to
+// the model rather than failing.
+func TestPinnedActWithoutElementsHealsUnderOnMiss(t *testing.T) {
+	t.Parallel()
+
+	const steps = `{"do": [{"act": {"instruction": "Save the invoice", "recorded": {"windows": [{"click": {"role": "button", "name": "保存", "id": "saveButton"}}]}}}]}`
+	run := newTestRun(t)
+	run.sessions = []*scriptedSession{{turns: []*computeruse.Turn{actions(clickAt(1, 1)), done("Saved")}}}
+	healed := run.execute(steps, nil)
+	require.NoError(t, healed.err)
+	assert.Equal(t, agentstep.StatusHealed, operationEvents(healed.exec.GetAgentSession())[0].Status)
+}
+
+// A pinned act waits until nobody has used the desktop for the idle window
+// before each input, as a learned replay does, so its click never lands in a
+// person's window.
+func TestPinnedActWaitsForIdleDesktop(t *testing.T) {
+	t.Parallel()
+
+	const steps = `{"ai": "never", "idle": "100ms", "do": [{"act": {"instruction": "Save the invoice", "recorded": {"windows": [{"click": {"role": "button", "name": "保存", "id": "saveButton"}}]}}}]}`
+	run := elementRun(t)
+	run.backend.personKeepsUsing(2)
+	replayed := run.execute(steps, nil)
+	require.NoError(t, replayed.err)
+	session := replayed.exec.GetAgentSession()
+	assert.Contains(t, strings.Join(lifecycleMessages(session), "\n"), "Waiting until nobody has used the desktop for 100ms")
+	assert.Equal(t, []string{waitReasonPerson}, waitReasons(session))
+	assert.Equal(t, []string{"move 235,194", "left down #1"}, run.backend.inputs(), "the pinned click lands once the person stops")
+}
+
 func elementRun(t *testing.T) *testRun {
 	t.Helper()
 	run := newTestRun(t)

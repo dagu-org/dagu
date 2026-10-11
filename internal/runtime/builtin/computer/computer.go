@@ -62,8 +62,12 @@ type computerExecutor struct {
 	// feeds the desktop input of its own, so a step there does not wait
 	// for a person unless idle is set.
 	onConsole func() bool
-	stdout    io.Writer
-	stderr    io.Writer
+	// system is which pinned block this device runs, windows or macos, or
+	// "" on a host that reads no elements. It is hostSystem() in
+	// production; a test sets it so pins resolve on any runner.
+	system string
+	stdout io.Writer
+	stderr io.Writer
 
 	mu            sync.Mutex
 	cancel        context.CancelFunc
@@ -93,6 +97,7 @@ func newExecutor(_ context.Context, step ir.Step) (executor.Executor, error) {
 		personWait:   defaultPersonWait,
 		findWithin:   defaultFindWithin,
 		onConsole:    desktop.OnConsoleSession,
+		system:       hostSystem(),
 		stdout:       os.Stdout,
 		stderr:       os.Stderr,
 	}, nil
