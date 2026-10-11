@@ -11,7 +11,6 @@ import (
 	"os"
 	"os/exec"
 	"runtime/debug"
-	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -136,7 +135,7 @@ func (b *SubCmdBuilder) Start(dag *ir.DAG, opts StartOptions) CmdSpec {
 	args := []string{"start"}
 
 	if opts.Params != "" {
-		args = append(args, "-p", strconv.Quote(opts.Params))
+		args = append(args, "--params-stdin")
 	}
 	if opts.Quiet {
 		args = append(args, "-q")
@@ -184,6 +183,7 @@ func (b *SubCmdBuilder) Start(dag *ir.DAG, opts StartOptions) CmdSpec {
 	return CmdSpec{
 		Executable:      b.executable,
 		Args:            args,
+		Input:           opts.Params,
 		Env:             b.parentEnv(definitionIDEnv(opts.DefinitionID)...),
 		BuildEnv:        append([]string{}, dag.Env...),
 		RuntimeResolved: dag.RuntimeResolved,
@@ -195,7 +195,7 @@ func (b *SubCmdBuilder) Enqueue(dag *ir.DAG, opts EnqueueOptions) CmdSpec {
 	args := []string{"enqueue"}
 
 	if opts.Params != "" {
-		args = append(args, "-p", strconv.Quote(opts.Params))
+		args = append(args, "--params-stdin")
 	}
 	if opts.Quiet {
 		args = append(args, "-q")
@@ -235,6 +235,7 @@ func (b *SubCmdBuilder) Enqueue(dag *ir.DAG, opts EnqueueOptions) CmdSpec {
 	return CmdSpec{
 		Executable:      b.executable,
 		Args:            args,
+		Input:           opts.Params,
 		Env:             b.filteredEnv(definitionIDEnv(opts.DefinitionID)...),
 		BuildEnv:        append([]string{}, dag.Env...),
 		RuntimeResolved: dag.RuntimeResolved,
@@ -328,8 +329,12 @@ func (b *SubCmdBuilder) Retry(dag *ir.DAG, opts RetryOptions) CmdSpec {
 
 // CmdSpec describes a command to be executed with all its configuration.
 type CmdSpec struct {
-	Executable      string
-	Args            []string
+	Executable string
+	Args       []string
+	// Input is written to the command's standard input. Params travel here
+	// rather than in Args, so their size is not bound by the platform's
+	// command-line limit.
+	Input           string
 	Env             []string
 	BuildEnv        []string
 	RuntimeResolved bool
@@ -511,6 +516,9 @@ func newCommand(ctx context.Context, spec CmdSpec, withContext bool) (*exec.Cmd,
 	}
 
 	cmdutil.SetupCommand(cmd)
+	if spec.Input != "" {
+		cmd.Stdin = strings.NewReader(spec.Input)
+	}
 	var env []string
 	if spec.Env != nil {
 		env = append([]string{}, spec.Env...)
