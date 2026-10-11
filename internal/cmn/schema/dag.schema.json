@@ -8065,7 +8065,7 @@
             "instruction": { "type": "string", "minLength": 1 },
             "ai": {
               "$ref": "#/definitions/computerAI",
-              "description": "How much the model decides for this extract, in place of with.ai. An extract needs the model, so never is refused."
+              "description": "How much the model decides for this extract, in place of with.ai. every_run reads with the model every run; on_miss reads the bound elements and asks the model only when one is missing; never reads the bound elements with no model and fails when one is missing. A field that reads from an element binds on a successful run; an object, array, or boolean field needs the model."
             },
             "schema": { "$ref": "#/definitions/extractSchema" }
           },
