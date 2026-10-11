@@ -125,7 +125,8 @@ export const messages = {
       'Open access and infrastructure settings.',
     'home.remoteNodesDescription': 'Configure distributed execution targets.',
     'home.terminalDescription': 'Open a server-side shell.',
-    'home.licenseDescription': 'Review plan and entitlement status.',
+    'home.licenseDescription':
+      'License, Dagu Console connection, and monitoring.',
     'administration.security': 'Security',
     'administration.usersDescription': 'Manage accounts and roles.',
     'administration.apiKeysDescription': 'Issue access tokens for automation.',
@@ -285,7 +286,7 @@ export const messages = {
     'home.administrationDescription': '打开访问和基础设施设置。',
     'home.remoteNodesDescription': '配置分布式执行目标。',
     'home.terminalDescription': '打开服务器端 Shell。',
-    'home.licenseDescription': '查看套餐和授权状态。',
+    'home.licenseDescription': '许可证、Dagu Console 连接和监控。',
     'administration.security': '安全',
     'administration.usersDescription': '管理账户和角色。',
     'administration.apiKeysDescription': '为自动化签发访问令牌。',
@@ -446,7 +447,7 @@ export const messages = {
     'home.administrationDescription': 'アクセスとインフラ設定を開きます。',
     'home.remoteNodesDescription': '分散実行先を設定します。',
     'home.terminalDescription': 'サーバー側のシェルを開きます。',
-    'home.licenseDescription': 'プランと利用権限の状態を確認します。',
+    'home.licenseDescription': 'ライセンス、Dagu Console との接続、監視。',
     'administration.security': 'セキュリティ',
     'administration.usersDescription': 'アカウントとロールを管理します。',
     'administration.apiKeysDescription':
