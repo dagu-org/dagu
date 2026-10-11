@@ -1970,7 +1970,9 @@ function DAGTable({
                     );
                     return disabled ? (
                       <Tooltip key={option.value}>
-                        <TooltipTrigger asChild>{item}</TooltipTrigger>
+                        <TooltipTrigger asChild>
+                          <div className="cursor-not-allowed">{item}</div>
+                        </TooltipTrigger>
                         <TooltipContent className="bg-muted text-muted-foreground border">
                           <p className="text-xs">
                             <I18nText

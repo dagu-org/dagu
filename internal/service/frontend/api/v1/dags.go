@@ -2245,9 +2245,11 @@ func (a *API) listDAGsDataSortedByRun(ctx context.Context, listOpts persis.DAGLi
 
 	// Build the sort key (latest run status or start time) for each DAG.
 	type keyedItem struct {
-		item    persis.DAGListItem
-		status  ir.Status
-		lastRun time.Time
+		item      persis.DAGListItem
+		dagStatus ir.DAGRunStatus
+		statusErr error
+		status    ir.Status
+		lastRun   time.Time
 	}
 	keyed := make([]keyedItem, 0, len(result.Items))
 	for _, item := range result.Items {
@@ -2256,9 +2258,11 @@ func (a *API) listDAGsDataSortedByRun(ctx context.Context, listOpts persis.DAGLi
 			errList = append(errList, statusErr.Error())
 		}
 		keyed = append(keyed, keyedItem{
-			item:    item,
-			status:  dagStatus.Status,
-			lastRun: parseRunTime(dagStatus.StartedAt),
+			item:      item,
+			dagStatus: dagStatus,
+			statusErr: statusErr,
+			status:    dagStatus.Status,
+			lastRun:   parseRunTime(dagStatus.StartedAt),
 		})
 	}
 
@@ -2290,20 +2294,19 @@ func (a *API) listDAGsDataSortedByRun(ctx context.Context, listOpts persis.DAGLi
 	totalCount := len(keyed)
 	start := pg.Offset()
 	end := min(start+pg.Limit(), totalCount)
-	items := make([]persis.DAGListItem, 0, len(keyed))
-	for _, k := range keyed {
-		items = append(items, k.item)
+	var pageKeyed []keyedItem
+	if start < totalCount {
+		pageKeyed = keyed[start:end]
 	}
-	if start >= totalCount {
-		items = nil
-	} else {
-		items = items[start:end]
+	items := make([]persis.DAGListItem, 0, len(pageKeyed))
+	for _, k := range pageKeyed {
+		items = append(items, k.item)
 	}
 	paged := pagination.NewPaginatedResult(items, totalCount, *pg)
 
 	dagFiles := make([]api.DAGFile, 0, len(paged.Items))
-	for _, item := range paged.Items {
-		dagStatus, statusErr := a.dagRunMgr.GetLatestStatus(ctx, item.DAG)
+	for _, k := range pageKeyed {
+		item := k.item
 		var nextRun time.Time
 		if !item.Suspended {
 			nextRun = nextRunProjection(item.DAG, projectionTime)
@@ -2315,15 +2318,15 @@ func (a *API) listDAGsDataSortedByRun(ctx context.Context, listOpts persis.DAGLi
 		_, pinned := pinnedIDs[item.ID]
 		dagFile := api.DAGFile{
 			FileName:     item.ID,
-			LatestDAGRun: toDAGRunSummary(dagStatus),
+			LatestDAGRun: toDAGRunSummary(k.dagStatus),
 			Suspended:    item.Suspended,
 			Pinned:       pinned,
 			Dag:          toDAG(item.DAG),
 			NextRun:      nextRunAt,
 			Errors:       extractBuildErrors(item.BuildErrors),
 		}
-		if statusErr != nil {
-			errList = append(errList, statusErr.Error())
+		if k.statusErr != nil {
+			errList = append(errList, k.statusErr.Error())
 		}
 		dagFiles = append(dagFiles, dagFile)
 	}

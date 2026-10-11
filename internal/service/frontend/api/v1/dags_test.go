@@ -2400,6 +2400,22 @@ steps:
 	require.Len(t, listResp.Dags, 1)
 	require.Equal(t, "sort-paginate-2", listResp.Dags[0].Dag.Name)
 	require.Equal(t, 3, listResp.Pagination.TotalRecords)
+
+	// A page past the end returns no DAGs instead of slicing out of range.
+	page = 5
+	listRespObj, err = apiImpl.ListDAGs(context.Background(), api.ListDAGsRequestObject{
+		Params: api.ListDAGsParams{
+			Sort:    &sortField,
+			Order:   &order,
+			Page:    &page,
+			PerPage: &perPage,
+		},
+	})
+	require.NoError(t, err)
+	listResp, ok = listRespObj.(*api.ListDAGs200JSONResponse)
+	require.True(t, ok)
+	require.Empty(t, listResp.Dags)
+	require.Equal(t, 3, listResp.Pagination.TotalRecords)
 }
 
 // TestListDAGsSortsByStatusNoRunLastDesc verifies that a DAG with no latest run
