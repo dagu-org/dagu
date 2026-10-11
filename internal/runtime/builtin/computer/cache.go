@@ -64,11 +64,31 @@ type recording struct {
 }
 
 // fieldBinding ties one extract output to the element its value was read
-// from, with the type to convert the element's text to.
+// from, with the type to convert the element's text to. A table field
+// binds to a container and its columns instead of a single element.
 type fieldBinding struct {
 	Name    string          `json:"name"`
 	Kind    string          `json:"kind"`
 	Element recordedElement `json:"element"`
+	Table   *tableBinding   `json:"table,omitempty"`
+}
+
+// tableBinding ties an array-of-objects output to a grid, table, or list:
+// the container to read, the application it belongs to, and the column
+// each item property reads from, by the header that names it.
+type tableBinding struct {
+	Container desktop.Selector `json:"container"`
+	App       string           `json:"app,omitempty"`
+	Window    string           `json:"window,omitempty"`
+	Columns   []columnBinding  `json:"columns"`
+}
+
+// columnBinding maps an item property to the column header it reads from
+// and the type to convert each cell to.
+type columnBinding struct {
+	Property string `json:"property"`
+	Header   string `json:"header"`
+	Kind     string `json:"kind"`
 }
 
 // recordedTurn is a screen the model saw and the actions it chose.

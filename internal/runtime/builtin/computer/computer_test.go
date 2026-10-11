@@ -227,6 +227,97 @@ func TestExtractHealsAMissingBinding(t *testing.T) {
 	assert.Len(t, run.vision.requests, 1, "the model reread the extract")
 }
 
+// A boolean field binds to a checkbox and reads its state without a model.
+func TestExtractBindsACheckbox(t *testing.T) {
+	t.Parallel()
+
+	const steps = `{"do": [{"extract": {"instruction": "Whether the box is checked", "schema": {"type": "object", "properties": {"agreed": {"type": "boolean"}}}}}]}`
+	run := elementRun(t)
+	run.elements.elements = append(expenseElements(), desktop.Element{Role: desktop.RoleCheckbox, Name: "同意", ID: "agreeBox", Value: "true", Bounds: image.Rect(120, 250, 300, 274), Path: []desktop.PathStep{{Role: desktop.RoleCheckbox, Name: "同意", Index: 0}}})
+	run.vision.extract = `{"agreed": {"value": true, "element": "e7"}}`
+	first := run.execute(steps, nil)
+	require.NoError(t, first.err)
+	assert.Equal(t, true, first.exec.GetOutputs()["agreed"])
+
+	run.vision.extract = ""
+	run.vision.requests = nil
+	replayed := run.execute(`{"ai": "never", "do": [{"extract": {"instruction": "Whether the box is checked", "schema": {"type": "object", "properties": {"agreed": {"type": "boolean"}}}}}]}`, nil)
+	require.NoError(t, replayed.err)
+	assert.Equal(t, true, replayed.exec.GetOutputs()["agreed"])
+	assert.Equal(t, agentstep.ViaElement, operationEvents(replayed.exec.GetAgentSession())[0].Via)
+	assert.Empty(t, run.vision.requests, "no model request")
+}
+
+// extractTable reads invoice lines into an array of objects.
+const extractTable = `{"do": [{"extract": {"instruction": "The invoice lines", "schema": {"type": "object", "properties": {"lines": {"type": "array", "items": {"type": "object", "properties": {"item": {"type": "string"}, "amount": {"type": "number"}}}}}}}}]}`
+
+// extractTableNever is extractTable under never.
+const extractTableNever = `{"ai": "never", "do": [{"extract": {"instruction": "The invoice lines", "schema": {"type": "object", "properties": {"lines": {"type": "array", "items": {"type": "object", "properties": {"item": {"type": "string"}, "amount": {"type": "number"}}}}}}}}]}`
+
+func withTable(run *testRun) {
+	run.elements.elements = append(expenseElements(), desktop.Element{Role: desktop.RoleList, Name: "明細", ID: "lines", Bounds: image.Rect(120, 250, 660, 440), Path: []desktop.PathStep{{Role: desktop.RoleList, Name: "明細", Index: 0}}})
+	run.elements.tableHeaders = []string{"品目", "金額"}
+}
+
+// A table field binds to its container and reads every row by header,
+// converting each cell, with no model on a later run.
+func TestExtractBindsATable(t *testing.T) {
+	t.Parallel()
+
+	run := elementRun(t)
+	withTable(run)
+	run.elements.tableRows = [][]string{{"りんご", "1,200"}, {"みかん", "3,400"}}
+	run.vision.extract = `{"lines": {"container": {"role": "list", "name": "明細"}, "columns": {"item": "品目", "amount": "金額"}, "rows": [{"item": "りんご", "amount": 1200}, {"item": "みかん", "amount": 3400}]}}`
+	first := run.execute(extractTable, nil)
+	require.NoError(t, first.err)
+	wantRows := []any{
+		map[string]any{"item": "りんご", "amount": int64(1200)},
+		map[string]any{"item": "みかん", "amount": int64(3400)},
+	}
+	assert.Equal(t, wantRows, first.exec.GetOutputs()["lines"])
+	entry := lookupRecording(t, run, "The invoice lines")
+	require.Len(t, entry.Fields, 1)
+	require.NotNil(t, entry.Fields[0].Table)
+	assert.Equal(t, "明細", entry.Fields[0].Table.Container.Name)
+
+	run.vision.extract = ""
+	run.vision.requests = nil
+	replayed := run.execute(extractTableNever, nil)
+	require.NoError(t, replayed.err)
+	assert.Equal(t, wantRows, replayed.exec.GetOutputs()["lines"])
+	assert.Equal(t, agentstep.ViaElement, operationEvents(replayed.exec.GetAgentSession())[0].Via)
+	assert.Empty(t, run.vision.requests, "no model request")
+}
+
+// A table whose read does not reproduce the model's rows does not bind.
+func TestExtractDoesNotBindAMismatchedTable(t *testing.T) {
+	t.Parallel()
+
+	run := elementRun(t)
+	withTable(run)
+	run.elements.tableRows = [][]string{{"りんご", "1,200"}}
+	run.vision.extract = `{"lines": {"container": {"role": "list", "name": "明細"}, "columns": {"item": "品目", "amount": "金額"}, "rows": [{"item": "ぶどう", "amount": 9999}]}}`
+	require.NoError(t, run.execute(extractTable, nil).err)
+
+	failed := run.execute(extractTableNever, nil)
+	require.ErrorContains(t, failed.err, "there is no binding")
+}
+
+// A moved-away column header misses on a later read.
+func TestExtractTableMissesOnAMovedHeader(t *testing.T) {
+	t.Parallel()
+
+	run := elementRun(t)
+	withTable(run)
+	run.elements.tableRows = [][]string{{"りんご", "1,200"}}
+	run.vision.extract = `{"lines": {"container": {"role": "list", "name": "明細"}, "columns": {"item": "品目", "amount": "金額"}, "rows": [{"item": "りんご", "amount": 1200}]}}`
+	require.NoError(t, run.execute(extractTable, nil).err)
+
+	run.elements.tableHeaders = []string{"品目", "単価"}
+	failed := run.execute(extractTableNever, nil)
+	require.ErrorContains(t, failed.err, "no column is headed")
+}
+
 // A model that answers the plain value, ignoring the reading schema's
 // {value, element} wrapper, still publishes; the field just does not bind.
 func TestExtractToleratesAPlainAnswer(t *testing.T) {

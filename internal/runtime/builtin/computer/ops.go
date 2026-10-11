@@ -358,7 +358,7 @@ func (r *run) replayExtract(ctx context.Context, index int, spec extractSpec, ke
 		}
 		return false, nil
 	}
-	// A field that cannot bind, such as an object or a boolean, needs the
+	// A field that cannot bind, a plain object or a free array, needs the
 	// model, so a schema with one never reads from bindings alone. Never
 	// refuses such a schema at validation, so this only defers on_miss.
 	if modelOnly := unbindableFields(spec.Schema); len(modelOnly) > 0 {
@@ -373,7 +373,7 @@ func (r *run) replayExtract(ctx context.Context, index int, spec extractSpec, ke
 		logAction(r.timeline, index, "extract reread: "+reason)
 		return false, nil
 	}
-	values, reason, err := r.readBinding(ctx, index, els, entry, findWithin)
+	values, reason, err := r.readBinding(ctx, index, els, entry, findWithin, r.cfg.maxRows(spec))
 	if err != nil {
 		return true, err
 	}
@@ -410,11 +410,12 @@ func (r *run) modelExtract(ctx context.Context, index int, spec extractSpec, key
 	instruction, schema := spec.Instruction, spec.Schema
 	var outline []desktop.Element
 	var front desktop.Element
+	var reader desktop.Elements
 	wrapped := false
 	if els, err := r.elementsIfAvailable(); err == nil {
 		if f, err := els.FrontWindow(); err == nil {
 			if o, err := els.Outline(f, maxExtractOutline); err == nil && len(o) > 0 {
-				front, outline = f, o
+				front, outline, reader = f, o, els
 				schema = readingSchema(spec.Schema)
 				instruction = r.extractInstruction(spec.Instruction, f, o)
 				wrapped = true
@@ -429,10 +430,10 @@ func (r *run) modelExtract(ctx context.Context, index int, spec extractSpec, key
 	if err := json.Unmarshal(data, &values); err != nil {
 		return fmt.Errorf("extract returned a non-object value: %w", err)
 	}
-	out, scalars, sources := unwrapAnswer(values, spec.Schema, wrapped)
+	out := unwrapAnswer(values, spec.Schema, wrapped)
 	if wrapped {
-		fields, bound := r.bindExtract(scalars, sources, spec.Schema, outline, front)
-		// A bound field publishes the element's converted value, so the
+		fields, bound := r.bindExtract(ctx, values, spec.Schema, outline, front, reader, r.cfg.maxRows(spec))
+		// A bound field publishes the value read through the binding, so the
 		// model run reads the same as every later run.
 		maps.Copy(out, bound)
 		if len(fields) > 0 {

@@ -435,8 +435,8 @@ its `bounds` in display pixels, its `window`'s title, and its `path` from
 the window down, each step a role, a name, and the element's position among
 its parent's children of that role. Roles are `button`, `text_field`,
 `text`, `checkbox`, `radio`, `combo_box`, `list_item`, `menu_item`, `tab`,
-`link`, `cell`, `group`, `window`, and `other`. A password field has no
-value.
+`link`, `cell`, `list` (a list, grid, table, or tree), `group`, `window`,
+and `other`. A password field has no value.
 
 `dagu computer elements` lists the visible elements of the window in front
 in tree order, with the window itself, up to `--limit` of them (default

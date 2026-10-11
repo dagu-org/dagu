@@ -289,6 +289,34 @@ func TestWindowsDirectInput(t *testing.T) {
 	expectStatus("同意: True")
 }
 
+// A table in Details view is read row by row, each cell under the column
+// its header names; a column with no header is a miss.
+func TestWindowsTableRead(t *testing.T) {
+	driver := e2eDesktop(t)
+	els := e2eElements(t)
+	elementsWindow(t, driver, els)
+	ctx := t.Context()
+
+	container := Selector{Role: RoleList, ID: "linesList"}
+	rows, err := els.Rows(ctx, container, []string{"品目", "金額"}, 100)
+	require.NoError(t, err)
+	assert.Equal(t, [][]string{{"りんご", "1,200"}, {"みかん", "3,400"}}, rows)
+
+	// The columns may be asked for in any order, by their headers.
+	swapped, err := els.Rows(ctx, container, []string{"金額", "品目"}, 100)
+	require.NoError(t, err)
+	assert.Equal(t, [][]string{{"1,200", "りんご"}, {"3,400", "みかん"}}, swapped)
+
+	// max bounds the rows read.
+	one, err := els.Rows(ctx, container, []string{"品目"}, 1)
+	require.NoError(t, err)
+	assert.Equal(t, [][]string{{"りんご"}}, one)
+
+	// A header that is not there is a miss.
+	_, err = els.Rows(ctx, container, []string{"単価"}, 100)
+	assert.ErrorIs(t, err, ErrNotFound)
+}
+
 // TestWindowsElementTimings logs how long reading elements takes in common
 // applications. It asserts nothing about time; the numbers inform the
 // replay design.

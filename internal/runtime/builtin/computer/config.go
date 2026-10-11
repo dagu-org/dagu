@@ -66,6 +66,8 @@ const (
 	// does not hold it long, and long enough to finish a word or a click.
 	defaultIdle       = 5 * time.Second
 	defaultFindWithin = 10 * time.Second
+	// defaultMaxRows bounds a table read when nothing sets it.
+	defaultMaxRows = 10000
 )
 
 // How a replayed action reaches the application: through the pointer and
@@ -95,8 +97,10 @@ type config struct {
 	FindWithin string `json:"find_within,omitempty"`
 	// Input is how a replayed action reaches the application: screen, the
 	// default, or direct.
-	Input string      `json:"input,omitempty"`
-	Do    []operation `json:"do"`
+	Input string `json:"input,omitempty"`
+	// MaxRows bounds how many rows an extract reads from a table.
+	MaxRows int         `json:"max_rows,omitempty"`
+	Do      []operation `json:"do"`
 }
 
 // operation is one item of with.do. Exactly one operation field is set.
@@ -129,6 +133,7 @@ type actSpec struct {
 type extractSpec struct {
 	Instruction string         `json:"instruction"`
 	AI          string         `json:"ai,omitempty"`
+	MaxRows     int            `json:"max_rows,omitempty"`
 	Schema      map[string]any `json:"schema"`
 }
 
@@ -284,6 +289,19 @@ func (c config) extractChoice(spec extractSpec) string {
 		return spec.AI
 	}
 	return c.choice()
+}
+
+// maxRows returns how many rows an extract reads from a table: the
+// extract's setting, the step's, or the default.
+func (c config) maxRows(spec extractSpec) int {
+	switch {
+	case spec.MaxRows > 0:
+		return spec.MaxRows
+	case c.MaxRows > 0:
+		return c.MaxRows
+	default:
+		return defaultMaxRows
+	}
 }
 
 // modelOperation returns the first operation that can call the model under
@@ -520,10 +538,10 @@ func (c config) validateChoice(o operation) error {
 		return errors.New("act: set ai or cache, not both; cache: false means ai: every_run")
 	case o.Extract != nil && c.extractChoice(*o.Extract) == aiNever:
 		if len(bindableFields(o.Extract.Schema)) == 0 {
-			return errors.New("extract under never has no field that reads from an element; every field is an object, an array, or a boolean, which need the model")
+			return errors.New("extract under never has no field that reads from an element; every field needs the model")
 		}
 		if unbindable := unbindableFields(o.Extract.Schema); len(unbindable) > 0 {
-			return fmt.Errorf("extract under never cannot read %s without the model; an object, array, or boolean field needs ai: on_miss or every_run", strings.Join(unbindable, ", "))
+			return fmt.Errorf("extract under never cannot read %s without the model; set ai: on_miss or every_run", strings.Join(unbindable, ", "))
 		}
 	}
 	return nil
@@ -710,6 +728,7 @@ var operationSchema = &jsonschema.Schema{
 			Properties: map[string]*jsonschema.Schema{
 				"instruction": agentstep.NonEmptyString(),
 				"ai":          aiSchema(),
+				"max_rows":    positiveInteger(),
 				"schema":      {Type: "object"},
 			},
 		},
@@ -755,6 +774,7 @@ var configSchema = &jsonschema.Schema{
 		"idle":            agentstep.StringSchema(),
 		"find_within":     agentstep.StringSchema(),
 		"input":           inputSchema(),
+		"max_rows":        positiveInteger(),
 		"do":              {Type: "array", MinItems: new(1), Items: operationSchema},
 	},
 	Defs: map[string]*jsonschema.Schema{"selector": selectorSchema()},
