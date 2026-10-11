@@ -358,6 +358,13 @@ func (r *run) replayExtract(ctx context.Context, index int, spec extractSpec, ke
 		}
 		return false, nil
 	}
+	// A field that cannot bind, such as an object or a boolean, needs the
+	// model, so a schema with one never reads from bindings alone. Never
+	// refuses such a schema at validation, so this only defers on_miss.
+	if modelOnly := unbindableFields(spec.Schema); len(modelOnly) > 0 {
+		logAction(r.timeline, index, fmt.Sprintf("extract reread: %q needs the model", modelOnly[0]))
+		return false, nil
+	}
 	if missing := missingBindings(spec.Schema, entry); len(missing) > 0 {
 		reason := fmt.Sprintf("field %q is not bound", missing[0])
 		if choice == aiNever {
@@ -430,6 +437,10 @@ func (r *run) modelExtract(ctx context.Context, index int, spec extractSpec, key
 		maps.Copy(out, bound)
 		if len(fields) > 0 {
 			r.cache.Stage(key, recording{Op: index, Version: recordingVersion, Fields: fields})
+		} else {
+			// Nothing bound; forget any stale binding so a later on_miss run
+			// does not wait for an element that is gone before it asks again.
+			r.cache.Drop(key)
 		}
 	}
 	r.publishExtract(spec.Schema, out)

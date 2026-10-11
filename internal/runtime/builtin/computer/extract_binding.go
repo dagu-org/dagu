@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -165,30 +166,40 @@ func sameValue(elemText string, modelValue any, kind workbook.ColumnType) bool {
 	return ev == mv
 }
 
-// bindField binds one field to the element that uniquely gives its value.
-// The binding holds only when exactly one element in the outline gives the
-// value, so a coincidental second match is a miss, not a guess; the caller
-// has already checked the model read the value from an element, not the
-// screen. front names the application to record.
-func (r *run) bindField(name string, kind workbook.ColumnType, modelValue any, outline []desktop.Element, front desktop.Element) (fieldBinding, any, bool) {
-	var match *desktop.Element
+// elementIndex returns the outline position a model source id names, such
+// as "e3", or -1 when the id is empty, malformed, or out of range.
+func elementIndex(source string, n int) int {
+	num, err := strconv.Atoi(strings.TrimPrefix(source, "e"))
+	if err != nil || num < 1 || num > n {
+		return -1
+	}
+	return num - 1
+}
+
+// bindField binds a field to the element the model named, when that
+// element's value is the field's value and no other element in the window
+// gives that value, so the binding is both the element the model read and
+// an unambiguous one. front names the application to record.
+func (r *run) bindField(name string, kind workbook.ColumnType, modelValue any, named desktop.Element, outline []desktop.Element, front desktop.Element) (fieldBinding, any, bool) {
+	if !sameValue(elementText(named), modelValue, kind) {
+		return fieldBinding{}, nil, false
+	}
 	count := 0
 	for i := range outline {
 		if sameValue(elementText(outline[i]), modelValue, kind) {
-			match = &outline[i]
 			count++
 		}
 	}
 	if count != 1 {
 		return fieldBinding{}, nil, false
 	}
-	rec := r.recordElement(*match, nil, front.App)
+	rec := r.recordElement(named, nil, front.App)
 	if rec == nil {
 		return fieldBinding{}, nil, false
 	}
 	// The bound run publishes the element's converted value, so it reads
 	// the same as every later run that reads the binding.
-	value, err := convertField(elementText(*match), kind)
+	value, err := convertField(elementText(named), kind)
 	if err != nil {
 		return fieldBinding{}, nil, false
 	}
@@ -254,11 +265,15 @@ func (r *run) bindExtract(scalars map[string]any, sources map[string]string, sch
 	properties := schemaProperties(schema)
 	for _, name := range bindableFields(schema) {
 		value, ok := scalars[name]
-		if !ok || sources[name] == "" {
+		if !ok {
+			continue
+		}
+		index := elementIndex(sources[name], len(outline))
+		if index < 0 {
 			continue
 		}
 		kind, _ := bindableKind(properties[name])
-		if binding, bound, ok := r.bindField(name, kind, value, outline, front); ok {
+		if binding, bound, ok := r.bindField(name, kind, value, outline[index], outline, front); ok {
 			fields = append(fields, binding)
 			values[name] = bound
 		}
