@@ -128,6 +128,10 @@ type actSpec struct {
 	MaxActions  int    `json:"max_actions,omitempty"`
 	FindWithin  string `json:"find_within,omitempty"`
 	Input       string `json:"input,omitempty"`
+	// Recorded holds the act's pinned steps, keyed by system (windows or
+	// macos). A device of that system runs them first, ignoring its own
+	// recording, so a learned act travels across devices.
+	Recorded map[string][]pinnedStep `json:"recorded,omitempty"`
 }
 
 type extractSpec struct {
@@ -135,6 +139,10 @@ type extractSpec struct {
 	AI          string         `json:"ai,omitempty"`
 	MaxRows     int            `json:"max_rows,omitempty"`
 	Schema      map[string]any `json:"schema"`
+	// Fields holds the extract's pinned bindings, keyed by system then by
+	// output name, so a device reads them with no model even if it never
+	// learned them.
+	Fields map[string]map[string]pinnedField `json:"fields,omitempty"`
 }
 
 type askSpec struct {
@@ -571,12 +579,18 @@ func (o operation) validate() error {
 		if err := validateFindWithin(o.Act.FindWithin); err != nil {
 			return fmt.Errorf("act: %w", err)
 		}
+		if err := validateRecorded(o.Act.Recorded); err != nil {
+			return fmt.Errorf("act: %w", err)
+		}
 	case o.Extract != nil:
 		if strings.TrimSpace(o.Extract.Instruction) == "" {
 			return errors.New("extract instruction must not be empty")
 		}
 		if o.Extract.Schema["type"] != "object" {
 			return errors.New(`extract schema must have type: object`)
+		}
+		if err := validateFields(o.Extract.Fields); err != nil {
+			return fmt.Errorf("extract: %w", err)
 		}
 	case o.Expect != nil:
 		if err := o.Expect.validate(); err != nil {
@@ -658,6 +672,97 @@ func conditionSchema() *jsonschema.Schema {
 // selectorSchema accepts a selector as a condition names an element. A
 // container is a selector too, through the definition the step's schema
 // holds.
+// pinnedBySystem wraps a per-system value in an object keyed by the systems
+// a pin may name. The value is built fresh for each system, so the schema
+// stays a tree.
+func pinnedBySystem(value func() *jsonschema.Schema) *jsonschema.Schema {
+	return &jsonschema.Schema{
+		Type:                 "object",
+		AdditionalProperties: agentstep.NoExtraProperties(),
+		Properties:           map[string]*jsonschema.Schema{systemWindows: value(), systemMacOS: value()},
+	}
+}
+
+// pinnedStepsSchema accepts a non-empty list of pinned steps.
+func pinnedStepsSchema() *jsonschema.Schema {
+	return &jsonschema.Schema{Type: "array", MinItems: new(1), Items: pinnedStepSchema()}
+}
+
+// pinnedStepSchema accepts exactly one action of a pinned step.
+func pinnedStepSchema() *jsonschema.Schema {
+	selector := func() *jsonschema.Schema { return &jsonschema.Schema{Ref: "#/$defs/selector"} }
+	return &jsonschema.Schema{
+		Type:                 "object",
+		AdditionalProperties: agentstep.NoExtraProperties(),
+		Properties: map[string]*jsonschema.Schema{
+			"click":        selector(),
+			"double_click": selector(),
+			"right_click":  selector(),
+			"type": {
+				Type:                 "object",
+				AdditionalProperties: agentstep.NoExtraProperties(),
+				Required:             []string{"into", "text"},
+				Properties:           map[string]*jsonschema.Schema{"into": selector(), "text": agentstep.StringSchema()},
+			},
+			"key": agentstep.NonEmptyString(),
+			"scroll": {
+				Type:                 "object",
+				AdditionalProperties: agentstep.NoExtraProperties(),
+				Required:             []string{"on", "dy"},
+				Properties:           map[string]*jsonschema.Schema{"on": selector(), "dy": {Type: "integer"}},
+			},
+			"wait": agentstep.NonEmptyString(),
+		},
+		OneOf: []*jsonschema.Schema{
+			{Required: []string{"click"}}, {Required: []string{"double_click"}}, {Required: []string{"right_click"}},
+			{Required: []string{"type"}}, {Required: []string{"key"}}, {Required: []string{"scroll"}}, {Required: []string{"wait"}},
+		},
+	}
+}
+
+// pinnedFieldSchema accepts an extract's pinned field: a selector for a
+// scalar, or a container and columns for a table.
+func pinnedFieldSchema() *jsonschema.Schema {
+	return &jsonschema.Schema{
+		Type:                 "object",
+		AdditionalProperties: agentstep.NoExtraProperties(),
+		Properties: map[string]*jsonschema.Schema{
+			"role":      {Type: "string", Enum: roleValues()},
+			"name":      agentstep.NonEmptyString(),
+			"id":        agentstep.NonEmptyString(),
+			"app":       agentstep.NonEmptyString(),
+			"window":    agentstep.NonEmptyString(),
+			"in":        {Ref: "#/$defs/selector"},
+			"near":      nearSchema(),
+			"nth":       {Type: "integer", Minimum: new(0.0)},
+			"container": {Ref: "#/$defs/selector"},
+			"columns":   {Type: "object", AdditionalProperties: agentstep.NonEmptyString()},
+		},
+	}
+}
+
+// roleValues is the role enum as schema values.
+func roleValues() []any {
+	roles := make([]any, 0, len(desktop.Roles))
+	for _, role := range desktop.Roles {
+		roles = append(roles, role)
+	}
+	return roles
+}
+
+// nearSchema is the near clause of a selector.
+func nearSchema() *jsonschema.Schema {
+	return &jsonschema.Schema{
+		Type:                 "object",
+		AdditionalProperties: agentstep.NoExtraProperties(),
+		Required:             []string{"label", "side"},
+		Properties: map[string]*jsonschema.Schema{
+			"label": agentstep.NonEmptyString(),
+			"side":  {Type: "string", Enum: []any{desktop.SideRight, desktop.SideBelow, desktop.SideLeft, desktop.SideAbove}},
+		},
+	}
+}
+
 func selectorSchema() *jsonschema.Schema {
 	roles := make([]any, 0, len(desktop.Roles))
 	for _, role := range desktop.Roles {
@@ -719,6 +824,7 @@ var operationSchema = &jsonschema.Schema{
 				"max_actions": positiveInteger(),
 				"find_within": agentstep.StringSchema(),
 				"input":       inputSchema(),
+				"recorded":    pinnedBySystem(pinnedStepsSchema),
 			},
 		},
 		opExtract: {
@@ -730,6 +836,7 @@ var operationSchema = &jsonschema.Schema{
 				"ai":          aiSchema(),
 				"max_rows":    positiveInteger(),
 				"schema":      {Type: "object"},
+				"fields":      pinnedBySystem(func() *jsonschema.Schema { return &jsonschema.Schema{Type: "object", AdditionalProperties: pinnedFieldSchema()} }),
 			},
 		},
 		opExpect:     conditionSchema(),

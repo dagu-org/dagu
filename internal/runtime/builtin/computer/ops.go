@@ -324,20 +324,22 @@ func (r *run) extract(ctx context.Context, index int, spec extractSpec, timeout 
 		return err
 	}
 
+	// Pinned fields, authored into the step, read on every device of the
+	// system ahead of this device's own binding.
+	pins := pinnedBindings(spec, hostSystem())
 	if choice != aiEveryRun {
 		entry, ok := r.cache.Lookup(key)
-		switch {
-		case ok && entry.Version != recordingVersion:
+		if ok && entry.Version != recordingVersion {
 			r.cache.Drop(key)
-			if choice == aiNever {
-				return extractMiss{err: errors.New("its binding on this host is from an older version and was ignored"), via: agentstep.ViaScreen}
-			}
-		case !ok || len(entry.Fields) == 0:
+			entry, ok = recording{}, false
+		}
+		entry.Fields = mergeFields(entry.Fields, pins)
+		if len(entry.Fields) == 0 {
 			if choice == aiNever {
 				return extractMiss{err: errors.New("there is no binding of it on this host"), via: agentstep.ViaScreen}
 			}
-		default:
-			done, err := r.replayExtract(ctx, index, spec, key, entry, findWithin, choice, began)
+		} else {
+			done, err := r.replayExtract(ctx, index, spec, key, entry, findWithin, choice, began, ok)
 			if done || err != nil {
 				return err
 			}
@@ -350,7 +352,7 @@ func (r *run) extract(ctx context.Context, index int, spec extractSpec, timeout 
 // replayExtract reads an extract from its bindings. It returns done when the
 // read published every field; otherwise, under never it fails, and under
 // on_miss it returns not done so the model reruns and rebinds.
-func (r *run) replayExtract(ctx context.Context, index int, spec extractSpec, key string, entry recording, findWithin time.Duration, choice string, began time.Time) (bool, error) {
+func (r *run) replayExtract(ctx context.Context, index int, spec extractSpec, key string, entry recording, findWithin time.Duration, choice string, began time.Time, fromDevice bool) (bool, error) {
 	els, err := r.elementsReader()
 	if err != nil {
 		if choice == aiNever {
@@ -385,7 +387,9 @@ func (r *run) replayExtract(ctx context.Context, index int, spec extractSpec, ke
 		return false, nil
 	}
 	r.publishExtract(spec.Schema, values)
-	if entry.Op != index {
+	// Only a recording that came from this device is restaged to upgrade its
+	// position; authored pins are not written into the device cache.
+	if fromDevice && entry.Op != index {
 		entry.Op = index
 		r.cache.Stage(key, entry)
 	}
