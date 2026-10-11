@@ -1,19 +1,19 @@
 import { useContext, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Check } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
+import { ExternalLink, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import ConfirmModal from '@/components/ui/confirm-dialog';
-import { LicenseStatusBadge } from '@/components/LicenseStatusBadge';
-import { LicenseActions } from '@/components/LicenseActions';
 import { MonitoringDialog } from '@/components/MonitoringDialog';
 import { ConnectSection } from './ConnectSection';
+import { FeatureList } from './FeatureList';
+import { CalloutLink, LicenseAlerts, LicenseCallout } from './LicenseAlerts';
+import { LicenseOverview } from './LicenseOverview';
 import { MonitoringSection } from './MonitoringSection';
-import { ServerIdentity } from './ServerIdentity';
 import { useLicenseConnect } from './useLicenseConnect';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { LicenseContext } from '@/contexts/LicenseContext';
-import { useConfig, type LicenseStatus } from '@/contexts/ConfigContext';
+import type { LicenseStatus } from '@/contexts/ConfigContext';
 import { useClient } from '@/hooks/api';
 import { useLicenseState } from '@/hooks/useLicense';
 import {
@@ -25,35 +25,43 @@ import {
   LicenseMonitoringLevel,
 } from '@/api/v1/schema';
 import { useI18n } from '@/i18n/I18nProvider';
-import {
-  hasActiveLicense,
-  hasLicensedFeature,
-  licensedFeatures,
-  licenseLink,
-  licensePlanName,
-} from '@/lib/license';
-import dayjs from '@/lib/dayjs';
+import { hasActiveLicense, licenseLink } from '@/lib/license';
 
 /** How often the time of the last report is refreshed. */
 const MONITORING_REFRESH_MS = 30_000;
 
+/** Explains how to stop using a license that Dagu loads again on restart. */
+const restartNotes: Record<string, string> = {
+  config:
+    'license.key in the config file activates this license again when Dagu restarts. Remove it to stop using the license.',
+  file: 'The license file is loaded again when Dagu restarts. Remove it to stop using the license.',
+};
+
 export default function LicensePage() {
-  const { license, loading, error: statusError } = useLicenseState();
+  const { license, loading, error: statusError, now } = useLicenseState();
   const { mutate } = useContext(LicenseContext)!;
-  const config = useConfig();
   const { setTitle, selectedRemoteNode } = useContext(AppBarContext);
   const remoteNode = selectedRemoteNode || 'local';
   const client = useClient();
   const { ts } = useI18n();
+  const { hash, key: locationKey } = useLocation();
   const [key, setKey] = useState('');
+  const [keyOpen, setKeyOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<
     'activate' | 'deactivate' | null
   >(null);
   const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [activateError, setActivateError] = useState<string | null>(null);
+  const [deactivateError, setDeactivateError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{
+    text: string;
+    releaseFailed?: boolean;
+  } | null>(null);
   const connect = useLicenseConnect(remoteNode);
   const granted = connect.status?.state === LicenseConnectStatusState.granted;
+  const connecting =
+    connect.status?.state === LicenseConnectStatusState.pending ||
+    Boolean(connect.failure);
   const { clear: clearConnect } = connect;
   // Only a license that checks in with Dagu Console can report to it.
   const online = !loading && !statusError && Boolean(license.serverId);
@@ -69,19 +77,29 @@ export default function LicensePage() {
     setTitle(ts('Plan & features'));
   }, [setTitle, ts]);
 
+  // Each visit to #activate, even a repeated one, opens the key form, which
+  // takes focus, in view.
+  useEffect(() => {
+    if (hash !== '#activate') return;
+    setKeyOpen(true);
+    document.getElementById('activate')?.scrollIntoView({ block: 'start' });
+  }, [hash, locationKey]);
+
   useEffect(() => {
     if (!granted) return;
     // Handle each approval once, even if this effect runs again later.
     clearConnect();
-    setError(null);
+    setActivateError(null);
+    setDeactivateError(null);
     void mutate().then(async (next) => {
-      setSuccessMessage(
-        next && hasActiveLicense(next)
-          ? ts('{plan} connected. Explore your included features below.', {
-              plan: licensePlanName(next),
-            })
-          : ts('License status updated.')
-      );
+      setNotice({
+        text:
+          next && hasActiveLicense(next)
+            ? next.workspace
+              ? ts('Connected to {workspace}.', { workspace: next.workspace })
+              : ts('Connected to Dagu Console.')
+            : ts('License status updated.'),
+      });
       if (!next?.serverId) return;
       // A server just connected is the moment to offer failure emails.
       try {
@@ -99,8 +117,8 @@ export default function LicensePage() {
     e.preventDefault();
     if (!key.trim()) return;
     setPendingAction('activate');
-    setError(null);
-    setSuccessMessage(null);
+    setActivateError(null);
+    setNotice(null);
     try {
       const next = await mutate(
         async () => {
@@ -119,15 +137,17 @@ export default function LicensePage() {
         { revalidate: true }
       );
       setKey('');
-      setSuccessMessage(
-        next && hasActiveLicense(next)
-          ? ts('{plan} activated. Explore your included features below.', {
-              plan: licensePlanName(next),
-            })
-          : ts('License status updated.')
-      );
+      setKeyOpen(false);
+      setNotice({
+        text:
+          next && hasActiveLicense(next)
+            ? ts('License activated.')
+            : ts('License status updated.'),
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : ts('Activation failed'));
+      setActivateError(
+        err instanceof Error ? err.message : ts('Activation failed')
+      );
     } finally {
       setPendingAction(null);
     }
@@ -136,8 +156,8 @@ export default function LicensePage() {
   async function handleDeactivate() {
     setShowDeactivateConfirm(false);
     setPendingAction('deactivate');
-    setError(null);
-    setSuccessMessage(null);
+    setDeactivateError(null);
+    setNotice(null);
     const disconnecting = connectedToConsole;
     let releaseFailed = false;
     try {
@@ -165,229 +185,299 @@ export default function LicensePage() {
         },
         { revalidate: true }
       );
-      setSuccessMessage(
+      setNotice(
         releaseFailed
-          ? ts(
-              'Disconnected here, but Dagu Console could not be reached. Disconnect this server in Dagu Console to free its slot.'
-            )
-          : ts(
-              disconnecting
-                ? 'Disconnected. Running in community mode.'
-                : 'License deactivated. Running in community mode.'
-            )
+          ? {
+              text: ts(
+                'Disconnected here, but Dagu Console could not be reached. Disconnect this server in Dagu Console to free its slot.'
+              ),
+              releaseFailed,
+            }
+          : {
+              text: ts(
+                disconnecting
+                  ? 'Disconnected. Running in community mode.'
+                  : 'License deactivated. Running in community mode.'
+              ),
+            }
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : ts('Deactivation failed'));
+      setDeactivateError(
+        err instanceof Error ? err.message : ts('Deactivation failed')
+      );
     } finally {
       setPendingAction(null);
     }
   }
 
-  const active = hasActiveLicense(license);
-  const connectedToConsole =
-    license.connectedVia === 'console' || license.connectedVia === 'key';
   const known = !loading && !statusError;
+  const via = license.connectedVia;
+  const connectedToConsole = via === 'console' || via === 'key';
+  const managedByEnv = via ? via === 'env' : license.source === 'env';
+  const restartNote = via ? restartNotes[via] : undefined;
+  const consoleHref = license.consoleUrl || licenseLink('manage', 'plan-page');
+  const busy = Boolean(pendingAction);
+
   return (
-    <div className="flex flex-col gap-4 max-w-3xl">
-      <div>
-        <h1 className="text-lg font-semibold">{ts('Plan & features')}</h1>
-        <p className="text-sm text-muted-foreground">
-          {ts('Your plan, included features, and license settings.')}
-        </p>
-      </div>
-      <section className="card-obsidian p-4 space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <LicenseStatusBadge />
-          <span className="text-xs text-muted-foreground break-all">
-            {ts('Server: {name}', { name: license.serverName || remoteNode })}
-          </span>
-        </div>
-        {known && (
-          <p className="text-sm">
-            {active
-              ? ts('Your {plan} license is active.', {
-                  plan: licensePlanName(license),
-                })
-              : license.community && !license.error
-                ? ts(
-                    'Community includes workflow automation. Add team controls when you need them.'
-                  )
-                : ts('Review your license status to restore paid features.')}
-          </p>
-        )}
-        {known && license.expiry && dayjs(license.expiry).isValid() && (
-          <p className="text-xs text-muted-foreground">
-            {ts('Expires')}: {dayjs(license.expiry).format('YYYY-MM-DD')}
-          </p>
-        )}
-        {known && license.gracePeriod && (
-          <p className="text-sm text-warning">
+    <div className="flex flex-col gap-4 max-w-4xl">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-lg font-semibold">{ts('Plan & features')}</h1>
+          <p className="text-sm text-muted-foreground">
             {ts(
-              'Features remain available during the grace period. Renew to keep access.'
+              'License, Dagu Console connection, and monitoring for this server.'
             )}
           </p>
+        </div>
+        {known && (
+          <div className="flex flex-wrap items-center gap-2">
+            {license.community ? (
+              !managedByEnv &&
+              !connecting && (
+                <>
+                  <Button asChild size="sm" variant="outline">
+                    <a
+                      href={licenseLink('trial', 'plan-page')}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {ts('Start free trial')}
+                    </a>
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    disabled={busy || connect.starting}
+                    onClick={() => void connect.start()}
+                  >
+                    {connect.starting ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    )}
+                    {ts('Connect to Dagu Console')}
+                  </Button>
+                </>
+              )
+            ) : (
+              <Button asChild size="sm" variant="outline">
+                <a href={consoleHref} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  {ts('Manage in Dagu Console')}
+                </a>
+              </Button>
+            )}
+          </div>
         )}
-        {license.error && (
-          <p role="alert" className="text-sm text-destructive">
-            {license.error}
-          </p>
-        )}
-        {statusError ? (
-          <div
-            role="status"
-            className="flex flex-wrap items-center gap-2 text-sm"
+      </div>
+
+      {notice &&
+        (notice.releaseFailed ? (
+          <LicenseCallout
+            tone="warning"
+            title={ts('Disconnected')}
+            action={
+              <CalloutLink href={licenseLink('manage', 'plan-page')}>
+                {ts('Open Dagu Console')}
+              </CalloutLink>
+            }
           >
-            <span>{ts('License status unavailable')}</span>
+            {notice.text}
+          </LicenseCallout>
+        ) : (
+          <p role="status" className="text-sm text-muted-foreground">
+            {notice.text}
+          </p>
+        ))}
+      {statusError ? (
+        <LicenseCallout
+          tone="warning"
+          title={ts('License status unavailable')}
+          action={
             <Button size="sm" variant="outline" onClick={() => void mutate()}>
               {ts('Retry')}
             </Button>
-          </div>
-        ) : (
-          known &&
-          (active && license.plan !== 'trial' ? (
-            <Button asChild size="sm" variant="outline">
-              <a
-                href={licenseLink('manage', 'plan-page')}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                {ts('Manage license')}
-              </a>
-            </Button>
-          ) : (
-            <LicenseActions content="plan-page" activationLink={false} />
-          ))
-        )}
-      </section>
-      {successMessage && (
-        <div role="status" className="text-sm text-muted-foreground">
-          <p>{successMessage}</p>
-        </div>
+          }
+        />
+      ) : (
+        known && (
+          <LicenseAlerts
+            license={license}
+            now={now}
+            consoleHref={consoleHref}
+          />
+        )
       )}
-      {error && (
-        <p role="alert" className="text-sm text-destructive">
-          {error}
+      {known && license.community && !managedByEnv && (
+        <ConnectSection connect={connect} disabled={busy} />
+      )}
+
+      {loading && (
+        <p role="status" className="text-sm text-muted-foreground">
+          {ts('Checking license…')}
         </p>
       )}
-      {known && license.community && (
-        <ConnectSection
-          connect={connect}
-          managedByEnv={license.source === 'env'}
-          disabled={Boolean(pendingAction)}
+      {known && (
+        <LicenseOverview
+          license={license}
+          remoteNode={remoteNode}
+          busy={busy}
         />
       )}
       {online && (
         <MonitoringSection
           monitoring={monitoring.monitoring}
+          now={now}
           loadError={Boolean(monitoring.error)}
           onRetry={() => void monitoring.refresh()}
           onChoose={() => setMonitoringDialog('choose')}
           onTurnOff={() => monitoring.setLevel(LicenseMonitoringLevel.off)}
         />
       )}
-      {known && !license.community && (
-        <ServerIdentity
-          license={license}
-          remoteNode={remoteNode}
-          busy={Boolean(pendingAction)}
-          disconnecting={pendingAction === 'deactivate'}
-          onDisconnect={() => setShowDeactivateConfirm(true)}
-        />
-      )}
-      {known && (
-        <section
-          id="features"
-          className="space-y-2 scroll-mt-4"
-          aria-label={ts('Features')}
-        >
-          <h2 className="text-sm font-semibold">{ts('Features')}</h2>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {licensedFeatures.map((feature) => {
-              const included = hasLicensedFeature(license, feature.id);
-              const setup =
-                feature.id === 'sso' ||
-                (feature.id === 'rbac' && config.authMode !== 'builtin');
-              const href =
-                feature.id === 'rbac' && setup
-                  ? 'https://docs.dagu.sh/server-admin/authentication/builtin'
-                  : feature.href;
-              return (
-                <article
-                  key={feature.id}
-                  className="card-obsidian p-3 flex flex-col items-start gap-2"
-                >
-                  <h3 className="text-sm font-medium">{ts(feature.title)}</h3>
-                  <p className="text-sm text-muted-foreground flex-1">
-                    {ts(feature.description)}
-                  </p>
-                  <div className="flex w-full flex-wrap items-center justify-between gap-2 text-xs">
-                    <span
-                      className={
-                        included
-                          ? 'text-success inline-flex items-center gap-1'
-                          : 'text-muted-foreground'
-                      }
-                    >
-                      {included && (
-                        <Check className="h-3 w-3" aria-hidden="true" />
-                      )}
-                      {ts(
-                        included
-                          ? 'Included'
-                          : 'Requires a license with this feature'
-                      )}
-                    </span>
-                    {included &&
-                      (setup ? (
-                        <a
-                          className="underline"
-                          href={href}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          {ts('Setup guide')}
-                        </a>
-                      ) : (
-                        <Link className="underline" to={href}>
-                          {ts('Open feature')}
-                        </Link>
-                      ))}
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        </section>
-      )}
+      {known && <FeatureList license={license} />}
+
       <section
         id="activate"
         className="card-obsidian p-4 space-y-3 scroll-mt-4"
       >
-        <h2 className="text-sm font-medium">{ts('Activate License Key')}</h2>
-        <form onSubmit={handleActivate} className="flex gap-2">
-          <Input
-            type="password"
-            autoComplete="off"
-            value={key}
-            onChange={(e) => setKey(e.target.value)}
-            placeholder="DAGU-XXXX-XXXX-XXXX-XXXX"
-            className="font-mono text-sm h-8"
-            aria-label={ts('License key')}
-            disabled={Boolean(pendingAction)}
-          />
-          <Button
-            type="submit"
-            size="sm"
-            className="h-8 shrink-0"
-            disabled={Boolean(pendingAction) || !key.trim()}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="min-w-0 flex-1 space-y-1">
+            <h2 className="text-sm font-medium">{ts('License key')}</h2>
+            <p className="text-xs text-muted-foreground">
+              {ts('Enter a server key or license key from Dagu Console.')}
+            </p>
+          </div>
+          {!keyOpen && (
+            <Button
+              size="sm"
+              variant="outline"
+              aria-expanded={false}
+              aria-controls="license-key-form"
+              onClick={() => setKeyOpen(true)}
+            >
+              {ts(
+                license.community
+                  ? 'Use a license key'
+                  : 'Use a different license key'
+              )}
+            </Button>
+          )}
+        </div>
+        {keyOpen && (
+          <form
+            id="license-key-form"
+            onSubmit={handleActivate}
+            className="flex flex-wrap gap-2"
           >
-            {ts(pendingAction === 'activate' ? 'Activating...' : 'Activate')}
-          </Button>
-        </form>
-        <p className="text-xs text-muted-foreground">
-          {ts('Enter a server key or license key from Dagu Console.')}
-        </p>
+            <Input
+              type="password"
+              autoComplete="off"
+              autoFocus
+              value={key}
+              onChange={(e) => setKey(e.target.value)}
+              placeholder="DAGU-XXXX-XXXX-XXXX-XXXX"
+              className="font-mono text-sm h-8 min-w-0 flex-1 basis-60"
+              aria-label={ts('License key')}
+              disabled={busy}
+            />
+            <div className="flex gap-2">
+              <Button
+                type="submit"
+                size="sm"
+                className="h-8"
+                disabled={busy || !key.trim()}
+              >
+                {ts(
+                  pendingAction === 'activate' ? 'Activating...' : 'Activate'
+                )}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-8"
+                disabled={busy}
+                onClick={() => {
+                  setKeyOpen(false);
+                  setKey('');
+                  setActivateError(null);
+                }}
+              >
+                {ts('Cancel')}
+              </Button>
+            </div>
+          </form>
+        )}
+        {activateError && (
+          <p role="alert" className="text-sm text-destructive">
+            {activateError}
+          </p>
+        )}
       </section>
+
+      {known && !license.community && (
+        <section
+          className="rounded-md border border-destructive/30 p-4 space-y-3"
+          aria-labelledby="license-danger-zone"
+        >
+          <h2 id="license-danger-zone" className="text-sm font-medium">
+            {ts('Danger zone')}
+          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0 flex-1 space-y-1">
+              <p className="text-sm font-medium">
+                {ts(
+                  connectedToConsole
+                    ? 'Disconnect this server'
+                    : 'Deactivate License'
+                )}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {managedByEnv ? (
+                  ts(
+                    'This license is configured via an environment variable (DAGU_LICENSE or DAGU_LICENSE_KEY). To deactivate, remove the environment variable and restart Dagu.'
+                  )
+                ) : (
+                  <>
+                    {ts(
+                      connectedToConsole
+                        ? 'Disconnecting frees this server’s slot in Dagu Console and returns it to community mode.'
+                        : 'Remove the license from this machine and return to community mode.'
+                    )}
+                    {restartNote && <> {ts(restartNote)}</>}
+                  </>
+                )}
+              </p>
+            </div>
+            {!managedByEnv && (
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled={busy}
+                onClick={() => setShowDeactivateConfirm(true)}
+              >
+                {connectedToConsole
+                  ? ts(
+                      pendingAction === 'deactivate'
+                        ? 'Disconnecting...'
+                        : 'Disconnect'
+                    )
+                  : ts(
+                      pendingAction === 'deactivate'
+                        ? 'Deactivating...'
+                        : 'Deactivate License'
+                    )}
+              </Button>
+            )}
+          </div>
+          {deactivateError && (
+            <p role="alert" className="text-sm text-destructive">
+              {deactivateError}
+            </p>
+          )}
+        </section>
+      )}
+
       <MonitoringDialog
         open={monitoringDialog !== null}
         level={monitoring.monitoring?.level}

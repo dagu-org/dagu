@@ -14,7 +14,7 @@ const POLL_INTERVAL_MS = 2000;
 /**
  * Drives a request to connect the selected server to Dagu Console: starts it,
  * opens the approval page, and follows it until it is approved, fails, or
- * expires.
+ * expires. `failure` says why the last request failed, if it did.
  */
 export function useLicenseConnect(remoteNode: string) {
   const client = useClient();
@@ -98,5 +98,24 @@ export function useLicenseConnect(remoteNode: string) {
 
   const clear = useCallback(() => setStatus(null), []);
 
-  return { status, starting, error, popupBlocked, start, cancel, clear };
+  // A cancel that fails while the request still waits is not a failure of
+  // the request itself.
+  const failure = pending
+    ? undefined
+    : error ||
+      (status?.state === LicenseConnectStatusState.failed ||
+      status?.state === LicenseConnectStatusState.expired
+        ? status.error
+        : undefined);
+
+  return {
+    status,
+    starting,
+    error,
+    failure,
+    popupBlocked,
+    start,
+    cancel,
+    clear,
+  };
 }

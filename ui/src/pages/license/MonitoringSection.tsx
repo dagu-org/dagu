@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { useState, type ReactNode } from 'react';
-import { Info } from 'lucide-react';
+import { AlertTriangle, Info } from 'lucide-react';
 import { LicenseMonitoringLevel } from '@/api/v1/schema';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,12 +15,8 @@ import {
 import RelativeTime from '@/components/ui/relative-time';
 import type { LicenseMonitoring } from '@/hooks/useLicenseMonitoring';
 import { useI18n } from '@/i18n/I18nProvider';
-
-const levelLabels: Record<LicenseMonitoringLevel, string> = {
-  [LicenseMonitoringLevel.off]: 'Off',
-  [LicenseMonitoringLevel.health]: 'Health only',
-  [LicenseMonitoringLevel.runs]: 'Health and run status',
-};
+import dayjs from '@/lib/dayjs';
+import { monitoringLevelLabels, monitoringStale } from '@/lib/license';
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -43,16 +39,18 @@ function formatReport(report: string): string {
 /**
  * Shows what this server reports to Dagu Console, when it last did, and the
  * last report itself, and lets an administrator change or stop it unless the
- * configuration fixes it.
+ * configuration fixes it. A server that stopped reporting is called out.
  */
 export function MonitoringSection({
   monitoring,
+  now,
   loadError,
   onRetry,
   onChoose,
   onTurnOff,
 }: {
   monitoring?: LicenseMonitoring;
+  now: number;
   loadError: boolean;
   onRetry: () => void;
   onChoose: () => void;
@@ -64,6 +62,7 @@ export function MonitoringSection({
   const [error, setError] = useState<string | null>(null);
   const reporting =
     monitoring !== undefined && monitoring.level !== LicenseMonitoringLevel.off;
+  const stale = monitoringStale(monitoring, now);
 
   async function turnOff() {
     setTurningOff(true);
@@ -86,21 +85,23 @@ export function MonitoringSection({
       className="card-obsidian p-4 space-y-3"
       aria-labelledby="license-monitoring"
     >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id="license-monitoring" className="text-sm font-medium">
-          {ts('Monitoring')}
-        </h2>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0 flex-1 space-y-1">
+          <h2 id="license-monitoring" className="text-sm font-medium">
+            {ts('Monitoring')}
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            {ts(
+              "Dagu Console shows this server's health on its Servers page. With run status, it also emails the workspace's owners and admins when a workflow fails."
+            )}
+          </p>
+        </div>
         {monitoring?.configured && (
           <span className="text-xs text-muted-foreground">
             {ts('Set in configuration')}
           </span>
         )}
       </div>
-      <p className="text-sm text-muted-foreground">
-        {ts(
-          "Dagu Console shows this server's health on its Servers page. With run status, it also emails the workspace's owners and admins when a workflow fails."
-        )}
-      </p>
       {loadError && !monitoring ? (
         <div
           role="status"
@@ -114,16 +115,71 @@ export function MonitoringSection({
       ) : (
         monitoring && (
           <>
-            <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-sm">
+            <dl className="grid grid-cols-[7.5rem_minmax(0,1fr)] items-center gap-x-4 gap-y-1.5 text-sm">
               <Row label={ts('Reports')}>
-                {ts(levelLabels[monitoring.level])}
+                <span className="flex flex-wrap items-center justify-between gap-2">
+                  {ts(monitoringLevelLabels[monitoring.level])}
+                  {!monitoring.configured && (
+                    <span className="flex flex-wrap items-center gap-2">
+                      {reporting ? (
+                        <>
+                          <Button
+                            size="xs"
+                            variant="outline"
+                            disabled={turningOff}
+                            onClick={onChoose}
+                          >
+                            {ts('Change')}
+                          </Button>
+                          <Button
+                            size="xs"
+                            variant="outline"
+                            disabled={turningOff}
+                            onClick={() => void turnOff()}
+                          >
+                            {ts(turningOff ? 'Turning off…' : 'Turn off')}
+                          </Button>
+                        </>
+                      ) : (
+                        <Button size="xs" variant="outline" onClick={onChoose}>
+                          {ts('Turn on')}
+                        </Button>
+                      )}
+                    </span>
+                  )}
+                </span>
               </Row>
-              {reporting && (
+              {(reporting || monitoring.lastReport) && (
                 <Row label={ts('Last report')}>
-                  <RelativeTime
-                    timestamp={monitoring.lastReportAt}
-                    fallback={ts('Not yet')}
-                  />
+                  <span className="flex flex-wrap items-center justify-between gap-2">
+                    {stale ? (
+                      <span className="inline-flex items-center gap-1.5 text-warning">
+                        <AlertTriangle
+                          className="h-3.5 w-3.5 shrink-0"
+                          aria-hidden="true"
+                        />
+                        {ts('Not reporting since {time}', {
+                          time: dayjs(monitoring.lastReportAt).format(
+                            'YYYY-MM-DD HH:mm'
+                          ),
+                        })}
+                      </span>
+                    ) : (
+                      <RelativeTime
+                        timestamp={monitoring.lastReportAt}
+                        fallback={ts('Not yet')}
+                      />
+                    )}
+                    {monitoring.lastReport && (
+                      <Button
+                        size="xs"
+                        variant="outline"
+                        onClick={() => setShowReport(true)}
+                      >
+                        {ts('View last report')}
+                      </Button>
+                    )}
+                  </span>
                 </Row>
               )}
             </dl>
@@ -140,42 +196,6 @@ export function MonitoringSection({
                 {error}
               </p>
             )}
-            <div className="flex flex-wrap items-center gap-2">
-              {!monitoring.configured &&
-                (reporting ? (
-                  <>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={turningOff}
-                      onClick={onChoose}
-                    >
-                      {ts('Change')}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={turningOff}
-                      onClick={() => void turnOff()}
-                    >
-                      {ts(turningOff ? 'Turning off…' : 'Turn off')}
-                    </Button>
-                  </>
-                ) : (
-                  <Button size="sm" onClick={onChoose}>
-                    {ts('Turn on')}
-                  </Button>
-                ))}
-              {monitoring.lastReport && (
-                <Button
-                  size="sm"
-                  variant="link"
-                  onClick={() => setShowReport(true)}
-                >
-                  {ts('View last report')}
-                </Button>
-              )}
-            </div>
           </>
         )
       )}

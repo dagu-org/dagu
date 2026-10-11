@@ -1,11 +1,24 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import { LicenseMonitoringLevel, type components } from '@/api/v1/schema';
 import type { LicenseStatus } from '@/contexts/ConfigContext';
+import type { StaticTranslationValues } from '@/i18n/staticMessages';
 import { LICENSE_CONSOLE_URL } from './constants';
 import dayjs from './dayjs';
 
+type LicenseMonitoring = components['schemas']['LicenseMonitoring'];
+
 export const TRIAL_WARNING_DAYS = 3;
+
+/** Days before a paid license expires when Dagu starts warning about it. */
+export const LICENSE_WARNING_DAYS = 30;
+
+/**
+ * How long a server set to report may go without a report before it counts
+ * as not reporting. Servers report about once a minute.
+ */
+export const MONITORING_STALE_MS = 10 * 60_000;
 
 export const licensedFeatures = [
   {
@@ -63,6 +76,82 @@ export function licensePlanName(license: LicenseStatus): string {
   const plan = license.plan.trim();
   if (plan === 'minimum' || plan === 'team') return 'Team';
   return plan ? plan.charAt(0).toUpperCase() + plan.slice(1) : 'Licensed';
+}
+
+/** What each monitoring level reports, as a short label. */
+export const monitoringLevelLabels: Record<LicenseMonitoringLevel, string> = {
+  [LicenseMonitoringLevel.off]: 'Off',
+  [LicenseMonitoringLevel.health]: 'Health only',
+  [LicenseMonitoringLevel.runs]: 'Health and run status',
+};
+
+/** Names the plan as a plan ("Team plan"), or "Community" without one. */
+export function licensePlanLabel(
+  license: LicenseStatus,
+  ts: (source: string, values?: StaticTranslationValues) => string
+): string {
+  const name = ts(licensePlanName(license));
+  return license.community ? name : ts('{plan} plan', { plan: name });
+}
+
+/** How a license status reads: in force, informational, or a problem. */
+export type LicenseTone = 'ok' | 'neutral' | 'warning' | 'error';
+
+/** A license status as a phrase to translate with its values. */
+export type LicenseStatusText = {
+  text: string;
+  values?: StaticTranslationValues;
+  tone: LicenseTone;
+};
+
+/**
+ * Describes where a license stands, most urgent condition first. A trial
+ * always shows when it expires; a paid license only within
+ * LICENSE_WARNING_DAYS. Expiry is a warning within TRIAL_WARNING_DAYS for a
+ * trial and LICENSE_WARNING_DAYS for a paid license, as in LicenseBanner.
+ */
+export function licenseStatus(
+  license: LicenseStatus,
+  now = Date.now()
+): LicenseStatusText {
+  if (license.error) return { text: 'License error', tone: 'error' };
+  if (license.warningCode) return { text: 'Needs attention', tone: 'warning' };
+  if (license.gracePeriod) return { text: 'Grace period', tone: 'warning' };
+  if (license.community) return { text: 'Community', tone: 'neutral' };
+  if (!license.valid) return { text: 'Expired', tone: 'error' };
+  const trial = license.plan === 'trial';
+  const warningDays = trial ? TRIAL_WARNING_DAYS : LICENSE_WARNING_DAYS;
+  const days = licenseDaysLeft(license.expiry, now);
+  if (days === undefined || (!trial && days > warningDays))
+    return { text: 'Active', tone: 'ok' };
+  return {
+    text:
+      days === 0
+        ? 'Expires today'
+        : days === 1
+          ? 'Expires in {count} day'
+          : 'Expires in {count} days',
+    values: { count: days },
+    tone: days <= warningDays ? 'warning' : 'neutral',
+  };
+}
+
+/**
+ * Reports whether a server set to report has sent nothing for longer than
+ * MONITORING_STALE_MS. A server that has not reported yet is not judged.
+ */
+export function monitoringStale(
+  monitoring: LicenseMonitoring | undefined,
+  now = Date.now()
+): boolean {
+  if (
+    !monitoring ||
+    monitoring.level === LicenseMonitoringLevel.off ||
+    !monitoring.lastReportAt
+  )
+    return false;
+  const last = dayjs(monitoring.lastReportAt);
+  return last.isValid() && now - last.valueOf() > MONITORING_STALE_MS;
 }
 
 export function licenseDaysLeft(
