@@ -206,8 +206,10 @@ func unwrapAnswer(values map[string]any, schema map[string]any, wrapped bool) (o
 	sources = map[string]string{}
 	properties := schemaProperties(schema)
 	for name, value := range values {
-		if _, bindable := bindableKind(properties[name]); wrapped && bindable {
-			inner, _ := value.(map[string]any)
+		// A bindable field's answer is {value, element} under the reading
+		// schema; a model that answered the plain value anyway still
+		// publishes, just without a source to bind.
+		if inner, ok := value.(map[string]any); wrapped && ok && hasBindableAnswer(properties[name], inner) {
 			out[name] = inner["value"]
 			scalars[name] = inner["value"]
 			source, _ := inner["element"].(string)
@@ -217,6 +219,17 @@ func unwrapAnswer(values map[string]any, schema map[string]any, wrapped bool) (o
 		out[name] = value
 	}
 	return out, scalars, sources
+}
+
+// hasBindableAnswer reports whether a bindable field's answer is the
+// {value, element} object the reading schema asked for.
+func hasBindableAnswer(property any, answer map[string]any) bool {
+	if _, bindable := bindableKind(property); !bindable {
+		return false
+	}
+	_, hasValue := answer["value"]
+	_, hasElement := answer["element"]
+	return hasValue && hasElement
 }
 
 // publishExtract writes an extract's values to the step outputs, keeping

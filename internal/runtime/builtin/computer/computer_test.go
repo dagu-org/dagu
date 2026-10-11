@@ -227,6 +227,21 @@ func TestExtractHealsAMissingBinding(t *testing.T) {
 	assert.Len(t, run.vision.requests, 1, "the model reread the extract")
 }
 
+// A model that answers the plain value, ignoring the reading schema's
+// {value, element} wrapper, still publishes; the field just does not bind.
+func TestExtractToleratesAPlainAnswer(t *testing.T) {
+	t.Parallel()
+
+	run := elementRun(t)
+	run.vision.extract = `{"amount": 42}`
+	published := run.execute(extractStep, nil)
+	require.NoError(t, published.err)
+	assert.EqualValues(t, 42, published.exec.GetOutputs()["amount"])
+
+	failed := run.execute(`{"ai": "never", "do": [{"extract": {"instruction": "The invoice amount", "schema": {"type": "object", "properties": {"amount": {"type": "number"}}}}}]}`, nil)
+	require.ErrorContains(t, failed.err, "there is no binding", "a plain answer binds nothing")
+}
+
 // A full-width value reads as the number a person sees.
 func TestExtractConvertsFullWidthValue(t *testing.T) {
 	t.Parallel()
