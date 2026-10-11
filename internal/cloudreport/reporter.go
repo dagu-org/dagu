@@ -1,8 +1,8 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Package cloudreport reports the health and DAG-run events of a server with
-// an online license to Dagu Console.
+// Package cloudreport reports the health and DAG runs of a server with an
+// online license to Dagu Console.
 package cloudreport
 
 import (
@@ -29,7 +29,7 @@ import (
 
 const (
 	reportPath      = "/api/v1/servers/report"
-	protocolVersion = 1
+	protocolVersion = 2
 
 	defaultInterval = time.Minute
 	minInterval     = 30 * time.Second
@@ -54,7 +54,7 @@ type Reporter struct {
 	credentials func() (license.CloudCredentials, bool)
 	registry    serviceregistry.ServiceRegistry
 	monitoring  *Monitoring
-	// events is nil when reports carry no events.
+	// events is nil when reports carry no runs.
 	events    *eventFeed
 	client    *http.Client
 	startedAt time.Time
@@ -80,7 +80,7 @@ type Reporter struct {
 	level config.ReportLevel
 	// levelWarned records that the level could not be read.
 	levelWarned bool
-	// noEventsLogged records that reports were said to carry no events.
+	// noEventsLogged records that reports were said to carry no runs.
 	noEventsLogged bool
 }
 
@@ -88,8 +88,10 @@ type Reporter struct {
 // Reports authenticate with what credentials returns and are skipped while it
 // returns false. Services are counted in registry; a nil registry leaves them
 // out of reports. Each report sends what the level in monitoring allows at the
-// time: nothing at off, health at health, and also the DAG-run events that
-// events configures at runs. Choosing off stops a report in flight.
+// time: nothing at off, health at health, and also the finished and
+// in-progress DAG runs that events configures at runs. Choosing off stops a
+// report in flight. Finished runs are sent even while Dagu Console pauses
+// storing them; monitoring shows until when.
 func Start(
 	ctx context.Context,
 	credentials func() (license.CloudCredentials, bool),
@@ -323,13 +325,14 @@ func (r *Reporter) report(ctx context.Context) time.Duration {
 		// A body that is not JSON asks for nothing.
 		_ = json.Unmarshal(res.body, &accepted)
 		r.interval = accepted.interval()
+		r.monitoring.recordPause(accepted.runsPausedUntil())
 		more := r.events.acknowledge(ctx, accepted.Ack)
 		if r.changed(outcome{kind: outcomeAccepted}) {
 			logger.Info(ctx, "Reporting server health to Dagu Console", tag.URL(creds.CloudURL))
 		}
 		if r.events == nil && level == config.ReportRuns && !r.noEventsLogged {
 			r.noEventsLogged = true
-			logger.Info(ctx, "Reports to Dagu Console carry no DAG-run events because the event store is disabled")
+			logger.Info(ctx, "Reports to Dagu Console carry no DAG runs because the event store is disabled")
 		}
 		if more {
 			return eventCheckInterval
@@ -364,6 +367,19 @@ type acceptance struct {
 	NextReportSeconds float64 `json:"next_report_seconds"`
 	// Ack is the cursor that Dagu Console stored.
 	Ack string `json:"ack"`
+	// RunsPausedUntil is when Dagu Console stores finished runs again after
+	// the workspace reached its daily limit; it is empty when not paused.
+	RunsPausedUntil string `json:"runs_paused_until"`
+}
+
+// runsPausedUntil returns when storing finished runs resumes, or zero when
+// it is not paused or the time is not RFC 3339.
+func (a acceptance) runsPausedUntil() time.Time {
+	t, err := time.Parse(time.RFC3339, a.RunsPausedUntil)
+	if err != nil {
+		return time.Time{}
+	}
+	return t
 }
 
 // interval returns the interval the response asks for, within
@@ -393,10 +409,14 @@ type reportRequest struct {
 	ServerID        string `json:"server_id"`
 	HeartbeatSecret string `json:"heartbeat_secret"`
 	Health          health `json:"health"`
-	// Events is set whenever Cursor is; it is empty when the report moves
-	// past events that reports leave out.
-	Events []reportEvent `json:"events,omitzero"`
-	// Cursor identifies the position after Events.
+	// Finished is set whenever Cursor is; it is empty when the report moves
+	// past events that end no run.
+	Finished []finishedRun `json:"finished,omitzero"`
+	// Active lists the runs in progress, newest first, and ActiveTotal
+	// counts them all. Both are left out while the runs are unknown.
+	Active      []activeRun `json:"active,omitzero"`
+	ActiveTotal *int        `json:"active_total,omitempty"`
+	// Cursor identifies the position after Finished.
 	Cursor string     `json:"cursor,omitempty"`
 	Gap    *reportGap `json:"gap,omitempty"`
 }

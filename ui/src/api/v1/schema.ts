@@ -6740,7 +6740,7 @@ export interface components {
             error?: string;
         };
         /**
-         * @description How much this server reports to Dagu Console: off sends nothing, health sends its version and which services run, and runs also sends DAG-run status changes
+         * @description How much this server reports to Dagu Console: off sends nothing, health sends its version and which services run, and runs also sends the status of finished DAG runs and the runs in progress
          * @enum {string}
          */
         LicenseMonitoringLevel: LicenseMonitoringLevel;
@@ -6757,6 +6757,11 @@ export interface components {
             lastReportAt?: string;
             /** @description JSON body of the last report, as sent, with heartbeat_secret replaced by "[redacted]" */
             lastReport?: string;
+            /**
+             * Format: date-time
+             * @description When Dagu Console stores this server's finished runs again, after its workspace reached the daily limit; absent when the last accepted report was not told of a pause
+             */
+            runsPausedUntil?: string;
         };
         /** @description Request body for changing password */
         ChangePasswordRequest: {

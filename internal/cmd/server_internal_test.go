@@ -11,6 +11,7 @@ import (
 	"github.com/dagucloud/dagu/v2/internal/cmn/config"
 	"github.com/dagucloud/dagu/v2/internal/eventstore"
 	"github.com/dagucloud/dagu/v2/internal/license"
+	"github.com/dagucloud/dagu/v2/internal/persis"
 	"github.com/stretchr/testify/require"
 )
 
@@ -65,17 +66,27 @@ func TestStartCloudReport(t *testing.T) {
 	})
 }
 
-// The event store is prepared unless configuration fixes a level below runs,
-// because an administrator can choose runs at any time.
+// The event store and the run history are prepared unless configuration
+// fixes a level below runs, because an administrator can choose runs at any
+// time.
 func TestCloudReportEvents(t *testing.T) {
+	runs := persis.NewDAGRunRepository(nil, nil, persis.DAGRunRepositoryOptions{})
 	newContext := func(report config.ReportLevel) *Context {
 		cfg := &config.Config{Cloud: config.CloudConfig{Report: report}}
 		cfg.Paths.DataDir = t.TempDir()
-		return &Context{Context: t.Context(), Config: cfg, event: eventstore.New(nil)}
+		return &Context{
+			Context:     t.Context(),
+			Config:      cfg,
+			event:       eventstore.New(nil),
+			Persistence: Persistence{DAGRunRepository: runs},
+		}
 	}
 
-	require.NotNil(t, cloudReportEvents(newContext(config.ReportRuns)).Reader)
-	require.NotNil(t, cloudReportEvents(newContext("")).Reader)
+	for _, level := range []config.ReportLevel{config.ReportRuns, ""} {
+		events := cloudReportEvents(newContext(level))
+		require.NotNil(t, events.Reader)
+		require.Equal(t, runs, events.Statuses)
+	}
 	require.Nil(t, cloudReportEvents(newContext(config.ReportHealth)).Reader)
 	require.Nil(t, cloudReportEvents(newContext(config.ReportOff)).Reader)
 }

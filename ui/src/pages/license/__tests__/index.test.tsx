@@ -25,6 +25,7 @@ import {
   LicenseStatusResponseConnectedVia,
 } from '@/api/v1/schema';
 import type { LicenseMonitoring } from '@/hooks/useLicenseMonitoring';
+import dayjs from '@/lib/dayjs';
 
 vi.mock('@/hooks/api', async () => {
   const { default: useSWR } = await import('swr');
@@ -925,7 +926,7 @@ describe('LicensePage', () => {
         chosen: true,
         noticeDismissed: false,
         lastReportAt: new Date().toISOString(),
-        lastReport: '{"protocol":1,"heartbeat_secret":"[redacted]"}',
+        lastReport: '{"protocol":2,"heartbeat_secret":"[redacted]"}',
       });
 
       const card = await findMonitoringCard();
@@ -969,7 +970,7 @@ describe('LicensePage', () => {
         'Sends the Dagu version, OS, architecture, process start time, and service counts: schedulers holding the scheduler lock, and registered coordinators.'
       );
       expect(runs).toHaveAccessibleDescription(
-        'Sends the health fields, plus each reportable status change of a top-level DAG run: event ID, type, DAG name, run ID, attempt ID, status, the event’s time, and the run’s queued, started, and finished times; on a finished run, up to 50 failed step names.'
+        'Sends the health fields, plus the status of each top-level DAG run that finishes, with its failed step names (up to 50) and how it was triggered, and the list of runs queued, running, or waiting. Each run is sent as its DAG name, run ID, attempt ID, status, trigger, and queued, started, and finished times. No parameters, logs, or outputs.'
       );
       expect(dialog).toHaveTextContent(
         'Never sent: logs, outputs, parameters, environment, step commands, DAG YAML, the values of workflow secrets, and error message text.'
@@ -1113,6 +1114,44 @@ describe('LicensePage', () => {
 
       expect(await within(card).findByText('9 minutes ago')).toBeVisible();
       expect(within(card).queryByText(/Not reporting/)).not.toBeInTheDocument();
+    });
+
+    it('says until when Dagu Console pauses storing finished runs', async () => {
+      const until = new Date(Date.now() + 3 * 60 * 60_000);
+      serveMonitoring({
+        level: LicenseMonitoringLevel.runs,
+        configured: false,
+        chosen: true,
+        noticeDismissed: false,
+        lastReportAt: new Date().toISOString(),
+        runsPausedUntil: until.toISOString(),
+      });
+      const card = await findMonitoringCard();
+
+      expect(
+        await within(card).findByText(
+          `Run history paused until ${dayjs(until).format('YYYY-MM-DD HH:mm')}`
+        )
+      ).toBeVisible();
+    });
+
+    it('does not mention a pause that has ended', async () => {
+      serveMonitoring({
+        level: LicenseMonitoringLevel.runs,
+        configured: false,
+        chosen: true,
+        noticeDismissed: false,
+        lastReportAt: new Date().toISOString(),
+        runsPausedUntil: new Date(Date.now() - 60_000).toISOString(),
+      });
+      const card = await findMonitoringCard();
+
+      expect(
+        await within(card).findByText('Health and run status')
+      ).toBeVisible();
+      expect(
+        within(card).queryByText(/Run history paused/)
+      ).not.toBeInTheDocument();
     });
 
     it('is not offered for a license that does not check in', () => {

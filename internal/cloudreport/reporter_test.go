@@ -56,7 +56,7 @@ func TestReportPayload(t *testing.T) {
 	assert.Equal(t, "application/json", report.header.Get("Content-Type"))
 	assert.Equal(t, "dagu-oss/"+config.Version, report.header.Get("User-Agent"))
 	assert.JSONEq(t, fmt.Sprintf(`{
-		"protocol": 1,
+		"protocol": 2,
 		"license_id": "lic-1",
 		"server_id": "srv-1",
 		"heartbeat_secret": "hb-secret",
@@ -314,8 +314,24 @@ func startReporter(ctx context.Context, t *testing.T, r *Reporter, random func()
 	return startReporterAt(ctx, t, r, random, testClockStart)
 }
 
-// startReporterAt is startReporter with a clock that starts at start.
+// startReporterAt is startReporter with a clock that starts at start. It
+// lists the runs in progress before the report loop goes on, so that tests
+// see them when they expect.
 func startReporterAt(ctx context.Context, t *testing.T, r *Reporter, random func() float64, start time.Time) *fakeClock {
+	t.Helper()
+	return startReporterSpawning(ctx, t, r, random, start, func(fn func()) { fn() })
+}
+
+// startReporterSpawning is startReporterAt with spawn running the listings of
+// runs in progress.
+func startReporterSpawning(
+	ctx context.Context,
+	t *testing.T,
+	r *Reporter,
+	random func() float64,
+	start time.Time,
+	spawn func(func()),
+) *fakeClock {
 	t.Helper()
 	clock := &fakeClock{t: t, waits: make(chan time.Duration, 16), fire: make(chan time.Time), at: start}
 	r.after = clock.after
@@ -323,6 +339,7 @@ func startReporterAt(ctx context.Context, t *testing.T, r *Reporter, random func
 	r.startedAt = testStartedAt
 	if r.events != nil {
 		r.events.now = clock.now
+		r.events.spawn = spawn
 	}
 	r.start(ctx)
 	t.Cleanup(r.Stop)

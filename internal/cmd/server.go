@@ -296,8 +296,9 @@ func startCloudReport(ctx *Context, monitoring *cloudreport.Monitoring) *cloudre
 // reporter's lease heartbeats: an event check followed by a report request.
 const cloudReportLeaseStaleThreshold = time.Minute
 
-// cloudReportEvents configures the DAG-run events that reports to Dagu Console
-// carry at the runs level. It configures none when cloud.report fixes a lower
+// cloudReportEvents configures the DAG runs that reports to Dagu Console carry
+// at the runs level: finished runs from the event store, and runs in progress
+// followed through it. It configures none when cloud.report fixes a lower
 // level, or while the event store is disabled.
 func cloudReportEvents(ctx *Context) cloudreport.Events {
 	report := ctx.Config.Cloud.Report
@@ -310,6 +311,7 @@ func cloudReportEvents(ctx *Context) cloudreport.Events {
 		RetentionDays: ctx.Config.EventStore.RetentionDays,
 		State:         filemonitor.NewStateStore(stateFile),
 		Lease:         filemonitor.NewLease(stateFile, &dirlock.LockOptions{StaleThreshold: cloudReportLeaseStaleThreshold}),
+		Statuses:      ctx.Persistence.DAGRunRepository,
 	}
 }
 

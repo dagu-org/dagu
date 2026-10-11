@@ -38,8 +38,9 @@ type Monitoring struct {
 	mu       sync.Mutex
 	onChange func(config.ReportLevel)
 
-	sentMu sync.Mutex
-	sent   *sentReport
+	sentMu      sync.Mutex
+	sent        *sentReport
+	pausedUntil time.Time
 }
 
 // Status describes what a server reports to Dagu Console.
@@ -59,6 +60,10 @@ type Status struct {
 	// LastReport is the JSON body of that report, with the heartbeat secret
 	// redacted.
 	LastReport []byte
+	// RunsPausedUntil is when Dagu Console stores this server's finished runs
+	// again, as the last accepted report was told, or zero when it was not
+	// paused.
+	RunsPausedUntil time.Time
 }
 
 // choice is what an administrator chose, as persisted.
@@ -95,6 +100,7 @@ func (m *Monitoring) Status(ctx context.Context) (Status, error) {
 
 	m.sentMu.Lock()
 	sent := m.sent
+	status.RunsPausedUntil = m.pausedUntil
 	m.sentMu.Unlock()
 	if sent != nil {
 		body, err := json.Marshal(sent.report)
@@ -166,6 +172,13 @@ func (m *Monitoring) recordSent(at time.Time, report reportRequest) {
 	m.sentMu.Lock()
 	defer m.sentMu.Unlock()
 	m.sent = &sentReport{at: at, report: report}
+}
+
+// recordPause keeps until as when Dagu Console stores finished runs again.
+func (m *Monitoring) recordPause(until time.Time) {
+	m.sentMu.Lock()
+	defer m.sentMu.Unlock()
+	m.pausedUntil = until
 }
 
 func (m *Monitoring) update(ctx context.Context, change func(*choice)) error {
