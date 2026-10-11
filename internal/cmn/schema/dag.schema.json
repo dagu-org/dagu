@@ -7935,6 +7935,70 @@
         }
       ]
     },
+    "computerPinnedStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "oneOf": [
+        { "required": ["click"] },
+        { "required": ["double_click"] },
+        { "required": ["right_click"] },
+        { "required": ["type"] },
+        { "required": ["key"] },
+        { "required": ["scroll"] },
+        { "required": ["wait"] }
+      ],
+      "properties": {
+        "click": { "$ref": "#/definitions/computerSelector" },
+        "double_click": { "$ref": "#/definitions/computerSelector" },
+        "right_click": { "$ref": "#/definitions/computerSelector" },
+        "type": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["into", "text"],
+          "properties": {
+            "into": { "$ref": "#/definitions/computerSelector" },
+            "text": { "type": "string" }
+          }
+        },
+        "key": { "type": "string", "minLength": 1, "description": "A key chord such as ctrl+s." },
+        "scroll": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["on", "dy"],
+          "properties": {
+            "on": { "$ref": "#/definitions/computerSelector" },
+            "dy": { "type": "integer" }
+          }
+        },
+        "wait": { "type": "string", "minLength": 1, "description": "A time to pause, such as 1s." }
+      },
+      "description": "One pinned step of an act: exactly one of click, double_click, right_click (a selector), type (into, text), key (a chord), scroll (on, dy), or wait."
+    },
+    "computerPinnedField": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "A pinned extract field: a selector for a scalar, or a container and columns for a table.",
+      "properties": {
+        "role": { "type": "string", "enum": ["button", "text_field", "text", "checkbox", "radio", "combo_box", "list_item", "menu_item", "tab", "link", "cell", "list", "group", "window", "other"] },
+        "name": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1 },
+        "app": { "type": "string", "minLength": 1 },
+        "window": { "type": "string", "minLength": 1 },
+        "in": { "$ref": "#/definitions/computerSelector" },
+        "near": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["label", "side"],
+          "properties": {
+            "label": { "type": "string", "minLength": 1 },
+            "side": { "type": "string", "enum": ["right", "below", "left", "above"] }
+          }
+        },
+        "nth": { "type": "integer", "minimum": 0 },
+        "container": { "$ref": "#/definitions/computerSelector" },
+        "columns": { "type": "object", "additionalProperties": { "type": "string", "minLength": 1 } }
+      }
+    },
     "computerSelector": {
       "type": "object",
       "additionalProperties": false,
@@ -8057,6 +8121,15 @@
                 "input": {
                   "$ref": "#/definitions/computerInput",
                   "description": "How a replay of this act reaches the application, in place of with.input."
+                },
+                "recorded": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "description": "Pinned steps, keyed by system (windows or macos). A device of that system runs them first, ahead of its own recording, so a learned act travels across devices.",
+                  "properties": {
+                    "windows": { "type": "array", "minItems": 1, "items": { "$ref": "#/definitions/computerPinnedStep" } },
+                    "macos": { "type": "array", "minItems": 1, "items": { "$ref": "#/definitions/computerPinnedStep" } }
+                  }
                 }
               }
             }
@@ -8078,7 +8151,16 @@
               "minimum": 1,
               "description": "Most rows this extract reads from a table, in place of with.max_rows."
             },
-            "schema": { "$ref": "#/definitions/extractSchema" }
+            "schema": { "$ref": "#/definitions/extractSchema" },
+            "fields": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "Pinned field bindings, keyed by system (windows or macos) then by output name, so a device reads them with no model even if it never learned them. A scalar field is a selector; a table field is a container selector and columns.",
+              "properties": {
+                "windows": { "type": "object", "additionalProperties": { "$ref": "#/definitions/computerPinnedField" } },
+                "macos": { "type": "object", "additionalProperties": { "$ref": "#/definitions/computerPinnedField" } }
+              }
+            }
           },
           "description": "Read structured data from the screen into step outputs."
         },

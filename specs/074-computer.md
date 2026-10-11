@@ -43,11 +43,13 @@ Each operation sets exactly one of:
   the step ends.
 - `act`: a task described in natural language. The value is an instruction
   string or an object with `instruction` and optional `ai`, `cache`,
-  `max_actions`, `find_within`, and `input`.
-- `extract`: `{instruction, schema}`, with optional `ai`. The schema must be
-  a JSON Schema with `type: object`. A successful extract binds each scalar
-  field to the element its value came from, so a later run reads it without
-  the model (see Extract binding).
+  `max_actions`, `find_within`, `input`, and `recorded` (pinned steps, see
+  Pinned steps).
+- `extract`: `{instruction, schema}`, with optional `ai`, `max_rows`, and
+  `fields` (pinned bindings, see Pinned steps). The schema must be a JSON
+  Schema with `type: object`. A successful extract binds each scalar field
+  to the element its value came from, so a later run reads it without the
+  model (see Extract binding).
 - `expect`: a statement about the screen that must hold; otherwise the step
   fails with the model's reason.
 - `wait`: a duration such as `2s`.
@@ -405,6 +407,39 @@ extract with the model again and rebinds. `never` reads the bindings alone
 and fails, naming the field, when one is missing. The timeline event's
 `via` is `element` when every field was read from its binding, `model` when
 the model read it.
+
+### Pinned steps
+
+A recording lives on the device that learned it. To run a step on every
+device of a system with no first-time learning, an act takes `recorded` and
+an extract takes `fields`, written into the step and keyed by system
+(`windows` or `macos`). A device whose system matches runs them ahead of its
+own recording; a block for another system is ignored. The system is the
+host's: Windows runs the `windows` block, macOS the `macos` block.
+
+`recorded` is a list of steps, each exactly one of: `click`, `double_click`,
+`right_click` (a selector); `type` (`{into, text}`, where `text` keeps its
+`%name%` placeholders); `key` (a chord such as `ctrl+s`); `scroll`
+(`{on, dy}`); or `wait` (a duration). Each pointer step clicks the centre of
+the element its selector names, found the same way a replay finds a recorded
+element, so the window is raised by the selector's `app` and `window` and the
+action waits up to `find_within`. Under `input: direct` a step drives the
+element's pattern. When every step runs, the act is a cache hit by element
+with no model; when a step misses, `on_miss` lets the model finish and
+record a fresh device recording (which a person reviews to update the pin),
+and `never` fails naming the step. A pinned act has no screen check of its
+own; the following `expect` is its gate.
+
+`fields` maps each output name to a selector for a scalar, or to
+`{container, columns}` for a table, where `columns` maps each item property
+to its column header. A device reads the pinned field with no model, taking
+each field's type from the extract schema, exactly as it reads a learned
+binding, and a field the device has learned itself is overridden by its pin.
+A field with no pin falls back to the device's own binding.
+
+Pins are kept per system because UI Automation and the macOS accessibility
+API expose an application differently, so a pin made on Windows serves
+Windows devices. Pins travel with the step; the device cache does not.
 
 ### Elements
 
