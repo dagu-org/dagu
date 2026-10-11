@@ -333,7 +333,10 @@ func actAlone(what string, fn func(*uiaWorker) error) error {
 	case err := <-result:
 		return err
 	case <-deadline.C:
-		return fmt.Errorf("%s: no answer within %s: %w", what, elementsTimeout, context.DeadlineExceeded)
+		// The call is abandoned, not stopped, so it may still be running
+		// or may already have taken effect, such as an Invoke whose handler
+		// opened a dialog.
+		return fmt.Errorf("%s: no answer within %s; the application may still be handling it: %w", what, elementsTimeout, context.DeadlineExceeded)
 	}
 }
 

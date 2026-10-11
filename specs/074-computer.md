@@ -305,9 +305,10 @@ recorded.
 reaches the application. `screen`, the default, sends the pointer and keys
 as the model did. `direct` has the element act itself through its
 automation pattern, which moves no pointer and needs no window in front: a
-plain click on a `button`, `menu_item`, or `link` invokes it, on a
-`checkbox` toggles it, on a `radio`, `list_item`, `tab`, or `cell` selects
-it, on a `combo_box` opens it, and on a `text_field` focuses it; a typing
+plain click on a `button`, `menu_item`, `link`, or a control of role
+`other` invokes it, on a `checkbox` toggles it, on a `radio`, `list_item`,
+`tab`, or `cell` selects it, on a `combo_box` opens it, and on a
+`text_field` focuses it; a typing
 sets the field's value at once when the recording proved it could, which is
 when the field showed the typed text once the model had typed it, so an
 append to existing text, a text with a line break, or a field that
