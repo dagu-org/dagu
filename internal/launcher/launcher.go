@@ -183,7 +183,7 @@ func (b *SubCmdBuilder) Start(dag *ir.DAG, opts StartOptions) CmdSpec {
 	return CmdSpec{
 		Executable:      b.executable,
 		Args:            args,
-		Input:           opts.Params,
+		Params:          opts.Params,
 		Env:             b.parentEnv(definitionIDEnv(opts.DefinitionID)...),
 		BuildEnv:        append([]string{}, dag.Env...),
 		RuntimeResolved: dag.RuntimeResolved,
@@ -235,7 +235,7 @@ func (b *SubCmdBuilder) Enqueue(dag *ir.DAG, opts EnqueueOptions) CmdSpec {
 	return CmdSpec{
 		Executable:      b.executable,
 		Args:            args,
-		Input:           opts.Params,
+		Params:          opts.Params,
 		Env:             b.filteredEnv(definitionIDEnv(opts.DefinitionID)...),
 		BuildEnv:        append([]string{}, dag.Env...),
 		RuntimeResolved: dag.RuntimeResolved,
@@ -327,14 +327,16 @@ func (b *SubCmdBuilder) Retry(dag *ir.DAG, opts RetryOptions) CmdSpec {
 	return spec
 }
 
+// MaxParamsSize is the most bytes of params a started or enqueued run takes.
+const MaxParamsSize = 1 << 20
+
 // CmdSpec describes a command to be executed with all its configuration.
 type CmdSpec struct {
 	Executable string
 	Args       []string
-	// Input is written to the command's standard input. Params travel here
-	// rather than in Args, so their size is not bound by the platform's
-	// command-line limit.
-	Input           string
+	// Params are the run's params, passed on the command's standard input
+	// so their size is not bound by the platform's command-line limit.
+	Params          string
 	Env             []string
 	BuildEnv        []string
 	RuntimeResolved bool
@@ -516,8 +518,8 @@ func newCommand(ctx context.Context, spec CmdSpec, withContext bool) (*exec.Cmd,
 	}
 
 	cmdutil.SetupCommand(cmd)
-	if spec.Input != "" {
-		cmd.Stdin = strings.NewReader(spec.Input)
+	if spec.Params != "" {
+		cmd.Stdin = strings.NewReader(spec.Params)
 	}
 	var env []string
 	if spec.Env != nil {

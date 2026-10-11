@@ -403,7 +403,7 @@ func TestStart(t *testing.T) {
 
 		assert.Contains(t, spec.Args, "--params-stdin")
 		assert.NotContains(t, spec.Args, "key=value")
-		assert.Equal(t, "key=value", spec.Input)
+		assert.Equal(t, "key=value", spec.Params)
 	})
 
 	t.Run("StartWithQuiet", func(t *testing.T) {
@@ -447,7 +447,7 @@ func TestStart(t *testing.T) {
 
 		assert.Contains(t, spec.Args, "start")
 		assert.Contains(t, spec.Args, "--params-stdin")
-		assert.Equal(t, "env=prod", spec.Input)
+		assert.Equal(t, "env=prod", spec.Params)
 		assert.Contains(t, spec.Args, "-q")
 		assert.Contains(t, spec.Args, "--run-id=full-test-id")
 		assert.Contains(t, spec.Args, "--trigger-actor=alice")
@@ -511,7 +511,7 @@ func TestEnqueue(t *testing.T) {
 
 		assert.Contains(t, spec.Args, "--params-stdin")
 		assert.NotContains(t, spec.Args, "key=value")
-		assert.Equal(t, "key=value", spec.Input)
+		assert.Equal(t, "key=value", spec.Params)
 	})
 
 	t.Run("EnqueueWithQuiet", func(t *testing.T) {
@@ -559,7 +559,7 @@ func TestEnqueue(t *testing.T) {
 
 		assert.Contains(t, spec.Args, "enqueue")
 		assert.Contains(t, spec.Args, "--params-stdin")
-		assert.Equal(t, "env=staging", spec.Input)
+		assert.Equal(t, "env=staging", spec.Params)
 		assert.Contains(t, spec.Args, "-q")
 		assert.Contains(t, spec.Args, "--run-id=full-enqueue-id")
 		assert.Contains(t, spec.Args, "--queue")
