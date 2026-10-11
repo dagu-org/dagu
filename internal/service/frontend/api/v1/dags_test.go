@@ -17,6 +17,7 @@ import (
 	"github.com/dagucloud/dagu/v2/api/v1"
 	"github.com/dagucloud/dagu/v2/internal/cmn/config"
 	"github.com/dagucloud/dagu/v2/internal/ir"
+	"github.com/dagucloud/dagu/v2/internal/launcher"
 	persisfile "github.com/dagucloud/dagu/v2/internal/persis/file"
 	"github.com/dagucloud/dagu/v2/internal/runtime"
 	"github.com/dagucloud/dagu/v2/internal/schedulerstate"
@@ -696,6 +697,35 @@ steps:
 			return details.DagRunDetails.Labels != nil
 		}, 5*time.Second, 250*time.Millisecond)
 		assert.ElementsMatch(t, labels, *details.DagRunDetails.Labels)
+
+		_ = server.Client().Delete("/api/v1/dags/" + dagName).ExpectStatus(http.StatusNoContent).Send(t)
+	})
+
+	t.Run("StartAndEnqueueRefuseParamsOverTheLimit", func(t *testing.T) {
+		spec := `
+params:
+  - PAYLOAD: ""
+steps:
+  - name: echo
+    run: echo "test"
+`
+		dagName := "test_oversized_params_dag"
+
+		_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
+			Name: dagName,
+			Spec: &spec,
+		}).ExpectStatus(http.StatusCreated).Send(t)
+
+		params := fmt.Sprintf(`{"PAYLOAD":%q}`, strings.Repeat("x", launcher.MaxParamsSize))
+		for _, path := range []string{"/start", "/enqueue"} {
+			resp := server.Client().Post("/api/v1/dags/"+dagName+path, api.ExecuteDAGJSONRequestBody{
+				Params: &params,
+			}).ExpectStatus(http.StatusBadRequest).Send(t)
+
+			var errResp api.Error
+			resp.Unmarshal(t, &errResp)
+			require.Contains(t, errResp.Message, "params exceed", path)
+		}
 
 		_ = server.Client().Delete("/api/v1/dags/" + dagName).ExpectStatus(http.StatusNoContent).Send(t)
 	})

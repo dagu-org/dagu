@@ -270,6 +270,31 @@ func platformTestDuration(nonWindows, windows time.Duration) time.Duration {
 	return nonWindows
 }
 
+func TestRunEnqueueWithBuiltExecutableTakesParamsLargerThanACommandLine(t *testing.T) {
+	th := test.Setup(t, test.WithBuiltExecutable())
+
+	dagFile := th.DAG(t, `name: built-exec-enqueue-large-params
+params:
+  - PAYLOAD: ""
+steps:
+  - name: step1
+    run: echo enqueued
+`)
+
+	// Larger than one Linux argument or a whole Windows command line.
+	payload := strings.Repeat("x", 200*1024)
+	spec := th.SubCmdBuilder.Enqueue(dagFile.DAG, launcher.EnqueueOptions{
+		Params:   fmt.Sprintf(`{"PAYLOAD":%q}`, payload),
+		DAGRunID: "built-exec-enqueue-large-params-run",
+	})
+	require.NoError(t, launcher.Run(th.Context, spec))
+
+	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dagFile.DAG)
+	require.NoError(t, err)
+	require.Equal(t, "built-exec-enqueue-large-params-run", status.DAGRunID)
+	require.Contains(t, status.ParamsList, "PAYLOAD="+payload)
+}
+
 func TestRunStartWithBuiltExecutablePreservesExplicitEnv(t *testing.T) {
 	th := test.Setup(t, test.WithBuiltExecutable())
 	t.Setenv("SUBCMD_START_EXPLICIT_ENV", "from-host")
@@ -376,8 +401,9 @@ func TestStart(t *testing.T) {
 		}
 		spec := builder.Start(dag, opts)
 
-		assert.Contains(t, spec.Args, "-p")
-		assert.Contains(t, spec.Args, `"key=value"`)
+		assert.Contains(t, spec.Args, "--params-stdin")
+		assert.NotContains(t, spec.Args, "key=value")
+		assert.Equal(t, "key=value", spec.Params)
 	})
 
 	t.Run("StartWithQuiet", func(t *testing.T) {
@@ -420,8 +446,8 @@ func TestStart(t *testing.T) {
 		spec := builder.Start(dag, opts)
 
 		assert.Contains(t, spec.Args, "start")
-		assert.Contains(t, spec.Args, "-p")
-		assert.Contains(t, spec.Args, `"env=prod"`)
+		assert.Contains(t, spec.Args, "--params-stdin")
+		assert.Equal(t, "env=prod", spec.Params)
 		assert.Contains(t, spec.Args, "-q")
 		assert.Contains(t, spec.Args, "--run-id=full-test-id")
 		assert.Contains(t, spec.Args, "--trigger-actor=alice")
@@ -483,8 +509,9 @@ func TestEnqueue(t *testing.T) {
 		}
 		spec := builder.Enqueue(dag, opts)
 
-		assert.Contains(t, spec.Args, "-p")
-		assert.Contains(t, spec.Args, `"key=value"`)
+		assert.Contains(t, spec.Args, "--params-stdin")
+		assert.NotContains(t, spec.Args, "key=value")
+		assert.Equal(t, "key=value", spec.Params)
 	})
 
 	t.Run("EnqueueWithQuiet", func(t *testing.T) {
@@ -531,8 +558,8 @@ func TestEnqueue(t *testing.T) {
 		spec := builder.Enqueue(dag, opts)
 
 		assert.Contains(t, spec.Args, "enqueue")
-		assert.Contains(t, spec.Args, "-p")
-		assert.Contains(t, spec.Args, `"env=staging"`)
+		assert.Contains(t, spec.Args, "--params-stdin")
+		assert.Equal(t, "env=staging", spec.Params)
 		assert.Contains(t, spec.Args, "-q")
 		assert.Contains(t, spec.Args, "--run-id=full-enqueue-id")
 		assert.Contains(t, spec.Args, "--queue")

@@ -1613,6 +1613,9 @@ func (a *API) startPreparedDAGRunWithOptions(
 	if opts.triggerType != ir.TriggerTypeUnknown {
 		triggerTypeStr = opts.triggerType.String()
 	}
+	if err := launchParamsError(dispatchParams); err != nil {
+		return nil, err
+	}
 	target := opts.target
 	fromRunID := opts.fromRunID
 	if fromRunID != "" && dispatchParams != "" && len(dag.YamlData) > 0 {
@@ -1652,6 +1655,18 @@ func (a *API) startPreparedDAGRunWithOptions(
 	}
 
 	return started, a.waitForLocalDAGStart(ctx, dag, opts.dagRunID, started, timeout)
+}
+
+// launchParamsError refuses params larger than a launched run takes.
+func launchParamsError(params string) error {
+	if len(params) <= launcher.MaxParamsSize {
+		return nil
+	}
+	return &Error{
+		HTTPStatus: http.StatusBadRequest,
+		Code:       api.ErrorCodeBadRequest,
+		Message:    fmt.Sprintf("params exceed the %d byte limit", launcher.MaxParamsSize),
+	}
 }
 
 func buildRequiresLocalAPIError() *Error {
@@ -1779,6 +1794,9 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 }
 
 func (a *API) enqueueDAGRun(ctx context.Context, dag *ir.DAG, params, dagRunID, nameOverride string, triggerType ir.TriggerType, labels, profileName string, noReuse bool, definitionID string) error {
+	if err := launchParamsError(params); err != nil {
+		return err
+	}
 	resolvedDAG, err := spec.ResolveRuntimeParams(ctx, dag, params, spec.ResolveRuntimeParamsOptions{
 		BaseConfig: a.config.Paths.BaseConfig,
 	})
