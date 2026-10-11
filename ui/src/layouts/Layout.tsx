@@ -257,8 +257,13 @@ function Content({ navbarColor, children }: LayoutProps) {
         <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <ContentNavigation pathname={location.pathname} />
           <UpdateBanner />
-          <LicenseBanner />
-          <MonitoringNotice />
+          {/* The license page states these itself, with their actions. */}
+          {location.pathname !== '/license' && (
+            <>
+              <LicenseBanner />
+              <MonitoringNotice />
+            </>
+          )}
           <SchedulerPauseBanner />
           <div className="min-h-0 flex-1 overflow-auto p-4 md:p-6 w-full">
             {children}

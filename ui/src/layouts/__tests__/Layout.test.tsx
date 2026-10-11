@@ -19,11 +19,11 @@ import Layout from '../Layout';
 vi.mock('@/components/LicenseBadge', () => ({ LicenseBadge: () => null }));
 
 vi.mock('@/components/LicenseBanner', () => ({
-  LicenseBanner: () => null,
+  LicenseBanner: () => <div data-testid="license-banner" />,
 }));
 
 vi.mock('@/components/MonitoringNotice', () => ({
-  MonitoringNotice: () => null,
+  MonitoringNotice: () => <div data-testid="monitoring-notice" />,
 }));
 
 vi.mock('@/components/UpdateBanner', () => ({
@@ -166,5 +166,16 @@ describe('Layout', () => {
     expect(
       within(breadcrumbs).getByRole('link', { name: 'DAG 运行' })
     ).toBeVisible();
+  });
+
+  it('leaves license and monitoring notices to the license page', () => {
+    const { unmount } = renderLayout('/home');
+    expect(screen.getByTestId('license-banner')).toBeInTheDocument();
+    expect(screen.getByTestId('monitoring-notice')).toBeInTheDocument();
+    unmount();
+
+    renderLayout('/license');
+    expect(screen.queryByTestId('license-banner')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('monitoring-notice')).not.toBeInTheDocument();
   });
 });
