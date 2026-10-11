@@ -653,7 +653,12 @@ func TestReportActiveFollowsEvents(t *testing.T) {
 	dir.emit(eventstore.TypeDAGRunWaiting, etlRun(ir.Waiting))
 	assert.Equal(t, []string{"attempt-1 waiting"}, statuses())
 	dir.emit(eventstore.TypeDAGRunFailed, etlRun(ir.Failed))
-	assert.Nil(t, statuses())
+	// An empty list is sent as an empty list, not left out, so Dagu Console
+	// clears the runs it showed instead of keeping them as unknown.
+	ended := decodeActive(t, nextReport(t, clock, console))
+	assert.JSONEq(t, `[]`, string(ended.Active))
+	require.NotNil(t, ended.Total)
+	assert.Zero(t, *ended.Total)
 
 	retry := etlRun(ir.Running)
 	retry.AttemptID = "attempt-2"
