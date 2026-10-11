@@ -358,7 +358,7 @@ func (r *run) replayExtract(ctx context.Context, index int, spec extractSpec, ke
 		}
 		return false, nil
 	}
-	// A field that cannot bind, such as an object or a boolean, needs the
+	// A field that cannot bind, a plain object or a free array, needs the
 	// model, so a schema with one never reads from bindings alone. Never
 	// refuses such a schema at validation, so this only defers on_miss.
 	if modelOnly := unbindableFields(spec.Schema); len(modelOnly) > 0 {
@@ -373,7 +373,7 @@ func (r *run) replayExtract(ctx context.Context, index int, spec extractSpec, ke
 		logAction(r.timeline, index, "extract reread: "+reason)
 		return false, nil
 	}
-	values, reason, err := r.readBinding(ctx, index, els, entry, findWithin)
+	values, reason, err := r.readBinding(ctx, index, els, entry, findWithin, r.cfg.maxRows(spec))
 	if err != nil {
 		return true, err
 	}

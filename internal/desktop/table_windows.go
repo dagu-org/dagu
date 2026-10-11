@@ -124,12 +124,14 @@ func (e *uiaElements) Rows(ctx context.Context, container Selector, columns []st
 	default:
 	}
 	return readAlone(ctx, "rows", func(w *uiaWorker) ([][]string, error) {
-		return w.readRows(container, columns, maxRows)
+		return w.readRows(ctx, container, columns, maxRows)
 	})
 }
 
-// readRows resolves the container in the front window and reads its cells.
-func (w *uiaWorker) readRows(container Selector, columns []string, maxRows int) ([][]string, error) {
+// readRows resolves the container in the front window and reads its cells,
+// stopping if ctx ends so an abandoned read does not keep calling the
+// application.
+func (w *uiaWorker) readRows(ctx context.Context, container Selector, columns []string, maxRows int) ([][]string, error) {
 	top, err := w.frontWindow()
 	if err != nil {
 		return nil, err
@@ -166,6 +168,9 @@ func (w *uiaWorker) readRows(container Selector, columns []string, maxRows int) 
 	}
 	out := make([][]string, 0, min(rows, maxRows))
 	for r := 0; r < rows && r < maxRows; r++ {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		row := make([]string, len(indexes))
 		for i, column := range indexes {
 			cell, err := grid.gridItem(r, column)

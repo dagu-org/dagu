@@ -81,7 +81,6 @@ type tableBinding struct {
 	App       string           `json:"app,omitempty"`
 	Window    string           `json:"window,omitempty"`
 	Columns   []columnBinding  `json:"columns"`
-	MaxRows   int              `json:"maxRows"`
 }
 
 // columnBinding maps an item property to the column header it reads from

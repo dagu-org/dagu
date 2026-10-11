@@ -403,10 +403,14 @@ func (r *run) bindTable(ctx context.Context, name string, columns map[string]wor
 	if err != nil || !tableReproduces(read, modelRows, props, columns) {
 		return fieldBinding{}, nil, false
 	}
+	values, err := rowsToValues(read, props, columns)
+	if err != nil {
+		return fieldBinding{}, nil, false
+	}
 	binding := fieldBinding{Name: name, Kind: "table", Table: &tableBinding{
-		Container: container, App: front.App, Window: front.Window, Columns: cols, MaxRows: maxRows,
+		Container: container, App: front.App, Window: front.Window, Columns: cols,
 	}}
-	return binding, rowsToValues(read, props, columns), true
+	return binding, values, true
 }
 
 // selectorFromAnswer builds a selector from the model's container object.
@@ -446,31 +450,33 @@ func tableReproduces(read [][]string, modelRows []any, props []string, columns m
 }
 
 // rowsToValues converts a table read into step-output rows: one object per
-// row, each property converted to its column's type.
-func rowsToValues(read [][]string, props []string, columns map[string]workbook.ColumnType) []any {
+// row, each property converted to its column's type. A cell that does not
+// convert is an error, as a scalar field's would be, so a wrong-typed value
+// is a miss, not published raw.
+func rowsToValues(read [][]string, props []string, columns map[string]workbook.ColumnType) ([]any, error) {
 	out := make([]any, 0, len(read))
-	for _, row := range read {
+	for i, row := range read {
 		object := make(map[string]any, len(props))
 		for j, prop := range props {
 			value, err := convertField(row[j], columns[prop])
 			if err != nil {
-				value = row[j]
+				return nil, fmt.Errorf("row %d column %q reads %q, which is not %s", i+1, prop, row[j], columns[prop])
 			}
 			object[prop] = value
 		}
 		out = append(out, object)
 	}
-	return out
+	return out, nil
 }
 
 // readBinding reads every bound field from the screen now, converting each
 // to its type. It returns the values, or the reason a field could not be
 // read, looking again until findWithin passes.
-func (r *run) readBinding(ctx context.Context, index int, els desktop.Elements, entry recording, findWithin time.Duration) (map[string]any, string, error) {
+func (r *run) readBinding(ctx context.Context, index int, els desktop.Elements, entry recording, findWithin time.Duration, maxRows int) (map[string]any, string, error) {
 	values := make(map[string]any, len(entry.Fields))
 	for _, field := range entry.Fields {
 		if field.Table != nil {
-			rows, reason, err := r.readTable(ctx, els, field)
+			rows, reason, err := r.readTable(ctx, els, field, maxRows)
 			if err != nil || reason != "" {
 				return nil, reason, err
 			}
@@ -498,9 +504,10 @@ func (r *run) readBinding(ctx context.Context, index int, els desktop.Elements, 
 }
 
 // readTable reads a bound table's rows, after the recorded application is
-// in front. A container that is gone, a column header that moved away, or
-// an unreadable cell is a miss.
-func (r *run) readTable(ctx context.Context, els desktop.Elements, field fieldBinding) ([]any, string, error) {
+// in front, up to the current max rows so a changed setting takes effect. A
+// container that is gone, a column header that moved away, or a cell that
+// does not convert is a miss.
+func (r *run) readTable(ctx context.Context, els desktop.Elements, field fieldBinding, maxRows int) ([]any, string, error) {
 	tbl := field.Table
 	front, err := els.FrontWindow()
 	if err != nil {
@@ -521,14 +528,18 @@ func (r *run) readTable(ctx context.Context, els desktop.Elements, field fieldBi
 		}
 		columns[column.Property] = kind
 	}
-	read, err := els.Rows(ctx, substituteSelector(tbl.Container, r.variables), headers, tbl.MaxRows)
+	read, err := els.Rows(ctx, substituteSelector(tbl.Container, r.variables), headers, maxRows)
 	switch {
 	case errors.Is(err, desktop.ErrNotFound):
 		return nil, fmt.Sprintf("table %q cannot be read: %s", field.Name, err.Error()), nil
 	case err != nil:
 		return nil, "", err
 	}
-	return rowsToValues(read, props, columns), "", nil
+	values, err := rowsToValues(read, props, columns)
+	if err != nil {
+		return nil, fmt.Sprintf("table %q cannot be read: %s", field.Name, err.Error()), nil
+	}
+	return values, "", nil
 }
 
 // boundNames lists the fields a recording binds, sorted.
