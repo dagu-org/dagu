@@ -382,39 +382,85 @@ func actionableRole(role string) bool {
 	return false
 }
 
-// resolveElements turns each click aimed at an element id into a click at
-// the element's centre. An id the latest observation did not offer fails
-// that action and skips the rest, so the model is told and can look again.
-func (l *actLoop) resolveElements(turn *computeruse.Turn) []computeruse.Result {
-	unknown := -1
-	for i := range turn.Actions {
-		a := &turn.Actions[i]
-		if a.ElementID == "" {
-			continue
-		}
-		e, ok := l.choices[a.ElementID]
-		if !ok {
-			unknown = i
-			break
-		}
-		centre := image.Pt((e.Bounds.Min.X+e.Bounds.Max.X)/2, (e.Bounds.Min.Y+e.Bounds.Max.Y)/2)
-		point := l.seen.toModel(centre)
-		a.Point = &point
-		logAction(l.r.timeline, l.index, fmt.Sprintf("element %s is %s %q", a.ElementID, e.Role, e.Name))
-		a.ElementID = ""
+// elementCentre is the centre of an element's bounds, in display pixels.
+func elementCentre(e desktop.Element) image.Point {
+	return image.Pt((e.Bounds.Min.X+e.Bounds.Max.X)/2, (e.Bounds.Min.Y+e.Bounds.Max.Y)/2)
+}
+
+// describeElement names an element for the step log.
+func describeElement(e desktop.Element) string {
+	return fmt.Sprintf("%s %q", e.Role, e.Name)
+}
+
+// elementAction names how a click on an element of a role is best carried
+// out: an invokable control performs its pattern itself, which works wherever
+// the window is and does not depend on a pixel; a text field takes the
+// keyboard focus. It mirrors the role mapping a replay uses under input:
+// direct. Anything else, such as a double or modified click, has no pattern
+// and runs on the screen.
+func elementAction(action computeruse.Action, role string) (pattern desktop.Pattern, focus bool, ok bool) {
+	if !plainClick(action) {
+		return "", false, false
 	}
-	if unknown < 0 {
-		return nil
+	switch role {
+	case desktop.RoleButton, desktop.RoleMenuItem, desktop.RoleLink, desktop.RoleOther:
+		return desktop.PatternInvoke, false, true
+	case desktop.RoleCheckbox:
+		return desktop.PatternToggle, false, true
+	case desktop.RoleRadio, desktop.RoleListItem, desktop.RoleTab, desktop.RoleCell:
+		return desktop.PatternSelect, false, true
+	case desktop.RoleComboBox:
+		return desktop.PatternExpand, false, true
+	case desktop.RoleTextField:
+		return "", true, true
 	}
-	results := make([]computeruse.Result, len(turn.Actions))
-	for i := range turn.Actions {
-		if i == unknown {
-			results[i] = computeruse.Result{CallID: turn.Actions[i].CallID, Error: fmt.Sprintf("no element %q is on the screen now; look at the latest list and choose one of its ids", turn.Actions[i].ElementID)}
-		} else {
-			results[i] = computeruse.Result{CallID: turn.Actions[i].CallID, Skipped: true}
+	return "", false, false
+}
+
+// invokeElement carries out a click the model aimed at an element through the
+// element itself, rather than a click at a pixel the window may have moved
+// away from or another window may now cover. It reports done=false when the
+// host reads no elements or the element offers no pattern for the action, so
+// the caller clicks the element's position on the screen instead.
+func (l *actLoop) invokeElement(ctx context.Context, els desktop.Elements, action computeruse.Action, e desktop.Element) (done bool, rec *recordedAction, result computeruse.Result) {
+	if els == nil {
+		return false, nil, computeruse.Result{}
+	}
+	pattern, focus, ok := elementAction(action, e.Role)
+	if !ok {
+		return false, nil, computeruse.Result{}
+	}
+	result = computeruse.Result{CallID: action.CallID}
+	if focus {
+		if err := els.Focus(e); err != nil {
+			result.Error = l.r.masker.MaskString(err.Error())
+			return true, nil, result
+		}
+		logAction(l.r.timeline, l.index, "focus "+describeElement(e))
+	} else {
+		switch err := els.Apply(e, pattern, ""); {
+		case err == nil:
+			logAction(l.r.timeline, l.index, string(pattern)+" "+describeElement(e))
+		case errors.Is(err, desktop.ErrNoPattern):
+			return false, nil, computeruse.Result{}
+		default:
+			result.Error = l.r.masker.MaskString(err.Error())
+			return true, nil, result
 		}
 	}
-	return results
+	l.touched = true
+	recorded := l.recordInvoked(action, e)
+	return true, &recorded, result
+}
+
+// recordInvoked records an element the model invoked as the click it asked
+// for, landing at the element's centre, so a later run can replay it by the
+// element or, on a host without one, by that pixel.
+func (l *actLoop) recordInvoked(action computeruse.Action, e desktop.Element) recordedAction {
+	centre := elementCentre(e)
+	display := computeruse.Action{Kind: computeruse.KindClick, Count: action.Count, Button: action.Button, Point: &computeruse.Point{X: centre.X, Y: centre.Y}}
+	element := l.r.recordElement(e, &centre, l.r.driver.WindowAt(centre).App)
+	return recordAction(display, l.seen.full, element)
 }
 
 // reconcile waits for a person using the desktop to pause, then reports
@@ -542,14 +588,50 @@ func describeRound(actions []computeruse.Action) string {
 
 // apply performs a turn's actions and records the ones that completed.
 func (l *actLoop) apply(ctx context.Context, turn *computeruse.Turn) []computeruse.Result {
-	if early := l.resolveElements(turn); early != nil {
-		l.touched = true
-		l.outcome.actions += len(turn.Actions)
-		return early
-	}
-	results, recorded := l.r.perform(ctx, l.index, turn.Actions, l.seen, l.limit)
 	l.touched = l.touched || len(turn.Actions) > 0
 	l.outcome.actions += len(turn.Actions)
+	els, _ := l.r.elementsIfAvailable()
+	results := make([]computeruse.Result, len(turn.Actions))
+	var recorded []recordedAction
+	failed := false
+	for i := range turn.Actions {
+		action := turn.Actions[i]
+		if failed {
+			results[i] = computeruse.Result{CallID: action.CallID, Skipped: true}
+			continue
+		}
+		var rec *recordedAction
+		if action.ElementID != "" {
+			e, ok := l.choices[action.ElementID]
+			if !ok {
+				results[i] = computeruse.Result{CallID: action.CallID, Error: fmt.Sprintf("no element %q is on the screen now; look at the latest list and choose one of its ids", action.ElementID)}
+				failed = true
+				continue
+			}
+			logAction(l.r.timeline, l.index, fmt.Sprintf("element %s is %s %q", action.ElementID, e.Role, e.Name))
+			if invoked, invokedRec, invokedResult := l.invokeElement(ctx, els, action, e); invoked {
+				results[i], rec = invokedResult, invokedRec
+				if invokedResult.Failed() {
+					logAction(l.r.timeline, l.index, "  failed: "+invokedResult.Error)
+					failed = true
+					continue
+				}
+				recorded = appendRecorded(recorded, rec)
+				continue
+			}
+			// No pattern, or a host without elements: click the element's
+			// position on the screen instead.
+			point := l.seen.toModel(elementCentre(e))
+			action.Point = &point
+			action.ElementID = ""
+		}
+		results[i], rec = l.r.performOne(ctx, l.index, action, l.seen, l.limit)
+		if results[i].Failed() {
+			failed = true
+			continue
+		}
+		recorded = appendRecorded(recorded, rec)
+	}
 	if len(recorded) > 0 {
 		l.outcome.recording.Turns = append(l.outcome.recording.Turns, recordedTurn{
 			Screen:    desktop.FingerprintOf(l.seen.full),
@@ -563,6 +645,14 @@ func (l *actLoop) apply(ctx context.Context, turn *computeruse.Turn) []computeru
 		}
 	}
 	return results
+}
+
+// appendRecorded adds a recorded action when the action produced one.
+func appendRecorded(recorded []recordedAction, rec *recordedAction) []recordedAction {
+	if rec != nil {
+		recorded = append(recorded, *rec)
+	}
+	return recorded
 }
 
 // finish ends the act with the model's report.

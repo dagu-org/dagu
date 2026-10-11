@@ -1963,8 +1963,9 @@ func TestOpenDesktopFailure(t *testing.T) {
 	require.ErrorContains(t, err, "open the desktop: Screen Recording permission is missing")
 }
 
-// The model may click an element the observation lists by id, which the
-// executor finds exactly and clicks at its centre, instead of a pixel.
+// The model may click an element the observation lists by id. A button is
+// invoked through the element itself, which works wherever the window is and
+// does not depend on a pixel another window might cover.
 func TestModelActsOnElementById(t *testing.T) {
 	t.Parallel()
 
@@ -1981,6 +1982,47 @@ func TestModelActsOnElementById(t *testing.T) {
 	require.NotEmpty(t, session.observations)
 	assert.Contains(t, session.observations[0].Elements, computeruse.Element{ID: "e1", Role: desktop.RoleButton, Name: "保存"},
 		"the observation offers the button as an element")
+	assert.Equal(t, []string{"invoke saveButton"}, run.backend.inputs(), "the button is invoked, not clicked at a pixel")
+}
+
+// A click the model aims at a text field element gives it the keyboard focus
+// through the element itself, so the typing that follows reaches it even if
+// the field moved since the screenshot.
+func TestModelFocusesFieldElement(t *testing.T) {
+	t.Parallel()
+
+	run := newTestRun(t)
+	run.elements = newFakeElements()
+	// Give the amount field a name so the observation offers it; it is then
+	// e1, before the two 保存 buttons.
+	run.elements.elements[2].Name = "金額"
+	session := &scriptedSession{turns: []*computeruse.Turn{
+		actions(computeruse.Action{CallID: "x", Kind: computeruse.KindClick, ElementID: "e1"}),
+		done("Focused the field"),
+	}}
+	run.sessions = []*scriptedSession{session}
+	execution := run.execute(`{"idle": "0", "do": [{"act": "Click the amount field"}]}`, nil)
+	require.NoError(t, execution.err)
+
+	assert.Equal(t, []string{"focus amountBox"}, run.backend.inputs(), "the field takes the focus, no pixel click")
+}
+
+// An element that offers no pattern for the click, such as a custom control,
+// falls back to a click at its position on the screen.
+func TestModelElementFallsBackToClick(t *testing.T) {
+	t.Parallel()
+
+	run := newTestRun(t)
+	run.elements = newFakeElements()
+	run.elements.withoutPattern("saveButton")
+	session := &scriptedSession{turns: []*computeruse.Turn{
+		actions(computeruse.Action{CallID: "x", Kind: computeruse.KindClick, ElementID: "e1"}),
+		done("Clicked save"),
+	}}
+	run.sessions = []*scriptedSession{session}
+	execution := run.execute(`{"idle": "0", "do": [{"act": "Save the form"}]}`, nil)
+	require.NoError(t, execution.err)
+
 	// e1 is the 保存 button at (190,180)-(280,208); its centre is 235,194.
 	assert.Equal(t, []string{"move 235,194", "left down #1"}, run.backend.inputs())
 }
