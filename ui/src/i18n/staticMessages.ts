@@ -2427,6 +2427,7 @@ const english = {
   "Deactivation failed": "Deactivation failed",
   "Plan": "Plan",
   "Expires": "Expires",
+  "License deactivated. Running in community mode.": "License deactivated. Running in community mode.",
 } as const;
 
 export type StaticMessage = keyof typeof english;
@@ -4796,6 +4797,7 @@ const chinese = {
   "Deactivation failed": "停用失败",
   "Plan": "套餐",
   "Expires": "到期日",
+  "License deactivated. Running in community mode.": "许可证已停用。正在以社区版模式运行。",
 } as const satisfies Record<StaticMessage, string>;
 
 const japanese = {
@@ -7247,6 +7249,7 @@ const japanese = {
   "Deactivation failed": "無効化に失敗しました",
   "Plan": "プラン",
   "Expires": "有効期限",
+  "License deactivated. Running in community mode.": "ライセンスを無効化しました。コミュニティモードで動作しています。",
 } as const satisfies Record<StaticMessage, string>;
 
 export const staticMessages = {
