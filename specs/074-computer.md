@@ -415,7 +415,11 @@ device of a system with no first-time learning, an act takes `recorded` and
 an extract takes `fields`, written into the step and keyed by system
 (`windows` or `macos`). A device whose system matches runs them ahead of its
 own recording; a block for another system is ignored. The system is the
-host's: Windows runs the `windows` block, macOS the `macos` block.
+host's: Windows runs the `windows` block, macOS the `macos` block. A `macos`
+pin is accepted now but runs only once the macOS element reader lands (phase
+8); until then a Mac host reads no elements, so a `macos` pin misses rather
+than failing, and `on_miss` hands the act to the model while `never` reports
+the miss. A Windows host that cannot open UI Automation behaves the same.
 
 `recorded` is a list of steps, each exactly one of: `click`, `double_click`,
 `right_click` (a selector); `type` (`{into, text}`, where `text` keeps its

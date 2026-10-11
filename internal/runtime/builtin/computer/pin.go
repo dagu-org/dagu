@@ -117,6 +117,30 @@ func (s pinnedStep) validate() error {
 	return nil
 }
 
+// references returns the variable placeholders a pinned step's texts use:
+// the selector names and labels and a typed text. They are checked like the
+// instruction's, so a typo or a reference to a skipped ask is caught.
+func (s pinnedStep) references() []string {
+	var texts []string
+	for _, sel := range []*desktop.Selector{s.Click, s.DoubleClick, s.RightClick} {
+		if sel != nil {
+			texts = append(texts, selectorTexts(*sel)...)
+		}
+	}
+	if s.Type != nil {
+		texts = append(texts, s.Type.Text)
+		texts = append(texts, selectorTexts(s.Type.Into)...)
+	}
+	if s.Scroll != nil {
+		texts = append(texts, selectorTexts(s.Scroll.On)...)
+	}
+	var names []string
+	for _, text := range texts {
+		names = append(names, agentstep.VariableReferences(text)...)
+	}
+	return names
+}
+
 // validate checks a pinned field's selector or container.
 func (f pinnedField) validate() error {
 	if f.Container != nil {
@@ -149,9 +173,11 @@ func validateRecorded(recorded map[string][]pinnedStep) error {
 	return nil
 }
 
-// validateFields checks an extract's pinned fields: a known system and each
-// field's selector valid.
-func validateFields(fields map[string]map[string]pinnedField) error {
+// validateFields checks an extract's pinned fields: a known system, each
+// field's selector valid, and each field readable as the schema types it, so
+// a pin that cannot bind fails at load rather than silently at replay.
+func validateFields(fields map[string]map[string]pinnedField, schema map[string]any) error {
+	properties := schemaProperties(schema)
 	for system, byName := range fields {
 		if !validSystem(system) {
 			return fmt.Errorf("fields has an unknown system %q; use windows or macos", system)
@@ -159,6 +185,28 @@ func validateFields(fields map[string]map[string]pinnedField) error {
 		for name, field := range byName {
 			if err := field.validate(); err != nil {
 				return fmt.Errorf("fields.%s.%s: %w", system, name, err)
+			}
+			property, ok := properties[name]
+			if !ok {
+				return fmt.Errorf("fields.%s.%s is not a property of the extract schema", system, name)
+			}
+			if field.Container != nil {
+				columns, ok := tableColumns(property)
+				if !ok {
+					return fmt.Errorf("fields.%s.%s pins a container, but %s is not an array of objects with scalar properties", system, name, name)
+				}
+				if len(field.Columns) == 0 {
+					return fmt.Errorf("fields.%s.%s pins a container but names no columns", system, name)
+				}
+				for column := range field.Columns {
+					if _, ok := columns[column]; !ok {
+						return fmt.Errorf("fields.%s.%s column %q is not a property of %s's items", system, name, column, name)
+					}
+				}
+				continue
+			}
+			if _, ok := bindableKind(property); !ok {
+				return fmt.Errorf("fields.%s.%s cannot read %s from an element; its type is not a string, number, integer, or boolean", system, name, name)
 			}
 		}
 	}
@@ -202,9 +250,12 @@ func ptr[T any](v T) *T { return new(v) }
 // replay a learned recording uses. It returns whether every step ran, how
 // many ran, and the reason one missed.
 func (r *run) replayPinned(ctx context.Context, index int, steps []pinnedStep, direct bool, findWithin time.Duration) (done bool, performed int, reason string, err error) {
-	els, err := r.elementsReader()
+	els, err := r.elementsIfAvailable()
 	if err != nil {
-		return false, 0, "", err
+		// A pin replays only by element; a host that reads none, macOS
+		// until phase 8 or a 32-bit Windows, misses rather than failing, so
+		// on_miss hands the act to the model and never reports the miss.
+		return false, 0, fmt.Sprintf("pinned steps need the window's elements, which this host cannot read: %v", err), nil
 	}
 	total := len(steps)
 	var outcome replayOutcome
@@ -219,6 +270,12 @@ func (r *run) replayPinned(ctx context.Context, index int, steps []pinnedStep, d
 		rec, ok := step.recordedAction()
 		if !ok {
 			return false, performed, "", fmt.Errorf("a pinned step sets no action")
+		}
+		// Wait until nobody has touched the desktop for the idle window, as a
+		// learned replay and the model loop do, so a pinned click or text
+		// never lands in a person's window.
+		if err := r.awaitPerson(ctx); err != nil {
+			return false, performed, "", err
 		}
 		turn := recordedTurn{Actions: []recordedAction{rec}}
 		reason, err := r.replayByElement(ctx, index, i, total, turn, els, findWithin, direct, &outcome)

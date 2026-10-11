@@ -874,6 +874,49 @@ func TestPinnedExtractReads(t *testing.T) {
 	assert.Empty(t, run.vision.requests, "no model request")
 }
 
+// A host that reads no elements, macOS until phase 8 or a 32-bit Windows,
+// misses a pinned act rather than failing it: under never it reports the miss
+// naming the cause, so on_miss can still hand the act to the model.
+func TestPinnedActMissesWithoutElements(t *testing.T) {
+	t.Parallel()
+
+	const steps = `{"ai": "never", "do": [{"act": {"instruction": "Save the invoice", "recorded": {"windows": [{"click": {"role": "button", "name": "保存", "id": "saveButton"}}]}}}]}`
+	run := newTestRun(t) // no elements reader on this host
+	failed := run.execute(steps, nil)
+	require.ErrorContains(t, failed.err, "pinned steps need the window's elements")
+	assert.Equal(t, agentstep.ViaElement, operationEvents(failed.exec.GetAgentSession())[0].Via)
+}
+
+// Under on_miss, a pinned act on a host that reads no elements hands off to
+// the model rather than failing.
+func TestPinnedActWithoutElementsHealsUnderOnMiss(t *testing.T) {
+	t.Parallel()
+
+	const steps = `{"do": [{"act": {"instruction": "Save the invoice", "recorded": {"windows": [{"click": {"role": "button", "name": "保存", "id": "saveButton"}}]}}}]}`
+	run := newTestRun(t)
+	run.sessions = []*scriptedSession{{turns: []*computeruse.Turn{actions(clickAt(1, 1)), done("Saved")}}}
+	healed := run.execute(steps, nil)
+	require.NoError(t, healed.err)
+	assert.Equal(t, agentstep.StatusHealed, operationEvents(healed.exec.GetAgentSession())[0].Status)
+}
+
+// A pinned act waits until nobody has used the desktop for the idle window
+// before each input, as a learned replay does, so its click never lands in a
+// person's window.
+func TestPinnedActWaitsForIdleDesktop(t *testing.T) {
+	t.Parallel()
+
+	const steps = `{"ai": "never", "idle": "100ms", "do": [{"act": {"instruction": "Save the invoice", "recorded": {"windows": [{"click": {"role": "button", "name": "保存", "id": "saveButton"}}]}}}]}`
+	run := elementRun(t)
+	run.backend.personKeepsUsing(2)
+	replayed := run.execute(steps, nil)
+	require.NoError(t, replayed.err)
+	session := replayed.exec.GetAgentSession()
+	assert.Contains(t, strings.Join(lifecycleMessages(session), "\n"), "Waiting until nobody has used the desktop for 100ms")
+	assert.Equal(t, []string{waitReasonPerson}, waitReasons(session))
+	assert.Equal(t, []string{"move 235,194", "left down #1"}, run.backend.inputs(), "the pinned click lands once the person stops")
+}
+
 func elementRun(t *testing.T) *testRun {
 	t.Helper()
 	run := newTestRun(t)

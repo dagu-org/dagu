@@ -331,18 +331,22 @@ func (r *run) extract(ctx context.Context, index int, spec extractSpec, timeout 
 	// system ahead of this device's own binding.
 	pins := pinnedBindings(spec, r.system)
 	if choice != aiEveryRun {
-		entry, ok := r.cache.Lookup(key)
-		if ok && entry.Version != recordingVersion {
+		device, ok := r.cache.Lookup(key)
+		if ok && device.Version != recordingVersion {
 			r.cache.Drop(key)
-			entry, ok = recording{}, false
+			device, ok = recording{}, false
 		}
-		entry.Fields = mergeFields(entry.Fields, pins)
+		// entry reads from the device's own bindings overlaid with the pins;
+		// device keeps only what this host learned, so a pin is never written
+		// into the device cache and a pin later removed stops overriding it.
+		entry := device
+		entry.Fields = mergeFields(device.Fields, pins)
 		if len(entry.Fields) == 0 {
 			if choice == aiNever {
 				return extractMiss{err: errors.New("there is no binding of it on this host"), via: agentstep.ViaScreen}
 			}
 		} else {
-			done, err := r.replayExtract(ctx, index, spec, key, entry, findWithin, choice, began, ok)
+			done, err := r.replayExtract(ctx, index, spec, key, entry, device, findWithin, choice, began, ok)
 			if done || err != nil {
 				return err
 			}
@@ -355,7 +359,7 @@ func (r *run) extract(ctx context.Context, index int, spec extractSpec, timeout 
 // replayExtract reads an extract from its bindings. It returns done when the
 // read published every field; otherwise, under never it fails, and under
 // on_miss it returns not done so the model reruns and rebinds.
-func (r *run) replayExtract(ctx context.Context, index int, spec extractSpec, key string, entry recording, findWithin time.Duration, choice string, began time.Time, fromDevice bool) (bool, error) {
+func (r *run) replayExtract(ctx context.Context, index int, spec extractSpec, key string, entry, device recording, findWithin time.Duration, choice string, began time.Time, fromDevice bool) (bool, error) {
 	els, err := r.elementsReader()
 	if err != nil {
 		if choice == aiNever {
@@ -391,10 +395,11 @@ func (r *run) replayExtract(ctx context.Context, index int, spec extractSpec, ke
 	}
 	r.publishExtract(spec.Schema, values)
 	// Only a recording that came from this device is restaged to upgrade its
-	// position; authored pins are not written into the device cache.
-	if fromDevice && entry.Op != index {
-		entry.Op = index
-		r.cache.Stage(key, entry)
+	// position; the device recording carries no pins, so staging it never
+	// writes authored pins into the device cache.
+	if fromDevice && device.Op != index {
+		device.Op = index
+		r.cache.Stage(key, device)
 	}
 	r.report(ctx, agentstep.Report{
 		Index: index, Kind: opExtract, Subject: spec.Instruction, Status: agentstep.StatusCacheHit, Via: agentstep.ViaElement,

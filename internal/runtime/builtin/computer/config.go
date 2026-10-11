@@ -490,7 +490,13 @@ func (c config) validate() error {
 		}
 		references := map[string][]string{}
 		if op.Act != nil {
-			references[opAct] = agentstep.VariableReferences(op.Act.Instruction)
+			names := agentstep.VariableReferences(op.Act.Instruction)
+			for _, steps := range op.Act.Recorded {
+				for _, step := range steps {
+					names = append(names, step.references()...)
+				}
+			}
+			references[opAct] = names
 		}
 		if op.When != nil {
 			references["when"] = op.When.references()
@@ -589,7 +595,7 @@ func (o operation) validate() error {
 		if o.Extract.Schema["type"] != "object" {
 			return errors.New(`extract schema must have type: object`)
 		}
-		if err := validateFields(o.Extract.Fields); err != nil {
+		if err := validateFields(o.Extract.Fields, o.Extract.Schema); err != nil {
 			return fmt.Errorf("extract: %w", err)
 		}
 	case o.Expect != nil:
@@ -764,31 +770,19 @@ func nearSchema() *jsonschema.Schema {
 }
 
 func selectorSchema() *jsonschema.Schema {
-	roles := make([]any, 0, len(desktop.Roles))
-	for _, role := range desktop.Roles {
-		roles = append(roles, role)
-	}
 	return &jsonschema.Schema{
 		Type:                 "object",
 		AdditionalProperties: agentstep.NoExtraProperties(),
 		Required:             []string{"role"},
 		Properties: map[string]*jsonschema.Schema{
-			"role":   {Type: "string", Enum: roles},
+			"role":   {Type: "string", Enum: roleValues()},
 			"name":   agentstep.NonEmptyString(),
 			"id":     agentstep.NonEmptyString(),
 			"app":    agentstep.NonEmptyString(),
 			"window": agentstep.NonEmptyString(),
 			"in":     {Ref: "#/$defs/selector"},
-			"near": {
-				Type:                 "object",
-				AdditionalProperties: agentstep.NoExtraProperties(),
-				Required:             []string{"label", "side"},
-				Properties: map[string]*jsonschema.Schema{
-					"label": agentstep.NonEmptyString(),
-					"side":  {Type: "string", Enum: []any{desktop.SideRight, desktop.SideBelow, desktop.SideLeft, desktop.SideAbove}},
-				},
-			},
-			"nth": {Type: "integer", Minimum: new(0.0)},
+			"near":   nearSchema(),
+			"nth":    {Type: "integer", Minimum: new(0.0)},
 		},
 		AnyOf: []*jsonschema.Schema{
 			{Required: []string{"name"}},

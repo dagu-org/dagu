@@ -86,6 +86,15 @@ func (r *run) act(ctx context.Context, index int, spec actSpec, timeout time.Dur
 	if choice != aiEveryRun {
 		if steps := spec.Recorded[r.system]; len(steps) > 0 {
 			pinned = true
+			// A pinned step's placeholders, like the instruction's, must
+			// have a value; a missing one means its ask was skipped.
+			for _, step := range steps {
+				for _, name := range step.references() {
+					if _, ok := r.variables[name]; !ok {
+						return fmt.Errorf("a pinned step uses %%%s%%, but the ask that sets it did not run", name)
+					}
+				}
+			}
 			findWithin, err := r.cfg.findWithin(spec, r.exec.findWithin)
 			if err != nil {
 				return err
