@@ -44,7 +44,7 @@ export default function LicensePage() {
   const remoteNode = selectedRemoteNode || 'local';
   const client = useClient();
   const { ts } = useI18n();
-  const { hash } = useLocation();
+  const { hash, key: locationKey } = useLocation();
   const [key, setKey] = useState('');
   const [keyOpen, setKeyOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<
@@ -77,12 +77,13 @@ export default function LicensePage() {
     setTitle(ts('Plan & features'));
   }, [setTitle, ts]);
 
-  // A link to #activate opens the key form, which takes focus, in view.
+  // Each visit to #activate, even a repeated one, opens the key form, which
+  // takes focus, in view.
   useEffect(() => {
     if (hash !== '#activate') return;
     setKeyOpen(true);
     document.getElementById('activate')?.scrollIntoView({ block: 'start' });
-  }, [hash]);
+  }, [hash, locationKey]);
 
   useEffect(() => {
     if (!granted) return;

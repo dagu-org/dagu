@@ -19,7 +19,7 @@ import {
 import { useClient } from '@/hooks/api';
 import { LicenseProvider } from '@/components/LicenseProvider';
 import { SWRConfig } from 'swr';
-import { MemoryRouter } from 'react-router-dom';
+import { Link, MemoryRouter } from 'react-router-dom';
 import {
   LicenseMonitoringLevel,
   LicenseStatusResponseConnectedVia,
@@ -110,7 +110,12 @@ function renderPage(
   {
     path = '/license',
     authMode = 'builtin',
-  }: { path?: string; authMode?: Config['authMode'] } = {}
+    children,
+  }: {
+    path?: string;
+    authMode?: Config['authMode'];
+    children?: React.ReactNode;
+  } = {}
 ) {
   return render(
     <MemoryRouter initialEntries={[path]}>
@@ -134,6 +139,7 @@ function renderPage(
               initialLicense={makeConfig(licenseOverrides).license}
             >
               <LicensePage />
+              {children}
             </LicenseProvider>
           </AppBarContext.Provider>
         </ConfigContext.Provider>
@@ -1383,6 +1389,24 @@ describe('LicensePage', () => {
       renderPage({ valid: false, community: true, plan: '', features: [] });
 
       expect(await openKeyForm('Use a license key')).toBeVisible();
+    });
+
+    it('opens again from a repeated link to #activate', async () => {
+      renderPage(
+        { valid: false, community: true, plan: '', features: [] },
+        {
+          path: '/license#activate',
+          children: <Link to="/license#activate">Activate a key</Link>,
+        }
+      );
+      await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      expect(screen.queryByLabelText('License key')).not.toBeInTheDocument();
+
+      await userEvent.click(
+        screen.getByRole('link', { name: 'Activate a key' })
+      );
+
+      expect(screen.getByLabelText('License key')).toHaveFocus();
     });
 
     it('opens from a link to #activate', () => {
