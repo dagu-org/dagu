@@ -389,13 +389,20 @@ func newWorker() (*uiaWorker, error) {
 }
 
 // newActor creates the client a pattern call uses: the newer one, which
-// bounds how long an application may hold a call, when the system has it.
+// bounds how long an application may hold a call. Without that bound a call
+// to an application that hangs never returns, so actAlone's deadline frees
+// the caller while the locked thread and its COM apartment stay alive. When
+// the bound is unavailable, the pattern is reported as unoffered so the
+// action falls back to the screen instead.
 func newActor() (*uiaWorker, error) {
 	obj, err := coCreateInstance(&clsidCUIAutomation8, &iidIUIAutomation2)
 	if err != nil {
-		return newWorker()
+		return nil, ErrNoPattern
 	}
-	_ = check("put_TransactionTimeout", obj.call(uia2PutTransactionTimeout, uintptr(transactionTimeout/time.Millisecond)))
+	if err := check("put_TransactionTimeout", obj.call(uia2PutTransactionTimeout, uintptr(transactionTimeout/time.Millisecond))); err != nil {
+		obj.release()
+		return nil, ErrNoPattern
+	}
 	return setUp(obj)
 }
 
