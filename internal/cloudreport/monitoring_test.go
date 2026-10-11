@@ -161,9 +161,10 @@ func TestLastReportOnlyWhenAccepted(t *testing.T) {
 }
 
 // The reporter follows the level an administrator chooses. Off sends
-// nothing. Health sends no events and leaves the events lease to others.
-// Runs sends the events that occur once it is chosen, never those from
-// before, even after a period below runs. Off again stops at once.
+// nothing. Health sends no runs and leaves the events lease to others. Runs
+// sends the runs in progress and those that finish once it is chosen, never
+// those that finished before, even after a period below runs. Off again
+// stops at once.
 func TestReportFollowsLevel(t *testing.T) {
 	t.Parallel()
 
@@ -182,33 +183,36 @@ func TestReportFollowsLevel(t *testing.T) {
 	assertLeaseFree(t, dir)
 
 	require.NoError(t, m.SetLevel(t.Context(), config.ReportHealth))
+	dir.emit(eventstore.TypeDAGRunRunning, run("etl", "run-2", ir.Running))
+	dir.statuses.set(run("etl", "run-2", ir.Running))
 	health, passed := clock.nextReport(console)
 	assert.Equal(t, defaultInterval, passed)
 	assert.Equal(t, config.Version, decodeReport(t, health).Health.Version)
-	assert.Equal(t, eventReport{}, decodeEvents(t, health))
+	assertNoRuns(t, health)
 	assertLeaseFree(t, dir)
 
 	require.NoError(t, m.SetLevel(t.Context(), config.ReportRuns))
-	assert.Equal(t, eventReport{}, decodeEvents(t, nextReport(t, clock, console)),
-		"events from before runs was chosen are left out")
+	chosen := nextReport(t, clock, console)
+	assert.Equal(t, finishedReport{}, decodeFinished(t, chosen), "runs that finished before runs was chosen are left out")
+	assert.Equal(t, []string{"run-2"}, decodeActive(t, chosen).ids(t))
 	failed := etlRun(ir.Failed)
 	failed.AttemptID = "attempt-2"
-	failedID := dir.emit(eventstore.TypeDAGRunFailed, failed)
+	dir.emit(eventstore.TypeDAGRunFailed, failed)
 	runs, passed := clock.nextReport(console)
 	assert.Equal(t, eventCheckInterval, passed)
-	assert.Equal(t, []string{failedID}, decodeEvents(t, runs).ids(t))
+	assert.Equal(t, []string{"run-1"}, decodeFinished(t, runs).ids(t))
 	assertLeaseHeld(t, dir)
 
 	require.NoError(t, m.SetLevel(t.Context(), config.ReportHealth))
 	skipped := etlRun(ir.Failed)
 	skipped.AttemptID = "attempt-3"
 	dir.emit(eventstore.TypeDAGRunFailed, skipped)
-	assert.Equal(t, eventReport{}, decodeEvents(t, nextReport(t, clock, console)))
+	assertNoRuns(t, nextReport(t, clock, console))
 	assertLeaseFree(t, dir)
 
 	require.NoError(t, m.SetLevel(t.Context(), config.ReportRuns))
-	assert.Equal(t, eventReport{}, decodeEvents(t, nextReport(t, clock, console)),
-		"events that occurred at health are left out")
+	assert.Equal(t, finishedReport{}, decodeFinished(t, nextReport(t, clock, console)),
+		"runs that finished at health are left out")
 
 	require.NoError(t, m.SetLevel(t.Context(), config.ReportOff))
 	dir.emit(eventstore.TypeDAGRunAborted, etlRun(ir.Aborted))
@@ -312,6 +316,13 @@ func assertNoReport(t *testing.T, console *fakeConsole) {
 		t.Fatalf("console received a report: %s", report.body)
 	default:
 	}
+}
+
+// assertNoRuns checks that report says nothing about runs.
+func assertNoRuns(t *testing.T, report receivedReport) {
+	t.Helper()
+	assert.Equal(t, finishedReport{}, decodeFinished(t, report))
+	assert.Equal(t, inProgress{}, decodeActive(t, report))
 }
 
 func assertLeaseFree(t *testing.T, dir *eventDir) {

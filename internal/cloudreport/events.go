@@ -20,29 +20,31 @@ import (
 	"github.com/dagucloud/dagu/v2/internal/cmn/stringutil"
 	"github.com/dagucloud/dagu/v2/internal/eventstore"
 	"github.com/dagucloud/dagu/v2/internal/ir"
+	"github.com/dagucloud/dagu/v2/internal/persis"
 )
 
 const (
 	// eventCheckInterval is how often the event store is checked for events
 	// that call for an early report.
 	eventCheckInterval = 5 * time.Second
-	maxReportEvents    = 500
-	// maxReportEventBytes bounds the encoded events of one report, leaving
-	// room for the rest of it under the 1 MiB that Dagu Console accepts.
-	maxReportEventBytes = 512 << 10
-	maxFailedSteps      = 50
+	maxFinishedRuns    = 500
+	// maxFinishedBytes bounds the encoded finished runs of one report. With
+	// at most maxActiveRuns runs in progress, about 250 KiB, the report
+	// stays under the 1 MiB that Dagu Console accepts.
+	maxFinishedBytes = 512 << 10
+	maxFailedSteps   = 50
 	// maxStepNameBytes is the longest failed step name Dagu Console keeps.
 	maxStepNameBytes = 512
-	// maxNameBytes and maxIDBytes are the longest DAG name and run or event
-	// ID Dagu Console keeps; it leaves out an event with a longer one. With
-	// them, an event encodes to about 28 KiB at most, and about 160 KiB even
-	// if JSON escapes every byte: always inside a batch.
+	// maxNameBytes and maxIDBytes are the longest DAG name and run or
+	// attempt ID Dagu Console keeps; reports leave out a run with a longer
+	// one. With them, a finished run encodes to about 28 KiB at most, and
+	// about 160 KiB even if JSON escapes every byte: always inside a batch.
 	maxNameBytes = 512
 	maxIDBytes   = 256
 	// caughtUpSaveInterval is how often an idle reporter records that it has
 	// seen every event, so that a restart does not take idleness for a gap.
 	caughtUpSaveInterval = time.Hour
-	eventStateVersion    = 1
+	eventStateVersion    = 2
 )
 
 const (
@@ -51,6 +53,7 @@ const (
 	warnStateUnreadable = "Unreadable Dagu Console report state; reporting DAG-run events from the newest one"
 	warnLease           = "Failed to take the lease to report DAG-run events to Dagu Console"
 	warnLeaseLost       = "Lost the lease to report DAG-run events to Dagu Console"
+	warnActive          = "Failed to list the DAG runs in progress; reports to Dagu Console leave them out until listing succeeds"
 )
 
 // Events configures the DAG-run events that reports carry.
@@ -65,6 +68,10 @@ type Events struct {
 	// Lease lets one process at a time report the events of a shared data
 	// directory.
 	Lease Lease
+	// Statuses lists the runs in progress when they are not known from the
+	// events: when the reporter starts without a saved list of them, and
+	// after events were lost. It must be set when Reader is.
+	Statuses RunStatuses
 }
 
 // StateStore persists encoded reporter state.
@@ -83,37 +90,36 @@ type Lease interface {
 }
 
 type eventTraits struct {
-	// terminal events end a DAG-run attempt and name its failed steps.
-	terminal bool
+	// finished events end a DAG-run attempt.
+	finished bool
 	// urgent events are reported early.
 	urgent bool
 }
 
-// reportedEventTypes lists the event types that reports carry.
+// reportedEventTypes lists the event types that change what reports carry.
 var reportedEventTypes = map[eventstore.EventType]eventTraits{
 	eventstore.TypeDAGRunQueued:             {},
 	eventstore.TypeDAGRunRunning:            {},
-	eventstore.TypeDAGRunWaiting:            {urgent: true},
-	eventstore.TypeDAGRunSucceeded:          {terminal: true},
-	eventstore.TypeDAGRunPartiallySucceeded: {terminal: true},
-	eventstore.TypeDAGRunFailed:             {terminal: true, urgent: true},
-	eventstore.TypeDAGRunAborted:            {terminal: true, urgent: true},
-	eventstore.TypeDAGRunRejected:           {terminal: true, urgent: true},
+	eventstore.TypeDAGRunWaiting:            {},
+	eventstore.TypeDAGRunSucceeded:          {finished: true},
+	eventstore.TypeDAGRunPartiallySucceeded: {finished: true},
+	eventstore.TypeDAGRunFailed:             {finished: true, urgent: true},
+	eventstore.TypeDAGRunAborted:            {finished: true, urgent: true},
+	eventstore.TypeDAGRunRejected:           {finished: true, urgent: true},
 }
 
-// reportEvent is a DAG-run status change in a report.
-type reportEvent struct {
-	ID          string   `json:"id"`
-	Type        string   `json:"type"`
-	DAGName     string   `json:"dag_name"`
-	DAGRunID    string   `json:"dag_run_id"`
-	AttemptID   string   `json:"attempt_id"`
-	Status      string   `json:"status"`
-	OccurredAt  string   `json:"occurred_at"`
-	QueuedAt    string   `json:"queued_at,omitempty"`
-	StartedAt   string   `json:"started_at,omitempty"`
-	FinishedAt  string   `json:"finished_at,omitempty"`
-	FailedSteps []string `json:"failed_steps,omitempty"`
+// finishedRun is a top-level DAG-run attempt that ended, as a report carries
+// it.
+type finishedRun struct {
+	Workflow    string     `json:"workflow"`
+	DAGRunID    string     `json:"dag_run_id"`
+	AttemptID   string     `json:"attempt_id"`
+	Status      string     `json:"status"`
+	TriggerType string     `json:"trigger_type"`
+	QueuedAt    reportTime `json:"queued_at"`
+	StartedAt   reportTime `json:"started_at"`
+	FinishedAt  string     `json:"finished_at"`
+	FailedSteps []string   `json:"failed_steps"`
 }
 
 // reportGap tells Dagu Console that events after Since were lost.
@@ -121,49 +127,57 @@ type reportGap struct {
 	Since string `json:"since"`
 }
 
-// newReportEvent describes event for Dagu Console. It reports false for an
+// reportedEvent is what an event changes in reports.
+type reportedEvent struct {
+	change runChange
+	// finished is set for an event that ends an attempt.
+	finished *finishedRun
+	urgent   bool
+}
+
+// newReportedEvent describes event for Dagu Console. It reports false for an
 // event that reports leave out: an unreported type, a sub-DAG run, an event
 // without a valid status snapshot, or one with a name or ID longer than Dagu
 // Console keeps.
-func newReportEvent(event *eventstore.Event) (reportEvent, bool) {
+func newReportedEvent(event *eventstore.Event) (reportedEvent, bool) {
 	traits, ok := reportedEventTypes[event.Type]
 	if !ok {
-		return reportEvent{}, false
+		return reportedEvent{}, false
 	}
 	snapshot, err := eventstore.DAGRunSnapshotFromEvent(event)
 	if err != nil {
-		return reportEvent{}, false
+		return reportedEvent{}, false
 	}
 	status := snapshot.DAGRunStatus()
-	if !status.Parent.Zero() {
-		return reportEvent{}, false
-	}
-	if len(status.Name) > maxNameBytes || len(event.ID) > maxIDBytes ||
-		len(status.DAGRunID) > maxIDBytes || len(status.AttemptID) > maxIDBytes {
-		return reportEvent{}, false
+	if !reportable(status) {
+		return reportedEvent{}, false
 	}
 
-	reported := reportEvent{
-		ID:         event.ID,
-		Type:       string(event.Type),
-		DAGName:    status.Name,
-		DAGRunID:   status.DAGRunID,
-		AttemptID:  status.AttemptID,
-		Status:     event.Status,
-		OccurredAt: formatTime(event.OccurredAt),
-		QueuedAt:   snapshotTime(status.QueuedAt),
-		StartedAt:  snapshotTime(status.StartedAt),
-		FinishedAt: snapshotTime(status.FinishedAt),
-	}
-	if traits.terminal {
-		reported.FailedSteps = failedSteps(status)
+	run := newActiveRun(status)
+	reported := reportedEvent{change: runChange{run: run, ended: traits.finished}, urgent: traits.urgent}
+	if traits.finished {
+		finishedAt := snapshotTime(status.FinishedAt)
+		if finishedAt == "" {
+			finishedAt = formatTime(event.OccurredAt)
+		}
+		reported.finished = &finishedRun{
+			Workflow:    run.Workflow,
+			DAGRunID:    run.DAGRunID,
+			AttemptID:   run.AttemptID,
+			Status:      run.Status,
+			TriggerType: run.TriggerType,
+			QueuedAt:    run.QueuedAt,
+			StartedAt:   run.StartedAt,
+			FinishedAt:  finishedAt,
+			FailedSteps: failedSteps(status),
+		}
 	}
 	return reported, true
 }
 
 // failedSteps names the failed steps of status, handlers included.
 func failedSteps(status *ir.DAGRunStatus) []string {
-	var names []string
+	names := []string{}
 	for _, node := range status.NodesInRunOrder() {
 		if node.Status != ir.NodeFailed || node.Step.Name == "" {
 			continue
@@ -231,17 +245,25 @@ type eventState struct {
 	LastEventAt time.Time `json:"last_event_at,omitzero"`
 	// GapSince marks lost events that no accepted report has mentioned yet.
 	GapSince time.Time `json:"gap_since,omitzero"`
+	// Active holds the runs in progress as of the position. It is nil while
+	// they are unknown.
+	Active activeSet `json:"active,omitzero"`
 }
 
 // eventBatch is what the next report carries from the event store.
 type eventBatch struct {
-	events []reportEvent
-	// next is the position after events, and token identifies it.
+	finished []finishedRun
+	// changes are how the events of the batch change the runs in progress,
+	// in order.
+	changes []runChange
+	// ids names the events of the batch.
+	ids []string
+	// next is the position after the batch, and token identifies it.
 	next  position
 	token string
 	// capped reports that more events wait after the batch.
 	capped bool
-	// size is the encoded size of events.
+	// size is the encoded size of finished.
 	size   int
 	readAt time.Time
 	// lastEventAt is when the latest event in the batch occurred.
@@ -250,52 +272,64 @@ type eventBatch struct {
 	urgent []string
 }
 
-// fits reports whether an event encoded in size bytes can join the batch.
+// fits reports whether a finished run encoded in size bytes can join the
+// batch.
 func (b *eventBatch) fits(size int) bool {
-	return len(b.events) < maxReportEvents && b.size+size <= maxReportEventBytes
+	return len(b.finished) < maxFinishedRuns && b.size+size <= maxFinishedBytes
 }
 
-func (b *eventBatch) add(event *eventstore.Event, reported reportEvent, size int) {
-	b.events = append(b.events, reported)
-	b.size += size
-	if reportedEventTypes[event.Type].urgent {
+func (b *eventBatch) add(event *eventstore.Event, reported reportedEvent, size int) {
+	if reported.finished != nil {
+		b.finished = append(b.finished, *reported.finished)
+		b.size += size
+	}
+	if reported.urgent {
 		b.urgent = append(b.urgent, event.ID)
 	}
+	b.changes = append(b.changes, reported.change)
+	b.ids = append(b.ids, event.ID)
 	if event.OccurredAt.After(b.lastEventAt) {
 		b.lastEventAt = event.OccurredAt
 	}
 }
 
-func (b *eventBatch) ids() []string {
-	ids := make([]string, 0, len(b.events))
-	for _, event := range b.events {
-		ids = append(ids, event.ID)
-	}
-	return ids
-}
-
-// eventFeed reads the events that reports carry and tracks which of them
-// Dagu Console has acknowledged. The report loop owns it.
+// eventFeed reads the events that reports carry, tracks which of them Dagu
+// Console has acknowledged, and follows the runs in progress. The report loop
+// owns it.
 type eventFeed struct {
 	reader        eventstore.DAGRunReader
 	retentionDays int
 	store         StateStore
 	lease         Lease
+	statuses      RunStatuses
 	now           func() time.Time
+	// spawn runs a rebuild in the background.
+	spawn func(func())
 
 	held bool
 	// loaded reports that state was read or written under the lease.
 	loaded bool
 	state  eventState
 	batch  *eventBatch
+	// fresh reports that the event store was read for the next report.
+	fresh bool
 	// sent is the cursor the last prepared report carried, which its
-	// acknowledgement must name.
-	sent string
+	// acknowledgement must name, and sentActive is what it said about the
+	// runs in progress.
+	sent       string
+	sentActive activeReport
+	// accepted is what the last accepted report said about the runs in
+	// progress, or nil before the first.
+	accepted *activeReport
 	// notified holds urgent events that accepted reports carried without
 	// moving the position, so that they call for no more early reports.
 	notified map[string]struct{}
-	standby  bool
-	warning  string
+	// rebuild lists the runs in progress while they are unknown, and
+	// rebuildAfter delays the next attempt after one failed.
+	rebuild      *rebuild
+	rebuildAfter time.Time
+	standby      bool
+	warning      string
 }
 
 // newEventFeed returns nil when events has no Reader.
@@ -308,19 +342,27 @@ func newEventFeed(events Events) *eventFeed {
 		retentionDays: events.RetentionDays,
 		store:         events.State,
 		lease:         events.Lease,
+		statuses:      events.Statuses,
 		now:           time.Now,
+		spawn:         func(fn func()) { go fn() },
 	}
 }
 
-// poll prepares the events of the next report of serverID. It reads the event
-// store only when read is set, and reports whether the events include an
-// urgent one that no accepted report has carried.
+// poll prepares the next report of serverID. It reads the event store only
+// when read is set, and reports whether the report calls for sending early:
+// it carries an urgent event that no accepted report has carried, or the
+// runs in progress differ from what the last accepted report said.
 func (f *eventFeed) poll(ctx context.Context, serverID string, read bool) bool {
-	f.batch = nil
-	if !f.hold(ctx) || !f.load(ctx, serverID) || !read {
+	f.batch, f.fresh = nil, false
+	if !f.hold(ctx) || !f.load(ctx, serverID) {
 		return false
 	}
-	return f.read(ctx)
+	f.rebuildActive(ctx)
+	if !read {
+		return false
+	}
+	urgent := f.read(ctx)
+	return urgent || f.activeChanged()
 }
 
 // hold takes or keeps the lease.
@@ -424,8 +466,10 @@ func (f *eventFeed) gapSince() time.Time {
 	}
 }
 
-// restart saves next at the newest event in the store.
+// restart saves next at the newest event in the store, with the runs in
+// progress unknown.
 func (f *eventFeed) restart(ctx context.Context, next eventState) bool {
+	f.stopRebuild()
 	cursor, err := f.reader.DAGRunHeadCursor(ctx)
 	if err != nil {
 		f.warn(ctx, warnRead, err)
@@ -446,27 +490,31 @@ func (f *eventFeed) read(ctx context.Context) bool {
 		return false
 	}
 	f.recovered(warnRead)
+	f.fresh = true
 	readAt := f.now()
 
 	acked := make(map[string]struct{}, len(f.state.Acked))
 	for _, id := range f.state.Acked {
 		acked[id] = struct{}{}
 	}
-	batch := &eventBatch{events: []reportEvent{}, next: position{Cursor: cursor}, readAt: readAt}
+	batch := &eventBatch{finished: []finishedRun{}, next: position{Cursor: cursor}, readAt: readAt}
 	unacked := false
 	for _, event := range events {
 		if _, ok := acked[event.ID]; ok {
 			continue
 		}
 		unacked = true
-		reported, ok := newReportEvent(event)
+		reported, ok := newReportedEvent(event)
 		if !ok {
 			continue
 		}
-		size := encodedSize(reported)
-		if !batch.fits(size) {
-			batch.capped = true
-			break
+		size := 0
+		if reported.finished != nil {
+			size = encodedSize(*reported.finished)
+			if !batch.fits(size) {
+				batch.capped = true
+				break
+			}
 		}
 		batch.add(event, reported, size)
 	}
@@ -476,7 +524,9 @@ func (f *eventFeed) read(ctx context.Context) bool {
 		return false
 	}
 	if batch.capped {
-		batch.next = position{Cursor: f.state.Cursor, Acked: slices.Concat(f.state.Acked, batch.ids())}
+		// The events after the cap are read again, so the position names
+		// every event the batch applies, not only those it reports.
+		batch.next = position{Cursor: f.state.Cursor, Acked: slices.Concat(f.state.Acked, batch.ids)}
 	}
 	batch.token = batch.next.token()
 	f.batch = batch
@@ -486,9 +536,9 @@ func (f *eventFeed) read(ctx context.Context) bool {
 	})
 }
 
-// encodedSize is how many bytes reported adds to a report's events.
-func encodedSize(reported reportEvent) int {
-	data, _ := json.Marshal(reported)
+// encodedSize is how many bytes run adds to a report's finished runs.
+func encodedSize(run finishedRun) int {
+	data, _ := json.Marshal(run)
 	return len(data) + len(",")
 }
 
@@ -506,13 +556,92 @@ func (f *eventFeed) advance(ctx context.Context, cursor eventstore.DAGRunCursor,
 	f.save(ctx, next)
 }
 
-// fill adds the prepared events, and any gap, to req.
+// activeReport returns what the next report says about the runs in
+// progress: nothing unless the event store was read for it.
+func (f *eventFeed) activeReport() activeReport {
+	if !f.fresh {
+		return activeReport{}
+	}
+	set := f.state.Active
+	if f.batch != nil {
+		set = set.with(f.batch.changes)
+	}
+	return newActiveReport(set)
+}
+
+// activeChanged reports whether the runs in progress differ from what the
+// last accepted report said about them.
+func (f *eventFeed) activeChanged() bool {
+	current := f.activeReport()
+	return current.known && f.accepted != nil && !current.equal(*f.accepted)
+}
+
+// rebuildActive starts listing the runs in progress while they are unknown,
+// and makes them known once the listing is done.
+func (f *eventFeed) rebuildActive(ctx context.Context) {
+	if f.state.Active != nil {
+		return
+	}
+	if f.rebuild == nil {
+		if f.now().Before(f.rebuildAfter) {
+			return
+		}
+		f.startRebuild(ctx)
+	}
+	select {
+	case <-f.rebuild.done:
+	default:
+		return
+	}
+	done := f.rebuild
+	f.rebuild = nil
+	if done.err != nil {
+		f.warn(ctx, warnActive, done.err)
+		f.rebuildAfter = f.now().Add(rebuildRetryInterval)
+		return
+	}
+	f.recovered(warnActive)
+	next := f.state
+	next.Active = done.runs.with(done.pending)
+	f.save(ctx, next)
+}
+
+// startRebuild lists the runs in progress in the background. The changes
+// that reports apply meanwhile are kept to apply on top of what it finds.
+func (f *eventFeed) startRebuild(ctx context.Context) {
+	ctx, cancel := context.WithCancel(ctx)
+	r := &rebuild{cancel: cancel, done: make(chan struct{})}
+	since := f.now().Add(-activeLookback)
+	f.rebuild = r
+	f.spawn(func() {
+		defer close(r.done)
+		statuses, err := f.statuses.ListStatuses(ctx, persis.DAGRunListOptions{
+			Statuses:  activeStatuses,
+			From:      persis.NewUTC(since),
+			Unbounded: true,
+		})
+		r.runs, r.err = activeSetOf(statuses), err
+	})
+}
+
+// stopRebuild cancels the rebuild in progress and waits for it to end.
+func (f *eventFeed) stopRebuild() {
+	if f.rebuild == nil {
+		return
+	}
+	f.rebuild.cancel()
+	<-f.rebuild.done
+	f.rebuild = nil
+}
+
+// fill adds the prepared finished runs, the runs in progress, and any gap to
+// req.
 func (f *eventFeed) fill(req *reportRequest) {
 	if f == nil || !f.loaded {
 		return
 	}
 	if f.batch != nil {
-		req.Events = f.batch.events
+		req.Finished = f.batch.finished
 		req.Cursor = f.batch.token
 	}
 	if !f.state.GapSince.IsZero() {
@@ -524,6 +653,11 @@ func (f *eventFeed) fill(req *reportRequest) {
 		}
 	}
 	f.sent = req.Cursor
+	f.sentActive = f.activeReport()
+	if f.sentActive.known {
+		total := f.sentActive.total
+		req.Active, req.ActiveTotal = f.sentActive.runs, &total
+	}
 }
 
 // acknowledge applies Dagu Console's acceptance of a report that fill
@@ -535,6 +669,8 @@ func (f *eventFeed) acknowledge(ctx context.Context, ack string) bool {
 	}
 	batch, sent := f.batch, f.sent
 	f.batch, f.sent = nil, ""
+	accepted := f.sentActive
+	f.accepted = &accepted
 	// Only an acknowledgement of the cursor the report carried confirms its
 	// events and gap.
 	confirmed := sent != "" && ack == sent
@@ -555,6 +691,7 @@ func (f *eventFeed) acknowledge(ctx context.Context, ack string) bool {
 	next.GapSince = time.Time{}
 	if moved {
 		next.position = batch.next
+		next.Active = f.state.Active.with(batch.changes)
 		if !batch.capped {
 			next.CaughtUpAt = batch.readAt
 		}
@@ -567,6 +704,9 @@ func (f *eventFeed) acknowledge(ctx context.Context, ack string) bool {
 	}
 	if moved {
 		f.notified = nil
+		if next.Active == nil && f.rebuild != nil {
+			f.rebuild.pending = append(f.rebuild.pending, batch.changes...)
+		}
 	}
 	return moved && batch.capped
 }
@@ -612,8 +752,10 @@ func (f *eventFeed) close(ctx context.Context) {
 
 // drop forgets the lease and everything read under it.
 func (f *eventFeed) drop() {
-	f.held, f.loaded = false, false
-	f.state, f.batch, f.notified = eventState{}, nil, nil
+	f.stopRebuild()
+	f.held, f.loaded, f.fresh = false, false, false
+	f.state, f.batch, f.notified, f.accepted = eventState{}, nil, nil, nil
+	f.rebuildAfter = time.Time{}
 }
 
 // warn logs a failure unless it repeats the previous one.
