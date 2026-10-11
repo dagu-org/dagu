@@ -17,6 +17,32 @@ var ErrNoElements = errors.New("the application exposes no accessible elements")
 // ErrElementsUnsupported reports a system that cannot read elements.
 var ErrElementsUnsupported = errors.New("accessible elements are supported on 64-bit Windows only")
 
+// ErrNoPattern reports an element that cannot perform a pattern itself, so
+// the action falls back to the pointer and keys.
+var ErrNoPattern = errors.New("the element offers no such pattern")
+
+// ErrDisabled reports an element that takes no input until the application
+// enables it.
+var ErrDisabled = errors.New("the element is disabled")
+
+// Pattern is something an element does by itself when asked through the
+// system's automation, with no pointer or key: the UI Automation control
+// patterns on Windows.
+type Pattern string
+
+const (
+	// PatternInvoke presses a button, menu item, or link.
+	PatternInvoke Pattern = "invoke"
+	// PatternToggle flips a checkbox.
+	PatternToggle Pattern = "toggle"
+	// PatternSelect selects a radio button, list item, tab, or cell.
+	PatternSelect Pattern = "select"
+	// PatternExpand opens a combo box or another collapsed element.
+	PatternExpand Pattern = "expand"
+	// PatternSetValue replaces the text of a field.
+	PatternSetValue Pattern = "set_value"
+)
+
 // Roles an element can have. Each system maps its control types onto them.
 const (
 	RoleButton    = "button"
@@ -97,6 +123,12 @@ type Elements interface {
 	Outline(window Element, limit int) ([]Element, error)
 	// Focus gives an element the keyboard focus.
 	Focus(Element) error
+	// Apply has an element perform a pattern itself, finding it again as
+	// Focus does; value is the text PatternSetValue sets. ErrNoPattern says
+	// the element cannot, so the action falls back to the pointer and keys;
+	// ErrDisabled says it takes no input yet; a read-only field or an
+	// element with nothing to expand is an error saying so.
+	Apply(target Element, pattern Pattern, value string) error
 	Close() error
 }
 

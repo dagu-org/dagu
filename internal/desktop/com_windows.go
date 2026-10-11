@@ -6,6 +6,7 @@
 package desktop
 
 import (
+	"errors"
 	"fmt"
 	"syscall"
 	"unicode/utf16"
@@ -22,10 +23,11 @@ var (
 	ole32    = windows.NewLazySystemDLL("ole32.dll")
 	oleaut32 = windows.NewLazySystemDLL("oleaut32.dll")
 
-	procCoCreateInstance = ole32.NewProc("CoCreateInstance")
-	procSysFreeString    = oleaut32.NewProc("SysFreeString")
-	procSysStringLen     = oleaut32.NewProc("SysStringLen")
-	procVariantClear     = oleaut32.NewProc("VariantClear")
+	procCoCreateInstance  = ole32.NewProc("CoCreateInstance")
+	procSysAllocStringLen = oleaut32.NewProc("SysAllocStringLen")
+	procSysFreeString     = oleaut32.NewProc("SysFreeString")
+	procSysStringLen      = oleaut32.NewProc("SysStringLen")
+	procVariantClear      = oleaut32.NewProc("VariantClear")
 )
 
 const clsctxInprocServer = 1
@@ -40,7 +42,9 @@ var hresultNames = map[hresult]string{
 	0x80070057: "E_INVALIDARG",
 	0x800401F0: "CO_E_NOTINITIALIZED",
 	0x80040154: "REGDB_E_CLASSNOTREG",
+	0x80040200: "UIA_E_ELEMENTNOTENABLED",
 	0x80040201: "UIA_E_ELEMENTNOTAVAILABLE",
+	0x80040202: "UIA_E_NOCLICKABLEPOINT",
 	0x80040204: "UIA_E_NOTSUPPORTED",
 	0x80131505: "UIA_E_TIMEOUT",
 	0x80131509: "UIA_E_INVALIDOPERATION",
@@ -115,6 +119,21 @@ func bstrString(b *uint16) string {
 		return ""
 	}
 	return string(utf16.Decode(unsafe.Slice(b, n))) //nolint:gosec // n is the length SysStringLen reports.
+}
+
+// bstrAlloc makes a BSTR of a string, which the caller frees. A method
+// that takes a string needs one, since COM reads the length before it.
+func bstrAlloc(s string) (*uint16, error) {
+	text := utf16.Encode([]rune(s))
+	var first *uint16
+	if len(text) > 0 {
+		first = &text[0]
+	}
+	r, _, _ := procSysAllocStringLen.Call(out(first), uintptr(len(text)))
+	if r == 0 {
+		return nil, errors.New("SysAllocStringLen: out of memory")
+	}
+	return *(**uint16)(unsafe.Pointer(&r)), nil //nolint:gosec // r is the pointer the call returned.
 }
 
 // bstrFree releases a BSTR. It is safe on nil.

@@ -263,40 +263,115 @@ func (e *uiaElements) Outline(window Element, limit int) ([]Element, error) {
 	})
 }
 
-// Focus finds the element again, under its centre first and then by its
-// path in the front window, and gives it the keyboard focus.
+// Focus finds the element again and gives it the keyboard focus.
 func (e *uiaElements) Focus(target Element) error {
 	return e.run("focus", func(w *uiaWorker) error {
-		if !target.Bounds.Empty() {
-			centre := target.Bounds.Min.Add(target.Bounds.Size().Div(2))
-			if el, err := w.auto.elementFromPoint(centre.X, centre.Y, w.cacheElement); err == nil {
-				defer el.release()
-				found, err := w.convert(el, false)
-				if err == nil && found.Role == target.Role && found.Name == target.Name && found.ID == target.ID {
-					return el.setFocus()
-				}
-			}
-		}
-		if len(target.Path) == 0 {
-			return fmt.Errorf("%w: the element is not where it was", ErrNotFound)
-		}
-		top, err := w.frontWindow()
+		el, err := w.locate(target)
 		if err != nil {
 			return err
 		}
-		defer top.el.release()
-		tree, err := w.subtree(top, findLimit)
-		if err != nil {
-			return err
-		}
-		defer tree.release()
-		for _, node := range tree.nodes {
-			if slices.Equal(node.path, target.Path) {
-				return node.el.setFocus()
-			}
-		}
-		return fmt.Errorf("%w: no element has the path %v in %q", ErrNotFound, target.Path, top.window.Name)
+		defer el.release()
+		return el.setFocus()
 	})
+}
+
+// Apply finds the element again and has it perform a pattern. The call
+// runs on a thread of its own, with an automation client of its own: an
+// application may run the element's handler inside the call, and one that
+// opens a dialog there holds the call until the dialog closes, which must
+// not hold the thread that reads the screen.
+func (e *uiaElements) Apply(target Element, pattern Pattern, value string) error {
+	select {
+	case <-e.quit:
+		return errElementsClosed
+	default:
+	}
+	return actAlone(string(pattern), func(w *uiaWorker) error {
+		el, err := w.locate(target)
+		if err != nil {
+			return err
+		}
+		defer el.release()
+		if enabled, err := el.currentIsEnabled(); err == nil && !enabled {
+			return ErrDisabled
+		}
+		err = perform(el, pattern, value)
+		switch {
+		case errors.Is(err, hrElementNotEnabled):
+			return ErrDisabled
+		case errors.Is(err, hrElementNotAvailable):
+			return fmt.Errorf("%w: the element went away", ErrNotFound)
+		}
+		return err
+	})
+}
+
+// actAlone runs fn on a locked thread that lives for the call, with an
+// automation client of its own, and waits elementsTimeout for its answer.
+// A call the application holds is abandoned with its thread, as the
+// automation thread's calls are.
+func actAlone(what string, fn func(*uiaWorker) error) error {
+	result := make(chan error, 1)
+	go func() {
+		runtime.LockOSThread()
+		result <- func() error {
+			if err := windows.CoInitializeEx(0, windows.COINIT_MULTITHREADED); err != nil {
+				return err
+			}
+			defer windows.CoUninitialize()
+			w, err := newActor()
+			if err != nil {
+				return err
+			}
+			defer w.release()
+			return fn(w)
+		}()
+	}()
+	deadline := time.NewTimer(elementsTimeout)
+	defer deadline.Stop()
+	select {
+	case err := <-result:
+		return err
+	case <-deadline.C:
+		return fmt.Errorf("%s: no answer within %s: %w", what, elementsTimeout, context.DeadlineExceeded)
+	}
+}
+
+// locate finds an element again, under its centre first and then by its
+// path in the front window, and returns it live. The caller releases it.
+func (w *uiaWorker) locate(target Element) (*element, error) {
+	if !target.Bounds.Empty() {
+		centre := target.Bounds.Min.Add(target.Bounds.Size().Div(2))
+		if el, err := w.auto.elementFromPoint(centre.X, centre.Y, w.cacheElement); err == nil {
+			found, err := w.convert(el, false)
+			if err == nil && found.Role == target.Role && found.Name == target.Name && found.ID == target.ID {
+				return el, nil
+			}
+			el.release()
+		}
+	}
+	if len(target.Path) == 0 {
+		return nil, fmt.Errorf("%w: the element is not where it was", ErrNotFound)
+	}
+	top, err := w.frontWindow()
+	if err != nil {
+		return nil, err
+	}
+	defer top.el.release()
+	tree, err := w.subtree(top, findLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer tree.release()
+	for _, node := range tree.nodes {
+		if slices.Equal(node.path, target.Path) {
+			// The tree releases its elements; the caller gets a reference
+			// of its own.
+			node.el.com().addRef()
+			return node.el, nil
+		}
+	}
+	return nil, fmt.Errorf("%w: no element has the path %v in %q", ErrNotFound, target.Path, top.window.Name)
 }
 
 // newWorker creates the automation client and what every call shares.
@@ -307,6 +382,21 @@ func newWorker() (*uiaWorker, error) {
 			return nil, fmt.Errorf("create the automation client: %w", err)
 		}
 	}
+	return setUp(obj)
+}
+
+// newActor creates the client a pattern call uses: the newer one, which
+// bounds how long an application may hold a call, when the system has it.
+func newActor() (*uiaWorker, error) {
+	obj, err := coCreateInstance(&clsidCUIAutomation8, &iidIUIAutomation2)
+	if err != nil {
+		return newWorker()
+	}
+	_ = check("put_TransactionTimeout", obj.call(uia2PutTransactionTimeout, uintptr(transactionTimeout/time.Millisecond)))
+	return setUp(obj)
+}
+
+func setUp(obj *comObject) (*uiaWorker, error) {
 	w := &uiaWorker{auto: (*automation)(obj)}
 	if err := w.setup(); err != nil {
 		w.release()
