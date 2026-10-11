@@ -1080,15 +1080,25 @@ const defaultColumns = [
 const columnToSortField: Record<string, string> = {
   Name: 'name',
   ScheduleAndNextRun: 'nextRun',
+  Status: 'status',
+  LastRun: 'lastRun',
 };
 
-// Client-side sortable columns
-const clientSortableColumns = ['Status', 'LastRun'];
+// Client-side sortable columns. Kept empty because every column now sorts on
+// the server, so the sort choice stays in the URL like the Name sort does.
+const clientSortableColumns: string[] = [];
 
 const cardSortOptions = [
   { value: 'name', label: 'Name' },
   { value: 'nextRun', label: 'Next run' },
+  { value: 'status', label: 'Status' },
+  { value: 'lastRun', label: 'Last run' },
 ] as const;
+
+// The server reads every matching DAG to sort by status or lastRun, so those
+// sorts are capped at this many DAGs. Above it the server returns 400 and the
+// UI disables the two sorts.
+const maxRunSortDAGs = 300;
 
 function getCardSortLabel(sort: string): string {
   return (
@@ -1286,6 +1296,9 @@ function DAGTable({
   onSelectDAG,
 }: Props) {
   const { ts } = useI18n();
+  // Status and LastRun sorts are disabled when the list total exceeds the
+  // server cap, because the server would reject the request with a 400.
+  const runSortDisabled = (resultCount ?? 0) > maxRunSortDAGs;
   const navigate = useNavigate();
   const columns = useMemo(
     () =>
@@ -1941,15 +1954,37 @@ function DAGTable({
                   </SelectTrigger>
                 </I18nProps>
                 <SelectContent>
-                  {cardSortOptions.map((option) => (
-                    <SelectItem
-                      key={option.value}
-                      value={option.value}
-                      className="text-xs"
-                    >
-                      <I18nText text={option.label} />
-                    </SelectItem>
-                  ))}
+                  {cardSortOptions.map((option) => {
+                    const disabled =
+                      runSortDisabled &&
+                      (option.value === 'status' || option.value === 'lastRun');
+                    const item = (
+                      <SelectItem
+                        key={option.value}
+                        value={option.value}
+                        className="text-xs"
+                        disabled={disabled}
+                      >
+                        <I18nText text={option.label} />
+                      </SelectItem>
+                    );
+                    return disabled ? (
+                      <Tooltip key={option.value}>
+                        <TooltipTrigger asChild>{item}</TooltipTrigger>
+                        <TooltipContent className="bg-muted text-muted-foreground border">
+                          <p className="text-xs">
+                            <I18nText
+                              text={
+                                'Sorting by this column is disabled for more than 300 workflows'
+                              }
+                            />
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      item
+                    );
+                  })}
                 </SelectContent>
               </Select>
               <Button
@@ -2016,20 +2051,45 @@ function DAGTable({
                         {/* Wrap header content */}
                         {columnToSortField[header.column.id] ||
                         clientSortableColumns.includes(header.column.id) ? (
-                          <SortableHeader
-                            column={header.column}
-                            currentSort={sortField}
-                            currentOrder={sortOrder}
-                            onSort={onSortChange}
-                            clientSort={clientSort}
-                            clientOrder={clientOrder}
-                            onClientSort={handleClientSort}
-                          >
-                            {flexRender(
-                              header.column.columnDef.header,
-                              header.getContext()
-                            )}
-                          </SortableHeader>
+                          runSortDisabled &&
+                          (columnToSortField[header.column.id] === 'status' ||
+                            columnToSortField[header.column.id] ===
+                              'lastRun') ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="cursor-not-allowed">
+                                  {flexRender(
+                                    header.column.columnDef.header,
+                                    header.getContext()
+                                  )}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent className="bg-muted text-muted-foreground border">
+                                <p className="text-xs">
+                                  <I18nText
+                                    text={
+                                      'Sorting by this column is disabled for more than 300 workflows'
+                                    }
+                                  />
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            <SortableHeader
+                              column={header.column}
+                              currentSort={sortField}
+                              currentOrder={sortOrder}
+                              onSort={onSortChange}
+                              clientSort={clientSort}
+                              clientOrder={clientOrder}
+                              onClientSort={handleClientSort}
+                            >
+                              {flexRender(
+                                header.column.columnDef.header,
+                                header.getContext()
+                              )}
+                            </SortableHeader>
+                          )
                         ) : (
                           flexRender(
                             header.column.columnDef.header,

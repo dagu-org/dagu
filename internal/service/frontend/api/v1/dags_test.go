@@ -18,6 +18,7 @@ import (
 	"github.com/dagucloud/dagu/v2/internal/cmn/config"
 	"github.com/dagucloud/dagu/v2/internal/ir"
 	"github.com/dagucloud/dagu/v2/internal/launcher"
+	"github.com/dagucloud/dagu/v2/internal/persis"
 	persisfile "github.com/dagucloud/dagu/v2/internal/persis/file"
 	"github.com/dagucloud/dagu/v2/internal/runtime"
 	"github.com/dagucloud/dagu/v2/internal/schedulerstate"
@@ -2217,4 +2218,246 @@ steps:
 	notice := specResp.ValueReferenceNotices[0]
 	require.NotNil(t, notice.Class)
 	require.Equal(t, api.ValueReferenceNoticeClassRuntimeOnly, *notice.Class)
+}
+
+// TestListDAGsSortsByLastRunServerSide verifies that sorting the DAG list by
+// lastRun happens on the server across every page, not only within the loaded
+// rows. The most recently run DAG must come first in descending order.
+func TestListDAGsSortsByLastRunServerSide(t *testing.T) {
+	t.Parallel()
+
+	helper := test.Setup(t, test.WithStatusPersistence())
+
+	// Create three DAGs and give each a latest run with a distinct start time.
+	now := time.Now().UTC()
+	names := []string{"sort-lastrun-0", "sort-lastrun-1", "sort-lastrun-2"}
+	runTimes := []time.Time{now.Add(-3 * time.Minute), now.Add(-1 * time.Minute), now.Add(-2 * time.Minute)}
+	for i, name := range names {
+		dag := helper.DAG(t, fmt.Sprintf(`
+name: %s
+steps:
+  - run: echo hi
+`, name))
+		attempt, err := helper.DAGRunRepository.CreateAttempt(helper.Context, dag.DAG, runTimes[i], fmt.Sprintf("run-%d", i), persis.DAGRunCreateAttemptOptions{})
+		require.NoError(t, err)
+		status := ir.InitialStatus(dag.DAG)
+		status.DAGRunID = fmt.Sprintf("run-%d", i)
+		status.AttemptID = attempt.ID()
+		status.Status = ir.Succeeded
+		status.StartedAt = runTimes[i].Format(time.RFC3339)
+		require.NoError(t, attempt.Open(helper.Context))
+		require.NoError(t, attempt.Write(helper.Context, status))
+		require.NoError(t, attempt.Close(helper.Context))
+	}
+
+	apiImpl := localapi.New(
+		helper.DAGRepository,
+		helper.DAGRunRepository,
+		helper.QueueStore,
+		helper.ProcRepository,
+		helper.DAGRunMgr,
+		helper.Config,
+		nil,
+		helper.ServiceRegistry,
+		nil,
+		nil,
+	)
+
+	// Sort by lastRun descending: the most recently run DAG must come first.
+	order := api.ListDAGsParamsOrderDesc
+	sortField := api.ListDAGsParamsSortLastRun
+	listRespObj, err := apiImpl.ListDAGs(context.Background(), api.ListDAGsRequestObject{
+		Params: api.ListDAGsParams{Sort: &sortField, Order: &order},
+	})
+	require.NoError(t, err)
+	listResp, ok := listRespObj.(*api.ListDAGs200JSONResponse)
+	require.True(t, ok)
+	require.Len(t, listResp.Dags, 3)
+	require.Equal(t, "sort-lastrun-1", listResp.Dags[0].Dag.Name)
+	require.Equal(t, "sort-lastrun-2", listResp.Dags[1].Dag.Name)
+	require.Equal(t, "sort-lastrun-0", listResp.Dags[2].Dag.Name)
+}
+
+// TestListDAGsSortsByStatusServerSide verifies that sorting the DAG list by
+// status happens on the server. In ascending order the lowest status value
+// comes first.
+func TestListDAGsSortsByStatusServerSide(t *testing.T) {
+	t.Parallel()
+
+	helper := test.Setup(t, test.WithStatusPersistence())
+
+	// Create three DAGs and give each a latest run with a distinct status.
+	now := time.Now().UTC()
+	names := []string{"sort-status-0", "sort-status-1", "sort-status-2"}
+	statuses := []ir.Status{ir.Succeeded, ir.Failed, ir.Running}
+	for i, name := range names {
+		dag := helper.DAG(t, fmt.Sprintf(`
+name: %s
+steps:
+  - run: echo hi
+`, name))
+		attempt, err := helper.DAGRunRepository.CreateAttempt(helper.Context, dag.DAG, now, fmt.Sprintf("run-%d", i), persis.DAGRunCreateAttemptOptions{})
+		require.NoError(t, err)
+		status := ir.InitialStatus(dag.DAG)
+		status.DAGRunID = fmt.Sprintf("run-%d", i)
+		status.AttemptID = attempt.ID()
+		status.Status = statuses[i]
+		status.StartedAt = now.Format(time.RFC3339)
+		require.NoError(t, attempt.Open(helper.Context))
+		require.NoError(t, attempt.Write(helper.Context, status))
+		require.NoError(t, attempt.Close(helper.Context))
+	}
+
+	apiImpl := localapi.New(
+		helper.DAGRepository,
+		helper.DAGRunRepository,
+		helper.QueueStore,
+		helper.ProcRepository,
+		helper.DAGRunMgr,
+		helper.Config,
+		nil,
+		helper.ServiceRegistry,
+		nil,
+		nil,
+	)
+
+	// Sort by status ascending: Running(1), Failed(2), Succeeded(4).
+	order := api.ListDAGsParamsOrderAsc
+	sortField := api.ListDAGsParamsSortStatus
+	listRespObj, err := apiImpl.ListDAGs(context.Background(), api.ListDAGsRequestObject{
+		Params: api.ListDAGsParams{Sort: &sortField, Order: &order},
+	})
+	require.NoError(t, err)
+	listResp, ok := listRespObj.(*api.ListDAGs200JSONResponse)
+	require.True(t, ok)
+	require.Len(t, listResp.Dags, 3)
+	require.Equal(t, "sort-status-2", listResp.Dags[0].Dag.Name)
+	require.Equal(t, "sort-status-1", listResp.Dags[1].Dag.Name)
+	require.Equal(t, "sort-status-0", listResp.Dags[2].Dag.Name)
+}
+
+// TestListDAGsSortsByLastRunPaginates verifies that the server-side lastRun
+// sort paginates with the caller's page and perPage, not the unbounded page
+// used to load every DAG for the sort. With perPage 1 and page 2, exactly the
+// second most recently run DAG must come back.
+func TestListDAGsSortsByLastRunPaginates(t *testing.T) {
+	t.Parallel()
+
+	helper := test.Setup(t, test.WithStatusPersistence())
+
+	// Create three DAGs and give each a latest run with a distinct start time.
+	now := time.Now().UTC()
+	names := []string{"sort-paginate-0", "sort-paginate-1", "sort-paginate-2"}
+	runTimes := []time.Time{now.Add(-3 * time.Minute), now.Add(-1 * time.Minute), now.Add(-2 * time.Minute)}
+	for i, name := range names {
+		dag := helper.DAG(t, fmt.Sprintf(`
+name: %s
+steps:
+  - run: echo hi
+`, name))
+		attempt, err := helper.DAGRunRepository.CreateAttempt(helper.Context, dag.DAG, runTimes[i], fmt.Sprintf("run-%d", i), persis.DAGRunCreateAttemptOptions{})
+		require.NoError(t, err)
+		status := ir.InitialStatus(dag.DAG)
+		status.DAGRunID = fmt.Sprintf("run-%d", i)
+		status.AttemptID = attempt.ID()
+		status.Status = ir.Succeeded
+		status.StartedAt = runTimes[i].Format(time.RFC3339)
+		require.NoError(t, attempt.Open(helper.Context))
+		require.NoError(t, attempt.Write(helper.Context, status))
+		require.NoError(t, attempt.Close(helper.Context))
+	}
+
+	apiImpl := localapi.New(
+		helper.DAGRepository,
+		helper.DAGRunRepository,
+		helper.QueueStore,
+		helper.ProcRepository,
+		helper.DAGRunMgr,
+		helper.Config,
+		nil,
+		helper.ServiceRegistry,
+		nil,
+		nil,
+	)
+
+	// Sort by lastRun descending, one item per page, ask for page 2. The most
+	// recently run DAG is sort-paginate-1, so page 2 must be sort-paginate-2.
+	order := api.ListDAGsParamsOrderDesc
+	sortField := api.ListDAGsParamsSortLastRun
+	page := 2
+	perPage := 1
+	listRespObj, err := apiImpl.ListDAGs(context.Background(), api.ListDAGsRequestObject{
+		Params: api.ListDAGsParams{
+			Sort:    &sortField,
+			Order:   &order,
+			Page:    &page,
+			PerPage: &perPage,
+		},
+	})
+	require.NoError(t, err)
+	listResp, ok := listRespObj.(*api.ListDAGs200JSONResponse)
+	require.True(t, ok)
+	require.Len(t, listResp.Dags, 1)
+	require.Equal(t, "sort-paginate-2", listResp.Dags[0].Dag.Name)
+	require.Equal(t, 3, listResp.Pagination.TotalRecords)
+}
+
+// TestListDAGsSortsByStatusNoRunLastDesc verifies that a DAG with no latest run
+// sorts last even in descending order, matching the documented behavior.
+func TestListDAGsSortsByStatusNoRunLastDesc(t *testing.T) {
+	t.Parallel()
+
+	helper := test.Setup(t, test.WithStatusPersistence())
+
+	// Two DAGs with runs (Succeeded and Failed) and one DAG with no run.
+	now := time.Now().UTC()
+	names := []string{"sort-norun-0", "sort-norun-1", "sort-norun-none"}
+	statuses := []ir.Status{ir.Succeeded, ir.Failed, ir.NotStarted}
+	for i, name := range names {
+		dag := helper.DAG(t, fmt.Sprintf(`
+name: %s
+steps:
+  - run: echo hi
+`, name))
+		if statuses[i] == ir.NotStarted {
+			continue
+		}
+		attempt, err := helper.DAGRunRepository.CreateAttempt(helper.Context, dag.DAG, now, fmt.Sprintf("run-%d", i), persis.DAGRunCreateAttemptOptions{})
+		require.NoError(t, err)
+		status := ir.InitialStatus(dag.DAG)
+		status.DAGRunID = fmt.Sprintf("run-%d", i)
+		status.AttemptID = attempt.ID()
+		status.Status = statuses[i]
+		status.StartedAt = now.Format(time.RFC3339)
+		require.NoError(t, attempt.Open(helper.Context))
+		require.NoError(t, attempt.Write(helper.Context, status))
+		require.NoError(t, attempt.Close(helper.Context))
+	}
+
+	apiImpl := localapi.New(
+		helper.DAGRepository,
+		helper.DAGRunRepository,
+		helper.QueueStore,
+		helper.ProcRepository,
+		helper.DAGRunMgr,
+		helper.Config,
+		nil,
+		helper.ServiceRegistry,
+		nil,
+		nil,
+	)
+
+	// Sort by status descending. The no-run DAG must still come last.
+	order := api.ListDAGsParamsOrderDesc
+	sortField := api.ListDAGsParamsSortStatus
+	listRespObj, err := apiImpl.ListDAGs(context.Background(), api.ListDAGsRequestObject{
+		Params: api.ListDAGsParams{Sort: &sortField, Order: &order},
+	})
+	require.NoError(t, err)
+	listResp, ok := listRespObj.(*api.ListDAGs200JSONResponse)
+	require.True(t, ok)
+	require.Len(t, listResp.Dags, 3)
+	require.Equal(t, "sort-norun-0", listResp.Dags[0].Dag.Name)
+	require.Equal(t, "sort-norun-1", listResp.Dags[1].Dag.Name)
+	require.Equal(t, "sort-norun-none", listResp.Dags[2].Dag.Name)
 }

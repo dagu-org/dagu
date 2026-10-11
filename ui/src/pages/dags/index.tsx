@@ -5,6 +5,7 @@ import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   components,
+  ErrorCode,
   PathsDagsGetParametersQueryOrder,
   PathsDagsGetParametersQuerySort,
   ViewSortField,
@@ -85,8 +86,10 @@ const ALL_WORKFLOWS_VIEW_PARAM = 'all';
 const DELETE_BATCH_SIZE = 5;
 
 function normalizeWorkflowSortField(value?: string | null): ViewSortField {
-  return value === ViewSortField.nextRun
-    ? ViewSortField.nextRun
+  return value === ViewSortField.nextRun ||
+    value === ViewSortField.status ||
+    value === ViewSortField.lastRun
+    ? (value as ViewSortField)
     : ViewSortField.name;
 }
 
@@ -99,7 +102,11 @@ function workflowSortFieldQuery(
 ): PathsDagsGetParametersQuerySort {
   return value === ViewSortField.nextRun
     ? PathsDagsGetParametersQuerySort.nextRun
-    : PathsDagsGetParametersQuerySort.name;
+    : value === ViewSortField.status
+      ? PathsDagsGetParametersQuerySort.status
+      : value === ViewSortField.lastRun
+        ? PathsDagsGetParametersQuerySort.lastRun
+        : PathsDagsGetParametersQuerySort.name;
 }
 
 function workflowSortOrderQuery(
@@ -630,7 +637,7 @@ function DAGsContent() {
   );
 
   const dagsListSSE = useDAGsListSSE(queryParams, filtersReady);
-  const { data, mutate, isLoading } = useQuery(
+  const { data, error, mutate, isLoading } = useQuery(
     '/dags',
     filtersReady
       ? {
@@ -851,6 +858,23 @@ function DAGsContent() {
     },
     [activeWorkflowViewId, applyQueryFilters, updateFilterLocation]
   );
+
+  // A status or lastRun sort is rejected with a 400 (bad_request) when more
+  // than 300 DAGs match. Fall back to the name sort and drop the stale sort
+  // from the URL so the list does not stay broken for big installs.
+  React.useEffect(() => {
+    if (
+      error &&
+      error.code === ErrorCode.bad_request &&
+      (requestFilters.sortField === ViewSortField.status ||
+        requestFilters.sortField === ViewSortField.lastRun)
+    ) {
+      patchFilters(
+        { sortField: ViewSortField.name, sortOrder: ViewSortOrder.asc },
+        true
+      );
+    }
+  }, [error, requestFilters.sortField, patchFilters]);
 
   const searchTextChange = (nextSearchText: string) => {
     patchFilters({ searchText: nextSearchText });
