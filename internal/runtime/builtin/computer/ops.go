@@ -410,11 +410,12 @@ func (r *run) modelExtract(ctx context.Context, index int, spec extractSpec, key
 	instruction, schema := spec.Instruction, spec.Schema
 	var outline []desktop.Element
 	var front desktop.Element
+	var reader desktop.Elements
 	wrapped := false
 	if els, err := r.elementsIfAvailable(); err == nil {
 		if f, err := els.FrontWindow(); err == nil {
 			if o, err := els.Outline(f, maxExtractOutline); err == nil && len(o) > 0 {
-				front, outline = f, o
+				front, outline, reader = f, o, els
 				schema = readingSchema(spec.Schema)
 				instruction = r.extractInstruction(spec.Instruction, f, o)
 				wrapped = true
@@ -429,10 +430,10 @@ func (r *run) modelExtract(ctx context.Context, index int, spec extractSpec, key
 	if err := json.Unmarshal(data, &values); err != nil {
 		return fmt.Errorf("extract returned a non-object value: %w", err)
 	}
-	out, scalars, sources := unwrapAnswer(values, spec.Schema, wrapped)
+	out := unwrapAnswer(values, spec.Schema, wrapped)
 	if wrapped {
-		fields, bound := r.bindExtract(scalars, sources, spec.Schema, outline, front)
-		// A bound field publishes the element's converted value, so the
+		fields, bound := r.bindExtract(ctx, values, spec.Schema, outline, front, reader, r.cfg.maxRows(spec))
+		// A bound field publishes the value read through the binding, so the
 		// model run reads the same as every later run.
 		maps.Copy(out, bound)
 		if len(fields) > 0 {

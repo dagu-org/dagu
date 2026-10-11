@@ -5,6 +5,7 @@ package computer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -32,8 +33,8 @@ func (m extractMiss) Error() string { return "the extract cannot run without AI:
 func (m extractMiss) Unwrap() error { return m.err }
 
 // bindableKind returns the column type a scalar schema property binds as,
-// and whether it can bind at all. Objects and arrays never bind, and a
-// boolean reads a checkbox's state, which follows with tables.
+// and whether it can bind at all. Objects and arrays never bind; a boolean
+// reads a checkbox's state.
 func bindableKind(property any) (workbook.ColumnType, bool) {
 	prop, ok := property.(map[string]any)
 	if !ok {
@@ -46,9 +47,49 @@ func bindableKind(property any) (workbook.ColumnType, bool) {
 		return workbook.TypeNumber, true
 	case "integer":
 		return workbook.TypeInteger, true
+	case "boolean":
+		return workbook.TypeBoolean, true
 	default:
 		return "", false
 	}
+}
+
+// tableColumns returns the column type of each item property of an
+// array-of-objects field, and whether the field binds to a table: an array
+// whose items are objects of scalar properties. Its item properties are
+// the table's columns.
+func tableColumns(property any) (map[string]workbook.ColumnType, bool) {
+	prop, ok := property.(map[string]any)
+	if !ok || prop["type"] != "array" {
+		return nil, false
+	}
+	items, ok := prop["items"].(map[string]any)
+	if !ok || items["type"] != "object" {
+		return nil, false
+	}
+	itemProps, ok := items["properties"].(map[string]any)
+	if !ok || len(itemProps) == 0 {
+		return nil, false
+	}
+	columns := make(map[string]workbook.ColumnType, len(itemProps))
+	for name, p := range itemProps {
+		kind, ok := bindableKind(p)
+		if !ok {
+			return nil, false
+		}
+		columns[name] = kind
+	}
+	return columns, true
+}
+
+// readsFromElements reports whether a field can be read without the model:
+// a scalar from one element, or a table of scalars from a container.
+func readsFromElements(property any) bool {
+	if _, ok := bindableKind(property); ok {
+		return true
+	}
+	_, ok := tableColumns(property)
+	return ok
 }
 
 // schemaProperties returns the top-level properties of an extract schema.
@@ -57,12 +98,12 @@ func schemaProperties(schema map[string]any) map[string]any {
 	return properties
 }
 
-// bindableFields names the schema properties an extract can read from an
-// element, with the type each converts to, in sorted order.
+// bindableFields names the schema properties an extract can read from the
+// window's elements, scalar or table, in sorted order.
 func bindableFields(schema map[string]any) []string {
 	var names []string
 	for name, property := range schemaProperties(schema) {
-		if _, ok := bindableKind(property); ok {
+		if readsFromElements(property) {
 			names = append(names, name)
 		}
 	}
@@ -71,11 +112,11 @@ func bindableFields(schema map[string]any) []string {
 }
 
 // unbindableFields names the schema properties an extract cannot read
-// without the model: objects, arrays, and, until tables land, booleans.
+// without the model: objects, and arrays that are not tables of scalars.
 func unbindableFields(schema map[string]any) []string {
 	var names []string
 	for name, property := range schemaProperties(schema) {
-		if _, ok := bindableKind(property); !ok {
+		if !readsFromElements(property) {
 			names = append(names, name)
 		}
 	}
@@ -103,11 +144,43 @@ func readingSchema(schema map[string]any) map[string]any {
 			}
 			continue
 		}
+		if _, ok := tableColumns(property); ok {
+			reading[name] = tableReadingSchema(prop)
+			continue
+		}
 		reading[name] = property
 	}
 	out := maps.Clone(schema)
 	out["properties"] = reading
 	return out
+}
+
+// tableReadingSchema is the object the model answers for a table field:
+// the container to read, the column each item property came from, and the
+// rows themselves, so the run can bind the container and verify the rows.
+func tableReadingSchema(array map[string]any) map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"container": map[string]any{
+				"type":        "object",
+				"description": "the grid, table, or list the rows came from",
+				"properties": map[string]any{
+					"role": map[string]any{"type": "string"},
+					"name": map[string]any{"type": "string"},
+					"id":   map[string]any{"type": "string"},
+				},
+				"required": []any{"role"},
+			},
+			"columns": map[string]any{
+				"type":                 "object",
+				"description":          "for each item property, the column header it was read from",
+				"additionalProperties": map[string]any{"type": "string"},
+			},
+			"rows": array,
+		},
+		"required": []any{"container", "columns", "rows"},
+	}
 }
 
 // extractInstruction appends the window's elements to the instruction, so
@@ -206,33 +279,29 @@ func (r *run) bindField(name string, kind workbook.ColumnType, modelValue any, n
 	return fieldBinding{Name: name, Kind: string(kind), Element: *rec}, value, true
 }
 
-// unwrapAnswer separates a model answer into the values to publish and, for
-// each bindable field, the value the model read, so the run can bind it.
-// When the request used the reading schema, a bindable field's answer is
-// {value, element}; otherwise every field is its own value. schema is the
-// original extract schema, which says which fields are bindable.
-func unwrapAnswer(values map[string]any, schema map[string]any, wrapped bool) (out map[string]any, scalars map[string]any, sources map[string]string) {
-	out = make(map[string]any, len(values))
-	scalars = map[string]any{}
-	sources = map[string]string{}
+// unwrapAnswer turns a model answer under the reading schema into the
+// values to publish: a scalar field's {value, element} becomes its value,
+// a table field's {container, columns, rows} becomes its rows, and any
+// other field is its own value. A model that answered the plain value
+// anyway still publishes. schema is the original extract schema.
+func unwrapAnswer(values map[string]any, schema map[string]any, wrapped bool) map[string]any {
+	out := make(map[string]any, len(values))
 	properties := schemaProperties(schema)
 	for name, value := range values {
-		// A bindable field's answer is {value, element} under the reading
-		// schema; a model that answered the plain value anyway still
-		// publishes, just without a source to bind.
-		if inner, ok := value.(map[string]any); wrapped && ok && hasBindableAnswer(properties[name], inner) {
+		inner, ok := value.(map[string]any)
+		switch {
+		case wrapped && ok && hasBindableAnswer(properties[name], inner):
 			out[name] = inner["value"]
-			scalars[name] = inner["value"]
-			source, _ := inner["element"].(string)
-			sources[name] = source
-			continue
+		case wrapped && ok && hasTableAnswer(properties[name], inner):
+			out[name] = inner["rows"]
+		default:
+			out[name] = value
 		}
-		out[name] = value
 	}
-	return out, scalars, sources
+	return out
 }
 
-// hasBindableAnswer reports whether a bindable field's answer is the
+// hasBindableAnswer reports whether a scalar field's answer is the
 // {value, element} object the reading schema asked for.
 func hasBindableAnswer(property any, answer map[string]any) bool {
 	if _, bindable := bindableKind(property); !bindable {
@@ -241,6 +310,17 @@ func hasBindableAnswer(property any, answer map[string]any) bool {
 	_, hasValue := answer["value"]
 	_, hasElement := answer["element"]
 	return hasValue && hasElement
+}
+
+// hasTableAnswer reports whether a table field's answer is the
+// {container, columns, rows} object the reading schema asked for.
+func hasTableAnswer(property any, answer map[string]any) bool {
+	if _, ok := tableColumns(property); !ok {
+		return false
+	}
+	_, hasContainer := answer["container"]
+	_, hasRows := answer["rows"]
+	return hasContainer && hasRows
 }
 
 // publishExtract writes an extract's values to the step outputs, keeping
@@ -256,29 +336,131 @@ func (r *run) publishExtract(schema map[string]any, values map[string]any) {
 	}
 }
 
-// bindExtract binds every bindable field the model read from an element,
-// over the window's outline. A field the model read from the screen, with
-// no element named, does not bind.
-func (r *run) bindExtract(scalars map[string]any, sources map[string]string, schema map[string]any, outline []desktop.Element, front desktop.Element) ([]fieldBinding, map[string]any) {
+// bindExtract binds every field the model read from the window: a scalar
+// to the element it named, a table to its container. It returns the
+// bindings and, for each bound field, the value read through the binding,
+// which the model run publishes so it reads the same as every later run. A
+// field the model read from the screen does not bind.
+func (r *run) bindExtract(ctx context.Context, values map[string]any, schema map[string]any, outline []desktop.Element, front desktop.Element, els desktop.Elements, maxRows int) ([]fieldBinding, map[string]any) {
 	var fields []fieldBinding
-	values := map[string]any{}
+	published := map[string]any{}
 	properties := schemaProperties(schema)
 	for _, name := range bindableFields(schema) {
-		value, ok := scalars[name]
+		answer, ok := values[name].(map[string]any)
 		if !ok {
 			continue
 		}
-		index := elementIndex(sources[name], len(outline))
-		if index < 0 {
+		if kind, scalar := bindableKind(properties[name]); scalar {
+			if binding, bound, ok := r.bindScalar(name, kind, answer, outline, front); ok {
+				fields = append(fields, binding)
+				published[name] = bound
+			}
 			continue
 		}
-		kind, _ := bindableKind(properties[name])
-		if binding, bound, ok := r.bindField(name, kind, value, outline[index], outline, front); ok {
-			fields = append(fields, binding)
-			values[name] = bound
+		if columns, table := tableColumns(properties[name]); table {
+			if binding, rows, ok := r.bindTable(ctx, name, columns, answer, els, front, maxRows); ok {
+				fields = append(fields, binding)
+				published[name] = rows
+			}
 		}
 	}
-	return fields, values
+	return fields, published
+}
+
+// bindScalar binds a scalar field to the element the model named in its
+// {value, element} answer.
+func (r *run) bindScalar(name string, kind workbook.ColumnType, answer map[string]any, outline []desktop.Element, front desktop.Element) (fieldBinding, any, bool) {
+	source, _ := answer["element"].(string)
+	index := elementIndex(source, len(outline))
+	if index < 0 {
+		return fieldBinding{}, nil, false
+	}
+	return r.bindField(name, kind, answer["value"], outline[index], outline, front)
+}
+
+// bindTable binds a table field to its container, when the rows read
+// through the binding reproduce the rows the model returned, so a binding
+// to the wrong container does not hold.
+func (r *run) bindTable(ctx context.Context, name string, columns map[string]workbook.ColumnType, answer map[string]any, els desktop.Elements, front desktop.Element, maxRows int) (fieldBinding, []any, bool) {
+	container, ok := selectorFromAnswer(answer["container"])
+	if !ok {
+		return fieldBinding{}, nil, false
+	}
+	headers, _ := answer["columns"].(map[string]any)
+	modelRows, _ := answer["rows"].([]any)
+	props := slices.Sorted(maps.Keys(columns))
+	var cols []columnBinding
+	var wanted []string
+	for _, prop := range props {
+		header, _ := headers[prop].(string)
+		if header == "" {
+			return fieldBinding{}, nil, false
+		}
+		cols = append(cols, columnBinding{Property: prop, Header: header, Kind: string(columns[prop])})
+		wanted = append(wanted, header)
+	}
+	read, err := els.Rows(ctx, container, wanted, maxRows)
+	if err != nil || !tableReproduces(read, modelRows, props, columns) {
+		return fieldBinding{}, nil, false
+	}
+	binding := fieldBinding{Name: name, Kind: "table", Table: &tableBinding{
+		Container: container, App: front.App, Window: front.Window, Columns: cols, MaxRows: maxRows,
+	}}
+	return binding, rowsToValues(read, props, columns), true
+}
+
+// selectorFromAnswer builds a selector from the model's container object.
+func selectorFromAnswer(value any) (desktop.Selector, bool) {
+	answer, ok := value.(map[string]any)
+	if !ok {
+		return desktop.Selector{}, false
+	}
+	role, _ := answer["role"].(string)
+	if role == "" {
+		return desktop.Selector{}, false
+	}
+	name, _ := answer["name"].(string)
+	id, _ := answer["id"].(string)
+	return desktop.Selector{Role: role, Name: name, ID: id}, true
+}
+
+// tableReproduces reports whether the rows read through a binding give the
+// rows the model returned, each cell converted to its column's type. The
+// read must hold at least the rows the model returned.
+func tableReproduces(read [][]string, modelRows []any, props []string, columns map[string]workbook.ColumnType) bool {
+	if len(modelRows) == 0 || len(read) < len(modelRows) {
+		return false
+	}
+	for i, raw := range modelRows {
+		row, ok := raw.(map[string]any)
+		if !ok {
+			return false
+		}
+		for j, prop := range props {
+			if !sameValue(read[i][j], row[prop], columns[prop]) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// rowsToValues converts a table read into step-output rows: one object per
+// row, each property converted to its column's type.
+func rowsToValues(read [][]string, props []string, columns map[string]workbook.ColumnType) []any {
+	out := make([]any, 0, len(read))
+	for _, row := range read {
+		object := make(map[string]any, len(props))
+		for j, prop := range props {
+			value, err := convertField(row[j], columns[prop])
+			if err != nil {
+				value = row[j]
+			}
+			object[prop] = value
+		}
+		out = append(out, object)
+	}
+	return out
 }
 
 // readBinding reads every bound field from the screen now, converting each
@@ -287,6 +469,14 @@ func (r *run) bindExtract(scalars map[string]any, sources map[string]string, sch
 func (r *run) readBinding(ctx context.Context, index int, els desktop.Elements, entry recording, findWithin time.Duration) (map[string]any, string, error) {
 	values := make(map[string]any, len(entry.Fields))
 	for _, field := range entry.Fields {
+		if field.Table != nil {
+			rows, reason, err := r.readTable(ctx, els, field)
+			if err != nil || reason != "" {
+				return nil, reason, err
+			}
+			values[field.Name] = rows
+			continue
+		}
 		found, reason, err := r.resolveElement(ctx, index, els, field.Element, findWithin)
 		if err != nil {
 			return nil, "", err
@@ -305,6 +495,40 @@ func (r *run) readBinding(ctx context.Context, index int, els desktop.Elements, 
 		values[field.Name] = value
 	}
 	return values, "", nil
+}
+
+// readTable reads a bound table's rows, after the recorded application is
+// in front. A container that is gone, a column header that moved away, or
+// an unreadable cell is a miss.
+func (r *run) readTable(ctx context.Context, els desktop.Elements, field fieldBinding) ([]any, string, error) {
+	tbl := field.Table
+	front, err := els.FrontWindow()
+	if err != nil {
+		return nil, "", err
+	}
+	if ok, reason := r.frontMatches(front, tbl.App, tbl.Window); !ok {
+		return nil, fmt.Sprintf("table %q cannot be read: %s", field.Name, reason), nil
+	}
+	props := make([]string, len(tbl.Columns))
+	headers := make([]string, len(tbl.Columns))
+	columns := make(map[string]workbook.ColumnType, len(tbl.Columns))
+	for i, column := range tbl.Columns {
+		props[i] = column.Property
+		headers[i] = column.Header
+		kind, err := workbook.ParseColumnType(column.Kind)
+		if err != nil {
+			return nil, fmt.Sprintf("table %q column %q has an unknown type %q", field.Name, column.Property, column.Kind), nil
+		}
+		columns[column.Property] = kind
+	}
+	read, err := els.Rows(ctx, substituteSelector(tbl.Container, r.variables), headers, tbl.MaxRows)
+	switch {
+	case errors.Is(err, desktop.ErrNotFound):
+		return nil, fmt.Sprintf("table %q cannot be read: %s", field.Name, err.Error()), nil
+	case err != nil:
+		return nil, "", err
+	}
+	return rowsToValues(read, props, columns), "", nil
 }
 
 // boundNames lists the fields a recording binds, sorted.

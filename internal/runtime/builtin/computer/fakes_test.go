@@ -169,6 +169,47 @@ type fakeElements struct {
 	applyErr map[string]error
 	// onApply sees every pattern the executor applies.
 	onApply func(desktop.Element, desktop.Pattern, string)
+	// tableHeaders and tableRows are the columns and rows a container
+	// exposes, for Rows; tableErr fails Rows when set.
+	tableHeaders []string
+	tableRows    [][]string
+	tableErr     error
+}
+
+// Rows returns the scripted table rows, each cell under the column a
+// header names, as the real reader does.
+func (f *fakeElements) Rows(_ context.Context, _ desktop.Selector, columns []string, maxRows int) ([][]string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.tableErr != nil {
+		return nil, f.tableErr
+	}
+	index := map[string]int{}
+	for i, head := range f.tableHeaders {
+		index[desktop.NormalizeText(head)] = i
+	}
+	cols := make([]int, len(columns))
+	for i, name := range columns {
+		at, ok := index[desktop.NormalizeText(name)]
+		if !ok {
+			return nil, fmt.Errorf("%w: no column is headed %q", desktop.ErrNotFound, name)
+		}
+		cols[i] = at
+	}
+	var out [][]string
+	for r, row := range f.tableRows {
+		if r >= maxRows {
+			break
+		}
+		cells := make([]string, len(cols))
+		for i, at := range cols {
+			if at < len(row) {
+				cells[i] = row[at]
+			}
+		}
+		out = append(out, cells)
+	}
+	return out, nil
 }
 
 // expenseWindow and expenseElements are a form in an expense app: a saved
