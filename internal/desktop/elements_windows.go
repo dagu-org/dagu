@@ -42,8 +42,14 @@ var elementProperties = []int32{
 	uiaRuntimeIdProperty, uiaBoundingRectangleProperty, uiaControlTypeProperty, uiaNameProperty,
 	uiaAutomationIdProperty, uiaClassNameProperty, uiaLabeledByProperty, uiaIsPasswordProperty,
 	uiaNativeWindowHandleProperty, uiaIsOffscreenProperty, uiaFrameworkIdProperty,
-	uiaValueValueProperty, uiaLegacyIAccessibleValueProperty,
+	uiaValueValueProperty, uiaLegacyIAccessibleValueProperty, uiaToggleToggleStateProperty,
 }
+
+// toggle state values a checkbox or radio button reports.
+const (
+	toggleStateOff = 0
+	toggleStateOn  = 1
+)
 
 // parentProperties are cached for an element's ancestors and their
 // children, which only need to be told apart and placed.
@@ -64,6 +70,7 @@ var roles = map[int32]string{
 	uiaTabItem:   RoleTab,
 	uiaHyperlink: RoleLink,
 	uiaDataItem:  RoleCell, uiaHeaderItem: RoleCell,
+	uiaList: RoleList, uiaDataGrid: RoleList, uiaTable: RoleList, uiaTree: RoleList,
 	uiaGroup:  RoleGroup,
 	uiaWindow: RoleWindow,
 }
@@ -337,6 +344,42 @@ func actAlone(what string, fn func(*uiaWorker) error) error {
 		// or may already have taken effect, such as an Invoke whose handler
 		// opened a dialog.
 		return fmt.Errorf("%s: no answer within %s; the application may still be handling it: %w", what, elementsTimeout, context.DeadlineExceeded)
+	}
+}
+
+// readAlone runs fn on a locked thread that lives for the call, with an
+// automation client of its own, and waits until ctx is done rather than the
+// reader's five seconds, so a long read, such as a large table, has the
+// operation's time without holding the reader thread. An abandoned call
+// ends with its thread.
+func readAlone[T any](ctx context.Context, what string, fn func(*uiaWorker) (T, error)) (T, error) {
+	type answer struct {
+		value T
+		err   error
+	}
+	result := make(chan answer, 1)
+	go func() {
+		runtime.LockOSThread()
+		result <- func() answer {
+			if err := windows.CoInitializeEx(0, windows.COINIT_MULTITHREADED); err != nil {
+				return answer{err: err}
+			}
+			defer windows.CoUninitialize()
+			w, err := newActor()
+			if err != nil {
+				return answer{err: err}
+			}
+			defer w.release()
+			value, err := fn(w)
+			return answer{value: value, err: err}
+		}()
+	}()
+	select {
+	case res := <-result:
+		return res.value, res.err
+	case <-ctx.Done():
+		var zero T
+		return zero, fmt.Errorf("%s: %w", what, ctx.Err())
 	}
 }
 
@@ -700,6 +743,16 @@ func (w *uiaWorker) convert(el *element, topLevel bool) (Element, error) {
 	found := Element{Role: roleOf(controlType, topLevel), Name: name, ID: id, Bounds: bounds}
 	if password, err := el.cachedIsPassword(); err == nil && !password {
 		found.Value = w.value(el)
+	}
+	// A checkbox or radio button holds its state, not text, so its value is
+	// its toggle state as a boolean a person would read.
+	if found.Value == "" && (found.Role == RoleCheckbox || found.Role == RoleRadio) {
+		switch state, err := el.cachedInt(uiaToggleToggleStateProperty); {
+		case err == nil && state == toggleStateOn:
+			found.Value = "true"
+		case err == nil && state == toggleStateOff:
+			found.Value = "false"
+		}
 	}
 	if label, err := el.cachedLabeledBy(); err == nil && label != nil {
 		found.Label, _ = label.currentName()

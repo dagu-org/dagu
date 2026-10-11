@@ -34,6 +34,7 @@ const (
 	uiaNativeWindowHandleProperty     = 30020
 	uiaIsOffscreenProperty            = 30022
 	uiaFrameworkIdProperty            = 30024
+	uiaToggleToggleStateProperty      = 30086
 	uiaValueValueProperty             = 30045
 	uiaLegacyIAccessibleValueProperty = 30093
 )
@@ -45,18 +46,22 @@ const (
 	uiaComboBox    = 50003
 	uiaEdit        = 50004
 	uiaHyperlink   = 50005
+	uiaList        = 50008
 	uiaListItem    = 50007
 	uiaMenuItem    = 50011
 	uiaRadioButton = 50013
 	uiaTabItem     = 50019
 	uiaText        = 50020
+	uiaTree        = 50023
 	uiaTreeItem    = 50024
 	uiaGroup       = 50026
+	uiaDataGrid    = 50028
 	uiaDataItem    = 50029
 	uiaDocument    = 50030
 	uiaSplitButton = 50031
 	uiaWindow      = 50032
 	uiaHeaderItem  = 50035
+	uiaTable       = 50036
 )
 
 // Tree scopes and the element mode a cache request takes.

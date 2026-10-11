@@ -11,7 +11,7 @@ $form = New-Object System.Windows.Forms.Form
 $form.Text = 'Dagu elements test'
 $form.StartPosition = 'Manual'
 $form.Location = New-Object System.Drawing.Point(100, 100)
-$form.Size = New-Object System.Drawing.Size(600, 400)
+$form.Size = New-Object System.Drawing.Size(600, 540)
 $form.TopMost = $true
 $form.Add_Shown({ $form.Activate() })
 
@@ -52,5 +52,14 @@ $group = Add-Control $form 'GroupBox' 'paymentGroup' '支払情報' 20 190 540 1
 [void](Add-Control $group 'Label' 'lblPaymentAmount' '金額' 20 30 60 24)
 [void](Add-Control $group 'TextBox' 'paymentAmountBox' '' 90 30 200 24)
 [void](Add-Control $group 'Button' 'paymentSaveButton' '保存' 90 70 90 28)
+
+# A table in Details view, for tests that read rows by column header.
+$lines = Add-Control $form 'ListView' 'linesList' '' 20 350 540 100
+$lines.View = 'Details'
+$lines.FullRowSelect = $true
+[void]$lines.Columns.Add('品目', 260)
+[void]$lines.Columns.Add('金額', 260)
+[void]$lines.Items.Add('りんご').SubItems.Add('1,200')
+[void]$lines.Items.Add('みかん').SubItems.Add('3,400')
 
 [void]$form.ShowDialog()

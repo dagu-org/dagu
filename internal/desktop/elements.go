@@ -4,6 +4,7 @@
 package desktop
 
 import (
+	"context"
 	"errors"
 	"image"
 	"slices"
@@ -56,6 +57,7 @@ const (
 	RoleTab       = "tab"
 	RoleLink      = "link"
 	RoleCell      = "cell"
+	RoleList      = "list"
 	RoleGroup     = "group"
 	RoleWindow    = "window"
 	RoleOther     = "other"
@@ -64,7 +66,7 @@ const (
 // Roles lists every role a selector may name.
 var Roles = []string{
 	RoleButton, RoleTextField, RoleText, RoleCheckbox, RoleRadio, RoleComboBox,
-	RoleListItem, RoleMenuItem, RoleTab, RoleLink, RoleCell, RoleGroup, RoleWindow, RoleOther,
+	RoleListItem, RoleMenuItem, RoleTab, RoleLink, RoleCell, RoleList, RoleGroup, RoleWindow, RoleOther,
 }
 
 // maxOutline bounds an outline that sets no limit, so a window with an
@@ -129,6 +131,12 @@ type Elements interface {
 	// ErrDisabled says it takes no input yet; a read-only field or an
 	// element with nothing to expand is an error saying so.
 	Apply(target Element, pattern Pattern, value string) error
+	// Rows reads a grid, table, or list's rows as text, one []string per
+	// row, each cell the text under the column that columns names by its
+	// header, up to max rows. A container with no grid, a column with no
+	// header, or an unreadable cell is an error. It may take longer than
+	// one read, so it is bounded by ctx.
+	Rows(ctx context.Context, container Selector, columns []string, max int) ([][]string, error)
 	Close() error
 }
 
