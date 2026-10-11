@@ -59,7 +59,7 @@ export function FeatureList({ license }: { license: LicenseStatus }) {
                   {included &&
                     (setup ? (
                       <a
-                        className="underline"
+                        className="text-primary hover:underline"
                         href={href}
                         target="_blank"
                         rel="noopener noreferrer"
@@ -67,7 +67,7 @@ export function FeatureList({ license }: { license: LicenseStatus }) {
                         {ts('Setup guide')}
                       </a>
                     ) : (
-                      <Link className="underline" to={href}>
+                      <Link className="text-primary hover:underline" to={href}>
                         {ts('Open feature')}
                       </Link>
                     ))}
