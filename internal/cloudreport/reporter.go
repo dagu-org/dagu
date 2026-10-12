@@ -299,6 +299,9 @@ func (r *Reporter) report(ctx context.Context) time.Duration {
 		return r.jitter(r.interval)
 	}
 
+	// Recorded before sending: a report that fails or is cut short may still
+	// have reached Dagu Console, and a needless off report costs less than
+	// a missing one, which looks like an outage.
 	r.setReported(ctx, level)
 	res, err := r.send(sendCtx, creds, level)
 	switch {
