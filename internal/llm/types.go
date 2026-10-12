@@ -28,18 +28,24 @@ const (
 )
 
 // ThinkingEffort represents the reasoning depth level for thinking mode.
+// Each provider maps a level it lacks to its nearest supported one.
 type ThinkingEffort string
 
 const (
+	// ThinkingEffortNone turns thinking off where the provider allows it.
+	ThinkingEffortNone ThinkingEffort = "none"
+	// ThinkingEffortMinimal provides the least reasoning short of none.
+	ThinkingEffortMinimal ThinkingEffort = "minimal"
 	// ThinkingEffortLow provides quick reasoning with minimal token budget.
 	ThinkingEffortLow ThinkingEffort = "low"
 	// ThinkingEffortMedium provides balanced reasoning (default).
 	ThinkingEffortMedium ThinkingEffort = "medium"
 	// ThinkingEffortHigh provides thorough analysis with larger token budget.
 	ThinkingEffortHigh ThinkingEffort = "high"
-	// ThinkingEffortXHigh provides maximum reasoning depth.
-	// Note: Not all providers support this level.
+	// ThinkingEffortXHigh provides deeper reasoning than high.
 	ThinkingEffortXHigh ThinkingEffort = "xhigh"
+	// ThinkingEffortMax provides maximum reasoning depth.
+	ThinkingEffortMax ThinkingEffort = "max"
 )
 
 // ParseThinkingEffort validates and returns a ThinkingEffort from a string.
@@ -48,10 +54,11 @@ func ParseThinkingEffort(s string) (ThinkingEffort, error) {
 	switch ThinkingEffort(s) {
 	case "":
 		return "", nil
-	case ThinkingEffortLow, ThinkingEffortMedium, ThinkingEffortHigh, ThinkingEffortXHigh:
+	case ThinkingEffortNone, ThinkingEffortMinimal, ThinkingEffortLow, ThinkingEffortMedium,
+		ThinkingEffortHigh, ThinkingEffortXHigh, ThinkingEffortMax:
 		return ThinkingEffort(s), nil
 	default:
-		return "", fmt.Errorf("invalid thinking effort %q: must be one of: low, medium, high, xhigh", s)
+		return "", fmt.Errorf("invalid thinking effort %q: must be one of: none, minimal, low, medium, high, xhigh, max", s)
 	}
 }
 
@@ -233,7 +240,8 @@ func DefaultConfig() Config {
 type ThinkingRequest struct {
 	// Enabled activates thinking mode.
 	Enabled bool
-	// Effort controls reasoning depth: low, medium, high, xhigh.
+	// Effort controls reasoning depth: none, minimal, low, medium, high,
+	// xhigh, max.
 	Effort ThinkingEffort
 	// BudgetTokens sets explicit token budget (provider-specific).
 	BudgetTokens *int

@@ -3794,6 +3794,16 @@ func TestBuildThinkingConfig(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name:    "ValidNoneEffort",
+			cfg:     &thinkingConfig{Enabled: true, Effort: "none"},
+			wantErr: false,
+		},
+		{
+			name:    "ValidMaxEffort",
+			cfg:     &thinkingConfig{Enabled: true, Effort: "max"},
+			wantErr: false,
+		},
+		{
 			name:    "InvalidEffort",
 			cfg:     &thinkingConfig{Enabled: true, Effort: "invalid"},
 			wantErr: true,
