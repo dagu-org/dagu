@@ -84,7 +84,7 @@ a way to activate a license, not as a new concept:
 ```text
  Dagu server                           Dagu Cloud console                 Owner (browser)
    │ secret = 32 random bytes                 │                                │
-   │ open /servers/connect?code=sha256(secret)&server_id=…&name=… ───────────▶ │
+   │ open /servers/connect?code=sha256(secret)&server_id=…&name=…&version=… ─▶ │
    │                                          │ ◀── sign in, pick workspace ── │
    │                                          │ ◀── approve ────────────────── │
    │ POST /api/v1/licenses/connect {connection_secret, server_id} (every 3 s)  │
@@ -95,11 +95,41 @@ a way to activate a license, not as a new concept:
 The approval page states what the server will report. Approvals expire after
 15 minutes, as the console enforces today.
 
+`version` is the Dagu version, the same string the server sends as
+`client_version`: `2.19.2` from a release, `v2.19.2-3-gabc1234` from a source
+build, or `dev`. The approval page uses it to turn away servers too old for
+the plan on offer (see Free plan).
+
 ### Disconnecting
 
 **Disconnect** on the license settings page calls `POST /api/v1/licenses/release`,
 clears the activation, and stops reporting and remote access at once. Disconnecting
 from the console has the same effect on the next report (`401`).
+
+### Free plan
+
+A workspace can connect a server without a paid plan, so that Dagu Cloud
+monitors it: the server's runs, failures, and trends, with an email when a
+workflow fails or the server stops reporting.
+
+- **Token.** The license token has `plan` `free` and an empty `features`
+  list. Dagu treats it as Community for every paid feature: SSO, RBAC, audit
+  logs, incident routing, and API keys beyond two stay off, even if the token
+  claims features.
+- **Still connected.** The server checks in hourly and reports at the level
+  its admin chooses, as any connected server does. Starting another
+  connection fails as it does with a paid license, and disconnecting frees the
+  server's free slot.
+- **Slower reports.** Dagu Cloud may answer a free server with
+  `next_report_seconds` `300`, and answer reports that come sooner, early
+  reports included, with `429` and `Retry-After`. The reporter honors both
+  (see Cadence and Wire contract).
+- **Plan changes.** The next check-in replaces the token, so paid features
+  turn on or off without reconnecting.
+- **Version gate.** Releases before v2.19.2 treat any license as paid. Dagu
+  Cloud refuses a free connection when `version` is missing or older than
+  v2.19.2, with the message "Update Dagu to v2.19.2 or later to use free
+  monitoring."
 
 ## Reporting
 
@@ -171,7 +201,7 @@ was queued, started, began waiting, or finished. Once a report is throttled,
 rejected, or fails, nothing is reported early until one is accepted, and news
 that an accepted report carried calls for no further early report. Dagu Cloud
 can lengthen the interval in its response (`next_report_seconds`) to shed
-load.
+load, and does for free servers (see Free plan).
 
 Many workflows run at the top of the hour, so reports are spread out:
 
@@ -437,6 +467,7 @@ the relay and announced in its reply to `hello`.
 | Release | Ships |
 | --- | --- |
 | v2.19 | Browser approval; reporting; the `cloud` config section. Dagu Cloud's report endpoint must be live first. |
+| v2.19.2 | The free plan, and `version` on the connect URL. |
 | v2.20 | The `dagucloud` tunnel provider, carrying webhook deliveries for public triggers only (RFC 004). |
 | v3.0 | Remote access over the same connection: assertions, the Remote access control, the UI bar. License audience check. |
 
