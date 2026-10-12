@@ -77,6 +77,9 @@ type fakeEngine struct {
 	// replayLosesPage is how many of the next replayed actions lose the
 	// connection to the page after their click lands.
 	replayLosesPage int
+	// pageLoss, if set, is how acts and replays that lose the page report it
+	// in place of errFakeSessionLost.
+	pageLoss error
 	// onAct runs while an act asks the model, for what happens meanwhile.
 	onAct func()
 	// actDialogs are the dialogs the next act opens and the browser accepts.
@@ -158,6 +161,10 @@ func (e *fakeEngine) load(url string) {
 // page session was detached.
 var errFakeSessionLost = fmt.Errorf("%w: Failed to perform act: -32001 Session with given id not found.", errPageSessionLost)
 
+// errFakeContextLost is how the browser runtime reports an operation whose
+// script context a new document replaced.
+var errFakeContextLost = fmt.Errorf("%w: Failed to perform act: -32000 Cannot find context with specified id", errPageContextLost)
+
 func (e *fakeEngine) Act(ctx context.Context, instruction string, variables map[string]string, _ time.Duration) (actOutcome, error) {
 	e.mu.Lock()
 	e.acts = append(e.acts, fakeAct{instruction: instruction, variables: maps.Clone(variables)})
@@ -168,7 +175,7 @@ func (e *fakeEngine) Act(ctx context.Context, instruction string, variables map[
 	e.actDialogs = nil
 	e.blocked, e.actBlocked = e.actBlocked, nil
 	generate, onAct, twoStep, fills := e.generate, e.onAct, e.twoStepAct, e.actFills
-	losesPage := e.actLosesPage > 0
+	losesPage, pageLoss := e.actLosesPage > 0, cmp.Or(e.pageLoss, errFakeSessionLost)
 	if losesPage {
 		e.actLosesPage--
 	}
@@ -192,7 +199,7 @@ func (e *fakeEngine) Act(ctx context.Context, instruction string, variables map[
 		return actOutcome{Message: "Failed to perform act: No action found"}, nil
 	}
 	if losesPage {
-		return actOutcome{}, errFakeSessionLost
+		return actOutcome{}, pageLoss
 	}
 	actions := []recordedAction{{Selector: "xpath=" + choice.ElementID, Method: "click"}}
 	if fills != "" {
@@ -216,7 +223,7 @@ func (e *fakeEngine) Replay(_ context.Context, action recordedAction, _ map[stri
 	}
 	if e.replayLosesPage > 0 {
 		e.replayLosesPage--
-		return false, errFakeSessionLost
+		return false, cmp.Or(e.pageLoss, errFakeSessionLost)
 	}
 	return !e.replayFails, nil
 }

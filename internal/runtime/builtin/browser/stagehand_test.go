@@ -715,14 +715,15 @@ func TestSessionLost(t *testing.T) {
 		return stagehand.ActResult{Data: stagehand.ActResultData{Message: message}}
 	}
 	for name, tc := range map[string]struct {
-		result stagehand.ActResult
-		err    error
-		lost   bool
+		result  stagehand.ActResult
+		err     error
+		lost    bool
+		context bool
 	}{
 		"failed action": {result: failed("Failed to perform act: -32001 Session with given id not found."), lost: true},
 		"replaced context": {
 			result: failed("Failed to perform act: -32000 Cannot find context with specified id"),
-			lost:   true,
+			lost:   true, context: true,
 		},
 		"rpc error": {
 			err:  fmt.Errorf("act: %w", &stagehand.RPCError{Code: -32603, Message: "No Page found for target closed before CDP response (sessionId=s1, targetId=t1)"}),
@@ -734,6 +735,7 @@ func TestSessionLost(t *testing.T) {
 	} {
 		lost := sessionLost(tc.result, tc.err)
 		assert.Equal(t, tc.lost, errors.Is(lost, errPageSessionLost), name)
+		assert.Equal(t, tc.context, errors.Is(lost, errPageContextLost), name)
 	}
 }
 

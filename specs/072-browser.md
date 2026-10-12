@@ -265,7 +265,9 @@ reports back, as when a click or a chosen option loads a new page. The step
 then checks the page instead of acting blindly, which could submit a form
 twice: a new document means the action took effect, and the step goes on; the
 same document means it did not, and the act runs once more. Losing the page
-again, or a page that cannot be read, fails the step.
+again, or a page that cannot be read, fails the step. So does losing the page
+to a frame that loads a new document while the page keeps its own: the action
+may have caused that load, so acting again could repeat it.
 
 ## Examples
 

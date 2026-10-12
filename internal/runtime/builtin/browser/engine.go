@@ -7,12 +7,18 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 )
 
 // errPageSessionLost reports an operation whose connection to the page went
 // away before it reported back, as when a click loads a new document.
 var errPageSessionLost = errors.New("the browser lost its connection to the page")
+
+// errPageContextLost is an errPageSessionLost whose operation lost the script
+// context it ran in to a new document. That document may be a frame's, which
+// leaves the page's own document as it was.
+var errPageContextLost = fmt.Errorf("%w: a new document replaced its script context", errPageSessionLost)
 
 // launcher starts or reattaches browser sessions.
 type launcher interface {
@@ -27,14 +33,16 @@ type engine interface {
 	Goto(ctx context.Context, url string, timeout time.Duration) error
 	// Act performs one action described in natural language. Its error wraps
 	// errPageSessionLost when the connection to the page went away before
-	// the act reported back; the act may or may not have taken effect.
+	// the act reported back, and errPageContextLost when its script context
+	// did; the act may or may not have taken effect.
 	Act(ctx context.Context, instruction string, variables map[string]string, timeout time.Duration) (actOutcome, error)
 	// Replay performs one recorded action without a model call and reports
 	// whether it succeeded. An action whose element is not visible, or is
 	// no longer the element it recorded, is not performed and does not
 	// succeed. Its error wraps errPageSessionLost when
-	// the connection to the page went away before the action reported back;
-	// the action may or may not have taken effect.
+	// the connection to the page went away before the action reported back,
+	// and errPageContextLost when its script context did; the action may or
+	// may not have taken effect.
 	Replay(ctx context.Context, action recordedAction, variables map[string]string, timeout time.Duration) (bool, error)
 	// DocumentID identifies the document the active page shows. It changes
 	// whenever the page loads a new document.
