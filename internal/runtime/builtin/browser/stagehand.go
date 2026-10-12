@@ -368,6 +368,8 @@ func (e *stagehandEngine) Act(ctx context.Context, instruction string, variables
 		return e.client.Act(ctx, stagehand.ActInstruction(instruction), actOptions(variables, timeout))
 	})
 	if lost := sessionLost(result, err); lost != nil {
+		// The act may have loaded a new document before the page was lost.
+		e.settle(ctx)
 		return actOutcome{}, lost
 	}
 	if err != nil {
@@ -445,6 +447,8 @@ func (e *stagehandEngine) Replay(ctx context.Context, recorded recordedAction, v
 		return e.client.Act(ctx, stagehand.ObservedAction(action), actOptions(variables, timeout))
 	})
 	if lost := sessionLost(result, err); lost != nil {
+		// The action may have loaded a new document before the page was lost.
+		e.settle(ctx)
 		return false, lost
 	}
 	if err != nil {
