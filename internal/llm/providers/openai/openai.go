@@ -200,11 +200,7 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest, stream bool) ([]byte, 
 
 	// Add reasoning configuration if enabled
 	if req.Thinking != nil && req.Thinking.Enabled {
-		effort := req.Thinking.Effort
-		if effort == "" {
-			effort = llm.ThinkingEffortMedium
-		}
-		chatReq.Reasoning = &reasoningRequest{Effort: string(effort)}
+		chatReq.Reasoning = &reasoningRequest{Effort: string(reasoningEffort(req.Thinking.Effort))}
 
 		// For reasoning models, use max_completion_tokens instead of max_tokens
 		if req.MaxTokens != nil {
@@ -223,6 +219,20 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest, stream bool) ([]byte, 
 	}
 
 	return json.Marshal(chatReq)
+}
+
+// reasoningEffort returns the reasoning effort to send: the requested level,
+// or xhigh for max, which the API lacks. An unset effort is medium.
+func reasoningEffort(effort llm.ThinkingEffort) llm.ThinkingEffort {
+	switch effort {
+	case llm.ThinkingEffortNone, llm.ThinkingEffortMinimal, llm.ThinkingEffortLow,
+		llm.ThinkingEffortMedium, llm.ThinkingEffortHigh, llm.ThinkingEffortXHigh:
+		return effort
+	case llm.ThinkingEffortMax:
+		return llm.ThinkingEffortXHigh
+	default:
+		return llm.ThinkingEffortMedium
+	}
 }
 
 func (p *Provider) doRequest(ctx context.Context, body []byte) (io.ReadCloser, error) {

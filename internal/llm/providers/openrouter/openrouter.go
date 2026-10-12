@@ -178,12 +178,7 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest, stream bool) ([]byte, 
 	// Note: max_tokens must be strictly higher than reasoning budget
 	var reasoningBudget int
 	if req.Thinking != nil && req.Thinking.Enabled {
-		reasoning := &reasoningRequest{}
-		if req.Thinking.Effort != "" {
-			reasoning.Effort = string(req.Thinking.Effort)
-		} else {
-			reasoning.Effort = string(llm.ThinkingEffortMedium)
-		}
+		reasoning := &reasoningRequest{Effort: string(reasoningEffort(req.Thinking.Effort))}
 		if req.Thinking.BudgetTokens != nil {
 			reasoning.MaxTokens = req.Thinking.BudgetTokens
 			reasoningBudget = *req.Thinking.BudgetTokens
@@ -244,6 +239,20 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest, stream bool) ([]byte, 
 	}
 
 	return json.Marshal(chatReq)
+}
+
+// reasoningEffort returns the reasoning effort to send: the requested level,
+// or xhigh for max, which the API lacks. An unset effort is medium.
+func reasoningEffort(effort llm.ThinkingEffort) llm.ThinkingEffort {
+	switch effort {
+	case llm.ThinkingEffortNone, llm.ThinkingEffortMinimal, llm.ThinkingEffortLow,
+		llm.ThinkingEffortMedium, llm.ThinkingEffortHigh, llm.ThinkingEffortXHigh:
+		return effort
+	case llm.ThinkingEffortMax:
+		return llm.ThinkingEffortXHigh
+	default:
+		return llm.ThinkingEffortMedium
+	}
 }
 
 // claudeRejectsForcedChoice reports whether a request forces tool use on a

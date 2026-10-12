@@ -303,3 +303,41 @@ func TestBuildRequestBody_ToolChoice(t *testing.T) {
 		})
 	}
 }
+
+// Reasoning effort passes through, except that an unset effort is medium
+// and max becomes xhigh.
+func TestBuildRequestBody_ReasoningEffort(t *testing.T) {
+	t.Parallel()
+
+	provider := &Provider{config: llm.Config{APIKey: "test-key"}}
+	reasoning := func(effort string) map[string]any { return map[string]any{"effort": effort} }
+
+	tests := []struct {
+		name     string
+		thinking *llm.ThinkingRequest
+		expected any
+	}{
+		{name: "Disabled", thinking: &llm.ThinkingRequest{Effort: llm.ThinkingEffortHigh}},
+		{name: "Unset", thinking: &llm.ThinkingRequest{Enabled: true}, expected: reasoning("medium")},
+		{name: "None", thinking: &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortNone}, expected: reasoning("none")},
+		{name: "Minimal", thinking: &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortMinimal}, expected: reasoning("minimal")},
+		{name: "XHigh", thinking: &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortXHigh}, expected: reasoning("xhigh")},
+		{name: "Max", thinking: &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortMax}, expected: reasoning("xhigh")},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			req := &llm.ChatRequest{
+				Model:    "openai/gpt-5.5",
+				Messages: []llm.Message{{Role: llm.RoleUser, Content: "Hello"}},
+				Thinking: tt.thinking,
+			}
+			body, err := provider.buildRequestBody(req, false)
+			require.NoError(t, err)
+
+			var parsed map[string]any
+			require.NoError(t, json.Unmarshal(body, &parsed))
+			assert.Equal(t, tt.expected, parsed["reasoning"])
+		})
+	}
+}
