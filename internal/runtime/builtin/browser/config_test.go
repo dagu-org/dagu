@@ -70,6 +70,25 @@ func TestValidateStep(t *testing.T) {
 			want: `ask.as "otp" collides with a variable`,
 		},
 		{
+			name: "client certificate",
+			with: `{"browser":{"client_certificates":[{"hosts":["portal.example.com","${HOST}"],"pfx_file":"client.p12","passphrase":"${PASS}"}]},"do":[{"act":"a"}]}`,
+		},
+		{
+			name: "client certificate without a file",
+			with: `{"browser":{"client_certificates":[{"hosts":["*"]}]},"do":[{"act":"a"}]}`,
+			want: "client_certificates[0]: set pfx_file, or cert_file and key_file",
+		},
+		{
+			name: "client certificate with an invalid host",
+			with: `{"browser":{"client_certificates":[{"hosts":["portal.example.com:443"],"pfx_file":"client.p12"}]},"do":[{"act":"a"}]}`,
+			want: "client_certificates[0]: host pattern",
+		},
+		{
+			name: "client certificate with no hosts",
+			with: `{"browser":{"client_certificates":[{"hosts":[],"pfx_file":"client.p12"}]},"do":[{"act":"a"}]}`,
+			want: "invalid browser config",
+		},
+		{
 			name: "invalid profile name",
 			with: `{"browser":{"profile":"../escape"},"do":[{"act":"a"}]}`,
 			want: `profile "../escape" must match`,

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	cmnconfig "github.com/dagucloud/dagu/v2/internal/cmn/config"
 	"github.com/dagucloud/dagu/v2/internal/executor/registry"
 	"github.com/dagucloud/dagu/v2/internal/ir"
 	"github.com/dagucloud/dagu/v2/internal/runtime/builtin/internal/agentstep"
@@ -69,6 +70,9 @@ type browserOptions struct {
 	AllowedDomains []string  `json:"allowed_domains,omitempty"`
 	Screenshots    string    `json:"screenshots,omitempty"`
 	Profile        string    `json:"profile,omitempty"`
+	// ClientCertificates are presented to the hosts they name, before
+	// those configured for the host.
+	ClientCertificates []cmnconfig.BrowserClientCertificate `json:"client_certificates,omitempty"`
 }
 
 type viewport struct {
@@ -270,6 +274,11 @@ func (c config) validate() error {
 			return fmt.Errorf("browser: %w", err)
 		}
 	}
+	for i, certificate := range c.Browser.ClientCertificates {
+		if err := certificate.Validate(); err != nil {
+			return fmt.Errorf("browser: client_certificates[%d]: %w", i, err)
+		}
+	}
 	if profile := c.Browser.Profile; profile != "" && !agentstep.FileNamePattern.MatchString(profile) {
 		return fmt.Errorf("browser: profile %q must match %s", profile, agentstep.FileNamePattern)
 	}
@@ -469,6 +478,23 @@ var configSchema = &jsonschema.Schema{
 				"allowed_domains": {Type: "array", Items: agentstep.NonEmptyString()},
 				"screenshots":     {Type: "string", Enum: []any{screenshotsOnFailure, screenshotsFinal, screenshotsEach, screenshotsNever}},
 				"profile":         agentstep.NonEmptyString(),
+				"client_certificates": {
+					Type: "array",
+					Items: &jsonschema.Schema{
+						Type:                 "object",
+						AdditionalProperties: agentstep.NoExtraProperties(),
+						Required:             []string{"hosts"},
+						Properties: map[string]*jsonschema.Schema{
+							"hosts":           {Type: "array", MinItems: new(1), Items: agentstep.NonEmptyString()},
+							"pfx_file":        agentstep.NonEmptyString(),
+							"cert_file":       agentstep.NonEmptyString(),
+							"key_file":        agentstep.NonEmptyString(),
+							"ca_file":         agentstep.NonEmptyString(),
+							"passphrase":      agentstep.StringSchema(),
+							"passphrase_file": agentstep.NonEmptyString(),
+						},
+					},
+				},
 			},
 		},
 		"variables": {Type: "object", AdditionalProperties: agentstep.StringSchema()},
