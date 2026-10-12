@@ -199,7 +199,7 @@ func TestSessionVariables(t *testing.T) {
 
 // An extract whose link field has no format: uri warns while the step is
 // being built, since a step with that schema gets the link's element id.
-func TestSessionWarnsOfLinkFieldWithoutFormat(t *testing.T) {
+func TestSessionLinkFieldWarning(t *testing.T) {
 	t.Parallel()
 
 	ts := newTestSessions(t, pageModel(map[string]string{"The first listing": `{"link":"0-11"}`}))
