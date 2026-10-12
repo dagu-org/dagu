@@ -382,6 +382,19 @@ func TestThinkingConfig(t *testing.T) {
 			wantMaxTokens: 8192 + 4096,
 		},
 		{
+			name:         "Flash Image low falls back to minimal",
+			model:        "gemini-3.1-flash-image",
+			thinking:     &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortLow},
+			wantThinking: `{"thinkingLevel":"MINIMAL"}`,
+		},
+		{
+			name:          "Flash Image medium falls back to high",
+			model:         "gemini-3.1-flash-image",
+			thinking:      &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortMedium},
+			wantThinking:  `{"thinkingLevel":"HIGH"}`,
+			wantMaxTokens: 8192 + 4096,
+		},
+		{
 			name:         "3 series minimal level",
 			model:        "gemini-3-flash-preview",
 			thinking:     &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortMinimal},

@@ -407,7 +407,7 @@ func (p *Provider) mapEffortToThinkingLevel(model string, effort llm.ThinkingEff
 	if level == "minimal" && (strings.Contains(model, "gemini-3.1-pro") || strings.Contains(model, "gemini-3.8-flash")) {
 		return "low"
 	}
-	if strings.Contains(model, "gemini-3.1-flash-lite-image") {
+	if strings.Contains(model, "gemini-3.1-flash-lite-image") || strings.Contains(model, "gemini-3.1-flash-image") {
 		switch level {
 		case "low":
 			return "minimal"
