@@ -160,7 +160,7 @@ export function MonitoringDialog({
         </fieldset>
         <p className="text-sm text-muted-foreground">
           {ts(
-            'Every report also carries what identifies and authenticates this server, as its license check-in does: the protocol version, license ID, server ID, and heartbeat secret, and which choice it was sent under. With run status, it also carries the reporter’s cursor and, after events were lost, the time they were lost from. Turning reporting off sends one last report with only these, so that Dagu Console shows monitoring as off.'
+            'Every report also carries what identifies and authenticates this server, as its license check-in does: the protocol version, license ID, server ID, and heartbeat secret, and which choice it was sent under. With run status, it also carries the reporter’s cursor and, after events were lost, the time they were lost from. Turning reporting off sends one last report that carries only what identifies and authenticates this server and the choice Off, so that Dagu Console shows monitoring as off.'
           )}
         </p>
         <p className="text-sm text-muted-foreground">
