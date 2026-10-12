@@ -6562,7 +6562,7 @@
         "budget_tokens": {
           "type": "integer",
           "minimum": 1,
-          "description": "Explicit token budget for thinking (provider-specific). Anthropic: 1024-128K, Gemini 2.5: 128-32768. Overrides effort-based defaults."
+          "description": "Explicit token budget for thinking (provider-specific). Anthropic: 1024-128K, for models without adaptive thinking such as Claude Haiku 4.5; current Claude models reject it. Gemini 2.5: 128-32768. Overrides effort."
         },
         "include_in_output": {
           "type": "boolean",
