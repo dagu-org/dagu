@@ -90,11 +90,25 @@ type Sessions struct {
 	launcher    launcher
 	newProvider providerFactory
 	now         func() time.Time
+	// wait returns once d has passed on the clock now reads, or ctx ended.
+	wait func(ctx context.Context, d time.Duration) error
 }
 
 // NewSessions returns the browser sessions of this host.
 func NewSessions() *Sessions {
-	return &Sessions{launcher: stagehandLauncher{}, now: time.Now}
+	return &Sessions{launcher: stagehandLauncher{}, now: time.Now, wait: sleepContext}
+}
+
+// sleepContext returns once d has passed, or ctx ended.
+func sleepContext(ctx context.Context, d time.Duration) error {
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 // SessionOptions configures the browser a session opens.

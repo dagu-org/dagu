@@ -54,7 +54,8 @@ func newTestSessions(t *testing.T, answer func(*llmpkg.ChatRequest) (string, err
 		newProvider: func(context.Context, *ir.LLMConfig) (llmpkg.Provider, error) {
 			return ts.provider, nil
 		},
-		now: func() time.Time { return ts.clock },
+		now:  func() time.Time { return ts.clock },
+		wait: sleepContext,
 	}
 	return ts
 }
