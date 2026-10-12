@@ -47,6 +47,11 @@ type ExecutorCapabilities struct {
 	// is shown as a warning and never fails the dry run; several problems can
 	// be joined into one error.
 	DryRunCheck func(ctx context.Context, step ir.Step) error
+	// ConfigWarnings reports settings in the step's configuration that are
+	// valid but likely give results the author does not expect. Loading the
+	// DAG shows each message as a warning. It also receives steps that fail
+	// validation and need not report what validation already does.
+	ConfigWarnings func(step ir.Step) []string
 }
 
 // executorCapabilitiesRegistry is a typed registry of executor capabilities.
@@ -132,4 +137,14 @@ func ScriptResolution(ctx context.Context, s ir.Step) cmnvalue.CommandContext {
 		return caps.CommandContext(ctx, s)
 	}
 	return cmnvalue.CommandContext{}
+}
+
+// StepConfigWarnings returns the configuration warnings the step's executor
+// reports.
+func StepConfigWarnings(s ir.Step) []string {
+	caps := executorCapabilities.Get(s.ExecutorConfig.Type)
+	if caps.ConfigWarnings == nil {
+		return nil
+	}
+	return caps.ConfigWarnings(s)
 }

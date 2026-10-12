@@ -40,7 +40,10 @@ Each operation sets exactly one of:
   or typing into one field. The value is an instruction string or an object
   with `instruction` and optional `cache`.
 - `extract`: `{instruction, schema}`. The schema must be a JSON Schema with
-  `type: object`.
+  `type: object`. A string field with `format: uri` or `format: uri-reference`
+  gets the address of the element the model picks, such as a link's target;
+  any other string field gets what the model writes, which for a link is its
+  element id, such as `0-11`.
 - `expect`: a condition that must hold; otherwise the step fails with the
   reason.
 - `wait`: `{selector}` waits until the element is visible; `{duration}` pauses.
@@ -259,6 +262,11 @@ started. When an `act` fails because its model chose no element, the error
 names the model, since some models give that answer for every request. An
 `act` whose model picks an option that the select does not offer does not
 complete.
+
+Loading a DAG warns, without failing, about each `extract` string field whose
+name ends in `url`, `uri`, `link`, or `href`, singular or plural, and that has
+neither address format, naming the operation and the field's path, such as
+`do[0]: extract field "listings[].link"`.
 
 The browser can lose its connection to the page before an `act` or a replay
 reports back, as when a click or a chosen option loads a new page. The step

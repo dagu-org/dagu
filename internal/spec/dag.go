@@ -808,6 +808,8 @@ func (s *dagBuildState) resolveWorkerSelector() {
 	s.result.WorkerSelector = resolved
 }
 
+// collectWarnings sets the DAG's build warnings: deprecated settings,
+// schedule notes, and what step executors report about their configuration.
 func (s *dagBuildState) collectWarnings() {
 	s.result.BuildWarnings = nil
 
@@ -831,13 +833,15 @@ func (s *dagBuildState) collectWarnings() {
 	}
 	if !s.ctx.opts.Has(buildFlagOnlyMetadata) {
 		s.result.BuildWarnings = append(s.result.BuildWarnings, harnessWorkingDirWarnings(s.result)...)
+		s.result.BuildWarnings = append(s.result.BuildWarnings, executorConfigWarnings(s.result)...)
 	}
 }
 
+// harnessWorkingDirWarnings reports harness steps that leave the agent's
+// workspace to an implicit working directory.
 func harnessWorkingDirWarnings(dag *ir.DAG) []string {
 	var warnings []string
-	var visit func(ir.Step, string)
-	visit = func(step ir.Step, path string) {
+	walkSteps(dag, func(step ir.Step, path string) {
 		if step.ExecutorConfig.Type == "harness" {
 			container := step.Container
 			if container == nil {
@@ -855,14 +859,36 @@ func harnessWorkingDirWarnings(dag *ir.DAG) []string {
 				warnings = append(warnings, fmt.Sprintf("DAG %q: harness step %q %s", dag.Name, path, message))
 			}
 		}
+	})
+	return warnings
+}
+
+// executorConfigWarnings returns the warnings each step's executor reports
+// about its configuration.
+func executorConfigWarnings(dag *ir.DAG) []string {
+	var warnings []string
+	walkSteps(dag, func(step ir.Step, path string) {
+		for _, message := range registry.StepConfigWarnings(step) {
+			warnings = append(warnings, fmt.Sprintf("DAG %q: step %q: %s", dag.Name, path, message))
+		}
+	})
+	return warnings
+}
+
+// walkSteps calls visit for every step of dag, including foreach bodies and
+// handlers, with the step's path in the DAG.
+func walkSteps(dag *ir.DAG, visit func(step ir.Step, path string)) {
+	var walk func(ir.Step, string)
+	walk = func(step ir.Step, path string) {
+		visit(step, path)
 		if step.Foreach != nil {
 			for _, child := range step.Foreach.Steps {
-				visit(child, path+".foreach.steps."+child.Name)
+				walk(child, path+".foreach.steps."+child.Name)
 			}
 		}
 	}
 	for _, step := range dag.Steps {
-		visit(step, "steps."+step.Name)
+		walk(step, "steps."+step.Name)
 	}
 	for _, handler := range []struct {
 		name string
@@ -876,10 +902,9 @@ func harnessWorkingDirWarnings(dag *ir.DAG) []string {
 		{"wait", dag.HandlerOn.Wait},
 	} {
 		if handler.step != nil {
-			visit(*handler.step, "handler_on."+handler.name)
+			walk(*handler.step, "handler_on."+handler.name)
 		}
 	}
-	return warnings
 }
 
 func (s *dagBuildState) buildActionGraph() {

@@ -197,6 +197,20 @@ func TestSessionVariables(t *testing.T) {
 	assert.Equal(t, CodeInvalidInput, sessionCode(err), "a secret value never goes to the model")
 }
 
+// An extract whose link field has no format: uri warns while the step is
+// being built, since a step with that schema gets the link's element id.
+func TestSessionLinkFieldWarning(t *testing.T) {
+	t.Parallel()
+
+	ts := newTestSessions(t, pageModel(map[string]string{"The first listing": `{"link":"0-11"}`}))
+	opened := ts.open(SessionOptions{URL: "https://shop.example.com/listings", LLM: testModel})
+
+	result, err := ts.do(opened.ID, `{"extract": {"instruction": "The first listing", "schema": {"type": "object", "properties": {"link": {"type": "string"}}}}}`)
+	require.NoError(t, err)
+	require.Len(t, result.Warnings, 1)
+	assert.Contains(t, result.Warnings[0], `extract field "link" has no format: uri`)
+}
+
 // An act that typed a variable's value itself reports its actions with
 // secrets masked, and the session keeps neither the actions nor a recording
 // of them.
