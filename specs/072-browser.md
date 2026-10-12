@@ -202,7 +202,9 @@ element the act recorded: the element at the recorded location has another
 accessibility role or name, or a select there does not offer the recorded
 option. When other elements on the page shared the recorded element's role and
 name, such as a Delete button in each row of a list, the text of its row must
-also match. An element without a name is told apart by its role only.
+also match. Without such a row, the replay fails when the page has more
+elements of that role and name than when the act recorded it. An element
+without a name is told apart by its role only.
 `act.cache: false` disables the cache for one operation.
 
 Runs of a step share its recordings, and each `act` reads them when it runs. A

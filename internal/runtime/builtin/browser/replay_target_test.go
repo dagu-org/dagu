@@ -4,7 +4,9 @@
 package browser
 
 import (
+	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -46,39 +48,39 @@ func TestReplayTarget(t *testing.T) {
 		want      bool
 	}{
 		"same element": {
-			action: recordedAction{Selector: "xpath=/html[1]/body[1]/button[1]", Method: "click", Role: "button", Name: "Save"},
+			action: recordedAction{Selector: "xpath=/html[1]/body[1]/button[1]", Method: "click", Target: &recordedTarget{Role: "button", Name: "Save"}},
 			want:   true,
 		},
 		"another name": {
-			action: recordedAction{Selector: "xpath=/html[1]/body[1]/button[1]", Method: "click", Role: "button", Name: "Delete"},
+			action: recordedAction{Selector: "xpath=/html[1]/body[1]/button[1]", Method: "click", Target: &recordedTarget{Role: "button", Name: "Delete"}},
 		},
 		"another role": {
-			action: recordedAction{Selector: "xpath=/html[1]/body[1]/a[1]", Method: "click", Role: "button", Name: "ACME-1001"},
+			action: recordedAction{Selector: "xpath=/html[1]/body[1]/a[1]", Method: "click", Target: &recordedTarget{Role: "button", Name: "ACME-1001"}},
 		},
 		"element gone": {
-			action: recordedAction{Selector: "xpath=/html[1]/body[1]/button[2]", Method: "click", Role: "button", Name: "Save"},
+			action: recordedAction{Selector: "xpath=/html[1]/body[1]/button[2]", Method: "click", Target: &recordedTarget{Role: "button", Name: "Save"}},
 		},
 		"name from a variable": {
-			action:    recordedAction{Selector: "xpath=/html[1]/body[1]/a[1]", Method: "click", Role: "link", Name: "%customer%"},
+			action:    recordedAction{Selector: "xpath=/html[1]/body[1]/a[1]", Method: "click", Target: &recordedTarget{Role: "link", Name: "%customer%"}},
 			variables: customer,
 			want:      true,
 		},
 		"name from another value": {
-			action:    recordedAction{Selector: "xpath=/html[1]/body[1]/a[1]", Method: "click", Role: "link", Name: "%customer%"},
+			action:    recordedAction{Selector: "xpath=/html[1]/body[1]/a[1]", Method: "click", Target: &recordedTarget{Role: "link", Name: "%customer%"}},
 			variables: map[string]string{"customer": "ACME-1002"},
 		},
 		"select offering the option": {
-			action: recordedAction{Selector: "xpath=/html[1]/body[1]/select[1]", Method: selectOptionMethod, Arguments: []string{"未出荷"}, Role: "select"},
+			action: recordedAction{Selector: "xpath=/html[1]/body[1]/select[1]", Method: selectOptionMethod, Arguments: []string{"未出荷"}, Target: &recordedTarget{Role: "select", Lookalikes: 2}},
 			want:   true,
 		},
 		"select lacking the option": {
-			action: recordedAction{Selector: "xpath=/html[1]/body[1]/select[1]", Method: selectOptionMethod, Arguments: []string{"出荷済み"}, Role: "select"},
+			action: recordedAction{Selector: "xpath=/html[1]/body[1]/select[1]", Method: selectOptionMethod, Arguments: []string{"出荷済み"}, Target: &recordedTarget{Role: "select", Lookalikes: 2}},
 		},
 		"native select without options": {
-			action: recordedAction{Selector: "xpath=/html[1]/body[1]/select[2]", Method: selectOptionMethod, Arguments: []string{"未出荷"}, Role: "select"},
+			action: recordedAction{Selector: "xpath=/html[1]/body[1]/select[2]", Method: selectOptionMethod, Arguments: []string{"未出荷"}, Target: &recordedTarget{Role: "select", Lookalikes: 2}},
 		},
 		"custom combobox not showing its options": {
-			action: recordedAction{Selector: "xpath=/html[1]/body[1]/input[1]", Method: selectOptionMethod, Arguments: []string{"Express"}, Role: "combobox", Name: "Carrier"},
+			action: recordedAction{Selector: "xpath=/html[1]/body[1]/input[1]", Method: selectOptionMethod, Arguments: []string{"Express"}, Target: &recordedTarget{Role: "combobox", Name: "Carrier"}},
 			want:   true,
 		},
 		"unidentified select lacking the option": {
@@ -106,9 +108,9 @@ func TestIdentifyActions(t *testing.T) {
 	identifyOn(ordersPage, actions, map[string]string{"customer": "ACME-1001", "short": "AC"})
 
 	require.Len(t, actions, 2)
-	assert.Equal(t, "link", actions[0].Role)
-	assert.Equal(t, "%customer%", actions[0].Name)
-	assert.Empty(t, actions[1].Role, "an element outside the tree is not identified")
+	require.NotNil(t, actions[0].Target)
+	assert.Equal(t, recordedTarget{Role: "link", Name: "%customer%"}, *actions[0].Target)
+	assert.Nil(t, actions[1].Target, "an element outside the tree is not identified")
 	assert.True(t, stillTargets(actions[0], ordersPage, map[string]string{"customer": "ACME-1001"}))
 }
 
@@ -125,9 +127,32 @@ func TestReplayTargetInRow(t *testing.T) {
 	assert.True(t, stillTargets(deleteCustomer, rowsPage("Alpha", "Delta"), map[string]string{"customer": "Delta"}), "the row of the customer this run names")
 	assert.False(t, stillTargets(deleteCustomer, rowsPage("Gamma", "Alpha", "Beta"), map[string]string{"customer": "Beta"}), "Alpha's Delete is where Beta's was")
 
-	// A lone element has nothing to be told apart from, so it is named by
-	// its role and name only.
+	// Rows that differ only after a long shared prefix are told apart too.
+	prefix := strings.Repeat("Shared warehouse note ", 20)
+	long := []recordedAction{{Selector: "xpath=/html[1]/body[1]/ul[1]/li[2]/button[1]", Method: "click"}}
+	identifyOn(rowsPage(prefix+"A-1", prefix+"A-2"), long, nil)
+	assert.False(t, stillTargets(long[0], rowsPage(prefix+"A-0", prefix+"A-1", prefix+"A-2"), nil))
+
+	// A lone element has nothing to be told apart from, so it is identified
+	// by its role and name, until lookalikes appear beside it.
 	lone := []recordedAction{{Selector: "xpath=/html[1]/body[1]/ul[1]/li[1]/button[1]", Method: "click"}}
 	identifyOn(rowsPage("Alpha"), lone, nil)
 	assert.True(t, stillTargets(lone[0], rowsPage("Beta"), nil))
+	assert.False(t, stillTargets(lone[0], rowsPage("New", "Alpha"), nil), "New's Delete is where Alpha's was")
+}
+
+// An act picking an option does not count as done unless the page before
+// it shows the select offers the option.
+func TestUncheckedOption(t *testing.T) {
+	t.Parallel()
+
+	pick := func(selector, option string) []recordedAction {
+		return []recordedAction{{Selector: selector, Method: selectOptionMethod, Arguments: []string{option}}}
+	}
+	status := "xpath=/html[1]/body[1]/select[1]"
+	assert.Empty(t, uncheckedOption(ordersPage, nil, pick(status, "未出荷"), nil))
+	assert.Equal(t, `the select offers no option "出荷済み"`, uncheckedOption(ordersPage, nil, pick(status, "出荷済み"), nil))
+	assert.Contains(t, uncheckedOption(pageSnapshot{}, errors.New("page busy"), pick(status, "未出荷"), nil), "page busy")
+	assert.Empty(t, uncheckedOption(pageSnapshot{}, errors.New("page busy"), []recordedAction{{Selector: status, Method: "click"}}, nil),
+		"only a picked option needs the page")
 }

@@ -499,6 +499,18 @@ func TestStagehandReplayMissesShiftedRow(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, replayed)
 	requireStatus(t, eng, "deleted Beta")
+
+	// A Delete alone in its list when recorded has no row to be told apart
+	// by, so a row added before it makes the replay miss.
+	require.NoError(t, eng.Goto(t.Context(), deleteList("Beta"), time.Minute))
+	outcome, err = eng.Act(t.Context(), "Delete Beta", nil, time.Minute)
+	require.NoError(t, err)
+	require.True(t, outcome.Success, outcome.Message)
+	require.NoError(t, eng.Goto(t.Context(), deleteList("Alpha", "Beta"), time.Minute))
+	replayed, err = eng.Replay(t.Context(), outcome.Actions[0], nil, time.Minute)
+	require.NoError(t, err)
+	assert.False(t, replayed, "Alpha's Delete is where the lone one was")
+	requireStatus(t, eng, "idle")
 }
 
 // An act whose model picks an option the select does not offer does not

@@ -122,18 +122,26 @@ type recordedAction struct {
 	Description string   `json:"description,omitempty"`
 	Method      string   `json:"method,omitempty"`
 	Arguments   []string `json:"arguments,omitempty"`
-	// Role and Name identify the element at Selector as the page's
-	// accessibility tree showed it before the action ran, so a replay acts
-	// only on that element. Name holds a variable's placeholder in place of
-	// its value. Both are empty when the element was not identified.
-	Role string `json:"role,omitempty"`
+	// Target identifies the element at Selector as the page's accessibility
+	// tree showed it before the action ran, so a replay acts only on that
+	// element. It is nil when the element was not identified.
+	Target *recordedTarget `json:"target,omitempty"`
+}
+
+// recordedTarget identifies the element an action acted on.
+type recordedTarget struct {
+	Role string `json:"role"`
+	// Name holds a variable's placeholder in place of its value.
 	Name string `json:"name,omitempty"`
-	// Context tells the element apart from others of its role and name on
-	// the page, such as a button in each row of a list: the text of its
-	// ancestor ContextDepth levels up, the largest holding none of the
-	// others. Both are empty when the page had no such others.
-	Context      string `json:"context,omitempty"`
-	ContextDepth int    `json:"context_depth,omitempty"`
+	// Lookalikes counts the elements of the role and name on the page when
+	// it had more than one, such as a Delete button in each row of a list,
+	// and is 0 otherwise.
+	Lookalikes int `json:"lookalikes,omitempty"`
+	// Context tells the element apart from its lookalikes: a digest of the
+	// text of its ancestor Depth levels up, the largest holding none of the
+	// others. Both are empty when its parent already holds another.
+	Context string `json:"context,omitempty"`
+	Depth   int    `json:"depth,omitempty"`
 }
 
 type actOutcome struct {

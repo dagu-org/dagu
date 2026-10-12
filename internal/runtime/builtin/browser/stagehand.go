@@ -386,18 +386,26 @@ func (e *stagehandEngine) Act(ctx context.Context, instruction string, variables
 	}
 	if beforeErr == nil {
 		identifyOn(before, outcome.Actions, variables)
-		if message := missingOption(before, outcome.Actions, variables); outcome.Success && message != "" {
-			outcome.Success, outcome.Message = false, message
-		}
+	}
+	if message := uncheckedOption(before, beforeErr, outcome.Actions, variables); outcome.Success && message != "" {
+		outcome.Success, outcome.Message = false, message
 	}
 	return outcome, nil
 }
 
-// missingOption says which select on snap, the page before actions ran,
-// lacks the option an action picked, or returns "". The runtime resets such
-// a select to its first option and reports success.
-func missingOption(snap pageSnapshot, actions []recordedAction, variables map[string]string) string {
+// uncheckedOption says why an option an action picked is not known to be
+// on its select: snap, the page before the actions ran, shows the select
+// lacks it, or the page could not be read, as snapErr says. It returns ""
+// otherwise. The runtime resets a select told to pick an option it lacks
+// to its first option and reports success.
+func uncheckedOption(snap pageSnapshot, snapErr error, actions []recordedAction, variables map[string]string) string {
 	for _, action := range actions {
+		if action.Method != selectOptionMethod {
+			continue
+		}
+		if snapErr != nil {
+			return "the page could not be read to check the option picked: " + snapErr.Error()
+		}
 		if target, ok := targetOf(snap, action.Selector); ok && !offersOption(target.node(), action, variables) {
 			return fmt.Sprintf("the %s offers no option %q", withName(target.node().role, target.node().name), action.Arguments[0])
 		}
@@ -414,7 +422,7 @@ func (e *stagehandEngine) Replay(ctx context.Context, recorded recordedAction, v
 	}
 	// A layout change can put another element at the recorded location,
 	// which the runtime acts on without failing.
-	if recorded.Role != "" || recorded.Method == selectOptionMethod {
+	if recorded.Target != nil || recorded.Method == selectOptionMethod {
 		snap, err := e.Snapshot(ctx)
 		if err != nil || !stillTargets(recorded, snap, variables) {
 			return false, ctx.Err()
