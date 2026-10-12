@@ -379,7 +379,8 @@ func (r *run) launchOptions(ctx context.Context, recordID string) (launchOptions
 	for _, warning := range warnings {
 		r.warn(-1, warning)
 	}
-	r.presentsCertificates = len(certificates) > 0
+	guard := guardsCertificates(ctx, certificates)
+	r.certificateProxy = len(certificates) > 0 || guard
 	opts := launchOptions{
 		Executable:     r.cfg.Browser.Executable,
 		Headless:       r.cfg.headless(),
@@ -391,6 +392,7 @@ func (r *run) launchOptions(ctx context.Context, recordID string) (launchOptions
 		Generate:       r.bridge.generate,
 
 		ClientCertificates: certificates,
+		Guard:              guard,
 		Warn:               func(message string) { r.warn(-1, message) },
 	}
 	if name := r.cfg.Browser.Profile; name != "" {

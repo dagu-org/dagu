@@ -343,6 +343,7 @@ func (s *Sessions) Open(ctx context.Context, opts SessionOptions) (OpenResult, e
 		Generate:       generate,
 
 		ClientCertificates: certificates,
+		Guard:              guardsCertificates(ctx, certificates),
 		Warn:               func(message string) { warnings = append(warnings, message) },
 	}
 	if opts.Viewport != nil {
@@ -520,7 +521,7 @@ func (s *Sessions) operator(eng engine, bridge *modelBridge, state sessionState,
 		warn: func(_ int, message string) {
 			*warnings = append(*warnings, message)
 		},
-		presentsCertificates: eng.Handle().CertProxy != nil,
+		certificateProxy: eng.Handle().CertProxy != nil,
 		certificateEvent: func(_ int, event certproxy.Event) {
 			if event.Kind != certproxy.EventConnect {
 				*warnings = append(*warnings, "client certificate: "+describeCertificateEvent(event))

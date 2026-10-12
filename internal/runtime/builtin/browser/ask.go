@@ -106,7 +106,7 @@ func (r *run) resumeSession(ctx context.Context, recordID string, session *ir.Ag
 		return 0, err
 	}
 	r.eng = eng
-	r.presentsCertificates = record.CertProxyURL != ""
+	r.certificateProxy = record.CertProxyURL != ""
 	if err := r.saveRunningRecord(); err != nil {
 		return 0, err
 	}

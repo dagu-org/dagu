@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -88,16 +89,28 @@ func (ca *testCA) pem() string {
 // and refuses connections without a certificate clientCA issued.
 func startMTLSSite(t *testing.T, serverCA, clientCA *testCA) string {
 	t.Helper()
-	cert, key := serverCA.issue(t, mtlsHost, x509.ExtKeyUsageServerAuth, mtlsHost)
+	return startSite(t, serverCA, clientCA, mtlsHost, tls.RequireAndVerifyClientCert)
+}
+
+// startSite serves host with a certificate serverCA issued, asking for a
+// client certificate clientCA issued as auth says. Its page greets the
+// certificate's common name, or "anonymous".
+func startSite(t *testing.T, serverCA, clientCA *testCA, host string, auth tls.ClientAuthType) string {
+	t.Helper()
+	cert, key := serverCA.issue(t, host, x509.ExtKeyUsageServerAuth, host)
 	pool := x509.NewCertPool()
 	pool.AddCert(clientCA.cert)
 	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		name := "anonymous"
+		if len(r.TLS.PeerCertificates) > 0 {
+			name = r.TLS.PeerCertificates[0].Subject.CommonName
+		}
 		w.Header().Set("Content-Type", "text/html")
-		_, _ = io.WriteString(w, "<!doctype html><title>Portal</title><h1>Hello "+r.TLS.PeerCertificates[0].Subject.CommonName+"</h1>")
+		_, _ = io.WriteString(w, "<!doctype html><title>Portal</title><h1>Hello "+name+"</h1>")
 	}))
 	server.TLS = &tls.Config{
 		Certificates: []tls.Certificate{{Certificate: [][]byte{cert.Raw}, PrivateKey: key, Leaf: cert}},
-		ClientAuth:   tls.RequireAndVerifyClientCert,
+		ClientAuth:   auth,
 		ClientCAs:    pool,
 	}
 	server.StartTLS()
@@ -105,14 +118,18 @@ func startMTLSSite(t *testing.T, serverCA, clientCA *testCA) string {
 	return server.Listener.Addr().String()
 }
 
-// upstreamProxy is a CONNECT proxy that sends mtlsHost to the local site and
-// records the targets it was asked for.
+// upstreamProxy is a CONNECT proxy that sends each site's host to the local
+// server for it, and records the targets it was asked for.
 type upstreamProxy struct {
 	mu      sync.Mutex
 	targets []string
 }
 
-func startUpstreamProxy(t *testing.T, siteAddr string) (*upstreamProxy, string) {
+// startUpstreamProxy starts an upstream proxy for sites, which maps host
+// names to local addresses. With signIn, it asks for credentials from a
+// client other than a browser, as a proxy wanting a Windows sign-in does
+// from a program that cannot give one.
+func startUpstreamProxy(t *testing.T, sites map[string]string, signIn bool) (*upstreamProxy, string) {
 	t.Helper()
 	proxy := &upstreamProxy{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -120,10 +137,17 @@ func startUpstreamProxy(t *testing.T, siteAddr string) (*upstreamProxy, string) 
 			http.Error(w, "CONNECT only", http.StatusMethodNotAllowed)
 			return
 		}
+		if signIn && !strings.Contains(r.Header.Get("User-Agent"), "Mozilla") {
+			w.Header().Set("Proxy-Authenticate", "Negotiate")
+			http.Error(w, "sign in", http.StatusProxyAuthRequired)
+			return
+		}
 		proxy.mu.Lock()
 		proxy.targets = append(proxy.targets, r.Host)
 		proxy.mu.Unlock()
-		if r.Host != mtlsHost+":443" {
+		host, _, _ := net.SplitHostPort(r.Host)
+		siteAddr, ok := sites[host]
+		if !ok {
 			http.Error(w, "unknown host", http.StatusBadGateway)
 			return
 		}
@@ -157,14 +181,38 @@ func (p *upstreamProxy) connects() []string {
 // site's CA into the project.
 func clientCertificateEnv(t *testing.T, b *browserEnv, clientCA, issuer *testCA) *upstreamProxy {
 	t.Helper()
+	return certificateSitesEnv(t, b, clientCA, issuer, certificateSites{})
+}
+
+// certificateSites describes, besides the certificate's own site, a site no
+// certificate names and how the upstream proxy treats requests.
+type certificateSites struct {
+	// otherAuth is how the other site asks for a client certificate; zero
+	// leaves it out.
+	otherAuth tls.ClientAuthType
+	other     bool
+	// signIn makes the upstream proxy ask a client other than the browser
+	// for credentials.
+	signIn bool
+}
+
+// otherHost names the site no certificate names.
+const otherHost = "other.test"
+
+func certificateSitesEnv(t *testing.T, b *browserEnv, clientCA, issuer *testCA, sites certificateSites) *upstreamProxy {
+	t.Helper()
 	serverCA := newTestCA(t, "Conformance Server CA")
-	proxy, proxyURL := startUpstreamProxy(t, startMTLSSite(t, serverCA, clientCA))
+	addrs := map[string]string{mtlsHost: startMTLSSite(t, serverCA, clientCA)}
+	if sites.other {
+		addrs[otherHost] = startSite(t, serverCA, clientCA, otherHost, sites.otherAuth)
+	}
+	proxy, proxyURL := startUpstreamProxy(t, addrs, sites.signIn)
 	cert, key := issuer.issue(t, "client-1", x509.ExtKeyUsageClientAuth)
 	data, err := pkcs12.Modern.Encode(key, cert, []*x509.Certificate{issuer.cert}, certificatePassphrase)
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(b.dagu.ProjectPath("client.p12"), data, 0o600))
 	b.dagu.WriteFile("ca.pem", serverCA.pem())
-	b.env = append(b.env, "UPSTREAM_PROXY="+proxyURL, "CERT_PASSPHRASE="+certificatePassphrase)
+	b.env = append(b.env, "UPSTREAM_PROXY="+proxyURL, "CERT_PASSPHRASE="+certificatePassphrase, "OTHER_URL=https://"+otherHost+"/")
 	return proxy
 }
 
@@ -208,4 +256,44 @@ func TestBrowserClientCertificateWrongPassphrase(t *testing.T) {
 	result.ExpectStderrContains("with.browser.client_certificates[0]")
 	result.ExpectStderrNotContains("not-the-passphrase")
 	require.Empty(t, proxy.connects())
+}
+
+// A site no certificate names that asks for one fails at once, saying so,
+// instead of leaving the browser waiting on the system's certificate
+// prompt.
+func TestBrowserGuardReportsMissingCertificate(t *testing.T) {
+	t.Parallel()
+
+	b := newBrowserEnv(t)
+	clientCA := newTestCA(t, "Conformance Client CA")
+	certificateSitesEnv(t, b, clientCA, clientCA, certificateSites{other: true, otherAuth: tls.RequireAndVerifyClientCert})
+	began := time.Now()
+	result := b.dagu.RunWithEnv(b.env, "start", "client_certificate_guard.yaml")
+	result.ExpectNonZeroExitCode()
+	result.ExpectStderrContains(otherHost + " asks for a TLS client certificate, and none is configured for it")
+	require.Less(t, time.Since(began), time.Minute, "the step fails without waiting out the goto")
+}
+
+// A site that asks for a certificate but opens without one opens.
+func TestBrowserGuardOpensOptionalCertificateSite(t *testing.T) {
+	t.Parallel()
+
+	b := newBrowserEnv(t)
+	clientCA := newTestCA(t, "Conformance Client CA")
+	certificateSitesEnv(t, b, clientCA, clientCA, certificateSites{other: true, otherAuth: tls.VerifyClientCertIfGiven})
+	b.dagu.RunWithEnv(b.env, "start", "client_certificate_guard.yaml").ExpectExitCode(0)
+}
+
+// When the device's proxy asks the certificate proxy for credentials it
+// cannot give, the browser falls back to reaching other sites itself.
+func TestBrowserGuardFallsBackForProxySignIn(t *testing.T) {
+	t.Parallel()
+
+	b := newBrowserEnv(t)
+	clientCA := newTestCA(t, "Conformance Client CA")
+	proxy := certificateSitesEnv(t, b, clientCA, clientCA, certificateSites{other: true, otherAuth: tls.NoClientCert, signIn: true})
+	// The browser does not trust the test site's CA, so the step only opens
+	// it; the upstream proxy records only the browser's requests.
+	b.dagu.RunWithEnv(b.env, "start", "client_certificate_fallback.yaml").ExpectExitCode(0)
+	require.Contains(t, proxy.connects(), otherHost+":443", "the browser reached the site through the device's proxy")
 }

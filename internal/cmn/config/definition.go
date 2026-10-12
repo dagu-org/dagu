@@ -111,8 +111,9 @@ type OpenCodeDef struct {
 
 // BrowserDef configures the browsers that browser steps start on this host.
 type BrowserDef struct {
-	Sandbox            *bool                         `mapstructure:"sandbox"`
-	ClientCertificates []BrowserClientCertificateDef `mapstructure:"client_certificates"`
+	Sandbox                 *bool                         `mapstructure:"sandbox"`
+	ClientCertificates      []BrowserClientCertificateDef `mapstructure:"client_certificates"`
+	GuardClientCertificates *bool                         `mapstructure:"guard_client_certificates"`
 }
 
 // BrowserClientCertificateDef is a TLS client certificate that browsers on

@@ -64,6 +64,11 @@ type BrowserConfig struct {
 	// ClientCertificates are presented by every browser started on this
 	// host, after the certificates a step names itself.
 	ClientCertificates []BrowserClientCertificate
+	// GuardClientCertificates sends a browser's other https: requests
+	// through the certificate proxy too, so the browser never asks the
+	// operating system for a client certificate. Unset, it is on whenever
+	// the browser presents certificates.
+	GuardClientCertificates *bool
 }
 
 // BrowserClientCertificate is a TLS client certificate a browser presents to

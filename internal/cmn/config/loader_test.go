@@ -730,6 +730,23 @@ browser:
 	}, cfg.Browser.ClientCertificates)
 }
 
+// The certificate guard follows the browser's certificates unless the
+// config file or the environment turns it on or off.
+func TestLoad_BrowserGuardClientCertificates(t *testing.T) {
+	require.Nil(t, testLoad(t).Browser.GuardClientCertificates, "unset, the guard follows the certificates")
+
+	configFile := filepath.Join(t.TempDir(), "config.yaml")
+	require.NoError(t, os.WriteFile(configFile, []byte("browser:\n  guard_client_certificates: false\n"), 0o600))
+	guard := testLoad(t, WithConfigFile(configFile)).Browser.GuardClientCertificates
+	require.NotNil(t, guard)
+	require.False(t, *guard)
+
+	t.Setenv("DAGU_BROWSER_GUARD_CLIENT_CERTIFICATES", "true")
+	guard = testLoad(t).Browser.GuardClientCertificates
+	require.NotNil(t, guard)
+	require.True(t, *guard)
+}
+
 func TestLoad_BrowserClientCertificatesRejectsMalformed(t *testing.T) {
 	configFile := filepath.Join(t.TempDir(), "config.yaml")
 	require.NoError(t, os.WriteFile(configFile, []byte(`

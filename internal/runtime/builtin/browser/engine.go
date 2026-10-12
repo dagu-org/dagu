@@ -69,10 +69,12 @@ type engine interface {
 	// browser presents none. Its error reports that the proxy no longer
 	// answers.
 	TakeCertificateEvents(ctx context.Context) ([]certproxy.Event, error)
-	// NavigationError describes the error page the browser shows in place
-	// of a page it could not load; its Code is empty when the browser shows
-	// a page.
-	NavigationError(ctx context.Context) (navigationFailure, error)
+	// PageOutcome describes what the browser shows: a page, or the error
+	// page it shows in place of one it could not load.
+	PageOutcome(ctx context.Context) (pageOutcome, error)
+	// PendingConnections returns the connections the certificate proxy has
+	// not yet heard a site answer on, or nothing without a proxy.
+	PendingConnections(ctx context.Context) ([]certproxy.Pending, error)
 	Handle() browserHandle
 	// Detach releases the session while the browser keeps running.
 	Detach(ctx context.Context) error
@@ -95,6 +97,9 @@ type launchOptions struct {
 	// ClientCertificates are presented, through a proxy, to the hosts they
 	// name.
 	ClientCertificates []certproxy.Entry
+	// Guard sends the browser's other https: requests through the proxy
+	// too.
+	Guard bool
 	// Warn reports what the launch could not set up as configured without
 	// failing.
 	Warn func(string)
@@ -116,14 +121,20 @@ type browserHandle struct {
 	CertProxy *certproxy.Handle
 }
 
-// navigationFailure is the error page the browser shows in place of a page
-// it could not load.
-type navigationFailure struct {
-	// Code is the network error code, such as ERR_BAD_SSL_CLIENT_AUTH_CERT.
+// pageOutcome is what the browser shows after it opened a page.
+type pageOutcome struct {
+	// Code is the network error code, such as ERR_BAD_SSL_CLIENT_AUTH_CERT,
+	// of the error page the browser shows in place of a page it could not
+	// load, or "" when it shows a page.
 	Code string `json:"code"`
-	// Host is the host of the page that did not load, when the error page
-	// names it.
+	// Host is the page's host, or that of the page that did not load when
+	// the error page names it.
 	Host string `json:"host"`
+	// Status is the HTTP status the page came with, or zero when unknown.
+	Status int    `json:"status"`
+	Title  string `json:"title"`
+	// Text is the start of the page's visible text.
+	Text string `json:"text"`
 }
 
 // pageSnapshot is the accessibility tree of a page.

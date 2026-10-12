@@ -401,6 +401,10 @@ func (l *ConfigLoader) loadCoreConfig(cfg *Config, def Definition) error {
 		cfg.OpenCode.Executable = "opencode"
 	}
 	cfg.Browser = BrowserConfig{NoSandbox: !l.v.GetBool("browser.sandbox")}
+	if l.v.IsSet("browser.guard_client_certificates") {
+		guard := l.v.GetBool("browser.guard_client_certificates")
+		cfg.Browser.GuardClientCertificates = &guard
+	}
 	if def.Browser != nil {
 		certificates, err := l.loadBrowserClientCertificates(def.Browser.ClientCertificates)
 		if err != nil {
@@ -2204,6 +2208,7 @@ var envBindings = []envBinding{
 	{key: "opencode.executable", env: "OPENCODE_EXECUTABLE"},
 	{key: "opencode.env_passthrough", env: "OPENCODE_ENV_PASSTHROUGH"},
 	{key: "browser.sandbox", env: "BROWSER_SANDBOX"},
+	{key: "browser.guard_client_certificates", env: "BROWSER_GUARD_CLIENT_CERTIFICATES"},
 
 	// Secrets
 	{key: "secrets.vault.address", env: "SECRETS_VAULT_ADDRESS"},

@@ -113,14 +113,19 @@ const selectorVisibleExpression = `Array.from(document.querySelectorAll(%s)).som
 	return box.width > 0 && box.height > 0 && style.visibility !== "hidden" && style.display !== "none";
 })`
 
-// navigationErrorExpression describes the browser's error page: the network
-// error code it shows, and the host of the page that did not load, which
-// Chrome uses as the error page's title. On any other page the code is "".
-const navigationErrorExpression = `(() => {
-	if (location.protocol !== "chrome-error:") return {code: "", host: ""};
-	const code = document.querySelector(".error-code");
-	const match = ((code && code.textContent) || (document.body && document.body.innerText) || "").match(/ERR_[A-Z0-9_]+/);
-	return {code: match ? match[0] : "ERR_FAILED", host: document.title};
+// pageOutcomeExpression describes what the browser shows. On its error page
+// that is the network error code and the host of the page that did not
+// load, which Chrome uses as the error page's title; on a page, its host,
+// HTTP status, title, and the start of its text.
+const pageOutcomeExpression = `(() => {
+	const text = ((document.body && document.body.innerText) || "").slice(0, 500);
+	if (location.protocol === "chrome-error:") {
+		const code = document.querySelector(".error-code");
+		const match = ((code && code.textContent) || text).match(/ERR_[A-Z0-9_]+/);
+		return {code: match ? match[0] : "ERR_FAILED", host: document.title, status: 0, title: "", text: ""};
+	}
+	const entry = performance.getEntriesByType("navigation")[0];
+	return {code: "", host: location.hostname, status: (entry && entry.responseStatus) || 0, title: document.title, text};
 })()`
 
 var errImageInput = errors.New("browser: image input to the model is not supported")
@@ -184,7 +189,7 @@ func (l stagehandLauncher) Launch(ctx context.Context, opts launchOptions) (engi
 	}
 	cdpURL := fmt.Sprintf("http://127.0.0.1:%d", port)
 	var proxy *certproxy.Handle
-	if len(opts.ClientCertificates) > 0 {
+	if len(opts.ClientCertificates) > 0 || opts.Guard {
 		if proxy, err = l.startCertProxy(ctx, cdpURL, opts); err != nil {
 			return nil, err
 		}
@@ -268,6 +273,7 @@ func (l stagehandLauncher) startCertProxy(ctx context.Context, cdpURL string, op
 		CDPURL:    cdpURL,
 		SystemPAC: pac,
 		Entries:   opts.ClientCertificates,
+		Guard:     opts.Guard,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("start the client certificate proxy: %w", err)
@@ -778,21 +784,30 @@ func (e *stagehandEngine) TakeCertificateEvents(ctx context.Context) ([]certprox
 	return events, err
 }
 
-func (e *stagehandEngine) NavigationError(ctx context.Context) (navigationFailure, error) {
-	raw, err := e.evaluate(ctx, navigationErrorExpression)
+func (e *stagehandEngine) PageOutcome(ctx context.Context) (pageOutcome, error) {
+	raw, err := e.evaluate(ctx, pageOutcomeExpression)
 	if err != nil {
-		return navigationFailure{}, err
+		return pageOutcome{}, err
 	}
-	var failure navigationFailure
-	if err := json.Unmarshal(raw, &failure); err != nil {
-		return navigationFailure{}, fmt.Errorf("read the error page: %w", err)
+	var outcome pageOutcome
+	if err := json.Unmarshal(raw, &outcome); err != nil {
+		return pageOutcome{}, fmt.Errorf("read the page: %w", err)
 	}
-	// A title that is not a host name is the page's own, not the failed
+	// An error page's title that is not a host name is not the failed
 	// host.
-	if hostpattern.Validate(failure.Host) != nil || strings.Contains(failure.Host, "*") {
-		failure.Host = ""
+	if hostpattern.Validate(outcome.Host) != nil || strings.Contains(outcome.Host, "*") {
+		outcome.Host = ""
 	}
-	return failure, nil
+	return outcome, nil
+}
+
+func (e *stagehandEngine) PendingConnections(ctx context.Context) ([]certproxy.Pending, error) {
+	if e.handle.CertProxy == nil {
+		return nil, nil
+	}
+	return boundCall(ctx, e.pageCallTimeout, func(ctx context.Context) ([]certproxy.Pending, error) {
+		return certproxy.PendingConnections(ctx, e.handle.CertProxy.URL)
+	})
 }
 
 func (e *stagehandEngine) Handle() browserHandle {

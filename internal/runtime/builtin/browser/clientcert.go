@@ -4,9 +4,12 @@
 package browser
 
 import (
+	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"maps"
+	"net/http"
 	"net/url"
 	"regexp"
 	"slices"
@@ -24,8 +27,11 @@ import (
 const (
 	// kindClientCertificate labels what the client certificate proxy reports.
 	kindClientCertificate = "client_certificate"
-	stepCertificateLabel  = "with.browser.client_certificates[%d]"
-	hostCertificateLabel  = "browser.client_certificates[%d] in the Dagu config"
+	// statusAsked marks a site that asked for a client certificate no entry
+	// names.
+	statusAsked          = "asked"
+	stepCertificateLabel = "with.browser.client_certificates[%d]"
+	hostCertificateLabel = "browser.client_certificates[%d] in the Dagu config"
 )
 
 // clientAuthError matches the network errors of a site that asks for a TLS
@@ -74,6 +80,16 @@ func loadClientCertificates(ctx context.Context, step []cmnconfig.BrowserClientC
 	return entries, warnings, nil
 }
 
+// guardsCertificates reports whether a browser presenting certificates
+// guards its other https: requests too: as the host config says, or
+// whenever it presents certificates.
+func guardsCertificates(ctx context.Context, certificates []certproxy.Entry) bool {
+	if guard := cmnconfig.GetConfig(ctx).Browser.GuardClientCertificates; guard != nil {
+		return *guard
+	}
+	return len(certificates) > 0
+}
+
 // withCertificatePassphrases returns secrets with the passphrases the step's
 // certificates name, so they are masked and kept from the model like
 // secrets even when written literally.
@@ -115,28 +131,78 @@ func recordedHandle(record browserhost.Record) browserHandle {
 	return handle
 }
 
-// clientCertificateFailure explains the error page the browser shows, using
-// what the certificate proxy reported for the page's host, or returns nil
-// when the page is unrelated to client certificates. Without a known host,
-// a proxy failure explains only an error that a failed TLS connection
-// causes.
-func clientCertificateFailure(page navigationFailure, failures []certproxy.Event, presenting bool) error {
-	code := page.Code
+// refusalPage matches what a web server, such as nginx or IIS, shows in
+// place of a site when the browser presented no client certificate it
+// accepts.
+var refusalPage = regexp.MustCompile(`(?i)no required ssl certificate was sent|ssl certificate error|client certificate|403\.(7|13|16)\b`)
+
+// certificateFailure explains what the browser shows when a client
+// certificate kept the page from opening, using what the certificate proxy
+// reported for the page's host, or returns nil when the page is unrelated
+// to client certificates. presented maps the hosts the proxy presented a
+// certificate to, to its label. Without a known host, a proxy failure
+// explains only an error that a failed TLS connection causes.
+func certificateFailure(page pageOutcome, failures []certproxy.Event, presented map[string]string, proxy bool) error {
+	switch {
+	case page.Code != "":
+		if failure, ok := failureFor(page.Host, failures, connectionError.MatchString(page.Code)); ok {
+			return describeFailure(failure, "the browser shows "+page.Code, proxy)
+		}
+		if clientAuthError.MatchString(page.Code) {
+			return missingCertificate(page.Host, page.Code, proxy)
+		}
+	case page.Status >= http.StatusBadRequest:
+		if failure, ok := failureFor(page.Host, failures, false); ok && refusesCertificate(failure) {
+			return describeFailure(failure, fmt.Sprintf("the site answered %d", page.Status), proxy)
+		}
+		if !refusalPage.MatchString(page.Title + "\n" + page.Text) {
+			return nil
+		}
+		if label, ok := presented[hostpattern.Canonical(page.Host)]; ok {
+			return fmt.Errorf("%s rejected the client certificate %s: it answered %d %s", page.Host, label, page.Status, strings.TrimSpace(page.Title))
+		}
+		return missingCertificate(page.Host, fmt.Sprintf("it answered %d", page.Status), proxy)
+	}
+	return nil
+}
+
+// failureFor returns the last failure the proxy reported for host. Without
+// a host, it returns the last failure only when unknown is set.
+func failureFor(host string, failures []certproxy.Event, unknown bool) (certproxy.Event, bool) {
 	for _, failure := range slices.Backward(failures) {
-		if page.Host != "" && hostpattern.Canonical(failure.Host) == hostpattern.Canonical(page.Host) ||
-			page.Host == "" && connectionError.MatchString(code) {
-			return fmt.Errorf("%s (the browser shows %s)", failure.Message, code)
+		if host != "" && hostpattern.Canonical(failure.Host) == hostpattern.Canonical(host) || host == "" && unknown {
+			return failure, true
 		}
 	}
-	if !clientAuthError.MatchString(code) {
-		return nil
+	return certproxy.Event{}, false
+}
+
+// refusesCertificate reports whether failure is a site refusing the browser
+// for its client certificate.
+func refusesCertificate(failure certproxy.Event) bool {
+	return failure.Kind == certproxy.EventClientCertificateMissing || failure.Kind == certproxy.EventClientCertificateRejected
+}
+
+// describeFailure states failure, with detail on what the browser showed.
+func describeFailure(failure certproxy.Event, detail string, proxy bool) error {
+	if failure.Kind == certproxy.EventClientCertificateMissing {
+		return missingCertificate(failure.Host, detail, proxy)
 	}
-	if presenting {
-		return fmt.Errorf("the site asks for a TLS client certificate (%s), but none was presented through Dagu; "+
-			"check that its host matches the certificate's hosts, and that no Chrome enterprise policy sets the proxy", code)
+	return fmt.Errorf("%s (%s)", failure.Message, detail)
+}
+
+// missingCertificate states that host asks for a client certificate no
+// entry names, and how to name one.
+func missingCertificate(host, detail string, proxy bool) error {
+	subject := cmp.Or(host, "the site")
+	message := fmt.Sprintf("%s asks for a TLS client certificate, and none is configured for it (%s); "+
+		"set with.browser.client_certificates or browser.client_certificates in the Dagu config", subject, detail)
+	if proxy && clientAuthError.MatchString(detail) {
+		// The proxy answers such a request itself; the browser met it on
+		// a route that bypassed the proxy.
+		message += "; if one is configured for it, a Chrome enterprise policy may be setting the browser's proxy"
 	}
-	return fmt.Errorf("the site asks for a TLS client certificate (%s); "+
-		"set with.browser.client_certificates or browser.client_certificates in the Dagu config", code)
+	return errors.New(message)
 }
 
 // certificateTrouble reports whether event is about a client certificate
@@ -144,7 +210,8 @@ func clientCertificateFailure(page navigationFailure, failures []certproxy.Event
 // step's summary whichever host failed.
 func certificateTrouble(event certproxy.Event) bool {
 	switch event.Kind {
-	case certproxy.EventClientCertificateRejected, certproxy.EventServerCertificate, certproxy.EventProxyAuth:
+	case certproxy.EventClientCertificateRejected, certproxy.EventClientCertificateMissing,
+		certproxy.EventServerCertificate, certproxy.EventProxyAuth, certproxy.EventGuardOff:
 		return true
 	}
 	return false
@@ -160,11 +227,15 @@ func describeCertificateEvent(event certproxy.Event) string {
 }
 
 // logCertificateEvent records what the certificate proxy reported while the
-// operation at index ran.
+// operation at index ran. A site asking for a certificate is not a failure
+// by itself: one that opens without it can ask.
 func logCertificateEvent(t *agentstep.Timeline, index int, event certproxy.Event) {
 	status := agentstep.StatusFailed
-	if event.Kind == certproxy.EventConnect {
+	switch event.Kind {
+	case certproxy.EventConnect:
 		status = agentstep.StatusCompleted
+	case certproxy.EventClientCertificateMissing:
+		status = statusAsked
 	}
 	content := t.Masker.MaskString(describeCertificateEvent(event))
 	_, _ = fmt.Fprintf(t.Log, "%s %s %s %s\n", t.Position(index), kindClientCertificate, status, content)
