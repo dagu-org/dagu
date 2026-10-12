@@ -92,12 +92,14 @@ const pageTextExpression = `document.body ? document.body.innerText : ""`
 const documentExpression = `String(performance.timeOrigin)`
 
 // sessionLostMarkers are the texts by which the browser runtime reports a
-// command whose page session was detached: the browser's answer to a command
-// sent after the detach, and the runtime's own rejection of a command still
-// in flight.
+// command that lost the page: the browser's answer to a command sent after
+// the page session was detached, the runtime's own rejection of a command
+// still in flight, and the browser's answer to a command on a script context
+// that a new document replaced.
 var sessionLostMarkers = []string{
 	"Session with given id not found",
 	"target closed before CDP",
+	"Cannot find context with specified id",
 }
 
 // selectorVisibleExpression reports whether the selector, a JSON string
@@ -514,10 +516,9 @@ func (e *stagehandEngine) targetVisible(ctx context.Context, selector string) bo
 }
 
 // sessionLost returns an error wrapping errPageSessionLost when an act call
-// that returned result and err failed because the page's session was
-// detached, or nil. The runtime reports that detach in a failed result when
-// the action itself failed, and as an RPC error when the work around the
-// action did.
+// that returned result and err failed because it lost the page, or nil. The
+// runtime reports that loss in a failed result when the action itself
+// failed, and as an RPC error when the work around the action did.
 func sessionLost(result stagehand.ActResult, err error) error {
 	message := result.Data.Message
 	var rpcErr *stagehand.RPCError

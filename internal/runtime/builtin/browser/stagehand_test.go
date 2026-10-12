@@ -526,6 +526,42 @@ func TestStagehandActMissingOption(t *testing.T) {
 	assert.Contains(t, outcome.Message, `"8000万円未満"`)
 }
 
+// servePerPage serves a list whose results-per-page select reloads the page
+// when an option is chosen. The change handler holds the page's script for a
+// moment after starting the reload, so the new document replaces the select
+// before the runtime is done with it, as on a page that answers fast.
+func servePerPage(t *testing.T) string {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = io.WriteString(w, `<select onchange="location.search = '?per_page=' + this.value;
+const end = Date.now() + 300; while (Date.now() < end) {}">
+<option value="20">20</option><option value="100">100</option></select>`)
+	}))
+	t.Cleanup(server.Close)
+	return server.URL
+}
+
+// An act that chooses an option which reloads the page reports the choice as
+// done, or as a lost page that the step judges by the document, never as a
+// failure.
+func TestStagehandActSelectThatReloads(t *testing.T) {
+	t.Parallel()
+
+	eng := launchBrowser(t, launchOptions{Generate: treeModel(where(selectOffering("100")), selectOptionMethod, "100")})
+	require.NoError(t, eng.Goto(t.Context(), servePerPage(t), time.Minute))
+	outcome, err := eng.Act(t.Context(), "Show 100 results per page", nil, time.Minute)
+	if err != nil {
+		require.ErrorIs(t, err, errPageSessionLost)
+	} else {
+		require.True(t, outcome.Success, outcome.Message)
+	}
+	require.Eventually(t, func() bool {
+		pageURL, err := eng.CurrentURL(t.Context())
+		return err == nil && strings.Contains(pageURL, "per_page=100")
+	}, 30*time.Second, 50*time.Millisecond, "the choice reloads the page")
+}
+
 // servePager serves a page that draws its list from a request it makes on
 // load and again for each press of Next, as pages paged by buttons do. Each
 // answer sends its headers at once and its body a moment later.
@@ -668,9 +704,10 @@ func TestStagehandActPerformsOneAction(t *testing.T) {
 	assert.Contains(t, text, "pending", "Approve is not clicked")
 }
 
-// The runtime reports a detached page session in a failed act result when
-// the action failed, and as an RPC error when the work around it did. Other
-// failures, including the SDK's own connection errors, are not a lost page.
+// The runtime reports a lost page, a detached session or a script context a
+// new document replaced, in a failed act result when the action failed, and
+// as an RPC error when the work around it did. Other failures, including the
+// SDK's own connection errors, are not a lost page.
 func TestSessionLost(t *testing.T) {
 	t.Parallel()
 
@@ -683,6 +720,10 @@ func TestSessionLost(t *testing.T) {
 		lost   bool
 	}{
 		"failed action": {result: failed("Failed to perform act: -32001 Session with given id not found."), lost: true},
+		"replaced context": {
+			result: failed("Failed to perform act: -32000 Cannot find context with specified id"),
+			lost:   true,
+		},
 		"rpc error": {
 			err:  fmt.Errorf("act: %w", &stagehand.RPCError{Code: -32603, Message: "No Page found for target closed before CDP response (sessionId=s1, targetId=t1)"}),
 			lost: true,
