@@ -110,8 +110,8 @@ runs. A field is listed here, under its level, before any release sends it.
 
 Every report also carries what identifies and authenticates the server, as
 its license check-in does: the protocol version, license ID, server ID, and
-heartbeat secret. At `runs` it also carries the reporter's cursor and, after
-events were lost, the time they were lost from.
+heartbeat secret, and the level it was sent at. At `runs` it also carries the
+reporter's cursor and, after events were lost, the time they were lost from.
 
 | Level | Fields | When |
 | --- | --- | --- |
@@ -136,7 +136,7 @@ them sensitive chooses `health`, which sends neither.
 
 | `cloud.report` | Sends |
 | --- | --- |
-| unset or `off` (default) | Nothing beyond the license check-in |
+| unset or `off` (default) | Nothing beyond the license check-in, except one report that says so, carrying only what identifies the server, when the level becomes `off` after a report at `health` or `runs` |
 | `health` | Dagu version, OS, architecture, start time, and which services run |
 | `runs` | Also the status of finished runs and the runs in progress: DAG names, run IDs, status, triggers, times, failed step names |
 
@@ -152,7 +152,9 @@ them sensitive chooses `health`, which sends neither.
 - **Inspectable and reversible.** The license settings page shows the level,
   when the last report was sent, and the exact last report, with its
   heartbeat secret redacted. Turning it off takes effect at once and stops a
-  report in flight, and Dagu Cloud can delete what a server reported.
+  report in flight; one last report then says that reporting is off, so that
+  Dagu Cloud does not take the silence for an outage. Dagu Cloud can delete
+  what a server reported.
 - **No catching up.** When the level drops below `runs` while the server
   runs, the reporter moves its cursor to the newest event, so choosing `runs`
   again never sends the runs that finished in between. It lists the runs in
@@ -217,6 +219,7 @@ activation's credentials, as the heartbeat is.
   "license_id": "…",
   "server_id": "…",
   "heartbeat_secret": "…",
+  "level": "runs",
   "health": { "version": "3.0.0", "os": "linux", "arch": "amd64",
               "started_at": "2026-10-09T12:00:00Z",
               "services": [{ "name": "scheduler", "instances": 1 },
@@ -235,6 +238,9 @@ activation's credentials, as the heartbeat is.
   "gap": { "since": "2026-10-08T00:00:00Z" }
 }
 ```
+
+`level` is the level the report was sent at, `health` or `runs`, or `off`
+for the report that says reporting stopped.
 
 A scheduler count of zero means no scheduler holds the lock; leaving
 `services` out means the count is unknown.
@@ -259,6 +265,22 @@ recently started or queued first. `active_total` counts them all. Each
 report's list replaces the one before. Both are left out at `health`, and at
 `runs` until the reporter knows the runs in progress; a report without them
 says nothing about the runs in progress.
+
+**Reporting off.** When the level becomes `off` after a report at `health` or
+`runs`, whether chosen in the UI or set in configuration and applied at the
+next start, the next report due is the last one:
+
+```json
+{ "protocol": 2, "license_id": "…", "server_id": "…",
+  "heartbeat_secret": "…", "level": "off" }
+```
+
+It carries no `health` and no runs. It is retried like any report on `429`,
+`5xx`, and network errors; once Dagu Cloud answers otherwise, nothing more is
+sent until a level that reports is chosen. The server records the level of
+its last report in the data directory, so a server stopped before sending
+this report sends it after it starts. A level that cannot be read stops
+reports without it, since no one chose `off`.
 
 The response is:
 

@@ -152,7 +152,8 @@ type CloudConfig struct {
 type ReportLevel string
 
 const (
-	// ReportOff reports nothing.
+	// ReportOff reports nothing but, after a level that reports, one report
+	// saying so.
 	ReportOff ReportLevel = "off"
 	// ReportHealth reports the server's version and which services run.
 	ReportHealth ReportLevel = "health"
