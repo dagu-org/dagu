@@ -13,7 +13,12 @@ import { useCopyFeedback } from '@/hooks/useCopyFeedback';
 import { useI18n } from '@/i18n/I18nProvider';
 import dayjs from '@/lib/dayjs';
 import { useLicenseState } from '@/hooks/useLicense';
-import { licenseLink, licensePlanLabel, licenseStatus } from '@/lib/license';
+import {
+  isFreeLicense,
+  licenseLink,
+  licensePlanLabel,
+  licenseStatus,
+} from '@/lib/license';
 
 const connectedViaLabels: Record<string, string> = {
   console: 'Connected via Dagu Console',
@@ -102,8 +107,9 @@ export function LicenseOverview({
   const offerPlans =
     (license.community || license.plan === 'trial') &&
     (tone === 'ok' || tone === 'neutral');
+  // A free license has no term to renew, so its expiry is left out.
   const expiry =
-    license.expiry && dayjs(license.expiry).isValid()
+    !isFreeLicense(license) && license.expiry && dayjs(license.expiry).isValid()
       ? dayjs(license.expiry).format('YYYY-MM-DD')
       : undefined;
 

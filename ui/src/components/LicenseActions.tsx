@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { useIsAdmin } from '@/contexts/AuthContext';
 import { useLicenseState } from '@/hooks/useLicense';
 import { useI18n } from '@/i18n/I18nProvider';
-import { licenseLink } from '@/lib/license';
+import { isFreeLicense, licenseLink } from '@/lib/license';
 import { Button } from './ui/button';
 
 export function LicenseActions({
@@ -36,7 +36,7 @@ export function LicenseActions({
     ? 'manage'
     : license.community
       ? 'trial'
-      : license.plan === 'trial' || license.valid
+      : license.plan === 'trial' || license.valid || isFreeLicense(license)
         ? 'plans'
         : 'manage';
   const label =

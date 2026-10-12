@@ -55,8 +55,28 @@ export const licensedFeatures = [
 
 export type LicensedFeature = (typeof licensedFeatures)[number]['id'];
 
-export function hasActiveLicense(license: LicenseStatus): boolean {
+/**
+ * Reports whether the license is on the free plan, which lets Dagu Console
+ * monitor the server and unlocks no paid features.
+ */
+export function isFreeLicense(license: LicenseStatus): boolean {
+  return !license.community && license.plan === 'free';
+}
+
+/**
+ * Reports whether any license, free included, is valid or in its grace
+ * period.
+ */
+export function hasLicense(license: LicenseStatus): boolean {
   return !license.community && (license.valid || license.gracePeriod);
+}
+
+/**
+ * Reports whether a license that unlocks paid features is valid or in its
+ * grace period. The free plan unlocks none.
+ */
+export function hasActiveLicense(license: LicenseStatus): boolean {
+  return hasLicense(license) && !isFreeLicense(license);
 }
 
 export function hasLicensedFeature(
@@ -108,7 +128,8 @@ export type LicenseStatusText = {
  * Describes where a license stands, most urgent condition first. A trial
  * always shows when it expires; a paid license only within
  * LICENSE_WARNING_DAYS. Expiry is a warning within TRIAL_WARNING_DAYS for a
- * trial and LICENSE_WARNING_DAYS for a paid license, as in LicenseBanner.
+ * trial and LICENSE_WARNING_DAYS for a paid license, as in LicenseBanner. A
+ * free license, which unlocks nothing that could lapse, never shows expiry.
  */
 export function licenseStatus(
   license: LicenseStatus,
@@ -116,6 +137,8 @@ export function licenseStatus(
 ): LicenseStatusText {
   if (license.error) return { text: 'License error', tone: 'error' };
   if (license.warningCode) return { text: 'Needs attention', tone: 'warning' };
+  if (isFreeLicense(license))
+    return { text: 'Monitoring only', tone: 'neutral' };
   if (license.gracePeriod) return { text: 'Grace period', tone: 'warning' };
   if (license.community) return { text: 'Community', tone: 'neutral' };
   if (!license.valid) return { text: 'Expired', tone: 'error' };
