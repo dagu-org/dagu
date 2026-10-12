@@ -43,6 +43,12 @@ result carries the session ID, the page's URL, title, and outline, and the
 browser's DevTools address (`cdp_url`), where an application can show the
 page and let a person act on it.
 
+A session's browser presents the client certificates of the host
+configuration's `browser.client_certificates`, as a browser step does, for as
+long as the browser runs, including between commands. What the certificate
+proxy reports while a command runs, such as a site rejecting the certificate,
+appears in the command's warnings or error.
+
 ### Lifetime
 
 A session waits between commands until its idle deadline, which every

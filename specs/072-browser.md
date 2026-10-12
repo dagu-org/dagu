@@ -6,7 +6,7 @@ Partially implemented.
 
 Conformance covers extraction into outputs, a multi-operation run with model
 and fixed conditions, screenshots, downloads, the replay cache, the secret
-check, allowed domains, dialogs, and validation. Waiting for input and resuming the same
+check, allowed domains, client certificates, dialogs, and validation. Waiting for input and resuming the same
 browser need the REST API and are covered by integration tests. Model prompts,
 page interaction internals, and profile locking belong to executor tests.
 
@@ -121,7 +121,8 @@ those outputs. Operation progress is written to stderr.
 
 `with.browser` accepts `headless` (default `true`), `executable` (otherwise
 `CHROME_PATH` or an installed Chrome), `viewport` `{width, height}`, `proxy`
-(unauthenticated), `allowed_domains`, `screenshots`, and `profile`.
+(unauthenticated), `allowed_domains`, `screenshots`, `profile`, and
+`client_certificates`.
 
 The host configuration `browser.sandbox: false`, or the environment variable
 `DAGU_BROWSER_SANDBOX=false`, turns off Chromium's sandbox for every browser
@@ -129,6 +130,47 @@ the host starts, for hosts where the sandbox cannot start. The sandbox is on
 by default, and a DAG cannot change it. With the sandbox on, a step fails
 before starting a browser where the browser runtime would turn the sandbox off
 anyway: when `CI` is set, or when Dagu runs as root on Linux.
+
+### Client certificates
+
+`client_certificates` lists TLS client certificates and the hosts each is
+presented to, so a site that requires one opens without the operating system
+asking for the certificate's password. An entry names `hosts`, either
+`pfx_file` with `passphrase` or `passphrase_file`, or `cert_file` and an
+unencrypted `key_file` in PEM, and optionally `ca_file`, PEM certificates
+trusted for those hosts' servers besides the system's. A host is a host name
+or IP address, `*.example.com` for the subdomains of `example.com`, or `*` for
+every host. The step's relative files resolve against its working directory.
+
+The host configuration `browser.client_certificates` takes the same entries,
+with `passphrase_file` for a passphrase, and applies to every browser the host
+starts, including `dagu browser session` browsers. A step's entries come
+first, and the first entry whose hosts match a request is used. An entry with
+no hosts, a malformed host, both or neither of the file forms, or a passphrase
+for a PEM key fails validation; host configuration entries fail at startup.
+
+The certificates are read before the browser starts: an unreadable file, a
+wrong passphrase, or a key that does not match its certificate fails the step
+then, naming the entry without its passphrase. A certificate outside its
+validity period is a warning. A passphrase written in a step is masked and
+kept from the model like a secret.
+
+Dagu presents the certificates through a proxy process that runs as long as
+the browser. The browser sends it the HTTPS requests to the entries' hosts, and
+the proxy reaches those hosts the way the device does: through `proxy` when it
+is set, otherwise through the operating system's proxy settings (the proxy
+auto-config, automatic detection on Windows, or the manual proxies; the proxy
+environment variables on Linux). The browser sends every other request there
+itself. With certificates, `proxy` takes only `[scheme://]host[:port]` with
+scheme `http`, `https`, or `socks5`. A proxy that asks for authentication
+cannot carry requests to certificate hosts, and the proxy, not the browser,
+verifies those hosts' server certificates.
+
+A page that does not load because of a client certificate fails the
+operation: the error names what the proxy saw, such as the site rejecting the
+certificate, or, when the browser presents none for the host, says the site
+asks for one. The step's log records each host the proxy presented a
+certificate to and each failure it saw.
 
 ### Allowed domains
 
@@ -258,7 +300,8 @@ allowed domains, the browser stops responding, or the browser cannot be
 started. When an `act` fails because its model chose no element, the error
 names the model, since some models give that answer for every request. An
 `act` whose model picks an option that the select does not offer does not
-complete.
+complete. A page that does not load because of a client certificate fails the
+operation that opened it, as described under Client certificates.
 
 The browser can lose its connection to the page before an `act` or a replay
 reports back, as when a click loads a new page. The step then checks the page
