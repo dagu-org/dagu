@@ -6,6 +6,7 @@ package certproxy
 import (
 	"context"
 	"errors"
+	"net"
 	"time"
 
 	"github.com/dagucloud/dagu/v2/internal/browserhost"
@@ -20,9 +21,10 @@ const (
 )
 
 // watchBrowser returns once the browser at cdpURL is gone: nothing accepts
-// connections there, or another browser answers in its place. It also
-// returns when no browser answers within grace, or when ctx ends. A browser
-// that is slow to answer counts as running.
+// connections there, or something else answers in its place, such as
+// another browser or a server that took its port. It also returns when no
+// browser answers within grace, or when ctx ends. A browser that is slow to
+// answer counts as running.
 func watchBrowser(ctx context.Context, cdpURL string, grace, interval time.Duration) {
 	deadline := time.Now().Add(grace)
 	ticker := time.NewTicker(interval)
@@ -37,7 +39,7 @@ func watchBrowser(ctx context.Context, cdpURL string, grace, interval time.Durat
 			pinned = id
 		case pinned == "" && time.Now().After(deadline):
 			return
-		case pinned != "" && errors.Is(err, browserhost.ErrUnreachable):
+		case pinned != "" && err != nil && !timedOut(err):
 			return
 		case pinned != "" && err == nil && id != pinned:
 			return
@@ -48,4 +50,14 @@ func watchBrowser(ctx context.Context, cdpURL string, grace, interval time.Durat
 		case <-ticker.C:
 		}
 	}
+}
+
+// timedOut reports whether err is a check that ran out of time, which a
+// busy browser causes, rather than an answer that no browser is there.
+func timedOut(err error) bool {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	var netErr net.Error
+	return errors.As(err, &netErr) && netErr.Timeout()
 }

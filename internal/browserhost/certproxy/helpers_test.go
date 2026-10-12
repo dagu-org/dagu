@@ -158,6 +158,11 @@ func keyPEM(t *testing.T, key crypto.Signer) string {
 type fakeBrowser struct {
 	server *httptest.Server
 	id     atomic.Value
+	// replaced makes the endpoint answer as a server other than a
+	// browser does.
+	replaced atomic.Bool
+	// answered counts the times the endpoint answered as a browser.
+	answered atomic.Int64
 }
 
 func newFakeBrowser(t *testing.T) *fakeBrowser {
@@ -166,12 +171,13 @@ func newFakeBrowser(t *testing.T) *fakeBrowser {
 	// Like Chrome, every browser has an identity of its own.
 	fake.id.Store(rand.Text())
 	fake.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/json/version" {
+		if r.URL.Path != "/json/version" || fake.replaced.Load() {
 			http.NotFound(w, r)
 			return
 		}
 		url := "ws://" + r.Host + "/devtools/browser/" + fake.id.Load().(string)
 		_ = json.NewEncoder(w).Encode(map[string]string{"webSocketDebuggerUrl": url})
+		fake.answered.Add(1)
 	}))
 	t.Cleanup(fake.server.Close)
 	return fake

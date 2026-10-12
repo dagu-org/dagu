@@ -5,6 +5,7 @@ package certproxy
 
 import (
 	"context"
+	"errors"
 	"net"
 	"testing"
 	"time"
@@ -80,6 +81,16 @@ func TestWatchBrowser(t *testing.T) {
 		assertEnds(t, done)
 	})
 
+	// Another server can take the port of a browser that closed.
+	t.Run("EndsWhenSomethingElseAnswers", func(t *testing.T) {
+		t.Parallel()
+		browser := newFakeBrowser(t)
+		done := watch(t, browser.server.URL, time.Minute)
+		assertRunning(t, done)
+		browser.replaced.Store(true)
+		assertEnds(t, done)
+	})
+
 	t.Run("EndsWhenNoBrowserAnswersInTime", func(t *testing.T) {
 		t.Parallel()
 		const grace = 300 * time.Millisecond
@@ -103,3 +114,19 @@ func TestWatchBrowser(t *testing.T) {
 		assertEnds(t, done)
 	})
 }
+
+// A check that runs out of time is a busy browser, not a gone one.
+func TestTimedOut(t *testing.T) {
+	t.Parallel()
+
+	assert.True(t, timedOut(context.DeadlineExceeded))
+	assert.True(t, timedOut(&net.OpError{Op: "dial", Err: timeoutError{}}))
+	assert.False(t, timedOut(errors.New("browser DevTools endpoint returned 404 Not Found")))
+}
+
+// timeoutError is a network error that ran out of time.
+type timeoutError struct{}
+
+func (timeoutError) Error() string   { return "i/o timeout" }
+func (timeoutError) Timeout() bool   { return true }
+func (timeoutError) Temporary() bool { return true }
