@@ -379,13 +379,16 @@ func (p *Provider) buildGenerationConfig(req *llm.ChatRequest) *generationConfig
 }
 
 // mapEffortToThinkingLevel maps unified effort levels to Gemini thinkingLevel.
+// Gemini cannot turn thinking off by level, so none becomes minimal.
 func (p *Provider) mapEffortToThinkingLevel(effort llm.ThinkingEffort) string {
 	switch effort {
+	case llm.ThinkingEffortNone, llm.ThinkingEffortMinimal:
+		return "minimal"
 	case llm.ThinkingEffortLow:
 		return "low"
 	case llm.ThinkingEffortMedium:
 		return "medium"
-	case llm.ThinkingEffortHigh, llm.ThinkingEffortXHigh:
+	case llm.ThinkingEffortHigh, llm.ThinkingEffortXHigh, llm.ThinkingEffortMax:
 		return "high"
 	default:
 		return "medium"
@@ -396,13 +399,13 @@ func (p *Provider) mapEffortToThinkingLevel(effort llm.ThinkingEffort) string {
 // These are conservative estimates to ensure maxOutputTokens is sufficient.
 func (p *Provider) estimateThinkingBudget(effort llm.ThinkingEffort) int {
 	switch effort {
-	case llm.ThinkingEffortLow:
+	case llm.ThinkingEffortNone, llm.ThinkingEffortMinimal, llm.ThinkingEffortLow:
 		return 1024
 	case llm.ThinkingEffortMedium:
 		return 4096
 	case llm.ThinkingEffortHigh:
 		return 8192
-	case llm.ThinkingEffortXHigh:
+	case llm.ThinkingEffortXHigh, llm.ThinkingEffortMax:
 		return 16384
 	default:
 		return 4096
@@ -557,8 +560,9 @@ type generationConfig struct {
 	MaxOutputTokens *int     `json:"maxOutputTokens,omitempty"`
 	TopP            *float64 `json:"topP,omitempty"`
 	StopSequences   []string `json:"stopSequences,omitempty"`
-	// ThinkingLevel for Gemini 3 models: low, medium, high
-	// Maps from effort: low→low, medium→medium, high/xhigh→high
+	// ThinkingLevel for Gemini 3 models: minimal, low, medium, high
+	// Maps from effort: none/minimal→minimal, low→low, medium→medium,
+	// high/xhigh/max→high
 	ThinkingLevel string `json:"thinkingLevel,omitempty"`
 	// ThinkingBudget for Gemini 2.5 models: 128-32768, 0=disable, -1=dynamic
 	ThinkingBudget *int `json:"thinkingBudget,omitempty"`
