@@ -9,6 +9,11 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// PlanFree is the plan of a license that connects a server to Dagu Console
+// for monitoring only. It unlocks no paid features, whatever features it
+// claims.
+const PlanFree = "free"
+
 // LicenseClaims represents the custom JWT claims for a Dagu license.
 type LicenseClaims struct {
 	jwt.RegisteredClaims
@@ -26,4 +31,10 @@ type LicenseClaims struct {
 // HasFeature returns true if the given feature is included in the license claims.
 func (c *LicenseClaims) HasFeature(name string) bool {
 	return slices.Contains(c.Features, name)
+}
+
+// IsFree reports whether the claims are on the free monitoring plan. Nil
+// claims are not.
+func (c *LicenseClaims) IsFree() bool {
+	return c != nil && c.Plan == PlanFree
 }

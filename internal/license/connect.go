@@ -134,7 +134,7 @@ func (m *Manager) Connect() (ConnectStatus, error) {
 	}
 	code := connectionCode(secret)
 	expiresAt := time.Now().Add(m.connectTTL)
-	query := url.Values{"code": {code}, "name": {m.serverName}, "server_id": {serverID}}
+	query := url.Values{"code": {code}, "name": {m.serverName}, "server_id": {serverID}, "version": {config.Version}}
 
 	ctx, cancel := context.WithDeadline(context.Background(), expiresAt)
 	s := &connectSession{
@@ -201,7 +201,7 @@ func (m *Manager) checkConnectable() error {
 	if m.licenseConfigured() {
 		return ErrManagedExternally
 	}
-	if HasActiveLicense(m.state) {
+	if HasLicense(m.state) {
 		return ErrAlreadyLicensed
 	}
 	return nil
@@ -294,7 +294,7 @@ func (m *Manager) completeConnect(ctx context.Context, s *connectSession, resp *
 		Via:             ConnectedViaConsole,
 		CheckedInAt:     time.Now(),
 	}
-	if current := m.state.Claims(); current != nil && HasActiveLicense(m.state) {
+	if current := m.state.Claims(); current != nil && HasLicense(m.state) {
 		granted, err := VerifyToken(m.pubKey, resp.Token)
 		if err != nil {
 			return err
