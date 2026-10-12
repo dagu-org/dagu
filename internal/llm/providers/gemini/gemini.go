@@ -346,11 +346,15 @@ func (p *Provider) buildGenerationConfig(req *llm.ChatRequest) *generationConfig
 			genConfig.ThinkingConfig = &thinkingConfig{ThinkingBudget: req.Thinking.BudgetTokens}
 			thinkingBudget = *req.Thinking.BudgetTokens
 		} else if strings.Contains(model, "gemini-3") || strings.Contains(model, "gemini-robotics-er-2-") {
-			// Level-based models use the effort level directly.
+			// Level-based models use their nearest supported effort level.
+			level := p.mapEffortToThinkingLevel(model, req.Thinking.Effort)
 			genConfig.ThinkingConfig = &thinkingConfig{
-				ThinkingLevel: strings.ToUpper(p.mapEffortToThinkingLevel(req.Thinking.Effort)),
+				ThinkingLevel: strings.ToUpper(level),
 			}
-			thinkingBudget = p.estimateThinkingBudget(req.Thinking.Effort)
+			thinkingBudget = max(
+				p.estimateThinkingBudget(req.Thinking.Effort),
+				p.estimateThinkingBudget(llm.ThinkingEffort(level)),
+			)
 		} else {
 			thinkingBudget = p.estimateThinkingBudget(req.Thinking.Effort)
 			if req.Thinking.Effort == llm.ThinkingEffortNone &&
@@ -387,21 +391,31 @@ func (p *Provider) buildGenerationConfig(req *llm.ChatRequest) *generationConfig
 	return genConfig
 }
 
-// mapEffortToThinkingLevel maps unified effort levels to Gemini thinkingLevel.
-// Gemini cannot turn thinking off by level, so none becomes minimal.
-func (p *Provider) mapEffortToThinkingLevel(effort llm.ThinkingEffort) string {
+// mapEffortToThinkingLevel maps effort to the nearest level supported by the model.
+func (p *Provider) mapEffortToThinkingLevel(model string, effort llm.ThinkingEffort) string {
+	level := "medium"
 	switch effort {
 	case llm.ThinkingEffortNone, llm.ThinkingEffortMinimal:
-		return "minimal"
+		level = "minimal"
 	case llm.ThinkingEffortLow:
-		return "low"
+		level = "low"
 	case llm.ThinkingEffortMedium:
-		return "medium"
+		level = "medium"
 	case llm.ThinkingEffortHigh, llm.ThinkingEffortXHigh, llm.ThinkingEffortMax:
-		return "high"
-	default:
-		return "medium"
+		level = "high"
 	}
+	if level == "minimal" && (strings.Contains(model, "gemini-3.1-pro") || strings.Contains(model, "gemini-3.8-flash")) {
+		return "low"
+	}
+	if strings.Contains(model, "gemini-3.1-flash-lite-image") {
+		switch level {
+		case "low":
+			return "minimal"
+		case "medium":
+			return "high"
+		}
+	}
+	return level
 }
 
 // estimateThinkingBudget estimates token budget for effort levels when using thinkingLevel.

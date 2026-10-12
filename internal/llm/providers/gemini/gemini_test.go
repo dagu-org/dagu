@@ -299,13 +299,14 @@ func TestThinkingConfig(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name         string
-		model        string
-		thinking     *llm.ThinkingRequest
-		temperature  *float64
-		topP         *float64
-		stop         []string
-		wantThinking string
+		name          string
+		model         string
+		thinking      *llm.ThinkingRequest
+		temperature   *float64
+		topP          *float64
+		stop          []string
+		wantThinking  string
+		wantMaxTokens int
 	}{
 		{
 			name:         "Flash Lite none disables thinking",
@@ -342,6 +343,43 @@ func TestThinkingConfig(t *testing.T) {
 			model:        "gemini-3.8-flash",
 			thinking:     &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortHigh},
 			wantThinking: `{"thinkingLevel":"HIGH"}`,
+		},
+		{
+			name:         "3.1 Pro none falls back to low",
+			model:        "gemini-3.1-pro-preview",
+			thinking:     &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortNone},
+			wantThinking: `{"thinkingLevel":"LOW"}`,
+		},
+		{
+			name:         "3.1 Pro minimal falls back to low",
+			model:        "gemini-3.1-pro-preview",
+			thinking:     &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortMinimal},
+			wantThinking: `{"thinkingLevel":"LOW"}`,
+		},
+		{
+			name:         "3.8 Flash none falls back to low",
+			model:        "gemini-3.8-flash",
+			thinking:     &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortNone},
+			wantThinking: `{"thinkingLevel":"LOW"}`,
+		},
+		{
+			name:         "3.8 Flash minimal falls back to low",
+			model:        "gemini-3.8-flash",
+			thinking:     &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortMinimal},
+			wantThinking: `{"thinkingLevel":"LOW"}`,
+		},
+		{
+			name:         "Flash Lite Image low falls back to minimal",
+			model:        "gemini-3.1-flash-lite-image",
+			thinking:     &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortLow},
+			wantThinking: `{"thinkingLevel":"MINIMAL"}`,
+		},
+		{
+			name:          "Flash Lite Image medium falls back to high",
+			model:         "gemini-3.1-flash-lite-image",
+			thinking:      &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortMedium},
+			wantThinking:  `{"thinkingLevel":"HIGH"}`,
+			wantMaxTokens: 8192 + 4096,
 		},
 		{
 			name:         "3 series minimal level",
@@ -417,6 +455,11 @@ func TestThinkingConfig(t *testing.T) {
 			require.NoError(t, json.Unmarshal(request["generationConfig"], &config))
 			require.Contains(t, config, "thinkingConfig")
 			assert.JSONEq(t, tt.wantThinking, string(config["thinkingConfig"]))
+			if tt.wantMaxTokens > 0 {
+				var maxTokens int
+				require.NoError(t, json.Unmarshal(config["maxOutputTokens"], &maxTokens))
+				assert.Equal(t, tt.wantMaxTokens, maxTokens)
+			}
 			if tt.wantThinking == `{"thinkingBudget":0}` {
 				assert.NotContains(t, config, "maxOutputTokens")
 			}
