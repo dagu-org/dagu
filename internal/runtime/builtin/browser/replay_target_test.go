@@ -1,0 +1,158 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package browser
+
+import (
+	"errors"
+	"fmt"
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// ordersPage is an orders page's tree: a customer's link, a status select,
+// a button, a select whose options are not loaded yet, and a custom
+// combobox that shows its options only when opened.
+var ordersPage = pageSnapshot{
+	Tree: "[0-1] RootWebArea: Orders\n  [0-2] link: ACME-1001\n  [0-3] select\n    [0-4] MenuListPopup\n      [0-5] option: すべて [selected]\n      [0-6] option: 未出荷\n  [0-7] button: Save\n" +
+		"  [0-8] select\n    [0-9] MenuListPopup\n  [0-10] combobox: Carrier\n",
+	XPaths: map[string]string{
+		"0-2": "/html[1]/body[1]/a[1]", "0-3": "/html[1]/body[1]/select[1]", "0-7": "/html[1]/body[1]/button[1]",
+		"0-8": "/html[1]/body[1]/select[2]", "0-10": "/html[1]/body[1]/input[1]",
+	},
+}
+
+// rowsPage is a list with a Delete button in each row.
+func rowsPage(rows ...string) pageSnapshot {
+	snap := pageSnapshot{Tree: "[0-1] RootWebArea: Rows\n  [0-2] list\n", XPaths: map[string]string{}}
+	for i, row := range rows {
+		button := fmt.Sprintf("3-%d", i)
+		snap.Tree += fmt.Sprintf("    [1-%d] listitem\n      [2-%d] StaticText: %s\n      [%s] button: Delete\n", i, i, row, button)
+		snap.XPaths[button] = fmt.Sprintf("/html[1]/body[1]/ul[1]/li[%d]/button[1]", i+1)
+	}
+	return snap
+}
+
+// A replay goes ahead only while the element at the recorded location is
+// the one the action recorded.
+func TestReplayTarget(t *testing.T) {
+	t.Parallel()
+
+	customer := map[string]string{"customer": "ACME-1001"}
+	for name, tc := range map[string]struct {
+		action    recordedAction
+		variables map[string]string
+		want      bool
+	}{
+		"same element": {
+			action: recordedAction{Selector: "xpath=/html[1]/body[1]/button[1]", Method: "click", Target: &recordedTarget{Role: "button", Name: "Save"}},
+			want:   true,
+		},
+		"another name": {
+			action: recordedAction{Selector: "xpath=/html[1]/body[1]/button[1]", Method: "click", Target: &recordedTarget{Role: "button", Name: "Delete"}},
+		},
+		"another role": {
+			action: recordedAction{Selector: "xpath=/html[1]/body[1]/a[1]", Method: "click", Target: &recordedTarget{Role: "button", Name: "ACME-1001"}},
+		},
+		"element gone": {
+			action: recordedAction{Selector: "xpath=/html[1]/body[1]/button[2]", Method: "click", Target: &recordedTarget{Role: "button", Name: "Save"}},
+		},
+		"name from a variable": {
+			action:    recordedAction{Selector: "xpath=/html[1]/body[1]/a[1]", Method: "click", Target: &recordedTarget{Role: "link", Name: "%customer%"}},
+			variables: customer,
+			want:      true,
+		},
+		"name from another value": {
+			action:    recordedAction{Selector: "xpath=/html[1]/body[1]/a[1]", Method: "click", Target: &recordedTarget{Role: "link", Name: "%customer%"}},
+			variables: map[string]string{"customer": "ACME-1002"},
+		},
+		"select offering the option": {
+			action: recordedAction{Selector: "xpath=/html[1]/body[1]/select[1]", Method: selectOptionMethod, Arguments: []string{"未出荷"}, Target: &recordedTarget{Role: "select", Lookalikes: 2}},
+			want:   true,
+		},
+		"select lacking the option": {
+			action: recordedAction{Selector: "xpath=/html[1]/body[1]/select[1]", Method: selectOptionMethod, Arguments: []string{"出荷済み"}, Target: &recordedTarget{Role: "select", Lookalikes: 2}},
+		},
+		"native select without options": {
+			action: recordedAction{Selector: "xpath=/html[1]/body[1]/select[2]", Method: selectOptionMethod, Arguments: []string{"未出荷"}, Target: &recordedTarget{Role: "select", Lookalikes: 2}},
+		},
+		"custom combobox not showing its options": {
+			action: recordedAction{Selector: "xpath=/html[1]/body[1]/input[1]", Method: selectOptionMethod, Arguments: []string{"Express"}, Target: &recordedTarget{Role: "combobox", Name: "Carrier"}},
+			want:   true,
+		},
+		"unidentified select lacking the option": {
+			action: recordedAction{Selector: "xpath=/html[1]/body[1]/select[1]", Method: selectOptionMethod, Arguments: []string{"出荷済み"}},
+		},
+		// A recording made before actions were identified replays as before.
+		"unidentified element": {
+			action: recordedAction{Selector: "xpath=/html[1]/body[1]/button[2]", Method: "click"},
+			want:   true,
+		},
+	} {
+		assert.Equal(t, tc.want, stillTargets(tc.action, ordersPage, tc.variables), name)
+	}
+}
+
+// An action is identified by the element it targets, with a variable's
+// value in the name kept as its placeholder.
+func TestIdentifyActions(t *testing.T) {
+	t.Parallel()
+
+	actions := []recordedAction{
+		{Selector: "xpath=/html[1]/body[1]/a[1]", Method: "click"},
+		{Selector: "xpath=/html[1]/body[1]/div[1]", Method: "click"},
+	}
+	identifyOn(ordersPage, actions, map[string]string{"customer": "ACME-1001", "short": "AC"})
+
+	require.Len(t, actions, 2)
+	require.NotNil(t, actions[0].Target)
+	assert.Equal(t, recordedTarget{Role: "link", Name: "%customer%"}, *actions[0].Target)
+	assert.Nil(t, actions[1].Target, "an element outside the tree is not identified")
+	assert.True(t, stillTargets(actions[0], ordersPage, map[string]string{"customer": "ACME-1001"}))
+}
+
+// An element with lookalikes on the page, such as a Delete button in each
+// row, is told apart by the text of its row, which may show a variable.
+func TestReplayTargetInRow(t *testing.T) {
+	t.Parallel()
+
+	actions := []recordedAction{{Selector: "xpath=/html[1]/body[1]/ul[1]/li[2]/button[1]", Method: "click"}}
+	identifyOn(rowsPage("Alpha", "Beta"), actions, map[string]string{"customer": "Beta"})
+	deleteCustomer := actions[0]
+
+	assert.True(t, stillTargets(deleteCustomer, rowsPage("Alpha", "Beta"), map[string]string{"customer": "Beta"}))
+	assert.True(t, stillTargets(deleteCustomer, rowsPage("Alpha", "Delta"), map[string]string{"customer": "Delta"}), "the row of the customer this run names")
+	assert.False(t, stillTargets(deleteCustomer, rowsPage("Gamma", "Alpha", "Beta"), map[string]string{"customer": "Beta"}), "Alpha's Delete is where Beta's was")
+
+	// Rows that differ only after a long shared prefix are told apart too.
+	prefix := strings.Repeat("Shared warehouse note ", 20)
+	long := []recordedAction{{Selector: "xpath=/html[1]/body[1]/ul[1]/li[2]/button[1]", Method: "click"}}
+	identifyOn(rowsPage(prefix+"A-1", prefix+"A-2"), long, nil)
+	assert.False(t, stillTargets(long[0], rowsPage(prefix+"A-0", prefix+"A-1", prefix+"A-2"), nil))
+
+	// A lone element has nothing to be told apart from, so it is identified
+	// by its role and name, until lookalikes appear beside it.
+	lone := []recordedAction{{Selector: "xpath=/html[1]/body[1]/ul[1]/li[1]/button[1]", Method: "click"}}
+	identifyOn(rowsPage("Alpha"), lone, nil)
+	assert.True(t, stillTargets(lone[0], rowsPage("Beta"), nil))
+	assert.False(t, stillTargets(lone[0], rowsPage("New", "Alpha"), nil), "New's Delete is where Alpha's was")
+}
+
+// An act picking an option does not count as done unless the page before
+// it shows the select offers the option.
+func TestUncheckedOption(t *testing.T) {
+	t.Parallel()
+
+	pick := func(selector, option string) []recordedAction {
+		return []recordedAction{{Selector: selector, Method: selectOptionMethod, Arguments: []string{option}}}
+	}
+	status := "xpath=/html[1]/body[1]/select[1]"
+	assert.Empty(t, uncheckedOption(ordersPage, nil, pick(status, "未出荷"), nil))
+	assert.Equal(t, `the select offers no option "出荷済み"`, uncheckedOption(ordersPage, nil, pick(status, "出荷済み"), nil))
+	assert.Contains(t, uncheckedOption(pageSnapshot{}, errors.New("page busy"), pick(status, "未出荷"), nil), "page busy")
+	assert.Empty(t, uncheckedOption(pageSnapshot{}, errors.New("page busy"), []recordedAction{{Selector: status, Method: "click"}}, nil),
+		"only a picked option needs the page")
+}

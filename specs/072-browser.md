@@ -196,17 +196,23 @@ query or fragment match. When a replay fails, the step asks the model again.
 If the step succeeds, the model's new actions replace the recording; an act
 that records no actions, such as one whose click loaded a new document before
 it reported back, removes the recording instead, unless another run of the step
-replaced it first. A replay fails when a recorded element is gone or is on the
-page but not visible, such as a field in a closed dialog. `act.cache: false`
-disables the cache for one operation.
+replaced it first. A replay fails when a recorded element is gone, is on the
+page but not visible, such as a field in a closed dialog, or is no longer the
+element the act recorded: the element at the recorded location has another
+accessibility role or name, or a select there does not offer the recorded
+option. When other elements on the page shared the recorded element's role and
+name, such as a Delete button in each row of a list, the text of its row must
+also match. Without such a row, the replay fails when the page has more
+elements of that role and name than when the act recorded it. An element
+without a name is told apart by its role only.
+`act.cache: false` disables the cache for one operation.
 
 Runs of a step share its recordings, and each `act` reads them when it runs. A
 recording that another run of the step replaced or removed meanwhile, such as
 an earlier `foreach` item waiting for the same profile, is not replayed.
 
 The cache covers `act` only. `extract` and model-judged conditions make model
-requests on every run. A replay that finds an element at the recorded location
-succeeds even if the page layout changed and a different element is now there.
+requests on every run.
 
 `dagu browser cache clear <dag>` removes the recorded actions of every step of
 the DAG, or of one step with `--step <id>`, and reports the steps it removed.
@@ -250,7 +256,9 @@ an `act` does not complete, an `expect` does not hold, a selector does not
 appear before the timeout, a download does not finish, the page leaves the
 allowed domains, the browser stops responding, or the browser cannot be
 started. When an `act` fails because its model chose no element, the error
-names the model, since some models give that answer for every request.
+names the model, since some models give that answer for every request. An
+`act` whose model picks an option that the select does not offer does not
+complete.
 
 The browser can lose its connection to the page before an `act` or a replay
 reports back, as when a click loads a new page. The step then checks the page

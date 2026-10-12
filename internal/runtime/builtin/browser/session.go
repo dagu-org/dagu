@@ -585,7 +585,7 @@ func (s *Sessions) Do(ctx context.Context, req DoRequest) (DoResult, error) {
 		if err != nil {
 			return DoResult{}, &SessionError{Code: CodeOperationFailed, Message: "read the page: " + masker.MaskString(err.Error())}
 		}
-		instruction, action, err := elementAct(snap, element)
+		instruction, action, err := elementAct(snap, element, values.all)
 		if err != nil {
 			return DoResult{}, &SessionError{Code: CodeInvalidInput, Message: masker.MaskString(err.Error())}
 		}
@@ -1083,8 +1083,12 @@ func reserveSession(store *browserhost.Store) (string, string, error) {
 func sessionActions(actions []recordedAction, masker *masking.Masker) []SessionAction {
 	out := make([]SessionAction, 0, len(actions))
 	for _, action := range actions {
-		action.Arguments = maskAll(masker, slices.Clone(action.Arguments))
-		out = append(out, SessionAction(action))
+		out = append(out, SessionAction{
+			Selector:    action.Selector,
+			Description: action.Description,
+			Method:      action.Method,
+			Arguments:   maskAll(masker, slices.Clone(action.Arguments)),
+		})
 	}
 	return out
 }

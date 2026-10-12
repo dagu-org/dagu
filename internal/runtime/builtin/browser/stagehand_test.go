@@ -19,6 +19,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -309,6 +310,220 @@ func TestStagehandReplayHiddenElement(t *testing.T) {
 	replayed, err = eng.Replay(t.Context(), typeInto("xpath=/html/body/input[1]"), nil, time.Minute)
 	require.NoError(t, err)
 	assert.True(t, replayed, "the field outside the dialog is visible")
+}
+
+// treeModel answers act requests with method and arguments on the element
+// find finds in the tree the runtime sends.
+func treeModel(find func(roots []*outlineNode) *outlineNode, method string, arguments ...string) generateFunc {
+	return func(_ context.Context, req generateRequest) (generateResponse, error) {
+		if !strings.Contains(string(req.Schema), "elementId") {
+			return generateResponse{JSON: json.RawMessage(`{"completed":true,"progress":"done"}`)}, nil
+		}
+		text := ""
+		for _, message := range req.Messages {
+			text += message.Text + "\n"
+		}
+		node := find(parseSnapshotTree(text))
+		if node == nil {
+			return generateResponse{}, fmt.Errorf("no element to act on in:\n%s", text)
+		}
+		action, err := json.Marshal(map[string]any{
+			"elementId": node.id, "description": node.role, "method": method, "arguments": append([]string{}, arguments...),
+		})
+		if err != nil {
+			return generateResponse{}, err
+		}
+		return generateResponse{JSON: json.RawMessage(`{"action":` + string(action) + `,"twoStep":false}`)}, nil
+	}
+}
+
+// where finds the first node pick accepts.
+func where(pick func(*outlineNode) bool) func([]*outlineNode) *outlineNode {
+	return func(roots []*outlineNode) *outlineNode { return nodeWhere(roots, pick) }
+}
+
+func nodeWhere(nodes []*outlineNode, pick func(*outlineNode) bool) *outlineNode {
+	for _, n := range nodes {
+		if pick(n) {
+			return n
+		}
+		if found := nodeWhere(n.children, pick); found != nil {
+			return found
+		}
+	}
+	return nil
+}
+
+func buttonNamed(name string) func(*outlineNode) bool {
+	return func(n *outlineNode) bool { return n.role == "button" && n.name == name }
+}
+
+func selectOffering(option string) func(*outlineNode) bool {
+	return func(n *outlineNode) bool {
+		return slices.Contains(choiceRoles, n.role) && slices.ContainsFunc(optionsOf(n), func(o *outlineNode) bool { return o.name == option })
+	}
+}
+
+// statusPage is a page whose elements report what was done to them in its
+// status line, which starts as "idle".
+func statusPage(body string) string {
+	return "data:text/html;charset=utf-8," + url.PathEscape(`<p id="status">idle</p>`+body+
+		`<script>function report(s) { document.getElementById("status").textContent = s; }</script>`)
+}
+
+func requireStatus(t *testing.T, eng engine, want string) {
+	t.Helper()
+	text, err := eng.PageText(t.Context())
+	require.NoError(t, err)
+	require.Equal(t, want, strings.SplitN(text, "\n", 2)[0])
+}
+
+// savePage has a Save button. A banner puts a Dismiss button before it, at
+// the location Save had.
+func savePage(banner bool) string {
+	dismiss := ""
+	if banner {
+		dismiss = `<button onclick="report('dismissed')">Dismiss</button>`
+	}
+	return statusPage(`<div>` + dismiss + `<button onclick="report('saved')">Save</button></div>`)
+}
+
+// A replay acts only on the element it recorded. When the layout moves
+// another element to the recorded location, the replay misses instead of
+// acting on it.
+func TestStagehandReplayMissesShiftedElement(t *testing.T) {
+	t.Parallel()
+
+	eng := launchBrowser(t, launchOptions{Generate: treeModel(where(buttonNamed("Save")), "click")})
+	require.NoError(t, eng.Goto(t.Context(), savePage(false), time.Minute))
+	outcome, err := eng.Act(t.Context(), "Click Save", nil, time.Minute)
+	require.NoError(t, err)
+	require.True(t, outcome.Success, outcome.Message)
+	require.Len(t, outcome.Actions, 1)
+	save := outcome.Actions[0]
+
+	require.NoError(t, eng.Goto(t.Context(), savePage(true), time.Minute))
+	replayed, err := eng.Replay(t.Context(), save, nil, time.Minute)
+	require.NoError(t, err)
+	assert.False(t, replayed, "Dismiss is where Save was")
+	requireStatus(t, eng, "idle")
+
+	require.NoError(t, eng.Goto(t.Context(), savePage(false), time.Minute))
+	replayed, err = eng.Replay(t.Context(), save, nil, time.Minute)
+	require.NoError(t, err)
+	assert.True(t, replayed)
+	requireStatus(t, eng, "saved")
+}
+
+// priceForm has unlabeled lower and upper price selects. A banner puts a
+// sort select before them, so the upper price's location holds the lower.
+func priceForm(banner bool) string {
+	sort := ""
+	if banner {
+		sort = `<select onchange="report(this.value)"><option>新着順</option><option>価格順</option></select>`
+	}
+	return statusPage(`<div>` + sort +
+		`<select onchange="report(this.value)"><option>下限なし</option><option>7000万円以上</option></select>` +
+		`<select onchange="report(this.value)"><option>上限なし</option><option>7000万円未満</option></select></div>`)
+}
+
+// A replayed select acts only on a select offering the recorded option. The
+// runtime would otherwise reset another select at the recorded location to
+// its first option and report success.
+func TestStagehandReplayMissesShiftedSelect(t *testing.T) {
+	t.Parallel()
+
+	eng := launchBrowser(t, launchOptions{Generate: treeModel(where(selectOffering("7000万円未満")), "selectOptionFromDropdown", "7000万円未満")})
+	require.NoError(t, eng.Goto(t.Context(), priceForm(false), time.Minute))
+	outcome, err := eng.Act(t.Context(), "Choose 7000万円未満 as the upper price", nil, time.Minute)
+	require.NoError(t, err)
+	require.True(t, outcome.Success, outcome.Message)
+	require.Len(t, outcome.Actions, 1)
+	upper := outcome.Actions[0]
+
+	require.NoError(t, eng.Goto(t.Context(), priceForm(true), time.Minute))
+	replayed, err := eng.Replay(t.Context(), upper, nil, time.Minute)
+	require.NoError(t, err)
+	assert.False(t, replayed, "the lower price select is where the upper was")
+	requireStatus(t, eng, "idle")
+
+	require.NoError(t, eng.Goto(t.Context(), statusPage(`<div><select><option>下限なし</option></select><select onchange="report(this.value)"></select></div>`), time.Minute))
+	replayed, err = eng.Replay(t.Context(), upper, nil, time.Minute)
+	require.NoError(t, err)
+	assert.False(t, replayed, "the upper price select has no options yet")
+
+	require.NoError(t, eng.Goto(t.Context(), priceForm(false), time.Minute))
+	replayed, err = eng.Replay(t.Context(), upper, nil, time.Minute)
+	require.NoError(t, err)
+	assert.True(t, replayed)
+	requireStatus(t, eng, "7000万円未満")
+}
+
+// deleteList has a Delete button in each row.
+func deleteList(rows ...string) string {
+	body := "<ul>"
+	for _, row := range rows {
+		body += fmt.Sprintf(`<li>%[1]s <button onclick="report('deleted %[1]s')">Delete</button></li>`, row)
+	}
+	return statusPage(body + "</ul>")
+}
+
+// A replayed action on one of several lookalike elements, such as the Delete
+// button of a row, acts only on the one in the row it recorded.
+func TestStagehandReplayMissesShiftedRow(t *testing.T) {
+	t.Parallel()
+
+	betaDelete := func(roots []*outlineNode) *outlineNode {
+		row := nodeWhere(roots, func(n *outlineNode) bool { return n.role == "listitem" && strings.Contains(textOf(n), "Beta") })
+		if row == nil {
+			return nil
+		}
+		return nodeWhere(row.children, buttonNamed("Delete"))
+	}
+	eng := launchBrowser(t, launchOptions{Generate: treeModel(betaDelete, "click")})
+	require.NoError(t, eng.Goto(t.Context(), deleteList("Alpha", "Beta"), time.Minute))
+	outcome, err := eng.Act(t.Context(), "Delete Beta", nil, time.Minute)
+	require.NoError(t, err)
+	require.True(t, outcome.Success, outcome.Message)
+	require.Len(t, outcome.Actions, 1)
+	deleteBeta := outcome.Actions[0]
+
+	require.NoError(t, eng.Goto(t.Context(), deleteList("Gamma", "Alpha", "Beta"), time.Minute))
+	replayed, err := eng.Replay(t.Context(), deleteBeta, nil, time.Minute)
+	require.NoError(t, err)
+	assert.False(t, replayed, "Alpha's Delete is where Beta's was")
+	requireStatus(t, eng, "idle")
+
+	require.NoError(t, eng.Goto(t.Context(), deleteList("Alpha", "Beta"), time.Minute))
+	replayed, err = eng.Replay(t.Context(), deleteBeta, nil, time.Minute)
+	require.NoError(t, err)
+	assert.True(t, replayed)
+	requireStatus(t, eng, "deleted Beta")
+
+	// A Delete alone in its list when recorded has no row to be told apart
+	// by, so a row added before it makes the replay miss.
+	require.NoError(t, eng.Goto(t.Context(), deleteList("Beta"), time.Minute))
+	outcome, err = eng.Act(t.Context(), "Delete Beta", nil, time.Minute)
+	require.NoError(t, err)
+	require.True(t, outcome.Success, outcome.Message)
+	require.NoError(t, eng.Goto(t.Context(), deleteList("Alpha", "Beta"), time.Minute))
+	replayed, err = eng.Replay(t.Context(), outcome.Actions[0], nil, time.Minute)
+	require.NoError(t, err)
+	assert.False(t, replayed, "Alpha's Delete is where the lone one was")
+	requireStatus(t, eng, "idle")
+}
+
+// An act whose model picks an option the select does not offer does not
+// complete, though the runtime reports success for it.
+func TestStagehandActMissingOption(t *testing.T) {
+	t.Parallel()
+
+	eng := launchBrowser(t, launchOptions{Generate: treeModel(where(selectOffering("7000万円未満")), "selectOptionFromDropdown", "8000万円未満")})
+	require.NoError(t, eng.Goto(t.Context(), priceForm(false), time.Minute))
+	outcome, err := eng.Act(t.Context(), "Choose 8000万円未満 as the upper price", nil, time.Minute)
+	require.NoError(t, err)
+	assert.False(t, outcome.Success)
+	assert.Contains(t, outcome.Message, `"8000万円未満"`)
 }
 
 // servePager serves a page that draws its list from a request it makes on
@@ -872,13 +1087,13 @@ form
 
 	// The ID before an element finds it again: an element operation acts on
 	// it by its XPath, as a replayed action does.
-	selected, help, err := elementAct(snap, elementOperation{kind: opSelect, element: elementRef(t, text, `select "Status"`), text: "All"})
+	selected, help, err := elementAct(snap, elementOperation{kind: opSelect, element: elementRef(t, text, `select "Status"`), text: "All"}, nil)
 	require.NoError(t, err)
 	assert.Equal(t, `Select "All" in the "Status" dropdown`, selected)
 	done, err := eng.Replay(t.Context(), help, nil, time.Minute)
 	require.NoError(t, err)
 	assert.True(t, done, "the select takes the option")
-	_, click, err := elementAct(snap, elementOperation{kind: opClick, element: elementRef(t, text, `link "Help"`)})
+	_, click, err := elementAct(snap, elementOperation{kind: opClick, element: elementRef(t, text, `link "Help"`)}, nil)
 	require.NoError(t, err)
 	done, err = eng.Replay(t.Context(), click, nil, time.Minute)
 	require.NoError(t, err)

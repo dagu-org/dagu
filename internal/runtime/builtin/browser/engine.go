@@ -30,8 +30,9 @@ type engine interface {
 	// the act reported back; the act may or may not have taken effect.
 	Act(ctx context.Context, instruction string, variables map[string]string, timeout time.Duration) (actOutcome, error)
 	// Replay performs one recorded action without a model call and reports
-	// whether it succeeded. An action whose element is not visible is not
-	// performed and does not succeed. Its error wraps errPageSessionLost when
+	// whether it succeeded. An action whose element is not visible, or is
+	// no longer the element it recorded, is not performed and does not
+	// succeed. Its error wraps errPageSessionLost when
 	// the connection to the page went away before the action reported back;
 	// the action may or may not have taken effect.
 	Replay(ctx context.Context, action recordedAction, variables map[string]string, timeout time.Duration) (bool, error)
@@ -121,6 +122,26 @@ type recordedAction struct {
 	Description string   `json:"description,omitempty"`
 	Method      string   `json:"method,omitempty"`
 	Arguments   []string `json:"arguments,omitempty"`
+	// Target identifies the element at Selector as the page's accessibility
+	// tree showed it before the action ran, so a replay acts only on that
+	// element. It is nil when the element was not identified.
+	Target *recordedTarget `json:"target,omitempty"`
+}
+
+// recordedTarget identifies the element an action acted on.
+type recordedTarget struct {
+	Role string `json:"role"`
+	// Name holds a variable's placeholder in place of its value.
+	Name string `json:"name,omitempty"`
+	// Lookalikes counts the elements of the role and name on the page when
+	// it had more than one, such as a Delete button in each row of a list,
+	// and is 0 otherwise.
+	Lookalikes int `json:"lookalikes,omitempty"`
+	// Context tells the element apart from its lookalikes: a digest of the
+	// text of its ancestor Depth levels up, the largest holding none of the
+	// others. Both are empty when its parent already holds another.
+	Context string `json:"context,omitempty"`
+	Depth   int    `json:"depth,omitempty"`
 }
 
 type actOutcome struct {

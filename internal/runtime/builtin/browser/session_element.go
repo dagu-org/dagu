@@ -125,13 +125,17 @@ func elementID(raw json.RawMessage) (string, error) {
 }
 
 // elementAct is the act an element operation stands for on the page snap
-// shows: the act's instruction, and the action that does it.
-func elementAct(snap pageSnapshot, op elementOperation) (string, recordedAction, error) {
-	node := findNode(parseSnapshotTree(snap.Tree), op.element)
+// shows: the act's instruction, and the action that does it, identifying
+// the element with variables' values as their placeholders.
+func elementAct(snap pageSnapshot, op elementOperation, variables map[string]string) (string, recordedAction, error) {
+	roots := parseSnapshotTree(snap.Tree)
+	path := pathTo(roots, op.element)
 	xpath := snap.XPaths[op.element]
-	if node == nil || xpath == "" {
+	if path == nil || xpath == "" {
 		return "", recordedAction{}, fmt.Errorf("element %s is not on the page now; describe the page again for its elements", op.element)
 	}
+	target := pageTarget{roots: roots, path: path}
+	node := target.node()
 	if node.name == "" {
 		return "", recordedAction{}, fmt.Errorf("element %s has no name a step could find it by again; act on it with an instruction that describes it", op.element)
 	}
@@ -140,7 +144,7 @@ func elementAct(snap pageSnapshot, op elementOperation) (string, recordedAction,
 		selector = "xpath=" + selector
 	}
 	name := strconv.Quote(clip(node.name, outlineTextRunes))
-	action := recordedAction{Selector: selector, Description: withName(node.role, node.name)}
+	action := identified(recordedAction{Selector: selector, Description: withName(node.role, node.name)}, target, variables)
 	switch op.kind {
 	case opType:
 		if !slices.Contains(fieldRoles, node.role) && node.role != "combobox" {
@@ -173,17 +177,4 @@ func roleWord(role string) string {
 		return "item"
 	}
 	return role
-}
-
-// findNode finds the node with id among nodes and the nodes they hold.
-func findNode(nodes []*outlineNode, id string) *outlineNode {
-	for _, n := range nodes {
-		if n.id == id {
-			return n
-		}
-		if found := findNode(n.children, id); found != nil {
-			return found
-		}
-	}
-	return nil
 }
