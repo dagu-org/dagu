@@ -7,6 +7,7 @@
  * @module features/dags/components/dag-details
  */
 import dayjs from '@/lib/dayjs';
+import RelativeTime from '@/components/ui/relative-time';
 import {
   humanizeIdentifier,
   runtimeConditionLabel,
@@ -99,17 +100,6 @@ const EXECUTION_STATUS_CONFIG: ExecutionStatusConfig[] = [
   },
 ];
 
-function formatTimestamp(timestamp: string | undefined): string {
-  if (!timestamp || timestamp === '-') {
-    return '-';
-  }
-  const parsed = dayjs(timestamp);
-  if (!parsed.isValid()) {
-    return timestamp;
-  }
-  return parsed.format('YYYY-MM-DD HH:mm:ss');
-}
-
 function truncateId(id: string): string {
   if (id.length <= 16) return id;
   return `${id.slice(0, 8)}...${id.slice(-4)}`;
@@ -151,9 +141,10 @@ function RuntimeConditionCard({
         <span className="font-semibold text-foreground">
           {runtimeConditionLabel(condition)}
         </span>
-        <span className="font-mono text-muted-foreground">
-          {formatTimestamp(condition.checkedAt)}
-        </span>
+        <RelativeTime
+          className="font-mono text-muted-foreground"
+          timestamp={condition.checkedAt}
+        />
       </div>
       <div className="text-muted-foreground break-words">
         {condition.message}
@@ -370,30 +361,34 @@ function DAGStatusOverview({
         {status.scheduleTime && (
           <span>
             <span className="text-muted-foreground"><I18nText text={"Scheduled"} /> </span>
-            <span className="font-mono text-foreground">
-              {formatTimestamp(status.scheduleTime)}
-            </span>
+            <RelativeTime
+              className="font-mono text-foreground"
+              timestamp={status.scheduleTime}
+            />
           </span>
         )}
         {status.queuedAt && (
           <span>
             <span className="text-muted-foreground"><I18nText text={"Queued"} /> </span>
-            <span className="font-mono text-foreground">
-              {formatTimestamp(status.queuedAt)}
-            </span>
+            <RelativeTime
+              className="font-mono text-foreground"
+              timestamp={status.queuedAt}
+            />
           </span>
         )}
         <span>
           <span className="text-muted-foreground"><I18nText text={"Started"} /> </span>
-          <span className="font-mono text-foreground">
-            {formatTimestamp(status.startedAt)}
-          </span>
+          <RelativeTime
+            className="font-mono text-foreground"
+            timestamp={status.startedAt}
+          />
         </span>
         <span>
           <span className="text-muted-foreground"><I18nText text={"Finished"} /> </span>
-          <span className="font-mono text-foreground">
-            {formatTimestamp(status.finishedAt)}
-          </span>
+          <RelativeTime
+            className="font-mono text-foreground"
+            timestamp={status.finishedAt}
+          />
         </span>
         <span className="flex items-center gap-1">
           <span className="text-muted-foreground"><I18nText text={"Duration"} /> </span>

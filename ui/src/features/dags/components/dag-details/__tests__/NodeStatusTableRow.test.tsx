@@ -5,7 +5,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { components } from '@/api/v1/schema';
 import {
   NodeStatus,
@@ -17,6 +17,7 @@ import { ToastProvider } from '@/components/ui/simple-toast';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { DAGRunContext } from '@/features/dag-runs/contexts/DAGRunContext';
 import { useQuery } from '@/hooks/api';
+import dayjs from '@/lib/dayjs';
 import { DAGContext } from '../../../contexts/DAGContext';
 import NodeStatusTableRow from '../NodeStatusTableRow';
 
@@ -86,6 +87,10 @@ describe('NodeStatusTableRow', () => {
       isValidating: false,
       mutate: vi.fn(),
     }));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('keeps the selected remote node in producer run links', async () => {
@@ -247,6 +252,56 @@ describe('NodeStatusTableRow', () => {
 
     expect(screen.getByText(/full \| minimal/)).toBeInTheDocument();
   });
+
+  it.each(['desktop', 'mobile'] as const)(
+    'shows the step start time relative to now in the %s view',
+    (view) => {
+      // Only Date is faked so the label is stable without stalling timers.
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-07-22T01:05:00Z'));
+      const startedAt = '2026-07-22T01:00:00Z';
+      const node = {
+        step: { name: 'build' },
+        status: NodeStatus.Success,
+        statusLabel: NodeStatusLabel.succeeded,
+        stdout: '',
+        stderr: '',
+        startedAt,
+        finishedAt: '2026-07-22T01:01:00Z',
+        retryCount: 0,
+        doneCount: 1,
+      } as components['schemas']['Node'];
+
+      const row = (
+        <NodeStatusTableRow
+          rownum={1}
+          node={node}
+          name="example.yaml"
+          dagRun={dagRun}
+          view={view}
+        />
+      );
+
+      render(
+        <MemoryRouter>
+          <AppBarContext.Provider value={appBarValue}>
+            {view === 'desktop' ? (
+              <table>
+                <tbody>{row}</tbody>
+              </table>
+            ) : (
+              row
+            )}
+          </AppBarContext.Provider>
+        </MemoryRouter>
+      );
+
+      expect(screen.getByText('5 minutes ago')).toHaveAttribute(
+        'title',
+        dayjs(startedAt).format('YYYY-MM-DD HH:mm:ss Z')
+      );
+    }
+  );
 
   it('falls back to the configured log message when stdout cannot be loaded', () => {
     mockedUseQuery.mockImplementation((path, init) => ({

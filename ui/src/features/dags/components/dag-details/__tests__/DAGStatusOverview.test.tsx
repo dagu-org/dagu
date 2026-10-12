@@ -1,9 +1,9 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import React from 'react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   DAGRunConditionStatus,
   NodeStatus,
@@ -15,13 +15,22 @@ import {
 import dayjs from '@/lib/dayjs';
 import DAGStatusOverview from '../DAGStatusOverview';
 
+const ABSOLUTE_FORMAT = 'YYYY-MM-DD HH:mm:ss Z';
+
+beforeEach(() => {
+  // Only Date is faked so relative labels stay stable without stalling timers.
+  vi.useFakeTimers({ toFake: ['Date'] });
+});
+
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
 });
 
 describe('DAGStatusOverview', () => {
-  it('renders schedule time when present', () => {
+  it('renders schedule time relative to now with the absolute time on hover', () => {
     const scheduleTime = '2026-03-13T10:00:00Z';
+    vi.setSystemTime(new Date('2026-03-13T10:10:00Z'));
 
     render(
       <DAGStatusOverview
@@ -45,10 +54,11 @@ describe('DAGStatusOverview', () => {
       />
     );
 
-    expect(screen.getByText('Scheduled')).toBeInTheDocument();
-    expect(
-      screen.getByText(dayjs(scheduleTime).format('YYYY-MM-DD HH:mm:ss'))
-    ).toBeInTheDocument();
+    const scheduled = screen.getByText('Scheduled').parentElement!;
+    expect(within(scheduled).getByText('10 minutes ago')).toHaveAttribute(
+      'title',
+      dayjs(scheduleTime).format(ABSOLUTE_FORMAT)
+    );
     expect(screen.getByText('Queued')).toBeInTheDocument();
   });
 
@@ -191,6 +201,7 @@ describe('DAGStatusOverview', () => {
   it('renders runtime conditions with Runnable as the summary before non-True details', () => {
     const runnableCheckedAt = '2026-05-19T01:02:03Z';
     const workerCheckedAt = '2026-05-19T01:03:03Z';
+    vi.setSystemTime(new Date('2026-05-19T01:05:03Z'));
 
     const { container } = render(
       <DAGStatusOverview
@@ -254,12 +265,14 @@ describe('DAGStatusOverview', () => {
     expect(
       screen.getByText('Worker availability is still being checked.')
     ).toBeInTheDocument();
-    expect(
-      screen.getByText(dayjs(runnableCheckedAt).format('YYYY-MM-DD HH:mm:ss'))
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(dayjs(workerCheckedAt).format('YYYY-MM-DD HH:mm:ss'))
-    ).toBeInTheDocument();
+    expect(screen.getByText('3 minutes ago')).toHaveAttribute(
+      'title',
+      dayjs(runnableCheckedAt).format(ABSOLUTE_FORMAT)
+    );
+    expect(screen.getByText('2 minutes ago')).toHaveAttribute(
+      'title',
+      dayjs(workerCheckedAt).format(ABSOLUTE_FORMAT)
+    );
     expect(screen.queryByText('Concurrency ready')).not.toBeInTheDocument();
     expect(
       screen.queryByText('The queue active-run concurrency limit has capacity.')

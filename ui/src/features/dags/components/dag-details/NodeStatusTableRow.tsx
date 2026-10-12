@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { CommandDisplay } from '@/components/ui/command-display';
 import { useErrorModal } from '@/components/ui/error-modal';
 import { useSimpleToast } from '@/components/ui/simple-toast';
+import RelativeTime from '@/components/ui/relative-time';
 import { ScriptBadge } from '@/components/ui/script-dialog';
 import { TableCell } from '@/components/ui/table';
 import {
@@ -1041,7 +1042,7 @@ function NodeStatusTableRow({
           <TableCell>
             <div className="space-y-0.5">
               <div className="font-medium text-foreground/90 text-sm">
-                {formatTimestamp(node.startedAt)}
+                <RelativeTime timestamp={node.startedAt} />
               </div>
               {node.startedAt && (
                 <div className="text-xs text-muted-foreground flex items-center gap-1.5 leading-tight">
@@ -1425,7 +1426,8 @@ function NodeStatusTableRow({
         </div>
         <div className="space-y-0.5">
           <div className="text-xs text-muted-foreground">
-            <I18nText text={'Started:'} /> {formatTimestamp(node.startedAt)}
+            <I18nText text={'Started:'} />{' '}
+            <RelativeTime timestamp={node.startedAt} />
           </div>
           {node.startedAt && (
             <div className="text-xs text-muted-foreground flex items-center gap-1.5">

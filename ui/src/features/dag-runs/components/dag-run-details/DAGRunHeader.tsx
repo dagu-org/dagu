@@ -19,6 +19,7 @@ import { useConfig } from '../../../../contexts/ConfigContext';
 import { useRemoteNode } from '../../../../contexts/RemoteNodeContext';
 import { useCopyFeedback } from '@/hooks/useCopyFeedback';
 import dayjs from '../../../../lib/dayjs';
+import RelativeTime from '@/components/ui/relative-time';
 import StatusChip from '@/components/ui/status-chip';
 import AutoRetryBadge from '../common/AutoRetryBadge';
 import { DAGRunActions } from '../common';
@@ -306,11 +307,11 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({
           <div className="flex flex-wrap items-center gap-4 lg:gap-6 text-sm">
             <div className="flex items-center gap-2 text-foreground bg-accent rounded-md px-3 py-1.5 border">
               <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium text-xs">
-                {dagRun?.startedAt
-                  ? `${dayjs(dagRun.startedAt).format('MMM D, HH:mm:ss')} ${dayjs(dagRun.startedAt).format('z')}`
-                  : '--'}
-              </span>
+              <RelativeTime
+                className="font-medium text-xs"
+                timestamp={dagRun?.startedAt}
+                fallback="--"
+              />
             </div>
 
             <div className="flex items-center gap-2 text-foreground bg-accent rounded-md px-3 py-1.5 border">

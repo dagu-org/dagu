@@ -5,7 +5,7 @@ import { components, StatusLabel } from '@/api/v1/schema';
 import { useRemoteNode } from '@/contexts/RemoteNodeContext';
 import { useQuery } from '@/hooks/api';
 import { whenEnabled } from '@/hooks/queryUtils';
-import dayjs from '@/lib/dayjs';
+import RelativeTime from '@/components/ui/relative-time';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { StatusDot } from '../common/StatusDot';
@@ -324,9 +324,10 @@ export function SubDAGRunsList({
                       </div>
                     </I18nProps>
                     {startedAt && (
-                      <div className="text-xs text-muted-foreground">
-                        {dayjs(startedAt).format('MMM D, HH:mm:ss')}
-                      </div>
+                      <RelativeTime
+                        className="block text-xs text-muted-foreground"
+                        timestamp={startedAt}
+                      />
                     )}
                     {status && (
                       <StatusDot status={status} statusLabel={statusLabel} />
