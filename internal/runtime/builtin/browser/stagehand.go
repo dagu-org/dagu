@@ -398,8 +398,8 @@ func (e *stagehandEngine) Act(ctx context.Context, instruction string, variables
 // a select to its first option and reports success.
 func missingOption(snap pageSnapshot, actions []recordedAction, variables map[string]string) string {
 	for _, action := range actions {
-		if node := targetOf(snap, action.Selector); node != nil && !offersOption(node, action, variables) {
-			return fmt.Sprintf("the %s offers no option %q", withName(node.role, node.name), action.Arguments[0])
+		if target, ok := targetOf(snap, action.Selector); ok && !offersOption(target.node(), action, variables) {
+			return fmt.Sprintf("the %s offers no option %q", withName(target.node().role, target.node().name), action.Arguments[0])
 		}
 	}
 	return ""

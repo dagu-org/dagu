@@ -200,7 +200,9 @@ replaced it first. A replay fails when a recorded element is gone, is on the
 page but not visible, such as a field in a closed dialog, or is no longer the
 element the act recorded: the element at the recorded location has another
 accessibility role or name, or a select there does not offer the recorded
-option. An element without a name is told apart by its role only.
+option. When other elements on the page shared the recorded element's role and
+name, such as a Delete button in each row of a list, the text of its row must
+also match. An element without a name is told apart by its role only.
 `act.cache: false` disables the cache for one operation.
 
 Runs of a step share its recordings, and each `act` reads them when it runs. A

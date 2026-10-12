@@ -128,6 +128,12 @@ type recordedAction struct {
 	// its value. Both are empty when the element was not identified.
 	Role string `json:"role,omitempty"`
 	Name string `json:"name,omitempty"`
+	// Context tells the element apart from others of its role and name on
+	// the page, such as a button in each row of a list: the text of its
+	// ancestor ContextDepth levels up, the largest holding none of the
+	// others. Both are empty when the page had no such others.
+	Context      string `json:"context,omitempty"`
+	ContextDepth int    `json:"context_depth,omitempty"`
 }
 
 type actOutcome struct {

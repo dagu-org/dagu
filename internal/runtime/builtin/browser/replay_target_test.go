@@ -4,6 +4,7 @@
 package browser
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,12 +12,26 @@ import (
 )
 
 // ordersPage is an orders page's tree: a customer's link, a status select,
-// and a button.
+// a button, a select whose options are not loaded yet, and a custom
+// combobox that shows its options only when opened.
 var ordersPage = pageSnapshot{
-	Tree: "[0-1] RootWebArea: Orders\n  [0-2] link: ACME-1001\n  [0-3] select\n    [0-4] MenuListPopup\n      [0-5] option: すべて [selected]\n      [0-6] option: 未出荷\n  [0-7] button: Save\n",
+	Tree: "[0-1] RootWebArea: Orders\n  [0-2] link: ACME-1001\n  [0-3] select\n    [0-4] MenuListPopup\n      [0-5] option: すべて [selected]\n      [0-6] option: 未出荷\n  [0-7] button: Save\n" +
+		"  [0-8] select\n    [0-9] MenuListPopup\n  [0-10] combobox: Carrier\n",
 	XPaths: map[string]string{
 		"0-2": "/html[1]/body[1]/a[1]", "0-3": "/html[1]/body[1]/select[1]", "0-7": "/html[1]/body[1]/button[1]",
+		"0-8": "/html[1]/body[1]/select[2]", "0-10": "/html[1]/body[1]/input[1]",
 	},
+}
+
+// rowsPage is a list with a Delete button in each row.
+func rowsPage(rows ...string) pageSnapshot {
+	snap := pageSnapshot{Tree: "[0-1] RootWebArea: Rows\n  [0-2] list\n", XPaths: map[string]string{}}
+	for i, row := range rows {
+		button := fmt.Sprintf("3-%d", i)
+		snap.Tree += fmt.Sprintf("    [1-%d] listitem\n      [2-%d] StaticText: %s\n      [%s] button: Delete\n", i, i, row, button)
+		snap.XPaths[button] = fmt.Sprintf("/html[1]/body[1]/ul[1]/li[%d]/button[1]", i+1)
+	}
+	return snap
 }
 
 // A replay goes ahead only while the element at the recorded location is
@@ -59,6 +74,13 @@ func TestReplayTarget(t *testing.T) {
 		"select lacking the option": {
 			action: recordedAction{Selector: "xpath=/html[1]/body[1]/select[1]", Method: selectOptionMethod, Arguments: []string{"出荷済み"}, Role: "select"},
 		},
+		"native select without options": {
+			action: recordedAction{Selector: "xpath=/html[1]/body[1]/select[2]", Method: selectOptionMethod, Arguments: []string{"未出荷"}, Role: "select"},
+		},
+		"custom combobox not showing its options": {
+			action: recordedAction{Selector: "xpath=/html[1]/body[1]/input[1]", Method: selectOptionMethod, Arguments: []string{"Express"}, Role: "combobox", Name: "Carrier"},
+			want:   true,
+		},
 		"unidentified select lacking the option": {
 			action: recordedAction{Selector: "xpath=/html[1]/body[1]/select[1]", Method: selectOptionMethod, Arguments: []string{"出荷済み"}},
 		},
@@ -88,4 +110,24 @@ func TestIdentifyActions(t *testing.T) {
 	assert.Equal(t, "%customer%", actions[0].Name)
 	assert.Empty(t, actions[1].Role, "an element outside the tree is not identified")
 	assert.True(t, stillTargets(actions[0], ordersPage, map[string]string{"customer": "ACME-1001"}))
+}
+
+// An element with lookalikes on the page, such as a Delete button in each
+// row, is told apart by the text of its row, which may show a variable.
+func TestReplayTargetInRow(t *testing.T) {
+	t.Parallel()
+
+	actions := []recordedAction{{Selector: "xpath=/html[1]/body[1]/ul[1]/li[2]/button[1]", Method: "click"}}
+	identifyOn(rowsPage("Alpha", "Beta"), actions, map[string]string{"customer": "Beta"})
+	deleteCustomer := actions[0]
+
+	assert.True(t, stillTargets(deleteCustomer, rowsPage("Alpha", "Beta"), map[string]string{"customer": "Beta"}))
+	assert.True(t, stillTargets(deleteCustomer, rowsPage("Alpha", "Delta"), map[string]string{"customer": "Delta"}), "the row of the customer this run names")
+	assert.False(t, stillTargets(deleteCustomer, rowsPage("Gamma", "Alpha", "Beta"), map[string]string{"customer": "Beta"}), "Alpha's Delete is where Beta's was")
+
+	// A lone element has nothing to be told apart from, so it is named by
+	// its role and name only.
+	lone := []recordedAction{{Selector: "xpath=/html[1]/body[1]/ul[1]/li[1]/button[1]", Method: "click"}}
+	identifyOn(rowsPage("Alpha"), lone, nil)
+	assert.True(t, stillTargets(lone[0], rowsPage("Beta"), nil))
 }

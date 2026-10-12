@@ -313,8 +313,8 @@ func TestStagehandReplayHiddenElement(t *testing.T) {
 }
 
 // treeModel answers act requests with method and arguments on the element
-// pick finds in the tree the runtime sends.
-func treeModel(pick func(*outlineNode) bool, method string, arguments ...string) generateFunc {
+// find finds in the tree the runtime sends.
+func treeModel(find func(roots []*outlineNode) *outlineNode, method string, arguments ...string) generateFunc {
 	return func(_ context.Context, req generateRequest) (generateResponse, error) {
 		if !strings.Contains(string(req.Schema), "elementId") {
 			return generateResponse{JSON: json.RawMessage(`{"completed":true,"progress":"done"}`)}, nil
@@ -323,7 +323,7 @@ func treeModel(pick func(*outlineNode) bool, method string, arguments ...string)
 		for _, message := range req.Messages {
 			text += message.Text + "\n"
 		}
-		node := nodeWhere(parseSnapshotTree(text), pick)
+		node := find(parseSnapshotTree(text))
 		if node == nil {
 			return generateResponse{}, fmt.Errorf("no element to act on in:\n%s", text)
 		}
@@ -335,6 +335,11 @@ func treeModel(pick func(*outlineNode) bool, method string, arguments ...string)
 		}
 		return generateResponse{JSON: json.RawMessage(`{"action":` + string(action) + `,"twoStep":false}`)}, nil
 	}
+}
+
+// where finds the first node pick accepts.
+func where(pick func(*outlineNode) bool) func([]*outlineNode) *outlineNode {
+	return func(roots []*outlineNode) *outlineNode { return nodeWhere(roots, pick) }
 }
 
 func nodeWhere(nodes []*outlineNode, pick func(*outlineNode) bool) *outlineNode {
@@ -389,7 +394,7 @@ func savePage(banner bool) string {
 func TestStagehandReplayMissesShiftedElement(t *testing.T) {
 	t.Parallel()
 
-	eng := launchBrowser(t, launchOptions{Generate: treeModel(buttonNamed("Save"), "click")})
+	eng := launchBrowser(t, launchOptions{Generate: treeModel(where(buttonNamed("Save")), "click")})
 	require.NoError(t, eng.Goto(t.Context(), savePage(false), time.Minute))
 	outcome, err := eng.Act(t.Context(), "Click Save", nil, time.Minute)
 	require.NoError(t, err)
@@ -428,7 +433,7 @@ func priceForm(banner bool) string {
 func TestStagehandReplayMissesShiftedSelect(t *testing.T) {
 	t.Parallel()
 
-	eng := launchBrowser(t, launchOptions{Generate: treeModel(selectOffering("7000万円未満"), "selectOptionFromDropdown", "7000万円未満")})
+	eng := launchBrowser(t, launchOptions{Generate: treeModel(where(selectOffering("7000万円未満")), "selectOptionFromDropdown", "7000万円未満")})
 	require.NoError(t, eng.Goto(t.Context(), priceForm(false), time.Minute))
 	outcome, err := eng.Act(t.Context(), "Choose 7000万円未満 as the upper price", nil, time.Minute)
 	require.NoError(t, err)
@@ -442,6 +447,11 @@ func TestStagehandReplayMissesShiftedSelect(t *testing.T) {
 	assert.False(t, replayed, "the lower price select is where the upper was")
 	requireStatus(t, eng, "idle")
 
+	require.NoError(t, eng.Goto(t.Context(), statusPage(`<div><select><option>下限なし</option></select><select onchange="report(this.value)"></select></div>`), time.Minute))
+	replayed, err = eng.Replay(t.Context(), upper, nil, time.Minute)
+	require.NoError(t, err)
+	assert.False(t, replayed, "the upper price select has no options yet")
+
 	require.NoError(t, eng.Goto(t.Context(), priceForm(false), time.Minute))
 	replayed, err = eng.Replay(t.Context(), upper, nil, time.Minute)
 	require.NoError(t, err)
@@ -449,12 +459,54 @@ func TestStagehandReplayMissesShiftedSelect(t *testing.T) {
 	requireStatus(t, eng, "7000万円未満")
 }
 
+// deleteList has a Delete button in each row.
+func deleteList(rows ...string) string {
+	body := "<ul>"
+	for _, row := range rows {
+		body += fmt.Sprintf(`<li>%[1]s <button onclick="report('deleted %[1]s')">Delete</button></li>`, row)
+	}
+	return statusPage(body + "</ul>")
+}
+
+// A replayed action on one of several lookalike elements, such as the Delete
+// button of a row, acts only on the one in the row it recorded.
+func TestStagehandReplayMissesShiftedRow(t *testing.T) {
+	t.Parallel()
+
+	betaDelete := func(roots []*outlineNode) *outlineNode {
+		row := nodeWhere(roots, func(n *outlineNode) bool { return n.role == "listitem" && strings.Contains(textOf(n), "Beta") })
+		if row == nil {
+			return nil
+		}
+		return nodeWhere(row.children, buttonNamed("Delete"))
+	}
+	eng := launchBrowser(t, launchOptions{Generate: treeModel(betaDelete, "click")})
+	require.NoError(t, eng.Goto(t.Context(), deleteList("Alpha", "Beta"), time.Minute))
+	outcome, err := eng.Act(t.Context(), "Delete Beta", nil, time.Minute)
+	require.NoError(t, err)
+	require.True(t, outcome.Success, outcome.Message)
+	require.Len(t, outcome.Actions, 1)
+	deleteBeta := outcome.Actions[0]
+
+	require.NoError(t, eng.Goto(t.Context(), deleteList("Gamma", "Alpha", "Beta"), time.Minute))
+	replayed, err := eng.Replay(t.Context(), deleteBeta, nil, time.Minute)
+	require.NoError(t, err)
+	assert.False(t, replayed, "Alpha's Delete is where Beta's was")
+	requireStatus(t, eng, "idle")
+
+	require.NoError(t, eng.Goto(t.Context(), deleteList("Alpha", "Beta"), time.Minute))
+	replayed, err = eng.Replay(t.Context(), deleteBeta, nil, time.Minute)
+	require.NoError(t, err)
+	assert.True(t, replayed)
+	requireStatus(t, eng, "deleted Beta")
+}
+
 // An act whose model picks an option the select does not offer does not
 // complete, though the runtime reports success for it.
 func TestStagehandActMissingOption(t *testing.T) {
 	t.Parallel()
 
-	eng := launchBrowser(t, launchOptions{Generate: treeModel(selectOffering("7000万円未満"), "selectOptionFromDropdown", "8000万円未満")})
+	eng := launchBrowser(t, launchOptions{Generate: treeModel(where(selectOffering("7000万円未満")), "selectOptionFromDropdown", "8000万円未満")})
 	require.NoError(t, eng.Goto(t.Context(), priceForm(false), time.Minute))
 	outcome, err := eng.Act(t.Context(), "Choose 8000万円未満 as the upper price", nil, time.Minute)
 	require.NoError(t, err)
