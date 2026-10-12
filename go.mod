@@ -104,6 +104,7 @@ require (
 	k8s.io/client-go v0.35.9
 	modernc.org/sqlite v1.43.0
 	mvdan.cc/sh/v3 v3.12.0
+	software.sslmate.com/src/go-pkcs12 v0.7.3
 	tailscale.com v1.94.2
 )
 
