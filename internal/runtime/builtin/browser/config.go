@@ -48,7 +48,7 @@ const (
 
 func init() {
 	registry.RegisterExecutorConfigSchema(executorType, configSchema)
-	executor.RegisterExecutor(executorType, newExecutor, validateStep, registry.ExecutorCapabilities{LLM: true})
+	executor.RegisterExecutor(executorType, newExecutor, validateStep, registry.ExecutorCapabilities{LLM: true, ConfigWarnings: configWarnings})
 }
 
 // config is the resolved with block of a browser step.

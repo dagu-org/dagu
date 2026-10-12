@@ -607,6 +607,9 @@ func (s *Sessions) Do(ctx context.Context, req DoRequest) (DoResult, error) {
 	if state.Page.URL != "" && urlBefore != state.Page.URL {
 		warnings = append(warnings, fmt.Sprintf("the page changed since the last command, from %s to %s", state.Page.URL, urlBefore))
 	}
+	if op.Extract != nil {
+		warnings = append(warnings, extractWarnings(*op.Extract)...)
+	}
 	result := DoResult{ID: req.ID, Index: index, Kind: op.kind(), Status: OperationDone}
 	if isElement {
 		result.Act = op.Act.Instruction

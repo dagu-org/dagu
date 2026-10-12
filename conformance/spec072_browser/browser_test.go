@@ -445,3 +445,13 @@ func TestBrowserValidation(t *testing.T) {
 		})
 	}
 }
+
+// A link field without format: uri gets the link's element id when the step
+// runs, so validate warns about it and still succeeds.
+func TestBrowserLinkFieldWarning(t *testing.T) {
+	t.Parallel()
+
+	result := harness.NewRunner(t).Run("validate", "link_field.yaml")
+	result.ExpectExitCode(0)
+	result.ExpectStderrContains("listings[].link", "has no format: uri")
+}
