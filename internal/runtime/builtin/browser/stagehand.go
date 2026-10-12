@@ -100,6 +100,10 @@ var sessionLostMarkers = []string{
 	"target closed before CDP",
 }
 
+// contextLostMarker is the browser's answer to a command on a script context
+// that a new document replaced, in the page or in one of its frames.
+const contextLostMarker = "Cannot find context with specified id"
+
 // selectorVisibleExpression reports whether the selector, a JSON string
 // literal substituted for %s, matches any rendered, visible element.
 const selectorVisibleExpression = `Array.from(document.querySelectorAll(%s)).some((element) => {
@@ -364,6 +368,8 @@ func (e *stagehandEngine) Act(ctx context.Context, instruction string, variables
 		return e.client.Act(ctx, stagehand.ActInstruction(instruction), actOptions(variables, timeout))
 	})
 	if lost := sessionLost(result, err); lost != nil {
+		// The act may have loaded a new document before the page was lost.
+		e.settle(ctx)
 		return actOutcome{}, lost
 	}
 	if err != nil {
@@ -441,6 +447,8 @@ func (e *stagehandEngine) Replay(ctx context.Context, recorded recordedAction, v
 		return e.client.Act(ctx, stagehand.ObservedAction(action), actOptions(variables, timeout))
 	})
 	if lost := sessionLost(result, err); lost != nil {
+		// The action may have loaded a new document before the page was lost.
+		e.settle(ctx)
 		return false, lost
 	}
 	if err != nil {
@@ -515,9 +523,9 @@ func (e *stagehandEngine) targetVisible(ctx context.Context, selector string) bo
 
 // sessionLost returns an error wrapping errPageSessionLost when an act call
 // that returned result and err failed because the page's session was
-// detached, or nil. The runtime reports that detach in a failed result when
-// the action itself failed, and as an RPC error when the work around the
-// action did.
+// detached, or errPageContextLost when its script context was replaced, or
+// nil. The runtime reports that loss in a failed result when the action
+// itself failed, and as an RPC error when the work around the action did.
 func sessionLost(result stagehand.ActResult, err error) error {
 	message := result.Data.Message
 	var rpcErr *stagehand.RPCError
@@ -526,6 +534,9 @@ func sessionLost(result stagehand.ActResult, err error) error {
 		message = rpcErr.Message
 	case err != nil || result.Data.Success:
 		return nil
+	}
+	if strings.Contains(message, contextLostMarker) {
+		return fmt.Errorf("%w: %s", errPageContextLost, message)
 	}
 	for _, marker := range sessionLostMarkers {
 		if strings.Contains(message, marker) {

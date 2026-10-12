@@ -183,7 +183,8 @@ func (o *operator) lookup(key string) ([]recordedAction, bool) {
 // succeeded. document identifies the page's document before the first. An
 // action that lost the page is judged by the document it started on: a new
 // document means it took effect, and the next action runs there; the same
-// document means it did not, and the replay ends so the model acts instead.
+// document means it did not, and the replay ends so the model acts instead,
+// unless the action lost its script context, as loadedNewDocument says.
 func (o *operator) replay(ctx context.Context, actions []recordedAction, document string, timeout time.Duration) (bool, error) {
 	for i, action := range actions {
 		if i > 0 {
@@ -202,8 +203,9 @@ func (o *operator) replay(ctx context.Context, actions []recordedAction, documen
 
 // performAct runs an act and judges one that lost the page by the page's
 // document: a document other than document means the act took effect, and
-// the same document means it did not, so it runs once more. Acting again
-// without that check could submit a form twice.
+// the same document means it did not, so it runs once more, unless the act
+// lost its script context, as loadedNewDocument says. Acting again without
+// that check could submit a form twice.
 func (o *operator) performAct(ctx context.Context, index int, instruction, document string, timeout time.Duration) (actOutcome, error) {
 	for retried := false; ; retried = true {
 		outcome, err := o.eng.Act(ctx, instruction, o.variables, timeout)
@@ -226,7 +228,9 @@ func (o *operator) performAct(ctx context.Context, index int, instruction, docum
 
 // loadedNewDocument reports whether the page shows a document other than
 // document after lost, an error wrapping errPageSessionLost. It returns lost
-// when the documents cannot be compared.
+// when the documents cannot be compared, and when lost wraps
+// errPageContextLost but the page kept its document: a frame then loaded the
+// document that replaced the context, which the action may have caused.
 func (o *operator) loadedNewDocument(ctx context.Context, document string, lost error) (bool, error) {
 	if document == "" {
 		return false, lost
@@ -234,6 +238,9 @@ func (o *operator) loadedNewDocument(ctx context.Context, document string, lost 
 	current, err := o.eng.DocumentID(ctx)
 	if err != nil {
 		return false, errors.Join(lost, err)
+	}
+	if current == document && errors.Is(lost, errPageContextLost) {
+		return false, lost
 	}
 	return current != document, nil
 }

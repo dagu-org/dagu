@@ -331,6 +331,21 @@ func TestActLosingPageKeepingDocumentRunsAgain(t *testing.T) {
 	}
 }
 
+// An act that lost its script context while the page kept its document lost
+// it to a frame that loaded a new document, which the act may have caused,
+// so the step fails instead of acting again.
+func TestActLosingContextKeepingDocumentFails(t *testing.T) {
+	t.Parallel()
+
+	run := newTestRun(t, pageModel(nil))
+	run.engine.actLosesPage = 1
+	run.engine.pageLoss = errFakeContextLost
+	execution := run.execute(`{"url": "https://shop.example.com/login", "do": [{"act": "Click the sign-in button"}]}`, nil)
+
+	require.ErrorContains(t, execution.err, "do[0] act failed: "+errPageContextLost.Error())
+	assert.Len(t, run.engine.actInstructions(), 1, "no second act")
+}
+
 func TestSecretInInstructionIsRejected(t *testing.T) {
 	t.Parallel()
 
@@ -579,6 +594,24 @@ func TestReplayLosingPageKeepingDocumentAsksModel(t *testing.T) {
 
 	assert.Len(t, run.engine.actInstructions(), 2, "the model acts once more")
 	assert.Equal(t, []string{"goto:completed", "act:healed"}, eventNames(replayed.exec.GetAgentSession()))
+}
+
+// A replayed action that lost its script context while the page kept its
+// document may have taken effect in a frame, so the step fails instead of
+// asking the model to act again.
+func TestReplayLosingContextKeepingDocumentFails(t *testing.T) {
+	t.Parallel()
+
+	const steps = `{"url": "https://shop.example.com/login", "do": [{"act": "Click the sign-in button"}]}`
+	run := newTestRun(t, pageModel(nil))
+	require.NoError(t, run.execute(steps, nil).err)
+
+	run.engine.replayLosesPage = 1
+	run.engine.pageLoss = errFakeContextLost
+	replayed := run.execute(steps, nil)
+
+	require.ErrorContains(t, replayed.err, "do[0] act failed: "+errPageContextLost.Error())
+	assert.Len(t, run.engine.actInstructions(), 1, "the model does not act again")
 }
 
 // A replay can miss after an earlier recorded action loaded a new document.
