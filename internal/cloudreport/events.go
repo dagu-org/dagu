@@ -308,6 +308,8 @@ type eventFeed struct {
 	spawn func(func())
 
 	held bool
+	// leftover reports that forget left a saved position in place.
+	leftover bool
 	// loaded reports that state was read or written under the lease.
 	loaded bool
 	state  eventState
@@ -730,14 +732,43 @@ func (f *eventFeed) save(ctx context.Context, next eventState) bool {
 	return true
 }
 
-// forget gives up the lease after moving the position to the newest event,
-// so that reporting events again later leaves out the events in between.
+// forget discards the saved position and gives up the lease, so that
+// reporting events again later, in this process or another, leaves out the
+// events in between. Without the lease, it takes the lease to discard a saved
+// position, and leaves the position to a later call while another process
+// holds it.
 func (f *eventFeed) forget(ctx context.Context) {
-	if f == nil || !f.held {
+	if f == nil {
 		return
 	}
-	f.save(ctx, eventState{Version: eventStateVersion})
+	f.leftover = !f.discard(ctx)
 	f.close(ctx)
+}
+
+// discard saves an empty state, and reports whether no position is saved.
+func (f *eventFeed) discard(ctx context.Context) bool {
+	if !f.held {
+		// Reading first spares a server that never reported runs from
+		// creating the state and the lease.
+		state, err := f.readState(ctx)
+		if err == nil && (state == nil || state.ServerID == "") {
+			return true
+		}
+		switch err := f.lease.TryLock(); {
+		case errors.Is(err, dirlock.ErrLockConflict):
+			return false
+		case err != nil:
+			f.warn(ctx, warnLease, err)
+			return false
+		}
+		f.held = true
+	}
+	return f.save(ctx, eventState{Version: eventStateVersion})
+}
+
+// forgetDue reports whether forget left a saved position to discard.
+func (f *eventFeed) forgetDue() bool {
+	return f != nil && f.leftover
 }
 
 // close gives up the lease.
