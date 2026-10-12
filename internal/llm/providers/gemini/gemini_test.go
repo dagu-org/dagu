@@ -86,6 +86,8 @@ func TestBuildRequestBody_WebSearch(t *testing.T) {
 	})
 }
 
+// Test the wire shape through raw JSON so the production request structs do
+// not define their own expected output.
 func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
 	t.Parallel()
 
@@ -100,7 +102,6 @@ func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
 		expectedMaxOutputTokens *int
 		expectedHasThinking     bool
 		expectedThinkingBudget  *int
-		expectedThinkingLevel   string
 	}{
 		{
 			name:                    "no thinking, no max tokens",
@@ -159,7 +160,7 @@ func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
 			// Estimated budget 1024, so no adjustment needed with default
 			expectedMaxOutputTokens: new(1024 + 4096),
 			expectedHasThinking:     true,
-			expectedThinkingLevel:   "low",
+			expectedThinkingBudget:  new(1024),
 		},
 		{
 			name:      "thinking with effort level medium",
@@ -171,7 +172,7 @@ func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
 			// Estimated budget 4096, auto-adjust to 8192
 			expectedMaxOutputTokens: new(4096 + 4096),
 			expectedHasThinking:     true,
-			expectedThinkingLevel:   "medium",
+			expectedThinkingBudget:  new(4096),
 		},
 		{
 			name:      "thinking with effort level high",
@@ -183,7 +184,7 @@ func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
 			// Estimated budget 8192, auto-adjust to 12288
 			expectedMaxOutputTokens: new(8192 + 4096),
 			expectedHasThinking:     true,
-			expectedThinkingLevel:   "high",
+			expectedThinkingBudget:  new(8192),
 		},
 		{
 			name:      "thinking with effort level xhigh",
@@ -195,7 +196,7 @@ func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
 			// Estimated budget 16384, auto-adjust to 20480
 			expectedMaxOutputTokens: new(16384 + 4096),
 			expectedHasThinking:     true,
-			expectedThinkingLevel:   "high", // xhigh maps to high for Gemini
+			expectedThinkingBudget:  new(16384),
 		},
 		{
 			name:      "thinking with effort level max",
@@ -206,7 +207,7 @@ func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
 			},
 			expectedMaxOutputTokens: new(16384 + 4096),
 			expectedHasThinking:     true,
-			expectedThinkingLevel:   "high", // max maps to high for Gemini
+			expectedThinkingBudget:  new(16384),
 		},
 		{
 			name:      "thinking with effort level minimal",
@@ -217,7 +218,7 @@ func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
 			},
 			expectedMaxOutputTokens: new(1024 + 4096),
 			expectedHasThinking:     true,
-			expectedThinkingLevel:   "minimal",
+			expectedThinkingBudget:  new(1024),
 		},
 		{
 			name:      "thinking with effort level none",
@@ -228,7 +229,7 @@ func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
 			},
 			expectedMaxOutputTokens: new(1024 + 4096),
 			expectedHasThinking:     true,
-			expectedThinkingLevel:   "minimal", // Gemini cannot turn thinking off by level
+			expectedThinkingBudget:  new(1024),
 		},
 	}
 
@@ -248,34 +249,144 @@ func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
 			body, err := provider.buildRequestBody(req)
 			require.NoError(t, err)
 
-			var parsed generateContentRequest
-			err = json.Unmarshal(body, &parsed)
-			require.NoError(t, err)
+			var request map[string]json.RawMessage
+			require.NoError(t, json.Unmarshal(body, &request))
 
 			if tt.expectedMaxOutputTokens != nil || tt.expectedHasThinking {
-				require.NotNil(t, parsed.GenerationConfig, "generationConfig should be present")
+				var config map[string]json.RawMessage
+				require.Contains(t, request, "generationConfig")
+				require.NoError(t, json.Unmarshal(request["generationConfig"], &config))
 
 				if tt.expectedMaxOutputTokens != nil {
-					require.NotNil(t, parsed.GenerationConfig.MaxOutputTokens, "maxOutputTokens should be present")
-					assert.Equal(t, *tt.expectedMaxOutputTokens, *parsed.GenerationConfig.MaxOutputTokens,
-						"maxOutputTokens should be %d, got %d", *tt.expectedMaxOutputTokens, *parsed.GenerationConfig.MaxOutputTokens)
+					var maxOutputTokens int
+					require.Contains(t, config, "maxOutputTokens")
+					require.NoError(t, json.Unmarshal(config["maxOutputTokens"], &maxOutputTokens))
+					assert.Equal(t, *tt.expectedMaxOutputTokens, maxOutputTokens)
 				}
 
 				if tt.expectedThinkingBudget != nil {
-					require.NotNil(t, parsed.GenerationConfig.ThinkingBudget, "thinkingBudget should be present")
-					assert.Equal(t, *tt.expectedThinkingBudget, *parsed.GenerationConfig.ThinkingBudget)
+					var thinking map[string]json.RawMessage
+					require.Contains(t, config, "thinkingConfig")
+					require.NoError(t, json.Unmarshal(config["thinkingConfig"], &thinking))
+					var thinkingBudget int
+					require.Contains(t, thinking, "thinkingBudget")
+					require.NoError(t, json.Unmarshal(thinking["thinkingBudget"], &thinkingBudget))
+					assert.Equal(t, *tt.expectedThinkingBudget, thinkingBudget)
 					// Verify maxOutputTokens > thinkingBudget
-					require.NotNil(t, parsed.GenerationConfig.MaxOutputTokens, "maxOutputTokens should be set when thinkingBudget is set")
-					assert.Greater(t, *parsed.GenerationConfig.MaxOutputTokens, *parsed.GenerationConfig.ThinkingBudget,
+					require.Contains(t, config, "maxOutputTokens", "maxOutputTokens should be set when thinkingBudget is set")
+					var maxOutputTokens int
+					require.NoError(t, json.Unmarshal(config["maxOutputTokens"], &maxOutputTokens))
+					assert.Greater(t, maxOutputTokens, thinkingBudget,
 						"maxOutputTokens (%d) must be greater than thinkingBudget (%d)",
-						*parsed.GenerationConfig.MaxOutputTokens, *parsed.GenerationConfig.ThinkingBudget)
-				}
-
-				if tt.expectedThinkingLevel != "" {
-					assert.Equal(t, tt.expectedThinkingLevel, parsed.GenerationConfig.ThinkingLevel)
+						maxOutputTokens, thinkingBudget)
 				}
 			} else {
-				assert.Nil(t, parsed.GenerationConfig, "generationConfig should not be present")
+				assert.NotContains(t, request, "generationConfig")
+			}
+		})
+	}
+}
+
+func TestThinkingConfig(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		model        string
+		thinking     *llm.ThinkingRequest
+		temperature  *float64
+		topP         *float64
+		stop         []string
+		wantThinking string
+	}{
+		{
+			name:         "3 series effort becomes uppercase level",
+			model:        "gemini-3.8-flash",
+			thinking:     &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortHigh},
+			wantThinking: `{"thinkingLevel":"HIGH"}`,
+		},
+		{
+			name:         "3 series minimal level",
+			model:        "gemini-3-flash-preview",
+			thinking:     &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortMinimal},
+			wantThinking: `{"thinkingLevel":"MINIMAL"}`,
+		},
+		{
+			name:         "3 series low level",
+			model:        "gemini-3.8-flash",
+			thinking:     &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortLow},
+			wantThinking: `{"thinkingLevel":"LOW"}`,
+		},
+		{
+			name:         "3 series medium level",
+			model:        "gemini-3.8-flash",
+			thinking:     &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortMedium},
+			wantThinking: `{"thinkingLevel":"MEDIUM"}`,
+		},
+		{
+			name:         "3 series max maps to high",
+			model:        "gemini-3-flash-preview",
+			thinking:     &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortMax},
+			wantThinking: `{"thinkingLevel":"HIGH"}`,
+		},
+		{
+			name:         "explicit zero budget is preserved",
+			model:        "gemini-2.5-flash",
+			thinking:     &llm.ThinkingRequest{Enabled: true, BudgetTokens: new(0)},
+			wantThinking: `{"thinkingBudget":0}`,
+		},
+		{
+			name:         "dynamic budget is preserved",
+			model:        "gemini-2.5-flash",
+			thinking:     &llm.ThinkingRequest{Enabled: true, BudgetTokens: new(-1)},
+			wantThinking: `{"thinkingBudget":-1}`,
+		},
+		{
+			name:         "other generation settings remain alongside thinking",
+			model:        "gemini-2.5-flash",
+			thinking:     &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortLow},
+			temperature:  new(0.2),
+			topP:         new(0.8),
+			stop:         []string{"END"},
+			wantThinking: `{"thinkingBudget":1024}`,
+		},
+		{
+			name:     "disabled thinking is omitted",
+			model:    "gemini-2.5-flash",
+			thinking: &llm.ThinkingRequest{Enabled: false, Effort: llm.ThinkingEffortHigh},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			body, err := (&Provider{}).buildRequestBody(&llm.ChatRequest{
+				Model:       tt.model,
+				Thinking:    tt.thinking,
+				Temperature: tt.temperature,
+				TopP:        tt.topP,
+				Stop:        tt.stop,
+				Messages:    []llm.Message{{Role: llm.RoleUser, Content: "Hello"}},
+			})
+			require.NoError(t, err)
+			var request map[string]json.RawMessage
+			require.NoError(t, json.Unmarshal(body, &request))
+			if tt.wantThinking == "" {
+				assert.NotContains(t, request, "generationConfig")
+				return
+			}
+			var config map[string]json.RawMessage
+			require.Contains(t, request, "generationConfig")
+			require.NoError(t, json.Unmarshal(request["generationConfig"], &config))
+			require.Contains(t, config, "thinkingConfig")
+			assert.JSONEq(t, tt.wantThinking, string(config["thinkingConfig"]))
+			if tt.temperature != nil {
+				assert.JSONEq(t, `0.2`, string(config["temperature"]))
+			}
+			if tt.topP != nil {
+				assert.JSONEq(t, `0.8`, string(config["topP"]))
+			}
+			if tt.stop != nil {
+				assert.JSONEq(t, `["END"]`, string(config["stopSequences"]))
 			}
 		})
 	}

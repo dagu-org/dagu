@@ -342,12 +342,16 @@ func (p *Provider) buildGenerationConfig(req *llm.ChatRequest) *generationConfig
 	if req.Thinking != nil && req.Thinking.Enabled {
 		// Use explicit budget if provided
 		if req.Thinking.BudgetTokens != nil {
-			genConfig.ThinkingBudget = req.Thinking.BudgetTokens
+			genConfig.ThinkingConfig = &thinkingConfig{ThinkingBudget: req.Thinking.BudgetTokens}
 			thinkingBudget = *req.Thinking.BudgetTokens
+		} else if strings.Contains(strings.ToLower(req.Model), "gemini-2.5") {
+			thinkingBudget = p.estimateThinkingBudget(req.Thinking.Effort)
+			genConfig.ThinkingConfig = &thinkingConfig{ThinkingBudget: &thinkingBudget}
 		} else {
-			// Map effort level to thinkingLevel
-			genConfig.ThinkingLevel = p.mapEffortToThinkingLevel(req.Thinking.Effort)
-			// Estimate budget based on effort level for maxOutputTokens calculation
+			// Gemini 3 models use the effort level directly.
+			genConfig.ThinkingConfig = &thinkingConfig{
+				ThinkingLevel: strings.ToUpper(p.mapEffortToThinkingLevel(req.Thinking.Effort)),
+			}
 			thinkingBudget = p.estimateThinkingBudget(req.Thinking.Effort)
 		}
 		hasConfig = true
@@ -556,10 +560,14 @@ type systemInstruction struct {
 }
 
 type generationConfig struct {
-	Temperature     *float64 `json:"temperature,omitempty"`
-	MaxOutputTokens *int     `json:"maxOutputTokens,omitempty"`
-	TopP            *float64 `json:"topP,omitempty"`
-	StopSequences   []string `json:"stopSequences,omitempty"`
+	Temperature     *float64        `json:"temperature,omitempty"`
+	MaxOutputTokens *int            `json:"maxOutputTokens,omitempty"`
+	TopP            *float64        `json:"topP,omitempty"`
+	StopSequences   []string        `json:"stopSequences,omitempty"`
+	ThinkingConfig  *thinkingConfig `json:"thinkingConfig,omitempty"`
+}
+
+type thinkingConfig struct {
 	// ThinkingLevel for Gemini 3 models: minimal, low, medium, high
 	// Maps from effort: none/minimal→minimal, low→low, medium→medium,
 	// high/xhigh/max→high
