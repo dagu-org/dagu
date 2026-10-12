@@ -140,6 +140,10 @@ func TestStartedProxyExitsWithBrowser(t *testing.T) {
 	t.Cleanup(func() { _ = handle.Kill() })
 	_, err = Events(context.Background(), handle.URL, 0)
 	require.NoError(t, err)
+	// A browser that closes before the proxy first saw it is one that has
+	// not started yet, which the proxy waits for.
+	require.Eventually(t, func() bool { return browser.answered.Load() > 0 },
+		3*browserPollInterval+5*time.Second, 50*time.Millisecond, "the proxy never checked on its browser")
 
 	browser.server.Close()
 	require.Eventually(t, func() bool {
@@ -160,4 +164,15 @@ func TestStartReportsFailure(t *testing.T) {
 	_, err = Start(context.Background(), executable, cfg)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "the certificate proxy did not start: "+testLabel)
+}
+
+// A proxy that took the browser's debugging port, on its certificate port
+// or its guard's, is one Start replaces.
+func TestReadyListensOn(t *testing.T) {
+	t.Parallel()
+
+	assert.True(t, Ready{Port: 9333}.listensOn(9333))
+	assert.True(t, Ready{Port: 9100, GuardPort: 9333}.listensOn(9333))
+	assert.False(t, Ready{Port: 9100, GuardPort: 9101}.listensOn(9333))
+	assert.False(t, Ready{Port: 9100}.listensOn(0), "a proxy without a guard has no guard port to collide")
 }

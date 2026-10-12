@@ -95,15 +95,15 @@ func Start(ctx context.Context, executable string, cfg Config) (*Handle, error) 
 	}
 	cdpPort := urlPort(cfg.CDPURL)
 	for range startAttempts {
-		handle, port, err := startProcess(ctx, executable, cfg)
+		handle, ready, err := startProcess(ctx, executable, cfg)
 		if err != nil {
 			return nil, err
 		}
-		if port != cdpPort {
+		if !ready.listensOn(cdpPort) {
 			return handle, nil
 		}
 		// The browser's debugging port was only free when chosen, and the
-		// proxy took it before the browser started.
+		// proxy, or its guard, took it before the browser started.
 		if err := handle.Kill(); err != nil {
 			return nil, err
 		}
@@ -111,11 +111,17 @@ func Start(ctx context.Context, executable string, cfg Config) (*Handle, error) 
 	return nil, fmt.Errorf("the certificate proxy kept taking the browser's debugging port %d", cdpPort)
 }
 
-// startProcess starts one proxy process and returns it with its port.
-func startProcess(ctx context.Context, executable string, cfg Config) (*Handle, int, error) {
+// listensOn reports whether the proxy, or its guard, listens on port.
+func (r Ready) listensOn(port int) bool {
+	return r.Port == port || r.GuardPort != 0 && r.GuardPort == port
+}
+
+// startProcess starts one proxy process and returns it with what it said
+// once ready.
+func startProcess(ctx context.Context, executable string, cfg Config) (*Handle, Ready, error) {
 	input, err := json.Marshal(wireConfig{Version: configVersion, Config: cfg})
 	if err != nil {
-		return nil, 0, err
+		return nil, Ready{}, err
 	}
 	cmd := exec.Command(executable, "browser", "cert-proxy") //nolint:gosec // starting this executable's own proxy is the purpose
 	// The proxy outlives the caller, so it does not keep the caller's
@@ -127,17 +133,17 @@ func startProcess(ctx context.Context, executable string, cfg Config) (*Handle, 
 	cmd.Stdin = bytes.NewReader(input)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, 0, err
+		return nil, Ready{}, err
 	}
 	if err := cmd.Start(); err != nil {
-		return nil, 0, fmt.Errorf("start the certificate proxy: %w", err)
+		return nil, Ready{}, fmt.Errorf("start the certificate proxy: %w", err)
 	}
 	startedAt, _ := procutil.StartTime(cmd.Process.Pid)
 	ready, err := readReady(ctx, stdout)
 	if err != nil {
 		_ = cmd.Process.Kill()
 		_ = cmd.Wait()
-		return nil, 0, err
+		return nil, Ready{}, err
 	}
 	go func() { _ = cmd.Wait() }()
 	return &Handle{
@@ -146,7 +152,7 @@ func startProcess(ctx context.Context, executable string, cfg Config) (*Handle, 
 		StartedAt: startedAt,
 		PACURL:    ready.PACURL,
 		SPKI:      ready.SPKI,
-	}, ready.Port, nil
+	}, ready, nil
 }
 
 // readReady reads the line the proxy writes once it accepts connections.
