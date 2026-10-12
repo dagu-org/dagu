@@ -203,10 +203,15 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest, stream bool) ([]byte, 
 
 	// Add thinking configuration if enabled.
 	// Z.AI uses a binary toggle {"thinking": {"type": "enabled"}} instead of
-	// OpenAI's reasoning effort levels. Effort and BudgetTokens are not supported
-	// by the Z.AI API and are intentionally ignored here.
+	// OpenAI's reasoning effort levels, so effort none disables thinking and
+	// any other level enables it. BudgetTokens is not supported by the Z.AI
+	// API and is intentionally ignored here.
 	if req.Thinking != nil && req.Thinking.Enabled {
-		chatReq.Thinking = &thinkingRequest{Type: "enabled"}
+		thinkingType := "enabled"
+		if req.Thinking.Effort == llm.ThinkingEffortNone {
+			thinkingType = "disabled"
+		}
+		chatReq.Thinking = &thinkingRequest{Type: thinkingType}
 	}
 
 	return json.Marshal(chatReq)
