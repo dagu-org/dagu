@@ -78,7 +78,7 @@ export function ConnectSection({
             </h2>
             <p className="text-sm">
               {ts(
-                "Dagu Console shows this server's runs, failures, and trends, and emails you when a workflow fails or the server stops reporting."
+                "Dagu Console shows this server's runs, failures, and trends, and emails you when a workflow fails or the server stops reporting. You choose what the server reports once it connects."
               )}
             </p>
             <p className="text-xs text-muted-foreground">

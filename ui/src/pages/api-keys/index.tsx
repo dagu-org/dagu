@@ -196,7 +196,7 @@ export default function APIKeysPage() {
               <I18nText
                 text={
                   freePlan
-                    ? 'Existing keys remain active, but new key creation is blocked until extra keys are revoked. Team and Pro remove the limit.'
+                    ? 'Existing keys remain active. Revoke a key to create another, or move to Team or Pro to remove the limit.'
                     : 'Existing keys remain active, but new key creation is blocked until extra keys are revoked or a license is configured.'
                 }
               />

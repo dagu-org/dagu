@@ -54,8 +54,8 @@ var (
 	// connected license on restart.
 	ErrManagedExternally = errors.New("the license is set by DAGU_LICENSE, DAGU_LICENSE_KEY, or license.key; remove it to connect from Dagu Console")
 	// ErrAlreadyLicensed is returned when connecting a server that already
-	// has a usable license.
-	ErrAlreadyLicensed = errors.New("this server already has an active license; disconnect it first")
+	// has a usable license, free or paid.
+	ErrAlreadyLicensed = errors.New("this server already has a license; disconnect it first")
 	// ErrNoCheckIn is returned when refreshing a license that does not check
 	// in with Dagu Console.
 	ErrNoCheckIn = errors.New("this license does not check in with Dagu Console")

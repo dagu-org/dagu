@@ -17882,7 +17882,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description The license is set outside Dagu or the server already has an active license */
+            /** @description The license is set outside Dagu or the server already has a license */
             409: {
                 headers: {
                     [name: string]: unknown;

@@ -204,7 +204,7 @@ describe('APIKeysPage', () => {
     expect(
       await screen.findByText('The Free plan supports up to 2 API keys.')
     ).toBeVisible();
-    expect(screen.getByText(/Team and Pro remove the limit/)).toBeVisible();
+    expect(screen.getByText(/Revoke a key to create another/)).toBeVisible();
     expect(
       screen.getByRole('button', { name: /create api key/i })
     ).toBeDisabled();
