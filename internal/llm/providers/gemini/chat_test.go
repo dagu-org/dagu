@@ -66,9 +66,12 @@ func TestThinkingRequests(t *testing.T) {
 				if stream {
 					events, err := provider.ChatStream(context.Background(), req)
 					require.NoError(t, err)
+					var text string
 					for event := range events {
 						require.NoError(t, event.Error)
+						text += event.Delta
 					}
+					assert.Equal(t, "ok", text)
 				} else {
 					_, err = provider.Chat(context.Background(), req)
 					require.NoError(t, err)

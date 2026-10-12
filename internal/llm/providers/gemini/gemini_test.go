@@ -122,6 +122,7 @@ func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
 			maxTokens: nil,
 			thinking: &llm.ThinkingRequest{
 				Enabled:      true,
+				Effort:       llm.ThinkingEffortNone,
 				BudgetTokens: new(4096),
 			},
 			expectedMaxOutputTokens: new(4096 + 4096),
@@ -227,9 +228,9 @@ func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
 				Enabled: true,
 				Effort:  llm.ThinkingEffortNone,
 			},
-			expectedMaxOutputTokens: new(1024 + 4096),
+			expectedMaxOutputTokens: nil,
 			expectedHasThinking:     true,
-			expectedThinkingBudget:  new(1024),
+			expectedThinkingBudget:  new(0),
 		},
 	}
 
@@ -256,12 +257,16 @@ func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
 				var config map[string]json.RawMessage
 				require.Contains(t, request, "generationConfig")
 				require.NoError(t, json.Unmarshal(request["generationConfig"], &config))
+				require.NotContains(t, config, "thinkingBudget")
+				require.NotContains(t, config, "thinkingLevel")
 
 				if tt.expectedMaxOutputTokens != nil {
 					var maxOutputTokens int
 					require.Contains(t, config, "maxOutputTokens")
 					require.NoError(t, json.Unmarshal(config["maxOutputTokens"], &maxOutputTokens))
 					assert.Equal(t, *tt.expectedMaxOutputTokens, maxOutputTokens)
+				} else {
+					assert.NotContains(t, config, "maxOutputTokens")
 				}
 
 				if tt.expectedThinkingBudget != nil {
@@ -272,6 +277,9 @@ func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
 					require.Contains(t, thinking, "thinkingBudget")
 					require.NoError(t, json.Unmarshal(thinking["thinkingBudget"], &thinkingBudget))
 					assert.Equal(t, *tt.expectedThinkingBudget, thinkingBudget)
+				}
+				if tt.expectedThinkingBudget != nil && *tt.expectedThinkingBudget > 0 {
+					thinkingBudget := *tt.expectedThinkingBudget
 					// Verify maxOutputTokens > thinkingBudget
 					require.Contains(t, config, "maxOutputTokens", "maxOutputTokens should be set when thinkingBudget is set")
 					var maxOutputTokens int
@@ -299,6 +307,36 @@ func TestThinkingConfig(t *testing.T) {
 		stop         []string
 		wantThinking string
 	}{
+		{
+			name:         "Flash Lite none disables thinking",
+			model:        "gemini-2.5-flash-lite",
+			thinking:     &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortNone},
+			wantThinking: `{"thinkingBudget":0}`,
+		},
+		{
+			name:         "Pro none keeps a supported budget",
+			model:        "gemini-2.5-pro",
+			thinking:     &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortNone},
+			wantThinking: `{"thinkingBudget":1024}`,
+		},
+		{
+			name:         "budget model outside 2.5 omits level",
+			model:        "gemini-robotics-er-1.6-preview",
+			thinking:     &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortLow},
+			wantThinking: `{"thinkingBudget":1024}`,
+		},
+		{
+			name:         "Robotics 1.6 none disables thinking",
+			model:        "gemini-robotics-er-1.6-preview",
+			thinking:     &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortNone},
+			wantThinking: `{"thinkingBudget":0}`,
+		},
+		{
+			name:         "Robotics 2 uses a level",
+			model:        "gemini-robotics-er-2-preview",
+			thinking:     &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortLow},
+			wantThinking: `{"thinkingLevel":"LOW"}`,
+		},
 		{
 			name:         "3 series effort becomes uppercase level",
 			model:        "gemini-3.8-flash",
@@ -379,6 +417,9 @@ func TestThinkingConfig(t *testing.T) {
 			require.NoError(t, json.Unmarshal(request["generationConfig"], &config))
 			require.Contains(t, config, "thinkingConfig")
 			assert.JSONEq(t, tt.wantThinking, string(config["thinkingConfig"]))
+			if tt.wantThinking == `{"thinkingBudget":0}` {
+				assert.NotContains(t, config, "maxOutputTokens")
+			}
 			if tt.temperature != nil {
 				assert.JSONEq(t, `0.2`, string(config["temperature"]))
 			}

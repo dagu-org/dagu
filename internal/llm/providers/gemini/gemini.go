@@ -340,19 +340,24 @@ func (p *Provider) buildGenerationConfig(req *llm.ChatRequest) *generationConfig
 	// Known issue: MAX_TOKENS finish reason if thoughts_token_count + output_token_count > maxOutputTokens
 	var thinkingBudget int
 	if req.Thinking != nil && req.Thinking.Enabled {
+		model := strings.ToLower(req.Model)
 		// Use explicit budget if provided
 		if req.Thinking.BudgetTokens != nil {
 			genConfig.ThinkingConfig = &thinkingConfig{ThinkingBudget: req.Thinking.BudgetTokens}
 			thinkingBudget = *req.Thinking.BudgetTokens
-		} else if strings.Contains(strings.ToLower(req.Model), "gemini-2.5") {
-			thinkingBudget = p.estimateThinkingBudget(req.Thinking.Effort)
-			genConfig.ThinkingConfig = &thinkingConfig{ThinkingBudget: &thinkingBudget}
-		} else {
-			// Gemini 3 models use the effort level directly.
+		} else if strings.Contains(model, "gemini-3") || strings.Contains(model, "gemini-robotics-er-2-") {
+			// Level-based models use the effort level directly.
 			genConfig.ThinkingConfig = &thinkingConfig{
 				ThinkingLevel: strings.ToUpper(p.mapEffortToThinkingLevel(req.Thinking.Effort)),
 			}
 			thinkingBudget = p.estimateThinkingBudget(req.Thinking.Effort)
+		} else {
+			thinkingBudget = p.estimateThinkingBudget(req.Thinking.Effort)
+			if req.Thinking.Effort == llm.ThinkingEffortNone &&
+				(strings.Contains(model, "gemini-2.5-flash") || strings.Contains(model, "gemini-robotics-er-1.6-")) {
+				thinkingBudget = 0
+			}
+			genConfig.ThinkingConfig = &thinkingConfig{ThinkingBudget: &thinkingBudget}
 		}
 		hasConfig = true
 	}
