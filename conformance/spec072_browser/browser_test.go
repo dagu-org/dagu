@@ -8,6 +8,7 @@ package spec072_browser_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -51,6 +52,15 @@ const signinPage = `<!doctype html><html><head><title>Sign in</title>
 </body></html>`
 
 const reportBody = "id,total\n1,10\n2,20\n"
+
+// layoutPage has a Save button. With ?banner=1 a Dismiss button comes
+// first, at the location Save had.
+const layoutPage = `<!doctype html><html><head><title>Draft</title></head><body>
+<p id="status">Draft</p>
+<div>%s<button onclick="document.getElementById('status').textContent='Saved'">Save</button></div>
+</body></html>`
+
+const layoutBanner = `<button onclick="document.getElementById('status').textContent='Banner closed'">Dismiss</button>`
 
 // browserCommandTimeout bounds a command that starts a browser. Starting
 // one takes tens of seconds when the conformance job loads the runner.
@@ -196,6 +206,15 @@ func startShop(t *testing.T) string {
 			_, _ = io.WriteString(w, signinPage)
 			return
 		}
+		if r.URL.Path == "/layout" {
+			banner := ""
+			if r.URL.Query().Get("banner") == "1" {
+				banner = layoutBanner
+			}
+			w.Header().Set("Content-Type", "text/html")
+			_, _ = fmt.Fprintf(w, layoutPage, banner)
+			return
+		}
 		if r.URL.Path == "/report.csv" {
 			w.Header().Set("Content-Type", "text/csv")
 			w.Header().Set("Content-Disposition", `attachment; filename="report.csv"`)
@@ -337,6 +356,24 @@ func TestBrowserReplayCache(t *testing.T) {
 
 	b.dagu.RunWithEnv(env, "start", "click.yaml").ExpectExitCode(0)
 	require.Equal(t, 1, b.model.count(kindAct), "the replayed act makes no model request")
+}
+
+// A replay acts only on the element it recorded. When the layout puts
+// another element at the recorded location, the act asks the model again
+// instead of clicking that element.
+func TestBrowserReplayHealsShiftedElement(t *testing.T) {
+	t.Parallel()
+
+	b := newBrowserEnv(t)
+	env := append(b.env, "DAGU_HOME="+t.TempDir())
+	b.dagu.RunWithEnv(env, "start", "layout.yaml").ExpectExitCode(0)
+	require.Equal(t, 1, b.model.count(kindAct))
+
+	b.dagu.RunWithEnv(env, "start", "layout.yaml", "--", "BANNER=1").ExpectExitCode(0)
+	require.Equal(t, 2, b.model.count(kindAct), "the act heals on the shifted page")
+
+	b.dagu.RunWithEnv(env, "start", "layout.yaml", "--", "BANNER=1").ExpectExitCode(0)
+	require.Equal(t, 2, b.model.count(kindAct), "the healed act replays")
 }
 
 // Clearing a step's cache, or removing all of the DAG's history, makes the

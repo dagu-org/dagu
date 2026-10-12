@@ -30,8 +30,9 @@ type engine interface {
 	// the act reported back; the act may or may not have taken effect.
 	Act(ctx context.Context, instruction string, variables map[string]string, timeout time.Duration) (actOutcome, error)
 	// Replay performs one recorded action without a model call and reports
-	// whether it succeeded. An action whose element is not visible is not
-	// performed and does not succeed. Its error wraps errPageSessionLost when
+	// whether it succeeded. An action whose element is not visible, or is
+	// no longer the element it recorded, is not performed and does not
+	// succeed. Its error wraps errPageSessionLost when
 	// the connection to the page went away before the action reported back;
 	// the action may or may not have taken effect.
 	Replay(ctx context.Context, action recordedAction, variables map[string]string, timeout time.Duration) (bool, error)
@@ -121,6 +122,12 @@ type recordedAction struct {
 	Description string   `json:"description,omitempty"`
 	Method      string   `json:"method,omitempty"`
 	Arguments   []string `json:"arguments,omitempty"`
+	// Role and Name identify the element at Selector as the page's
+	// accessibility tree showed it before the action ran, so a replay acts
+	// only on that element. Name holds a variable's placeholder in place of
+	// its value. Both are empty when the element was not identified.
+	Role string `json:"role,omitempty"`
+	Name string `json:"name,omitempty"`
 }
 
 type actOutcome struct {
