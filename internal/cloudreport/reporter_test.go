@@ -306,7 +306,26 @@ func noJitter() float64 { return 0.5 }
 
 // fixedLevel is monitoring whose level configuration fixes.
 func fixedLevel(level config.ReportLevel) *Monitoring {
-	return NewMonitoring(level, nil)
+	return NewMonitoring(level, &memoryStore{})
+}
+
+// memoryStore is a StateStore that keeps the state in memory.
+type memoryStore struct {
+	mu   sync.Mutex
+	data []byte
+}
+
+func (s *memoryStore) Load(context.Context) ([]byte, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.data, s.data != nil, nil
+}
+
+func (s *memoryStore) Save(_ context.Context, data []byte) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.data = data
+	return nil
 }
 
 // startReporter runs r with fixed randomness and a clock the test controls.

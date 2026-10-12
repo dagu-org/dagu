@@ -34,8 +34,9 @@ func TestStopLocalAgentSessionCleanupHonorsShutdownContext(t *testing.T) {
 	}
 }
 
-// The reporter runs whenever a license manager does, so that an
-// administrator can choose a level later, unless configuration fixes off.
+// The reporter runs whenever a license manager does: so that an
+// administrator can choose a level later, and, when configuration fixes off,
+// so that Dagu Console can be told once that the server no longer reports.
 func TestStartCloudReport(t *testing.T) {
 	newContext := func(report config.ReportLevel) *Context {
 		cfg := &config.Config{Cloud: config.CloudConfig{Report: report}}
@@ -43,7 +44,7 @@ func TestStartCloudReport(t *testing.T) {
 		return &Context{Context: t.Context(), Config: cfg, LicenseManager: license.NewTestManager()}
 	}
 
-	for _, level := range []config.ReportLevel{"", config.ReportHealth, config.ReportRuns} {
+	for _, level := range []config.ReportLevel{"", config.ReportOff, config.ReportHealth, config.ReportRuns} {
 		t.Run("level "+string(level), func(t *testing.T) {
 			ctx := newContext(level)
 			reporter := startCloudReport(ctx, newCloudReportMonitoring(ctx))
@@ -51,11 +52,6 @@ func TestStartCloudReport(t *testing.T) {
 			reporter.Stop()
 		})
 	}
-
-	t.Run("off", func(t *testing.T) {
-		ctx := newContext(config.ReportOff)
-		require.Nil(t, startCloudReport(ctx, newCloudReportMonitoring(ctx)))
-	})
 
 	t.Run("no license manager", func(t *testing.T) {
 		ctx := newContext("")
