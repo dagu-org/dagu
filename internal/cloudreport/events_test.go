@@ -825,6 +825,7 @@ func (d *eventDir) events() Events {
 		Reader:        d.store,
 		RetentionDays: 1,
 		State:         filemonitor.NewStateStore(d.stateFile),
+		Stale:         filemonitor.NewStateStore(d.stateFile + ".stale"),
 		Lease:         filemonitor.NewLease(d.stateFile, nil),
 		Statuses:      d.statuses,
 	}

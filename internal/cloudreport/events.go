@@ -54,6 +54,8 @@ const (
 	warnLease           = "Failed to take the lease to report DAG-run events to Dagu Console"
 	warnLeaseLost       = "Lost the lease to report DAG-run events to Dagu Console"
 	warnActive          = "Failed to list the DAG runs in progress; reports to Dagu Console leave them out until listing succeeds"
+	warnMarkStale       = "Failed to record that DAG-run events stopped being reported to Dagu Console"
+	warnClearStale      = "Failed to clear the record that DAG-run events stopped being reported to Dagu Console"
 )
 
 // Events configures the DAG runs that reports carry: the runs that finish,
@@ -66,6 +68,10 @@ type Events struct {
 	RetentionDays int
 	// State persists which events Dagu Console has acknowledged.
 	State StateStore
+	// Stale persists, without the lease, that the position in State predates
+	// a period below runs, so that the next process to take the lease
+	// discards it. It must be set when Reader is.
+	Stale StateStore
 	// Lease lets one process at a time report the events of a shared data
 	// directory.
 	Lease Lease
@@ -301,6 +307,7 @@ type eventFeed struct {
 	reader        eventstore.DAGRunReader
 	retentionDays int
 	store         StateStore
+	stale         StateStore
 	lease         Lease
 	statuses      RunStatuses
 	now           func() time.Time
@@ -342,6 +349,7 @@ func newEventFeed(events Events) *eventFeed {
 		reader:        events.Reader,
 		retentionDays: events.RetentionDays,
 		store:         events.State,
+		stale:         events.Stale,
 		lease:         events.Lease,
 		statuses:      events.Statuses,
 		now:           time.Now,
@@ -400,8 +408,20 @@ func (f *eventFeed) hold(ctx context.Context) bool {
 }
 
 // load reads the persisted state of serverID. It moves to the newest event
-// when there is no state, and after events were lost.
+// when there is no state, when the state is marked stale, and after events
+// were lost.
 func (f *eventFeed) load(ctx context.Context, serverID string) bool {
+	if !f.loaded && f.isStale(ctx) {
+		if !f.restart(ctx, eventState{ServerID: serverID}) {
+			return false
+		}
+		// Cleared only after the restart, so that a failure in between
+		// leaves out more events rather than reporting stale ones.
+		if err := f.saveStale(ctx, false); err != nil {
+			f.warn(ctx, warnClearStale, err)
+		}
+		return true
+	}
 	if !f.loaded {
 		state, err := f.readState(ctx)
 		if err != nil {
@@ -730,14 +750,64 @@ func (f *eventFeed) save(ctx context.Context, next eventState) bool {
 	return true
 }
 
-// forget gives up the lease after moving the position to the newest event,
-// so that reporting events again later leaves out the events in between.
+// forget discards the saved position and gives up the lease, so that
+// reporting events again later, in this process or another, leaves out the
+// events in between. Without the lease, it marks a saved position stale for
+// the next process that takes the lease to discard.
 func (f *eventFeed) forget(ctx context.Context) {
-	if f == nil || !f.held {
+	if f == nil {
 		return
 	}
-	f.save(ctx, eventState{Version: eventStateVersion})
+	if !f.held || !f.save(ctx, eventState{Version: eventStateVersion}) {
+		f.markStale(ctx)
+	}
 	f.close(ctx)
+}
+
+// staleMark is the persisted record that the saved position predates a
+// period below runs.
+type staleMark struct {
+	Stale bool `json:"stale"`
+}
+
+// markStale marks the saved position stale. It writes nothing while no
+// position is saved, so that a server that never reported runs creates no
+// files, or while the position is already marked.
+func (f *eventFeed) markStale(ctx context.Context) {
+	state, err := f.readState(ctx)
+	if err == nil && (state == nil || state.ServerID == "") {
+		return
+	}
+	if f.isStale(ctx) {
+		return
+	}
+	if err := f.saveStale(ctx, true); err != nil {
+		f.warn(ctx, warnMarkStale, err)
+		return
+	}
+	f.recovered(warnMarkStale)
+}
+
+// isStale reports whether the saved position is marked stale. A mark that
+// cannot be read counts as one, so that stale events are never reported.
+func (f *eventFeed) isStale(ctx context.Context) bool {
+	data, found, err := f.stale.Load(ctx)
+	if err != nil {
+		return true
+	}
+	if !found {
+		return false
+	}
+	var mark staleMark
+	return json.Unmarshal(data, &mark) != nil || mark.Stale
+}
+
+func (f *eventFeed) saveStale(ctx context.Context, stale bool) error {
+	data, err := json.Marshal(staleMark{Stale: stale})
+	if err != nil {
+		return err
+	}
+	return f.stale.Save(ctx, data)
 }
 
 // close gives up the lease.

@@ -224,6 +224,118 @@ func TestReportFollowsLevel(t *testing.T) {
 	assertLeaseFree(t, dir)
 }
 
+// A reporter that starts below runs, fixed by configuration or chosen before,
+// leaves out the runs that finished below runs once runs is chosen again: in
+// the same process, or at a restart at runs while the event store still holds
+// them. No gap is reported for them either, even after the event store has
+// removed them.
+func TestReportStartBelowRuns(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		// configured fixes the level below runs, and runs is chosen again by
+		// restarting at runs; otherwise chosen is the level, and runs is
+		// chosen in the same process.
+		configured config.ReportLevel
+		chosen     config.ReportLevel
+		// later is how long after the first start the restart at runs is.
+		later time.Duration
+	}{
+		{name: "configured health", configured: config.ReportHealth},
+		{name: "configured off", configured: config.ReportOff},
+		{name: "configured health, events removed", configured: config.ReportHealth, later: 72 * time.Hour},
+		{name: "chosen health", chosen: config.ReportHealth},
+		{name: "chosen off", chosen: config.ReportOff},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			dir := newEventDir(t)
+			console := newFakeConsole(t)
+			first, clock := newEventReporter(t, console.credentials, dir, testClockStart)
+			dir.emit(eventstore.TypeDAGRunSucceeded, etlRun(ir.Succeeded))
+			assert.Equal(t, []string{"run-1"}, decodeFinished(t, nextReport(t, clock, console)).ids(t))
+			first.Stop()
+
+			m := NewMonitoring(tc.configured, newSettingsStore(t))
+			if tc.chosen != "" {
+				require.NoError(t, m.SetLevel(t.Context(), tc.chosen))
+			}
+			r := newReporter(console.credentials, nil, m)
+			r.events = newEventFeed(dir.events())
+			clock = startReporterAt(t.Context(), t, r, noJitter, testClockStart)
+			if tc.configured == config.ReportOff {
+				assertStops(t, r)
+			} else {
+				clock.wait()
+			}
+			dir.emit(eventstore.TypeDAGRunFailed, run("etl", "run-2", ir.Failed))
+
+			if tc.configured != "" {
+				r.Stop()
+				_, clock = newEventReporter(t, console.credentials, dir, testClockStart.Add(tc.later))
+			} else {
+				require.NoError(t, m.SetLevel(t.Context(), config.ReportRuns))
+			}
+			report := nextReport(t, clock, console)
+			assert.Equal(t, config.ReportRuns, decodeReport(t, report).Level)
+			assert.Nil(t, decodeFinished(t, report).ids(t))
+			assert.Nil(t, decodeFinished(t, report).Gap)
+		})
+	}
+}
+
+// A reporter below runs while another process holds the events lease, as a
+// process that stopped at runs does for a while, leaves the saved position to
+// the next process that takes the lease, which discards it: at a restart at
+// runs, or in the same process once runs is chosen.
+func TestReportBelowRunsWithoutLease(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		// configured fixes the level below runs, and runs is chosen again by
+		// restarting at runs; otherwise runs is chosen in the same process.
+		configured config.ReportLevel
+	}{
+		{name: "restart at runs", configured: config.ReportOff},
+		{name: "runs chosen"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			dir := newEventDir(t)
+			console := newFakeConsole(t)
+			first, _ := newEventReporter(t, console.credentials, dir, testClockStart)
+			first.Stop()
+			other := filemonitor.NewLease(dir.stateFile, nil)
+			require.NoError(t, other.TryLock())
+
+			m := NewMonitoring(tc.configured, newSettingsStore(t))
+			r := newReporter(console.credentials, nil, m)
+			r.events = newEventFeed(dir.events())
+			clock := startReporterAt(t.Context(), t, r, noJitter, testClockStart)
+			if tc.configured != "" {
+				assertStops(t, r)
+			} else {
+				clock.wait()
+			}
+			dir.emit(eventstore.TypeDAGRunFailed, etlRun(ir.Failed))
+			require.NoError(t, other.Unlock())
+
+			if tc.configured != "" {
+				_, clock = newEventReporter(t, console.credentials, dir, testClockStart)
+			} else {
+				require.NoError(t, m.SetLevel(t.Context(), config.ReportRuns))
+			}
+			assert.Nil(t, decodeFinished(t, nextReport(t, clock, console)).ids(t))
+		})
+	}
+}
+
 // Off tells Dagu Console once that the server no longer reports. The report
 // is retried while Dagu Console is unavailable, but not once it answers, and
 // nothing follows it until a level that reports is chosen again.

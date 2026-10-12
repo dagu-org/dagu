@@ -98,6 +98,9 @@ type Reporter struct {
 // runs are sent even while Dagu Console pauses storing them; monitoring shows
 // until when.
 //
+// Runs that finish below runs are never sent, even when runs is chosen again
+// after a restart.
+//
 // When the level is off, while running or at a later start, and the last
 // report sent was at a level that reports, one report tells Dagu Console that
 // the server no longer reports. It is retried until Dagu Console answers
@@ -207,8 +210,9 @@ func (r *Reporter) sleep(ctx context.Context, d time.Duration) bool {
 }
 
 // readLevel returns the level in effect, reading it as off when it cannot be
-// read. Below runs, it gives up the lease to report DAG-run events, and the
-// events that occur until runs is chosen again are never reported.
+// read. Below runs, it discards where DAG-run events stopped being reported
+// and gives up the lease to report them, so that the events that occur until
+// runs is chosen again are never reported, even after a restart.
 func (r *Reporter) readLevel(ctx context.Context) config.ReportLevel {
 	level, err := r.monitoring.level(ctx)
 	switch {

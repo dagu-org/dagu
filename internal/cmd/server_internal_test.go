@@ -62,9 +62,9 @@ func TestStartCloudReport(t *testing.T) {
 	})
 }
 
-// The event store and the run history are prepared unless configuration
-// fixes a level below runs, because an administrator can choose runs at any
-// time.
+// The event store and the run history are prepared at every level: an
+// administrator can choose runs at any time, and a reporter below runs
+// discards where runs stopped being reported.
 func TestCloudReportEvents(t *testing.T) {
 	runs := persis.NewDAGRunRepository(nil, nil, persis.DAGRunRepositoryOptions{})
 	newContext := func(report config.ReportLevel) *Context {
@@ -78,11 +78,9 @@ func TestCloudReportEvents(t *testing.T) {
 		}
 	}
 
-	for _, level := range []config.ReportLevel{config.ReportRuns, ""} {
+	for _, level := range []config.ReportLevel{config.ReportRuns, "", config.ReportHealth, config.ReportOff} {
 		events := cloudReportEvents(newContext(level))
 		require.NotNil(t, events.Reader)
 		require.Equal(t, runs, events.Statuses)
 	}
-	require.Nil(t, cloudReportEvents(newContext(config.ReportHealth)).Reader)
-	require.Nil(t, cloudReportEvents(newContext(config.ReportOff)).Reader)
 }

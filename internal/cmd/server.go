@@ -299,11 +299,11 @@ const cloudReportLeaseStaleThreshold = time.Minute
 
 // cloudReportEvents configures the DAG runs that reports to Dagu Console carry
 // at the runs level: finished runs from the event store, and runs in progress
-// followed through it. It configures none when cloud.report fixes a lower
-// level, or while the event store is disabled.
+// followed through it. A reporter below runs uses them only to discard where
+// they stopped being reported. It configures none while the event store is
+// disabled.
 func cloudReportEvents(ctx *Context) cloudreport.Events {
-	report := ctx.Config.Cloud.Report
-	if (report != "" && report != config.ReportRuns) || ctx.event == nil {
+	if ctx.event == nil {
 		return cloudreport.Events{}
 	}
 	stateFile := filepath.Join(ctx.Config.Paths.DataDir, "cloud", "report-state.json")
@@ -311,6 +311,7 @@ func cloudReportEvents(ctx *Context) cloudreport.Events {
 		Reader:        ctx.event,
 		RetentionDays: ctx.Config.EventStore.RetentionDays,
 		State:         filemonitor.NewStateStore(stateFile),
+		Stale:         filemonitor.NewStateStore(stateFile + ".stale"),
 		Lease:         filemonitor.NewLease(stateFile, &dirlock.LockOptions{StaleThreshold: cloudReportLeaseStaleThreshold}),
 		Statuses:      ctx.Persistence.DAGRunRepository,
 	}
