@@ -23,7 +23,10 @@ const (
 )
 
 // pacTemplate routes the https: URLs of the certificate hosts to the proxy
-// and everything else the way the system PAC script, %[3]s, does.
+// and everything else the way the system PAC script, %[3]s, does. With a
+// guard, %[4]s, the other https: URLs go to the guard first; the system's
+// route follows it, so the browser falls back to that route once the guard
+// stops accepting connections.
 //
 // The system script is the body of a function, so the functions it
 // declares stay out of the global scope, and a script that throws while
@@ -53,7 +56,7 @@ const pacTemplate = `var __daguSystem = (function () {
 })();
 FindProxyForURLEx = undefined;
 FindProxyForURL = function (url, host) {
-  var proxy = %[1]s, patterns = %[2]s;
+  var proxy = %[1]s, patterns = %[2]s, guard = %[4]s;
   if (String(url).substring(0, 6).toLowerCase() === "https:") {
     var h = String(host).toLowerCase().replace(/\.+$/, "");
     if (h.charAt(0) === "[" && h.charAt(h.length - 1) === "]") h = h.substring(1, h.length - 1);
@@ -62,24 +65,35 @@ FindProxyForURL = function (url, host) {
       if (p === "*" || h === p) return proxy;
       if (p.substring(0, 2) === "*." && h.substring(h.length - p.length + 1) === p.substring(1)) return proxy;
     }
+    if (guard !== "" && h !== "") return guard + "; " + __daguSystem(url, host);
   }
   return __daguSystem(url, host);
 };
 `
 
 // composePAC returns the PAC script the browser uses: the https: URLs of
-// the entries' hosts go to the proxy on proxyPort, and everything else
-// follows the system script.
-func composePAC(proxyPort int, entries []Entry, system string) string {
+// the entries' hosts go to the proxy on proxyPort, other https: URLs to the
+// guard on guardPort, if not zero, and everything else follows the system
+// script.
+func composePAC(proxyPort, guardPort int, entries []Entry, system string) string {
 	patterns := []string{}
 	for _, entry := range entries {
 		for _, host := range entry.Hosts {
 			patterns = append(patterns, pacPattern(host))
 		}
 	}
-	proxy, _ := json.Marshal(fmt.Sprintf("PROXY 127.0.0.1:%d", proxyPort))
+	proxy, _ := json.Marshal(proxyResult(proxyPort))
+	guard, _ := json.Marshal("")
+	if guardPort != 0 {
+		guard, _ = json.Marshal(proxyResult(guardPort))
+	}
 	list, _ := json.Marshal(patterns)
-	return fmt.Sprintf(pacTemplate, proxy, list, system)
+	return fmt.Sprintf(pacTemplate, proxy, list, system, guard)
+}
+
+// proxyResult is the PAC result that sends a request to the local port.
+func proxyResult(port int) string {
+	return fmt.Sprintf("PROXY 127.0.0.1:%d", port)
 }
 
 // pacPattern returns pattern in the form a browser gives the host it

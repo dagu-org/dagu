@@ -59,9 +59,10 @@ const (
 
 // Control paths, under the token.
 const (
-	eventsPath = "events"
-	pacPath    = "proxy.pac"
-	afterParam = "after"
+	eventsPath  = "events"
+	pendingPath = "pending"
+	pacPath     = "proxy.pac"
+	afterParam  = "after"
 )
 
 // rejectionAlerts are the TLS alerts by which a server refuses a client
@@ -80,19 +81,45 @@ type server struct {
 	issuer    *leafIssuer
 	events    *eventLog
 	pacScript string // served when too large for a data: URL
+	pending   *pendingLog
+	// guardEntry presents no certificate, to the hosts the guard carries.
+	guardEntry *upstreamEntry
 
 	mu      sync.Mutex
 	closed  bool
 	tunnels map[net.Conn]struct{}
+	// guard accepts the browser's other https: connections; nil without a
+	// guard, or once it stopped.
+	guard net.Listener
 }
 
 // upstreamEntry is an Entry ready to present.
 type upstreamEntry struct {
-	label    string
-	hosts    []string
+	label string
+	hosts []string
+	// cert is empty for the guard, which presents no certificate.
 	cert     tls.Certificate
 	roots    *x509.CertPool
 	sessions tls.ClientSessionCache
+}
+
+// newGuardEntry returns the entry of the hosts the guard carries, which
+// presents no certificate. It trusts the system's roots and the CA
+// certificates the entries name, which a private CA's other sites need.
+func newGuardEntry(entries []Entry) *upstreamEntry {
+	roots, err := x509.SystemCertPool()
+	if err != nil {
+		roots = x509.NewCertPool()
+	}
+	for _, entry := range entries {
+		roots.AppendCertsFromPEM([]byte(entry.CAPEM))
+	}
+	return &upstreamEntry{roots: roots, sessions: tls.NewLRUClientSessionCache(0)}
+}
+
+// presents reports whether the entry has a certificate to present.
+func (e *upstreamEntry) presents() bool {
+	return len(e.cert.Certificate) > 0
 }
 
 func newUpstreamEntry(entry Entry) (*upstreamEntry, error) {
@@ -120,14 +147,14 @@ func newUpstreamEntry(entry Entry) (*upstreamEntry, error) {
 type upstreamConn struct {
 	*tls.Conn
 	via route
-	// certRequested is set when the server asked for the client
-	// certificate.
-	certRequested bool
+	// requested is set once the server asked for a client certificate,
+	// which it can do again in a renegotiation after the handshake.
+	requested *atomic.Bool
 }
 
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodConnect {
-		s.handleConnect(w, r)
+		s.handleConnect(w, r, false)
 		return
 	}
 	// The control paths answer only requests made to the proxy itself, not
@@ -139,6 +166,9 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
 	case s.controlPath(eventsPath):
 		s.serveEvents(w, r)
+	case s.controlPath(pendingPath):
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(s.pending.list())
 	case s.controlPath(pacPath):
 		if s.pacScript == "" {
 			http.NotFound(w, r)
@@ -169,9 +199,22 @@ func (s *server) serveEvents(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(s.events.after(after))
 }
 
-// handleConnect opens a tunnel to a certificate host, ending the browser's
-// TLS in the proxy.
-func (s *server) handleConnect(w http.ResponseWriter, r *http.Request) {
+// guardHandler serves the guard, which tunnels to any host.
+type guardHandler struct{ s *server }
+
+func (g guardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodConnect {
+		http.NotFound(w, r)
+		return
+	}
+	g.s.handleConnect(w, r, true)
+}
+
+// handleConnect opens a tunnel to the host a CONNECT request names, ending
+// the browser's TLS in the proxy. The certificate port tunnels only to the
+// hosts the entries name; the guard tunnels to any host, presenting no
+// certificate to the others.
+func (s *server) handleConnect(w http.ResponseWriter, r *http.Request, guard bool) {
 	host, port := splitAuthority(r.Host)
 	if host == "" {
 		http.Error(w, "the CONNECT request names no host", http.StatusBadRequest)
@@ -179,20 +222,50 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request) {
 	}
 	entry := s.entryFor(host)
 	if entry == nil {
-		s.events.add(EventRefused, host, "", fmt.Sprintf("the certificate proxy refused a connection to %s, which no client certificate names", host))
-		http.Error(w, "no client certificate names this host", http.StatusForbidden)
+		if !guard {
+			s.events.add(EventRefused, host, "", fmt.Sprintf("the certificate proxy refused a connection to %s, which no client certificate names", host))
+			http.Error(w, "no client certificate names this host", http.StatusForbidden)
+			return
+		}
+		entry = s.guardEntry
+	}
+	pending := s.pending.start(host)
+	ctx, cancel := context.WithTimeout(s.ctx, handshakeTimeout)
+	raw, via, err := s.reach(ctx, host, port, entry)
+	cancel()
+	if err != nil {
+		s.pending.end(pending)
+		if guard && errors.Is(err, errProxyAuth) {
+			// A reset connection makes the browser try the route after the
+			// guard; a closed guard keeps it on that route.
+			s.stopGuard(host)
+			resetConnection(w)
+			return
+		}
+		kind := EventUpstream
+		if errors.Is(err, errProxyAuth) {
+			kind = EventProxyAuth
+		}
+		s.events.add(kind, host, entry.label, fmt.Sprintf("the certificate proxy could not reach %s: %s", host, oneLine(err)))
+		http.Error(w, "the certificate proxy could not reach the site", http.StatusBadGateway)
 		return
 	}
 	hijacker, ok := w.(http.Hijacker)
 	if !ok {
+		s.pending.end(pending)
+		_ = raw.Close()
 		http.Error(w, "the connection cannot be tunneled", http.StatusInternalServerError)
 		return
 	}
 	conn, buffered, err := hijacker.Hijack()
 	if err != nil {
+		s.pending.end(pending)
+		_ = raw.Close()
 		return
 	}
 	if _, err := io.WriteString(conn, connectEstablished); err != nil {
+		s.pending.end(pending)
+		_ = raw.Close()
 		_ = conn.Close()
 		return
 	}
@@ -200,7 +273,40 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request) {
 	if buffered.Reader.Buffered() > 0 {
 		client = &bufferedConn{Conn: conn, reader: buffered.Reader}
 	}
-	s.tunnel(client, host, port, entry)
+	s.tunnel(client, raw, via, host, entry, pending)
+}
+
+// stopGuard closes the guard, so the browser sends the requests it carried
+// on the route after it, and records why.
+func (s *server) stopGuard(host string) {
+	s.mu.Lock()
+	guard := s.guard
+	s.guard = nil
+	s.mu.Unlock()
+	if guard == nil {
+		return
+	}
+	_ = guard.Close()
+	s.events.add(EventGuardOff, host, "", fmt.Sprintf(
+		"the device's proxy asks %s for credentials the certificate proxy cannot give, so sites without a client certificate "+
+			"now go through the browser's own route; one of them that asks for a client certificate can make the system prompt for it", host))
+}
+
+// resetConnection resets the connection of the request w answers, which
+// browsers take as a proxy that cannot be reached.
+func resetConnection(w http.ResponseWriter) {
+	hijacker, ok := w.(http.Hijacker)
+	if !ok {
+		return
+	}
+	conn, _, err := hijacker.Hijack()
+	if err != nil {
+		return
+	}
+	if tcp, ok := conn.(*net.TCPConn); ok {
+		_ = tcp.SetLinger(0)
+	}
+	_ = conn.Close()
 }
 
 // splitAuthority returns the host, canonical, and port a CONNECT authority
@@ -223,13 +329,14 @@ func (s *server) entryFor(host string) *upstreamEntry {
 	return nil
 }
 
-// tunnel relays the browser's connection to the server at host and port.
+// tunnel relays the browser's connection to the server reached over raw.
 // The browser's handshake waits for the one with the server, so it learns
-// the server's application protocol, and fails when the server cannot be
-// reached.
-func (s *server) tunnel(client net.Conn, host, port string, entry *upstreamEntry) {
+// the server's application protocol, and fails when that one does.
+func (s *server) tunnel(client, raw net.Conn, via route, host string, entry *upstreamEntry, pending int64) {
+	defer s.pending.end(pending)
 	if !s.track(client) {
 		_ = client.Close()
+		_ = raw.Close()
 		return
 	}
 	defer s.untrack(client)
@@ -238,7 +345,8 @@ func (s *server) tunnel(client net.Conn, host, port string, entry *upstreamEntry
 	downstream := tls.Server(client, &tls.Config{
 		MinVersion: tls.VersionTLS12,
 		GetConfigForClient: func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
-			conn, err := s.dialServer(hello.Context(), host, port, entry, hello.SupportedProtos)
+			s.pending.set(pending, PhaseHandshake)
+			conn, err := s.handshake(hello.Context(), raw, via, host, entry, hello.SupportedProtos)
 			if err != nil {
 				return nil, err
 			}
@@ -259,43 +367,50 @@ func (s *server) tunnel(client net.Conn, host, port string, entry *upstreamEntry
 	cancel()
 	if err != nil {
 		_ = client.Close()
-		if upstream != nil {
-			_ = upstream.Close()
-		}
+		_ = raw.Close()
 		return
 	}
-	if upstream.certRequested {
-		s.events.connect(host, entry.label, fmt.Sprintf("presented the client certificate %s to %s through %s", entry.label, host, upstream.via))
-	} else {
-		s.events.connect(host, entry.label, fmt.Sprintf("connected to %s through %s; it did not ask for a client certificate", host, upstream.via))
-	}
-	s.relay(downstream, upstream, host, entry)
+	s.pending.set(pending, PhaseAnswer)
+	s.reportConnected(host, entry, upstream)
+	s.relay(downstream, upstream, host, entry, pending)
 }
 
-// dialServer opens TLS to the server at host and port, presenting entry's
-// certificate, on the route the device's proxy settings give it.
-func (s *server) dialServer(ctx context.Context, host, port string, entry *upstreamEntry, protocols []string) (*upstreamConn, error) {
+// reach connects to host and port on the route the device's proxy settings
+// give it.
+func (s *server) reach(ctx context.Context, host, port string, entry *upstreamEntry) (net.Conn, route, error) {
 	found := s.pac.routes(ctx, pacRequestURL(host, port), host)
 	for _, skipped := range found.skipped {
 		s.events.add(EventUpstream, host, entry.label, fmt.Sprintf(
 			"the device's proxy settings route %s through %s, which the certificate proxy does not support; it tries the next route", host, skipped))
 	}
-	raw, via, err := dialRoutes(ctx, found.routes, net.JoinHostPort(host, port))
-	if err != nil {
-		kind := EventUpstream
-		if errors.Is(err, errProxyAuth) {
-			kind = EventProxyAuth
+	return dialRoutes(ctx, found.routes, net.JoinHostPort(host, port), s.proxyTLS)
+}
+
+// proxyTLS returns the TLS configuration for an HTTPS proxy at host. An
+// entry whose hosts match the proxy's presents its certificate to it, and
+// its ca_file is trusted for it.
+func (s *server) proxyTLS(host string) *tls.Config {
+	config := &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}
+	if entry := s.entryFor(hostpattern.Canonical(host)); entry != nil {
+		config.RootCAs = entry.roots
+		config.GetClientCertificate = func(*tls.CertificateRequestInfo) (*tls.Certificate, error) {
+			return &entry.cert, nil
 		}
-		s.events.add(kind, host, entry.label, fmt.Sprintf("the certificate proxy could not reach %s: %s", host, oneLine(err)))
-		return nil, err
 	}
-	var requested atomic.Bool
+	return config
+}
+
+// handshake opens TLS to the server at host over raw, presenting entry's
+// certificate when the server asks for one.
+func (s *server) handshake(ctx context.Context, raw net.Conn, via route, host string, entry *upstreamEntry, protocols []string) (*upstreamConn, error) {
+	requested := &atomic.Bool{}
 	conn := tls.Client(raw, &tls.Config{
 		ServerName: host,
 		NextProtos: protocols,
 		RootCAs:    entry.roots,
 		GetClientCertificate: func(*tls.CertificateRequestInfo) (*tls.Certificate, error) {
 			requested.Store(true)
+			// The guard's entry is empty, which sends no certificate.
 			return &entry.cert, nil
 		},
 		Renegotiation:      tls.RenegotiateFreelyAsClient,
@@ -307,26 +422,53 @@ func (s *server) dialServer(ctx context.Context, host, port string, entry *upstr
 		s.reportHandshakeFailure(host, entry, requested.Load(), err)
 		return nil, err
 	}
-	return &upstreamConn{Conn: conn, via: via, certRequested: requested.Load()}, nil
+	return &upstreamConn{Conn: conn, via: via, requested: requested}, nil
+}
+
+// reportConnected records the first connection an entry makes to host, or,
+// for the guard, a server that asked for a certificate it does not have.
+func (s *server) reportConnected(host string, entry *upstreamEntry, upstream *upstreamConn) {
+	switch {
+	case !entry.presents():
+		if upstream.requested.Load() {
+			s.reportMissing(host)
+		}
+	case upstream.requested.Load():
+		s.events.connect(host, entry.label, true, fmt.Sprintf("presented the client certificate %s to %s through %s", entry.label, host, upstream.via))
+	default:
+		s.events.connect(host, entry.label, false, fmt.Sprintf("connected to %s through %s; it did not ask for a client certificate", host, upstream.via))
+	}
 }
 
 // reportHandshakeFailure records why the handshake with a server failed.
-func (s *server) reportHandshakeFailure(host string, entry *upstreamEntry, certRequested bool, err error) {
-	if alert, ok := rejectionAlert(err); ok && certRequested {
-		s.reportRejection(host, entry, alert)
+func (s *server) reportHandshakeFailure(host string, entry *upstreamEntry, requested bool, err error) {
+	if alert, ok := rejectionAlert(err); ok && requested {
+		s.reportRefusal(host, entry, alert)
 		return
 	}
 	if verifyErr, ok := errors.AsType[*tls.CertificateVerificationError](err); ok {
-		s.events.add(EventServerCertificate, host, entry.label, fmt.Sprintf(
-			"%s presented a server certificate that is not trusted (%v); if a private CA issued it, name that CA in ca_file of %s",
-			host, verifyErr.Err, entry.label))
+		message := fmt.Sprintf("%s presented a server certificate that is not trusted (%v)", host, verifyErr.Err)
+		if entry.presents() {
+			message += fmt.Sprintf("; if a private CA issued it, name that CA in ca_file of %s", entry.label)
+		}
+		s.events.add(EventServerCertificate, host, entry.label, message)
 		return
 	}
 	s.events.add(EventUpstream, host, entry.label, fmt.Sprintf("the TLS handshake with %s failed: %v", host, err))
 }
 
-func (s *server) reportRejection(host string, entry *upstreamEntry, alert string) {
+// reportRefusal records a server that refused the browser for its client
+// certificate: the one entry presented, or none at all.
+func (s *server) reportRefusal(host string, entry *upstreamEntry, alert string) {
+	if !entry.presents() {
+		s.reportMissing(host)
+		return
+	}
 	s.events.add(EventClientCertificateRejected, host, entry.label, fmt.Sprintf("%s rejected the client certificate %s: %s", host, entry.label, alert))
+}
+
+func (s *server) reportMissing(host string) {
+	s.events.add(EventClientCertificateMissing, host, "", fmt.Sprintf("%s asks for a TLS client certificate, and none is configured for it", host))
 }
 
 // rejectionAlert returns the alert of err when it is one by which a server
@@ -345,7 +487,7 @@ func rejectionAlert(err error) (string, bool) {
 }
 
 // relay copies between the browser and the server until either side ends.
-func (s *server) relay(client *tls.Conn, upstream *upstreamConn, host string, entry *upstreamEntry) {
+func (s *server) relay(client *tls.Conn, upstream *upstreamConn, host string, entry *upstreamEntry, pending int64) {
 	var once sync.Once
 	closeBoth := func() {
 		once.Do(func() {
@@ -357,20 +499,24 @@ func (s *server) relay(client *tls.Conn, upstream *upstreamConn, host string, en
 		_, _ = io.Copy(upstream, client)
 		closeBoth()
 	}()
-	s.copyFromServer(client, upstream, host, entry)
+	s.copyFromServer(client, upstream, host, entry, pending)
 	closeBoth()
 }
 
 // copyFromServer copies what the server sends to the browser. Under TLS
-// 1.3 a server refuses a client certificate after the handshake, so an
-// alert that ends the connection before it sent anything is reported.
-func (s *server) copyFromServer(client net.Conn, upstream *upstreamConn, host string, entry *upstreamEntry) {
+// 1.3, and in a TLS 1.2 renegotiation, a server refuses a client
+// certificate after the handshake, so an alert that ends the connection
+// before it sent anything is reported.
+func (s *server) copyFromServer(client net.Conn, upstream *upstreamConn, host string, entry *upstreamEntry, pending int64) {
 	buf := make([]byte, relayBufferBytes)
 	received := false
 	for {
 		n, err := upstream.Read(buf)
 		if n > 0 {
-			received = true
+			if !received {
+				received = true
+				s.pending.end(pending)
+			}
 			if _, err := client.Write(buf[:n]); err != nil {
 				return
 			}
@@ -378,8 +524,8 @@ func (s *server) copyFromServer(client net.Conn, upstream *upstreamConn, host st
 		if err == nil {
 			continue
 		}
-		if alert, ok := rejectionAlert(err); ok && !received && upstream.certRequested {
-			s.reportRejection(host, entry, alert)
+		if alert, ok := rejectionAlert(err); ok && !received && upstream.requested.Load() {
+			s.reportRefusal(host, entry, alert)
 		}
 		return
 	}

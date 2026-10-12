@@ -5,6 +5,7 @@ package certproxy
 
 import (
 	"context"
+	"crypto/tls"
 	"io"
 	"net"
 	"net/http"
@@ -49,6 +50,12 @@ func readGreeting(t *testing.T, conn net.Conn) string {
 	return string(greeting)
 }
 
+// noCertificate configures TLS to a proxy on the way without a client
+// certificate.
+func noCertificate(host string) *tls.Config {
+	return &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}
+}
+
 func TestDialRoutes(t *testing.T) {
 	t.Parallel()
 
@@ -63,7 +70,7 @@ func TestDialRoutes(t *testing.T) {
 			{kind: routeProxy, addr: authProxy.addr},
 			{kind: routeDirect},
 		}
-		conn, via, err := dialRoutes(context.Background(), routes, target)
+		conn, via, err := dialRoutes(context.Background(), routes, target, noCertificate)
 		require.NoError(t, err)
 		assert.Equal(t, route{kind: routeDirect}, via)
 		assert.Equal(t, "hello", readGreeting(t, conn))
@@ -73,7 +80,7 @@ func TestDialRoutes(t *testing.T) {
 	t.Run("TunnelsThroughProxy", func(t *testing.T) {
 		t.Parallel()
 		tunnel := newTunnelProxy(t, target, http.StatusOK)
-		conn, via, err := dialRoutes(context.Background(), []route{{kind: routeProxy, addr: tunnel.addr}}, "portal.test:443")
+		conn, via, err := dialRoutes(context.Background(), []route{{kind: routeProxy, addr: tunnel.addr}}, "portal.test:443", noCertificate)
 		require.NoError(t, err)
 		assert.Equal(t, routeProxy, via.kind)
 		assert.Equal(t, "hello", readGreeting(t, conn))
@@ -83,7 +90,7 @@ func TestDialRoutes(t *testing.T) {
 	t.Run("TunnelsThroughSOCKS5", func(t *testing.T) {
 		t.Parallel()
 		socks := newSOCKSProxy(t, target)
-		conn, _, err := dialRoutes(context.Background(), []route{{kind: routeSOCKS5, addr: socks.addr}}, "portal.test:443")
+		conn, _, err := dialRoutes(context.Background(), []route{{kind: routeSOCKS5, addr: socks.addr}}, "portal.test:443", noCertificate)
 		require.NoError(t, err)
 		assert.Equal(t, "hello", readGreeting(t, conn))
 		assert.Equal(t, []string{"portal.test:443"}, socks.requests())
@@ -95,7 +102,7 @@ func TestDialRoutes(t *testing.T) {
 		_, _, err := dialRoutes(context.Background(), []route{
 			{kind: routeProxy, addr: authProxy.addr},
 			{kind: routeDirect},
-		}, refusing)
+		}, refusing, noCertificate)
 		require.Error(t, err)
 		assert.ErrorIs(t, err, errProxyAuth)
 		message := oneLine(err)
@@ -105,7 +112,7 @@ func TestDialRoutes(t *testing.T) {
 
 	t.Run("NoRoute", func(t *testing.T) {
 		t.Parallel()
-		_, _, err := dialRoutes(context.Background(), nil, target)
+		_, _, err := dialRoutes(context.Background(), nil, target, noCertificate)
 		assert.Error(t, err)
 	})
 }

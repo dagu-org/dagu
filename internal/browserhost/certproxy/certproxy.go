@@ -15,6 +15,8 @@
 package certproxy
 
 import (
+	"maps"
+	"slices"
 	"sync"
 	"time"
 )
@@ -52,6 +54,10 @@ type Config struct {
 	// GraceSeconds is how long the proxy waits for the browser to answer
 	// for the first time; zero means five minutes.
 	GraceSeconds int `json:"grace_seconds,omitempty"`
+	// Guard sends the browser's other https: requests through the proxy too,
+	// so the browser never answers a site's request for a client
+	// certificate itself; a host no entry names gets none.
+	Guard bool `json:"guard,omitempty"`
 }
 
 // Ready describes a proxy that accepts connections.
@@ -64,6 +70,8 @@ type Ready struct {
 	// PACURL is the PAC script the browser uses: a data: URL, or one the
 	// proxy serves when the script is too large for a command line.
 	PACURL string `json:"pac_url"`
+	// GuardPort is the port of the guard, or zero without one.
+	GuardPort int `json:"guard_port,omitempty"`
 }
 
 // Kinds of Event.
@@ -82,6 +90,26 @@ const (
 	EventUpstream = "upstream"
 	// EventRefused reports a connection to a host no entry names.
 	EventRefused = "refused"
+	// EventClientCertificateMissing reports a server that asked for a
+	// client certificate when no entry names its host.
+	EventClientCertificateMissing = "client_certificate_missing"
+	// EventGuardOff reports that the guard stopped, because the device's
+	// proxy asks for credentials the proxy cannot give.
+	EventGuardOff = "guard_off"
+)
+
+// Pending is a connection the proxy has not yet heard the site answer on.
+type Pending struct {
+	Host  string    `json:"host"`
+	Phase string    `json:"phase"`
+	Since time.Time `json:"since"`
+}
+
+// Phases of a pending connection.
+const (
+	PhaseReaching  = "reaching the site"
+	PhaseHandshake = "TLS handshake with the site"
+	PhaseAnswer    = "waiting for the site's answer"
 )
 
 // Event is something the proxy reports about a connection.
@@ -94,6 +122,9 @@ type Event struct {
 	Entry string `json:"entry,omitempty"`
 	// Message explains the event in a sentence of its own.
 	Message string `json:"message,omitempty"`
+	// Presented is set on a connection on which the entry's certificate
+	// was presented.
+	Presented bool `json:"presented,omitempty"`
 }
 
 const (
@@ -130,8 +161,14 @@ func newEventLog() *eventLog {
 // add records an event unless the same one was recorded within
 // repeatWindow.
 func (l *eventLog) add(kind, host, entry, message string) {
+	l.record(Event{Kind: kind, Host: host, Entry: entry, Message: message})
+}
+
+// record keeps event, numbered and timed, unless the same one was recorded
+// within repeatWindow.
+func (l *eventLog) record(event Event) {
 	now := time.Now()
-	key := eventKey{kind: kind, host: host, message: message}
+	key := eventKey{kind: event.Kind, host: event.Host, message: event.Message}
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if last, ok := l.recent[key]; ok && now.Sub(last) < repeatWindow {
@@ -144,21 +181,23 @@ func (l *eventLog) add(kind, host, entry, message string) {
 	}
 	l.recent[key] = now
 	l.seq++
-	l.events = append(l.events, Event{Seq: l.seq, Time: now, Kind: kind, Host: host, Entry: entry, Message: message})
+	event.Seq, event.Time = l.seq, now
+	l.events = append(l.events, event)
 	if len(l.events) > maxEvents {
 		l.events = append(l.events[:0:0], l.events[len(l.events)-maxEvents:]...)
 	}
 }
 
-// connect records the first connection entry makes to host.
-func (l *eventLog) connect(host, entry, message string) {
+// connect records the first connection entry makes to host, and whether
+// it presented its certificate there.
+func (l *eventLog) connect(host, entry string, presented bool, message string) {
 	key := connectKey{entry: entry, host: host}
 	l.mu.Lock()
 	seen := l.connected[key]
 	l.connected[key] = true
 	l.mu.Unlock()
 	if !seen {
-		l.add(EventConnect, host, entry, message)
+		l.record(Event{Kind: EventConnect, Host: host, Entry: entry, Message: message, Presented: presented})
 	}
 }
 
@@ -173,4 +212,54 @@ func (l *eventLog) after(seq int64) []Event {
 		}
 	}
 	return events
+}
+
+// pendingLog keeps the connections the proxy has not yet heard the site
+// answer on.
+type pendingLog struct {
+	mu    sync.Mutex
+	next  int64
+	conns map[int64]Pending
+}
+
+func newPendingLog() *pendingLog {
+	return &pendingLog{conns: map[int64]Pending{}}
+}
+
+// start records a connection to host and returns its ID.
+func (p *pendingLog) start(host string) int64 {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.next++
+	p.conns[p.next] = Pending{Host: host, Phase: PhaseReaching, Since: time.Now()}
+	return p.next
+}
+
+// set moves a connection to phase, restarting its time.
+func (p *pendingLog) set(id int64, phase string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if conn, ok := p.conns[id]; ok {
+		conn.Phase, conn.Since = phase, time.Now()
+		p.conns[id] = conn
+	}
+}
+
+// end forgets a connection; ending one twice is harmless.
+func (p *pendingLog) end(id int64) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	delete(p.conns, id)
+}
+
+// list returns the pending connections, the longest waiting first.
+func (p *pendingLog) list() []Pending {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	conns := slices.Collect(maps.Values(p.conns))
+	slices.SortFunc(conns, func(a, b Pending) int { return a.Since.Compare(b.Since) })
+	if conns == nil {
+		conns = []Pending{}
+	}
+	return conns
 }

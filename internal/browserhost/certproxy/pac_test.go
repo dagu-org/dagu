@@ -69,7 +69,7 @@ func TestComposePAC(t *testing.T) {
 	}
 	const proxy = "PROXY 127.0.0.1:4567"
 	system := `function FindProxyForURL(url, host) { return "PROXY system:8080"; }`
-	evaluator := newTestEvaluator(t, composePAC(testProxyPort, entries, system))
+	evaluator := newTestEvaluator(t, composePAC(testProxyPort, 0, entries, system))
 
 	for rawURL, want := range map[string]string{
 		"https://portal.example.com/":  proxy,
@@ -81,6 +81,25 @@ func TestComposePAC(t *testing.T) {
 		"https://corp.example/":        "PROXY system:8080",
 		"https://other.example.com/":   "PROXY system:8080",
 		"https://10.0.0.6/":            "PROXY system:8080",
+	} {
+		assert.Equal(t, want, findProxy(t, evaluator, rawURL), rawURL)
+	}
+}
+
+// With a guard, the other https: URLs go to it first, falling back to the
+// system's route; http: URLs keep the system's route.
+func TestComposePACGuard(t *testing.T) {
+	t.Parallel()
+
+	entries := []Entry{{Hosts: []string{"portal.example.com"}}}
+	system := `function FindProxyForURL(url, host) { return "PROXY system:8080; DIRECT"; }`
+	evaluator := newTestEvaluator(t, composePAC(testProxyPort, 4568, entries, system))
+
+	for rawURL, want := range map[string]string{
+		"https://portal.example.com/": "PROXY 127.0.0.1:4567",
+		"https://other.example.com/":  "PROXY 127.0.0.1:4568; PROXY system:8080; DIRECT",
+		"https://10.0.0.6/":           "PROXY 127.0.0.1:4568; PROXY system:8080; DIRECT",
+		"http://other.example.com/":   "PROXY system:8080; DIRECT",
 	} {
 		assert.Equal(t, want, findProxy(t, evaluator, rawURL), rawURL)
 	}
@@ -123,7 +142,7 @@ func TestComposePACWrapsSystemScript(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			evaluator := newTestEvaluator(t, composePAC(testProxyPort, entries, tt.system))
+			evaluator := newTestEvaluator(t, composePAC(testProxyPort, 0, entries, tt.system))
 			assert.Equal(t, proxy, findProxy(t, evaluator, "https://portal.example.com/"))
 			assert.Equal(t, tt.wantOther, findProxy(t, evaluator, "https://other.example.com/"))
 		})
@@ -133,7 +152,7 @@ func TestComposePACWrapsSystemScript(t *testing.T) {
 func TestComposePACAnyHost(t *testing.T) {
 	t.Parallel()
 
-	evaluator := newTestEvaluator(t, composePAC(testProxyPort, []Entry{{Hosts: []string{"*"}}}, ""))
+	evaluator := newTestEvaluator(t, composePAC(testProxyPort, 0, []Entry{{Hosts: []string{"*"}}}, ""))
 	assert.Equal(t, "PROXY 127.0.0.1:4567", findProxy(t, evaluator, "https://anything.example/"))
 	assert.Equal(t, "DIRECT", findProxy(t, evaluator, "http://anything.example/"))
 }

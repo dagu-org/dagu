@@ -189,23 +189,39 @@ func readReady(ctx context.Context, stdout io.Reader) (Ready, error) {
 // error means the proxy no longer answers.
 func Events(ctx context.Context, handleURL string, after int64) ([]Event, error) {
 	query := url.Values{afterParam: {strconv.FormatInt(after, 10)}}
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, handleURL+"/"+eventsPath+"?"+query.Encode(), nil)
+	var events []Event
+	if err := getControl(ctx, handleURL+"/"+eventsPath+"?"+query.Encode(), &events); err != nil {
+		return nil, fmt.Errorf("read certificate proxy events: %w", err)
+	}
+	return events, nil
+}
+
+// PendingConnections returns the connections the proxy at handleURL has not
+// yet heard a site answer on, the longest waiting first. An error means the
+// proxy no longer answers.
+func PendingConnections(ctx context.Context, handleURL string) ([]Pending, error) {
+	var pending []Pending
+	if err := getControl(ctx, handleURL+"/"+pendingPath, &pending); err != nil {
+		return nil, fmt.Errorf("read certificate proxy connections: %w", err)
+	}
+	return pending, nil
+}
+
+// getControl reads the JSON a control path of the proxy answers into v.
+func getControl(ctx context.Context, address string, v any) error {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, address, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("the certificate proxy answered %s", response.Status)
+		return fmt.Errorf("the certificate proxy answered %s", response.Status)
 	}
-	var events []Event
-	if err := json.NewDecoder(response.Body).Decode(&events); err != nil {
-		return nil, fmt.Errorf("decode certificate proxy events: %w", err)
-	}
-	return events, nil
+	return json.NewDecoder(response.Body).Decode(v)
 }
 
 // controlURL returns the base of the control paths of the proxy on port.

@@ -67,11 +67,11 @@ func (r route) String() string {
 }
 
 // dialRoutes connects to target through the first of routes that reaches
-// it.
-func dialRoutes(ctx context.Context, routes []route, target string) (net.Conn, route, error) {
+// it. proxyTLS returns the TLS configuration for an HTTPS proxy on the way.
+func dialRoutes(ctx context.Context, routes []route, target string, proxyTLS func(host string) *tls.Config) (net.Conn, route, error) {
 	var errs []error
 	for _, r := range routes {
-		conn, err := dialRoute(ctx, r, target)
+		conn, err := dialRoute(ctx, r, target, proxyTLS)
 		if err == nil {
 			return conn, r, nil
 		}
@@ -86,7 +86,7 @@ func dialRoutes(ctx context.Context, routes []route, target string) (net.Conn, r
 	return nil, route{}, errors.Join(errs...)
 }
 
-func dialRoute(ctx context.Context, r route, target string) (net.Conn, error) {
+func dialRoute(ctx context.Context, r route, target string, proxyTLS func(host string) *tls.Config) (net.Conn, error) {
 	dialer := &net.Dialer{Timeout: dialTimeout}
 	switch r.kind {
 	case routeProxy, routeHTTPS:
@@ -96,7 +96,7 @@ func dialRoute(ctx context.Context, r route, target string) (net.Conn, error) {
 		}
 		if r.kind == routeHTTPS {
 			host, _, _ := net.SplitHostPort(r.addr)
-			tlsConn := tls.Client(conn, &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12})
+			tlsConn := tls.Client(conn, proxyTLS(host))
 			if err := tlsConn.HandshakeContext(ctx); err != nil {
 				_ = conn.Close()
 				return nil, err

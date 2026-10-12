@@ -10,8 +10,8 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/url"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -27,14 +27,25 @@ const siteHost = "portal.test"
 // name. A maxVersion of zero allows TLS 1.3.
 func newSite(t *testing.T, serverCA, clientCA *testCA, maxVersion uint16) *httptest.Server {
 	t.Helper()
+	return newSiteAuth(t, serverCA, clientCA, tls.RequireAndVerifyClientCert, maxVersion)
+}
+
+// newSiteAuth is newSite asking for a client certificate as auth says. It
+// names a client that presented none "anonymous".
+func newSiteAuth(t *testing.T, serverCA, clientCA *testCA, auth tls.ClientAuthType, maxVersion uint16) *httptest.Server {
+	t.Helper()
 	cert, key := serverCA.issue(t, certOptions{name: siteHost, dnsNames: []string{siteHost}, ips: []net.IP{net.IPv4(127, 0, 0, 1)}})
 	site := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = fmt.Fprintf(w, "%s %s", r.Proto, r.TLS.PeerCertificates[0].Subject.CommonName)
+		name := "anonymous"
+		if len(r.TLS.PeerCertificates) > 0 {
+			name = r.TLS.PeerCertificates[0].Subject.CommonName
+		}
+		_, _ = fmt.Fprintf(w, "%s %s", r.Proto, name)
 	}))
 	site.EnableHTTP2 = true
 	site.TLS = &tls.Config{
 		Certificates: []tls.Certificate{{Certificate: [][]byte{cert.Raw}, PrivateKey: key}},
-		ClientAuth:   tls.RequireAndVerifyClientCert,
+		ClientAuth:   auth,
 		ClientCAs:    clientCA.pool(),
 		NextProtos:   []string{"h2", "http/1.1"},
 		MaxVersion:   maxVersion,
@@ -244,7 +255,7 @@ func TestServeControlPaths(t *testing.T) {
 		assert.Equal(t, pacContentType, response.Header.Get("Content-Type"))
 		script, err := io.ReadAll(response.Body)
 		require.NoError(t, err)
-		assert.Equal(t, composePAC(ready.Port, cfg.Entries, system), string(script))
+		assert.Equal(t, composePAC(ready.Port, 0, cfg.Entries, system), string(script))
 		assert.Equal(t, http.StatusNotFound, status(base+"/other-token/proxy.pac"))
 	})
 }

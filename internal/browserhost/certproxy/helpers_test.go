@@ -229,7 +229,13 @@ func connectThrough(proxyAddr, target string) (net.Conn, int, error) {
 // proxy, trusting only certificates with the proxy's key, as a browser
 // given the proxy's flags does.
 func browserClient(ready Ready, protocols ...string) *http.Client {
-	proxyAddr := fmt.Sprintf("127.0.0.1:%d", ready.Port)
+	return browserClientAt(ready.Port, ready, protocols...)
+}
+
+// browserClientAt is browserClient for the proxy's port port, such as its
+// guard's.
+func browserClientAt(port int, ready Ready, protocols ...string) *http.Client {
+	proxyAddr := fmt.Sprintf("127.0.0.1:%d", port)
 	transport := &http.Transport{
 		ForceAttemptHTTP2: true,
 		DialTLSContext: func(ctx context.Context, _, addr string) (net.Conn, error) {

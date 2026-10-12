@@ -97,19 +97,31 @@ func Serve(ctx context.Context, cfg Config, ready func(Ready)) error {
 		return fmt.Errorf("listen for the browser: %w", err)
 	}
 	port := listener.Addr().(*net.TCPAddr).Port
+	var guard net.Listener
+	guardPort := 0
+	if cfg.Guard {
+		if guard, err = net.Listen("tcp", "127.0.0.1:0"); err != nil {
+			_ = listener.Close()
+			return fmt.Errorf("listen for the browser: %w", err)
+		}
+		guardPort = guard.Addr().(*net.TCPAddr).Port
+	}
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	s := &server{
-		ctx:     ctx,
-		token:   cfg.Token,
-		entries: entries,
-		pac:     evaluator,
-		issuer:  issuer,
-		events:  newEventLog(),
-		tunnels: map[net.Conn]struct{}{},
+		ctx:        ctx,
+		token:      cfg.Token,
+		entries:    entries,
+		pac:        evaluator,
+		issuer:     issuer,
+		events:     newEventLog(),
+		pending:    newPendingLog(),
+		guardEntry: newGuardEntry(cfg.Entries),
+		tunnels:    map[net.Conn]struct{}{},
+		guard:      guard,
 	}
-	script := composePAC(port, cfg.Entries, system)
+	script := composePAC(port, guardPort, cfg.Entries, system)
 	pacURL, served := pacLocation(script, controlURL(port, cfg.Token)+"/"+pacPath)
 	if served {
 		s.pacScript = script
@@ -117,7 +129,13 @@ func Serve(ctx context.Context, cfg Config, ready func(Ready)) error {
 	httpServer := &http.Server{Handler: s, ReadHeaderTimeout: readHeaderTimeout}
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- httpServer.Serve(listener) }()
-	ready(Ready{Port: port, SPKI: issuer.spki, PACURL: pacURL})
+	guardServer := &http.Server{Handler: guardHandler{s}, ReadHeaderTimeout: readHeaderTimeout}
+	if guard != nil {
+		// The guard's listener closes when the guard stops, which ends
+		// only the guard's serving.
+		go func() { _ = guardServer.Serve(guard) }()
+	}
+	ready(Ready{Port: port, SPKI: issuer.spki, PACURL: pacURL, GuardPort: guardPort})
 
 	grace := time.Duration(cfg.GraceSeconds) * time.Second
 	if grace <= 0 {
@@ -136,6 +154,7 @@ func Serve(ctx context.Context, cfg Config, ready func(Ready)) error {
 	cancel()
 	<-watched
 	_ = httpServer.Close()
+	_ = guardServer.Close()
 	s.closeTunnels()
 	if errors.Is(failure, http.ErrServerClosed) {
 		return nil
@@ -149,8 +168,8 @@ func (c Config) validate() error {
 		return errors.New("the certificate proxy config has no token")
 	case c.CDPURL == "":
 		return errors.New("the certificate proxy config names no browser")
-	case len(c.Entries) == 0:
-		return errors.New("the certificate proxy config has no certificates")
+	case len(c.Entries) == 0 && !c.Guard:
+		return errors.New("the certificate proxy config has no certificates and no guard")
 	}
 	return nil
 }
