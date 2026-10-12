@@ -279,8 +279,9 @@ It carries no `health` and no runs. It is retried like any report on `429`,
 `5xx`, and network errors; once Dagu Cloud answers otherwise, nothing more is
 sent until a level that reports is chosen. The server records the level of
 its last report in the data directory, so a server stopped before sending
-this report sends it after it starts. A level that cannot be read stops
-reports without it, since no one chose `off`.
+this report sends it after it starts. If that record cannot be saved, which
+the server logs, a restart may send the report again or not at all. A level
+that cannot be read stops reports without it, since no one chose `off`.
 
 The response is:
 
