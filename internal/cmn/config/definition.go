@@ -111,7 +111,21 @@ type OpenCodeDef struct {
 
 // BrowserDef configures the browsers that browser steps start on this host.
 type BrowserDef struct {
-	Sandbox *bool `mapstructure:"sandbox"`
+	Sandbox                 *bool                         `mapstructure:"sandbox"`
+	ClientCertificates      []BrowserClientCertificateDef `mapstructure:"client_certificates"`
+	GuardClientCertificates *bool                         `mapstructure:"guard_client_certificates"`
+}
+
+// BrowserClientCertificateDef is a TLS client certificate that browsers on
+// this host present to the hosts it names.
+type BrowserClientCertificateDef struct {
+	Hosts          []string `mapstructure:"hosts"`
+	PFXFile        string   `mapstructure:"pfx_file"`
+	CertFile       string   `mapstructure:"cert_file"`
+	KeyFile        string   `mapstructure:"key_file"`
+	CAFile         string   `mapstructure:"ca_file"`
+	Passphrase     string   `mapstructure:"passphrase"`
+	PassphraseFile string   `mapstructure:"passphrase_file"`
 }
 
 // DAGDiscoveryDef configures DAG definition discovery.

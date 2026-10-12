@@ -7612,9 +7612,57 @@
           "type": "string",
           "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
           "description": "Persistent profile name. Cookies and storage are kept across runs; runs sharing a profile wait for each other."
+        },
+        "client_certificates": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/browserClientCertificate" },
+          "description": "TLS client certificates presented to the hosts each names, before those in the Dagu config. The first entry whose hosts match is used."
         }
       },
       "description": "Browser launch options."
+    },
+    "browserClientCertificate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hosts"],
+      "properties": {
+        "hosts": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Hosts the certificate is presented to: a host name or IP address, *.example.com for the subdomains of example.com, or * for every host."
+        },
+        "pfx_file": {
+          "type": "string",
+          "minLength": 1,
+          "description": "PKCS#12 (.pfx or .p12) file holding the certificate, its private key, and optionally its chain. Relative to the step's working directory."
+        },
+        "cert_file": {
+          "type": "string",
+          "minLength": 1,
+          "description": "PEM certificate, followed by its chain. Used with key_file instead of pfx_file."
+        },
+        "key_file": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unencrypted PEM private key for cert_file."
+        },
+        "ca_file": {
+          "type": "string",
+          "minLength": 1,
+          "description": "PEM certificates to trust for these hosts' servers, in addition to the system's."
+        },
+        "passphrase": {
+          "type": "string",
+          "description": "Passphrase of pfx_file. Reference a secret, such as ${env.CERT_PASSPHRASE}."
+        },
+        "passphrase_file": {
+          "type": "string",
+          "minLength": 1,
+          "description": "File holding the passphrase of pfx_file."
+        }
+      },
+      "description": "A TLS client certificate and the hosts it is presented to."
     },
     "browserVariables": {
       "type": "object",

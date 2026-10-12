@@ -37,6 +37,10 @@ steps:
         allowed_domains: [portal.example.com]
         screenshots: each
         profile: vendor
+        client_certificates:
+          - hosts: [portal.example.com]
+            pfx_file: certs/client.p12
+            passphrase: ${CERT_PASSPHRASE}
       variables:
         user: alice
       do:
@@ -69,6 +73,8 @@ steps:
 		{"unknown screenshot policy", "screenshots: each", "screenshots: sometimes"},
 		{"invalid variable name", "        user: alice", "        user-name: alice"},
 		{"unknown browser option", "headless: true", "stealth: true"},
+		{"client certificate without hosts", "hosts: [portal.example.com]", "ca_file: certs/ca.pem"},
+		{"unknown client certificate option", "pfx_file: certs/client.p12", "pfx: certs/client.p12"},
 		{"condition with two checks", "expect: {text: Invoice}", "expect: {text: Invoice, url: /x}"},
 		{"unknown condition check", "when: {url: /billing}", "when: {title: Billing}"},
 	} {

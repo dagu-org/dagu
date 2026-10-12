@@ -4,9 +4,11 @@
 package cmd
 
 import (
+	"os"
 	"path/filepath"
 
 	"github.com/dagucloud/dagu/v2/internal/browserhost"
+	"github.com/dagucloud/dagu/v2/internal/browserhost/certproxy"
 	"github.com/dagucloud/dagu/v2/internal/cmn/replaycache"
 	"github.com/spf13/cobra"
 )
@@ -26,8 +28,26 @@ func Browser() *cobra.Command {
 		return ctx.Command.Help()
 	})
 
-	cmd.AddCommand(browserCacheCommand(), browserSessionCommand())
+	cmd.AddCommand(browserCacheCommand(), browserSessionCommand(), browserCertProxyCommand())
 	return cmd
+}
+
+// browserCertProxyCommand runs the proxy that presents a browser's client
+// certificates. The process starting it hands it its configuration on
+// stdin and reads one line from stdout, so it loads no Dagu configuration
+// and prints nothing else.
+func browserCertProxyCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:           "cert-proxy",
+		Short:         "Present a browser's TLS client certificates through a local proxy",
+		Hidden:        true,
+		Args:          cobra.NoArgs,
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return certproxy.Main(cmd.Context(), os.Stdin, os.Stdout)
+		},
+	}
 }
 
 func browserCacheCommand() *cobra.Command {

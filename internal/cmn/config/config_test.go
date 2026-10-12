@@ -1112,3 +1112,29 @@ func TestFindQueueConfig(t *testing.T) {
 	})
 
 }
+
+func TestBrowserClientCertificateValidate(t *testing.T) {
+	t.Parallel()
+	valid := []BrowserClientCertificate{
+		{Hosts: []string{"portal.example.com"}, PFXFile: "client.p12"},
+		{Hosts: []string{"*", "intranet"}, PFXFile: "client.p12", Passphrase: "secret"},
+		{Hosts: []string{"*.corp.example"}, PFXFile: "client.p12", PassphraseFile: "passphrase"},
+		{Hosts: []string{"10.0.0.5"}, CertFile: "client.pem", KeyFile: "client.key", CAFile: "ca.pem"},
+		{Hosts: []string{"${PORTAL_HOST}"}, PFXFile: "client.p12"},
+	}
+	for _, certificate := range valid {
+		assert.NoError(t, certificate.Validate(), "%+v", certificate)
+	}
+
+	invalid := map[string]BrowserClientCertificate{
+		"hosts must list":            {PFXFile: "client.p12"},
+		"must be a host name":        {Hosts: []string{"https://portal.example.com"}, PFXFile: "client.p12"},
+		"not both":                   {Hosts: []string{"*"}, PFXFile: "client.p12", CertFile: "client.pem", KeyFile: "client.key"},
+		"set pfx_file, or cert_file": {Hosts: []string{"*"}, CertFile: "client.pem"},
+		"either passphrase or":       {Hosts: []string{"*"}, PFXFile: "client.p12", Passphrase: "a", PassphraseFile: "b"},
+		"applies only to pfx_file":   {Hosts: []string{"*"}, CertFile: "client.pem", KeyFile: "client.key", Passphrase: "a"},
+	}
+	for message, certificate := range invalid {
+		assert.ErrorContains(t, certificate.Validate(), message)
+	}
+}

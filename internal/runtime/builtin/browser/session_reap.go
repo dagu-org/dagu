@@ -50,12 +50,8 @@ func (s *Sessions) Reap(ctx context.Context, id string) error {
 		if !failed && record.State == browserhost.StateInteractive && !record.Deadline.IsZero() {
 			wait = min(wait, max(record.Deadline.Sub(s.now()), 0)+reapMargin)
 		}
-		timer := time.NewTimer(wait)
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-			return ctx.Err()
-		case <-timer.C:
+		if err := s.wait(ctx, wait); err != nil {
+			return err
 		}
 		_, err = browserhost.RetireAbandoned(ctx, store, id, s.now())
 		failed = err != nil

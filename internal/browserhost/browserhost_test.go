@@ -200,6 +200,23 @@ func TestProbeAndClose(t *testing.T) {
 	assert.NoError(t, browserhost.CloseBrowser(context.Background(), unreachableURL), "an unreachable browser is already closed")
 }
 
+func TestBrowserID(t *testing.T) {
+	t.Parallel()
+
+	first, second := newFakeBrowser(t), newFakeBrowser(t)
+	id, err := browserhost.BrowserID(context.Background(), first.server.URL)
+	require.NoError(t, err)
+	again, err := browserhost.BrowserID(context.Background(), first.server.URL)
+	require.NoError(t, err)
+	assert.Equal(t, id, again)
+	other, err := browserhost.BrowserID(context.Background(), second.server.URL)
+	require.NoError(t, err)
+	assert.NotEqual(t, id, other)
+
+	_, err = browserhost.BrowserID(context.Background(), unreachableURL)
+	assert.ErrorIs(t, err, browserhost.ErrUnreachable)
+}
+
 func TestUsesProfile(t *testing.T) {
 	t.Parallel()
 

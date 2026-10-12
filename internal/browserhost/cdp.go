@@ -44,10 +44,17 @@ type Extension struct {
 
 // Probe reports whether a browser answers on its DevTools endpoint.
 func Probe(ctx context.Context, cdpURL string) error {
+	_, err := BrowserID(ctx, cdpURL)
+	return err
+}
+
+// BrowserID identifies the browser answering at cdpURL. A browser started
+// later on the same address has another identity. The error wraps
+// ErrUnreachable when nothing accepts connections there.
+func BrowserID(ctx context.Context, cdpURL string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, probeTimeout)
 	defer cancel()
-	_, err := browserWebSocketURL(ctx, cdpURL)
-	return err
+	return browserWebSocketURL(ctx, cdpURL)
 }
 
 // StagehandExtension returns the enabled Stagehand runtime extension loaded

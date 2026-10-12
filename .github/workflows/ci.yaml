@@ -56,7 +56,7 @@ permissions:
   contents: read
 
 env:
-  GO_VERSION: "1.27.0"
+  GO_VERSION: "1.27.2"
   NODE_VERSION: "20"
 
 jobs:
@@ -174,12 +174,19 @@ jobs:
             exit 1
           fi
 
+      # The linter is built from this module's requirements, as make lint
+      # does, so it reads the export data of this module's Go; a release
+      # binary, or one built from the linter's own go.mod, cannot. It is
+      # built for the runner, before GOOS names the system to lint for.
+      - name: Install golangci-lint
+        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint
+
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@82606bf257cbaff209d206a39f5134f0cfbfd2ee # v9.2.1
         env:
           GOOS: ${{ matrix.goos }}
         with:
-          version: v2.13.0
+          install-mode: none
           args: --timeout=10m
 
   test-ubuntu:

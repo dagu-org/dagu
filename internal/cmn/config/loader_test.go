@@ -699,6 +699,67 @@ func TestLoad_BrowserSandboxFromEnv(t *testing.T) {
 	require.True(t, testLoad(t).Browser.NoSandbox)
 }
 
+func TestLoad_BrowserClientCertificates(t *testing.T) {
+	dir := t.TempDir()
+	configFile := filepath.Join(dir, "config.yaml")
+	require.NoError(t, os.WriteFile(configFile, []byte(`
+browser:
+  client_certificates:
+    - hosts: [portal.example.com, "*.corp.example"]
+      pfx_file: `+filepath.Join(dir, "client.p12")+`
+      passphrase_file: `+filepath.Join(dir, "client.passphrase")+`
+    - hosts: ["*"]
+      cert_file: `+filepath.Join(dir, "client.pem")+`
+      key_file: `+filepath.Join(dir, "client.key")+`
+      ca_file: `+filepath.Join(dir, "ca.pem")+`
+`), 0o600))
+
+	cfg := testLoad(t, WithConfigFile(configFile))
+	require.Equal(t, []BrowserClientCertificate{
+		{
+			Hosts:          []string{"portal.example.com", "*.corp.example"},
+			PFXFile:        filepath.Join(dir, "client.p12"),
+			PassphraseFile: filepath.Join(dir, "client.passphrase"),
+		},
+		{
+			Hosts:    []string{"*"},
+			CertFile: filepath.Join(dir, "client.pem"),
+			KeyFile:  filepath.Join(dir, "client.key"),
+			CAFile:   filepath.Join(dir, "ca.pem"),
+		},
+	}, cfg.Browser.ClientCertificates)
+}
+
+// The certificate guard follows the browser's certificates unless the
+// config file or the environment turns it on or off.
+func TestLoad_BrowserGuardClientCertificates(t *testing.T) {
+	require.Nil(t, testLoad(t).Browser.GuardClientCertificates, "unset, the guard follows the certificates")
+
+	configFile := filepath.Join(t.TempDir(), "config.yaml")
+	require.NoError(t, os.WriteFile(configFile, []byte("browser:\n  guard_client_certificates: false\n"), 0o600))
+	guard := testLoad(t, WithConfigFile(configFile)).Browser.GuardClientCertificates
+	require.NotNil(t, guard)
+	require.False(t, *guard)
+
+	t.Setenv("DAGU_BROWSER_GUARD_CLIENT_CERTIFICATES", "true")
+	guard = testLoad(t).Browser.GuardClientCertificates
+	require.NotNil(t, guard)
+	require.True(t, *guard)
+}
+
+func TestLoad_BrowserClientCertificatesRejectsMalformed(t *testing.T) {
+	configFile := filepath.Join(t.TempDir(), "config.yaml")
+	require.NoError(t, os.WriteFile(configFile, []byte(`
+browser:
+  client_certificates:
+    - hosts: [portal.example.com]
+      cert_file: /tmp/client.pem
+`), 0o600))
+
+	err := testLoadWithError(t, WithConfigFile(configFile))
+	require.ErrorContains(t, err, "browser.client_certificates[0]: set pfx_file, or cert_file and key_file")
+}
+
 func TestLoad_OpenCodeRejectsReservedPassthrough(t *testing.T) {
 	configFile := filepath.Join(t.TempDir(), "config.yaml")
 	require.NoError(t, os.WriteFile(configFile, []byte(`

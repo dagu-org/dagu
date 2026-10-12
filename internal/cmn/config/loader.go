@@ -152,6 +152,38 @@ func (l *ConfigLoader) resolvePath(fieldName, pathValue string) (string, error) 
 	return resolved, nil
 }
 
+// loadBrowserClientCertificates resolves the files of each client
+// certificate and rejects a malformed one.
+func (l *ConfigLoader) loadBrowserClientCertificates(defs []BrowserClientCertificateDef) ([]BrowserClientCertificate, error) {
+	var certificates []BrowserClientCertificate
+	for i, def := range defs {
+		field := fmt.Sprintf("browser.client_certificates[%d]", i)
+		certificate := BrowserClientCertificate{Hosts: def.Hosts, Passphrase: def.Passphrase}
+		for _, file := range []struct {
+			name  string
+			value string
+			into  *string
+		}{
+			{"pfx_file", def.PFXFile, &certificate.PFXFile},
+			{"cert_file", def.CertFile, &certificate.CertFile},
+			{"key_file", def.KeyFile, &certificate.KeyFile},
+			{"ca_file", def.CAFile, &certificate.CAFile},
+			{"passphrase_file", def.PassphraseFile, &certificate.PassphraseFile},
+		} {
+			resolved, err := l.resolvePath(field+"."+file.name, file.value)
+			if err != nil {
+				return nil, err
+			}
+			*file.into = resolved
+		}
+		if err := certificate.Validate(); err != nil {
+			return nil, fmt.Errorf("%s: %w", field, err)
+		}
+		certificates = append(certificates, certificate)
+	}
+	return certificates, nil
+}
+
 // parseDuration parses a duration string, returning zero and adding a warning if invalid.
 func (l *ConfigLoader) parseDuration(fieldName, value string) time.Duration {
 	if value == "" {
@@ -369,6 +401,17 @@ func (l *ConfigLoader) loadCoreConfig(cfg *Config, def Definition) error {
 		cfg.OpenCode.Executable = "opencode"
 	}
 	cfg.Browser = BrowserConfig{NoSandbox: !l.v.GetBool("browser.sandbox")}
+	if l.v.IsSet("browser.guard_client_certificates") {
+		guard := l.v.GetBool("browser.guard_client_certificates")
+		cfg.Browser.GuardClientCertificates = &guard
+	}
+	if def.Browser != nil {
+		certificates, err := l.loadBrowserClientCertificates(def.Browser.ClientCertificates)
+		if err != nil {
+			return err
+		}
+		cfg.Browser.ClientCertificates = certificates
+	}
 	cfg.DAGDiscovery = DAGDiscoveryConfig{
 		Recursive: l.v.GetBool("dag_discovery.recursive"),
 		Symlinks:  l.v.GetBool("dag_discovery.symlinks"),
@@ -2165,6 +2208,7 @@ var envBindings = []envBinding{
 	{key: "opencode.executable", env: "OPENCODE_EXECUTABLE"},
 	{key: "opencode.env_passthrough", env: "OPENCODE_ENV_PASSTHROUGH"},
 	{key: "browser.sandbox", env: "BROWSER_SANDBOX"},
+	{key: "browser.guard_client_certificates", env: "BROWSER_GUARD_CLIENT_CERTIFICATES"},
 
 	// Secrets
 	{key: "secrets.vault.address", env: "SECRETS_VAULT_ADDRESS"},

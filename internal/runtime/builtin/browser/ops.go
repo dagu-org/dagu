@@ -11,10 +11,12 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/dagucloud/dagu/v2/internal/browserhost"
+	"github.com/dagucloud/dagu/v2/internal/browserhost/certproxy"
 	cmnconfig "github.com/dagucloud/dagu/v2/internal/cmn/config"
 	"github.com/dagucloud/dagu/v2/internal/cmn/fileutil"
 	"github.com/dagucloud/dagu/v2/internal/cmn/masking"
@@ -78,6 +80,9 @@ type run struct {
 	// blockedUncounted is set once blocked requests can no longer be
 	// counted.
 	blockedUncounted bool
+	// certificateFailures holds, by host, the last trouble with a client
+	// certificate the proxy reported in this attempt.
+	certificateFailures map[string]string
 	// downloadWindow is the longest timeout of the acts and gotos run so
 	// far, which can start downloads; zero until one runs.
 	downloadWindow time.Duration
@@ -95,6 +100,7 @@ func newRun(ctx context.Context, e *browserExecutor) (*run, error) {
 		secrets = env.Scope.AllSecrets()
 		artifactsDir, _ = env.Scope.Get(runenv.EnvKeyDAGRunArtifactsDir)
 	}
+	secrets = withCertificatePassphrases(secrets, e.cfg.Browser.ClientCertificates)
 	if err := agentstep.CheckSecrets(executorType, e.cfg.operationTexts(), secrets); err != nil {
 		return nil, err
 	}
@@ -138,6 +144,8 @@ func newRun(ctx context.Context, e *browserExecutor) (*run, error) {
 		answers:   map[string]string{},
 		outputs:   map[string]any{},
 		blocked:   map[string]int{},
+
+		certificateFailures: map[string]string{},
 	}
 	if e.cfg.cacheEnabled() {
 		r.cache = openReplayCache(browserDir, dagName, stepKey)
@@ -146,6 +154,12 @@ func newRun(ctx context.Context, e *browserExecutor) (*run, error) {
 	r.timeline = &agentstep.Timeline{Log: e.stderr, Masker: masker, Total: len(e.cfg.Do), Update: e.updateSession, Provider: providerName}
 	r.warn = func(index int, message string) {
 		_, _ = fmt.Fprintf(r.timeline.Log, "warning: %s %s\n", r.timeline.Position(index), message)
+	}
+	r.certificateEvent = func(index int, event certproxy.Event) {
+		logCertificateEvent(r.timeline, index, event)
+		if certificateTrouble(event) {
+			r.certificateFailures[event.Host] = describeCertificateEvent(event)
+		}
 	}
 	return r, nil
 }
@@ -162,7 +176,7 @@ func (r *run) execute(ctx context.Context) error {
 	r.reportDialogs(-1)
 	r.reportBlocked(-1)
 	if err == nil {
-		err = r.checkPage(ctx)
+		err = r.checkPage(ctx, -1)
 	}
 	if err != nil {
 		return r.fail(ctx, -1, "", err)
@@ -198,7 +212,7 @@ func (r *run) execute(ctx context.Context) error {
 		if err != nil {
 			return r.fail(ctx, i, op.kind(), err)
 		}
-		if err := r.checkPage(ctx); err != nil {
+		if err := r.checkPage(ctx, i); err != nil {
 			return r.fail(ctx, i, op.kind(), err)
 		}
 		if op.Act != nil || op.Goto != "" {
@@ -339,6 +353,7 @@ func (r *run) startSession(ctx context.Context) (int, error) {
 		BrowserPID:       handle.BrowserPID,
 		BrowserStartedAt: handle.BrowserStartedAt,
 	}
+	recordCertProxy(&r.record, handle.CertProxy)
 	if err := r.saveRunningRecord(); err != nil {
 		return 0, err
 	}
@@ -357,6 +372,15 @@ func (r *run) launchOptions(ctx context.Context, recordID string) (launchOptions
 	if err != nil {
 		return launchOptions{}, err
 	}
+	certificates, warnings, err := loadClientCertificates(ctx, r.cfg.Browser.ClientCertificates, runtime.GetEnv(ctx).WorkingDir)
+	if err != nil {
+		return launchOptions{}, err
+	}
+	for _, warning := range warnings {
+		r.warn(-1, warning)
+	}
+	guard := guardsCertificates(ctx, certificates)
+	r.certificateProxy = len(certificates) > 0 || guard
 	opts := launchOptions{
 		Executable:     r.cfg.Browser.Executable,
 		Headless:       r.cfg.headless(),
@@ -366,6 +390,10 @@ func (r *run) launchOptions(ctx context.Context, recordID string) (launchOptions
 		AllowedDomains: r.cfg.Browser.AllowedDomains,
 		NoSandbox:      cmnconfig.GetConfig(ctx).Browser.NoSandbox,
 		Generate:       r.bridge.generate,
+
+		ClientCertificates: certificates,
+		Guard:              guard,
+		Warn:               func(message string) { r.warn(-1, message) },
 	}
 	if name := r.cfg.Browser.Profile; name != "" {
 		lease, err := acquireProfile(ctx, r.browser, name, recordID, true)
@@ -480,6 +508,7 @@ func (r *run) fail(ctx context.Context, index int, kind string, cause error) err
 		cause = ctx.Err()
 	}
 	r.reportBlocked(index)
+	r.takeCertificateEvents(ctx, index)
 	var files []string
 	if r.cfg.screenshotPolicy() != screenshotsNever && r.artifacts.Enabled() && r.eng != nil {
 		if rel, err := r.capture(context.WithoutCancel(ctx), failureShotLabel); err == nil {
@@ -496,6 +525,11 @@ func (r *run) fail(ctx context.Context, index int, kind string, cause error) err
 	// fails, so the failure summarizes every request blocked in the attempt.
 	if len(r.blocked) > 0 {
 		message += "; browser.allowed_domains blocked " + r.masker.MaskString(describeBlocked(r.blocked))
+	}
+	for _, host := range slices.Sorted(maps.Keys(r.certificateFailures)) {
+		if failure := r.masker.MaskString(r.certificateFailures[host]); !strings.Contains(message, failure) {
+			message += "; client certificate: " + failure
+		}
 	}
 	usage := r.bridge.totals()
 	r.timeline.AppendEvent(ir.AgentSessionEvent{Type: agentstep.EventLifecycle, Status: agentstep.StatusFailed, Content: message, Files: files})
