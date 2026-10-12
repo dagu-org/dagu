@@ -252,7 +252,9 @@ an `act` does not complete, an `expect` does not hold, a selector does not
 appear before the timeout, a download does not finish, the page leaves the
 allowed domains, the browser stops responding, or the browser cannot be
 started. When an `act` fails because its model chose no element, the error
-names the model, since some models give that answer for every request.
+names the model, since some models give that answer for every request. An
+`act` whose model picks an option that the select does not offer does not
+complete.
 
 The browser can lose its connection to the page before an `act` or a replay
 reports back, as when a click loads a new page. The step then checks the page

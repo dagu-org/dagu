@@ -386,8 +386,23 @@ func (e *stagehandEngine) Act(ctx context.Context, instruction string, variables
 	}
 	if beforeErr == nil {
 		identifyOn(before, outcome.Actions, variables)
+		if message := missingOption(before, outcome.Actions, variables); outcome.Success && message != "" {
+			outcome.Success, outcome.Message = false, message
+		}
 	}
 	return outcome, nil
+}
+
+// missingOption says which select on snap, the page before actions ran,
+// lacks the option an action picked, or returns "". The runtime resets such
+// a select to its first option and reports success.
+func missingOption(snap pageSnapshot, actions []recordedAction, variables map[string]string) string {
+	for _, action := range actions {
+		if node := targetOf(snap, action.Selector); node != nil && !offersOption(node, action, variables) {
+			return fmt.Sprintf("the %s offers no option %q", withName(node.role, node.name), action.Arguments[0])
+		}
+	}
+	return ""
 }
 
 func (e *stagehandEngine) Replay(ctx context.Context, recorded recordedAction, variables map[string]string, timeout time.Duration) (bool, error) {

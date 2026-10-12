@@ -449,6 +449,19 @@ func TestStagehandReplayMissesShiftedSelect(t *testing.T) {
 	requireStatus(t, eng, "7000万円未満")
 }
 
+// An act whose model picks an option the select does not offer does not
+// complete, though the runtime reports success for it.
+func TestStagehandActMissingOption(t *testing.T) {
+	t.Parallel()
+
+	eng := launchBrowser(t, launchOptions{Generate: treeModel(selectOffering("7000万円未満"), "selectOptionFromDropdown", "8000万円未満")})
+	require.NoError(t, eng.Goto(t.Context(), priceForm(false), time.Minute))
+	outcome, err := eng.Act(t.Context(), "Choose 8000万円未満 as the upper price", nil, time.Minute)
+	require.NoError(t, err)
+	assert.False(t, outcome.Success)
+	assert.Contains(t, outcome.Message, `"8000万円未満"`)
+}
+
 // servePager serves a page that draws its list from a request it makes on
 // load and again for each press of Next, as pages paged by buttons do. Each
 // answer sends its headers at once and its body a moment later.
