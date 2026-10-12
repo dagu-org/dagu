@@ -314,8 +314,7 @@ func (s *server) reportHandshakeFailure(host string, entry *upstreamEntry, certR
 		s.reportRejection(host, entry, alert)
 		return
 	}
-	var verifyErr *tls.CertificateVerificationError
-	if errors.As(err, &verifyErr) {
+	if verifyErr, ok := errors.AsType[*tls.CertificateVerificationError](err); ok {
 		s.events.add(EventServerCertificate, host, entry.label, fmt.Sprintf(
 			"%s presented a server certificate that is not trusted (%v); if a private CA issued it, name that CA in ca_file of %s",
 			host, verifyErr.Err, entry.label))

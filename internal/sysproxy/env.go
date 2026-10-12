@@ -96,7 +96,7 @@ func (c envProxyConfig) staticConfig() (staticConfig, []string) {
 // that matches itself and its subdomains, or, with a leading . or *., a
 // domain that matches only its subdomains.
 func noProxyConditions(noProxy string) (conditions []string, all bool, warnings []string) {
-	for _, entry := range strings.Split(noProxy, ",") {
+	for entry := range strings.SplitSeq(noProxy, ",") {
 		entry = strings.TrimSpace(entry)
 		host := strings.ToLower(entry)
 		switch host {
