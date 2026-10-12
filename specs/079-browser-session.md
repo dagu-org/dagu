@@ -44,8 +44,9 @@ browser's DevTools address (`cdp_url`), where an application can show the
 page and let a person act on it.
 
 A session's browser presents the client certificates of the host
-configuration's `browser.client_certificates`, as a browser step does, for as
-long as the browser runs, including between commands. What the certificate
+configuration's `browser.client_certificates`, and guards its other HTTPS
+requests as the host configuration says, as a browser step does, for as long
+as the browser runs, including between commands. What the certificate
 proxy reports while a command runs, such as a site rejecting the certificate,
 appears in the command's warnings or error. Between commands the browser and
 its proxy keep running, so local processes can use the certificates as long

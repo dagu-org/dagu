@@ -172,11 +172,26 @@ address, which already lets a local process drive the browser, or through the
 proxy, which listens on the loopback interface. Present certificates only on
 hosts whose users are trusted with them.
 
+While the browser presents certificates, it also guards its other HTTPS
+requests: the proxy carries them too, presenting no certificate, so the
+browser never asks the operating system for one, which would wait on a
+system prompt nobody answers. The host configuration
+`browser.guard_client_certificates` (or `DAGU_BROWSER_GUARD_CLIENT_CERTIFICATES`)
+turns the guard off, or on for every browser even without certificates. When
+the device's proxy asks the certificate proxy for credentials it cannot give,
+such as a Windows sign-in, the guard stops and the browser reaches those sites
+itself; the step's log says so. The guard trusts the system's CA certificates
+and every entry's `ca_file`.
+
 A page that does not load because of a client certificate fails the
-operation: the error names what the proxy saw, such as the site rejecting the
-certificate, or, when the browser presents none for the host, says the site
-asks for one. The step's log records each host the proxy presented a
-certificate to and each failure it saw.
+operation that opened it: the error names what the proxy saw, such as the
+site rejecting the certificate, or says the site asks for a certificate and
+none is configured for it. That includes a site that answers with an error
+page, such as nginx's 400 or IIS's 403.7, rather than refusing the
+connection. A site that asks for a certificate and opens without one is not a
+failure. An operation that times out names the connections the proxy still
+waits on and how far each got. The step's log records each host the proxy
+presented a certificate to, each site that asked for one, and each failure.
 
 ### Allowed domains
 
