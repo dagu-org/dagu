@@ -197,6 +197,39 @@ func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
 			expectedHasThinking:     true,
 			expectedThinkingLevel:   "high", // xhigh maps to high for Gemini
 		},
+		{
+			name:      "thinking with effort level max",
+			maxTokens: nil,
+			thinking: &llm.ThinkingRequest{
+				Enabled: true,
+				Effort:  llm.ThinkingEffortMax,
+			},
+			expectedMaxOutputTokens: new(16384 + 4096),
+			expectedHasThinking:     true,
+			expectedThinkingLevel:   "high", // max maps to high for Gemini
+		},
+		{
+			name:      "thinking with effort level minimal",
+			maxTokens: nil,
+			thinking: &llm.ThinkingRequest{
+				Enabled: true,
+				Effort:  llm.ThinkingEffortMinimal,
+			},
+			expectedMaxOutputTokens: new(1024 + 4096),
+			expectedHasThinking:     true,
+			expectedThinkingLevel:   "minimal",
+		},
+		{
+			name:      "thinking with effort level none",
+			maxTokens: nil,
+			thinking: &llm.ThinkingRequest{
+				Enabled: true,
+				Effort:  llm.ThinkingEffortNone,
+			},
+			expectedMaxOutputTokens: new(1024 + 4096),
+			expectedHasThinking:     true,
+			expectedThinkingLevel:   "minimal", // Gemini cannot turn thinking off by level
+		},
 	}
 
 	for _, tt := range tests {

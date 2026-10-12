@@ -261,7 +261,8 @@ type retryPolicy struct {
 type thinkingConfig struct {
 	// Enabled activates thinking mode for supported models.
 	Enabled bool `yaml:"enabled,omitempty"`
-	// Effort controls reasoning depth: low, medium, high, xhigh.
+	// Effort controls reasoning depth: none, minimal, low, medium, high,
+	// xhigh, max.
 	Effort string `yaml:"effort,omitempty"`
 	// BudgetTokens sets explicit token budget (provider-specific).
 	BudgetTokens *int `yaml:"budget_tokens,omitempty"`

@@ -152,17 +152,27 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest) ([]byte, error) {
 		body["temperature"] = req.Temperature
 	}
 	if req.Thinking != nil && req.Thinking.Enabled {
-		effort := req.Thinking.Effort
-		if effort == "" {
-			effort = llm.ThinkingEffortMedium
-		}
 		body["reasoning"] = map[string]any{
-			"effort":  string(effort),
+			"effort":  string(reasoningEffort(req.Thinking.Effort)),
 			"summary": "auto",
 		}
 	}
 
 	return json.Marshal(body)
+}
+
+// reasoningEffort returns the reasoning effort to send: the requested level,
+// or xhigh for max, which the API lacks. An unset effort is medium.
+func reasoningEffort(effort llm.ThinkingEffort) llm.ThinkingEffort {
+	switch effort {
+	case llm.ThinkingEffortNone, llm.ThinkingEffortMinimal, llm.ThinkingEffortLow,
+		llm.ThinkingEffortMedium, llm.ThinkingEffortHigh, llm.ThinkingEffortXHigh:
+		return effort
+	case llm.ThinkingEffortMax:
+		return llm.ThinkingEffortXHigh
+	default:
+		return llm.ThinkingEffortMedium
+	}
 }
 
 func (p *Provider) doRequest(ctx context.Context, body []byte, cred llm.OAuthCredential) (io.ReadCloser, error) {

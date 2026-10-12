@@ -6556,13 +6556,13 @@
         },
         "effort": {
           "type": "string",
-          "enum": ["low", "medium", "high", "xhigh"],
-          "description": "Reasoning effort level. Maps to provider-specific settings: low (minimal reasoning), medium (default), high (thorough), xhigh (maximum, OpenAI GPT-5.2+ only)."
+          "enum": ["none", "minimal", "low", "medium", "high", "xhigh", "max"],
+          "description": "Reasoning effort level, from least to most: none, minimal, low, medium (default), high, xhigh, max. Each provider maps a level it does not support to its nearest supported one, so a fallback model on another provider still runs. 'none' turns thinking off where the provider allows it."
         },
         "budget_tokens": {
           "type": "integer",
           "minimum": 1,
-          "description": "Explicit token budget for thinking (provider-specific). Anthropic: 1024-128K, Gemini 2.5: 128-32768. Overrides effort-based defaults."
+          "description": "Explicit token budget for thinking (provider-specific). Anthropic: 1024-128K, for models without adaptive thinking such as Claude Haiku 4.5; current Claude models reject it. Gemini 2.5: 128-32768. Overrides effort."
         },
         "include_in_output": {
           "type": "boolean",

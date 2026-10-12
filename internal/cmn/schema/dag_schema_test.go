@@ -2688,3 +2688,36 @@ steps:
 		})
 	}
 }
+
+func TestDAGSchemaLLMThinkingEffort(t *testing.T) {
+	t.Parallel()
+
+	resolved := mustResolveDAGSchema(t)
+	for effort, valid := range map[string]bool{
+		"none":    true,
+		"minimal": true,
+		"xhigh":   true,
+		"max":     true,
+		"extreme": false,
+	} {
+		t.Run(effort, func(t *testing.T) {
+			t.Parallel()
+			doc := mustParseYAMLDocument(t, `
+llm:
+  provider: anthropic
+  model: claude-opus-5-5
+  thinking:
+    enabled: true
+    effort: `+effort+`
+steps:
+  - run: echo ok
+`)
+			err := resolved.Validate(doc)
+			if valid {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+		})
+	}
+}

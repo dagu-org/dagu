@@ -25,12 +25,14 @@ const (
 	streamPrefix               = "data: "
 	anthropicWebSearchToolType = "web_search_20260209"
 
-	// Thinking budget token limits for different effort levels.
-	// Note: Anthropic recommends budgets <= 32K to avoid timeout issues.
-	thinkingBudgetLow    = 1024
-	thinkingBudgetMedium = 4096
-	thinkingBudgetHigh   = 16384
-	thinkingBudgetXHigh  = 32768
+	// Thinking types: a fixed token budget, or adaptive thinking whose depth
+	// follows the effort level.
+	thinkingTypeEnabled  = "enabled"
+	thinkingTypeAdaptive = "adaptive"
+
+	// adaptiveThinkingMaxTokens is the max_tokens default under adaptive
+	// thinking, which spends max_tokens on thinking ahead of the answer.
+	adaptiveThinkingMaxTokens = 32768
 )
 
 func init() {
@@ -227,20 +229,20 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest, stream bool) ([]byte, 
 
 	// Add thinking configuration if enabled
 	// Must be done before setting max_tokens since max_tokens must be > budget_tokens
+	chatReq.Thinking, chatReq.OutputConfig = thinkingConfig(req.Thinking)
 	var thinkingBudget int
-	if req.Thinking != nil && req.Thinking.Enabled {
-		thinkingBudget = p.getThinkingBudget(req.Thinking)
-		chatReq.Thinking = &thinkingRequest{
-			Type:        "enabled",
-			BudgetToken: thinkingBudget,
-		}
+	if chatReq.Thinking != nil {
+		thinkingBudget = chatReq.Thinking.BudgetToken
 	}
 
 	// Set max_tokens (required by Anthropic)
 	// When thinking is enabled, max_tokens must be > budget_tokens
-	if req.MaxTokens != nil {
+	switch {
+	case req.MaxTokens != nil:
 		chatReq.MaxTokens = *req.MaxTokens
-	} else {
+	case chatReq.Thinking != nil && chatReq.Thinking.Type == thinkingTypeAdaptive:
+		chatReq.MaxTokens = adaptiveThinkingMaxTokens
+	default:
 		// Default to 4096 if not specified
 		chatReq.MaxTokens = 4096
 	}
@@ -404,30 +406,40 @@ func inputSchema(parameters map[string]any) map[string]any {
 // The API rejects a forced choice while thinking is enabled, and on models
 // that do not accept one at all.
 func forcedToolChoiceSupported(req *llm.ChatRequest) bool {
-	thinking := req.Thinking != nil && req.Thinking.Enabled
-	return !thinking && claudemodel.ForcedToolChoiceSupported(req.Model)
+	thinking, _ := thinkingConfig(req.Thinking)
+	return thinking == nil && claudemodel.ForcedToolChoiceSupported(req.Model)
 }
 
-// getThinkingBudget determines the token budget for thinking mode.
-// Uses explicit BudgetTokens if provided, otherwise maps effort level to tokens.
-func (p *Provider) getThinkingBudget(thinking *llm.ThinkingRequest) int {
-	// Use explicit budget if provided
-	if thinking.BudgetTokens != nil && *thinking.BudgetTokens > 0 {
-		return *thinking.BudgetTokens
+// thinkingConfig returns the thinking and output settings for a request, or
+// nil settings when the request runs without thinking. An explicit budget
+// asks for a fixed budget, which models that predate adaptive thinking need;
+// otherwise the model thinks adaptively at the requested effort, and effort
+// none leaves thinking out.
+func thinkingConfig(thinking *llm.ThinkingRequest) (*thinkingRequest, *outputConfig) {
+	if thinking == nil || !thinking.Enabled {
+		return nil, nil
 	}
+	if thinking.BudgetTokens != nil && *thinking.BudgetTokens > 0 {
+		return &thinkingRequest{Type: thinkingTypeEnabled, BudgetToken: *thinking.BudgetTokens}, nil
+	}
+	if thinking.Effort == llm.ThinkingEffortNone {
+		return nil, nil
+	}
+	return &thinkingRequest{Type: thinkingTypeAdaptive}, &outputConfig{Effort: string(adaptiveEffort(thinking.Effort))}
+}
 
-	// Map effort level to budget tokens
-	switch thinking.Effort {
-	case llm.ThinkingEffortLow:
-		return thinkingBudgetLow
-	case llm.ThinkingEffortMedium:
-		return thinkingBudgetMedium
-	case llm.ThinkingEffortHigh:
-		return thinkingBudgetHigh
-	case llm.ThinkingEffortXHigh:
-		return thinkingBudgetXHigh
+// adaptiveEffort returns the effort level sent with adaptive thinking: the
+// requested level, or low for levels below the lowest the API accepts. An
+// unset effort is medium.
+func adaptiveEffort(effort llm.ThinkingEffort) llm.ThinkingEffort {
+	switch effort {
+	case llm.ThinkingEffortNone, llm.ThinkingEffortMinimal:
+		return llm.ThinkingEffortLow
+	case llm.ThinkingEffortLow, llm.ThinkingEffortMedium, llm.ThinkingEffortHigh,
+		llm.ThinkingEffortXHigh, llm.ThinkingEffortMax:
+		return effort
 	default:
-		return thinkingBudgetMedium
+		return llm.ThinkingEffortMedium
 	}
 }
 
@@ -549,6 +561,7 @@ type messagesRequest struct {
 	StopSequences []string         `json:"stop_sequences,omitempty"`
 	Stream        bool             `json:"stream,omitempty"`
 	Thinking      *thinkingRequest `json:"thinking,omitempty"`
+	OutputConfig  *outputConfig    `json:"output_config,omitempty"`
 	Tools         []any            `json:"tools,omitempty"`
 	ToolChoice    any              `json:"tool_choice,omitempty"` // "auto", "any", or {"type": "tool", "name": "..."}
 }
@@ -556,7 +569,12 @@ type messagesRequest struct {
 // thinkingRequest represents Anthropic's extended thinking configuration.
 type thinkingRequest struct {
 	Type        string `json:"type"`
-	BudgetToken int    `json:"budget_tokens"`
+	BudgetToken int    `json:"budget_tokens,omitempty"`
+}
+
+// outputConfig carries the effort level for adaptive thinking.
+type outputConfig struct {
+	Effort string `json:"effort"`
 }
 
 type contentBlock struct {
