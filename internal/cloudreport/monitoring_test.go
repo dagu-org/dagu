@@ -287,31 +287,53 @@ func TestReportStartBelowRuns(t *testing.T) {
 	}
 }
 
-// A reporter whose configuration fixes off runs while another process holds
-// the events lease, and stops once the lease is free and it has discarded
-// where runs stopped being reported.
-func TestReportOffWaitsForLease(t *testing.T) {
+// A reporter below runs while another process holds the events lease, as a
+// process that stopped at runs does for a while, leaves the saved position to
+// the next process that takes the lease, which discards it: at a restart at
+// runs, or in the same process once runs is chosen.
+func TestReportBelowRunsWithoutLease(t *testing.T) {
 	t.Parallel()
 
-	dir := newEventDir(t)
-	console := newFakeConsole(t)
-	first, _ := newEventReporter(t, console.credentials, dir, testClockStart)
-	first.Stop()
-	other := filemonitor.NewLease(dir.stateFile, nil)
-	require.NoError(t, other.TryLock())
+	tests := []struct {
+		name string
+		// configured fixes the level below runs, and runs is chosen again by
+		// restarting at runs; otherwise runs is chosen in the same process.
+		configured config.ReportLevel
+	}{
+		{name: "restart at runs", configured: config.ReportOff},
+		{name: "runs chosen"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-	r := newReporter(console.credentials, nil, fixedLevel(config.ReportOff))
-	r.events = newEventFeed(dir.events())
-	clock := startReporterAt(t.Context(), t, r, noJitter, testClockStart)
-	clock.wait()
-	dir.emit(eventstore.TypeDAGRunFailed, etlRun(ir.Failed))
-	require.NoError(t, other.Unlock())
-	clock.elapse()
-	assertStops(t, r)
-	assertNoReport(t, console)
+			dir := newEventDir(t)
+			console := newFakeConsole(t)
+			first, _ := newEventReporter(t, console.credentials, dir, testClockStart)
+			first.Stop()
+			other := filemonitor.NewLease(dir.stateFile, nil)
+			require.NoError(t, other.TryLock())
 
-	_, clock = newEventReporter(t, console.credentials, dir, testClockStart)
-	assert.Nil(t, decodeFinished(t, nextReport(t, clock, console)).ids(t))
+			m := NewMonitoring(tc.configured, newSettingsStore(t))
+			r := newReporter(console.credentials, nil, m)
+			r.events = newEventFeed(dir.events())
+			clock := startReporterAt(t.Context(), t, r, noJitter, testClockStart)
+			if tc.configured != "" {
+				assertStops(t, r)
+			} else {
+				clock.wait()
+			}
+			dir.emit(eventstore.TypeDAGRunFailed, etlRun(ir.Failed))
+			require.NoError(t, other.Unlock())
+
+			if tc.configured != "" {
+				_, clock = newEventReporter(t, console.credentials, dir, testClockStart)
+			} else {
+				require.NoError(t, m.SetLevel(t.Context(), config.ReportRuns))
+			}
+			assert.Nil(t, decodeFinished(t, nextReport(t, clock, console)).ids(t))
+		})
+	}
 }
 
 // Off tells Dagu Console once that the server no longer reports. The report

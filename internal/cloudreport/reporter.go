@@ -176,9 +176,8 @@ func (r *Reporter) run(ctx context.Context) {
 	// until is the time left before the next scheduled report.
 	until := time.Duration(r.random() * float64(maxStartDelay))
 	r.pollEvents(ctx, r.readLevel(ctx), false)
-	// Off fixed by configuration never changes, so reporting ends once
-	// nothing is left to tell Dagu Console or to discard.
-	for r.monitoring.configured != config.ReportOff || r.offDue() || r.events.forgetDue() {
+	// Off fixed by configuration never changes.
+	for r.monitoring.configured != config.ReportOff || r.offDue() {
 		wait := until
 		if r.events != nil && r.level == config.ReportRuns {
 			wait = min(wait, eventCheckInterval)
