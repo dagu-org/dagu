@@ -146,6 +146,10 @@ describe('license presentation', () => {
     [{ valid: false }, 'Team · Expired'],
     [{ warningCode: 'MACHINE_LIMIT_EXCEEDED' }, 'Team · Needs attention'],
     [{ community: true, error: 'Invalid token' }, 'License error'],
+    [
+      { plan: 'free', features: [], expiry: '2026-10-02T00:00:00Z' },
+      'Free · Monitoring only',
+    ],
   ])('shows accurate license details for %j', async (license, label) => {
     renderLicense(license);
     await userEvent.tab();
@@ -281,6 +285,19 @@ describe('sidebar license line', () => {
       { community: true, valid: false, error: 'Invalid token' },
       'License error',
       'destructive',
+    ],
+    [
+      // A free license unlocks nothing that its expiry would take away.
+      'a free license',
+      {
+        ...connected,
+        plan: 'free',
+        features: [],
+        valid: false,
+        gracePeriod: true,
+      },
+      'Free plan · Monitoring only',
+      'muted',
     ],
   ])('names %s', (_case, license, text, tone) => {
     renderBadge(license);

@@ -25,7 +25,7 @@ import {
   LicenseMonitoringLevel,
 } from '@/api/v1/schema';
 import { useI18n } from '@/i18n/I18nProvider';
-import { hasActiveLicense, licenseLink } from '@/lib/license';
+import { hasLicense, isFreeLicense, licenseLink } from '@/lib/license';
 
 /** How often the time of the last report is refreshed. */
 const MONITORING_REFRESH_MS = 30_000;
@@ -94,7 +94,7 @@ export default function LicensePage() {
     void mutate().then(async (next) => {
       setNotice({
         text:
-          next && hasActiveLicense(next)
+          next && hasLicense(next)
             ? next.workspace
               ? ts('Connected to {workspace}.', { workspace: next.workspace })
               : ts('Connected to Dagu Console.')
@@ -140,7 +140,7 @@ export default function LicensePage() {
       setKeyOpen(false);
       setNotice({
         text:
-          next && hasActiveLicense(next)
+          next && hasLicense(next)
             ? ts('License activated.')
             : ts('License status updated.'),
       });
@@ -214,6 +214,7 @@ export default function LicensePage() {
   const via = license.connectedVia;
   const connectedToConsole = via === 'console' || via === 'key';
   const managedByEnv = via ? via === 'env' : license.source === 'env';
+  const free = isFreeLicense(license);
   const restartNote = via ? restartNotes[via] : undefined;
   const consoleHref = license.consoleUrl || licenseLink('manage', 'plan-page');
   const busy = Boolean(pendingAction);
@@ -246,7 +247,7 @@ export default function LicensePage() {
                   </Button>
                   <Button
                     size="sm"
-                    variant="primary"
+                    variant="outline"
                     disabled={busy || connect.starting}
                     onClick={() => void connect.start()}
                   >
@@ -260,12 +261,29 @@ export default function LicensePage() {
                 </>
               )
             ) : (
-              <Button asChild size="sm" variant="outline">
-                <a href={consoleHref} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="h-3.5 w-3.5" />
-                  {ts('Manage in Dagu Console')}
-                </a>
-              </Button>
+              <>
+                {free && (
+                  <Button asChild size="sm" variant="outline">
+                    <a
+                      href={licenseLink('plans', 'plan-page')}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {ts('View plans')}
+                    </a>
+                  </Button>
+                )}
+                <Button asChild size="sm" variant="outline">
+                  <a
+                    href={consoleHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    {ts('Manage in Dagu Console')}
+                  </a>
+                </Button>
+              </>
             )}
           </div>
         )}
@@ -505,9 +523,11 @@ export default function LicensePage() {
       >
         <p className="text-sm">
           {ts(
-            connectedToConsole
-              ? 'Paid features become unavailable on this server and its slot in Dagu Console is freed for another server. Existing API keys remain active.'
-              : 'This will deactivate the license on this server. Paid features will become unavailable. Existing API keys remain active.'
+            free
+              ? 'Dagu Console stops monitoring this server, and its free slot becomes available to another server.'
+              : connectedToConsole
+                ? 'Paid features become unavailable on this server and its slot in Dagu Console is freed for another server. Existing API keys remain active.'
+                : 'This will deactivate the license on this server. Paid features will become unavailable. Existing API keys remain active.'
           )}
         </p>
       </ConfirmModal>

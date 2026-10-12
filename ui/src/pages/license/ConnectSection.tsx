@@ -30,7 +30,8 @@ function Countdown({ expiresAt }: { expiresAt?: string }) {
 /**
  * Shows a request to connect the selected server to Dagu Console while it
  * waits for approval, or why the last request failed with a way to retry.
- * Nothing is shown otherwise; the page header starts a request.
+ * Otherwise it offers to connect the server so that Dagu Console monitors it
+ * for free; the page header starts the same request.
  */
 export function ConnectSection({
   connect,
@@ -64,7 +65,44 @@ export function ConnectSection({
         {failure}
       </LicenseCallout>
     );
-  if (!pending) return null;
+  if (!pending)
+    return (
+      <section
+        className="card-obsidian p-4"
+        aria-labelledby="license-free-monitoring"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 flex-1 space-y-1">
+            <h2 id="license-free-monitoring" className="text-sm font-medium">
+              {ts('Monitor this server for free')}
+            </h2>
+            <p className="text-sm">
+              {ts(
+                "Dagu Console shows this server's runs, failures, and trends, and emails you when a workflow fails or the server stops reporting. You choose what the server reports once it connects."
+              )}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {ts(
+                'Free for one server: reports every 5 minutes and keeps 7 days of run history. Paid features stay off.'
+              )}
+            </p>
+          </div>
+          <Button
+            size="sm"
+            variant="primary"
+            disabled={disabled || starting}
+            onClick={() => void start()}
+          >
+            {starting ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <ExternalLink className="h-3.5 w-3.5" />
+            )}
+            {ts('Connect for free')}
+          </Button>
+        </div>
+      </section>
+    );
   return (
     <section
       className="card-obsidian p-4 space-y-3"

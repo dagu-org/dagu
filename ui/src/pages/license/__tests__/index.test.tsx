@@ -155,6 +155,14 @@ const online: Partial<LicenseStatus> = {
   lastCheckIn: new Date().toISOString(),
 };
 
+// A server connected on the free plan, whose token claims no features.
+const freeOnline: Partial<LicenseStatus> = {
+  ...online,
+  plan: 'free',
+  features: [],
+  workspace: 'acme',
+};
+
 const unchosen: LicenseMonitoring = {
   level: LicenseMonitoringLevel.off,
   configured: false,
@@ -589,7 +597,10 @@ describe('LicensePage', () => {
     });
 
     // After approval, the server checks in with Dagu Console and can report.
-    function approveAndConnect(monitoring: LicenseMonitoring) {
+    function approveAndConnect(
+      monitoring: LicenseMonitoring,
+      connected: Partial<LicenseStatus> = { plan: 'team', ...online }
+    ) {
       vi.spyOn(window, 'open').mockReturnValue(null);
       let approved = false;
       const get = vi.fn((path: string) =>
@@ -602,7 +613,7 @@ describe('LicensePage', () => {
               : path === '/license/monitoring'
                 ? monitoring
                 : approved
-                  ? makeConfig({ plan: 'team', ...online }).license
+                  ? makeConfig(connected).license
                   : community(),
         })
       );
@@ -660,6 +671,56 @@ describe('LicensePage', () => {
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
       );
       expect(monitoringCard()).toHaveTextContent('Health and run status');
+    });
+
+    it('connects a free server and offers failure emails', async () => {
+      const { approve } = approveAndConnect(unchosen, freeOnline);
+      await approve();
+
+      expect(
+        await screen.findByText('Connected to acme.', undefined, {
+          timeout: 5000,
+        })
+      ).toBeVisible();
+      const dialog = await screen.findByRole('dialog', {
+        name: 'Monitor this server from Dagu Console',
+      });
+      await userEvent.click(
+        within(dialog).getByRole('button', { name: 'Not now' })
+      );
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      );
+      expect(row('Plan')).toHaveTextContent('Free plan');
+      expect(row('Status')).toHaveTextContent('Monitoring only');
+    });
+
+    it('starts the same request from the free monitoring offer', async () => {
+      vi.spyOn(window, 'open').mockReturnValue(null);
+      const post = vi.fn().mockResolvedValue({ data: pending });
+      useClientMock.mockReturnValue({
+        POST: post,
+        GET: vi.fn().mockReturnValue(new Promise(() => {})),
+      } as never);
+      renderPage(community());
+
+      const offer = screen.getByRole('region', {
+        name: 'Monitor this server for free',
+      });
+      expect(offer).toHaveTextContent(
+        'Free for one server: reports every 5 minutes and keeps 7 days of run history. Paid features stay off.'
+      );
+      await userEvent.click(
+        within(offer).getByRole('button', { name: 'Connect for free' })
+      );
+
+      expect(post).toHaveBeenCalledWith('/license/connect', {
+        params: { query: { remoteNode: 'local' } },
+      });
+      expect(await screen.findByText('ABCD1234')).toBeVisible();
+      expect(
+        screen.queryByRole('region', { name: 'Monitor this server for free' })
+      ).not.toBeInTheDocument();
     });
 
     it('stops asking once the offer after connecting is declined', async () => {
@@ -1273,6 +1334,63 @@ describe('LicensePage', () => {
       ).not.toBeInTheDocument();
       expect(callouts()).toHaveLength(0);
       expect(row('Status')).toHaveTextContent('Active');
+    });
+
+    it('treats a free license as monitoring only', () => {
+      renderPage({
+        ...freeOnline,
+        expiry: inDays(2),
+        consoleUrl: 'https://console.dagu.sh/servers?server=srv-123',
+      });
+
+      expect(
+        screen.getByRole('link', { name: 'Manage in Dagu Console' })
+      ).toHaveAttribute(
+        'href',
+        'https://console.dagu.sh/servers?server=srv-123'
+      );
+      expect(screen.getByRole('link', { name: 'View plans' })).toHaveAttribute(
+        'href',
+        expect.stringContaining('dagu.sh/pricing')
+      );
+      expect(
+        screen.queryByRole('button', { name: 'Connect to Dagu Console' })
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('region', { name: 'Monitor this server for free' })
+      ).not.toBeInTheDocument();
+      expect(row('Plan')).toHaveTextContent('Free plan');
+      expect(row('Status')).toHaveTextContent('Monitoring only');
+      expect(
+        within(overview()).queryByText('Expires', { selector: 'dt' })
+      ).not.toBeInTheDocument();
+      expect(callouts()).toHaveLength(0);
+      expect(screen.getAllByText('Included in Team and Pro')).toHaveLength(5);
+      expect(screen.queryByText('Included')).not.toBeInTheDocument();
+    });
+
+    it('calls out no expiry of a free license', () => {
+      renderPage({
+        ...freeOnline,
+        valid: false,
+        gracePeriod: true,
+        graceEndsAt: '2099-05-14T00:00:00Z',
+      });
+
+      expect(callouts()).toHaveLength(0);
+      expect(row('Status')).toHaveTextContent('Monitoring only');
+    });
+
+    it('says that disconnecting a free server stops monitoring', async () => {
+      renderPage(freeOnline);
+
+      await userEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
+
+      const dialog = await screen.findByRole('dialog');
+      expect(dialog).toHaveTextContent(
+        'Dagu Console stops monitoring this server, and its free slot becomes available to another server.'
+      );
+      expect(dialog).not.toHaveTextContent('Paid features');
     });
 
     it('stays quiet more than 30 days before a paid license expires', () => {

@@ -172,6 +172,12 @@ describe('LicenseBanner', () => {
       expect(screen.queryByRole('status')).not.toBeInTheDocument();
     });
 
+    it('stays quiet for a free license', () => {
+      renderBanner({ ...paid, plan: 'free', expiry: '2026-10-02T00:00:00Z' });
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
     it('asks non-admins to contact their administrator', () => {
       isAdmin.mockReturnValue(false);
       renderBanner({ ...paid, expiry: '2026-10-31T00:00:00Z' });

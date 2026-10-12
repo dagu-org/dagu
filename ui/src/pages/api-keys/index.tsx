@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { Link } from 'react-router-dom';
-import { hasActiveLicense } from '@/lib/license';
+import { hasActiveLicense, isFreeLicense } from '@/lib/license';
 import { components } from '@/api/v1/schema';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -72,6 +72,7 @@ export default function APIKeysPage() {
   const activeLicense = hasActiveLicense(license);
   const communityLimitReached =
     !activeLicense && apiKeys.length >= COMMUNITY_API_KEY_LIMIT;
+  const freePlan = isFreeLicense(license);
 
   // Set page title
   useEffect(() => {
@@ -184,13 +185,19 @@ export default function APIKeysPage() {
           <div>
             <p className="font-medium">
               <I18nText
-                text={'Community installs can manage up to 2 API keys.'}
+                text={
+                  freePlan
+                    ? 'The Free plan supports up to 2 API keys.'
+                    : 'Community installs can manage up to 2 API keys.'
+                }
               />
             </p>
             <p className="mt-1">
               <I18nText
                 text={
-                  'Existing keys remain active, but new key creation is blocked until extra keys are revoked or a license is configured.'
+                  freePlan
+                    ? 'Existing keys remain active. Revoke a key to create another, or move to Team or Pro to remove the limit.'
+                    : 'Existing keys remain active, but new key creation is blocked until extra keys are revoked or a license is configured.'
                 }
               />
             </p>

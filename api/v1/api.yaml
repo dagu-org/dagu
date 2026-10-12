@@ -8343,7 +8343,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "409":
-          description: "The license is set outside Dagu or the server already has an active license"
+          description: "The license is set outside Dagu or the server already has a license"
           content:
             application/json:
               schema:

@@ -2428,6 +2428,16 @@ const english = {
   "Plan": "Plan",
   "Expires": "Expires",
   "License deactivated. Running in community mode.": "License deactivated. Running in community mode.",
+  "Monitoring only": "Monitoring only",
+  "Free": "Free",
+  "Included in Team and Pro": "Included in Team and Pro",
+  "Monitor this server for free": "Monitor this server for free",
+  "Dagu Console shows this server's runs, failures, and trends, and emails you when a workflow fails or the server stops reporting. You choose what the server reports once it connects.": "Dagu Console shows this server's runs, failures, and trends, and emails you when a workflow fails or the server stops reporting. You choose what the server reports once it connects.",
+  "Free for one server: reports every 5 minutes and keeps 7 days of run history. Paid features stay off.": "Free for one server: reports every 5 minutes and keeps 7 days of run history. Paid features stay off.",
+  "Connect for free": "Connect for free",
+  "Dagu Console stops monitoring this server, and its free slot becomes available to another server.": "Dagu Console stops monitoring this server, and its free slot becomes available to another server.",
+  "The Free plan supports up to 2 API keys.": "The Free plan supports up to 2 API keys.",
+  "Existing keys remain active. Revoke a key to create another, or move to Team or Pro to remove the limit.": "Existing keys remain active. Revoke a key to create another, or move to Team or Pro to remove the limit.",
 } as const;
 
 export type StaticMessage = keyof typeof english;
@@ -4798,6 +4808,16 @@ const chinese = {
   "Plan": "套餐",
   "Expires": "到期日",
   "License deactivated. Running in community mode.": "许可证已停用。正在以社区版模式运行。",
+  "Monitoring only": "仅监控",
+  "Free": "免费",
+  "Included in Team and Pro": "包含在 Team 和 Pro 中",
+  "Monitor this server for free": "免费监控此服务器",
+  "Dagu Console shows this server's runs, failures, and trends, and emails you when a workflow fails or the server stops reporting. You choose what the server reports once it connects.": "Dagu Console 会显示此服务器的运行、失败和趋势，并在工作流失败或服务器停止报告时向你发送电子邮件。连接后由你选择此服务器报告的内容。",
+  "Free for one server: reports every 5 minutes and keeps 7 days of run history. Paid features stay off.": "一台服务器免费：每 5 分钟报告一次，保留 7 天的运行历史。付费功能保持关闭。",
+  "Connect for free": "免费连接",
+  "Dagu Console stops monitoring this server, and its free slot becomes available to another server.": "Dagu Console 将停止监控此服务器，其免费名额可供其他服务器使用。",
+  "The Free plan supports up to 2 API keys.": "免费套餐最多支持 2 个 API 密钥。",
+  "Existing keys remain active. Revoke a key to create another, or move to Team or Pro to remove the limit.": "现有密钥保持有效。撤销一个密钥即可创建新密钥，或升级到 Team 或 Pro 以取消此限制。",
 } as const satisfies Record<StaticMessage, string>;
 
 const japanese = {
@@ -7250,6 +7270,16 @@ const japanese = {
   "Plan": "プラン",
   "Expires": "有効期限",
   "License deactivated. Running in community mode.": "ライセンスを無効化しました。コミュニティモードで動作しています。",
+  "Monitoring only": "監視のみ",
+  "Free": "無料",
+  "Included in Team and Pro": "Team と Pro で利用可能",
+  "Monitor this server for free": "このサーバーを無料で監視",
+  "Dagu Console shows this server's runs, failures, and trends, and emails you when a workflow fails or the server stops reporting. You choose what the server reports once it connects.": "Dagu Console にこのサーバーの実行、失敗、傾向が表示され、ワークフローが失敗したときやサーバーからの報告が止まったときにメールが届きます。サーバーが報告する内容は接続後に選べます。",
+  "Free for one server: reports every 5 minutes and keeps 7 days of run history. Paid features stay off.": "1 台のサーバーまで無料です。5 分ごとに報告し、実行履歴を 7 日間保持します。有料機能はオフのままです。",
+  "Connect for free": "無料で接続",
+  "Dagu Console stops monitoring this server, and its free slot becomes available to another server.": "Dagu Console はこのサーバーの監視を停止し、無料枠は他のサーバーで使えるようになります。",
+  "The Free plan supports up to 2 API keys.": "無料プランでは最大2つのAPIキーを管理できます。",
+  "Existing keys remain active. Revoke a key to create another, or move to Team or Pro to remove the limit.": "既存のキーは有効のままです。キーを 1 つ失効させると新しいキーを作成できます。Team または Pro に移行すると上限がなくなります。",
 } as const satisfies Record<StaticMessage, string>;
 
 export const staticMessages = {
