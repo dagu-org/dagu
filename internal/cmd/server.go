@@ -283,10 +283,11 @@ func newCloudReportMonitoring(ctx *Context) *cloudreport.Monitoring {
 }
 
 // startCloudReport reports to Dagu Console at the level monitoring sets while
-// the server holds an online license. It returns nil when monitoring is nil
-// or cloud.report is off.
+// the server holds an online license. When cloud.report is off, it only tells
+// Dagu Console that the server no longer reports, if it reported before. It
+// returns nil when monitoring is nil.
 func startCloudReport(ctx *Context, monitoring *cloudreport.Monitoring) *cloudreport.Reporter {
-	if monitoring == nil || ctx.Config.Cloud.Report == config.ReportOff {
+	if monitoring == nil {
 		return nil
 	}
 	return cloudreport.Start(ctx, ctx.LicenseManager.CloudCredentials, ctx.Persistence.ServiceRegistry, cloudReportEvents(ctx), monitoring)

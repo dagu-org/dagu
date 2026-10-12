@@ -978,6 +978,9 @@ describe('LicensePage', () => {
       expect(dialog).toHaveTextContent(
         'the protocol version, license ID, server ID, and heartbeat secret'
       );
+      expect(dialog).toHaveTextContent(
+        'Turning reporting off sends one last report that carries only what identifies and authenticates this server and the choice Off'
+      );
 
       await userEvent.click(health);
       await userEvent.click(

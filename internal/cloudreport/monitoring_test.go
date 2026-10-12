@@ -164,7 +164,7 @@ func TestLastReportOnlyWhenAccepted(t *testing.T) {
 // nothing. Health sends no runs and leaves the events lease to others. Runs
 // sends the runs in progress and those that finish once it is chosen, never
 // those that finished before, even after a period below runs. Off again
-// stops at once.
+// stops at once, and sends only one report saying so.
 func TestReportFollowsLevel(t *testing.T) {
 	t.Parallel()
 
@@ -216,6 +216,7 @@ func TestReportFollowsLevel(t *testing.T) {
 
 	require.NoError(t, m.SetLevel(t.Context(), config.ReportOff))
 	dir.emit(eventstore.TypeDAGRunAborted, etlRun(ir.Aborted))
+	assert.JSONEq(t, offReport, nextReport(t, clock, console).body)
 	for range 3 {
 		clock.next()
 	}
@@ -223,24 +224,139 @@ func TestReportFollowsLevel(t *testing.T) {
 	assertLeaseFree(t, dir)
 }
 
+// Off tells Dagu Console once that the server no longer reports. The report
+// is retried while Dagu Console is unavailable, but not once it answers, and
+// nothing follows it until a level that reports is chosen again.
+func TestReportOff(t *testing.T) {
+	t.Parallel()
+
+	unavailable := consoleResponse{status: http.StatusServiceUnavailable}
+	tests := []struct {
+		name      string
+		responses []consoleResponse
+		// waits are those after each report saying that reporting stopped.
+		waits []time.Duration
+	}{
+		{
+			name:      "retried until accepted",
+			responses: []consoleResponse{unavailable, unavailable},
+			waits:     []time.Duration{time.Minute, 2 * time.Minute, time.Minute},
+		},
+		{
+			name:      "rejected",
+			responses: []consoleResponse{{status: http.StatusBadRequest, body: `{"message":"invalid report"}`}},
+			waits:     []time.Duration{time.Minute},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			accepted := consoleResponse{status: http.StatusOK, body: `{}`}
+			console := newFakeConsole(t, append([]consoleResponse{accepted}, tc.responses...)...)
+			m := chosenLevel(t)
+			require.NoError(t, m.SetLevel(t.Context(), config.ReportHealth))
+			clock := startReporter(t.Context(), t, newReporter(console.credentials, nil, m), noJitter)
+			clock.wait()
+			clock.next()
+			assert.Equal(t, config.ReportHealth, decodeReport(t, console.next(t)).Level)
+
+			require.NoError(t, m.SetLevel(t.Context(), config.ReportOff))
+			var waits []time.Duration
+			for range tc.waits {
+				waits = append(waits, clock.next())
+				assert.JSONEq(t, offReport, console.next(t).body)
+			}
+			assert.Equal(t, tc.waits, waits)
+			for range 3 {
+				clock.next()
+			}
+			assertNoReport(t, console)
+
+			require.NoError(t, m.SetLevel(t.Context(), config.ReportHealth))
+			clock.next()
+			resumed := decodeReport(t, console.next(t))
+			assert.Equal(t, config.ReportHealth, resumed.Level)
+			assert.Equal(t, config.Version, resumed.Health.Version)
+		})
+	}
+}
+
+// A server that starts at off, chosen or fixed by configuration, tells Dagu
+// Console once that it no longer reports when its last report was at a level
+// that reports: it stopped before telling, or its configuration changed while
+// it was down. A reporter whose configuration fixes off then stops.
+func TestReportOffAfterRestart(t *testing.T) {
+	t.Parallel()
+
+	t.Run("configured", func(t *testing.T) {
+		t.Parallel()
+
+		console := newFakeConsole(t)
+		store := reportedHealth(t, console)
+		r := newReporter(console.credentials, nil, NewMonitoring(config.ReportOff, store))
+		clock := startReporter(t.Context(), t, r, noJitter)
+		assert.Equal(t, maxStartDelay/2, clock.wait())
+		clock.elapse()
+		assert.JSONEq(t, offReport, console.next(t).body)
+		assertStops(t, r)
+
+		// Started again, it has nothing left to send.
+		r = newReporter(console.credentials, nil, NewMonitoring(config.ReportOff, store))
+		startReporter(t.Context(), t, r, noJitter)
+		assertStops(t, r)
+		assertNoReport(t, console)
+	})
+
+	t.Run("chosen", func(t *testing.T) {
+		t.Parallel()
+
+		console := newFakeConsole(t)
+		m := NewMonitoring("", reportedHealth(t, console))
+		require.NoError(t, m.SetLevel(t.Context(), config.ReportOff))
+		clock := startReporter(t.Context(), t, newReporter(console.credentials, nil, m), noJitter)
+		clock.wait()
+		clock.next()
+		assert.JSONEq(t, offReport, console.next(t).body)
+		for range 3 {
+			clock.next()
+		}
+		assertNoReport(t, console)
+	})
+
+	t.Run("never reported", func(t *testing.T) {
+		t.Parallel()
+
+		console := newFakeConsole(t)
+		r := newReporter(console.credentials, nil, NewMonitoring(config.ReportOff, newSettingsStore(t)))
+		startReporter(t.Context(), t, r, noJitter)
+		assertStops(t, r)
+		assertNoReport(t, console)
+	})
+}
+
 // Choosing off stops a report in flight, and the report is not retried or
-// counted as a failure.
+// counted as a failure. The next report says that reporting stopped.
 func TestReportOffStopsReportInFlight(t *testing.T) {
 	t.Parallel()
 
 	var requests atomic.Int32
 	inFlight := make(chan struct{})
 	cancelled := make(chan struct{})
+	later := make(chan string, 2)
 	console := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// The server notices a cancelled request only after reading its body.
-		_, _ = io.Copy(io.Discard, r.Body)
-		if requests.Add(1) == 1 {
+		body, _ := io.ReadAll(r.Body)
+		switch requests.Add(1) {
+		case 1:
 			_, _ = io.WriteString(w, `{"next_report_seconds": 120}`)
-			return
+		case 2:
+			close(inFlight)
+			<-r.Context().Done()
+			close(cancelled)
+		default:
+			later <- string(body)
 		}
-		close(inFlight)
-		<-r.Context().Done()
-		close(cancelled)
 	}))
 	t.Cleanup(console.Close)
 	credentials := func() (license.CloudCredentials, bool) {
@@ -270,18 +386,24 @@ func TestReportOffStopsReportInFlight(t *testing.T) {
 		t.Fatal("the report in flight was not cancelled")
 	}
 	clock.next()
+	select {
+	case body := <-later:
+		assert.JSONEq(t, `{"protocol":2,"license_id":"","server_id":"srv-1","heartbeat_secret":"","level":"off"}`, body)
+	case <-time.After(testTimeout):
+		t.Fatal("the console was not told that reporting stopped")
+	}
 	clock.next()
-	assert.Equal(t, int32(2), requests.Load())
+	assert.Equal(t, int32(3), requests.Load())
 	assert.NotContains(t, logs.String(), "Failed to report")
 }
 
-// A level that cannot be read is taken as off.
+// A level that cannot be read is taken as off, but not as a choice of off,
+// so Dagu Console is not told that reporting stopped.
 func TestReportUnreadableLevel(t *testing.T) {
 	t.Parallel()
 
 	console := newFakeConsole(t)
 	path := filepath.Join(t.TempDir(), "report-settings.json")
-	require.NoError(t, os.WriteFile(path, []byte("{"), 0o600))
 	var logs bytes.Buffer
 	ctx := logger.WithLogger(t.Context(), logger.NewLogger(
 		logger.WithFormat("text"),
@@ -289,9 +411,13 @@ func TestReportUnreadableLevel(t *testing.T) {
 		logger.WithQuiet(),
 	))
 	m := NewMonitoring("", filemonitor.NewStateStore(path))
+	require.NoError(t, m.SetLevel(ctx, config.ReportHealth))
 	clock := startReporter(ctx, t, newReporter(console.credentials, nil, m), noJitter)
 	clock.wait()
+	clock.next()
+	console.next(t)
 
+	require.NoError(t, os.WriteFile(path, []byte("{"), 0o600))
 	for range 3 {
 		clock.next()
 	}
@@ -299,11 +425,45 @@ func TestReportUnreadableLevel(t *testing.T) {
 	assert.Equal(t, 1, strings.Count(logs.String(), "Failed to read what to report to Dagu Console"))
 }
 
+// offReport is the report that tells the fake console that the server no
+// longer reports.
+const offReport = `{"protocol":2,"license_id":"lic-1","server_id":"srv-1","heartbeat_secret":"hb-secret","level":"off"}`
+
 // chosenLevel is monitoring whose level an administrator chooses, starting
 // with none.
 func chosenLevel(t *testing.T) *Monitoring {
 	t.Helper()
-	return NewMonitoring("", filemonitor.NewStateStore(filepath.Join(t.TempDir(), "report-settings.json")))
+	return NewMonitoring("", newSettingsStore(t))
+}
+
+// newSettingsStore returns an empty store for report settings.
+func newSettingsStore(t *testing.T) StateStore {
+	t.Helper()
+	return filemonitor.NewStateStore(filepath.Join(t.TempDir(), "report-settings.json"))
+}
+
+// reportedHealth returns a store in which a reporter at health, fixed by
+// configuration, recorded a report it sent to console and then stopped.
+func reportedHealth(t *testing.T, console *fakeConsole) StateStore {
+	t.Helper()
+	store := newSettingsStore(t)
+	r := newReporter(console.credentials, nil, NewMonitoring(config.ReportHealth, store))
+	clock := startReporter(t.Context(), t, r, noJitter)
+	clock.wait()
+	clock.next()
+	console.next(t)
+	r.Stop()
+	return store
+}
+
+// assertStops checks that r stops by itself.
+func assertStops(t *testing.T, r *Reporter) {
+	t.Helper()
+	select {
+	case <-r.done:
+	case <-time.After(testTimeout):
+		t.Fatal("the reporter kept running")
+	}
 }
 
 // assertNoReport checks that console has received no report since the last

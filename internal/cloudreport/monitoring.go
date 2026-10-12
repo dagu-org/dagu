@@ -66,10 +66,14 @@ type Status struct {
 	RunsPausedUntil time.Time
 }
 
-// choice is what an administrator chose, as persisted.
+// choice is what an administrator chose, as persisted, with the level of the
+// last report sent.
 type choice struct {
 	Level           config.ReportLevel `json:"level,omitempty"`
 	NoticeDismissed bool               `json:"notice_dismissed,omitempty"`
+	// ReportedLevel lets a restarted server know whether Dagu Console still
+	// expects reports from it.
+	ReportedLevel config.ReportLevel `json:"reported_level,omitempty"`
 }
 
 type sentReport struct {
@@ -79,6 +83,7 @@ type sentReport struct {
 
 // NewMonitoring returns the reporting state of a server. A configured level
 // other than empty fixes the level; otherwise store persists the choice.
+// Either way, store persists the level of the last report sent.
 func NewMonitoring(configured config.ReportLevel, store StateStore) *Monitoring {
 	return &Monitoring{configured: configured, store: store}
 }
@@ -157,6 +162,18 @@ func (m *Monitoring) level(ctx context.Context) (config.ReportLevel, error) {
 		return config.ReportOff, nil
 	}
 	return c.Level, nil
+}
+
+// reportedLevel returns the level of the last report sent, or empty when none
+// was recorded.
+func (m *Monitoring) reportedLevel(ctx context.Context) (config.ReportLevel, error) {
+	c, err := m.load(ctx)
+	return c.ReportedLevel, err
+}
+
+// saveReportedLevel records level as that of the last report sent.
+func (m *Monitoring) saveReportedLevel(ctx context.Context, level config.ReportLevel) error {
+	return m.update(ctx, func(c *choice) { c.ReportedLevel = level })
 }
 
 // watch calls fn with each level chosen in this process.
