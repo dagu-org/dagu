@@ -83,7 +83,7 @@ func (o *operator) runOperation(ctx context.Context, index int, op operation) (o
 // when a page the browser presents client certificates for did not load.
 func (o *operator) checkPage(ctx context.Context, index int) error {
 	if o.presentsCertificates {
-		if err := o.checkNavigation(ctx, index); err != nil {
+		if err := o.checkNavigation(ctx, index, ""); err != nil {
 			return err
 		}
 	}
@@ -108,7 +108,7 @@ func (o *operator) gotoURL(ctx context.Context, index int, target string, timeou
 	if err := o.eng.Goto(ctx, target, timeout); err != nil {
 		return opResult{}, err
 	}
-	if err := o.checkNavigation(ctx, index); err != nil {
+	if err := o.checkNavigation(ctx, index, target); err != nil {
 		return opResult{}, err
 	}
 	return opResult{Report: agentstep.Report{Index: index, Kind: opGoto, Subject: target, Status: agentstep.StatusCompleted, Duration: time.Since(began)}}, nil
@@ -116,15 +116,19 @@ func (o *operator) gotoURL(ctx context.Context, index int, target string, timeou
 
 // checkNavigation fails when the browser shows an error page because of a
 // client certificate: one the site asks for and the browser does not
-// present, or one the proxy could not present. A page that cannot be read
-// is left to the operations that follow.
-func (o *operator) checkNavigation(ctx context.Context, index int) error {
+// present, or one the proxy could not present. target is the address a goto
+// opened, if any. A page that cannot be read is left to the operations that
+// follow.
+func (o *operator) checkNavigation(ctx context.Context, index int, target string) error {
 	failures := o.takeCertificateEvents(ctx, index)
-	code, err := o.eng.NavigationError(ctx)
-	if err != nil || code == "" {
+	failure, err := o.eng.NavigationError(ctx)
+	if err != nil || failure.Code == "" {
 		return nil
 	}
-	return clientCertificateFailure(code, failures, o.presentsCertificates)
+	if failure.Host == "" {
+		failure.Host = urlHost(target)
+	}
+	return clientCertificateFailure(failure, failures, o.presentsCertificates)
 }
 
 // takeCertificateEvents reports what the certificate proxy saw since the

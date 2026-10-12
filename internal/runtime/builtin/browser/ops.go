@@ -80,8 +80,8 @@ type run struct {
 	// blockedUncounted is set once blocked requests can no longer be
 	// counted.
 	blockedUncounted bool
-	// certificateFailures holds, by host, the last failure the client
-	// certificate proxy reported in this attempt.
+	// certificateFailures holds, by host, the last trouble with a client
+	// certificate the proxy reported in this attempt.
 	certificateFailures map[string]string
 	// downloadWindow is the longest timeout of the acts and gotos run so
 	// far, which can start downloads; zero until one runs.
@@ -157,7 +157,7 @@ func newRun(ctx context.Context, e *browserExecutor) (*run, error) {
 	}
 	r.certificateEvent = func(index int, event certproxy.Event) {
 		logCertificateEvent(r.timeline, index, event)
-		if event.Kind != certproxy.EventConnect {
+		if certificateTrouble(event) {
 			r.certificateFailures[event.Host] = describeCertificateEvent(event)
 		}
 	}

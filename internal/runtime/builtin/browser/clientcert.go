@@ -7,13 +7,16 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/dagucloud/dagu/v2/internal/browserhost"
 	"github.com/dagucloud/dagu/v2/internal/browserhost/certproxy"
 	cmnconfig "github.com/dagucloud/dagu/v2/internal/cmn/config"
+	"github.com/dagucloud/dagu/v2/internal/cmn/hostpattern"
 	"github.com/dagucloud/dagu/v2/internal/ir"
 	"github.com/dagucloud/dagu/v2/internal/runtime/builtin/internal/agentstep"
 )
@@ -29,6 +32,19 @@ const (
 // client certificate the browser does not present, or refuses the one it
 // presents.
 var clientAuthError = regexp.MustCompile(`^ERR_(SSL_CLIENT_AUTH_[A-Z_]+|BAD_SSL_CLIENT_AUTH_CERT)$`)
+
+// connectionError matches the network errors a TLS connection the proxy
+// could not complete shows in the browser.
+var connectionError = regexp.MustCompile(`^ERR_(SSL_[A-Z_]+|BAD_SSL_[A-Z_]+|CERT_[A-Z_]+|EMPTY_RESPONSE|CONNECTION_(CLOSED|RESET)|TUNNEL_CONNECTION_FAILED|PROXY_CONNECTION_FAILED)$`)
+
+// urlHost returns the host of address, or "" when it names none.
+func urlHost(address string) string {
+	parsed, err := url.Parse(address)
+	if err != nil {
+		return ""
+	}
+	return parsed.Hostname()
+}
 
 // loadClientCertificates loads the certificates a browser presents: the
 // step's, then the host's, so the step's entry wins for a host both name.
@@ -99,12 +115,18 @@ func recordedHandle(record browserhost.Record) browserHandle {
 	return handle
 }
 
-// clientCertificateFailure explains the error page the browser shows with
-// code, using the failures the certificate proxy reported, or returns nil
-// when code is unrelated to client certificates.
-func clientCertificateFailure(code string, failures []certproxy.Event, presenting bool) error {
-	if len(failures) > 0 {
-		return fmt.Errorf("%s (the browser shows %s)", failures[len(failures)-1].Message, code)
+// clientCertificateFailure explains the error page the browser shows, using
+// what the certificate proxy reported for the page's host, or returns nil
+// when the page is unrelated to client certificates. Without a known host,
+// a proxy failure explains only an error that a failed TLS connection
+// causes.
+func clientCertificateFailure(page navigationFailure, failures []certproxy.Event, presenting bool) error {
+	code := page.Code
+	for _, failure := range slices.Backward(failures) {
+		if page.Host != "" && hostpattern.Canonical(failure.Host) == hostpattern.Canonical(page.Host) ||
+			page.Host == "" && connectionError.MatchString(code) {
+			return fmt.Errorf("%s (the browser shows %s)", failure.Message, code)
+		}
 	}
 	if !clientAuthError.MatchString(code) {
 		return nil
@@ -115,6 +137,17 @@ func clientCertificateFailure(code string, failures []certproxy.Event, presentin
 	}
 	return fmt.Errorf("the site asks for a TLS client certificate (%s); "+
 		"set with.browser.client_certificates or browser.client_certificates in the Dagu config", code)
+}
+
+// certificateTrouble reports whether event is about a client certificate
+// itself, rather than about reaching a host, so it belongs in a failed
+// step's summary whichever host failed.
+func certificateTrouble(event certproxy.Event) bool {
+	switch event.Kind {
+	case certproxy.EventClientCertificateRejected, certproxy.EventServerCertificate, certproxy.EventProxyAuth:
+		return true
+	}
+	return false
 }
 
 // describeCertificateEvent writes what the certificate proxy reported in one

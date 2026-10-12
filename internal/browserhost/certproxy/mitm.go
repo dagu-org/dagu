@@ -130,7 +130,9 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.handleConnect(w, r)
 		return
 	}
-	if r.Method != http.MethodGet {
+	// The control paths answer only requests made to the proxy itself, not
+	// requests for another site that a client sends through it.
+	if r.Method != http.MethodGet || r.URL.IsAbs() {
 		http.NotFound(w, r)
 		return
 	}

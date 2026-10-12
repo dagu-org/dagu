@@ -91,9 +91,8 @@ type fakeEngine struct {
 	blockedErr error
 	// certificateEvents are what the certificate proxy reports next.
 	certificateEvents []certproxy.Event
-	// navigationError is the network error code of the error page the
-	// browser shows, if any.
-	navigationError string
+	// navigationError is the error page the browser shows, if any.
+	navigationError navigationFailure
 	// pageText and visible describe the page that fixed checks read.
 	pageText string
 	visible  []string
@@ -155,7 +154,7 @@ func (e *fakeEngine) TakeCertificateEvents(context.Context) ([]certproxy.Event, 
 	return events, nil
 }
 
-func (e *fakeEngine) NavigationError(context.Context) (string, error) {
+func (e *fakeEngine) NavigationError(context.Context) (navigationFailure, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	return e.navigationError, nil

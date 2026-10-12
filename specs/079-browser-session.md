@@ -47,7 +47,9 @@ A session's browser presents the client certificates of the host
 configuration's `browser.client_certificates`, as a browser step does, for as
 long as the browser runs, including between commands. What the certificate
 proxy reports while a command runs, such as a site rejecting the certificate,
-appears in the command's warnings or error.
+appears in the command's warnings or error. Between commands the browser and
+its proxy keep running, so local processes can use the certificates as long
+as the session lasts, as they can during a browser step.
 
 ### Lifetime
 

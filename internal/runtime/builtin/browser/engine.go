@@ -69,10 +69,10 @@ type engine interface {
 	// browser presents none. Its error reports that the proxy no longer
 	// answers.
 	TakeCertificateEvents(ctx context.Context) ([]certproxy.Event, error)
-	// NavigationError returns the network error code, such as
-	// ERR_BAD_SSL_CLIENT_AUTH_CERT, of the error page the browser shows in
-	// place of a page it could not load, or "" when it shows a page.
-	NavigationError(ctx context.Context) (string, error)
+	// NavigationError describes the error page the browser shows in place
+	// of a page it could not load; its Code is empty when the browser shows
+	// a page.
+	NavigationError(ctx context.Context) (navigationFailure, error)
 	Handle() browserHandle
 	// Detach releases the session while the browser keeps running.
 	Detach(ctx context.Context) error
@@ -114,6 +114,16 @@ type browserHandle struct {
 	// CertProxy is the proxy presenting the browser's client certificates,
 	// or nil when it presents none.
 	CertProxy *certproxy.Handle
+}
+
+// navigationFailure is the error page the browser shows in place of a page
+// it could not load.
+type navigationFailure struct {
+	// Code is the network error code, such as ERR_BAD_SSL_CLIENT_AUTH_CERT.
+	Code string `json:"code"`
+	// Host is the host of the page that did not load, when the error page
+	// names it.
+	Host string `json:"host"`
 }
 
 // pageSnapshot is the accessibility tree of a page.

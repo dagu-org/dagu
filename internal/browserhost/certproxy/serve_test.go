@@ -10,6 +10,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -216,6 +217,16 @@ func TestServeControlPaths(t *testing.T) {
 		assert.Equal(t, http.StatusNotFound, status(base+"/other-token/events"))
 		assert.Equal(t, http.StatusNotFound, status(base+"/"+cfg.Token+"/proxy.pac"), "a PAC in a data: URL is not served")
 		assert.Equal(t, http.StatusNotFound, status(base+"/"))
+
+		// A request for another site sent through the proxy does not reach
+		// the control paths.
+		proxyURL, err := url.Parse(base)
+		require.NoError(t, err)
+		client := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)}}
+		response, err := client.Get("http://portal.example.com/" + cfg.Token + "/events")
+		require.NoError(t, err)
+		_ = response.Body.Close()
+		assert.Equal(t, http.StatusNotFound, response.StatusCode)
 	})
 
 	t.Run("ServeLargePAC", func(t *testing.T) {

@@ -166,6 +166,12 @@ scheme `http`, `https`, or `socks5`. A proxy that asks for authentication
 cannot carry requests to certificate hosts, and the proxy, not the browser,
 verifies those hosts' server certificates.
 
+While a browser runs, any process on the host, including another operating
+system user's, can use its certificates: through the browser's DevTools
+address, which already lets a local process drive the browser, or through the
+proxy, which listens on the loopback interface. Present certificates only on
+hosts whose users are trusted with them.
+
 A page that does not load because of a client certificate fails the
 operation: the error names what the proxy saw, such as the site rejecting the
 certificate, or, when the browser presents none for the host, says the site

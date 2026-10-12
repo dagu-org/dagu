@@ -22,6 +22,7 @@ import (
 	"github.com/dagucloud/dagu/v2/internal/browserhost"
 	"github.com/dagucloud/dagu/v2/internal/browserhost/certproxy"
 	cmnconfig "github.com/dagucloud/dagu/v2/internal/cmn/config"
+	"github.com/dagucloud/dagu/v2/internal/cmn/hostpattern"
 	"github.com/dagucloud/dagu/v2/internal/cmn/procutil"
 	"github.com/dagucloud/dagu/v2/internal/sysproxy"
 )
@@ -112,13 +113,14 @@ const selectorVisibleExpression = `Array.from(document.querySelectorAll(%s)).som
 	return box.width > 0 && box.height > 0 && style.visibility !== "hidden" && style.display !== "none";
 })`
 
-// navigationErrorExpression returns the network error code the browser's
-// error page shows, or "" on any other page.
+// navigationErrorExpression describes the browser's error page: the network
+// error code it shows, and the host of the page that did not load, which
+// Chrome uses as the error page's title. On any other page the code is "".
 const navigationErrorExpression = `(() => {
-	if (location.protocol !== "chrome-error:") return "";
+	if (location.protocol !== "chrome-error:") return {code: "", host: ""};
 	const code = document.querySelector(".error-code");
 	const match = ((code && code.textContent) || (document.body && document.body.innerText) || "").match(/ERR_[A-Z0-9_]+/);
-	return match ? match[0] : "ERR_FAILED";
+	return {code: match ? match[0] : "ERR_FAILED", host: document.title};
 })()`
 
 var errImageInput = errors.New("browser: image input to the model is not supported")
@@ -776,16 +778,21 @@ func (e *stagehandEngine) TakeCertificateEvents(ctx context.Context) ([]certprox
 	return events, err
 }
 
-func (e *stagehandEngine) NavigationError(ctx context.Context) (string, error) {
+func (e *stagehandEngine) NavigationError(ctx context.Context) (navigationFailure, error) {
 	raw, err := e.evaluate(ctx, navigationErrorExpression)
 	if err != nil {
-		return "", err
+		return navigationFailure{}, err
 	}
-	var code string
-	if err := json.Unmarshal(raw, &code); err != nil {
-		return "", fmt.Errorf("read the error page: %w", err)
+	var failure navigationFailure
+	if err := json.Unmarshal(raw, &failure); err != nil {
+		return navigationFailure{}, fmt.Errorf("read the error page: %w", err)
 	}
-	return code, nil
+	// A title that is not a host name is the page's own, not the failed
+	// host.
+	if hostpattern.Validate(failure.Host) != nil || strings.Contains(failure.Host, "*") {
+		failure.Host = ""
+	}
+	return failure, nil
 }
 
 func (e *stagehandEngine) Handle() browserHandle {

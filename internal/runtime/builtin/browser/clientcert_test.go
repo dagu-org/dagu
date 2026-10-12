@@ -112,7 +112,7 @@ func TestClientCertificateNeededFailsGoto(t *testing.T) {
 	t.Parallel()
 
 	run := newTestRun(t, pageModel(nil))
-	run.engine.navigationError = "ERR_BAD_SSL_CLIENT_AUTH_CERT"
+	run.engine.navigationError = navigationFailure{Code: "ERR_BAD_SSL_CLIENT_AUTH_CERT", Host: "portal.example.com"}
 	execution := run.execute(`{"do": [{"goto": "https://portal.example.com"}]}`, nil)
 
 	require.ErrorContains(t, execution.err, "the site asks for a TLS client certificate (ERR_BAD_SSL_CLIENT_AUTH_CERT)")
@@ -128,7 +128,7 @@ func TestCertificateProxyFailureExplainsErrorPage(t *testing.T) {
 	run.hostCertificates = []cmnconfig.BrowserClientCertificate{
 		{Hosts: []string{"portal.example.com"}, PFXFile: writeClientCertificate(t, "device", "")},
 	}
-	run.engine.navigationError = "ERR_SSL_PROTOCOL_ERROR"
+	run.engine.navigationError = navigationFailure{Code: "ERR_SSL_PROTOCOL_ERROR", Host: "portal.example.com"}
 	run.engine.certificateEvents = []certproxy.Event{
 		{Seq: 1, Kind: certproxy.EventConnect, Host: "portal.example.com", Message: "presented the certificate to portal.example.com"},
 		{Seq: 2, Kind: certproxy.EventClientCertificateRejected, Host: "portal.example.com", Message: "portal.example.com rejected the client certificate: bad certificate"},
@@ -138,6 +138,36 @@ func TestCertificateProxyFailureExplainsErrorPage(t *testing.T) {
 	require.ErrorContains(t, execution.err, "portal.example.com rejected the client certificate: bad certificate (the browser shows ERR_SSL_PROTOCOL_ERROR)")
 	assert.Contains(t, execution.stderr.String(), "client_certificate failed portal.example.com rejected the client certificate")
 	assert.Contains(t, execution.stderr.String(), "client_certificate completed presented the certificate to portal.example.com")
+}
+
+// A failure the proxy reports for another host, such as a page's CDN, does
+// not explain an error page unrelated to it.
+func TestCertificateProxyFailureForAnotherHostIsNotBlamed(t *testing.T) {
+	t.Parallel()
+
+	run := newTestRun(t, pageModel(nil))
+	run.hostCertificates = []cmnconfig.BrowserClientCertificate{
+		{Hosts: []string{"*"}, PFXFile: writeClientCertificate(t, "device", "")},
+	}
+	run.engine.navigationError = navigationFailure{Code: "ERR_NAME_NOT_RESOLVED", Host: "portal.example.com"}
+	run.engine.certificateEvents = []certproxy.Event{
+		{Seq: 1, Kind: certproxy.EventUpstream, Host: "cdn.example.net", Message: "could not reach cdn.example.net"},
+	}
+	execution := run.execute(`{"do": [{"goto": "https://portal.example.com"}]}`, nil)
+
+	require.NoError(t, execution.err)
+}
+
+// Without a host named on the error page, a proxy failure explains only an
+// error a failed TLS connection causes.
+func TestClientCertificateFailureWithoutHost(t *testing.T) {
+	t.Parallel()
+
+	failures := []certproxy.Event{{Kind: certproxy.EventClientCertificateRejected, Host: "portal.example.com", Message: "portal.example.com rejected the client certificate"}}
+	require.ErrorContains(t, clientCertificateFailure(navigationFailure{Code: "ERR_EMPTY_RESPONSE"}, failures, true), "rejected the client certificate")
+	require.NoError(t, clientCertificateFailure(navigationFailure{Code: "ERR_NAME_NOT_RESOLVED"}, failures, true))
+	require.ErrorContains(t, clientCertificateFailure(navigationFailure{Code: "ERR_SSL_PROTOCOL_ERROR", Host: "portal.example.com"}, failures, true), "rejected")
+	require.NoError(t, clientCertificateFailure(navigationFailure{Code: "ERR_SSL_PROTOCOL_ERROR", Host: "other.example.com"}, failures, true))
 }
 
 // A step resumed after an ask reattaches with the proxy its browser was
