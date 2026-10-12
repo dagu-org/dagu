@@ -81,6 +81,14 @@ type Record struct {
 	BrowserPID       int   `json:"browserPid,omitempty"`
 	BrowserStartedAt int64 `json:"browserStartedAt,omitempty"`
 
+	// CertProxyURL locates the proxy presenting the browser's client
+	// certificates, which runs while the browser does; CertProxyPID and
+	// CertProxyStartedAt identify its process, so it can be ended with the
+	// browser.
+	CertProxyURL       string `json:"certProxyUrl,omitempty"`
+	CertProxyPID       int    `json:"certProxyPid,omitempty"`
+	CertProxyStartedAt int64  `json:"certProxyStartedAt,omitempty"`
+
 	// OwnerPID and OwnerStartedAt identify the process driving a running
 	// browser, so a crashed owner can be detected even after PID reuse.
 	OwnerPID       int   `json:"ownerPid,omitempty"`

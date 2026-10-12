@@ -43,6 +43,8 @@ type testRun struct {
 	secrets   map[string]string
 	// noSandbox is the host's setting that turns off the browser sandbox.
 	noSandbox bool
+	// hostCertificates are the client certificates the host config names.
+	hostCertificates []cmnconfig.BrowserClientCertificate
 }
 
 func newTestRun(t *testing.T, answer func(*llmpkg.ChatRequest) (string, error)) *testRun {
@@ -98,7 +100,7 @@ func (r *testRun) context() context.Context {
 	}
 	ctx := cmnconfig.WithConfig(r.t.Context(), &cmnconfig.Config{
 		Paths:   cmnconfig.PathsConfig{DataDir: r.dataDir},
-		Browser: cmnconfig.BrowserConfig{NoSandbox: r.noSandbox},
+		Browser: cmnconfig.BrowserConfig{NoSandbox: r.noSandbox, ClientCertificates: r.hostCertificates},
 	})
 	return runtime.WithEnv(ctx, runtime.Env{
 		Context: runtime.Context{

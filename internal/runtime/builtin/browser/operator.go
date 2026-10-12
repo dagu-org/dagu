@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dagucloud/dagu/v2/internal/browserhost/certproxy"
 	"github.com/dagucloud/dagu/v2/internal/runtime/builtin/internal/agentstep"
 )
 
@@ -27,6 +28,15 @@ type operator struct {
 	shots *agentstep.ArtifactStore
 	// warn reports a problem that did not stop the operation at index.
 	warn func(index int, message string)
+	// presentsCertificates is set when the browser presents client
+	// certificates through a proxy.
+	presentsCertificates bool
+	// certificateEvent reports what the certificate proxy saw while the
+	// operation at index ran; nil discards it.
+	certificateEvent func(index int, event certproxy.Event)
+	// certificateProxyLost is set once the certificate proxy stopped
+	// answering, which is reported once.
+	certificateProxyLost bool
 }
 
 // actRecorder keeps the actions acts performed, keyed by replayKey.
@@ -69,8 +79,14 @@ func (o *operator) runOperation(ctx context.Context, index int, op operation) (o
 }
 
 // checkPage fails when the page has left the allowed domains, which a
-// redirect or an act can cause even when every goto target was allowed.
-func (o *operator) checkPage(ctx context.Context) error {
+// redirect or an act can cause even when every goto target was allowed, or
+// when a page the browser presents client certificates for did not load.
+func (o *operator) checkPage(ctx context.Context, index int) error {
+	if o.presentsCertificates {
+		if err := o.checkNavigation(ctx, index); err != nil {
+			return err
+		}
+	}
 	if len(o.allowedDomains) == 0 {
 		return nil
 	}
@@ -92,7 +108,49 @@ func (o *operator) gotoURL(ctx context.Context, index int, target string, timeou
 	if err := o.eng.Goto(ctx, target, timeout); err != nil {
 		return opResult{}, err
 	}
+	if err := o.checkNavigation(ctx, index); err != nil {
+		return opResult{}, err
+	}
 	return opResult{Report: agentstep.Report{Index: index, Kind: opGoto, Subject: target, Status: agentstep.StatusCompleted, Duration: time.Since(began)}}, nil
+}
+
+// checkNavigation fails when the browser shows an error page because of a
+// client certificate: one the site asks for and the browser does not
+// present, or one the proxy could not present. A page that cannot be read
+// is left to the operations that follow.
+func (o *operator) checkNavigation(ctx context.Context, index int) error {
+	failures := o.takeCertificateEvents(ctx, index)
+	code, err := o.eng.NavigationError(ctx)
+	if err != nil || code == "" {
+		return nil
+	}
+	return clientCertificateFailure(code, failures, o.presentsCertificates)
+}
+
+// takeCertificateEvents reports what the certificate proxy saw since the
+// previous call, attributed to the operation at index, and returns its
+// failures.
+func (o *operator) takeCertificateEvents(ctx context.Context, index int) []certproxy.Event {
+	if !o.presentsCertificates || o.eng == nil {
+		return nil
+	}
+	events, err := o.eng.TakeCertificateEvents(ctx)
+	if err != nil && !o.certificateProxyLost {
+		o.certificateProxyLost = true
+		if o.warn != nil {
+			o.warn(index, "the client certificate proxy stopped answering: "+err.Error())
+		}
+	}
+	var failures []certproxy.Event
+	for _, event := range events {
+		if o.certificateEvent != nil {
+			o.certificateEvent(index, event)
+		}
+		if event.Kind != certproxy.EventConnect {
+			failures = append(failures, event)
+		}
+	}
+	return failures
 }
 
 func (o *operator) act(ctx context.Context, index int, spec actSpec, timeout time.Duration) (opResult, error) {

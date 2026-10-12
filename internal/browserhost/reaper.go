@@ -97,6 +97,9 @@ func closeOwned(ctx context.Context, record Record) error {
 			return fmt.Errorf("close browser at %s: %w", record.CDPURL, err)
 		}
 	}
+	// The certificate proxy ends on its own once its browser is gone; ending
+	// it here frees its port at once.
+	endProcess(record.CertProxyPID, record.CertProxyStartedAt)
 	var errs []error
 	for _, dir := range []string{record.ExtensionDir, record.WorkDir} {
 		if dir != "" {

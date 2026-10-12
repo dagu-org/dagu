@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"errors"
 	"time"
+
+	"github.com/dagucloud/dagu/v2/internal/browserhost/certproxy"
 )
 
 // errPageSessionLost reports an operation whose connection to the page went
@@ -62,6 +64,15 @@ type engine interface {
 	// blocked since the previous call, by host. Its error reports that
 	// later blocked requests go uncounted.
 	TakeBlockedRequests() (map[string]int, error)
+	// TakeCertificateEvents returns what the proxy presenting client
+	// certificates reported since the previous call, or nothing when the
+	// browser presents none. Its error reports that the proxy no longer
+	// answers.
+	TakeCertificateEvents(ctx context.Context) ([]certproxy.Event, error)
+	// NavigationError returns the network error code, such as
+	// ERR_BAD_SSL_CLIENT_AUTH_CERT, of the error page the browser shows in
+	// place of a page it could not load, or "" when it shows a page.
+	NavigationError(ctx context.Context) (string, error)
 	Handle() browserHandle
 	// Detach releases the session while the browser keeps running.
 	Detach(ctx context.Context) error
@@ -81,6 +92,12 @@ type launchOptions struct {
 	// NoSandbox turns off the browser sandbox.
 	NoSandbox bool
 	Generate  generateFunc
+	// ClientCertificates are presented, through a proxy, to the hosts they
+	// name.
+	ClientCertificates []certproxy.Entry
+	// Warn reports what the launch could not set up as configured without
+	// failing.
+	Warn func(string)
 }
 
 // browserHandle locates a running browser.
@@ -94,6 +111,9 @@ type browserHandle struct {
 	// milliseconds, or zero when it is unknown. With BrowserPID it tells the
 	// browser apart from a later process that reuses its ID.
 	BrowserStartedAt int64
+	// CertProxy is the proxy presenting the browser's client certificates,
+	// or nil when it presents none.
+	CertProxy *certproxy.Handle
 }
 
 // pageSnapshot is the accessibility tree of a page.

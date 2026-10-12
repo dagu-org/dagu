@@ -5,6 +5,7 @@ package browser
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,7 +20,10 @@ import (
 
 	stagehand "github.com/browserbase/stagehand/packages/sdk-go/v4"
 	"github.com/dagucloud/dagu/v2/internal/browserhost"
+	"github.com/dagucloud/dagu/v2/internal/browserhost/certproxy"
+	cmnconfig "github.com/dagucloud/dagu/v2/internal/cmn/config"
 	"github.com/dagucloud/dagu/v2/internal/cmn/procutil"
+	"github.com/dagucloud/dagu/v2/internal/sysproxy"
 )
 
 // extractBatchSource runs an extract with a schema chosen at run time. The
@@ -108,6 +112,15 @@ const selectorVisibleExpression = `Array.from(document.querySelectorAll(%s)).som
 	return box.width > 0 && box.height > 0 && style.visibility !== "hidden" && style.display !== "none";
 })`
 
+// navigationErrorExpression returns the network error code the browser's
+// error page shows, or "" on any other page.
+const navigationErrorExpression = `(() => {
+	if (location.protocol !== "chrome-error:") return "";
+	const code = document.querySelector(".error-code");
+	const match = ((code && code.textContent) || (document.body && document.body.innerText) || "").match(/ERR_[A-Z0-9_]+/);
+	return match ? match[0] : "ERR_FAILED";
+})()`
+
 var errImageInput = errors.New("browser: image input to the model is not supported")
 
 // sandboxHint suggests how to let the browser sandbox start, or turn it off,
@@ -136,11 +149,15 @@ func sandboxOverride() string {
 }
 
 // stagehandLauncher runs sessions through the Stagehand Go SDK.
-type stagehandLauncher struct{}
+type stagehandLauncher struct {
+	// startProxy starts the proxy presenting client certificates; nil
+	// starts it as a process of the Dagu executable.
+	startProxy func(ctx context.Context, executable string, cfg certproxy.Config) (*certproxy.Handle, error)
+}
 
 var _ launcher = stagehandLauncher{}
 
-func (stagehandLauncher) Launch(ctx context.Context, opts launchOptions) (engine, error) {
+func (l stagehandLauncher) Launch(ctx context.Context, opts launchOptions) (engine, error) {
 	if reason := sandboxOverride(); reason != "" && !opts.NoSandbox {
 		return nil, fmt.Errorf("launch browser: the browser sandbox is on, but the browser runtime turns it off %s; "+
 			"set browser.sandbox: false in the Dagu config or DAGU_BROWSER_SANDBOX=false to run without it", reason)
@@ -164,15 +181,26 @@ func (stagehandLauncher) Launch(ctx context.Context, opts launchOptions) (engine
 		launch.Proxy = &stagehand.LocalProxyConfig{Server: opts.Proxy}
 	}
 	cdpURL := fmt.Sprintf("http://127.0.0.1:%d", port)
+	var proxy *certproxy.Handle
+	if len(opts.ClientCertificates) > 0 {
+		if proxy, err = l.startCertProxy(ctx, cdpURL, opts); err != nil {
+			return nil, err
+		}
+		// The proxy routes every request the browser makes, through
+		// browser.proxy where one is set.
+		launch.Proxy = nil
+		launch.Args = append(launch.Args, proxy.ChromeArgs()...)
+	}
 	browser, err := stagehand.LaunchLocalBrowser(ctx, launch)
 	if err != nil {
 		launchErr := fmt.Errorf("launch browser: %w%s", err, sandboxHint(opts.NoSandbox))
-		return nil, errors.Join(launchErr, endUnstartedBrowser(ctx, nil, cdpURL, opts.UserDataDir))
+		return nil, errors.Join(launchErr, endUnstartedBrowser(ctx, nil, cdpURL, opts.UserDataDir), killCertProxy(proxy))
 	}
 	eng, err := startEngine(ctx, browser, cdpURL, opts)
 	if err != nil {
-		return nil, errors.Join(err, endUnstartedBrowser(ctx, browser, cdpURL, opts.UserDataDir))
+		return nil, errors.Join(err, endUnstartedBrowser(ctx, browser, cdpURL, opts.UserDataDir), killCertProxy(proxy))
 	}
+	eng.handle.CertProxy = proxy
 	extension, err := browserhost.StagehandExtension(ctx, cdpURL)
 	if err != nil {
 		return nil, errors.Join(fmt.Errorf("locate browser runtime extension: %w", err), eng.Close(context.WithoutCancel(ctx)))
@@ -206,10 +234,52 @@ func (stagehandLauncher) Reattach(ctx context.Context, handle browserHandle, opt
 	// process identifies.
 	eng.handle.BrowserPID = handle.BrowserPID
 	eng.handle.BrowserStartedAt = handle.BrowserStartedAt
+	eng.handle.CertProxy = handle.CertProxy
+	// What the proxy reported before the browser was reattached belongs to
+	// the process that drove it then.
+	_, _ = eng.TakeCertificateEvents(ctx)
 	if err := eng.handleDownloads(ctx, opts.DownloadsDir); err != nil {
 		return nil, errors.Join(err, eng.Close(context.WithoutCancel(ctx)))
 	}
 	return eng, nil
+}
+
+// startCertProxy starts the proxy that presents opts.ClientCertificates for
+// the browser at cdpURL and routes every other request the way this device
+// does.
+func (l stagehandLauncher) startCertProxy(ctx context.Context, cdpURL string, opts launchOptions) (*certproxy.Handle, error) {
+	pac, warnings, err := sysproxy.Detect(ctx, opts.Proxy)
+	if err != nil {
+		return nil, fmt.Errorf("browser.proxy: %w", err)
+	}
+	for _, warning := range warnings {
+		if opts.Warn != nil {
+			opts.Warn(warning)
+		}
+	}
+	start := l.startProxy
+	if start == nil {
+		start = certproxy.Start
+	}
+	proxy, err := start(ctx, cmnconfig.GetConfig(ctx).Paths.Executable, certproxy.Config{
+		Token:     rand.Text(),
+		CDPURL:    cdpURL,
+		SystemPAC: pac,
+		Entries:   opts.ClientCertificates,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("start the client certificate proxy: %w", err)
+	}
+	return proxy, nil
+}
+
+// killCertProxy ends the certificate proxy of a browser that did not start,
+// if it has one.
+func killCertProxy(proxy *certproxy.Handle) error {
+	if proxy == nil {
+		return nil
+	}
+	return proxy.Kill()
 }
 
 // endUnstartedBrowser ends the browser launched with profileDir at cdpURL
@@ -316,6 +386,8 @@ type stagehandEngine struct {
 	blocked *browserhost.BlockedRequestWatcher
 	// pageCallTimeout bounds calls that take no timeout of their own.
 	pageCallTimeout time.Duration
+	// certificateEventsSeen is the last certificate proxy event taken.
+	certificateEventsSeen int64
 }
 
 // handleDownloads saves downloads into dir, or refuses them when dir is
@@ -691,6 +763,31 @@ func (e *stagehandEngine) TakeBlockedRequests() (map[string]int, error) {
 	return e.blocked.Take()
 }
 
+func (e *stagehandEngine) TakeCertificateEvents(ctx context.Context) ([]certproxy.Event, error) {
+	if e.handle.CertProxy == nil {
+		return nil, nil
+	}
+	events, err := boundCall(ctx, e.pageCallTimeout, func(ctx context.Context) ([]certproxy.Event, error) {
+		return certproxy.Events(ctx, e.handle.CertProxy.URL, e.certificateEventsSeen)
+	})
+	if len(events) > 0 {
+		e.certificateEventsSeen = events[len(events)-1].Seq
+	}
+	return events, err
+}
+
+func (e *stagehandEngine) NavigationError(ctx context.Context) (string, error) {
+	raw, err := e.evaluate(ctx, navigationErrorExpression)
+	if err != nil {
+		return "", err
+	}
+	var code string
+	if err := json.Unmarshal(raw, &code); err != nil {
+		return "", fmt.Errorf("read the error page: %w", err)
+	}
+	return code, nil
+}
+
 func (e *stagehandEngine) Handle() browserHandle {
 	return e.handle
 }
@@ -713,8 +810,14 @@ func (e *stagehandEngine) Detach(ctx context.Context) error {
 	return e.release(ctx)
 }
 
+// Close terminates the browser, and then the proxy that presented its
+// client certificates.
 func (e *stagehandEngine) Close(ctx context.Context) error {
-	return errors.Join(e.release(ctx), closeBrowser(ctx, e.handle.BrowserPID, e.handle.BrowserStartedAt, e.browser.Close))
+	return errors.Join(
+		e.release(ctx),
+		closeBrowser(ctx, e.handle.BrowserPID, e.handle.BrowserStartedAt, e.browser.Close),
+		killCertProxy(e.handle.CertProxy),
+	)
 }
 
 // closeBrowser terminates a launched browser with closeRuntime. The browser's

@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/dagucloud/dagu/v2/internal/browserhost"
+	"github.com/dagucloud/dagu/v2/internal/browserhost/certproxy"
 	cmnconfig "github.com/dagucloud/dagu/v2/internal/cmn/config"
 	"github.com/dagucloud/dagu/v2/internal/cmn/dirlock"
 	"github.com/dagucloud/dagu/v2/internal/cmn/masking"
@@ -282,6 +283,10 @@ func (s *Sessions) Open(ctx context.Context, opts SessionOptions) (OpenResult, e
 	sweepCtx, cancel := context.WithTimeout(ctx, sweepBudget)
 	_ = browserhost.SweepAll(sweepCtx, browserDir, s.now(), nil)
 	cancel()
+	certificates, warnings, err := loadClientCertificates(ctx, nil, "")
+	if err != nil {
+		return OpenResult{}, &SessionError{Code: CodeLaunchFailed, Message: err.Error()}
+	}
 
 	id, workDir, err := reserveSession(store)
 	if err != nil {
@@ -322,6 +327,9 @@ func (s *Sessions) Open(ctx context.Context, opts SessionOptions) (OpenResult, e
 		AllowedDomains: opts.AllowedDomains,
 		NoSandbox:      cmnconfig.GetConfig(ctx).Browser.NoSandbox,
 		Generate:       generate,
+
+		ClientCertificates: certificates,
+		Warn:               func(message string) { warnings = append(warnings, message) },
 	}
 	if opts.Viewport != nil {
 		launch.Viewport = &viewport{Width: opts.Viewport.Width, Height: opts.Viewport.Height}
@@ -365,10 +373,10 @@ func (s *Sessions) Open(ctx context.Context, opts SessionOptions) (OpenResult, e
 		BrowserStartedAt: handle.BrowserStartedAt,
 		WorkDir:          workDir,
 	}
+	recordCertProxy(&record, handle.CertProxy)
 	if err := saveSessionRecord(store, &record, state, browserhost.StateRunning, time.Time{}); err != nil {
 		return OpenResult{}, errors.Join(err, closeSession(ctx, eng, store, record))
 	}
-	var warnings []string
 	if warning := jobWarning(); warning != "" {
 		warnings = append(warnings, warning)
 	}
@@ -379,7 +387,7 @@ func (s *Sessions) Open(ctx context.Context, opts SessionOptions) (OpenResult, e
 				closeSession(ctx, eng, store, record))
 		}
 	}
-	if err := op.checkPage(ctx); err != nil {
+	if err := op.checkPage(ctx, -1); err != nil {
 		return OpenResult{}, errors.Join(&SessionError{Code: CodeOperationFailed, Message: err.Error()}, closeSession(ctx, eng, store, record))
 	}
 	view, pageURL := s.view(ctx, eng, masker, opts.OutlineChars, &warnings)
@@ -497,6 +505,12 @@ func (s *Sessions) operator(eng engine, bridge *modelBridge, state sessionState,
 		shots:          agentstep.NewArtifactStore(workDir, "", "screenshots"),
 		warn: func(_ int, message string) {
 			*warnings = append(*warnings, message)
+		},
+		presentsCertificates: eng.Handle().CertProxy != nil,
+		certificateEvent: func(_ int, event certproxy.Event) {
+			if event.Kind != certproxy.EventConnect {
+				*warnings = append(*warnings, "client certificate: "+describeCertificateEvent(event))
+			}
 		},
 	}
 }
@@ -636,7 +650,7 @@ func (s *Sessions) Do(ctx context.Context, req DoRequest) (DoResult, error) {
 		var done opResult
 		done, opErr = operator.runOperation(ctx, index, op)
 		if opErr == nil {
-			opErr = operator.checkPage(ctx)
+			opErr = operator.checkPage(ctx, index)
 		}
 		if opErr == nil {
 			result.Detail = done.Detail
@@ -952,13 +966,7 @@ func (s *Sessions) use(ctx context.Context, id string) (*sessionUse, error) {
 // attach reattaches to the session's browser for the command.
 func (u *sessionUse) attach(ctx context.Context, generate generateFunc) (engine, error) {
 	record := u.record
-	eng, err := u.sessions.launcher.Reattach(ctx, browserHandle{
-		CDPURL:           record.CDPURL,
-		ExtensionID:      record.ExtensionID,
-		ExtensionDir:     record.ExtensionDir,
-		BrowserPID:       record.BrowserPID,
-		BrowserStartedAt: record.BrowserStartedAt,
-	}, launchOptions{
+	eng, err := u.sessions.launcher.Reattach(ctx, recordedHandle(record), launchOptions{
 		DownloadsDir:   record.DownloadsDir,
 		AllowedDomains: u.state.Browser.AllowedDomains,
 		Generate:       generate,
