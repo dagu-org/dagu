@@ -58,6 +58,14 @@ func TestPowerShellPreambleUsesLegacyCompatibleSyntax(t *testing.T) {
 	assert.Contains(t, preamble, "New-Object -TypeName System.Text.UTF8Encoding -ArgumentList $false")
 }
 
+// The core modules are imported by name before the first cmdlet so Windows
+// PowerShell does not fall back to command auto-discovery, which analyzes
+// every module on PSModulePath when its analysis cache is cold.
+func TestPowerShellPreambleImportsCoreModulesFirst(t *testing.T) {
+	assert.Equal(t, "Import-Module Microsoft.PowerShell.Utility, Microsoft.PowerShell.Management", powerShellPreambleStatements[0])
+	assert.True(t, strings.HasPrefix(powerShellInlineCommand("Get-Date"), "Import-Module Microsoft.PowerShell.Utility, Microsoft.PowerShell.Management; "))
+}
+
 func TestDirectShell(t *testing.T) {
 	ctx := context.Background()
 
