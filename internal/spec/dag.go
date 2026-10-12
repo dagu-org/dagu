@@ -808,6 +808,8 @@ func (s *dagBuildState) resolveWorkerSelector() {
 	s.result.WorkerSelector = resolved
 }
 
+// collectWarnings sets the DAG's build warnings: deprecated settings,
+// schedule notes, and what step executors report about their configuration.
 func (s *dagBuildState) collectWarnings() {
 	s.result.BuildWarnings = nil
 
@@ -835,6 +837,8 @@ func (s *dagBuildState) collectWarnings() {
 	}
 }
 
+// harnessWorkingDirWarnings reports harness steps that leave the agent's
+// workspace to an implicit working directory.
 func harnessWorkingDirWarnings(dag *ir.DAG) []string {
 	var warnings []string
 	walkSteps(dag, func(step ir.Step, path string) {
