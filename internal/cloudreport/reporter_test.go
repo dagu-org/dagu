@@ -60,6 +60,7 @@ func TestReportPayload(t *testing.T) {
 		"license_id": "lic-1",
 		"server_id": "srv-1",
 		"heartbeat_secret": "hb-secret",
+		"level": "runs",
 		"health": {
 			"version": %q,
 			"os": %q,

@@ -280,7 +280,7 @@ func (r *Reporter) report(ctx context.Context) time.Duration {
 		return r.jitter(r.interval)
 	}
 
-	res, err := r.send(sendCtx, creds)
+	res, err := r.send(sendCtx, creds, level)
 	switch {
 	case err != nil && ctx.Err() == nil && sendCtx.Err() != nil:
 		// Reporting was turned off; nothing is retried.
@@ -408,7 +408,9 @@ type reportRequest struct {
 	LicenseID       string `json:"license_id"`
 	ServerID        string `json:"server_id"`
 	HeartbeatSecret string `json:"heartbeat_secret"`
-	Health          health `json:"health"`
+	// Level is the level the report was sent at.
+	Level  config.ReportLevel `json:"level"`
+	Health health             `json:"health"`
 	// Finished is set whenever Cursor is; it is empty when the report moves
 	// past events that end no run.
 	Finished []finishedRun `json:"finished,omitzero"`
@@ -457,12 +459,14 @@ func (r *response) message() string {
 	return strings.TrimSpace(string(r.body))
 }
 
-func (r *Reporter) send(ctx context.Context, creds license.CloudCredentials) (*response, error) {
+// send sends a report at level.
+func (r *Reporter) send(ctx context.Context, creds license.CloudCredentials, level config.ReportLevel) (*response, error) {
 	report := reportRequest{
 		Protocol:        protocolVersion,
 		LicenseID:       creds.LicenseID,
 		ServerID:        creds.ServerID,
 		HeartbeatSecret: creds.HeartbeatSecret,
+		Level:           level,
 		Health: health{
 			Version:   config.Version,
 			OS:        runtime.GOOS,
