@@ -203,7 +203,7 @@ Dagu runs on one machine, on temporary workers your platform creates for each ru
 
 ### Licensing
 
-- **Community self-host:** No license key required. You operate the server, storage, upgrades, networking, and workers. Start with the [installation guide](https://docs.dagu.sh/getting-started/installation/).
+- **Community self-host:** No license key required. You operate the server, storage, upgrades, networking, and workers. One server can be [monitored in Dagu Console](#monitor-every-server-from-one-place) for free. Start with the [installation guide](https://docs.dagu.sh/getting-started/installation/).
 - **Self-host license:** Adds SSO, RBAC, audit logging, incident SaaS integration, and [monitoring in Dagu Console](#monitor-every-server-from-one-place) to Dagu. See [self-host licensing](https://dagu.sh/pricing#self-host).
 
 ## Monitor Every Server from One Place
@@ -215,10 +215,10 @@ Connect your Dagu servers to [Dagu Console](https://console.dagu.sh) and see all
 </div>
 
 - **Opt-in:** a server reports nothing until an administrator turns monitoring on in **Plan & features**, or sets `cloud.report: runs`.
-- **Outbound only:** the server reports over HTTPS every 60 seconds. No inbound port and no VPN.
+- **Outbound only:** the server reports over HTTPS every 60 seconds, or every 5 minutes on the free tier. No inbound port and no VPN.
 - **Metadata only:** run status, timing, and failed step names. Logs, outputs, parameters, and secrets are never sent, and the server shows the exact JSON it last sent.
 
-Workflows keep running on your servers whether or not Dagu Console can be reached. Monitoring is in beta and needs a Team or Pro plan, or a trial. See [Monitoring](https://docs.dagu.sh/overview/console-monitoring).
+Workflows keep running on your servers whether or not Dagu Console can be reached. Monitoring is in beta. It is free for one server on Dagu v2.19.2 or later, with lower limits; a Team or Pro plan, or a trial, covers every licensed server. See [Monitoring](https://docs.dagu.sh/overview/console-monitoring).
 
 ## Key Features
 
