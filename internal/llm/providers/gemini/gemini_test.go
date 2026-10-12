@@ -419,6 +419,13 @@ func TestThinkingConfig(t *testing.T) {
 			wantThinking: `{"thinkingLevel":"HIGH"}`,
 		},
 		{
+			name:          "explicit budget on 3 series overrides effort",
+			model:         "gemini-3.8-flash",
+			thinking:      &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortHigh, BudgetTokens: new(4096)},
+			wantThinking:  `{"thinkingBudget":4096}`,
+			wantMaxTokens: 4096 + 4096,
+		},
+		{
 			name:         "explicit zero budget is preserved",
 			model:        "gemini-2.5-flash",
 			thinking:     &llm.ThinkingRequest{Enabled: true, BudgetTokens: new(0)},
