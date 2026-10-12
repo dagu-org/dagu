@@ -84,7 +84,8 @@ actions an act performed and whether an exported step will replay them,
 what an extract read, the files a screenshot or download saved, the dialogs
 the browser accepted, the requests `allowed_domains` blocked, the tokens
 used, and the page the browser is on next with its outline. A failed
-operation is kept in the history and the session stays open.
+operation is kept in the history and the session stays open. An extract
+warns about the same link fields loading a step does.
 
 ### Variables
 
