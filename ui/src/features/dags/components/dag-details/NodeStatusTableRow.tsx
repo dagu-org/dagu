@@ -29,7 +29,6 @@ import {
 } from '@/lib/executor-utils';
 import { isHarnessStep } from '@/lib/harness-step';
 import { isActiveNodeStatus } from '@/lib/status-utils';
-import dayjs from '@/lib/dayjs';
 import { cn } from '@/lib/utils';
 import {
   Dialog,
@@ -174,18 +173,6 @@ function BuildDecisionBadge({
 }
 
 /**
- * Format timestamp for better readability
- */
-const formatTimestamp = (timestamp: string | undefined) => {
-  if (!timestamp || timestamp == '-') return '-';
-  try {
-    return dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss Z');
-  } catch {
-    return timestamp;
-  }
-};
-
-/**
  * Calculate duration between two timestamps
  * If endTime is not provided, calculate duration from startTime to now (for running tasks)
  */
@@ -244,9 +231,7 @@ function ManualActionDetails({
             className="text-info"
           />
           {node.finishedAt && (
-            <span className="ml-1">
-              <I18nText text={'at'} /> {formatTimestamp(node.finishedAt)}
-            </span>
+            <RelativeTime className="ml-1" timestamp={node.finishedAt} />
           )}
         </div>
       ) : null}
@@ -261,9 +246,7 @@ function ManualActionDetails({
             className="text-info"
           />
           {node.approvedAt && (
-            <span className="ml-1">
-              <I18nText text={'at'} /> {formatTimestamp(node.approvedAt)}
-            </span>
+            <RelativeTime className="ml-1" timestamp={node.approvedAt} />
           )}
         </div>
       ) : null}
@@ -291,9 +274,7 @@ function ManualActionDetails({
             className="text-error"
           />
           {node.rejectedAt && (
-            <span className="ml-1">
-              <I18nText text={'at'} /> {formatTimestamp(node.rejectedAt)}
-            </span>
+            <RelativeTime className="ml-1" timestamp={node.rejectedAt} />
           )}
         </div>
       ) : null}

@@ -73,6 +73,56 @@ const mockedUseQuery = vi.mocked(
 
 const stepLogPath = '/dag-runs/{name}/{dagRunId}/steps/{stepName}/log';
 
+const NOW = '2026-07-22T01:05:00Z';
+const FIVE_MINUTES_AGO = '2026-07-22T01:00:00Z';
+const ABSOLUTE_FORMAT = 'YYYY-MM-DD HH:mm:ss Z';
+
+const timedNode = {
+  step: { name: 'build' },
+  status: NodeStatus.Success,
+  statusLabel: NodeStatusLabel.succeeded,
+  stdout: '',
+  stderr: '',
+  startedAt: '',
+  finishedAt: '',
+  retryCount: 0,
+  doneCount: 1,
+} as components['schemas']['Node'];
+
+// Fakes only Date so relative labels are stable without stalling timers.
+function freezeNow() {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date(NOW));
+}
+
+function renderRow(
+  node: components['schemas']['Node'],
+  view: 'desktop' | 'mobile'
+) {
+  const row = (
+    <NodeStatusTableRow
+      rownum={1}
+      node={node}
+      name="example.yaml"
+      dagRun={dagRun}
+      view={view}
+    />
+  );
+  return render(
+    <MemoryRouter>
+      <AppBarContext.Provider value={appBarValue}>
+        {view === 'desktop' ? (
+          <table>
+            <tbody>{row}</tbody>
+          </table>
+        ) : (
+          row
+        )}
+      </AppBarContext.Provider>
+    </MemoryRouter>
+  );
+}
+
 describe('NodeStatusTableRow', () => {
   beforeEach(() => {
     configMock.runDags = true;
@@ -256,52 +306,33 @@ describe('NodeStatusTableRow', () => {
   it.each(['desktop', 'mobile'] as const)(
     'shows the step start time relative to now in the %s view',
     (view) => {
-      // Only Date is faked so the label is stable without stalling timers.
-      vi.useFakeTimers({ toFake: ['Date'] });
-      vi.setSystemTime(new Date('2026-07-22T01:05:00Z'));
-      const startedAt = '2026-07-22T01:00:00Z';
-      const node = {
-        step: { name: 'build' },
-        status: NodeStatus.Success,
-        statusLabel: NodeStatusLabel.succeeded,
-        stdout: '',
-        stderr: '',
-        startedAt,
-        finishedAt: '2026-07-22T01:01:00Z',
-        retryCount: 0,
-        doneCount: 1,
-      } as components['schemas']['Node'];
-
-      const row = (
-        <NodeStatusTableRow
-          rownum={1}
-          node={node}
-          name="example.yaml"
-          dagRun={dagRun}
-          view={view}
-        />
-      );
-
-      render(
-        <MemoryRouter>
-          <AppBarContext.Provider value={appBarValue}>
-            {view === 'desktop' ? (
-              <table>
-                <tbody>{row}</tbody>
-              </table>
-            ) : (
-              row
-            )}
-          </AppBarContext.Provider>
-        </MemoryRouter>
-      );
+      freezeNow();
+      renderRow({ ...timedNode, startedAt: FIVE_MINUTES_AGO }, view);
 
       expect(screen.getByText('5 minutes ago')).toHaveAttribute(
         'title',
-        dayjs(startedAt).format('YYYY-MM-DD HH:mm:ss Z')
+        dayjs(FIVE_MINUTES_AGO).format(ABSOLUTE_FORMAT)
       );
     }
   );
+
+  it.each([
+    [
+      'Completed by:',
+      { humanTaskCompletedBy: 'alice', finishedAt: FIVE_MINUTES_AGO },
+    ],
+    ['Approved by:', { approvedBy: 'alice', approvedAt: FIVE_MINUTES_AGO }],
+    ['Rejected by:', { rejectedBy: 'alice', rejectedAt: FIVE_MINUTES_AGO }],
+  ])('shows the "%s" time relative to now', (label, fields) => {
+    freezeNow();
+    renderRow({ ...timedNode, ...fields }, 'desktop');
+
+    const line = screen.getByText(label).parentElement!;
+    expect(within(line).getByText('5 minutes ago')).toHaveAttribute(
+      'title',
+      dayjs(FIVE_MINUTES_AGO).format(ABSOLUTE_FORMAT)
+    );
+  });
 
   it('falls back to the configured log message when stdout cannot be loaded', () => {
     mockedUseQuery.mockImplementation((path, init) => ({

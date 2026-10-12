@@ -295,7 +295,6 @@ const english = {
   'Artifacts will appear here after a run writes files into {directory}.':
     'Artifacts will appear here after a run writes files into {directory}.',
   Asc: 'Asc',
-  at: 'at',
   'at sign-in.': 'at sign-in.',
   'Attach logs': 'Attach logs',
   Attempt: 'Attempt',
@@ -2720,7 +2719,6 @@ const chinese = {
   'Artifacts will appear here after a run writes files into {directory}.':
     '运行将文件写入 {directory} 后，产物将显示在此处。',
   Asc: '升序',
-  at: '于',
   'at sign-in.': '登录时。',
   'Attach logs': '附加日志',
   Attempt: '尝试',
@@ -5097,7 +5095,6 @@ const japanese = {
   'Artifacts will appear here after a run writes files into {directory}.':
     '実行が {directory} にファイルを書き込むと、成果物がここに表示されます。',
   Asc: '昇順',
-  at: '日時:',
   'at sign-in.': 'サインイン時。',
   'Attach logs': 'ログを添付',
   Attempt: '試行',
