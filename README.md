@@ -30,6 +30,7 @@ Dagu turns existing scripts and runbooks into production workflows with scheduli
 - Schedule workflows with cron syntax, timezones, overlap policies, and catch-up windows.
 - Keep logs, run history, retries, notifications, and webhook triggers in one place.
 - Built-in MCP server for inspecting workflows and runs, maintaining Wiki pages, applying changes, and controlling runs.
+- Optional monitoring in Dagu Console: every server's runs and trends in one place, and an email when a workflow fails or a server stops reporting. Opt-in, outbound HTTPS only, metadata only.
 
 ## Quick Look
 
@@ -203,7 +204,21 @@ Dagu runs on one machine, on temporary workers your platform creates for each ru
 ### Licensing
 
 - **Community self-host:** No license key required. You operate the server, storage, upgrades, networking, and workers. Start with the [installation guide](https://docs.dagu.sh/getting-started/installation/).
-- **Self-host license:** Adds SSO, RBAC, audit logging, and incident SaaS integration to Dagu. See [self-host licensing](https://dagu.sh/pricing#self-host).
+- **Self-host license:** Adds SSO, RBAC, audit logging, incident SaaS integration, and [monitoring in Dagu Console](#monitor-every-server-from-one-place) to Dagu. See [self-host licensing](https://dagu.sh/pricing#self-host).
+
+## Monitor Every Server from One Place
+
+Connect your Dagu servers to [Dagu Console](https://console.dagu.sh) and see all of them in one place: which servers report, what failed today, open alerts, and run and duration trends for each workflow. Alert emails go out when a workflow fails or recovers, and when a server stops reporting.
+
+<div align="center">
+  <img src="./assets/images/readme-console-overview.png" width="720" alt="Dagu Console Overview showing two of three servers reporting, failures today, open alerts including a server that stopped reporting, and the 7-day success rate.">
+</div>
+
+- **Opt-in:** a server reports nothing until an administrator turns monitoring on in **Plan & features**, or sets `cloud.report: runs`.
+- **Outbound only:** the server reports over HTTPS every 60 seconds. No inbound port and no VPN.
+- **Metadata only:** run status, timing, and failed step names. Logs, outputs, parameters, and secrets are never sent, and the server shows the exact JSON it last sent.
+
+Workflows keep running on your servers whether or not Dagu Console can be reached. Monitoring is in beta and needs a Team or Pro plan, or a trial. See [Monitoring](https://docs.dagu.sh/overview/console-monitoring).
 
 ## Key Features
 
@@ -743,6 +758,10 @@ Dagu exposes Prometheus-compatible metrics:
 - `dagu_worker_pollers`: Worker poller capacity by state
 - `dagu_worker_running_tasks`: Running tasks per worker
 - `dagu_worker_oldest_running_task_age_seconds`: Age of the oldest running task per worker
+
+### Dagu Console Monitoring
+
+Connected servers can report their health and run status to Dagu Console for one view across servers, trends, and alert emails. See [Monitor Every Server from One Place](#monitor-every-server-from-one-place).
 
 ### Structured Logging
 
