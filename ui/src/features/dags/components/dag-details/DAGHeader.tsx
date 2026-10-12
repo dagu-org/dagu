@@ -16,6 +16,7 @@ import { components, Status } from '../../../../api/v1/schema';
 import { useConfig } from '../../../../contexts/ConfigContext';
 import dayjs from '../../../../lib/dayjs';
 import { useCopyFeedback } from '@/hooks/useCopyFeedback';
+import RelativeTime from '@/components/ui/relative-time';
 import StatusChip from '@/components/ui/status-chip';
 import AutoRetryBadge from '../../../dag-runs/components/common/AutoRetryBadge';
 import { workspaceNameFromLabels } from '../../../../lib/workspace';
@@ -363,11 +364,11 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
 
             <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
               <Calendar className="h-3 w-3" />
-              <span className="truncate">
-                {dagRunToDisplay?.startedAt
-                  ? dayjs(dagRunToDisplay.startedAt).format('MMM D, HH:mm:ss')
-                  : '--'}
-              </span>
+              <RelativeTime
+                className="truncate"
+                timestamp={dagRunToDisplay?.startedAt}
+                fallback="--"
+              />
             </span>
 
             <span className="flex items-center gap-1 text-xs text-muted-foreground">
