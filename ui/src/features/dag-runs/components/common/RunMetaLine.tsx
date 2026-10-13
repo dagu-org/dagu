@@ -70,11 +70,17 @@ function MetaItem({
   );
 }
 
+// The API reports an unset time as "-".
+function parseTime(value?: string): dayjs.Dayjs | undefined {
+  if (!value || value === '-') return undefined;
+  const time = dayjs(value);
+  return time.isValid() ? time : undefined;
+}
+
 function queueWaitSeconds(queuedAt?: string, startedAt?: string): number {
-  if (!queuedAt || !startedAt || startedAt === '-') return 0;
-  const queued = dayjs(queuedAt);
-  const started = dayjs(startedAt);
-  if (!queued.isValid() || !started.isValid()) return 0;
+  const queued = parseTime(queuedAt);
+  const started = parseTime(startedAt);
+  if (!queued || !started) return 0;
   return started.diff(queued, 'second');
 }
 
@@ -97,7 +103,7 @@ export function RunMetaLine({
       void ownCopy.copy(dagRun.dagRunId);
     }
   };
-  const started = dagRun.status !== Status.NotStarted;
+  const started = parseTime(dagRun.startedAt) !== undefined;
   const running = dagRun.status === Status.Running;
   const queueWait = queueWaitSeconds(dagRun.queuedAt, dagRun.startedAt);
 

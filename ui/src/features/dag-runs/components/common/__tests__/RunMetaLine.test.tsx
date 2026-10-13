@@ -31,6 +31,23 @@ describe('RunMetaLine', () => {
     expect(screen.getByText('region=eu')).toBeInTheDocument();
   });
 
+  it('omits start and duration until a queued run starts', () => {
+    render(
+      <RunMetaLine
+        dagRun={{
+          ...run,
+          status: Status.Queued,
+          startedAt: '-',
+          finishedAt: '-',
+        }}
+      />
+    );
+
+    expect(screen.queryByTitle('Started')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Duration')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Queue wait')).not.toBeInTheDocument();
+  });
+
   it('copies and announces the run ID on its own', async () => {
     Object.assign(navigator, {
       clipboard: { writeText: vi.fn().mockResolvedValue(undefined) },
