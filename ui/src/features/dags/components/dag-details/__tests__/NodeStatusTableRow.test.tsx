@@ -68,7 +68,11 @@ const dagRun = {
 } as components['schemas']['DAGRunDetails'];
 
 const mockedUseQuery = vi.mocked(
-  useQuery as unknown as (path: unknown, init: unknown) => unknown
+  useQuery as unknown as (
+    path: unknown,
+    init: unknown,
+    config?: unknown
+  ) => unknown
 );
 
 const stepLogPath = '/dag-runs/{name}/{dagRunId}/steps/{stepName}/log';
@@ -333,6 +337,61 @@ describe('NodeStatusTableRow', () => {
       dayjs(FIVE_MINUTES_AGO).format(ABSOLUTE_FORMAT)
     );
   });
+
+  it.each([
+    ['finished', NodeStatus.Success, 0],
+    ['running', NodeStatus.Running, 2000],
+  ])(
+    'polls the expanded log of a %s step only while it runs',
+    (_, status, interval) => {
+      // Running status text animates and reads the reduced-motion preference.
+      Object.defineProperty(window, 'matchMedia', {
+        writable: true,
+        value: vi.fn().mockImplementation((query: string) => ({
+          matches: false,
+          media: query,
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+        })),
+      });
+      mockedUseQuery.mockClear();
+      const node = {
+        ...timedNode,
+        status,
+        stdout: '/tmp/build.out',
+      } as components['schemas']['Node'];
+
+      render(
+        <MemoryRouter>
+          <AppBarContext.Provider value={appBarValue}>
+            <table>
+              <tbody>
+                <NodeStatusTableRow
+                  rownum={1}
+                  node={node}
+                  name="example.yaml"
+                  dagRun={dagRun}
+                  view="desktop"
+                  defaultLogExpanded
+                />
+              </tbody>
+            </table>
+          </AppBarContext.Provider>
+        </MemoryRouter>
+      );
+
+      const inlineLogCalls = mockedUseQuery.mock.calls.filter(
+        ([path, init]) =>
+          path === stepLogPath &&
+          (init as { params?: { query?: { tail?: number } } } | undefined)
+            ?.params?.query?.tail === 100
+      );
+      expect(inlineLogCalls.length).toBeGreaterThan(0);
+      for (const call of inlineLogCalls) {
+        expect(call[2]).toMatchObject({ refreshInterval: interval });
+      }
+    }
+  );
 
   it('falls back to the configured log message when stdout cannot be loaded', () => {
     mockedUseQuery.mockImplementation((path, init) => ({
