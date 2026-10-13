@@ -314,7 +314,8 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
 
     // Scroll to the line after DOM updates
     setTimeout(() => {
-      const lineElements = document.querySelectorAll('[data-line-number]');
+      const lineElements =
+        logContainerRef.current?.querySelectorAll('[data-line-number]') ?? [];
       for (const element of lineElements) {
         const htmlElement = element as HTMLElement;
         const lineNumber = parseInt(
