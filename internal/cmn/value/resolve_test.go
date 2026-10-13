@@ -223,6 +223,7 @@ func TestResolverForeachDollarEscapes(t *testing.T) {
 			"episode": map[string]any{"請求番号": "INV-001"},
 		},
 	}, WithValueReferenceNotices(&notices))
+	command := CommandContext{Target: CommandTargetLocal, ShellConfigured: true, Shell: []string{"sh"}}
 	for _, ref := range []string{`${foreach.item}`, `${foreach.episode."請求番号"}`, `${foreach.episode["請求番号"]}`} {
 		for _, backslashes := range []int{1, 2, 3} {
 			input := strings.Repeat(`\`, backslashes) + ref
@@ -230,7 +231,11 @@ func TestResolverForeachDollarEscapes(t *testing.T) {
 			if backslashes%2 == 1 {
 				want = strings.Repeat(`\`, backslashes-1) + ref
 			}
-			for _, field := range []Field{WorkflowField("foreach.collect"), StepEnvField("CAPTURE")} {
+			for _, field := range []Field{
+				WorkflowField("foreach.collect"), StepEnvField("CAPTURE"),
+				ShellCommandField("run", command), CommandScriptField("script", command),
+				StepArtifactOutputField("output"),
+			} {
 				got, err := resolver.String(context.Background(), input, field)
 				require.NoError(t, err)
 				assert.Equal(t, want, got, "input: %s, field: %s", input, field.Path())

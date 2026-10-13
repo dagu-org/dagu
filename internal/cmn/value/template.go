@@ -111,8 +111,20 @@ func resolveBindings(
 		taken = ""
 	}
 	legacy := resolver{foreach: scope.Foreach, stepMap: scope.Steps}
+	protectOriginal := func(token string) string {
+		placeholder := uniqueToken(taken, "\uE000DAGU_UNRESOLVED_REF_")
+		// Shells get an ASCII token because Windows substitution output may not keep other runes.
+		commandToken := uniqueToken(taken, "__DAGU_UNRESOLVED_REF__")
+		all = append(all, placeholder, token)
+		toCommand = append(toCommand, placeholder, commandToken)
+		fromCommand = append(fromCommand, commandToken, placeholder)
+		return placeholder
+	}
 	// A leading non-identifier rune keeps an adjacent $NAME from absorbing a placeholder.
-	resolved, err := walkBindings(input, len(scope.Foreach) > 0, func(token string, path string) (string, error) {
+	resolved, err := walkBindings(input, len(scope.Foreach) > 0, func(token string, path string, escaped bool) (string, error) {
+		if escaped {
+			return protectOriginal(token), nil
+		}
 		var value any
 		var err error
 		if strings.HasPrefix(path, "foreach.") && !supportedStrictBinding(strings.Split(path, ".")) {
@@ -127,13 +139,7 @@ func resolveBindings(
 		}
 		if err != nil {
 			addUnresolvedReferenceNotice(notices, field, token, err)
-			placeholder := uniqueToken(taken, "\uE000DAGU_UNRESOLVED_REF_")
-			// Shells get an ASCII token because Windows substitution output may not keep other runes.
-			commandToken := uniqueToken(taken, "__DAGU_UNRESOLVED_REF__")
-			all = append(all, placeholder, token)
-			toCommand = append(toCommand, placeholder, commandToken)
-			fromCommand = append(fromCommand, commandToken, placeholder)
-			return placeholder, nil
+			return protectOriginal(token), nil
 		}
 		placeholder := uniqueToken(taken, "\uE000DAGU_RESOLVED_REF_")
 		text := formatBindingValue(value)
@@ -368,7 +374,7 @@ func isEscapedSingleQuote(input string, idx int) bool {
 	return backslashes%2 == 1
 }
 
-func walkBindings(input string, foreachPaths bool, visit func(token, path string) (string, error)) (string, error) {
+func walkBindings(input string, foreachPaths bool, visit func(token, path string, escaped bool) (string, error)) (string, error) {
 	var b strings.Builder
 	last := 0
 	for _, loc := range bindingRefPattern.FindAllStringSubmatchIndex(input, -1) {
@@ -377,17 +383,19 @@ func walkBindings(input string, foreachPaths bool, visit func(token, path string
 		if !supportedStrictBinding(segments) && !reservedBuiltinContextReference(segments) && (!foreachPaths || !strings.HasPrefix(path, "foreach.")) {
 			continue
 		}
-		if isEscapedDollar(input, loc[0]) {
-			if foreachPaths && strings.HasPrefix(path, "foreach.") {
-				continue
-			}
+		escaped := isEscapedDollar(input, loc[0])
+		if escaped && (!foreachPaths || !strings.HasPrefix(path, "foreach.")) {
 			b.WriteString(input[last : loc[0]-1])
 			b.WriteString(input[loc[0]:loc[1]])
 			last = loc[1]
 			continue
 		}
-		b.WriteString(input[last:loc[0]])
-		replacement, err := visit(input[loc[0]:loc[1]], path)
+		start := loc[0]
+		if escaped {
+			start--
+		}
+		b.WriteString(input[last:start])
+		replacement, err := visit(input[loc[0]:loc[1]], path, escaped)
 		if err != nil {
 			return "", err
 		}
