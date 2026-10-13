@@ -2441,6 +2441,7 @@ const english = {
   "Items per page": "Items per page",
   "Open in fullscreen": "Open in fullscreen",
   "{selected} of {loaded} selected": "{selected} of {loaded} selected",
+  "Toggle {name}": "Toggle {name}",
 } as const;
 
 export type StaticMessage = keyof typeof english;
@@ -4824,6 +4825,7 @@ const chinese = {
   "Items per page": "每页条数",
   "Open in fullscreen": "全屏打开",
   "{selected} of {loaded} selected": "已选择 {loaded} 项中的 {selected} 项",
+  "Toggle {name}": "切换 {name}",
 } as const satisfies Record<StaticMessage, string>;
 
 const japanese = {
@@ -7289,6 +7291,7 @@ const japanese = {
   "Items per page": "1 ページの件数",
   "Open in fullscreen": "全画面で開く",
   "{selected} of {loaded} selected": "{loaded} 件中 {selected} 件を選択",
+  "Toggle {name}": "{name} を切り替え",
 } as const satisfies Record<StaticMessage, string>;
 
 export const staticMessages = {

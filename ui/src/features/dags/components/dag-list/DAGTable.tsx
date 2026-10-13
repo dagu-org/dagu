@@ -344,13 +344,7 @@ function DAGCard({
           className="flex items-center gap-1 flex-shrink-0 min-w-0"
           onClick={(e) => e.stopPropagation()}
         >
-          {hasSchedule && (
-            <LiveSwitch
-              dag={dag}
-              refresh={refreshFn}
-              aria-label={`Toggle ${dag.dag.name}`}
-            />
-          )}
+          {hasSchedule && <LiveSwitch dag={dag} refresh={refreshFn} />}
           <span className="text-xs text-muted-foreground truncate">
             {dag.suspended ? (
               <I18nText text={'Suspended'} />
@@ -925,11 +919,7 @@ const defaultColumns = [
           onClick={(e) => e.stopPropagation()}
           className="flex-shrink-0 p-0.5"
         >
-          <LiveSwitch
-            dag={data.dag}
-            refresh={table.options.meta?.refreshFn}
-            aria-label={`Toggle ${data.name}`}
-          />
+          <LiveSwitch dag={data.dag} refresh={table.options.meta?.refreshFn} />
         </div>
       );
 
