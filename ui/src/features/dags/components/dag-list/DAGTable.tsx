@@ -37,7 +37,6 @@ import React, {
 import { Link, useNavigate } from 'react-router-dom';
 import { DAGNameInputModal } from '@/components/DAGNameInputModal';
 import { components, Status } from '../../../../api/v1/schema';
-import type { Config } from '../../../../contexts/ConfigContext';
 import dayjs from '../../../../lib/dayjs';
 import {
   getScheduleKey,
@@ -52,8 +51,6 @@ import { CreateDAGModal, DAGPagination } from '../common';
 import DAGActions from '../common/DAGActions';
 import LiveSwitch from '../common/LiveSwitch';
 import PinToggle from '../common/PinToggle';
-
-declare const getConfig: () => Config;
 
 // Helper to format milliseconds into d/h/m/s
 function formatMs(ms: number): string {
@@ -344,10 +341,10 @@ function DAGCard({
       {/* Actions row: LiveSwitch + DAGActions */}
       <div className="flex flex-wrap items-center justify-between gap-1 pt-1.5 border-t border-border/50 min-w-0">
         <div
-          className={`flex items-center gap-1 flex-shrink-0 min-w-0 ${!hasSchedule ? 'opacity-40 pointer-events-none' : ''}`}
+          className="flex items-center gap-1 flex-shrink-0 min-w-0"
           onClick={(e) => e.stopPropagation()}
         >
-          <LiveSwitch dag={dag} refresh={refreshFn} />
+          {hasSchedule && <LiveSwitch dag={dag} refresh={refreshFn} />}
           <span className="text-xs text-muted-foreground truncate">
             {dag.suspended ? (
               <I18nText text={'Suspended'} />
@@ -667,14 +664,9 @@ const defaultColumns = [
   columnHelper.accessor('name', {
     id: 'Name',
     header: () => (
-      <div className="flex flex-col py-1">
-        <span className="text-xs">
-          <I18nText text={'Name'} />
-        </span>
-        <span className="text-xs font-normal text-muted-foreground">
-          <I18nText text={'Description'} />
-        </span>
-      </div>
+      <span className="text-xs">
+        <I18nText text={'Name'} />
+      </span>
     ),
     cell: ({ row, getValue, table }) => {
       const data = row.original!;
@@ -822,14 +814,9 @@ const defaultColumns = [
     size: 80,
     minSize: 80,
     header: () => (
-      <div className="flex flex-col py-1">
-        <span className="text-xs">
-          <I18nText text={'Status'} />
-        </span>
-        <span className="text-xs font-normal text-muted-foreground">
-          <I18nText text={'Latest status'} />
-        </span>
-      </div>
+      <span className="text-xs">
+        <I18nText text={'Status'} />
+      </span>
     ),
     cell: ({ row }) => {
       // Use row
@@ -851,14 +838,9 @@ const defaultColumns = [
     size: 110,
     minSize: 90,
     header: () => (
-      <div className="flex flex-col py-1">
-        <span className="text-xs">
-          <I18nText text={'Last Run'} />
-        </span>
-        <span className="text-xs font-normal text-muted-foreground">
-          {getConfig().tz || <I18nText text={'Local Timezone'} />}
-        </span>
-      </div>
+      <span className="text-xs">
+        <I18nText text={'Last Run'} />
+      </span>
     ),
     cell: ({ row }) => {
       const data = row.original!;
@@ -913,14 +895,9 @@ const defaultColumns = [
     size: 140,
     minSize: 120,
     header: () => (
-      <div className="flex flex-col py-1">
-        <span className="text-xs">
-          <I18nText text={'Live / Schedule'} />
-        </span>
-        <span className="text-xs font-normal text-muted-foreground">
-          <I18nText text={'Toggle & next run'} />
-        </span>
-      </div>
+      <span className="text-xs">
+        <I18nText text={'Schedule'} />
+      </span>
     ),
     cell: ({ row, table }) => {
       const data = row.original!;
@@ -929,32 +906,22 @@ const defaultColumns = [
       }
 
       const schedules = data.dag.dag.schedule || [];
-      const hasSchedule = schedules.length > 0;
+      if (schedules.length === 0) {
+        return (
+          <span className="text-xs text-muted-foreground">
+            <I18nText text={'No schedule'} />
+          </span>
+        );
+      }
 
-      // LiveSwitch component
       const liveSwitch = (
         <div
           onClick={(e) => e.stopPropagation()}
-          className={`flex-shrink-0 p-0.5 ${!hasSchedule ? 'opacity-40 pointer-events-none' : ''}`}
+          className="flex-shrink-0 p-0.5"
         >
-          <LiveSwitch
-            dag={data.dag}
-            refresh={table.options.meta?.refreshFn}
-            aria-label={`Toggle ${data.name}`}
-          />
+          <LiveSwitch dag={data.dag} refresh={table.options.meta?.refreshFn} />
         </div>
       );
-
-      if (!hasSchedule) {
-        return (
-          <div className="flex items-center gap-2">
-            {liveSwitch}
-            <span className="text-xs text-muted-foreground">
-              <I18nText text={'No schedule'} />
-            </span>
-          </div>
-        );
-      }
 
       // Display schedule expressions
       const scheduleContent = (
@@ -1029,14 +996,9 @@ const defaultColumns = [
     minSize: 160,
     maxSize: 160,
     header: () => (
-      <div className="flex flex-col items-center py-1">
-        <span className="text-xs">
-          <I18nText text={'Actions'} />
-        </span>
-        <span className="text-xs font-normal text-muted-foreground">
-          <I18nText text={'Operations'} />
-        </span>
-      </div>
+      <span className="block text-center text-xs">
+        <I18nText text={'Actions'} />
+      </span>
     ),
     cell: ({ row, table }) => {
       // Use row and table

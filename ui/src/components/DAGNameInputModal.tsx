@@ -181,7 +181,7 @@ export function DAGNameInputModal({
               <X className="h-4 w-4" />
               <I18nText text={'Cancel'} />
             </Button>
-            <Button type="submit" disabled={isLoading}>
+            <Button type="submit" variant="primary" disabled={isLoading}>
               {mode === 'create' ? (
                 <Plus className="h-4 w-4" />
               ) : (

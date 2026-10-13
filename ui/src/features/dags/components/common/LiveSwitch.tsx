@@ -25,7 +25,7 @@ type Props = {
   dag: components['schemas']['DAGFile'];
   /** Function to refresh data after toggling */
   refresh?: () => void;
-  /** Aria label for accessibility */
+  /** Accessible name; defaults to "Schedule for" and the workflow name. */
   'aria-label'?: string;
 };
 
@@ -100,7 +100,9 @@ function LiveSwitch({ dag, refresh, 'aria-label': ariaLabel }: Props) {
           config.permissions.runDags ? handleCheckedChange : undefined
         }
         disabled={!config.permissions.runDags}
-        aria-label={ariaLabel}
+        aria-label={
+          ariaLabel ?? ts('Schedule for {name}', { name: dag.dag.name })
+        }
       />
       <I18nProps>
         <ConfirmModal

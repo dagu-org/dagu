@@ -181,7 +181,7 @@ export function ResetPasswordModal({
               <X className="h-4 w-4" />
               <I18nText text={'Cancel'} />
             </Button>
-            <Button type="submit" disabled={isLoading || success}>
+            <Button type="submit" variant="primary" disabled={isLoading || success}>
               <KeyRound className="h-4 w-4" />
               {isLoading ? (
                 <I18nText text={'Resetting...'} />

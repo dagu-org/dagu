@@ -336,6 +336,7 @@ export function SecretRefsSection(): React.ReactNode {
           </Select>
           <Button
             size="sm"
+            variant="primary"
             className="h-8"
             disabled={!canManageSecrets}
             onClick={() => {
@@ -850,7 +851,7 @@ function SecretFormDialog({
             <Button type="button" variant="ghost" onClick={onClose}>
               <I18nText text={'Cancel'} />
             </Button>
-            <Button type="submit" disabled={isSaving}>
+            <Button type="submit" variant="primary" disabled={isSaving}>
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               <I18nText text={'Save'} />
             </Button>
@@ -942,7 +943,7 @@ function RotateSecretDialog({
             <Button type="button" variant="ghost" onClick={onClose}>
               <I18nText text={'Cancel'} />
             </Button>
-            <Button type="submit" disabled={isSaving}>
+            <Button type="submit" variant="primary" disabled={isSaving}>
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               <I18nText text={'Rotate'} />
             </Button>

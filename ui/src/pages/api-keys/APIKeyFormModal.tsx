@@ -481,7 +481,7 @@ export function APIKeyFormModal({
             <Button type="button" variant="outline" onClick={onClose}>
               <I18nText text={'Cancel'} />
             </Button>
-            <Button type="submit" disabled={isLoading || !name}>
+            <Button type="submit" variant="primary" disabled={isLoading || !name}>
               {isLoading ? (
                 <I18nText text={'Saving...'} />
               ) : isEditing ? (

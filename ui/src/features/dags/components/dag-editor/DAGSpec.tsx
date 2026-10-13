@@ -794,6 +794,7 @@ function DAGSpec({ fileName, localDags, editorHints }: Props) {
                 <I18nProps>
                   <Button
                     id="save-config"
+                    variant="primary"
                     title="Save changes (Ctrl+S / Cmd+S)"
                     disabled={isSaving || !localHasUnsavedChanges}
                     onClick={async () => {

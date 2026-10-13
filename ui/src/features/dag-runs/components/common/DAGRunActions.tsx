@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/tooltip';
 import dayjs from '@/lib/dayjs';
 import ActionButton from '@/components/ui/action-button';
-import { Ban, RefreshCw, Square, X } from 'lucide-react';
+import { Ban, CircleStop, RefreshCw, X } from 'lucide-react';
 import React from 'react';
 import { components, Status } from '../../../../api/v1/schema';
 import { useConfig } from '../../../../contexts/ConfigContext';
@@ -228,7 +228,7 @@ function DAGRunActions({
                     terminateAction === 'cancel' ? (
                       <X className="h-4 w-4" />
                     ) : (
-                      <Square className="h-4 w-4" />
+                      <CircleStop className="h-4 w-4" />
                     )
                   }
                   disabled={!buttonState['terminate']}

@@ -1011,6 +1011,7 @@ function StartDAGModal({
             <I18nText text={'Cancel'} />
           </Button>
           <Button
+            variant="primary"
             onClick={() => void handleSubmit()}
             disabled={loading || !!loadError || submitting}
           >

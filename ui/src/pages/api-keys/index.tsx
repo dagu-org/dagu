@@ -162,6 +162,7 @@ export default function APIKeysPage() {
         <Button
           onClick={() => setShowCreateModal(true)}
           size="sm"
+          variant="primary"
           className="h-8"
           disabled={communityLimitReached}
         >

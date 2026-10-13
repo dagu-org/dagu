@@ -250,6 +250,7 @@ export default function UsersPage() {
           <Button
             onClick={() => setShowCreateModal(true)}
             size="sm"
+            variant="primary"
             className="h-8"
           >
             <UserPlus className="h-4 w-4 mr-1.5" />

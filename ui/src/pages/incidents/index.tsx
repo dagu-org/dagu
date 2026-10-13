@@ -181,7 +181,7 @@ function ProvidersHeader({ onAdd }: { onAdd: () => void }): ReactElement {
             />
           </p>
         </div>
-        <Button size="sm" onClick={onAdd}>
+        <Button size="sm" variant="primary" onClick={onAdd}>
           <Plus className="h-4 w-4" />
           <I18nText text={'Add connection'} />
         </Button>

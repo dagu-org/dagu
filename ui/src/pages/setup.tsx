@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useConfig } from '@/contexts/ConfigContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { LanguageSelector } from '@/components/LanguageSelector';
+import { AuthLayout } from '@/components/AuthLayout';
 import { useI18n } from '@/i18n/I18nProvider';
 import { AlertCircle, UserPlus, Loader2 } from 'lucide-react';
 
@@ -20,7 +19,6 @@ function getErrorStatus(err: unknown): number | undefined {
 
 export default function SetupPage() {
   const { t } = useI18n();
-  const config = useConfig();
   const { setupRequired, setup, completeSetup } = useAuth();
   const navigate = useNavigate();
 
@@ -79,92 +77,83 @@ export default function SetupPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/50">
-      <div className="w-full max-w-md p-6 space-y-6">
-        <div className="text-center space-y-2">
-          <h1 className="text-2xl font-bold">{config.title || 'Dagu'}</h1>
-          <p className="text-sm text-muted-foreground">
-            {t('setup.createAdmin')}
+    <AuthLayout subtitle={t('setup.createAdmin')}>
+      {error && (
+        <div className="flex items-center gap-2 p-3 text-sm text-destructive bg-destructive/10 rounded-md">
+          <AlertCircle className="h-4 w-4 flex-shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="username" className="text-sm">
+            {t('auth.username')}
+          </Label>
+          <Input
+            id="username"
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            required
+            autoComplete="username"
+            autoFocus
+            className="h-9"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="password" className="text-sm">
+            {t('auth.password')}
+          </Label>
+          <Input
+            id="password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            autoComplete="new-password"
+            className="h-9"
+          />
+          <p className="text-xs text-muted-foreground">
+            {t('setup.minimumCharacters')}
           </p>
         </div>
 
-        <div className="space-y-4">
-          {error && (
-            <div className="flex items-center gap-2 p-3 text-sm text-destructive bg-destructive/10 rounded-md">
-              <AlertCircle className="h-4 w-4 flex-shrink-0" />
-              <span>{error}</span>
-            </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="confirmPassword" className="text-sm">
+            {t('setup.confirmPassword')}
+          </Label>
+          <Input
+            id="confirmPassword"
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            required
+            autoComplete="new-password"
+            className="h-9"
+          />
+        </div>
+
+        <Button
+          type="submit"
+          variant="primary"
+          className="w-full h-9"
+          disabled={loading}
+        >
+          {loading ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              {t('setup.creatingAccount')}
+            </>
+          ) : (
+            <>
+              <UserPlus className="h-4 w-4" />
+              {t('setup.createAccount')}
+            </>
           )}
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="username" className="text-sm">
-                {t('auth.username')}
-              </Label>
-              <Input
-                id="username"
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-                autoComplete="username"
-                autoFocus
-                className="h-9"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="password" className="text-sm">
-                {t('auth.password')}
-              </Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                autoComplete="new-password"
-                className="h-9"
-              />
-              <p className="text-xs text-muted-foreground">
-                {t('setup.minimumCharacters')}
-              </p>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="confirmPassword" className="text-sm">
-                {t('setup.confirmPassword')}
-              </Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                autoComplete="new-password"
-                className="h-9"
-              />
-            </div>
-
-            <Button type="submit" className="w-full h-9" disabled={loading}>
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {t('setup.creatingAccount')}
-                </>
-              ) : (
-                <>
-                  <UserPlus className="h-4 w-4" />
-                  {t('setup.createAccount')}
-                </>
-              )}
-            </Button>
-          </form>
-        </div>
-        <div className="flex justify-center">
-          <LanguageSelector />
-        </div>
-      </div>
-    </div>
+        </Button>
+      </form>
+    </AuthLayout>
   );
 }

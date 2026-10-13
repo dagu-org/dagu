@@ -402,6 +402,7 @@ export default function LicensePage() {
               <Button
                 type="submit"
                 size="sm"
+                variant="primary"
                 className="h-8"
                 disabled={busy || !key.trim()}
               >

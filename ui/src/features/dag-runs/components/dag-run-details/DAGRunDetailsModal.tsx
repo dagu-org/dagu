@@ -261,10 +261,11 @@ function DAGRunDetailsModal({
                   size="icon"
                   onClick={handleFullscreenClick}
                   title="Open in fullscreen (F) - Cmd/Ctrl+Click to open in new tab"
+                  aria-label="Open in fullscreen"
                   className="relative group"
                 >
                   <Maximize2 className="h-4 w-4" />
-                  <span className="absolute -bottom-1 -right-1 bg-muted text-muted-foreground text-xs font-medium px-1 rounded-sm border opacity-0 group-hover:opacity-100 transition-opacity">
+                  <span aria-hidden="true" className="absolute -bottom-1 -right-1 bg-muted text-muted-foreground text-xs font-medium px-1 rounded-sm border opacity-0 group-hover:opacity-100 transition-opacity">
                     <I18nText text={"F"} />
                   </span>
                 </Button></I18nProps>
@@ -273,10 +274,11 @@ function DAGRunDetailsModal({
                   size="icon"
                   onClick={onClose}
                   title="Close (Esc)"
+                  aria-label="Close"
                   className="relative group"
                 >
                   <X className="h-4 w-4" />
-                  <span className="absolute -bottom-1 -right-1 bg-muted text-muted-foreground text-xs font-medium px-1 rounded-sm border opacity-0 group-hover:opacity-100 transition-opacity">
+                  <span aria-hidden="true" className="absolute -bottom-1 -right-1 bg-muted text-muted-foreground text-xs font-medium px-1 rounded-sm border opacity-0 group-hover:opacity-100 transition-opacity">
                     <I18nText text={"Esc"} />
                   </span>
                 </Button></I18nProps>

@@ -57,6 +57,7 @@ import {
 import { I18nText } from '@/i18n/I18nText';
 import { I18nProps } from '@/i18n/I18nProps';
 import { I18nTemplate } from '@/i18n/I18nTemplate';
+import { useI18n } from '@/i18n/I18nProvider';
 
 type WebhookDetails = components['schemas']['WebhookDetails'];
 type WebhookAuthMode = components['schemas']['WebhookAuthMode'];
@@ -114,6 +115,7 @@ function toHMACAuthMode(mode: WebhookAuthMode): WebhookHMACAuthMode {
 }
 
 function WebhookTab({ fileName }: WebhookTabProps) {
+  const { ts } = useI18n();
   const config = useConfig();
   const remoteNode = useRemoteNode();
   const client = useClient();
@@ -130,6 +132,9 @@ function WebhookTab({ fileName }: WebhookTabProps) {
   const [error, setError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showToggleConfirm, setShowToggleConfirm] = useState(false);
+  const [pendingCredentialAction, setPendingCredentialAction] = useState<
+    'token' | 'hmac-secret' | 'hmac-disable' | null
+  >(null);
   const [pendingToggleState, setPendingToggleState] = useState<boolean | null>(
     null
   );
@@ -572,6 +577,8 @@ function WebhookTab({ fileName }: WebhookTabProps) {
             <Button
               variant="outline"
               size="icon"
+              aria-label={ts(copiedSecret ? 'Copied' : 'Copy')}
+              title={ts(copiedSecret ? 'Copied' : 'Copy')}
               onClick={() => handleCopy(secretReveal.value, setCopiedSecret)}
             >
               {copiedSecret ? (
@@ -606,7 +613,7 @@ function WebhookTab({ fileName }: WebhookTabProps) {
         </CardHeader>
         <CardContent className="px-4 pb-3 pt-3">
           <Button
-            variant="default"
+            variant="primary"
             size="sm"
             onClick={handleCreate}
             disabled={isActioning}
@@ -728,7 +735,7 @@ function WebhookTab({ fileName }: WebhookTabProps) {
             <Button
               variant="outline"
               size="sm"
-              onClick={handleRegenerate}
+              onClick={() => setPendingCredentialAction('token')}
               disabled={isActioning}
             >
               {isActioning ? (
@@ -882,7 +889,7 @@ function WebhookTab({ fileName }: WebhookTabProps) {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleRegenerateHMAC}
+                  onClick={() => setPendingCredentialAction('hmac-secret')}
                   disabled={isActioning}
                 >
                   <I18nText text={'Regenerate HMAC Secret'} />
@@ -890,7 +897,7 @@ function WebhookTab({ fileName }: WebhookTabProps) {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleDisableHMAC}
+                  onClick={() => setPendingCredentialAction('hmac-disable')}
                   disabled={isActioning}
                 >
                   <I18nText text={'Disable HMAC'} />
@@ -1139,6 +1146,47 @@ function WebhookTab({ fileName }: WebhookTabProps) {
             <I18nText
               text={
                 'Are you sure you want to delete this webhook? Any applications using this webhook token will immediately lose access.'
+              }
+            />
+          </p>
+        </ConfirmModal>
+      </I18nProps>
+
+      {/* Credential Change Confirmation Modal */}
+      <I18nProps>
+        <ConfirmModal
+          title={
+            pendingCredentialAction === 'token'
+              ? 'Regenerate Token'
+              : pendingCredentialAction === 'hmac-secret'
+                ? 'Regenerate HMAC Secret'
+                : 'Disable HMAC'
+          }
+          buttonText={
+            pendingCredentialAction === 'hmac-disable' ? 'Disable' : 'Regenerate'
+          }
+          visible={pendingCredentialAction !== null}
+          dismissModal={() => setPendingCredentialAction(null)}
+          onSubmit={() => {
+            const action = pendingCredentialAction;
+            setPendingCredentialAction(null);
+            if (action === 'token') {
+              void handleRegenerate();
+            } else if (action === 'hmac-secret') {
+              void handleRegenerateHMAC();
+            } else if (action === 'hmac-disable') {
+              void handleDisableHMAC();
+            }
+          }}
+        >
+          <p>
+            <I18nText
+              text={
+                pendingCredentialAction === 'token'
+                  ? 'Callers using the current token lose access as soon as a new one is generated.'
+                  : pendingCredentialAction === 'hmac-secret'
+                    ? 'Requests signed with the current secret are rejected as soon as a new one is generated.'
+                    : 'The webhook will accept requests that carry only the token.'
               }
             />
           </p>
