@@ -216,7 +216,7 @@ function DAGRunBatchActions({
           'mb-3 flex min-h-11 flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-1.5 transition-colors',
           selectedCount > 0
             ? 'border-primary/40 bg-primary/5'
-            : 'border-border bg-card'
+            : 'border-transparent'
         )}
       >
         <div

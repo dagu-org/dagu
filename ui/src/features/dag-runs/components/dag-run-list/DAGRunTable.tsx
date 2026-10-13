@@ -432,9 +432,6 @@ function DAGRunTable({
                     dagRun.finishedAt,
                     dagRun.status
                   )}
-                  {dagRun.status === Status.Running && dagRun.startedAt && (
-                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-                  )}
                 </span>
               </div>
               {dagRun.workerId && (
@@ -622,7 +619,7 @@ function DAGRunTable({
                 </TableCell>
               )}
               {showScheduleColumn && (
-                <TableCell className="py-1 px-2 text-left whitespace-normal break-words">
+                <TableCell className="py-1 px-2 text-left whitespace-nowrap">
                   {dagRun.scheduleTime ? (
                     <span title={dagRun.scheduleTime}>
                       {formatScheduleTime(dagRun.scheduleTime)}
@@ -632,13 +629,13 @@ function DAGRunTable({
                   )}
                 </TableCell>
               )}
-              <TableCell className="py-1 px-2 text-left">
+              <TableCell className="py-1 px-2 text-left whitespace-nowrap">
                 <RelativeTime
                   timestamp={dagRun.queuedAt}
                   absolute={dagRun.queuedAt}
                 />
               </TableCell>
-              <TableCell className="py-1 px-2 text-left">
+              <TableCell className="py-1 px-2 text-left whitespace-nowrap">
                 <RelativeTime
                   timestamp={dagRun.startedAt}
                   absolute={dagRun.startedAt}
@@ -650,9 +647,6 @@ function DAGRunTable({
                     dagRun.startedAt,
                     dagRun.finishedAt,
                     dagRun.status
-                  )}
-                  {dagRun.status === Status.Running && dagRun.startedAt && (
-                    <span className="inline-block w-2 h-2 rounded-full bg-success animate-pulse" />
                   )}
                 </div>
               </TableCell>

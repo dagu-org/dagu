@@ -196,7 +196,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
     dagRunToDisplay.dagRunId === dagRunToDisplay.rootDAGRunId;
 
   return (
-    <div className="min-w-0 rounded-lg border border-border bg-card p-4 sm:p-6">
+    <div className="min-w-0">
       {/* Header with title and actions */}
       <div className="mb-4 flex min-w-0 flex-col items-stretch gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
         <div className="flex-1 min-w-0">

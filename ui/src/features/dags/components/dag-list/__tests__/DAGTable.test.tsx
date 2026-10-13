@@ -203,12 +203,7 @@ describe('DAGTable', () => {
     const controlSurface = searchInput.closest(
       '[data-testid="workflow-controls"]'
     );
-    expect(controlSurface?.className).toContain('mb-3');
-    expect(controlSurface?.className).toContain('rounded-lg');
-    expect(controlSurface?.className).toContain('border');
-    expect(controlSurface?.className).toContain('border-border');
-    expect(controlSurface?.className).toContain('bg-card/50');
-    expect(controlSurface?.className).toContain('p-3');
+    expect(controlSurface?.className).toContain('mb-4');
 
     const labelInput = screen.getByRole('combobox', {
       name: 'Filter by labels...',

@@ -1010,7 +1010,7 @@ function Artifacts() {
           {artifactViewError}
         </p>
       )}
-      <div className="mb-3 space-y-3 rounded-lg border border-border bg-card/50 p-3">
+      <div className="mb-4 space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <I18nProps>
             <Input

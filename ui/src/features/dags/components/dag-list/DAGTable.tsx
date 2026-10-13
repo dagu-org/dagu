@@ -696,7 +696,7 @@ const defaultColumns = [
           >
             <Link
               to={`/dags/${data.dag.fileName}`}
-              className="block font-medium text-foreground tracking-tight text-xs truncate hover:underline"
+              className="block truncate text-sm font-medium text-foreground hover:underline"
               onClick={(event) => event.stopPropagation()}
             >
               {getValue()}
@@ -996,7 +996,7 @@ const defaultColumns = [
     minSize: 160,
     maxSize: 160,
     header: () => (
-      <span className="block text-center text-xs">
+      <span className="sr-only">
         <I18nText text={'Actions'} />
       </span>
     ),
@@ -1010,7 +1010,7 @@ const defaultColumns = [
       return (
         // Wrap DAGActions in a div and stop propagation on its click
         <div
-          className="flex items-center justify-center gap-0.5"
+          className="flex items-center justify-center gap-0.5 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100 pointer-coarse:opacity-100"
           onClick={(e) => e.stopPropagation()}
         >
           <DAGActions
@@ -1764,7 +1764,7 @@ function DAGTable({
       {/* Search, Filter and Pagination Controls */}
       <div
         data-testid="workflow-controls"
-        className={`mb-3 space-y-3 rounded-lg border border-border bg-card/50 p-3 ${
+        className={`mb-4 space-y-2 ${
           isLoading ? 'opacity-70 pointer-events-none' : ''
         }`}
       >

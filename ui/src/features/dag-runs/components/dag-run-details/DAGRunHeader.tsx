@@ -170,7 +170,7 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({
   }, [handleRefresh]);
 
   return (
-    <div className="space-y-4 rounded-lg border border-border bg-card p-6">
+    <div className="space-y-4">
       {/* Header with title and actions */}
       <div className="flex items-start justify-between gap-6">
         <div className="flex-1 min-w-0">
