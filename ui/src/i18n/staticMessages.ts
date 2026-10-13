@@ -1896,7 +1896,7 @@ const english = {
   'Back one level': 'Back one level',
   'Back to {name}': 'Back to {name}',
   Critical: 'Critical',
-  'Create New DAG': 'Create New DAG',
+  'Create workflow': 'Create workflow',
   'Creating...': 'Creating...',
   Deactivate: 'Deactivate',
   'Delete "{id}" from the remote repository and local disk? This will remove the file from both locations.':
@@ -1925,10 +1925,10 @@ const english = {
     'Do you want to dequeue {count} selected DAG run?',
   'Do you want to dequeue {count} selected DAG runs?':
     'Do you want to dequeue {count} selected DAG runs?',
-  'Enter a name for your new DAG. Only letters, numbers, underscores, dots, and hyphens are allowed.':
-    'Enter a name for your new DAG. Only letters, numbers, underscores, dots, and hyphens are allowed.',
-  'Enter a new name for your DAG. Only letters, numbers, underscores, dots, and hyphens are allowed.':
-    'Enter a new name for your DAG. Only letters, numbers, underscores, dots, and hyphens are allowed.',
+  'Enter a name for your new workflow. Only letters, numbers, underscores, dots, and hyphens are allowed.':
+    'Enter a name for your new workflow. Only letters, numbers, underscores, dots, and hyphens are allowed.',
+  'Enter a new name for your workflow. Only letters, numbers, underscores, dots, and hyphens are allowed.':
+    'Enter a new name for your workflow. Only letters, numbers, underscores, dots, and hyphens are allowed.',
   'Failed at {step}': 'Failed at {step}',
   Info: 'Info',
   'Loaded {count} event': 'Loaded {count} event',
@@ -1953,7 +1953,6 @@ const english = {
     'Remove {count} missing item from sync tracking? Files remain in the remote repository.',
   'Remove {count} missing items from sync tracking? Files remain in the remote repository.':
     'Remove {count} missing items from sync tracking? Files remain in the remote repository.',
-  'Rename DAG': 'Rename DAG',
   'Renaming...': 'Renaming...',
   Reschedule: 'Reschedule',
   'Run Anyway': 'Run Anyway',
@@ -4329,7 +4328,7 @@ const chinese = {
   'Back one level': '返回上一级',
   'Back to {name}': '返回 {name}',
   Critical: '严重',
-  'Create New DAG': '新建 DAG',
+  'Create workflow': '新建工作流',
   Deactivate: '停用',
   'Delete "{id}" from the remote repository and local disk? This will remove the file from both locations.':
     '要从远程仓库和本地磁盘删除“{id}”吗？该文件将从两个位置移除。',
@@ -4356,10 +4355,10 @@ const chinese = {
     '要将选中的 {count} 个 DAG 运行移出队列吗？',
   'Do you want to dequeue {count} selected DAG runs?':
     '要将选中的 {count} 个 DAG 运行移出队列吗？',
-  'Enter a name for your new DAG. Only letters, numbers, underscores, dots, and hyphens are allowed.':
-    '输入新 DAG 的名称。仅允许字母、数字、下划线、点和连字符。',
-  'Enter a new name for your DAG. Only letters, numbers, underscores, dots, and hyphens are allowed.':
-    '输入 DAG 的新名称。仅允许字母、数字、下划线、点和连字符。',
+  'Enter a name for your new workflow. Only letters, numbers, underscores, dots, and hyphens are allowed.':
+    '输入新工作流的名称。仅允许字母、数字、下划线、点和连字符。',
+  'Enter a new name for your workflow. Only letters, numbers, underscores, dots, and hyphens are allowed.':
+    '输入工作流的新名称。仅允许字母、数字、下划线、点和连字符。',
   'Failed at {step}': '在步骤 {step} 失败',
   Info: '信息',
   'Loaded {count} event': '已加载 {count} 个事件',
@@ -4384,7 +4383,6 @@ const chinese = {
     '从同步跟踪中移除 {count} 个缺失项？文件将保留在远程仓库中。',
   'Remove {count} missing items from sync tracking? Files remain in the remote repository.':
     '从同步跟踪中移除 {count} 个缺失项？文件将保留在远程仓库中。',
-  'Rename DAG': '重命名 DAG',
   Reschedule: '重新调度',
   'Run Anyway': '仍然运行',
   'Run one of the example workflows from the {link} to see activity here.':
@@ -6811,7 +6809,7 @@ const japanese = {
   'Back one level': '1 つ前の階層に戻る',
   'Back to {name}': '{name} に戻る',
   Critical: '重大',
-  'Create New DAG': '新しい DAG を作成',
+  'Create workflow': 'ワークフローを作成',
   'Creating...': '作成中...',
   Deactivate: '無効化',
   'Delete "{id}" from the remote repository and local disk? This will remove the file from both locations.':
@@ -6840,10 +6838,10 @@ const japanese = {
     '選択した {count} 件の DAG 実行をキューから削除しますか？',
   'Do you want to dequeue {count} selected DAG runs?':
     '選択した {count} 件の DAG 実行をキューから削除しますか？',
-  'Enter a name for your new DAG. Only letters, numbers, underscores, dots, and hyphens are allowed.':
-    '新しい DAG の名前を入力してください。使用できるのは英数字、アンダースコア、ピリオド、ハイフンです。',
-  'Enter a new name for your DAG. Only letters, numbers, underscores, dots, and hyphens are allowed.':
-    'DAG の新しい名前を入力してください。使用できるのは英数字、アンダースコア、ピリオド、ハイフンです。',
+  'Enter a name for your new workflow. Only letters, numbers, underscores, dots, and hyphens are allowed.':
+    '新しいワークフローの名前を入力してください。使用できるのは英数字、アンダースコア、ピリオド、ハイフンです。',
+  'Enter a new name for your workflow. Only letters, numbers, underscores, dots, and hyphens are allowed.':
+    'ワークフローの新しい名前を入力してください。使用できるのは英数字、アンダースコア、ピリオド、ハイフンです。',
   'Failed at {step}': 'ステップ {step} で失敗',
   Info: '情報',
   'Loaded {count} event': '{count} 件のイベントを読み込みました',
@@ -6868,7 +6866,6 @@ const japanese = {
     '同期管理から欠落アイテムを {count} 件削除しますか？ファイルはリモートリポジトリに残ります。',
   'Remove {count} missing items from sync tracking? Files remain in the remote repository.':
     '同期管理から欠落アイテムを {count} 件削除しますか？ファイルはリモートリポジトリに残ります。',
-  'Rename DAG': 'DAG の名前を変更',
   Reschedule: '再スケジュール',
   'Run Anyway': 'そのまま実行',
   'Run one of the example workflows from the {link} to see activity here.':

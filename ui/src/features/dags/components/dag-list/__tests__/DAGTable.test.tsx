@@ -421,7 +421,7 @@ describe('DAGTable', () => {
     );
 
     const dialog = screen.getByRole('dialog');
-    expect(dialog).toHaveTextContent('Rename DAG');
+    expect(dialog).toHaveTextContent('Rename workflow');
     const nameInput = within(dialog).getByLabelText('Workflow name');
     expect(nameInput).toHaveValue('example.yaml');
     fireEvent.change(nameInput, { target: { value: 'renamed.yaml' } });

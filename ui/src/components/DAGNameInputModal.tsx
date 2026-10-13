@@ -108,18 +108,18 @@ export function DAGNameInputModal({
     switch (mode) {
       case 'create':
         return {
-          title: 'Create New DAG',
+          title: 'Create workflow',
           description:
-            'Enter a name for your new DAG. Only letters, numbers, underscores, dots, and hyphens are allowed.',
+            'Enter a name for your new workflow. Only letters, numbers, underscores, dots, and hyphens are allowed.',
           submitText: 'Create',
           loadingText: 'Creating...',
           placeholder: 'my_new_dag',
         };
       case 'rename':
         return {
-          title: 'Rename DAG',
+          title: 'Rename workflow',
           description:
-            'Enter a new name for your DAG. Only letters, numbers, underscores, dots, and hyphens are allowed.',
+            'Enter a new name for your workflow. Only letters, numbers, underscores, dots, and hyphens are allowed.',
           submitText: 'Rename',
           loadingText: 'Renaming...',
           placeholder: 'my_renamed_dag',
