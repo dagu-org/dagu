@@ -237,6 +237,24 @@ describe('AuditLogsPage', () => {
     ).toBeInTheDocument();
   });
 
+  it('counts list values and names nested values in the summary', async () => {
+    stubAuditResponse({
+      ...auditEntry,
+      details: JSON.stringify({
+        tags: ['critical'],
+        channels: ['slack', 'email'],
+        target: { id: 'r1' },
+      }),
+    });
+    renderPage();
+
+    expect(
+      await screen.findByText(
+        'tags: 1 item • channels: 2 items • target: structured data'
+      )
+    ).toBeInTheDocument();
+  });
+
   it('keeps existing rows visible while filters refresh', async () => {
     renderPage();
 

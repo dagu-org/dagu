@@ -203,6 +203,35 @@ describe('EventLogsPage', () => {
     expect(await screen.findByText('Partially succeeded')).toBeInTheDocument();
   });
 
+  it('renders unknown outcomes as words', async () => {
+    useQueryMock.mockImplementation(() =>
+      mockQueryResult({
+        data: {
+          entries: [
+            {
+              id: 'evt-timeout',
+              schemaVersion: 1,
+              occurredAt: '2026-04-01T00:00:00Z',
+              recordedAt: '2026-04-01T00:00:01Z',
+              kind: 'dag_run',
+              type: 'dag.run.timed_out',
+              sourceService: 'scheduler',
+              dagName: 'demo',
+              dagRunId: 'run-timeout',
+              attemptId: 'attempt-timeout',
+              status: 'timed_out',
+            },
+          ],
+          nextCursor: undefined,
+        },
+      })
+    );
+
+    renderPage();
+
+    expect(await screen.findByText('timed out')).toBeInTheDocument();
+  });
+
   it('queries event logs with a fixed dag_run kind and the selected remote node', async () => {
     const calls: QueryCall[] = [];
     useQueryMock.mockImplementation((path, init) => {

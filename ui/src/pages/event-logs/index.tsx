@@ -128,7 +128,9 @@ function getOutcomeLabel(type: string, status?: string): string {
       return 'Rejected';
     default:
       if (status) {
-        return statusLabelText(status);
+        // Statuses outside the known set still read as words.
+        const label = statusLabelText(status);
+        return label === status ? status.replace(/_/g, ' ') : label;
       }
       return type;
   }
