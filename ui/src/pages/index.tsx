@@ -217,7 +217,7 @@ function NoRunsNotice({
 }
 
 function Dashboard(): React.ReactElement | null {
-  const { locale } = useI18n();
+  const { locale, ts } = useI18n();
   const appBarContext = React.useContext(AppBarContext);
   const client = useClient();
   const config = useConfig();
@@ -565,7 +565,10 @@ function Dashboard(): React.ReactElement | null {
             onValueChange={handleDAGRunChange}
             disabled={isLoading}
           >
-            <SelectTrigger className="h-9 w-[168px]">
+            <SelectTrigger
+              className="h-9 w-[168px]"
+              aria-label={ts('Workflow')}
+            >
               <Filter className="h-4 w-4 mr-1.5 text-muted-foreground" />
               <I18nProps>
                 <SelectValue
@@ -587,6 +590,7 @@ function Dashboard(): React.ReactElement | null {
 
           <Input
             type="date"
+            aria-label={ts('Date')}
             value={dayjs.unix(dateRange.startDate).format('YYYY-MM-DD')}
             onChange={(e) => {
               const newDate = e.target.value;

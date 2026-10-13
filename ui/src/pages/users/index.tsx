@@ -296,7 +296,11 @@ export default function UsersPage() {
               <TableHead className="w-[150px]">
                 <I18nText text={'Updated'} />
               </TableHead>
-              <TableHead className="w-[80px]"></TableHead>
+              <TableHead className="w-[80px]">
+                <span className="sr-only">
+                  <I18nText text={'Actions'} />
+                </span>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

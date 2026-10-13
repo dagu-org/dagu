@@ -16,6 +16,7 @@ import dayjs from '../../../lib/dayjs';
 import DAGRunDetailsModal from '../../dag-runs/components/dag-run-details/DAGRunDetailsModal';
 import type { StatusTab } from '../../dags/components/DAGStatus';
 import { I18nText } from '@/i18n/I18nText';
+import { useI18n } from '@/i18n/I18nProvider';
 import { legibleTimeAxis, type TimelineAxis } from '../lib/timelineAxis';
 
 type Props = {
@@ -36,6 +37,7 @@ type TimelineItem = {
 };
 
 function DashboardTimeChart({ data: input, selectedDate }: Props) {
+  const { ts } = useI18n();
   const timelineRef = useRef<HTMLDivElement>(null);
   const timelineInstance = useRef<Timeline | null>(null);
   const timelineItemsRef = useRef(new DataSet<TimelineItem>([]));
@@ -558,6 +560,7 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
                 variant="ghost"
                 size="icon"
                 onClick={handleCurrent}
+                aria-label={ts('Current time')}
                 className="h-7 w-7 rounded-sm"
               >
                 <Clock className="h-3.5 w-3.5" />
@@ -574,6 +577,7 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
                 variant="ghost"
                 size="icon"
                 onClick={handleFit}
+                aria-label={ts('Fit all')}
                 className="h-7 w-7 rounded-sm"
               >
                 <Maximize className="h-3.5 w-3.5" />
@@ -592,6 +596,7 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
                 variant="ghost"
                 size="icon"
                 onClick={handleZoomIn}
+                aria-label={ts('Zoom in')}
                 className="h-7 w-7 rounded-sm"
               >
                 <ZoomIn className="h-3.5 w-3.5" />
@@ -608,6 +613,7 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
                 variant="ghost"
                 size="icon"
                 onClick={handleZoomOut}
+                aria-label={ts('Zoom out')}
                 className="h-7 w-7 rounded-sm"
               >
                 <ZoomOut className="h-3.5 w-3.5" />
@@ -626,6 +632,7 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
                 variant="ghost"
                 size="icon"
                 onClick={handleReset}
+                aria-label={ts('Reset view')}
                 className="h-7 w-7 rounded-sm"
               >
                 <RotateCcw className="h-3.5 w-3.5" />

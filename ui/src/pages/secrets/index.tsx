@@ -380,7 +380,11 @@ export function SecretRefsSection(): React.ReactNode {
               <TableHead className="w-[170px]">
                 <I18nText text={'Rotated'} />
               </TableHead>
-              <TableHead className="w-[80px]"></TableHead>
+              <TableHead className="w-[80px]">
+                <span className="sr-only">
+                  <I18nText text={'Actions'} />
+                </span>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

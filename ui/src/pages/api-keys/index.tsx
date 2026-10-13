@@ -236,7 +236,11 @@ export default function APIKeysPage() {
               <TableHead className="w-[180px]">
                 <I18nText text={'Last Used'} />
               </TableHead>
-              <TableHead className="w-[80px]"></TableHead>
+              <TableHead className="w-[80px]">
+                <span className="sr-only">
+                  <I18nText text={'Actions'} />
+                </span>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

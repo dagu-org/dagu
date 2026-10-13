@@ -1088,6 +1088,8 @@ const english = {
   'No running, retrying, or failed steps at the moment.':
     'No running, retrying, or failed steps at the moment.',
   'No runs': 'No runs',
+  "Time range": "Time range",
+  "Period": "Period",
   "No webhooks yet": "No webhooks yet",
   "Create a webhook from a workflow's Webhook tab to trigger it over HTTP.": "Create a webhook from a workflow's Webhook tab to trigger it over HTTP.",
   "No webhook yet": "No webhook yet",
@@ -3552,6 +3554,8 @@ const chinese = {
   'No running, retrying, or failed steps at the moment.':
     '当前没有正在运行、重试或失败的步骤。',
   'No runs': '暂无运行',
+  "Time range": "时间范围",
+  "Period": "时间单位",
   "No webhooks yet": "还没有 Webhook",
   "Create a webhook from a workflow's Webhook tab to trigger it over HTTP.": "在工作流的 Webhook 标签页中创建 Webhook，即可通过 HTTP 触发它。",
   "No webhook yet": "还没有 Webhook",
@@ -6021,6 +6025,8 @@ const japanese = {
   'No running, retrying, or failed steps at the moment.':
     '現在、実行中、再試行中、または失敗したステップはありません。',
   'No runs': '実行なし',
+  "Time range": "期間",
+  "Period": "期間の単位",
   "No webhooks yet": "Webhook はまだありません",
   "Create a webhook from a workflow's Webhook tab to trigger it over HTTP.": "ワークフローの Webhook タブで Webhook を作成すると、HTTP で起動できます。",
   "No webhook yet": "Webhook はまだありません",

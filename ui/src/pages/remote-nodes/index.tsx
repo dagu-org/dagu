@@ -252,7 +252,11 @@ export default function RemoteNodesPage() {
               <TableHead className="w-[120px]">
                 <I18nText text={'Status'} />
               </TableHead>
-              <TableHead className="w-[80px]"></TableHead>
+              <TableHead className="w-[80px]">
+                <span className="sr-only">
+                  <I18nText text={'Actions'} />
+                </span>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

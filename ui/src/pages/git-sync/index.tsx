@@ -663,6 +663,7 @@ export default function GitSyncPage() {
   if (!status.enabled) {
     return (
       <EmptyState
+        headingLevel={1}
         icon={<GitBranch />}
         title={<I18nText text={'Git sync is not configured'} />}
         description={
@@ -915,7 +916,11 @@ export default function GitSyncPage() {
               <TableHead className="w-28">
                 <I18nText text={'Synced'} />
               </TableHead>
-              <TableHead className="w-28"></TableHead>
+              <TableHead className="w-28">
+                <span className="sr-only">
+                  <I18nText text={'Actions'} />
+                </span>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

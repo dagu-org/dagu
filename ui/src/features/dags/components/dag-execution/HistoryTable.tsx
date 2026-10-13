@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { components } from '../../../../api/v1/schema';
 import dayjs from '../../../../lib/dayjs';
 import HistoryTableRow from './HistoryTableRow';
+import { I18nText } from '@/i18n/I18nText';
 
 /**
  * Props for the HistoryTable component
@@ -39,7 +40,11 @@ function HistoryTable({ dagRuns, gridData, onSelect, idx }: Props) {
       <Table className="select-none">
         <TableHeader className="bg-muted">
           <TableRow>
-            <TableHead className="py-3"></TableHead>
+            <TableHead className="py-3">
+              <span className="sr-only">
+                <I18nText text={'Step Name'} />
+              </span>
+            </TableHead>
             {dagRuns.map((_, i) => {
               if (!dagRuns || i >= dagRuns.length || !dagRuns[i]) {
                 return null;
@@ -75,7 +80,7 @@ function HistoryTable({ dagRuns, gridData, onSelect, idx }: Props) {
                     onSelect(i);
                   }}
                 >
-                  {flag ? date : ''}
+                  {flag ? date : <span className="sr-only">{date}</span>}
                 </TableHead>
               );
             })}

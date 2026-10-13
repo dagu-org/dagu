@@ -943,7 +943,10 @@ export default function EventLogsPage() {
               value={draftFilters.type}
               onValueChange={(value) => updateDraftFilters({ type: value })}
             >
-              <SelectTrigger className="w-[180px] h-8">
+              <SelectTrigger
+                className="w-[180px] h-8"
+                aria-label={ts('Outcome')}
+              >
                 <I18nProps>
                   <SelectValue placeholder="All outcomes" />
                 </I18nProps>
@@ -1047,7 +1050,10 @@ export default function EventLogsPage() {
                 value={draftFilters.datePreset}
                 onValueChange={handleDatePresetChange}
               >
-                <SelectTrigger className="w-[180px] h-8">
+                <SelectTrigger
+                  className="w-[180px] h-8"
+                  aria-label={ts('Time range')}
+                >
                   <I18nProps>
                     <SelectValue placeholder="Select period" />
                   </I18nProps>
@@ -1079,7 +1085,10 @@ export default function EventLogsPage() {
                   value={draftFilters.specificPeriod}
                   onValueChange={handleSpecificPeriodSelect}
                 >
-                  <SelectTrigger className="w-[110px] h-8">
+                  <SelectTrigger
+                    className="w-[110px] h-8"
+                    aria-label={ts('Period')}
+                  >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

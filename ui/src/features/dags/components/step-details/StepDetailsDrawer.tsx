@@ -185,7 +185,7 @@ function StepRuntimeSection({
       )}
       {subRuns.length > 0 && (
         <div className="space-y-1">
-          <div className="text-xs font-medium uppercase text-muted-foreground">
+          <div className="text-xs font-medium text-muted-foreground">
             <I18nText text={'Sub-runs'} />
           </div>
           {subRuns.map((subRun, index) => (
@@ -234,7 +234,6 @@ export function StepDetailsDrawer({
   const [renderedNode, setRenderedNode] = React.useState(node);
   const drawerWidthRef = React.useRef(drawerWidth);
   const drawerRef = React.useRef<HTMLElement>(null);
-  const closeButtonRef = React.useRef<HTMLButtonElement>(null);
   const previouslyFocusedRef = React.useRef<HTMLElement | null>(null);
 
   React.useEffect(() => {
@@ -321,7 +320,9 @@ export function StepDetailsDrawer({
       setShouldRender(true);
       animationFrame = window.requestAnimationFrame(() => {
         setIsVisible(true);
-        closeButtonRef.current?.focus();
+        // Focus the panel itself so a pointer click does not paint a focus
+        // ring on the close button; Tab still reaches it first.
+        drawerRef.current?.focus();
       });
     } else {
       setIsVisible(false);
@@ -446,8 +447,9 @@ export function StepDetailsDrawer({
         role="dialog"
         aria-modal="true"
         aria-labelledby="step-details-title"
+        tabIndex={-1}
         className={cn(
-          'relative z-10 flex h-full max-w-full flex-col border-l border-border bg-card shadow-lg shadow-foreground/10 transition-all duration-200 ease-out will-change-transform',
+          'relative z-10 flex h-full max-w-full flex-col outline-none border-l border-border bg-card shadow-lg shadow-foreground/10 transition-all duration-200 ease-out will-change-transform',
           isVisible ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
         )}
         style={{ width: `min(100vw, ${drawerWidth}px)` }}
@@ -471,7 +473,7 @@ export function StepDetailsDrawer({
         </I18nProps>
         <header className="flex items-start justify-between gap-4 border-b border-border bg-card px-4 py-3">
           <div className="min-w-0">
-            <div className="text-xs font-medium uppercase text-muted-foreground">
+            <div className="text-xs font-medium text-muted-foreground">
               {dagName || <I18nText text={'Workflow'} />}
             </div>
             <h2
@@ -492,7 +494,6 @@ export function StepDetailsDrawer({
           </div>
           <I18nProps>
             <Button
-              ref={closeButtonRef}
               type="button"
               variant="ghost"
               size="icon"

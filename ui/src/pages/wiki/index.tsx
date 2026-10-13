@@ -709,6 +709,9 @@ function WikiPage() {
         key={wikiTabStorageKey}
         storageKey={wikiTabStorageKey}
       >
+        <h1 className="sr-only">
+          <I18nText text={'Wiki'} />
+        </h1>
         <WikiContent />
       </WikiPageTabProvider>
     </UnsavedChangesProvider>

@@ -1,6 +1,7 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import { Slot } from '@radix-ui/react-slot';
 import * as React from 'react';
 
 import { cn } from '@/lib/utils';
@@ -53,9 +54,14 @@ function EmptyMedia({
   );
 }
 
-function EmptyTitle({ className, ...props }: React.ComponentProps<'h2'>) {
+function EmptyTitle({
+  className,
+  asChild = false,
+  ...props
+}: React.ComponentProps<'h2'> & { asChild?: boolean }) {
+  const Comp = asChild ? Slot : 'h2';
   return (
-    <h2
+    <Comp
       data-slot="empty-title"
       className={cn(
         'text-base font-semibold tracking-tight text-foreground',

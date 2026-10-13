@@ -249,6 +249,7 @@ export default function TerminalPage() {
   if (!isAdmin) {
     return (
       <EmptyState
+        headingLevel={1}
         icon={<Lock />}
         title={
           <I18nText text={'You do not have permission to access this page.'} />
@@ -260,6 +261,7 @@ export default function TerminalPage() {
   if (!config.terminalEnabled) {
     return (
       <EmptyState
+        headingLevel={1}
         icon={<SquareTerminal />}
         title={<I18nText text={'Terminal is turned off'} />}
         description={

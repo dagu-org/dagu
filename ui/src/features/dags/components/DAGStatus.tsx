@@ -922,9 +922,9 @@ function DAGStatus({
             {/* Lifecycle Hooks */}
             {handlers?.length ? (
               <section className="space-y-2">
-                <h3 className="text-sm font-semibold text-foreground">
+                <h2 className="text-sm font-semibold text-foreground">
                   <I18nText text={'Lifecycle handlers'} />
-                </h3>
+                </h2>
                 <NodeStatusTable
                   nodes={handlers}
                   status={displayDAGRun}
