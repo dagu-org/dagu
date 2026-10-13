@@ -29,6 +29,8 @@ describe('status-utils', () => {
     expect(statusLabelText('partially_succeeded')).toBe('Partially succeeded');
     expect(statusLabelText('retrying')).toBe('Retrying');
     expect(statusLabelText('custom label')).toBe('custom label');
+    expect(statusLabelText('__proto__')).toBe('__proto__');
+    expect(statusLabelText('constructor')).toBe('constructor');
   });
 
   it('names run and step statuses the same way', () => {

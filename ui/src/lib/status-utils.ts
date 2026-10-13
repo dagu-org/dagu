@@ -24,7 +24,9 @@ const STATUS_LABEL_TEXT: Record<StatusLabel | NodeStatusLabel, string> = {
  * `partially_succeeded`. Unknown labels are returned unchanged.
  */
 export function statusLabelText(label: string): string {
-  return STATUS_LABEL_TEXT[label as StatusLabel | NodeStatusLabel] ?? label;
+  return Object.prototype.hasOwnProperty.call(STATUS_LABEL_TEXT, label)
+    ? STATUS_LABEL_TEXT[label as StatusLabel | NodeStatusLabel]
+    : label;
 }
 
 const RUN_STATUS_LABELS: Record<Status, StatusLabel> = {

@@ -67,6 +67,13 @@ describe('translations', () => {
     );
   });
 
+  // Status chips pass arbitrary text through, so inherited object keys
+  // must come back unchanged instead of resolving to prototype members.
+  it('returns unknown text unchanged', () => {
+    expect(translateStatic('ja', '__proto__')).toBe('__proto__');
+    expect(translateStatic('zh-CN', 'constructor')).toBe('constructor');
+  });
+
   it('localizes plural messages without English suffixes', () => {
     expect(translateStatic('zh-CN', '{count} options', { count: 2 })).toBe(
       '2 个选项'

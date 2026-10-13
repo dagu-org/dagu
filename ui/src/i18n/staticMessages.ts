@@ -7406,10 +7406,11 @@ export function translateStatic(
   source: string,
   values?: StaticTranslationValues
 ): string {
+  const catalog = staticMessages[locale];
   const message =
-    locale === 'en'
-      ? source
-      : (staticMessages[locale][source as StaticMessage] ?? source);
+    locale !== 'en' && Object.prototype.hasOwnProperty.call(catalog, source)
+      ? catalog[source as StaticMessage]
+      : source;
   if (!values) {
     return message;
   }
