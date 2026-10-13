@@ -109,6 +109,8 @@ func TestForeachValidation(t *testing.T) {
 
 	validCases := []string{
 		"foreach_success_collect.yaml",
+		"foreach_unbraced.yaml",
+		"foreach_missing_collect.yaml",
 		"foreach_string_items.yaml",
 		"foreach_zero_items.yaml",
 	}
@@ -145,6 +147,39 @@ func TestForeachRuntime(t *testing.T) {
 			`"markdown":"https://example.com/two"`,
 			`"link":"https://example.com/one"`,
 			`"link":"https://example.com/two"`,
+			`"limit":"1000000"`,
+		)
+	})
+
+	t.Run("unbraced references and inserted values stay literal", func(t *testing.T) {
+		t.Parallel()
+
+		dagu := harness.NewRunner(t)
+		result := dagu.Run("start", "foreach_unbraced.yaml")
+		result.ExpectExitCode(0)
+		dagu.ExpectFileContent("foreach-unbraced-body.txt", "$foreach.item.value")
+		dagu.ExpectFileContains(
+			"foreach-unbraced-results.txt",
+			`"literal":"$foreach.item.value"`,
+			`"quoted":"$SECRET"`,
+		)
+	})
+
+	t.Run("a missing quoted collect field fails its item", func(t *testing.T) {
+		t.Parallel()
+
+		dagu := harness.NewRunner(t)
+		result := dagu.Run("start", "foreach_missing_collect.yaml")
+		result.ExpectExitCode(0)
+		dagu.ExpectFileContent("foreach-body-two.txt", "body-ok")
+		dagu.ExpectFileContains(
+			"foreach-missing-results.txt",
+			`"total":2`,
+			`"succeeded":1`,
+			`"failed":1`,
+			`"key":"two","status":"failed"`,
+			"foreach.collect.value resolved with unresolved reference",
+			`"outputs":[{"value":"present"}]`,
 		)
 	})
 

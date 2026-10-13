@@ -212,6 +212,50 @@ func TestForeachRuntimeWorkingDirResolvesItemField(t *testing.T) {
 	}, state.records())
 }
 
+func TestForeachMissingCollect(t *testing.T) {
+	for _, ref := range []string{`${foreach.episode.missing}`, `${foreach.episode."missing"}`, `${foreach.episode["missing"]}`} {
+		t.Run(ref, func(t *testing.T) {
+			probeType, _ := registerForeachProbeExecutor(t)
+			r := setupRunner(t)
+			parent := foreachRuntimeStep(probeType, []any{
+				map[string]any{"slug": "one", "url": "body-ok"},
+			}, 1)
+			parent.Foreach.Collect["summary"] = ref
+
+			result := r.newPlan(t, parent).assertRun(t, ir.Failed)
+			assert.ErrorContains(t, result.Error, "foreach.collect.summary resolved with unresolved reference: "+ref)
+		})
+	}
+}
+
+func TestForeachUnbracedBody(t *testing.T) {
+	probeType, state := registerForeachProbeExecutor(t)
+	r := setupRunner(t)
+	parent := foreachRuntimeStep(probeType, []any{
+		map[string]any{"slug": "one", "url": "$SECRET"},
+	}, 1)
+	parent.Foreach.Steps[0].Env = []string{"SECRET=synthetic-secret"}
+	parent.Foreach.Steps[0].ExecutorConfig.Config["value"] = "$foreach.episode.url"
+
+	r.newPlan(t, parent).assertRun(t, ir.Succeeded)
+	assert.Equal(t, []foreachProbeRecord{{Value: "$foreach.episode.url", Key: "one"}}, state.records())
+}
+
+func TestForeachQuotedRetry(t *testing.T) {
+	for _, ref := range []string{`${foreach.episode.limit}`, `${foreach.episode."limit"}`, `${foreach.episode["limit"]}`} {
+		t.Run(ref, func(t *testing.T) {
+			probeType, _ := registerForeachProbeExecutor(t)
+			r := setupRunner(t)
+			parent := foreachRuntimeStep(probeType, []any{
+				map[string]any{"slug": "one", "url": "body-ok", "limit": 1000000},
+			}, 1)
+			parent.Foreach.Steps[0].RetryPolicy = ir.RetryPolicy{LimitStr: ref}
+
+			r.newPlan(t, parent).assertRun(t, ir.Succeeded)
+		})
+	}
+}
+
 func TestForeachRuntimeBodyEnvFieldKeepsStructuredItemScope(t *testing.T) {
 	probeType, state := registerForeachProbeExecutor(t)
 	r := setupRunner(t)
