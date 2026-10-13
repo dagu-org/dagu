@@ -32,6 +32,7 @@ type options struct {
 
 	Variables []map[string]string // Ordered variable maps for expansion
 	StepMap   map[string]StepInfo // Step info map for step reference expansion
+	Foreach   Values              // Structured foreach values for JSON path references
 }
 
 // newOptions returns default options with ExpandEnv, ExpandShell, and
@@ -74,6 +75,12 @@ func withVariables(vars map[string]string) option {
 func withStepMap(stepMap map[string]StepInfo) option {
 	return func(opts *options) {
 		opts.StepMap = stepMap
+	}
+}
+
+func withForeach(foreach Values) option {
+	return func(opts *options) {
+		opts.Foreach = foreach
 	}
 }
 

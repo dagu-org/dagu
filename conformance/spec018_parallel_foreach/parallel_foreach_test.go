@@ -143,6 +143,8 @@ func TestForeachRuntime(t *testing.T) {
 			`"key":"two"`,
 			`"markdown":"https://example.com/one"`,
 			`"markdown":"https://example.com/two"`,
+			`"link":"https://example.com/one"`,
+			`"link":"https://example.com/two"`,
 		)
 	})
 

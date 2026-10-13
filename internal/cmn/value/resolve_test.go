@@ -134,6 +134,28 @@ func TestResolveReference_NotFound(t *testing.T) {
 	assert.False(t, ok)
 }
 
+func TestResolverForeachStructuredScopePrecedesShadowVariable(t *testing.T) {
+	t.Parallel()
+
+	shadow := NewEnvScope(nil, false).WithEntry("foreach", "shadow", EnvSourceStepEnv)
+	resolver := NewResolver(StaticScope{}, RuntimeScope{
+		Env: shadow,
+		Foreach: Values{
+			"episode": map[string]any{"請求番号": "INV-001"},
+		},
+	})
+
+	got, err := resolver.String(context.Background(), `${foreach.episode."請求番号"}|${foreach.episode["請求番号"]}|$foreach`, WorkflowField("run"))
+	require.NoError(t, err)
+	assert.Equal(t, "INV-001|INV-001|shadow", got)
+
+	jsonScope := NewEnvScope(nil, false).WithEntry("foreach", `{"episode":{"請求番号":"INV-002"}}`, EnvSourceStepEnv)
+	resolver = NewResolver(StaticScope{}, RuntimeScope{Env: jsonScope})
+	got, err = resolver.String(context.Background(), `${foreach.episode."請求番号"}|$foreach`, WorkflowField("run"))
+	require.NoError(t, err)
+	assert.Equal(t, `INV-002|{"episode":{"請求番号":"INV-002"}}`, got)
+}
+
 // --- ExpandOS resolver tests ---
 
 func TestResolveForShell_WithoutExpandOS(t *testing.T) {

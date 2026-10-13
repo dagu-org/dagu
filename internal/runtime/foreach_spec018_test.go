@@ -19,6 +19,7 @@ import (
 	"github.com/dagucloud/dagu/v2/internal/executor/registry"
 
 	"github.com/dagucloud/dagu/v2/internal/ir"
+	runtimepkg "github.com/dagucloud/dagu/v2/internal/runtime"
 	_ "github.com/dagucloud/dagu/v2/internal/runtime/builtin/foreach"
 	"github.com/dagucloud/dagu/v2/internal/runtime/executor"
 	"github.com/stretchr/testify/assert"
@@ -66,6 +67,169 @@ func TestForeachRuntimeRunsBodyAndPublishesAggregate(t *testing.T) {
 	assert.ElementsMatch(t, []foreachProbeRecord{
 		{Value: "https://example.com/one", Key: "one"},
 		{Value: "https://example.com/two", Key: "two"},
+	}, state.records())
+}
+
+// Top-level item fields are resolved in the key, body, and collect phases.
+func TestForeachRuntimeTopLevelFieldResolution(t *testing.T) {
+	items := []any{
+		map[string]any{"slug": "one", "url": "https://example.com/one", "_row": 2, "請求番号": "INV-001"},
+		map[string]any{"slug": "two", "url": "https://example.com/two", "_row": 3, "請求番号": "INV-002"},
+	}
+
+	tests := []struct {
+		name       string
+		key        string
+		body       string
+		collect    string
+		wantKeys   []string
+		wantValues []string
+		wantOutput []string
+	}{
+		{
+			name:       "ascii plain",
+			key:        "${foreach.episode.slug}",
+			body:       "${foreach.episode.url}",
+			collect:    "${write.outputs.value}",
+			wantKeys:   []string{"one", "two"},
+			wantValues: []string{"https://example.com/one", "https://example.com/two"},
+			wantOutput: []string{"https://example.com/one", "https://example.com/two"},
+		},
+		{
+			name:       "underscore plain",
+			key:        "${foreach.episode._row}",
+			body:       "${foreach.episode._row}",
+			collect:    "${write.outputs.value}",
+			wantKeys:   []string{"2", "3"},
+			wantValues: []string{"2", "3"},
+			wantOutput: []string{"2", "3"},
+		},
+		{
+			name:       "ascii quoted",
+			key:        `${foreach.episode."url"}`,
+			body:       `${foreach.episode."url"}`,
+			collect:    "body-ok",
+			wantKeys:   []string{"https://example.com/one", "https://example.com/two"},
+			wantValues: []string{"https://example.com/one", "https://example.com/two"},
+			wantOutput: []string{"body-ok", "body-ok"},
+		},
+		{
+			name:       "japanese quoted dot",
+			key:        `${foreach.episode."請求番号"}`,
+			body:       `${foreach.episode."請求番号"}`,
+			collect:    "body-ok",
+			wantKeys:   []string{"INV-001", "INV-002"},
+			wantValues: []string{"INV-001", "INV-002"},
+			wantOutput: []string{"body-ok", "body-ok"},
+		},
+		{
+			name:       "japanese quoted dot in collect",
+			key:        "${foreach.episode.slug}",
+			body:       "${foreach.episode.url}",
+			collect:    `${foreach.episode."請求番号"}`,
+			wantKeys:   []string{"one", "two"},
+			wantValues: []string{"https://example.com/one", "https://example.com/two"},
+			wantOutput: []string{"INV-001", "INV-002"},
+		},
+		{
+			name:       "japanese bracket",
+			key:        `${foreach.episode["請求番号"]}`,
+			body:       `${foreach.episode["請求番号"]}`,
+			collect:    "body-ok",
+			wantKeys:   []string{"INV-001", "INV-002"},
+			wantValues: []string{"INV-001", "INV-002"},
+			wantOutput: []string{"body-ok", "body-ok"},
+		},
+		{
+			name:       "japanese bracket in collect",
+			key:        "${foreach.episode.slug}",
+			body:       "${foreach.episode.url}",
+			collect:    `${foreach.episode["請求番号"]}`,
+			wantKeys:   []string{"one", "two"},
+			wantValues: []string{"https://example.com/one", "https://example.com/two"},
+			wantOutput: []string{"INV-001", "INV-002"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			probeType, state := registerForeachProbeExecutor(t)
+			r := setupRunner(t)
+			parent := foreachRuntimeStep(probeType, items, 2)
+			parent.Foreach.Key = tt.key
+			parent.Foreach.Steps[0].ExecutorConfig.Config["value"] = tt.body
+			parent.Foreach.Collect["summary"] = tt.collect
+
+			result := r.newPlan(t, parent).assertRun(t, ir.Succeeded)
+			node := result.nodeByName(t, "each")
+			raw, ok := node.NodeData().StringFormOutputValue()
+			require.True(t, ok)
+			var aggregate foreachAggregate
+			require.NoError(t, json.Unmarshal([]byte(raw), &aggregate))
+
+			records := state.records()
+			assert.ElementsMatch(t, []foreachProbeRecord{
+				{Value: tt.wantValues[0], Key: tt.wantKeys[0]},
+				{Value: tt.wantValues[1], Key: tt.wantKeys[1]},
+			}, records)
+			require.Len(t, aggregate.Outputs, 2)
+			assert.Equal(t, tt.wantOutput, []string{aggregate.Outputs[0]["summary"], aggregate.Outputs[1]["summary"]})
+		})
+	}
+}
+
+// A bare non-ASCII key remains a negative control: the jq-style key resolver
+// rejects it, while the quoted forms above are valid paths.
+func TestForeachRuntimeBareUnicodeKeyNegativeControl(t *testing.T) {
+	probeType, _ := registerForeachProbeExecutor(t)
+	r := setupRunner(t)
+	parent := foreachRuntimeStep(probeType,
+		[]any{map[string]any{"slug": "one", "url": "https://example.com/one", "請求番号": "INV-001"}}, 1)
+	parent.Foreach.Key = "${foreach.episode.請求番号}"
+
+	result := r.newPlan(t, parent).assertRun(t, ir.Failed)
+	require.Error(t, result.Error)
+	assert.Contains(t, result.Error.Error(), "foreach.key resolved with unresolved reference")
+}
+
+func TestForeachRuntimeWorkingDirResolvesItemField(t *testing.T) {
+	probeType, state := registerForeachProbeExecutor(t)
+	r := setupRunner(t)
+	firstDir := t.TempDir()
+	secondDir := t.TempDir()
+
+	parent := foreachRuntimeStep(probeType, []any{
+		map[string]any{"slug": "one", "url": "one", "workdir": firstDir},
+		map[string]any{"slug": "two", "url": "two", "workdir": secondDir},
+	}, 2)
+	parent.Foreach.Steps[0].Dir = `${foreach.episode."workdir"}`
+	parent.Foreach.Steps[0].ExecutorConfig.Config["record_working_dir"] = true
+
+	r.newPlan(t, parent).assertRun(t, ir.Succeeded)
+	assert.ElementsMatch(t, []foreachProbeRecord{
+		{Value: "one", Key: "one", WorkingDir: firstDir},
+		{Value: "two", Key: "two", WorkingDir: secondDir},
+	}, state.records())
+}
+
+func TestForeachRuntimeBodyEnvFieldKeepsStructuredItemScope(t *testing.T) {
+	probeType, state := registerForeachProbeExecutor(t)
+	r := setupRunner(t)
+
+	parent := foreachRuntimeStep(probeType, []any{
+		map[string]any{"slug": "one", "url": "one", "請求番号": "INV-001"},
+		map[string]any{"slug": "two", "url": "two", "請求番号": "INV-002"},
+	}, 2)
+	parent.Foreach.Steps[0].Env = []string{
+		"foreach=shadow",
+		`CAPTURE=${foreach.episode."請求番号"}`,
+	}
+	parent.Foreach.Steps[0].ExecutorConfig.Config["value"] = `${foreach.episode["請求番号"]}|${env.CAPTURE}|$foreach`
+
+	r.newPlan(t, parent).assertRun(t, ir.Succeeded)
+	assert.ElementsMatch(t, []foreachProbeRecord{
+		{Value: "INV-001|INV-001|shadow", Key: "one"},
+		{Value: "INV-002|INV-002|shadow", Key: "two"},
 	}, state.records())
 }
 
@@ -302,10 +466,15 @@ func registerForeachProbeExecutor(t *testing.T) (string, *foreachProbeState) {
 
 	state := &foreachProbeState{activeChanged: make(chan struct{})}
 	executorType := "foreach_probe_" + strconv.FormatInt(time.Now().UnixNano(), 36)
-	executor.RegisterExecutor(executorType, func(_ context.Context, step ir.Step) (executor.Executor, error) {
+	executor.RegisterExecutor(executorType, func(ctx context.Context, step ir.Step) (executor.Executor, error) {
+		workingDir := ""
+		if _, ok := step.ExecutorConfig.Config["record_working_dir"]; ok {
+			workingDir = runtimepkg.GetEnv(ctx).WorkingDir
+		}
 		return &foreachProbeExecutor{
-			state: state,
-			cfg:   step.ExecutorConfig.Config,
+			state:      state,
+			cfg:        step.ExecutorConfig.Config,
+			workingDir: workingDir,
 		}, nil
 	}, nil, registry.ExecutorCapabilities{})
 	t.Cleanup(func() {
@@ -324,8 +493,9 @@ type foreachProbeState struct {
 }
 
 type foreachProbeRecord struct {
-	Value string
-	Key   string
+	Value      string
+	Key        string
+	WorkingDir string
 }
 
 func (s *foreachProbeState) start() {
@@ -383,11 +553,12 @@ func (s *foreachProbeState) records() []foreachProbeRecord {
 }
 
 type foreachProbeExecutor struct {
-	state  *foreachProbeState
-	cfg    map[string]any
-	stdout io.Writer
-	stderr io.Writer
-	output map[string]any
+	state      *foreachProbeState
+	cfg        map[string]any
+	workingDir string
+	stdout     io.Writer
+	stderr     io.Writer
+	output     map[string]any
 }
 
 func (e *foreachProbeExecutor) SetStdout(out io.Writer) {
@@ -406,8 +577,9 @@ func (e *foreachProbeExecutor) Run(ctx context.Context) error {
 	e.state.start()
 	defer func() {
 		e.state.finish(foreachProbeRecord{
-			Value: stringConfigValue(e.cfg["value"]),
-			Key:   stringConfigValue(e.cfg["key"]),
+			Value:      stringConfigValue(e.cfg["value"]),
+			Key:        stringConfigValue(e.cfg["key"]),
+			WorkingDir: e.workingDir,
 		})
 	}()
 
