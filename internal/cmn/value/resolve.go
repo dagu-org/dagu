@@ -138,6 +138,11 @@ func (r *resolver) resolveForShell(name string) (string, bool) {
 
 // resolveReference resolves a dotted reference (step property or JSON path).
 func (r *resolver) resolveReference(ctx context.Context, varName, path string) (string, bool) {
+	if r.stepMap != nil {
+		if value, ok := resolveStepProperty(ctx, varName, path, r.stepMap); ok {
+			return value, true
+		}
+	}
 	// Structured item state takes precedence over a same-named environment variable.
 	if varName == "foreach" && len(r.foreach) > 0 {
 		value, ok := datapath.Select(ctx, varName, map[string]any(r.foreach), path)
@@ -145,11 +150,6 @@ func (r *resolver) resolveReference(ctx context.Context, varName, path string) (
 			return "", false
 		}
 		return stringifyResolvedValue(value), true
-	}
-	if r.stepMap != nil {
-		if value, ok := resolveStepProperty(ctx, varName, path, r.stepMap); ok {
-			return value, true
-		}
 	}
 	jsonStr, ok := r.resolveJSONSource(varName)
 	if !ok {

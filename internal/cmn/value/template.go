@@ -110,9 +110,21 @@ func resolveBindings(
 	if !strings.Contains(input, "DAGU_") {
 		taken = ""
 	}
+	legacy := resolver{foreach: scope.Foreach, stepMap: scope.Steps}
 	// A leading non-identifier rune keeps an adjacent $NAME from absorbing a placeholder.
-	resolved, err := walkBindings(input, func(token string, path string) (string, error) {
-		value, err := bindingValue(ctx, path, scope, true)
+	resolved, err := walkBindings(input, len(scope.Foreach) > 0, func(token string, path string) (string, error) {
+		var value any
+		var err error
+		if strings.HasPrefix(path, "foreach.") && !supportedStrictBinding(strings.Split(path, ".")) {
+			// Protect jq item paths with the same insertion rules as plain bindings.
+			var ok bool
+			value, ok = legacy.resolveReference(ctx, "foreach", strings.TrimPrefix(path, "foreach"))
+			if !ok {
+				return token, nil
+			}
+		} else {
+			value, err = bindingValue(ctx, path, scope, true)
+		}
 		if err != nil {
 			addUnresolvedReferenceNotice(notices, field, token, err)
 			placeholder := uniqueToken(taken, "\uE000DAGU_UNRESOLVED_REF_")
@@ -356,16 +368,19 @@ func isEscapedSingleQuote(input string, idx int) bool {
 	return backslashes%2 == 1
 }
 
-func walkBindings(input string, visit func(token, path string) (string, error)) (string, error) {
+func walkBindings(input string, foreachPaths bool, visit func(token, path string) (string, error)) (string, error) {
 	var b strings.Builder
 	last := 0
 	for _, loc := range bindingRefPattern.FindAllStringSubmatchIndex(input, -1) {
 		path := strings.TrimSpace(input[loc[2]:loc[3]])
 		segments := strings.Split(path, ".")
-		if !supportedStrictBinding(segments) && !reservedBuiltinContextReference(segments) {
+		if !supportedStrictBinding(segments) && !reservedBuiltinContextReference(segments) && (!foreachPaths || !strings.HasPrefix(path, "foreach.")) {
 			continue
 		}
 		if isEscapedDollar(input, loc[0]) {
+			if foreachPaths && strings.HasPrefix(path, "foreach.") {
+				continue
+			}
 			b.WriteString(input[last : loc[0]-1])
 			b.WriteString(input[loc[0]:loc[1]])
 			last = loc[1]
