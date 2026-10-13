@@ -1076,6 +1076,7 @@ function DAGStatus({
           onClose={() => setLogViewer((prev) => ({ ...prev, isOpen: false }))}
           logType={logViewer.logType}
           dagName={displayDAGRun.name}
+          fileName={fileName}
           dagRunId={logViewer.dagRunId}
           stepName={logViewer.stepName}
           dagRun={displayDAGRun}

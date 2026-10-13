@@ -540,6 +540,7 @@ function DAGHistoryTable({
                 }
                 logType={logViewer.logType}
                 dagName={selectedDAGRun.name}
+                fileName={fileName}
                 dagRunId={logViewer.dagRunId}
                 stepName={logViewer.stepName}
                 dagRun={selectedDAGRun}

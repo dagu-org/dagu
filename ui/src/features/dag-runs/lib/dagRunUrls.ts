@@ -17,6 +17,7 @@ type DAGPageURLInput = {
   rootDAGRunId?: string;
   subDAGRunId?: string;
   step?: string;
+  stream?: string;
 };
 
 function appendQuery(path: string, params: URLSearchParams): string {
@@ -56,6 +57,7 @@ export function buildDAGPageURL({
   rootDAGRunId,
   subDAGRunId,
   step,
+  stream,
 }: DAGPageURLInput): string {
   const params = new URLSearchParams();
   params.set('remoteNode', remoteNode);
@@ -70,6 +72,9 @@ export function buildDAGPageURL({
   }
   if (step) {
     params.set('step', step);
+  }
+  if (stream) {
+    params.set('stream', stream);
   }
 
   const path = tab

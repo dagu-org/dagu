@@ -624,6 +624,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
             onClose={closeLogViewer}
             logType={logViewer.logType}
             dagName={dag?.name || ''}
+            fileName={fileName}
             dagRunId={dagRunId}
             stepName={logViewer.stepName}
             isInModal={isModal}
