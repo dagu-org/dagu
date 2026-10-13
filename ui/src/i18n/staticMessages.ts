@@ -863,7 +863,6 @@ const english = {
   'Last updated:': 'Last updated:',
   'Last Used': 'Last Used',
   'Latest Run': 'Latest Run',
-  'Latest status': 'Latest status',
   License: 'License',
   'License key': 'License key',
   'license or trial': 'license or trial',
@@ -873,7 +872,6 @@ const english = {
   List: 'List',
   'List view': 'List view',
   Live: 'Live',
-  'Live / Schedule': 'Live / Schedule',
   'Load Average': 'Load Average',
   'Load into editor': 'Load into editor',
   'Load more': 'Load more',
@@ -1148,7 +1146,6 @@ const english = {
     'This runs the step again from its first operation. Windows the step opened stay as they are.',
   'Opens on final failure and resolves on recovery.':
     'Opens on final failure and resolves on recovery.',
-  Operations: 'Operations',
   'Operator - DAG execution only': 'Operator - DAG execution only',
   option: 'option',
   'Optional description': 'Optional description',
@@ -1696,7 +1693,6 @@ const english = {
   'to toggle': 'to toggle',
   'to update': 'to update',
   Today: 'Today',
-  'Toggle & next run': 'Toggle & next run',
   'Toggle notifications': 'Toggle notifications',
   'Toggle Schema Documentation (Ctrl+Shift+D)':
     'Toggle Schema Documentation (Ctrl+Shift+D)',
@@ -1979,7 +1975,6 @@ const english = {
   '{count} files': '{count} files',
   '{count} issue': '{count} issue',
   '{count} issues': '{count} issues',
-  '{count} loaded': '{count} loaded',
   '{count} run': '{count} run',
   '{count} runs': '{count} runs',
   '{count} route': '{count} route',
@@ -1988,8 +1983,6 @@ const english = {
   '{count} workflow': '{count} workflow',
   '{count} workflows': '{count} workflows',
   '{count} {type}': '{count} {type}',
-  '{selected} selected of {loaded} loaded':
-    '{selected} selected of {loaded} loaded',
   '{settled} of {total} tasks settled': '{settled} of {total} tasks settled',
   '{title} column': '{title} column',
   '{workspace} overrides layered on top of global defaults':
@@ -2438,6 +2431,16 @@ const english = {
   "Dagu Console stops monitoring this server, and its free slot becomes available to another server.": "Dagu Console stops monitoring this server, and its free slot becomes available to another server.",
   "The Free plan supports up to 2 API keys.": "The Free plan supports up to 2 API keys.",
   "Existing keys remain active. Revoke a key to create another, or move to Team or Pro to remove the limit.": "Existing keys remain active. Revoke a key to create another, or move to Team or Pro to remove the limit.",
+  "Remove this workflow's incident routing and use the inherited routing instead?": "Remove this workflow's incident routing and use the inherited routing instead?",
+  "Callers using the current token lose access as soon as a new one is generated.": "Callers using the current token lose access as soon as a new one is generated.",
+  "Requests signed with the current secret are rejected as soon as a new one is generated.": "Requests signed with the current secret are rejected as soon as a new one is generated.",
+  "The webhook will accept requests that carry only the token.": "The webhook will accept requests that carry only the token.",
+  "Collapse {name}": "Collapse {name}",
+  "Expand {name}": "Expand {name}",
+  "Remove {label}": "Remove {label}",
+  "Items per page": "Items per page",
+  "Open in fullscreen": "Open in fullscreen",
+  "{selected} of {loaded} selected": "{selected} of {loaded} selected",
 } as const;
 
 export type StaticMessage = keyof typeof english;
@@ -3287,7 +3290,6 @@ const chinese = {
   'Last updated:': '最后更新：',
   'Last Used': '上次使用',
   'Latest Run': '最新运行',
-  'Latest status': '最新状态',
   License: '许可证',
   'License key': '许可证密钥',
   'license or trial': '许可证或试用',
@@ -3297,7 +3299,6 @@ const chinese = {
   List: '列表',
   'List view': '列表视图',
   Live: '实时',
-  'Live / Schedule': '实时 / 调度',
   'Load Average': '负载均值',
   'Load into editor': '加载到编辑器',
   'Load more': '加载更多',
@@ -3560,7 +3561,6 @@ const chinese = {
     '将从第一个操作重新运行此步骤。此步骤打开的窗口将保持原样。',
   'Opens on final failure and resolves on recovery.':
     '在最终失败时打开，并在恢复时解决。',
-  Operations: '操作',
   'Operator - DAG execution only': '操作员 - 仅 DAG 执行',
   option: '选项',
   'Optional description': '可选描述',
@@ -4096,7 +4096,6 @@ const chinese = {
   'to toggle': '以切换',
   'to update': '以更新',
   Today: '今天',
-  'Toggle & next run': '切换与下次运行',
   'Toggle notifications': '切换通知',
   'Toggle Schema Documentation (Ctrl+Shift+D)': '切换架构文档（Ctrl+Shift+D）',
   Token: '令牌',
@@ -4370,7 +4369,6 @@ const chinese = {
   '{count} files': '{count} 个文件',
   '{count} issue': '{count} 个问题',
   '{count} issues': '{count} 个问题',
-  '{count} loaded': '已加载 {count} 个',
   '{count} run': '{count} 个运行',
   '{count} runs': '{count} 个运行',
   '{count} route': '{count} 条路由',
@@ -4379,8 +4377,6 @@ const chinese = {
   '{count} workflow': '{count} 个工作流',
   '{count} workflows': '{count} 个工作流',
   '{count} {type}': '{count} 个{type}',
-  '{selected} selected of {loaded} loaded':
-    '已选择 {loaded} 个已加载项中的 {selected} 个',
   '{settled} of {total} tasks settled':
     '已处理 {total} 个任务中的 {settled} 个',
   '{title} column': '{title}列',
@@ -4818,6 +4814,16 @@ const chinese = {
   "Dagu Console stops monitoring this server, and its free slot becomes available to another server.": "Dagu Console 将停止监控此服务器，其免费名额可供其他服务器使用。",
   "The Free plan supports up to 2 API keys.": "免费套餐最多支持 2 个 API 密钥。",
   "Existing keys remain active. Revoke a key to create another, or move to Team or Pro to remove the limit.": "现有密钥保持有效。撤销一个密钥即可创建新密钥，或升级到 Team 或 Pro 以取消此限制。",
+  "Remove this workflow's incident routing and use the inherited routing instead?": "移除此工作流的事件路由并改用继承的路由？",
+  "Callers using the current token lose access as soon as a new one is generated.": "生成新令牌后，使用当前令牌的调用方将立即失去访问权限。",
+  "Requests signed with the current secret are rejected as soon as a new one is generated.": "生成新密钥后，使用当前密钥签名的请求将立即被拒绝。",
+  "The webhook will accept requests that carry only the token.": "Webhook 将接受仅携带令牌的请求。",
+  "Collapse {name}": "折叠 {name}",
+  "Expand {name}": "展开 {name}",
+  "Remove {label}": "移除 {label}",
+  "Items per page": "每页条数",
+  "Open in fullscreen": "全屏打开",
+  "{selected} of {loaded} selected": "已选择 {loaded} 项中的 {selected} 项",
 } as const satisfies Record<StaticMessage, string>;
 
 const japanese = {
@@ -5687,7 +5693,6 @@ const japanese = {
   'Last updated:': '最終更新日:',
   'Last Used': '最終使用',
   'Latest Run': '最新の Run',
-  'Latest status': '最新ステータス',
   License: 'ライセンス',
   'License key': 'ライセンスキー',
   'license or trial': 'ライセンスまたはトライアル',
@@ -5697,7 +5702,6 @@ const japanese = {
   List: 'リスト',
   'List view': 'リストビュー',
   Live: 'ライブ',
-  'Live / Schedule': 'ライブ / スケジュール',
   'Load Average': 'ロードアベレージ',
   'Load into editor': 'エディターに読み込む',
   'Load more': 'もっと読み込む',
@@ -5980,7 +5984,6 @@ const japanese = {
     '最初の操作からステップを再実行します。ステップが開いたウィンドウはそのまま残ります。',
   'Opens on final failure and resolves on recovery.':
     '最終的な失敗時に開き、回復時に解決されます。',
-  Operations: '操作',
   'Operator - DAG execution only': 'オペレーター - DAG 実行のみ',
   option: 'オプション',
   'Optional description': '任意の説明',
@@ -6534,7 +6537,6 @@ const japanese = {
   'to toggle': 'で切り替え',
   'to update': 'で更新',
   Today: '今日',
-  'Toggle & next run': '切り替え & 次回実行',
   'Toggle notifications': '通知の表示を切り替え',
   'Toggle Schema Documentation (Ctrl+Shift+D)':
     'スキーマドキュメントの表示を切り替え (Ctrl+Shift+D)',
@@ -6818,7 +6820,6 @@ const japanese = {
   '{count} files': '{count} 個のファイル',
   '{count} issue': '{count} 件の問題',
   '{count} issues': '{count} 件の問題',
-  '{count} loaded': '{count} 件を読み込み済み',
   '{count} run': '{count} 件の実行',
   '{count} runs': '{count} 件の実行',
   '{count} route': '{count} 件のルート',
@@ -6827,8 +6828,6 @@ const japanese = {
   '{count} workflow': '{count} 件のワークフロー',
   '{count} workflows': '{count} 件のワークフロー',
   '{count} {type}': '{type} {count} 件',
-  '{selected} selected of {loaded} loaded':
-    '読み込み済み {loaded} 件中 {selected} 件を選択',
   '{settled} of {total} tasks settled':
     '{total} 件中 {settled} 件のタスクを処理済み',
   '{title} column': '{title}列',
@@ -7280,6 +7279,16 @@ const japanese = {
   "Dagu Console stops monitoring this server, and its free slot becomes available to another server.": "Dagu Console はこのサーバーの監視を停止し、無料枠は他のサーバーで使えるようになります。",
   "The Free plan supports up to 2 API keys.": "無料プランでは最大2つのAPIキーを管理できます。",
   "Existing keys remain active. Revoke a key to create another, or move to Team or Pro to remove the limit.": "既存のキーは有効のままです。キーを 1 つ失効させると新しいキーを作成できます。Team または Pro に移行すると上限がなくなります。",
+  "Remove this workflow's incident routing and use the inherited routing instead?": "このワークフローのインシデントルーティングを削除し、継承したルーティングを使用しますか？",
+  "Callers using the current token lose access as soon as a new one is generated.": "新しいトークンを生成すると、現在のトークンを使う呼び出し元はすぐにアクセスできなくなります。",
+  "Requests signed with the current secret are rejected as soon as a new one is generated.": "新しいシークレットを生成すると、現在のシークレットで署名されたリクエストはすぐに拒否されます。",
+  "The webhook will accept requests that carry only the token.": "Webhook はトークンのみのリクエストを受け付けるようになります。",
+  "Collapse {name}": "{name} を折りたたむ",
+  "Expand {name}": "{name} を展開",
+  "Remove {label}": "{label} を削除",
+  "Items per page": "1 ページの件数",
+  "Open in fullscreen": "全画面で開く",
+  "{selected} of {loaded} selected": "{loaded} 件中 {selected} 件を選択",
 } as const satisfies Record<StaticMessage, string>;
 
 export const staticMessages = {
