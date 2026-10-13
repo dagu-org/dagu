@@ -74,6 +74,27 @@ func TestPinnedRecordingRunsOnAnotherDevice(t *testing.T) {
 	assert.Equal(t, []string{"move 290,152", "left down #1", "focus amountBox", "type 8,500", "key ctrl", "key s", "move 235,194", "left down #1"}, device.backend.inputs())
 }
 
+// When a pinned step misses and the model finishes the act, the recording
+// begins with the pinned steps that ran, so pinning it again keeps them as
+// written instead of dropping the start of the task.
+func TestHealedPinnedActRecordsTheStepsThatRan(t *testing.T) {
+	t.Parallel()
+
+	const pinned = `[{"type": {"into": {"role": "text_field", "id": "amountBox"}, "text": "%amount%"}}, {"wait": "10ms"}, {"click": {"role": "button", "name": "送信", "id": "submit"}}]`
+	run := elementRun(t)
+	run.sessions = []*scriptedSession{{turns: []*computeruse.Turn{actions(clickAt(235, 194)), done("Saved")}}}
+	healed := run.execute(`{"variables": {"amount": "12,000"}, "do": [{"act": {"instruction": "Save the invoice", "recorded": {"windows": `+pinned+`}}}]}`, nil)
+	require.NoError(t, healed.err)
+	assert.Equal(t, agentstep.StatusHealed, operationEvents(healed.exec.GetAgentSession())[0].Status)
+
+	steps := marshal(t, pinOf(t, lookupRecording(t, run, "Save the invoice")).Recorded)
+	assert.JSONEq(t, `[
+		{"type": {"into": {"role": "text_field", "id": "amountBox"}, "text": "%amount%"}},
+		{"wait": "10ms"},
+		{"click": {"app": "expense", "role": "button", "name": "保存", "id": "saveButton"}}
+	]`, steps, "the pinned steps that ran, then what the model did in place of the one that missed")
+}
+
 // An element without an id is looked for in its closest named container, so
 // a name that repeats in the window still names one element.
 func TestPinnedRecordingNamesTheContainer(t *testing.T) {

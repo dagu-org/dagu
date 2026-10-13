@@ -183,13 +183,15 @@ var containerRoles = []string{desktop.RoleGroup, desktop.RoleList, desktop.RoleT
 // name, and id, in its application, or in its window's title when the
 // application could not be read. An element without an id is looked for in
 // its closest named container, since a name alone often repeats in a
-// window, such as a 保存 button in two groups.
+// window, such as a 保存 button in two groups. An element a pinned step
+// named keeps its selector as written.
 func pinnedSelector(rec recordedElement) desktop.Selector {
-	sel := desktop.Selector{App: rec.App, Role: rec.Selector.Role, Name: rec.Selector.Name, ID: rec.Selector.ID}
+	sel := rec.Selector
+	sel.App, sel.Window = rec.App, ""
 	if sel.App == "" {
 		sel.Window = rec.Window
 	}
-	if sel.ID == "" {
+	if sel.ID == "" && sel.In == nil {
 		sel.In = namedContainer(rec.Path)
 	}
 	return sel

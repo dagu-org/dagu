@@ -258,48 +258,76 @@ func (s pinnedStep) recordedAction() (recordedAction, bool) {
 //go:fix inline
 func ptr[T any](v T) *T { return new(v) }
 
+// pinnedOutcome is how far an act's pinned steps got.
+type pinnedOutcome struct {
+	done bool
+	// performed counts the steps that acted, waits aside.
+	performed int
+	// ran holds the steps that ran as one recorded turn, so the recording of
+	// an act the model finishes covers the whole task. It is empty when none
+	// of them acted on an element, since such a turn could replay only by
+	// pixels it never recorded.
+	ran    []recordedTurn
+	reason string
+}
+
 // replayPinned runs an act's pinned steps in order through the same element
-// replay a learned recording uses. It returns whether every step ran, how
-// many ran, and the reason one missed.
-func (r *run) replayPinned(ctx context.Context, index int, steps []pinnedStep, direct bool, findWithin time.Duration) (done bool, performed int, reason string, err error) {
+// replay a learned recording uses. It reports whether every step ran, which
+// ran, and the reason one missed.
+func (r *run) replayPinned(ctx context.Context, index int, steps []pinnedStep, direct bool, findWithin time.Duration) (pinnedOutcome, error) {
+	var result pinnedOutcome
 	els, err := r.elementsIfAvailable()
 	if err != nil {
 		// A pin replays only by element; a host that reads none, macOS
 		// until phase 8 or a 32-bit Windows, misses rather than failing, so
 		// on_miss hands the act to the model and never reports the miss.
-		return false, 0, fmt.Sprintf("pinned steps need the window's elements, which this host cannot read: %v", err), nil
+		result.reason = fmt.Sprintf("pinned steps need the window's elements, which this host cannot read: %v", err)
+		return result, nil
 	}
 	total := len(steps)
 	var outcome replayOutcome
+	var ran recordedTurn
+	byElement := false
+	keepRan := func() {
+		if byElement {
+			result.ran = []recordedTurn{ran}
+		}
+	}
 	for i, step := range steps {
 		if step.Wait != "" {
 			wait, _ := time.ParseDuration(step.Wait)
 			if err := sleep(ctx, wait); err != nil {
-				return false, performed, "", err
+				return result, err
 			}
+			ran.Actions = append(ran.Actions, recordedAction{Action: computeruse.Action{Kind: computeruse.KindWait, Duration: wait}})
 			continue
 		}
 		rec, ok := step.recordedAction()
 		if !ok {
-			return false, performed, "", fmt.Errorf("a pinned step sets no action")
+			return result, fmt.Errorf("a pinned step sets no action")
 		}
 		// Wait until nobody has touched the desktop for the idle window, as a
 		// learned replay and the model loop do, so a pinned click or text
 		// never lands in a person's window.
 		if err := r.awaitPerson(ctx); err != nil {
-			return false, performed, "", err
+			return result, err
 		}
 		turn := recordedTurn{Actions: []recordedAction{rec}}
 		reason, err := r.replayByElement(ctx, index, i, total, turn, els, findWithin, direct, &outcome)
 		if err != nil {
-			return false, performed, "", err
+			return result, err
 		}
 		if reason != "" {
-			return false, performed, reason, nil
+			result.reason = reason
+			keepRan()
+			return result, nil
 		}
-		performed++
+		result.performed++
+		ran.Actions = append(ran.Actions, rec)
+		byElement = byElement || rec.Element != nil
 	}
-	return true, performed, "", nil
+	result.done = true
+	return result, nil
 }
 
 // pinnedBindings turns an extract's pinned fields for a system into field

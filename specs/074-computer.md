@@ -430,8 +430,9 @@ element, so the window is raised by the selector's `app` and `window` and the
 action waits up to `find_within`. Under `input: direct` a step drives the
 element's pattern. When every step runs, the act is a cache hit by element
 with no model; when a step misses, `on_miss` lets the model finish and
-record a fresh device recording (which a person reviews to update the pin),
-and `never` fails naming the step. A pinned act has no screen check of its
+record a fresh device recording, which begins with the pinned steps that ran
+when any of them acted on an element, so a person can review it to update
+the pin; `never` fails naming the step. A pinned act has no screen check of its
 own; the following `expect` is its gate.
 
 `fields` maps each output name to a selector for a scalar, or to
