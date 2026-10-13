@@ -112,6 +112,16 @@ func (r *DAGRunRepository) ListStatuses(ctx context.Context, options DAGRunListO
 	return page.Items, nil
 }
 
+// VisitStatuses calls visit for every status matching options, in no
+// particular order. Unlike ListStatuses it has no row limit and does not hold
+// the whole result in memory.
+func (r *DAGRunRepository) VisitStatuses(ctx context.Context, options DAGRunListOptions, visit func(*ir.DAGRunStatus) error) error {
+	query := r.statusQuery(options)
+	query.Limit = 0
+	query.Cursor = ""
+	return r.store.VisitStatuses(ctx, query, visit)
+}
+
 // ListStatusesPage returns one forward-only page in canonical list order.
 func (r *DAGRunRepository) ListStatusesPage(ctx context.Context, options DAGRunListOptions) (DAGRunStatusPage, error) {
 	return r.store.QueryStatuses(ctx, r.statusQuery(options))

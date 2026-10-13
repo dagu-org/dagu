@@ -63,6 +63,30 @@ func (store *Store) QueryStatuses(ctx context.Context, query persis.DAGRunStatus
 	}, nil
 }
 
+// VisitStatuses calls visit for each status matching query. It walks each
+// DAG's days in turn and skips the cross-DAG merge that ordering needs.
+func (store *Store) VisitStatuses(ctx context.Context, query persis.DAGRunStatusQuery, visit func(*ir.DAGRunStatus) error) error {
+	iterators, err := store.newStatusIterators(ctx, query)
+	if err != nil {
+		return err
+	}
+	for _, iterator := range iterators {
+		for {
+			item, err := iterator.Next(ctx)
+			if err != nil {
+				return err
+			}
+			if item == nil {
+				break
+			}
+			if err := visit(item.Status); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func (store *Store) listStatusesOrdered(
 	ctx context.Context,
 	opts persis.DAGRunStatusQuery,

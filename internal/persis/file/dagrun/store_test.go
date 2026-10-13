@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -1110,6 +1111,47 @@ func TestLatestStatusTimezone(t *testing.T) {
 	status, err := attempt.ReadStatus(th.Context)
 	require.NoError(t, err)
 	assert.Equal(t, "midnight-run", status.DAGRunID)
+}
+
+func TestVisitStatuses(t *testing.T) {
+	t.Run("VisitsEveryRunInTheWindow", func(t *testing.T) {
+		th := setupTestRepository(t)
+		ts := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
+		th.CreateAttempt(t, ts, "in-1", ir.Succeeded)
+		th.CreateAttempt(t, ts.Add(time.Hour), "in-2", ir.Failed)
+		th.CreateAttempt(t, ts.Add(26*time.Hour), "in-3", ir.Running)
+		th.CreateAttempt(t, ts.Add(-time.Hour), "before-window", ir.Succeeded)
+
+		var visited []string
+		err := th.Repository.VisitStatuses(th.Context, persis.DAGRunListOptions{
+			From: persis.NewUTC(ts),
+		}, func(status *ir.DAGRunStatus) error {
+			visited = append(visited, status.DAGRunID)
+			return nil
+		})
+
+		require.NoError(t, err)
+		assert.ElementsMatch(t, []string{"in-1", "in-2", "in-3"}, visited)
+	})
+
+	t.Run("StopsAtTheFirstVisitError", func(t *testing.T) {
+		th := setupTestRepository(t)
+		ts := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
+		th.CreateAttempt(t, ts, "run-1", ir.Succeeded)
+		th.CreateAttempt(t, ts.Add(time.Minute), "run-2", ir.Succeeded)
+		stop := errors.New("stop")
+
+		visits := 0
+		err := th.Repository.VisitStatuses(th.Context, persis.DAGRunListOptions{
+			From: persis.NewUTC(ts),
+		}, func(*ir.DAGRunStatus) error {
+			visits++
+			return stop
+		})
+
+		require.ErrorIs(t, err, stop)
+		assert.Equal(t, 1, visits)
+	})
 }
 
 func TestListStatuses_RemainingCountWithFilters(t *testing.T) {
