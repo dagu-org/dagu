@@ -221,7 +221,7 @@ export function ForeachItemsSection({
 
 function SectionHeading() {
   return (
-    <h3 className="text-xs font-medium uppercase text-muted-foreground">
+    <h3 className="text-xs font-medium text-muted-foreground">
       <I18nText text={'Items'} />
     </h3>
   );

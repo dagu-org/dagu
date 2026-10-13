@@ -779,7 +779,7 @@ export default function GitSyncPage() {
                 title="Delete all missing items from remote repository"
               >
                 <Trash2 className="h-4 w-4 mr-1" />
-                <I18nText text={'Delete Missing'} />
+                <I18nText text={'Delete missing'} />
               </Button>
             </I18nProps>
           )}
@@ -1130,7 +1130,7 @@ export default function GitSyncPage() {
                 className="w-full mt-2"
                 onClick={handleTestConnection}
               >
-                <I18nText text={'Test Connection'} />
+                <I18nText text={'Test connection'} />
               </Button>
             )}
           </div>

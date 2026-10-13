@@ -672,7 +672,7 @@ export default function ProfilesPage(): React.ReactNode {
         <p className="text-sm text-muted-foreground">
           <I18nText
             text={
-              'Manage environment profiles and individual secret references used by DAG runs.'
+              'Manage environment profiles and individual secret references used by runs.'
             }
           />
         </p>
@@ -710,7 +710,7 @@ export default function ProfilesPage(): React.ReactNode {
             className="cursor-pointer gap-2"
           >
             <KeyRound className="h-4 w-4" />
-            <I18nText text={'DAG Secret Refs'} />
+            <I18nText text={'Secret refs'} />
           </Tab>
         </Tabs>
       </I18nProps>
@@ -746,7 +746,7 @@ export default function ProfilesPage(): React.ReactNode {
                 }}
               >
                 <Plus className="mr-1.5 h-4 w-4" />
-                <I18nText text={'Add Profile'} />
+                <I18nText text={'Add profile'} />
               </Button>
             </div>
 
@@ -1160,7 +1160,7 @@ export default function ProfilesPage(): React.ReactNode {
 
       <I18nProps>
         <ConfirmModal
-          title="Delete Profile"
+          title="Delete profile"
           buttonText="Delete"
           visible={!!deletingProfile}
           dismissModal={() => setDeletingProfile(null)}
@@ -1181,7 +1181,7 @@ export default function ProfilesPage(): React.ReactNode {
 
       <I18nProps>
         <ConfirmModal
-          title="Delete Entry"
+          title="Delete entry"
           buttonText="Delete"
           visible={!!deletingEntry}
           dismissModal={() => setDeletingEntry(null)}
@@ -1462,9 +1462,9 @@ function ProfileFormDialog({
           <DialogHeader>
             <DialogTitle>
               {isEditing ? (
-                <I18nText text={'Edit Profile'} />
+                <I18nText text={'Edit profile'} />
               ) : (
-                <I18nText text={'Add Profile'} />
+                <I18nText text={'Add profile'} />
               )}
             </DialogTitle>
             <DialogDescription className="sr-only">

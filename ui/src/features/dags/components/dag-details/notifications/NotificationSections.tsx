@@ -665,7 +665,7 @@ function EventFilterEditor({ events, onChange }: EventFilterEditorProps) {
       })}
       {events.length > 0 && (
         <Button variant="ghost" size="sm" onClick={() => onChange([])}>
-          <I18nText text={'Use DAG events'} />
+          <I18nText text={'Use workflow events'} />
         </Button>
       )}
     </div>
@@ -726,11 +726,11 @@ export function NotificationOverviewCard({
         <div className="flex items-center gap-2">
           <Bell className="h-4 w-4 text-muted-foreground" />
           <CardTitle className="text-sm">
-            <I18nText text={'Notification Source'} />
+            <I18nText text={'Notification source'} />
           </CardTitle>
           <Badge variant={isDAGConfigured ? 'success' : 'default'}>
             {isDAGConfigured ? (
-              <I18nText text={'DAG override'} />
+              <I18nText text={'Workflow override'} />
             ) : (
               <I18nText text={'Inherited'} />
             )}
@@ -779,7 +779,7 @@ export function NotificationOverviewCard({
         {isDAGConfigured ? (
           <div className="space-y-2">
             <div className="text-sm font-medium text-foreground">
-              <I18nText text={'Send notifications when this DAG is'} />
+              <I18nText text={'Send notifications when this workflow is'} />
             </div>
             <div className="flex flex-wrap gap-2">
               {EVENT_OPTIONS.map((event) => {
@@ -809,7 +809,7 @@ export function NotificationOverviewCard({
             <div className="text-xs text-muted-foreground">
               <I18nText
                 text={
-                  'This DAG override replaces workspace and Global rules for future runs. Send test verifies delivery now.'
+                  'This workflow override replaces workspace and Global rules for future runs. Send test verifies delivery now.'
                 }
               />
             </div>
@@ -817,7 +817,7 @@ export function NotificationOverviewCard({
               <div className="rounded-md border border-warning/20 bg-warning/10 px-3 py-2 text-sm text-foreground">
                 <I18nText
                   text={
-                    'This DAG override has no destinations. Inherited rules are not used while the override exists.'
+                    'This workflow override has no destinations. Inherited rules are not used while the override exists.'
                   }
                 />
               </div>
@@ -833,17 +833,17 @@ export function NotificationOverviewCard({
             )}
           </div>
         ) : (
-          <div className="rounded-md border border-border bg-muted/30 px-3 py-4">
+          <div>
             <div className="text-sm font-medium text-foreground">
               <I18nText
-                text="This DAG inherits {source}."
+                text="This workflow inherits {source}."
                 values={{ source: inheritedSourceLabel }}
               />
             </div>
             <div className="mt-1 text-sm text-muted-foreground">
               <I18nText
                 text={
-                  'Create a DAG override only when this DAG needs different events or destinations. The effective order is DAG, then workspace, then Global.'
+                  'Create a workflow override only when this workflow needs different events or destinations. The effective order is workflow, then workspace, then Global.'
                 }
               />
             </div>
@@ -925,7 +925,9 @@ export function InheritedNotificationRoutesCard({
       <CardContent>
         {routes.length === 0 ? (
           <div className="text-sm text-muted-foreground">
-            <I18nText text={'No inherited route is configured for this DAG.'} />
+            <I18nText
+              text={'No inherited route is configured for this workflow.'}
+            />
           </div>
         ) : (
           <div className="divide-y divide-border rounded-md border border-border">
@@ -1515,12 +1517,12 @@ export function DAGSubscriptionsSection({
         <Card>
           <CardContent className="space-y-2 py-8 text-sm text-muted-foreground">
             <div>
-              <I18nText text={'No DAG override channels selected.'} />
+              <I18nText text={'No workflow override channels selected.'} />
             </div>
             <div>
               <I18nText
                 text={
-                  'Inherited rules are not used while this DAG override exists. Add a channel or reset to inherit.'
+                  'Inherited rules are not used while this workflow override exists. Add a channel or reset to inherit.'
                 }
               />
             </div>
@@ -1652,7 +1654,7 @@ export function DAGSubscriptionsSection({
                           events={subscription.events}
                           fallback={
                             subscription.events.length === 0
-                              ? 'Same as DAG events'
+                              ? 'Same as workflow events'
                               : 'Custom events'
                           }
                         />
@@ -1669,7 +1671,7 @@ export function DAGSubscriptionsSection({
                               }))
                             }
                           >
-                            <I18nText text={'Use DAG events'} />
+                            <I18nText text={'Use workflow events'} />
                           </Button>
                         )}
                         <Button

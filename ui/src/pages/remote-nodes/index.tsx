@@ -220,7 +220,7 @@ export default function RemoteNodesPage() {
           className="h-8"
         >
           <Plus className="h-4 w-4 mr-1.5" />
-          <I18nText text={'Add Node'} />
+          <I18nText text={'Add node'} />
         </Button>
       </div>
 
@@ -364,7 +364,7 @@ export default function RemoteNodesPage() {
                             disabled={isTesting}
                           >
                             <Unplug className="h-4 w-4 mr-2" />
-                            <I18nText text={'Test Connection'} />
+                            <I18nText text={'Test connection'} />
                           </DropdownMenuItem>
                           {isStoreNode(node) && (
                             <DropdownMenuItem
@@ -420,7 +420,7 @@ export default function RemoteNodesPage() {
       {/* Delete Confirmation */}
       <I18nProps>
         <ConfirmModal
-          title="Delete Remote Node"
+          title="Delete remote node"
           buttonText="Delete"
           visible={!!deletingNode}
           dismissModal={() => setDeletingNode(null)}

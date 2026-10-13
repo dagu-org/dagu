@@ -739,7 +739,7 @@ function WebhookTab({ fileName }: WebhookTabProps) {
               ) : (
                 <RefreshCw className="h-3.5 w-3.5 mr-1" />
               )}
-              <I18nText text={'Regenerate Token'} />
+              <I18nText text={'Regenerate token'} />
             </Button>
             <Button
               variant="outline"
@@ -1153,7 +1153,7 @@ function WebhookTab({ fileName }: WebhookTabProps) {
         <ConfirmModal
           title={
             pendingCredentialAction === 'token'
-              ? 'Regenerate Token'
+              ? 'Regenerate token'
               : pendingCredentialAction === 'hmac-secret'
                 ? 'Regenerate HMAC Secret'
                 : 'Disable HMAC'

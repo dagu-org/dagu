@@ -485,9 +485,9 @@ export function APIKeyFormModal({
               {isLoading ? (
                 <I18nText text={'Saving...'} />
               ) : isEditing ? (
-                <I18nText text={'Save Changes'} />
+                <I18nText text={'Save changes'} />
               ) : (
-                <I18nText text={'Create Key'} />
+                <I18nText text={'Create key'} />
               )}
             </Button>
           </DialogFooter>

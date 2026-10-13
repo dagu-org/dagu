@@ -351,7 +351,7 @@ function QueueDetailsPage() {
         <div className="flex-1 min-h-0 overflow-auto space-y-4 pr-1">
           <section className="card-obsidian">
             <div className="border-b px-3 py-2">
-              <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <span className="text-xs font-medium text-muted-foreground">
                 <I18nText text={'Running ('} />
                 {queue?.runningCount || 0})
               </span>
@@ -374,7 +374,7 @@ function QueueDetailsPage() {
             <div className="border-b px-3 py-2">
               <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex flex-wrap items-center gap-3">
-                  <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <span className="text-xs font-medium text-muted-foreground">
                     <I18nText text={'Queued ('} />
                     {formatQueuedCount(
                       queue?.queuedCount || 0,
@@ -626,7 +626,7 @@ function QueueDetailsPage() {
               </div>
 
               <div className="rounded-md border bg-muted/20 p-3">
-                <div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <div className="mb-1 text-xs font-medium text-muted-foreground">
                   <I18nText text={'Current item'} />
                 </div>
                 {progress.currentItem ? (
@@ -656,7 +656,7 @@ function QueueDetailsPage() {
               )}
 
               <div className="rounded-md border">
-                <div className="border-b px-3 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <div className="border-b px-3 py-2 text-xs font-medium text-muted-foreground">
                   <I18nText text={'Results'} />
                 </div>
                 <div className="min-h-40 max-h-[45vh] space-y-3 overflow-y-auto p-3">

@@ -313,7 +313,7 @@ function SystemStatus() {
         </I18nProps>
         <I18nProps>
           <ResourceChart
-            title="Load Average"
+            title="Load average"
             data={resourceData?.load}
             color="#73BF69"
             unit=""

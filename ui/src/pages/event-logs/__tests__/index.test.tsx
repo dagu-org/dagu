@@ -326,7 +326,7 @@ describe('EventLogsPage', () => {
       throw new Error('Expected DAG name input to be rendered');
     }
     fireEvent.change(dagNameInput, { target: { value: 'demo' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Apply Filters' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }));
 
     await waitFor(() => {
       const call = latestEventLogsCall(calls);
@@ -396,7 +396,7 @@ describe('EventLogsPage', () => {
       'Filter by workflow name'
     );
     fireEvent.change(dagNameInput, { target: { value: 'payments' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Apply Filters' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }));
 
     await waitFor(() => {
       const call = latestEventLogsCall(calls);
@@ -480,7 +480,7 @@ describe('EventLogsPage', () => {
 
     renderPage();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Load More' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Load more' }));
 
     await waitFor(() => {
       expect(clientGetMock).toHaveBeenCalledWith('/event-logs', {

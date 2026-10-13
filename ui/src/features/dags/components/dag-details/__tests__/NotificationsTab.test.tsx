@@ -166,7 +166,7 @@ describe('NotificationsTab', () => {
       await screen.findByText('Notification delivery is unavailable')
     ).toBeVisible();
     expect(
-      screen.queryByRole('button', { name: /configure dag override/i })
+      screen.queryByRole('button', { name: /configure workflow override/i })
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /send test/i })
@@ -217,15 +217,17 @@ describe('NotificationsTab', () => {
     expect(screen.getByText('Inherited')).toBeVisible();
   });
 
-  it('shows inherited rules instead of silently creating a DAG override', async () => {
+  it('shows inherited rules instead of silently creating a workflow override', async () => {
     renderTab();
 
     expect(await screen.findByText('Inherited')).toBeVisible();
-    expect(screen.getByText('This DAG inherits Global rules.')).toBeVisible();
+    expect(
+      screen.getByText('This workflow inherits Global rules.')
+    ).toBeVisible();
     expect(screen.getByText('Effective Inherited Routes')).toBeVisible();
     expect(await screen.findByText('Slack Ops')).toBeVisible();
     expect(
-      screen.getByRole('button', { name: /configure dag override/i })
+      screen.getByRole('button', { name: /configure workflow override/i })
     ).toBeVisible();
     expect(screen.queryByText('Send to')).not.toBeInTheDocument();
   });
@@ -265,17 +267,17 @@ describe('NotificationsTab', () => {
       });
     renderTab();
 
-    expect((await screen.findAllByText('DAG override')).length).toBeGreaterThan(
-      0
-    );
+    expect(
+      (await screen.findAllByText('Workflow override')).length
+    ).toBeGreaterThan(0);
     expect(
       screen.getByText(
-        'This DAG override has no destinations. Inherited rules are not used while the override exists.'
+        'This workflow override has no destinations. Inherited rules are not used while the override exists.'
       )
     ).toBeVisible();
     expect(
       screen.getByText(
-        'Inherited rules are not used while this DAG override exists. Add a channel or reset to inherit.'
+        'Inherited rules are not used while this workflow override exists. Add a channel or reset to inherit.'
       )
     ).toBeVisible();
     expect(

@@ -115,7 +115,7 @@ function StepField({
 }) {
   return (
     <section className="space-y-2">
-      <div className="text-xs font-medium uppercase text-muted-foreground">
+      <div className="text-xs font-medium text-muted-foreground">
         <I18nText text={label} />
       </div>
       {renderStepFieldValue(name, value)}
@@ -198,7 +198,7 @@ function ExecutorConfigField({ value }: { value: Record<string, unknown> }) {
   return (
     <div className="space-y-3 rounded-md border border-border bg-background p-3">
       <div className="min-w-0">
-        <div className="mb-1 text-[11px] font-medium uppercase text-muted-foreground">
+        <div className="mb-1 text-[11px] font-medium text-muted-foreground">
           <I18nText text={'Type'} />
         </div>
         <Badge variant="outline">
@@ -206,7 +206,7 @@ function ExecutorConfigField({ value }: { value: Record<string, unknown> }) {
         </Badge>
       </div>
       <div className="min-w-0">
-        <div className="mb-1 text-[11px] font-medium uppercase text-muted-foreground">
+        <div className="mb-1 text-[11px] font-medium text-muted-foreground">
           <I18nText text={'Message'} />
         </div>
         <LogStepMessage message={logMessage} />
@@ -230,7 +230,7 @@ function ObjectFieldCard({ value }: { value: unknown }) {
     <div className="space-y-2 rounded-md border border-border bg-background p-3">
       {entries.map(([key, item]) => (
         <div key={key} className="min-w-0">
-          <div className="mb-1 text-[11px] font-medium uppercase text-muted-foreground">
+          <div className="mb-1 text-[11px] font-medium text-muted-foreground">
             {STEP_FIELD_LABELS[key] || toTitleLabel(key)}
           </div>
           {renderNestedFieldValue(key, item)}

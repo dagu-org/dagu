@@ -302,11 +302,11 @@ export function SecretRefsSection(): React.ReactNode {
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
         <div className="min-w-0 flex-1 basis-64">
           <h2 id="secret-refs-heading" className="text-base font-semibold">
-            <I18nText text={'DAG Secret Refs'} />
+            <I18nText text={'Secret refs'} />
           </h2>
           <p className="text-sm text-muted-foreground">
             <I18nTemplate
-              text="Individual secrets that DAGs reference with {reference}."
+              text="Individual secrets that workflows reference with {reference}."
               values={{
                 reference: <code className="text-xs">secrets[].ref</code>,
               }}
@@ -345,7 +345,7 @@ export function SecretRefsSection(): React.ReactNode {
             }}
           >
             <Plus className="mr-1.5 h-4 w-4" />
-            <I18nText text={'Add Secret Ref'} />
+            <I18nText text={'Add secret ref'} />
           </Button>
         </div>
       </div>
@@ -565,7 +565,7 @@ export function SecretRefsSection(): React.ReactNode {
 
       <I18nProps>
         <ConfirmModal
-          title="Delete Secret Ref"
+          title="Delete secret ref"
           buttonText="Delete"
           visible={!!deletingSecret}
           dismissModal={() => setDeletingSecret(null)}
@@ -688,9 +688,9 @@ function SecretFormDialog({
         <DialogHeader>
           <DialogTitle>
             {isEditing ? (
-              <I18nText text={'Edit Secret Ref'} />
+              <I18nText text={'Edit secret ref'} />
             ) : (
-              <I18nText text={'Add Secret Ref'} />
+              <I18nText text={'Add secret ref'} />
             )}
           </DialogTitle>
         </DialogHeader>

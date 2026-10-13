@@ -385,7 +385,7 @@ export function TemplateSelector({
                 <div key={group}>
                   {/* Group header */}
                   {hasGroups && (
-                    <div className="px-3 py-1 text-[10px] uppercase tracking-wider text-muted-foreground font-medium bg-popover border-b border-border sticky top-0 z-10">
+                    <div className="px-3 py-1 text-[10px] text-muted-foreground font-medium bg-popover border-b border-border sticky top-0 z-10">
                       {group || <I18nText text={'(ungrouped)'} />}
                     </div>
                   )}

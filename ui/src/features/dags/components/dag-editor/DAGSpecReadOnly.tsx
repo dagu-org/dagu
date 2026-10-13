@@ -685,7 +685,7 @@ function DAGSpecReadOnly({
 
       <I18nProps>
         <ConfirmModal
-          title="Retry Edited DAG Run"
+          title="Retry edited run"
           buttonText={retrySubmitting ? 'Creating...' : 'Create new run'}
           visible={previewVisible}
           dismissModal={() => {
@@ -707,7 +707,7 @@ function DAGSpecReadOnly({
               <div className="flex min-h-0 flex-col rounded-md border bg-surface">
                 <div className="grid grid-cols-2 gap-3 border-b px-3 py-2 text-xs sm:grid-cols-4">
                   <div className="min-w-0">
-                    <div className="text-xs uppercase text-muted-foreground">
+                    <div className="text-xs text-muted-foreground">
                       <I18nText text={'Target DAG'} />
                     </div>
                     <div className="truncate font-mono text-xs">
@@ -715,19 +715,19 @@ function DAGSpecReadOnly({
                     </div>
                   </div>
                   <div className="min-w-0">
-                    <div className="text-xs uppercase text-muted-foreground">
+                    <div className="text-xs text-muted-foreground">
                       <I18nText text={'Reuse previous output'} />
                     </div>
                     <div>{selectedSkipSteps.length}</div>
                   </div>
                   <div className="min-w-0">
-                    <div className="text-xs uppercase text-muted-foreground">
+                    <div className="text-xs text-muted-foreground">
                       <I18nText text={'Run again'} />
                     </div>
                     <div>{retryStepCount}</div>
                   </div>
                   <div className="min-w-0">
-                    <div className="text-xs uppercase text-muted-foreground">
+                    <div className="text-xs text-muted-foreground">
                       <I18nText text={'Source DAG-run ID'} />
                     </div>
                     <div className="truncate font-mono text-xs">{dagRunId}</div>

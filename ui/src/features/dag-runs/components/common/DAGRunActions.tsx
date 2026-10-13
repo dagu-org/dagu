@@ -165,12 +165,9 @@ function DAGRunActions({
   const terminateDetails = getDAGRunTerminateActionDetails(dagRun, {
     isRootLevel,
     copy: {
-      stopConfirmText: ts('Do you really want to stop the dag-run "{name}"?', {
-        name: dagRun?.name ?? name,
-      }),
+      stopConfirmText: ts('Running steps are canceled.'),
       cancelConfirmText: ts(
-        'Do you really want to cancel auto-retry for the dag-run "{name}"?',
-        { name: dagRun?.name ?? name }
+        'The failed run will not be retried automatically.'
       ),
     },
   });
@@ -319,7 +316,11 @@ function DAGRunActions({
         {/* Stop Confirmation Modal */}
         <I18nProps>
           <ConfirmModal
-            title="Confirmation"
+            title={
+              terminateAction === 'cancel'
+                ? 'Cancel auto-retry?'
+                : 'Stop this run?'
+            }
             buttonText={ts(terminateDetails.buttonText)}
             visible={isStopModal}
             dismissModal={() => setIsStopModal(false)}
@@ -358,7 +359,7 @@ function DAGRunActions({
         {/* Retry Confirmation Modal */}
         <I18nProps>
           <ConfirmModal
-            title={retryAsNew ? 'Reschedule DAG Run' : 'Confirmation'}
+            title={retryAsNew ? 'Reschedule as a new run?' : 'Retry this run?'}
             buttonText={retryAsNew ? 'Reschedule' : 'Retry'}
             visible={isRetryModal}
             dismissModal={() => {
@@ -435,11 +436,6 @@ function DAGRunActions({
           >
             {/* Modal content structure */}
             <div className="space-y-3">
-              <p className="mb-2">
-                <I18nText
-                  text={'Do you really want to retry the following execution?'}
-                />
-              </p>
               {!retryAsNew && hasManagedAgentSession && (
                 <p className="rounded-md border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
                   <I18nText
@@ -605,7 +601,7 @@ function DAGRunActions({
         {/* Dequeue Confirmation Modal */}
         <I18nProps>
           <ConfirmModal
-            title="Confirmation"
+            title="Remove this run from the queue?"
             buttonText="Dequeue"
             visible={isDequeueModal}
             dismissModal={() => setIsDequeueModal(false)}
@@ -638,11 +634,6 @@ function DAGRunActions({
             }}
           >
             <div>
-              <p className="mb-2">
-                <I18nText
-                  text={'Do you really want to dequeue the following dagRun?'}
-                />
-              </p>
               <I18nProps>
                 <LabeledItem label="Workflow">
                   <span className="font-mono text-sm">

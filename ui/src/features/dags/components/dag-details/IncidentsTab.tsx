@@ -195,13 +195,13 @@ export default function IncidentsTab({
     <div className="space-y-5">
       <div className="space-y-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div className="space-y-1">
-            <h1 className="text-lg font-semibold text-foreground">
-              <I18nText text={'DAG Incidents'} />
-            </h1>
+          <div className="min-w-0 max-w-2xl space-y-1">
+            <h2 className="text-lg font-semibold text-foreground">
+              <I18nText text={'Workflow incidents'} />
+            </h2>
             <p className="text-sm text-muted-foreground">
               <I18nTemplate
-                text="This DAG uses {source} routing unless you set a DAG override."
+                text="This workflow uses {source} routing unless you set a workflow override."
                 values={{
                   source: workspaceName ? (
                     <I18nText
@@ -215,7 +215,7 @@ export default function IncidentsTab({
               />
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
             <Button variant="outline" size="sm" onClick={refresh}>
               <RefreshCw className="h-4 w-4" />
               <I18nText text={'Refresh'} />
@@ -247,7 +247,7 @@ export default function IncidentsTab({
             ) : (
               <Button size="sm" onClick={configureOverride}>
                 <Settings className="h-4 w-4" />
-                <I18nText text={'Configure DAG override'} />
+                <I18nText text={'Configure workflow override'} />
               </Button>
             )}
           </div>

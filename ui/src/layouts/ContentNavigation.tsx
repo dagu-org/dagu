@@ -53,6 +53,21 @@ const STATIC_ROUTE_LABELS: Record<string, TranslationKey> = {
   '/git-sync': 'navigation.gitSync',
 };
 
+// Top-level routes that exist but have no static label above.
+const UNLABELED_ROUTE_ROOTS = new Set([
+  'docs',
+  'login',
+  'profiles',
+  'secrets',
+  'setup',
+]);
+
+function isKnownRouteRoot(segment: string): boolean {
+  return (
+    UNLABELED_ROUTE_ROOTS.has(segment) || `/${segment}` in STATIC_ROUTE_LABELS
+  );
+}
+
 type Translate = (key: TranslationKey) => string;
 
 function decodePathSegment(segment: string): string {
@@ -260,6 +275,11 @@ export function getBreadcrumbItems(
   const exactLabel = STATIC_ROUTE_LABELS[normalized];
   if (exactLabel) {
     items.push({ label: t(exactLabel), to: normalized });
+    return items;
+  }
+
+  if (!isKnownRouteRoot(segments[0] ?? '')) {
+    items.push({ label: t('navigation.pageNotFound'), to: normalized });
     return items;
   }
 

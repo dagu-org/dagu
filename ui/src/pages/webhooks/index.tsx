@@ -270,7 +270,7 @@ export default function WebhooksPage() {
             <I18nText text={'Webhooks'} />
           </h1>
           <p className="text-sm text-muted-foreground">
-            <I18nText text={'Manage webhooks across all DAGs'} />
+            <I18nText text={'Manage webhooks across all workflows'} />
           </p>
         </div>
       </div>
@@ -427,7 +427,7 @@ export default function WebhooksPage() {
                           onClick={() => setRegeneratingWebhook(webhook)}
                         >
                           <RefreshCw className="h-4 w-4 mr-2" />
-                          <I18nText text={'Regenerate Token'} />
+                          <I18nText text={'Regenerate token'} />
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => setDeletingWebhook(webhook)}
@@ -450,7 +450,7 @@ export default function WebhooksPage() {
       {regeneratingWebhook && !newToken && (
         <I18nProps>
           <ConfirmModal
-            title="Regenerate Token"
+            title="Regenerate token"
             buttonText="Regenerate"
             visible={true}
             dismissModal={() => setRegeneratingWebhook(null)}

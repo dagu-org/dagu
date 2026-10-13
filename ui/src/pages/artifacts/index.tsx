@@ -1141,7 +1141,7 @@ function Artifacts() {
             <p className="mt-1 max-w-md text-center">
               <I18nText
                 text={
-                  'No DAG-runs in the selected time range produced artifact files. Adjust the date range or filters.'
+                  'No runs in the selected time range produced artifact files. Adjust the date range or filters.'
                 }
               />
             </p>

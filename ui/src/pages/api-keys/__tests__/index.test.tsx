@@ -302,7 +302,7 @@ describe('APIKeyFormModal', () => {
     if (!mcpSurface) {
       fireEvent.click(screen.getByRole('checkbox', { name: 'MCP' }));
     }
-    fireEvent.click(screen.getByRole('button', { name: 'Create Key' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create key' }));
     await screen.findByText('API Key Created');
   }
 

@@ -271,7 +271,7 @@ function DAGCard({
           <Badge
             key={getScheduleKey(schedule, idx)}
             variant="outline"
-            className={`text-xs font-normal px-1 py-0 h-3 normal-case tracking-normal ${schedule.kind === 'at' ? 'border-0' : ''}`}
+            className={`h-[18px] rounded px-1.5 py-0 font-mono text-[11px] font-normal normal-case tracking-normal ${schedule.kind === 'at' ? 'border-0' : ''}`}
           >
             {getScheduleLabel(schedule)}
           </Badge>
@@ -395,7 +395,7 @@ function countLeadingPinnedRows(rows: Row<Data>[]): number {
 
 function PinnedSectionLabel() {
   return (
-    <span className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+    <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
       <Pin className="h-3 w-3" aria-hidden="true" />
       <I18nText text={'Pinned'} />
     </span>
@@ -930,7 +930,7 @@ const defaultColumns = [
             <Badge
               key={getScheduleKey(schedule, index)}
               variant="outline"
-              className="text-xs font-normal px-1 py-0 h-3.5 normal-case tracking-normal"
+              className="h-[18px] rounded px-1.5 py-0 font-mono text-[11px] font-normal normal-case tracking-normal"
             >
               {getScheduleLabel(schedule)}
             </Badge>
@@ -2127,7 +2127,7 @@ function DAGTable({
                           <ChevronDown className="h-4 w-4 text-muted-foreground" />
                         )}
                       </div>
-                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide truncate">
+                      <span className="text-xs font-semibold text-muted-foreground truncate">
                         {groupRow.name}
                       </span>
                     </div>

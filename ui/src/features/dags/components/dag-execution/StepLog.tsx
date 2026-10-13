@@ -537,7 +537,7 @@ function StepLogContent({
                 onClick={() => handleViewModeChange('tail')}
                 disabled={isNavigating}
               >
-                <I18nText text={'Show End'} />
+                <I18nText text={'Show end'} />
               </Button>
               <Button
                 size="sm"
@@ -545,7 +545,7 @@ function StepLogContent({
                 onClick={() => handleViewModeChange('head')}
                 disabled={isNavigating}
               >
-                <I18nText text={'Show Beginning'} />
+                <I18nText text={'Show beginning'} />
               </Button>
               <Button
                 size="sm"

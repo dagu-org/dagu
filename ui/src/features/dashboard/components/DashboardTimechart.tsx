@@ -550,7 +550,7 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
     <div className="w-full h-full flex flex-col bg-card overflow-hidden">
       {/* Toolbar */}
       <div className="flex justify-between items-center gap-2 px-3 py-1.5 bg-muted/30 flex-shrink-0">
-        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+        <span className="text-xs font-medium text-muted-foreground">
           <I18nText text={"Timeline"} />
         </span>
         <div className="flex items-center gap-0.5 rounded-md border border-border bg-card p-0.5">

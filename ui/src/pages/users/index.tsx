@@ -254,7 +254,7 @@ export default function UsersPage() {
             className="h-8"
           >
             <UserPlus className="h-4 w-4 mr-1.5" />
-            <I18nText text={'Add User'} />
+            <I18nText text={'Add user'} />
           </Button>
         )}
       </div>
@@ -394,7 +394,7 @@ export default function UsersPage() {
                             onClick={() => setResetPasswordUser(user)}
                           >
                             <Key className="h-4 w-4 mr-2" />
-                            <I18nText text={'Reset Password'} />
+                            <I18nText text={'Reset password'} />
                           </DropdownMenuItem>
                         )}
                         {hasRbac && isAdmin && user.id !== currentUser?.id && (
@@ -467,7 +467,7 @@ export default function UsersPage() {
       {/* Delete Confirmation */}
       <I18nProps>
         <ConfirmModal
-          title="Delete User"
+          title="Delete user"
           buttonText="Delete"
           visible={!!deletingUser}
           dismissModal={() => setDeletingUser(null)}

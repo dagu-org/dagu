@@ -190,13 +190,13 @@ steps:
     // Find user row and open actions
     const row = page.getByRole('row').filter({ hasText: username });
     await row.getByRole('button').click();
-    await page.getByRole('menuitem', { name: 'Reset Password' }).click();
+    await page.getByRole('menuitem', { name: 'Reset password' }).click();
 
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
     await dialog.getByLabel('New Password').fill(resetPass);
     await dialog.getByLabel('Confirm Password').fill(resetPass);
-    await dialog.getByRole('button', { name: 'Reset Password' }).click();
+    await dialog.getByRole('button', { name: 'Reset password' }).click();
 
     await expect(dialog.getByText('Password reset successfully')).toBeVisible();
 

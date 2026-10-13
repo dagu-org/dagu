@@ -256,17 +256,11 @@ function DAGActions({
   const hasWaitingApprovals = Boolean(waitingApprovalStepName);
   const terminateDetails = getDAGRunTerminateActionDetails(status, {
     copy: {
-      stopTooltipText: 'Stop DAG execution',
-      cancelTooltipText: 'Cancel auto-retry for this failed DAG execution',
-      stopConfirmText:
-        status?.name && status?.dagRunId
-          ? ts('Do you really want to stop the dag-run "{name}"?', {
-              name: status.name,
-            })
-          : 'Do you really want to cancel the DAG?',
+      stopTooltipText: 'Stop the latest run',
+      cancelTooltipText: 'Cancel auto-retry for the latest run',
+      stopConfirmText: ts('Running steps are canceled.'),
       cancelConfirmText: ts(
-        'Do you really want to cancel auto-retry for the dag-run "{name}"?',
-        { name: status?.name ?? '' }
+        'The failed run will not be retried automatically.'
       ),
     },
   });
@@ -474,7 +468,13 @@ function DAGActions({
 
         <I18nProps>
           <ConfirmModal
-            title="Confirmation"
+            title={
+              terminateAction === 'cancel'
+                ? 'Cancel auto-retry?'
+                : stopAllRunning
+                  ? 'Stop all running instances?'
+                  : 'Stop this run?'
+            }
             buttonText={terminateDetails.buttonText}
             visible={isStopModal}
             dismissModal={() => {
@@ -550,7 +550,7 @@ function DAGActions({
                 {terminateAction === 'stop' && stopAllRunning ? (
                   <I18nText
                     text={
-                      'Do you really want to stop all running instances of this DAG?'
+                      'Running steps in every instance of this workflow are canceled.'
                     }
                   />
                 ) : (
@@ -612,8 +612,8 @@ function DAGActions({
         </I18nProps>
         <I18nProps>
           <ConfirmModal
-            title={retryAsNew ? 'Reschedule DAG Run' : 'Confirmation'}
-            buttonText={retryAsNew ? 'Reschedule' : 'Rerun'}
+            title={retryAsNew ? 'Reschedule as a new run?' : 'Retry this run?'}
+            buttonText={retryAsNew ? 'Reschedule' : 'Retry'}
             visible={isRetryModal}
             dismissModal={() => {
               setIsRetryModal(false);
@@ -714,19 +714,6 @@ function DAGActions({
           >
             {/* Keep modal content structure */}
             <div className="space-y-3">
-              <p className="mb-2">
-                {status?.name && retryDagRunId ? (
-                  ts('Do you really want to retry the dag-run "{name}"?', {
-                    name: status.name,
-                  })
-                ) : (
-                  <I18nText
-                    text={
-                      'Do you really want to rerun the following execution?'
-                    }
-                  />
-                )}
-              </p>
               <I18nProps>
                 <LabeledItem label="Workflow">
                   <span className="font-mono text-sm">
@@ -937,7 +924,7 @@ function DAGActions({
         <I18nProps>
           <ConfirmModal
             title="Unsaved Changes"
-            buttonText="Run Anyway"
+            buttonText="Run anyway"
             visible={isUnsavedChangesModal}
             dismissModal={() => {
               setIsUnsavedChangesModal(false);

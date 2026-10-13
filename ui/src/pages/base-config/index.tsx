@@ -254,9 +254,7 @@ function BaseConfigPage(): React.ReactNode {
               values={{ workspace: selectedWorkspace ?? '' }}
             />
           ) : (
-            <I18nText
-              text={'Global defaults inherited by all DAG definitions'}
-            />
+            <I18nText text={'Global defaults inherited by all workflows'} />
           )}
         </p>
       </div>
@@ -329,6 +327,7 @@ function BaseConfigPage(): React.ReactNode {
                 </I18nProps>
                 <I18nProps>
                   <Button
+                    variant="primary"
                     title="Save changes (Ctrl+S / Cmd+S)"
                     disabled={!hasUnsavedChanges}
                     onClick={handleSave}

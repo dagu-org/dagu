@@ -459,7 +459,7 @@ function DAGStatusOverview({
           <I18nProps><button
             onClick={() => onViewLog(status.dagRunId)}
             className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded border border-border bg-card hover:bg-muted transition-colors cursor-pointer"
-            title="View Scheduler Log"
+            title="View scheduler log"
           >
             <Terminal className="h-3 w-3" />
             <span><I18nText text={"Log"} /></span>
