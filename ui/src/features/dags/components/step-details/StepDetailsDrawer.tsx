@@ -472,7 +472,7 @@ export function StepDetailsDrawer({
         <header className="flex items-start justify-between gap-4 border-b border-border bg-card px-4 py-3">
           <div className="min-w-0">
             <div className="text-xs font-medium uppercase text-muted-foreground">
-              {dagName || <I18nText text={'DAG'} />}
+              {dagName || <I18nText text={'Workflow'} />}
             </div>
             <h2
               id="step-details-title"

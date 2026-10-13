@@ -5,6 +5,7 @@ import RelativeTime from '@/components/ui/relative-time';
 import { cn } from '../../../lib/utils';
 import WorkerHealth from '../../workers/components/WorkerHealth';
 import { I18nText } from '@/i18n/I18nText';
+import { useI18n } from '@/i18n/I18nProvider';
 
 type Worker = components['schemas']['Worker'];
 type RunningTask = components['schemas']['RunningTask'];
@@ -22,6 +23,7 @@ function WorkersSummary({
   errors,
   onTaskClick,
 }: WorkersSummaryProps) {
+  const { ts } = useI18n();
   const [expandedWorkers, setExpandedWorkers] = React.useState<Set<string>>(
     new Set()
   );
@@ -83,9 +85,9 @@ function WorkersSummary({
             <span className="text-sm font-light tabular-nums text-foreground">
               {metrics.totalWorkers}
             </span>
-            <span><I18nText text={"workers"} /></span>
+            <span>{ts(metrics.totalWorkers === 1 ? 'worker' : 'workers')}</span>
             <span className="text-muted-foreground/60">
-              ({metrics.healthyWorkers} <I18nText text={"up)"} />
+              {ts('({count} up)', { count: metrics.healthyWorkers })}
             </span>
           </div>
           <div className="flex items-baseline gap-1">
@@ -98,7 +100,7 @@ function WorkersSummary({
             <span className="text-sm font-light tabular-nums text-foreground">
               {metrics.totalTasks}
             </span>
-            <span><I18nText text={"tasks"} /></span>
+            <span>{ts(metrics.totalTasks === 1 ? 'task' : 'tasks')}</span>
           </div>
           <div className="flex items-baseline gap-1">
             <span className="text-sm font-light tabular-nums text-foreground">

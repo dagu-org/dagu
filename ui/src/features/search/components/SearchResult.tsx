@@ -14,6 +14,7 @@ import { Link } from 'react-router-dom';
 import { components } from '../../../api/v1/schema';
 import { AppBarContext } from '../../../contexts/AppBarContext';
 import { I18nText } from '@/i18n/I18nText';
+import { useI18n } from '@/i18n/I18nProvider';
 
 type SearchMatch = components['schemas']['SearchMatchItem'];
 type DagResult = components['schemas']['DAGSearchPageItem'];
@@ -45,7 +46,7 @@ type Props =
   | { type: 'wiki'; query: string; results: WikiPageResult[] };
 
 type SearchResultItemProps = {
-  kind: 'DAG' | 'Wiki';
+  kind: 'Workflow' | 'Wiki';
   title: string;
   link: string;
   query: string;
@@ -116,6 +117,7 @@ function SearchResultItem({
   initialNextCursor,
   loadMore,
 }: SearchResultItemProps) {
+  const { ts } = useI18n();
   const [matches, setMatches] = React.useState<SearchMatch[]>(initialMatches);
   const [hasMoreMatches, setHasMoreMatches] = React.useState(
     initialHasMoreMatches
@@ -165,12 +167,17 @@ function SearchResultItem({
             <h3 className="text-lg font-semibold text-foreground whitespace-normal break-words">
               {title}
               <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-xs font-normal text-muted-foreground">
-                {kind}
+                {ts(kind)}
               </span>
             </h3>
           </Link>
           <span className="shrink-0 text-xs text-muted-foreground">
-            {matches.length} <I18nText text={"shown"} />
+            {ts(
+              matches.length === 1
+                ? '{count} match shown'
+                : '{count} matches shown',
+              { count: matches.length }
+            )}
           </span>
         </div>
 
@@ -219,7 +226,7 @@ function SearchResult(props: Props) {
             : '';
           return {
             key: `dag-${result.fileName}-${result.workspace ?? ''}-${query}`,
-            kind: 'DAG' as const,
+            kind: 'Workflow' as const,
             title: result.name,
             link: `/dags/${encodeURI(result.fileName)}/spec${linkSearch}`,
             initialMatches: result.matches ?? [],

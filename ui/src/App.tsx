@@ -119,7 +119,7 @@ const STATIC_PAGE_TITLES = new Set([
   'Notifications',
   'Profiles & Secrets',
   'Queue',
-  'Queue Dashboard',
+  'Queues',
   'Remote Nodes',
   'Search',
   'System Status',

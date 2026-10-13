@@ -57,6 +57,7 @@ import { I18nText } from '@/i18n/I18nText';
 import { useI18n } from '@/i18n/I18nProvider';
 import { LoadErrorState } from '@/components/PageStates';
 import { I18nProps } from '@/i18n/I18nProps';
+import { statusLabelText } from '@/lib/status-utils';
 
 type DAGRunsFilters = DAGRunsFilterSet;
 
@@ -123,7 +124,7 @@ function StatusSelectDisplay({ status }: { status: string }): React.ReactNode {
   const statusNum = parseInt(status) as Status;
   const label = STATUS_CONFIG[statusNum];
   if (label) {
-    return <I18nText text={label} />;
+    return <I18nText text={statusLabelText(label)} />;
   }
 
   return null;
@@ -1425,7 +1426,7 @@ function DAGRuns() {
           <div className="flex flex-wrap items-center gap-2">
             <I18nProps>
               <AutocompleteInput
-                placeholder="Filter by DAG name..."
+                placeholder="Filter by workflow name..."
                 value={searchText}
                 onValueChange={setSearchText}
                 onEnterPress={() => handleSearch()}
@@ -1465,7 +1466,7 @@ function DAGRuns() {
                       status={Number(statusValue) as Status}
                       size="sm"
                     >
-                      <I18nText text={label} />
+                      {label}
                     </StatusChip>
                   </SelectItem>
                 ))}
@@ -1673,7 +1674,7 @@ function DAGRuns() {
               <div ref={loadMoreSentinelRef} className="h-4 w-full" />
               {isLoadingMore ? (
                 <div className="text-sm text-muted-foreground">
-                  <I18nText text={'Loading more DAG runs...'} />
+                  <I18nText text={'Loading more runs...'} />
                 </div>
               ) : (
                 <Button
@@ -1692,7 +1693,7 @@ function DAGRuns() {
             </>
           ) : dagRuns.length > 0 ? (
             <div className="text-sm text-muted-foreground">
-              <I18nText text={'All loaded DAG runs are displayed.'} />
+              <I18nText text={'All runs are displayed.'} />
             </div>
           ) : null}
         </div>

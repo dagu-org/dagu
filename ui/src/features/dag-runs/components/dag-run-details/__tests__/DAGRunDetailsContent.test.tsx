@@ -72,7 +72,7 @@ describe('DAGRunDetailsContent', () => {
 
     expect(screen.getByText('Root:')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'root' })).toBeInTheDocument();
-    expect(screen.getByText(StatusLabel.running)).toBeInTheDocument();
+    expect(screen.getByText('Running')).toBeInTheDocument();
     expect(useBoundedDAGRunDetailsMock).toHaveBeenCalledWith({
       target: {
         remoteNode: 'local',

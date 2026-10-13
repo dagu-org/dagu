@@ -151,7 +151,7 @@ function RunProgressCard({
           </span>
           {dagRun?.status != null ? (
             <StatusChip status={dagRun.status} size="xs">
-              {ts(dagRun.statusLabel)}
+              {dagRun.statusLabel}
             </StatusChip>
           ) : isLoading ? (
             <LoadingIndicator />

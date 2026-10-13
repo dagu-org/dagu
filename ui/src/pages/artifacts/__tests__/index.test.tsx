@@ -248,7 +248,7 @@ describe('Artifacts page', () => {
     const user = userEvent.setup();
     renderPage();
 
-    const input = screen.getByPlaceholderText('Filter by DAG name...');
+    const input = screen.getByPlaceholderText('Filter by workflow name...');
     await user.type(input, 'demo');
     fireEvent.keyDown(input, { key: 'Enter' });
 
@@ -680,7 +680,7 @@ describe('Artifacts page', () => {
     usePaginatedArtifactsResult.current.items = [makeItem()];
     renderPage();
 
-    const input = screen.getByPlaceholderText('Filter by DAG name...');
+    const input = screen.getByPlaceholderText('Filter by workflow name...');
     await user.type(input, 'j');
     fireEvent.keyDown(input, { key: 'j' });
 
@@ -787,10 +787,10 @@ describe('Artifacts page', () => {
 
     renderPage();
 
-    fireEvent.change(screen.getByPlaceholderText('Filter by DAG name...'), {
+    fireEvent.change(screen.getByPlaceholderText('Filter by workflow name...'), {
       target: { value: 'nightly-etl' },
     });
-    fireEvent.keyDown(screen.getByPlaceholderText('Filter by DAG name...'), {
+    fireEvent.keyDown(screen.getByPlaceholderText('Filter by workflow name...'), {
       key: 'Enter',
     });
     await waitFor(() => {
@@ -1077,10 +1077,10 @@ describe('Artifacts page', () => {
       expect(lastQuery()['name']).toBe('nightly-etl');
     });
 
-    fireEvent.change(screen.getByPlaceholderText('Filter by DAG name...'), {
+    fireEvent.change(screen.getByPlaceholderText('Filter by workflow name...'), {
       target: { value: 'other' },
     });
-    fireEvent.keyDown(screen.getByPlaceholderText('Filter by DAG name...'), {
+    fireEvent.keyDown(screen.getByPlaceholderText('Filter by workflow name...'), {
       key: 'Enter',
     });
 

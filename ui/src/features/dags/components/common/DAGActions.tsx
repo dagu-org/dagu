@@ -329,7 +329,7 @@ function DAGActions({
           </TooltipTrigger>
           <TooltipContent>
             <p>
-              <I18nText text={'Start DAG execution'} />
+              <I18nText text={'Start a new run'} />
             </p>
           </TooltipContent>
         </Tooltip>
@@ -349,7 +349,7 @@ function DAGActions({
             </TooltipTrigger>
             <TooltipContent>
               <p>
-                <I18nText text={'Reject DAG run'} />
+                <I18nText text={'Reject this run'} />
               </p>
             </TooltipContent>
           </Tooltip>
@@ -456,7 +456,7 @@ function DAGActions({
             </TooltipTrigger>
             <TooltipContent>
               <p>
-                <I18nText text={'Retry DAG execution'} />
+                <I18nText text={'Retry this run'} />
               </p>
             </TooltipContent>
           </Tooltip>
@@ -559,14 +559,14 @@ function DAGActions({
               </p>
               {!stopAllRunning && status?.name && (
                 <I18nProps>
-                  <LabeledItem label="DAG-Run-Name">
+                  <LabeledItem label="Workflow">
                     <span className="font-mono text-sm">{status.name}</span>
                   </LabeledItem>
                 </I18nProps>
               )}
               {!stopAllRunning && status?.dagRunId && (
                 <I18nProps>
-                  <LabeledItem label="DAG-Run-ID">
+                  <LabeledItem label="Run ID">
                     <span className="font-mono text-sm">{status.dagRunId}</span>
                   </LabeledItem>
                 </I18nProps>
@@ -728,14 +728,14 @@ function DAGActions({
                 )}
               </p>
               <I18nProps>
-                <LabeledItem label="DAG-Run-Name">
+                <LabeledItem label="Workflow">
                   <span className="font-mono text-sm">
                     {status?.name || 'N/A'}
                   </span>
                 </LabeledItem>
               </I18nProps>
               <I18nProps>
-                <LabeledItem label="DAG-Run-ID">
+                <LabeledItem label="Run ID">
                   <span className="font-mono text-sm">
                     {retryDagRunId || status?.dagRunId || 'N/A'}
                   </span>
@@ -774,7 +774,7 @@ function DAGActions({
                   htmlFor="reschedule-dag"
                   className="cursor-pointer text-sm"
                 >
-                  <I18nText text={'Reschedule with new DAG-run'} />
+                  <I18nText text={'Reschedule as a new run'} />
                 </Label>
               </div>
 
@@ -783,7 +783,7 @@ function DAGActions({
                 <div className="space-y-3 pt-2">
                   <div className="space-y-1.5">
                     <Label htmlFor="new-dagrun-id-dag" className="text-sm">
-                      <I18nText text={'New DAG-Run ID (optional)'} />
+                      <I18nText text={'New run ID (optional)'} />
                     </Label>
                     <I18nProps>
                       <Input

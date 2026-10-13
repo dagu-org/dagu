@@ -291,7 +291,7 @@ describe('DAGStatusOverview', () => {
     ).toBeLessThan(
       runtimeText.indexOf('Worker availability is still being checked.')
     );
-    expect(screen.getByText('DAGRun Precondition Unmet')).toBeInTheDocument();
+    expect(screen.getByText('Run precondition not met')).toBeInTheDocument();
   });
 
   it('hides runtime conditions when only satisfied conditions are present', () => {

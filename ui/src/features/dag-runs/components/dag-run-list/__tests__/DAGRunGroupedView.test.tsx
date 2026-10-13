@@ -21,8 +21,8 @@ describe('DAGRunGroupedView', () => {
   it('shows a loading row instead of the empty state while the first page loads', () => {
     render(<DAGRunGroupedView dagRuns={[]} isLoading />);
 
-    expect(screen.getByText('Loading DAG runs...')).toBeInTheDocument();
-    expect(screen.queryByText('No DAG runs found')).not.toBeInTheDocument();
+    expect(screen.getByText('Loading runs...')).toBeInTheDocument();
+    expect(screen.queryByText('No runs found')).not.toBeInTheDocument();
   });
 
   it('sorts grouped runs by schedule time before queued time', () => {

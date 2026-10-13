@@ -534,7 +534,7 @@ describe('DAGStatus', () => {
 
     const drawer = await screen.findByRole('dialog', { name: 'step' });
     expect(drawer).toHaveTextContent('connection refused');
-    expect(drawer).toHaveTextContent('failed');
+    expect(drawer).toHaveTextContent('Failed');
     expect(drawer).toHaveTextContent('Duration');
 
     fireEvent.click(
@@ -611,7 +611,7 @@ describe('DAGStatus', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Open step details' }));
     const drawer = await screen.findByRole('dialog', { name: 'step' });
-    expect(drawer).toHaveTextContent('running');
+    expect(drawer).toHaveTextContent('Running');
 
     rerender(
       dagStatusView({

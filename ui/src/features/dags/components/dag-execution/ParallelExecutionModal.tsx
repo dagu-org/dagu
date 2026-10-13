@@ -14,7 +14,8 @@ import { whenEnabled } from '@/hooks/queryUtils';
 import { ExternalLink, Layers } from 'lucide-react';
 import React, { useMemo, useState } from 'react';
 import { components, StatusLabel } from '../../../../api/v1/schema';
-import { STATUS_DISPLAY_LABELS, StatusDot } from '../common';
+import { StatusDot } from '../common';
+import { statusLabelText } from '@/lib/status-utils';
 import { I18nText } from '@/i18n/I18nText';
 import { I18nProps } from '@/i18n/I18nProps';
 
@@ -145,7 +146,7 @@ export function ParallelExecutionModal({
       if (count && count > 0) {
         filters.push({
           value: status,
-          label: STATUS_DISPLAY_LABELS[status],
+          label: statusLabelText(status),
           count,
         });
       }
@@ -262,7 +263,7 @@ export function ParallelExecutionModal({
                       }
                     `}
                   >
-                    {filter.label}
+                    <I18nText text={filter.label} />
                     <span
                       className={`ml-1 ${isActive ? 'text-info' : 'text-muted-foreground'}`}
                     >

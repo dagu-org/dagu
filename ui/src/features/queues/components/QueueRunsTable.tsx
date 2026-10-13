@@ -125,7 +125,7 @@ function QueueRunsTable({
               </th>
             )}
             <th className="text-left py-1 px-2 font-medium text-muted-foreground">
-              <I18nText text={'DAG'} />
+              <I18nText text={'Workflow'} />
             </th>
             <th className="text-left py-1 px-2 font-medium text-muted-foreground">
               <I18nText text={'Status'} />

@@ -358,9 +358,7 @@ function QueueDetailsPage() {
                 />
               ) : (
                 <div className="rounded-md border border-dashed px-3 py-4 text-sm text-muted-foreground">
-                  <I18nText
-                    text={'No DAG runs are currently executing in this queue.'}
-                  />
+                  <I18nText text={'No runs are executing in this queue.'} />
                 </div>
               )}
             </div>

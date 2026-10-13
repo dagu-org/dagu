@@ -177,6 +177,7 @@ function SystemStatus() {
           <SchedulerPauseControl />
           <Button
             onClick={() => setAutoRefresh(!autoRefresh)}
+            aria-pressed={autoRefresh}
             aria-label={ts('Auto-refresh {state}', {
               state: ts(autoRefresh ? 'enabled' : 'disabled'),
             })}
@@ -187,8 +188,11 @@ function SystemStatus() {
             <Activity
               className={cn('h-4 w-4', autoRefresh && 'text-success')}
             />
-            <I18nText text={'Auto:'} />{' '}
-            {autoRefresh ? <I18nText text={'ON'} /> : <I18nText text={'OFF'} />}
+            {autoRefresh ? (
+              <I18nText text={'Live'} />
+            ) : (
+              <I18nText text={'Paused'} />
+            )}
           </Button>
           <I18nProps>
             <Button

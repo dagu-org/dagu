@@ -7,6 +7,8 @@ import { Loader2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { StepMessagesTable } from './StepMessagesTable';
 import { I18nText } from '@/i18n/I18nText';
+import { useI18n } from '@/i18n/I18nProvider';
+import { statusLabelText } from '@/lib/status-utils';
 
 type DAGRunDetails = components['schemas']['DAGRunDetails'];
 
@@ -18,6 +20,7 @@ interface ChatHistoryTabProps {
 }
 
 export function ChatHistoryTab({ dagRun }: ChatHistoryTabProps) {
+  const { ts } = useI18n();
   // Find all LLM-backed steps that persist message history.
   const historySteps = useMemo(() => {
     return (
@@ -115,7 +118,7 @@ export function ChatHistoryTab({ dagRun }: ChatHistoryTabProps) {
         >
           {historySteps.map((node) => (
             <option key={node.step.name} value={node.step.name}>
-              {node.step.name} ({node.statusLabel})
+              {node.step.name} ({ts(statusLabelText(node.statusLabel))})
             </option>
           ))}
         </select>

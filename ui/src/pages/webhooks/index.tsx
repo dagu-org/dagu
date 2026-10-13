@@ -285,7 +285,7 @@ export default function WebhooksPage() {
           <TableHeader>
             <TableRow>
               <TableHead className="w-[250px]">
-                <I18nText text={'DAG'} />
+                <I18nText text={'Workflow'} />
               </TableHead>
               <TableHead className="w-[150px]">
                 <I18nText text={'Token'} />

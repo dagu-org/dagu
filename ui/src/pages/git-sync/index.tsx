@@ -345,7 +345,10 @@ export default function GitSyncPage() {
         showError(response.error.message || 'Pull failed');
       } else {
         showToast(
-          `Pulled ${response.data?.synced?.length || 0} items; removed ${response.data?.deleted?.length || 0}`
+          ts('Pulled {synced}, removed {deleted}', {
+            synced: response.data?.synced?.length || 0,
+            deleted: response.data?.deleted?.length || 0,
+          })
         );
         mutateStatus();
       }
@@ -378,10 +381,17 @@ export default function GitSyncPage() {
       if (response.error) {
         showError(response.error.message || 'Publish failed');
       } else {
-        const count = itemId
-          ? itemId
-          : `${response.data?.synced?.length || 0} items`;
-        showToast(`Published ${count}`);
+        const syncedCount = response.data?.synced?.length || 0;
+        showToast(
+          itemId
+            ? ts('Published {item}', { item: itemId })
+            : ts(
+                syncedCount === 1
+                  ? 'Published {count} item'
+                  : 'Published {count} items',
+                { count: syncedCount }
+              )
+        );
         setPublishModal({ open: false });
         setDiffModal({ open: false });
         setCommitMessage('');

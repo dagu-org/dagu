@@ -40,6 +40,7 @@ import { useSearchState } from '@/contexts/SearchStateContext';
 import { useClient, useQuery } from '@/hooks/api';
 import { FetchError } from '@/lib/fetchJson';
 import dayjs from '@/lib/dayjs';
+import { statusLabelText } from '@/lib/status-utils';
 import { cn } from '@/lib/utils';
 import {
   Activity,
@@ -127,7 +128,9 @@ function getOutcomeLabel(type: string, status?: string): string {
       return 'Rejected';
     default:
       if (status) {
-        return status.replace(/_/g, ' ');
+        // Statuses outside the known set still read as words.
+        const label = statusLabelText(status);
+        return label === status ? status.replace(/_/g, ' ') : label;
       }
       return type;
   }
@@ -906,6 +909,7 @@ export default function EventLogsPage() {
                 }
               }}
               disabled={!isAutoRefreshAvailable}
+              aria-pressed={autoRefresh && isAutoRefreshAvailable}
               aria-label={ts('Auto-refresh {state}', {
                 state: ts(autoRefresh ? 'enabled' : 'disabled'),
               })}
@@ -923,11 +927,10 @@ export default function EventLogsPage() {
                   autoRefresh && isAutoRefreshAvailable && 'text-success'
                 )}
               />
-              <I18nText text={'Auto:'} />{' '}
               {autoRefresh && isAutoRefreshAvailable ? (
-                <I18nText text={'ON'} />
+                <I18nText text={'Live'} />
               ) : (
-                <I18nText text={'OFF'} />
+                <I18nText text={'Paused'} />
               )}
             </Button>
             <RefreshButton onRefresh={handleRefresh} />
@@ -962,7 +965,7 @@ export default function EventLogsPage() {
                     updateDraftFilters({ dagName: event.target.value })
                   }
                   onKeyDown={handleKeyDown}
-                  placeholder="Filter by DAG name"
+                  placeholder="Filter by workflow name"
                   className="h-8 w-[220px] pl-7"
                 />
               </I18nProps>
@@ -974,7 +977,7 @@ export default function EventLogsPage() {
                   updateDraftFilters({ dagRunId: event.target.value })
                 }
                 onKeyDown={handleKeyDown}
-                placeholder="DAG run ID"
+                placeholder="Run ID"
                 className="h-8 w-[220px]"
               />
             </I18nProps>
@@ -1172,7 +1175,7 @@ export default function EventLogsPage() {
                     <I18nText text={'Outcome'} />
                   </TableHead>
                   <TableHead>
-                    <I18nText text={'DAG'} />
+                    <I18nText text={'Workflow'} />
                   </TableHead>
                   <TableHead>
                     <I18nText text={'Run ID'} />
