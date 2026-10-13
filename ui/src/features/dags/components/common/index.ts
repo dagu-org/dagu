@@ -18,4 +18,3 @@ export {
   useOpenSubRun,
 } from './SubRunStackModal';
 export type { SubRunStackEntry } from './SubRunStackModal';
-export { STATUS_DISPLAY_LABELS } from './statusLabels';

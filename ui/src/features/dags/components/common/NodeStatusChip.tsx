@@ -4,7 +4,12 @@
  * @module features/dags/components/common
  */
 import { cn } from '@/lib/utils';
-import { getStatusClass, isActiveNodeStatus } from '@/lib/status-utils';
+import {
+  getStatusClass,
+  isActiveNodeStatus,
+  statusLabelText,
+} from '@/lib/status-utils';
+import { useI18n } from '@/i18n/I18nProvider';
 import MatrixText from '@/components/ui/matrix-text';
 import React, { useEffect, useState } from 'react';
 import { NodeStatus } from '../../../../api/v1/schema';
@@ -30,8 +35,8 @@ function BrailleSpinner() {
 type Props = {
   /** Status code of the node */
   status: NodeStatus;
-  /** Text to display in the chip */
-  children: React.ReactNode; // Allow ReactNode for flexibility
+  /** Text to display; an API status label such as `not_started` is shown as readable text. */
+  children: React.ReactNode;
   /** Size variant of the chip */
   size?: 'sm' | 'md' | 'lg';
 };
@@ -40,7 +45,10 @@ type Props = {
  * NodeStatusChip displays a styled badge based on the node status
  */
 function NodeStatusChip({ status, children, size = 'md' }: Props) {
+  const { ts } = useI18n();
   const statusClass = getStatusClass(status);
+  const label =
+    typeof children === 'string' ? ts(statusLabelText(children)) : children;
 
   // Size classes
   const sizeClasses = {
@@ -67,10 +75,10 @@ function NodeStatusChip({ status, children, size = 'md' }: Props) {
         </span>
       )}
       <span className="font-medium break-keep text-nowrap whitespace-nowrap">
-        {isRunning && typeof children === 'string' ? (
-          <MatrixText text={children} />
+        {isRunning && typeof label === 'string' ? (
+          <MatrixText text={label} />
         ) : (
-          children
+          label
         )}
       </span>
     </div>

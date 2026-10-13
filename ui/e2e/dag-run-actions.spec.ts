@@ -221,7 +221,7 @@ steps:
       const snapshot = await log.innerText();
       const scrollTop = await log.evaluate((element) => element.scrollTop);
       await writeFile(releaseFirst, '');
-      await expect(output.getByRole('tab', { name: /first/ })).toContainText('succeeded');
+      await expect(output.getByRole('tab', { name: /first/ })).toContainText('Succeeded');
       await expect(log).toHaveText(snapshot, { useInnerText: true });
       expect(await log.evaluate((element) => element.scrollTop)).toBe(scrollTop);
       await page.screenshot({ path: testInfo.outputPath('parallel-desktop.png'), fullPage: true });

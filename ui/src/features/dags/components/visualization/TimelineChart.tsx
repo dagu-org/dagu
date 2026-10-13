@@ -21,7 +21,11 @@ import { useRemoteNode } from '@/contexts/RemoteNodeContext';
 import { useQuery } from '@/hooks/api';
 import { whenEnabled } from '@/hooks/queryUtils';
 import dayjs from '@/lib/dayjs';
-import { isActiveNodeStatus } from '@/lib/status-utils';
+import {
+  isActiveNodeStatus,
+  nodeStatusText,
+  runStatusText,
+} from '@/lib/status-utils';
 import React, {
   forwardRef,
   useEffect,
@@ -58,69 +62,11 @@ type Props = {
 /** Format for displaying timestamps in tooltips */
 const timeFormat = 'HH:mm:ss';
 
-/**
- * Get status label for display
- */
-function getNodeStatusLabel(status: NodeStatus): string {
-  switch (status) {
-    case NodeStatus.NotStarted:
-      return 'Not Started';
-    case NodeStatus.Running:
-      return 'Running';
-    case NodeStatus.Retrying:
-      return 'Retrying';
-    case NodeStatus.Success:
-      return 'Success';
-    case NodeStatus.Failed:
-      return 'Failed';
-    case NodeStatus.Aborted:
-      return 'Aborted';
-    case NodeStatus.Skipped:
-      return 'Skipped';
-    case NodeStatus.PartialSuccess:
-      return 'Partial Success';
-    case NodeStatus.Waiting:
-      return 'Waiting';
-    case NodeStatus.Rejected:
-      return 'Rejected';
-    default:
-      return 'Unknown';
-  }
-}
-
-/**
- * Get DAG-run status label for display
- */
-function getDAGRunStatusLabel(status: Status): string {
-  switch (status) {
-    case Status.NotStarted:
-      return 'Not Started';
-    case Status.Running:
-      return 'Running';
-    case Status.Success:
-      return 'Success';
-    case Status.Failed:
-      return 'Failed';
-    case Status.Aborted:
-      return 'Aborted';
-    case Status.Queued:
-      return 'Queued';
-    case Status.PartialSuccess:
-      return 'Partial Success';
-    case Status.Waiting:
-      return 'Waiting';
-    case Status.Rejected:
-      return 'Rejected';
-    default:
-      return 'Unknown';
-  }
-}
-
 function getStatusLabel(row: TimelineRow): string {
   if (row.statusSource === 'dagrun') {
-    return getDAGRunStatusLabel(row.status as Status);
+    return runStatusText(row.status as Status);
   }
-  return getNodeStatusLabel(row.status as NodeStatus);
+  return nodeStatusText(row.status as NodeStatus);
 }
 
 /**

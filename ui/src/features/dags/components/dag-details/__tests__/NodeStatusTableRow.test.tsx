@@ -1065,7 +1065,7 @@ describe('NodeStatusTableRow', () => {
       </MemoryRouter>
     );
 
-    fireEvent.click(screen.getByText(NodeStatusLabel.waiting));
+    fireEvent.click(screen.getByText('Waiting'));
 
     expect(screen.queryByText('Update Status')).not.toBeInTheDocument();
   });
