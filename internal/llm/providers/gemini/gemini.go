@@ -421,6 +421,7 @@ var limitedThinkingLevels = []struct {
 }{
 	{"gemini-3-pro", []llm.ThinkingEffort{llm.ThinkingEffortLow, llm.ThinkingEffortHigh}},
 	{"gemini-3.1-pro", []llm.ThinkingEffort{llm.ThinkingEffortLow, llm.ThinkingEffortMedium, llm.ThinkingEffortHigh}},
+	{"gemini-3.7-flash", []llm.ThinkingEffort{llm.ThinkingEffortLow, llm.ThinkingEffortMedium, llm.ThinkingEffortHigh}},
 	{"gemini-3.8-flash", []llm.ThinkingEffort{llm.ThinkingEffortLow, llm.ThinkingEffortMedium, llm.ThinkingEffortHigh}},
 	{"gemini-3.1-flash-image", []llm.ThinkingEffort{llm.ThinkingEffortMinimal, llm.ThinkingEffortHigh}},
 	{"gemini-3.1-flash-lite-image", []llm.ThinkingEffort{llm.ThinkingEffortMinimal, llm.ThinkingEffortHigh}},

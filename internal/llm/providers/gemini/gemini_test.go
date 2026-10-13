@@ -390,6 +390,12 @@ func TestThinkingConfig(t *testing.T) {
 			wantThinking: `{"thinkingLevel":"LOW"}`,
 		},
 		{
+			name:         "3.7 Flash minimal falls back to low",
+			model:        "gemini-3.7-flash",
+			thinking:     &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortMinimal},
+			wantThinking: `{"thinkingLevel":"LOW"}`,
+		},
+		{
 			name:         "3 Pro minimal falls back to low",
 			model:        "gemini-3-pro-preview",
 			thinking:     &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortMinimal},
