@@ -13,18 +13,18 @@ const badgeVariants = cva(
         primary: 'bg-primary/10 text-primary border-transparent',
         secondary: 'bg-secondary text-secondary-foreground border-transparent',
         success:
-          'bg-success/10 text-success border-transparent dark:bg-success/15',
+          'bg-success/10 text-[color-mix(in_srgb,var(--success)_85%,#000)] border-transparent dark:bg-success/15 dark:text-success',
         error:
-          'bg-destructive/10 text-destructive border-transparent dark:bg-destructive/15',
+          'bg-destructive/10 text-[color-mix(in_srgb,var(--destructive)_85%,#000)] border-transparent dark:bg-destructive/15 dark:text-[color-mix(in_srgb,var(--destructive)_90%,#fff)]',
         warning:
-          'bg-warning/10 text-warning border-transparent dark:bg-warning/15',
+          'bg-warning/10 text-[color-mix(in_srgb,var(--warning)_85%,#000)] border-transparent dark:bg-warning/15 dark:text-warning',
         info: 'bg-info/10 text-info border-transparent dark:bg-info/15',
         outline:
           'bg-transparent text-foreground border-border [a&]:hover:bg-muted',
         // Status-specific variants for DAG runs
         running: 'bg-info/10 text-info border-transparent dark:bg-info/15',
         failed:
-          'bg-destructive/10 text-destructive border-transparent dark:bg-destructive/15',
+          'bg-destructive/10 text-[color-mix(in_srgb,var(--destructive)_85%,#000)] border-transparent dark:bg-destructive/15 dark:text-[color-mix(in_srgb,var(--destructive)_90%,#fff)]',
         cancelled: 'bg-muted text-muted-foreground border-transparent',
       },
     },

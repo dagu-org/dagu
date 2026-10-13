@@ -839,7 +839,7 @@ function RouteRuleCard({
                 <Checkbox
                   checked={checked}
                   disabled={readOnly}
-                  className="size-4 border-muted-foreground/70 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground data-[state=checked]:border-primary"
+                  className="size-4 border-muted-foreground/70 data-[state=checked]:bg-primary-fill data-[state=checked]:text-primary-foreground data-[state=checked]:border-primary"
                   onCheckedChange={(checked) =>
                     onUpdate(index, (current) => ({
                       ...current,

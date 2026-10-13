@@ -194,14 +194,14 @@ function QueueRunsTable({
                   <div className="flex flex-col gap-0.5">
                     {dagRun.scheduleTime && (
                       <span>
-                        <span className="text-muted-foreground/80">
+                        <span className="text-muted-foreground">
                           <I18nText text={'Scheduled'} />{' '}
                         </span>
                         {formatDateTime(dagRun.scheduleTime)}
                       </span>
                     )}
                     <span>
-                      <span className="text-muted-foreground/80">
+                      <span className="text-muted-foreground">
                         {showQueuedAt ? (
                           <I18nText text={'Queued '} />
                         ) : (
@@ -217,17 +217,17 @@ function QueueRunsTable({
                         <span className="font-medium text-foreground">
                           {runtimeConditionLabel(queuedConditionSummary)}
                         </span>
-                        <span className="text-muted-foreground/90">: </span>
-                        <span className="text-muted-foreground/90">
+                        <span className="text-muted-foreground">: </span>
+                        <span className="text-muted-foreground">
                           {queuedConditionSummary.message}
                         </span>
                         {queuedConditionSummary.reason && (
-                          <span className="ml-1 text-muted-foreground/80">
+                          <span className="ml-1 text-muted-foreground">
                             <I18nText text={'Reason:'} />{' '}
                             {humanizeIdentifier(queuedConditionSummary.reason)}
                           </span>
                         )}
-                        <span className="ml-1 text-muted-foreground/70">
+                        <span className="ml-1 text-muted-foreground">
                           <I18nText text={'Checked'} />{' '}
                           {formatDateTime(queuedConditionSummary.checkedAt)}
                         </span>

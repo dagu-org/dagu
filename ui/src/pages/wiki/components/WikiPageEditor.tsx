@@ -535,7 +535,7 @@ function WikiPageEditor({
             className={cn(
               'flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-colors',
               hasUnsavedChanges
-                ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                ? 'bg-primary-fill text-primary-foreground hover:bg-primary-fill-hover'
                 : 'text-muted-foreground cursor-not-allowed'
             )}
           >

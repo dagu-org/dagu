@@ -645,7 +645,7 @@ function Dashboard(): React.ReactElement | null {
               </div>
               <div className="flex items-baseline gap-1">
                 <span
-                  className={`text-lg sm:text-xl font-light tabular-nums ${hasFailures ? 'text-foreground' : 'text-muted-foreground/50'}`}
+                  className={`text-lg sm:text-xl font-light tabular-nums ${hasFailures ? 'text-foreground' : 'text-muted-foreground'}`}
                 >
                   {stat(metrics[Status.Failed])}
                 </span>

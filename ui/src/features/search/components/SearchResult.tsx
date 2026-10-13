@@ -94,7 +94,12 @@ function SearchSnippet({ match }: { match: SearchMatch }) {
               isHit && 'rounded bg-primary/10'
             )}
           >
-            <span className="w-8 select-none text-right text-[11px] tabular-nums text-muted-foreground">
+            <span
+              className={cn(
+                'w-8 select-none text-right text-[11px] tabular-nums',
+                isHit ? 'text-foreground' : 'text-muted-foreground'
+              )}
+            >
               {lineNumber}
             </span>
             <code className="whitespace-pre font-mono text-foreground">

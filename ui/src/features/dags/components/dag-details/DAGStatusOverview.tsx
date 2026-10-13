@@ -155,7 +155,7 @@ function RuntimeConditionCard({
         {condition.message}
       </div>
       {condition.reason && (
-        <div className="mt-0.5 text-muted-foreground/80 break-words">
+        <div className="mt-0.5 text-muted-foreground break-words">
           <I18nText text={"Reason:"} /> {humanizeIdentifier(condition.reason)}
         </div>
       )}

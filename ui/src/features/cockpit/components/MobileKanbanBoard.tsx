@@ -119,7 +119,7 @@ export function MobileKanbanBoard({
               >
                 <I18nText text={VIEW_COLUMN_LABELS[key]} />
                 {(count > 0 || columns[key].hasMore) && (
-                  <span className="ml-1 text-muted-foreground/60">
+                  <span className="ml-1 text-muted-foreground">
                     {countLabel}
                   </span>
                 )}

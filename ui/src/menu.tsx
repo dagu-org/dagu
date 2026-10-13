@@ -711,7 +711,7 @@ export const mainListItems = React.forwardRef<
           )}
         >
           {config.version && (
-            <span className="shrink-0 font-mono text-[11px] text-sidebar-foreground/50">
+            <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
               {isOpen ? `v${config.version}` : config.version.split('.')[0]}
             </span>
           )}

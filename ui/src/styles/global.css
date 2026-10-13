@@ -19,6 +19,8 @@
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary-hover: var(--primary-hover);
+  --color-primary-fill: var(--primary-fill);
+  --color-primary-fill-hover: var(--primary-fill-hover);
 
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
@@ -116,6 +118,8 @@
     --primary: #5d4fe0;
     --primary-foreground: #ffffff;
     --primary-hover: #4e40d4;
+    --primary-fill: #5d4fe0;
+    --primary-fill-hover: #4e40d4;
 
     --secondary: #f1f1f4;
     --secondary-foreground: #18181c;
@@ -129,7 +133,7 @@
     --success: #178a44;
     --success-foreground: #ffffff;
     --success-muted: color-mix(in srgb, var(--success) 10%, transparent);
-    --warning: #b47110;
+    --warning: #9a5d0b;
     --warning-foreground: #111827;
     --warning-muted: color-mix(in srgb, var(--warning) 10%, transparent);
     --info: #5d4fe0;
@@ -141,7 +145,7 @@
     --error-muted: color-mix(in srgb, var(--status-error) 10%, transparent);
     --status-running: #5d4fe0;
     --status-neutral: #80808b;
-    --status-warning: #b47110;
+    --status-warning: #9a5d0b;
     --status-aborted: #9333ea;
 
     --border: #e7e7ec;
@@ -195,6 +199,9 @@
     --primary: #7c6ef4;
     --primary-foreground: #ffffff;
     --primary-hover: #8e82f6;
+    /* Darker than --primary so white labels clear 4.5:1 on dark surfaces. */
+    --primary-fill: #6a5ce8;
+    --primary-fill-hover: #6355e0;
 
     --secondary: #1c1c21;
     --secondary-foreground: #ededf0;
@@ -336,22 +343,24 @@
 }
 
 .status-success {
-  color: var(--status-success);
+  color: color-mix(in srgb, var(--status-success) 85%, #000);
   background-color: color-mix(in srgb, var(--status-success) 11%, transparent);
   border-color: transparent;
 }
 .dark .status-success {
+  color: var(--status-success);
   background-color: color-mix(in srgb, var(--status-success) 18%, transparent);
 }
 
 .status-failed,
 .status-error {
-  color: var(--status-error);
+  color: color-mix(in srgb, var(--status-error) 85%, #000);
   background-color: color-mix(in srgb, var(--status-error) 11%, transparent);
   border-color: transparent;
 }
 .dark .status-failed,
 .dark .status-error {
+  color: color-mix(in srgb, var(--status-error) 90%, #fff);
   background-color: color-mix(in srgb, var(--status-error) 18%, transparent);
 }
 
@@ -365,29 +374,32 @@
 }
 
 .status-warning {
-  color: var(--status-warning);
+  color: color-mix(in srgb, var(--status-warning) 85%, #000);
   background-color: color-mix(in srgb, var(--status-warning) 11%, transparent);
   border-color: transparent;
 }
 .dark .status-warning {
+  color: var(--status-warning);
   background-color: color-mix(in srgb, var(--status-warning) 18%, transparent);
 }
 
 .status-aborted {
-  color: var(--status-aborted);
+  color: color-mix(in srgb, var(--status-aborted) 85%, #000);
   background-color: color-mix(in srgb, var(--status-aborted) 11%, transparent);
   border-color: transparent;
 }
 .dark .status-aborted {
+  color: var(--status-aborted);
   background-color: color-mix(in srgb, var(--status-aborted) 18%, transparent);
 }
 
 .status-neutral {
-  color: var(--status-neutral);
+  color: color-mix(in srgb, var(--status-neutral) 80%, #000);
   background-color: color-mix(in srgb, var(--status-neutral) 11%, transparent);
   border-color: transparent;
 }
 .dark .status-neutral {
+  color: color-mix(in srgb, var(--status-neutral) 90%, #fff);
   background-color: color-mix(in srgb, var(--status-neutral) 18%, transparent);
 }
 
@@ -402,12 +414,13 @@
 
 .status-muted,
 .status-cancelled {
-  color: var(--status-neutral);
+  color: color-mix(in srgb, var(--status-neutral) 80%, #000);
   background-color: color-mix(in srgb, var(--status-neutral) 11%, transparent);
   border-color: transparent;
 }
 .dark .status-muted,
 .dark .status-cancelled {
+  color: color-mix(in srgb, var(--status-neutral) 90%, #fff);
   background-color: color-mix(in srgb, var(--status-neutral) 18%, transparent);
 }
 

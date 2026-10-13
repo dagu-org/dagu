@@ -75,7 +75,7 @@ export function KanbanColumn({
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
             {localizedTitle}
           </span>
-          <span className="text-[11px] text-muted-foreground/60">
+          <span className="text-[11px] text-muted-foreground">
             {visibleCountLabel}
           </span>
         </div>
