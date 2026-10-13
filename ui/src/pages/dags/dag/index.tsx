@@ -39,6 +39,7 @@ import {
   PageLoading,
 } from '@/components/PageStates';
 import { isNotFoundQueryError } from '@/lib/queryErrors';
+import { buildDAGRunPageURL } from '@/features/dag-runs/lib/dagRunUrls';
 
 type Params = {
   fileName: string;
@@ -165,6 +166,23 @@ function DAGDetails() {
   useEffect(() => {
     setTitle(dagTitle);
   }, [dagTitle, setTitle]);
+
+  // A run is selected on the run page. Links that name a run on the
+  // workflow's Overview, from older versions or bookmarks, redirect there.
+  const runRootName = queriedDAGRunName || dagData?.dag?.name;
+  useEffect(() => {
+    if (tab !== 'status' || !dagRunId || !runRootName) return;
+    navigate(
+      buildDAGRunPageURL({
+        rootDAGRunName: runRootName,
+        rootDAGRunId: dagRunId,
+        subDAGRunId: subDAGRunId ?? undefined,
+        step: stepName ?? undefined,
+        remoteNode,
+      }),
+      { replace: true }
+    );
+  }, [dagRunId, navigate, remoteNode, runRootName, stepName, subDAGRunId, tab]);
 
   const dagLabels = [
     ...(dagData?.dag?.labels ?? []),

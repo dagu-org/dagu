@@ -329,7 +329,7 @@ function DAGStatus({
         }
       }
     },
-    [displayDAGRun, navigate, fileName, remoteNode]
+    [displayDAGRun, navigate, remoteNode]
   );
 
   const onInspectStepOnGraph = React.useCallback(
@@ -404,50 +404,13 @@ function DAGStatus({
       const subDAGRun = allSubRuns[childIndex];
 
       if (subDAGRun && subDAGRun.dagRunId) {
-        // Navigate to the sub DAG-run status page
-        const dagRunId = displayDAGRun.rootDAGRunId || displayDAGRun.dagRunId;
-
-        // Check if we're in a dagRun context or a DAG context
-        const currentPath = window.location.pathname;
-        const isModal =
-          document.querySelector('.dagRun-modal-content') !== null;
-        const isDAGRunContext = currentPath.startsWith('/dag-runs/') || isModal;
-
-        let url: string;
-        if (isDAGRunContext) {
-          // For DAG runs, use query parameters to navigate to the DAG-run details page
-          const searchParams = new URLSearchParams();
-          searchParams.set('remoteNode', remoteNode);
-          searchParams.set('subDAGRunId', subDAGRun.dagRunId);
-
-          // Use root DAG-run information
-          if (displayDAGRun.rootDAGRunId) {
-            searchParams.set('dagRunId', displayDAGRun.rootDAGRunId);
-            searchParams.set('dagRunName', displayDAGRun.rootDAGRunName);
-          } else {
-            searchParams.set('dagRunId', displayDAGRun.dagRunId);
-            searchParams.set('dagRunName', displayDAGRun.name);
-          }
-
-          searchParams.set('step', node.step.name);
-
-          // Determine root DAG name
-          const rootDAGName =
-            displayDAGRun.rootDAGRunName || displayDAGRun.name;
-          url = `/dag-runs/${rootDAGName}/${dagRunId}?${searchParams.toString()}`;
-        } else {
-          // For DAGs, use the existing approach with query parameters
-          const searchParams = new URLSearchParams();
-          searchParams.set('remoteNode', remoteNode);
-          searchParams.set('subDAGRunId', subDAGRun.dagRunId);
-          searchParams.set('dagRunId', dagRunId);
-          searchParams.set('step', node.step.name);
-          searchParams.set(
-            'dagRunName',
-            displayDAGRun.rootDAGRunName || displayDAGRun.name
-          );
-          url = `/dags/${fileName}?${searchParams.toString()}`;
-        }
+        const url = buildDAGRunPageURL({
+          rootDAGRunName: displayDAGRun.rootDAGRunName || displayDAGRun.name,
+          rootDAGRunId: displayDAGRun.rootDAGRunId || displayDAGRun.dagRunId,
+          subDAGRunId: subDAGRun.dagRunId,
+          step: node.step.name,
+          remoteNode,
+        });
 
         if (openInNewTab) {
           window.open(url, '_blank');
@@ -456,7 +419,7 @@ function DAGStatus({
         }
       }
     },
-    [displayDAGRun, navigate, fileName, remoteNode]
+    [displayDAGRun, navigate, remoteNode]
   );
 
   const openAgentChildRun = React.useCallback(

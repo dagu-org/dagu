@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import React, { useCallback, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useRemoteNode } from '@/contexts/RemoteNodeContext';
+import { buildDAGRunPageURL } from '@/features/dag-runs/lib/dagRunUrls';
 import { components, Status } from '../../../../api/v1/schema';
 import { useConfig } from '../../../../contexts/ConfigContext';
 import dayjs from '../../../../lib/dayjs';
@@ -52,6 +54,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
 }) => {
   const { ts } = useI18n();
   const navigate = useNavigate();
+  const remoteNode = useRemoteNode();
   const params = useParams<{ tab?: string }>();
   const rootDAGRunContext = React.useContext(RootDAGRunContext);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
@@ -116,33 +119,31 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
     }
   }, [isRunning, dagRunToDisplay?.startedAt, dagRunToDisplay?.finishedAt]);
 
-  const handleRootDAGRunClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    if (!dagRunToDisplay) return;
-    if (!dagRunToDisplay.rootDAGRunId || !dagRunToDisplay.rootDAGRunName) {
-      return;
-    }
-    const searchParams = new URLSearchParams();
-    searchParams.set('dagRunId', dagRunToDisplay.rootDAGRunId);
-    searchParams.set('dagRunName', dagRunToDisplay.rootDAGRunName);
-    navigate(scopedUrl(`/dags/${fileName}?${searchParams.toString()}`));
-  };
+  // Ancestor runs open on the run page, the one place a run is selected.
+  const rootRunURL =
+    dagRunToDisplay?.rootDAGRunId && dagRunToDisplay.rootDAGRunName
+      ? buildDAGRunPageURL({
+          rootDAGRunName: dagRunToDisplay.rootDAGRunName,
+          rootDAGRunId: dagRunToDisplay.rootDAGRunId,
+          remoteNode,
+        })
+      : undefined;
+  const parentRunURL =
+    dagRunToDisplay?.parentDAGRunId &&
+    dagRunToDisplay.rootDAGRunId &&
+    dagRunToDisplay.rootDAGRunName
+      ? buildDAGRunPageURL({
+          rootDAGRunName: dagRunToDisplay.rootDAGRunName,
+          rootDAGRunId: dagRunToDisplay.rootDAGRunId,
+          subDAGRunId: dagRunToDisplay.parentDAGRunId,
+          remoteNode,
+        })
+      : undefined;
 
-  const handleParentDAGRunClick = (e: React.MouseEvent) => {
+  const handleRunLinkClick = (e: React.MouseEvent, url?: string) => {
+    if (!url || e.metaKey || e.ctrlKey) return;
     e.preventDefault();
-    if (!dagRunToDisplay) return;
-    if (
-      !dagRunToDisplay.parentDAGRunId ||
-      !dagRunToDisplay.rootDAGRunId ||
-      !dagRunToDisplay.rootDAGRunName
-    ) {
-      return;
-    }
-    const searchParams = new URLSearchParams();
-    searchParams.set('subDAGRunId', dagRunToDisplay.parentDAGRunId);
-    searchParams.set('dagRunId', dagRunToDisplay.rootDAGRunId);
-    searchParams.set('dagRunName', dagRunToDisplay.rootDAGRunName);
-    navigate(scopedUrl(`/dags/${fileName}?${searchParams.toString()}`));
+    navigate(url);
   };
 
   const handleRefresh = () => {
@@ -208,10 +209,8 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
                 dagRunToDisplay.rootDAGRunId !== dagRunToDisplay.dagRunId && (
                   <>
                     <a
-                      href={scopedUrl(
-                        `/dags/${fileName}?dagRunId=${encodeURIComponent(dagRunToDisplay.rootDAGRunId)}&dagRunName=${encodeURIComponent(dagRunToDisplay.rootDAGRunName)}`
-                      )}
-                      onClick={handleRootDAGRunClick}
+                      href={rootRunURL}
+                      onClick={(e) => handleRunLinkClick(e, rootRunURL)}
                       className="text-primary hover:text-primary hover:underline transition-colors font-medium"
                     >
                       {dagRunToDisplay.rootDAGRunName}
@@ -229,10 +228,8 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
                 dagRunToDisplay.parentDAGRunName !== dagRunToDisplay.name && (
                   <>
                     <a
-                      href={scopedUrl(
-                        `/dags/${fileName}?dagRunId=${encodeURIComponent(dagRunToDisplay.rootDAGRunId)}&subDAGRunId=${encodeURIComponent(dagRunToDisplay.parentDAGRunId)}&dagRunName=${encodeURIComponent(dagRunToDisplay.rootDAGRunName)}`
-                      )}
-                      onClick={handleParentDAGRunClick}
+                      href={parentRunURL}
+                      onClick={(e) => handleRunLinkClick(e, parentRunURL)}
                       className="text-primary hover:text-primary hover:underline transition-colors font-medium"
                     >
                       {dagRunToDisplay.parentDAGRunName}
