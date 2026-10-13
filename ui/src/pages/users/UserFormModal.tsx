@@ -328,7 +328,7 @@ export function UserFormModal({
               <X className="h-4 w-4" />
               <I18nText text={'Cancel'} />
             </Button>
-            <Button type="submit" disabled={isLoading}>
+            <Button type="submit" variant="primary" disabled={isLoading}>
               {isEditing ? (
                 <Check className="h-4 w-4" />
               ) : (

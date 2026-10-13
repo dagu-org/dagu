@@ -100,7 +100,11 @@ function DAGEditButtons({ fileName, workspace }: Props) {
         <I18nText text={"Rename"} />
       </Button>
 
-      <Button variant="destructive" onClick={() => setIsDeleteModalOpen(true)}>
+      <Button
+        variant="ghost"
+        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+        onClick={() => setIsDeleteModalOpen(true)}
+      >
         <Trash2 className="h-4 w-4" />
         <I18nText text={"Delete"} />
       </Button>

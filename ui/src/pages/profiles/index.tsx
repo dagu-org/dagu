@@ -731,6 +731,7 @@ export default function ProfilesPage(): React.ReactNode {
               </div>
               <Button
                 size="sm"
+                variant="primary"
                 className="h-8"
                 disabled={!canManageProfiles}
                 onClick={() => {
@@ -1516,7 +1517,7 @@ function ProfileFormDialog({
             >
               <I18nText text={'Cancel'} />
             </Button>
-            <Button type="submit" disabled={isSaving}>
+            <Button type="submit" variant="primary" disabled={isSaving}>
               {isSaving ? (
                 <I18nText text={'Saving...'} />
               ) : (
@@ -1659,7 +1660,7 @@ function ProfileEntryDialog({
             >
               <I18nText text={'Cancel'} />
             </Button>
-            <Button type="submit" disabled={isSaving}>
+            <Button type="submit" variant="primary" disabled={isSaving}>
               {isSaving ? (
                 <I18nText text={'Saving...'} />
               ) : (

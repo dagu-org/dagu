@@ -216,6 +216,7 @@ export default function RemoteNodesPage() {
         <Button
           onClick={() => setShowCreateModal(true)}
           size="sm"
+          variant="primary"
           className="h-8"
         >
           <Plus className="h-4 w-4 mr-1.5" />
