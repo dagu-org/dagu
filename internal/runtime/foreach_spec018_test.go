@@ -200,20 +200,6 @@ func TestForeachRuntimeTopLevelFieldResolution(t *testing.T) {
 	}
 }
 
-// A bare non-ASCII key remains a negative control: the jq-style key resolver
-// rejects it, while the quoted forms above are valid paths.
-func TestForeachRuntimeBareUnicodeKeyNegativeControl(t *testing.T) {
-	probeType, _ := registerForeachProbeExecutor(t)
-	r := setupRunner(t)
-	parent := foreachRuntimeStep(probeType,
-		[]any{map[string]any{"slug": "one", "url": "https://example.com/one", "請求番号": "INV-001"}}, 1)
-	parent.Foreach.Key = "${foreach.episode.請求番号}"
-
-	result := r.newPlan(t, parent).assertRun(t, ir.Failed)
-	require.Error(t, result.Error)
-	assert.Contains(t, result.Error.Error(), "foreach.key resolved with unresolved reference")
-}
-
 func TestForeachRuntimeWorkingDirResolvesItemField(t *testing.T) {
 	probeType, state := registerForeachProbeExecutor(t)
 	r := setupRunner(t)

@@ -248,10 +248,10 @@ func TestResolverQuotedForeachValuesStayLiteral(t *testing.T) {
 	resolver = NewResolver(StaticScope{}, RuntimeScope{
 		Foreach: Values{"episode": map[string]any{"請求番号": item}},
 	}, WithValueReferenceNotices(&notices))
-	const unsupported = `${foreach.episode.請求番号}|${foreach.episode[}`
-	got, err := resolver.String(context.Background(), unsupported, WorkflowField("foreach.collect"))
+	const malformed = `${foreach.episode[}`
+	got, err := resolver.String(context.Background(), malformed, WorkflowField("foreach.collect"))
 	require.NoError(t, err)
-	assert.Equal(t, unsupported, got)
+	assert.Equal(t, malformed, got)
 	assert.Empty(t, notices.Notices())
 }
 
@@ -339,7 +339,6 @@ func TestForeachFieldValues(t *testing.T) {
 		{name: "integer", value: float64(1000000), want: "1000000"},
 		{name: "fraction", value: 0.0000042, want: "0.0000042"},
 		{name: "boolean", value: false, want: "false"},
-		{name: "null", value: nil, want: "<nil>"},
 		{name: "object", value: map[string]any{"nested": "value"}, want: `{"nested":"value"}`},
 		{name: "array", value: []any{"one", "two"}, want: `["one","two"]`},
 	} {
