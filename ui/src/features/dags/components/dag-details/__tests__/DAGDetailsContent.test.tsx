@@ -149,7 +149,6 @@ describe('DAGDetailsContent', () => {
             } as never
           }
           refreshFn={vi.fn()}
-          formatDuration={vi.fn()}
           activeTab="log"
           stepName="build"
           logStream={Stream.stderr}
