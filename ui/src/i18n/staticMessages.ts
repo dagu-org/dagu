@@ -2444,6 +2444,7 @@ const english = {
   "+{count} lines": "+{count} lines",
   "Lifecycle handlers": "Lifecycle handlers",
   "Copy run ID": "Copy run ID",
+  "Run ID copied to clipboard": "Run ID copied to clipboard",
 } as const;
 
 export type StaticMessage = keyof typeof english;
@@ -4830,6 +4831,7 @@ const chinese = {
   "+{count} lines": "另外 {count} 行",
   "Lifecycle handlers": "生命周期处理器",
   "Copy run ID": "复制运行 ID",
+  "Run ID copied to clipboard": "运行 ID 已复制到剪贴板",
 } as const satisfies Record<StaticMessage, string>;
 
 const japanese = {
@@ -7298,6 +7300,7 @@ const japanese = {
   "+{count} lines": "ほか {count} 行",
   "Lifecycle handlers": "ライフサイクルハンドラー",
   "Copy run ID": "実行 ID をコピー",
+  "Run ID copied to clipboard": "実行 ID をクリップボードにコピーしました",
 } as const satisfies Record<StaticMessage, string>;
 
 export const staticMessages = {

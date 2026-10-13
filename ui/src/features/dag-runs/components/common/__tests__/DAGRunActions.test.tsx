@@ -223,4 +223,27 @@ describe('DAGRunActions', () => {
     expect(screen.getByRole('button', { name: 'Dequeue' })).toBeEnabled();
     expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
   });
+
+  it('keeps a disabled Retry on sub-runs when hiding unavailable actions', () => {
+    render(
+      <DAGRunActions
+        dagRun={{
+          name: 'child',
+          dagRunId: 'run-2',
+          status: Status.Success,
+          statusLabel: StatusLabel.succeeded,
+          artifactsAvailable: false,
+          autoRetryCount: 0,
+          startedAt: '',
+          finishedAt: '',
+        }}
+        name="child"
+        displayMode="full"
+        hideUnavailable
+        isRootLevel={false}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeDisabled();
+  });
 });

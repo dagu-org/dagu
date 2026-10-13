@@ -362,6 +362,8 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({
           <span className="sr-only" aria-live="polite">
             {linkCopied ? (
               <I18nText text={'Run link copied to clipboard'} />
+            ) : runIdCopied ? (
+              <I18nText text={'Run ID copied to clipboard'} />
             ) : (
               ''
             )}

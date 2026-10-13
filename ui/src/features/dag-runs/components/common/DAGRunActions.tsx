@@ -53,7 +53,11 @@ type Props = {
   displayMode?: 'compact' | 'full';
   /** Whether this is a root level dagRun (controls availability of retry/stop actions) */
   isRootLevel?: boolean;
-  /** Hide actions that do not apply to the run's current state instead of disabling them. */
+  /**
+   * Hide actions that do not apply to the run's current state instead of
+   * disabling them. A sub-run still shows Retry, disabled, so its tooltip
+   * can point to the top-level run.
+   */
   hideUnavailable?: boolean;
 };
 
