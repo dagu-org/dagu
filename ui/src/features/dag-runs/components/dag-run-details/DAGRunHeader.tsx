@@ -335,7 +335,7 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({
                   );
                 }}
                 className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                title="View DAG Definition"
+                title="View workflow definition"
               >
                 <FileText className="h-3.5 w-3.5" />
                 <span>

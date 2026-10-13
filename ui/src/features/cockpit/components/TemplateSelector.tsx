@@ -313,7 +313,7 @@ export function TemplateSelector({
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Search DAGs..."
+                placeholder="Search workflows..."
                 className="flex-1 bg-transparent border-none outline-none text-xs placeholder:text-muted-foreground"
               />
             </I18nProps>
@@ -378,7 +378,7 @@ export function TemplateSelector({
           >
             {flatList.length === 0 ? (
               <div className="px-3 py-4 text-xs text-muted-foreground text-center">
-                <I18nText text={'No DAGs found'} />
+                <I18nText text={'No workflows found'} />
               </div>
             ) : (
               groupedDags.map(([group, dagList]) => (

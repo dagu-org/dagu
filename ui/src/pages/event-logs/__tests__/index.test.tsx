@@ -288,8 +288,9 @@ describe('EventLogsPage', () => {
 
     renderPage();
 
-    const dagNameInputs =
-      await screen.findAllByPlaceholderText('Filter by DAG name');
+    const dagNameInputs = await screen.findAllByPlaceholderText(
+      'Filter by workflow name'
+    );
     const dagNameInput = dagNameInputs[dagNameInputs.length - 1];
     expect(dagNameInput).toBeDefined();
     if (!dagNameInput) {
@@ -326,8 +327,9 @@ describe('EventLogsPage', () => {
     });
 
     const firstRender = renderPage();
-    const dagNameInput =
-      await screen.findByPlaceholderText('Filter by DAG name');
+    const dagNameInput = await screen.findByPlaceholderText(
+      'Filter by workflow name'
+    );
     fireEvent.change(dagNameInput, { target: { value: 'draft-only' } });
 
     firstRender.unmount();
@@ -349,7 +351,7 @@ describe('EventLogsPage', () => {
     });
 
     expect(
-      await screen.findByPlaceholderText('Filter by DAG name')
+      await screen.findByPlaceholderText('Filter by workflow name')
     ).toHaveValue('');
   });
 
@@ -361,8 +363,9 @@ describe('EventLogsPage', () => {
     });
 
     const firstRender = renderPage();
-    const dagNameInput =
-      await screen.findByPlaceholderText('Filter by DAG name');
+    const dagNameInput = await screen.findByPlaceholderText(
+      'Filter by workflow name'
+    );
     fireEvent.change(dagNameInput, { target: { value: 'payments' } });
     fireEvent.click(screen.getByRole('button', { name: 'Apply Filters' }));
 
@@ -398,7 +401,7 @@ describe('EventLogsPage', () => {
     });
 
     expect(
-      await screen.findByPlaceholderText('Filter by DAG name')
+      await screen.findByPlaceholderText('Filter by workflow name')
     ).toHaveValue('payments');
   });
 

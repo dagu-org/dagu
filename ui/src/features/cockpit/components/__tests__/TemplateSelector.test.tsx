@@ -146,7 +146,7 @@ describe('TemplateSelector', () => {
     fireEvent.click(screen.getByText('Example DAG'));
 
     expect(
-      screen.queryByPlaceholderText('Search DAGs...')
+      screen.queryByPlaceholderText('Search workflows...')
     ).not.toBeInTheDocument();
     expect(screen.getByText('Example DAG')).toBeInTheDocument();
     expect(latestQueryCall('/dags')?.init).toBeNull();

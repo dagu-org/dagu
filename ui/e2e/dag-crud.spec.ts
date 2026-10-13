@@ -46,7 +46,7 @@ test.describe('DAG CRUD operations', () => {
 
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
-    await dialog.getByLabel('DAG Name').fill(dagName);
+    await dialog.getByLabel('Workflow name').fill(dagName);
     await dialog.getByRole('button', { name: 'Create' }).click();
 
     await expect(page).toHaveURL(new RegExp(`/dags/${dagName}/spec$`));
@@ -216,8 +216,8 @@ steps:
 
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
-    await dialog.getByLabel('DAG Name').clear();
-    await dialog.getByLabel('DAG Name').fill(newName);
+    await dialog.getByLabel('Workflow name').clear();
+    await dialog.getByLabel('Workflow name').fill(newName);
     await dialog.getByRole('button', { name: 'Rename' }).click();
 
     await expect(page).toHaveURL(
@@ -257,7 +257,7 @@ steps:
 
     const deleteDialog = page.getByRole('dialog');
     await expect(deleteDialog).toBeVisible();
-    await expect(deleteDialog).toContainText('Delete DAG');
+    await expect(deleteDialog).toContainText('Delete workflow');
     await expect(deleteDialog).toContainText(fileName);
     await deleteDialog
       .getByRole('button', { name: 'Delete', exact: true })
@@ -424,7 +424,7 @@ steps:
 
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
-    await dialog.getByLabel('DAG Name').fill('invalid name with spaces!');
+    await dialog.getByLabel('Workflow name').fill('invalid name with spaces!');
     await dialog.getByRole('button', { name: 'Create' }).click();
 
     // Dialog stays open — validation prevents creation

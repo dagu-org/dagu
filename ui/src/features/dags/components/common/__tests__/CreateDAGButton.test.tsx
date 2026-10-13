@@ -49,7 +49,7 @@ describe('CreateDAGButton', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Create new DAG' }));
-    fireEvent.change(screen.getByLabelText('DAG Name'), {
+    fireEvent.change(screen.getByLabelText('Workflow name'), {
       target: { value: 'header-new-dag' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Create' }));

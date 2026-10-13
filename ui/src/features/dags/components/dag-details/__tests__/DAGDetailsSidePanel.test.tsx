@@ -126,7 +126,7 @@ describe('DAGDetailsSidePanel', () => {
 
     renderPanel();
 
-    expect(screen.getByText('Loading DAG details...')).toBeInTheDocument();
+    expect(screen.getByText('Loading workflow...')).toBeInTheDocument();
   });
 
   it('uses a null query key while closed so the detail request is truly disabled', () => {

@@ -467,7 +467,7 @@ describe('DAGRuns page', () => {
     renderPage();
 
     expect(
-      screen.getByPlaceholderText('Filter by DAG name...').className
+      screen.getByPlaceholderText('Filter by workflow name...').className
     ).toContain('h-9');
     expect(
       screen.getByPlaceholderText('Filter by Run ID...').className
@@ -525,9 +525,12 @@ describe('DAGRuns page', () => {
   it('preserves execution filters when opening a run', async () => {
     renderPage();
 
-    fireEvent.change(screen.getByPlaceholderText('Filter by DAG name...'), {
-      target: { value: 'deploy' },
-    });
+    fireEvent.change(
+      screen.getByPlaceholderText('Filter by workflow name...'),
+      {
+        target: { value: 'deploy' },
+      }
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Search' }));
 
     await waitFor(() => {
@@ -550,7 +553,7 @@ describe('DAGRuns page', () => {
     ];
     renderPage();
 
-    const input = screen.getByPlaceholderText('Filter by DAG name...');
+    const input = screen.getByPlaceholderText('Filter by workflow name...');
     fireEvent.focus(input);
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
 
@@ -764,9 +767,12 @@ describe('DAGRuns page', () => {
 
     renderPage();
 
-    fireEvent.change(screen.getByPlaceholderText('Filter by DAG name...'), {
-      target: { value: 'nightly' },
-    });
+    fireEvent.change(
+      screen.getByPlaceholderText('Filter by workflow name...'),
+      {
+        target: { value: 'nightly' },
+      }
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Search' }));
     await waitFor(() => {
       expect(locationSearchParams().get('name')).toBe('nightly');
@@ -817,9 +823,12 @@ describe('DAGRuns page', () => {
     });
     expect(screen.queryByText('Edited')).not.toBeInTheDocument();
 
-    fireEvent.change(screen.getByPlaceholderText('Filter by DAG name...'), {
-      target: { value: 'etl' },
-    });
+    fireEvent.change(
+      screen.getByPlaceholderText('Filter by workflow name...'),
+      {
+        target: { value: 'etl' },
+      }
+    );
     expect(screen.getByText('Edited')).toBeVisible();
 
     await user.click(
@@ -828,9 +837,9 @@ describe('DAGRuns page', () => {
     await user.click(screen.getByRole('menuitem', { name: 'Reset changes' }));
 
     await waitFor(() => {
-      expect(screen.getByPlaceholderText('Filter by DAG name...')).toHaveValue(
-        'deploy'
-      );
+      expect(
+        screen.getByPlaceholderText('Filter by workflow name...')
+      ).toHaveValue('deploy');
     });
   });
 
@@ -851,16 +860,19 @@ describe('DAGRuns page', () => {
     await user.click(screen.getByRole('menuitem', { name: /failed runs/i }));
     await waitFor(() => {
       expect(lastRunQuery()['name']).toBe('deploy');
-      expect(screen.getByPlaceholderText('Filter by DAG name...')).toHaveValue(
-        'deploy'
-      );
+      expect(
+        screen.getByPlaceholderText('Filter by workflow name...')
+      ).toHaveValue('deploy');
     });
 
     // Editing without searching leaves the URL, and therefore the reset
     // target URL, unchanged.
-    fireEvent.change(screen.getByPlaceholderText('Filter by DAG name...'), {
-      target: { value: 'etl' },
-    });
+    fireEvent.change(
+      screen.getByPlaceholderText('Filter by workflow name...'),
+      {
+        target: { value: 'etl' },
+      }
+    );
     expect(screen.getByText('Edited')).toBeVisible();
 
     await user.click(
@@ -869,9 +881,9 @@ describe('DAGRuns page', () => {
     await user.click(screen.getByRole('menuitem', { name: 'Reset changes' }));
 
     await waitFor(() => {
-      expect(screen.getByPlaceholderText('Filter by DAG name...')).toHaveValue(
-        'deploy'
-      );
+      expect(
+        screen.getByPlaceholderText('Filter by workflow name...')
+      ).toHaveValue('deploy');
     });
     expect(lastRunQuery()['name']).toBe('deploy');
   });
@@ -925,9 +937,12 @@ describe('DAGRuns page', () => {
       expect(lastRunQuery()['fromDate']).toBe(dayjs('2026-09-01T00:00').unix());
     });
 
-    fireEvent.change(screen.getByPlaceholderText('Filter by DAG name...'), {
-      target: { value: 'etl' },
-    });
+    fireEvent.change(
+      screen.getByPlaceholderText('Filter by workflow name...'),
+      {
+        target: { value: 'etl' },
+      }
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Search' }));
 
     await waitFor(() => {
@@ -949,9 +964,12 @@ describe('DAGRuns page', () => {
       expect(lastRunQuery()['dagRunId']).toBe('run-9');
     });
 
-    fireEvent.change(screen.getByPlaceholderText('Filter by DAG name...'), {
-      target: { value: '' },
-    });
+    fireEvent.change(
+      screen.getByPlaceholderText('Filter by workflow name...'),
+      {
+        target: { value: '' },
+      }
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Search' }));
     await waitFor(() => {
       expect(lastRunQuery()['name']).toBeUndefined();

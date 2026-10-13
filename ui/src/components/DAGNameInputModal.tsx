@@ -150,7 +150,7 @@ export function DAGNameInputModal({
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="dag-name" className="text-right">
-                <I18nText text={'DAG Name'} />
+                <I18nText text={'Workflow name'} />
               </Label>
               <I18nProps>
                 <Input

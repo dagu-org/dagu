@@ -337,7 +337,7 @@ function DAGDetailsSidePanel({
                   {loadState.state === 'loading' && (
                     <div className="flex h-full flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
                       <LoadingIndicator />
-                      <p><I18nText text={"Loading DAG details..."} /></p>
+                      <p><I18nText text={"Loading workflow..."} /></p>
                     </div>
                   )}
 

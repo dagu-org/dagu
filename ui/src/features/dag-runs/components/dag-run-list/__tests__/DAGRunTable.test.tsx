@@ -77,8 +77,8 @@ describe('DAGRunTable', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText('Loading DAG runs...')).toBeInTheDocument();
-    expect(screen.queryByText('No DAG runs found')).not.toBeInTheDocument();
+    expect(screen.getByText('Loading runs...')).toBeInTheDocument();
+    expect(screen.queryByText('No runs found')).not.toBeInTheDocument();
   });
 
   it('shows the empty state once loading finishes with no runs', () => {
@@ -90,7 +90,7 @@ describe('DAGRunTable', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText('No DAG runs found')).toBeInTheDocument();
+    expect(screen.getByText('No runs found')).toBeInTheDocument();
   });
 
   it('shows the scheduled at column and value when schedule time exists', () => {
@@ -350,7 +350,7 @@ describe('DAGRunTable', () => {
       <MemoryRouter>
         <ConfigContext.Provider value={config}>
           <div>
-            <Input aria-label="Filter by DAG name" />
+            <Input aria-label="Filter by workflow name" />
             <DAGRunTable
               dagRuns={[
                 {
@@ -376,7 +376,9 @@ describe('DAGRunTable', () => {
 
     fireEvent.keyDown(window, { key: 'ArrowDown' });
 
-    const input = screen.getByRole('textbox', { name: 'Filter by DAG name' });
+    const input = screen.getByRole('textbox', {
+      name: 'Filter by workflow name',
+    });
     input.focus();
     fireEvent.keyDown(input, { key: 'Enter' });
 

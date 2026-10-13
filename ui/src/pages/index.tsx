@@ -569,13 +569,13 @@ function Dashboard(): React.ReactElement | null {
               <Filter className="h-4 w-4 mr-1.5 text-muted-foreground" />
               <I18nProps>
                 <SelectValue
-                  placeholder={isLoading ? 'Loading...' : 'All DAGs'}
+                  placeholder={isLoading ? 'Loading...' : 'All workflows'}
                 />
               </I18nProps>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">
-                <I18nText text={'All DAGs'} />
+                <I18nText text={'All workflows'} />
               </SelectItem>
               {uniqueDAGRunNames.map((name) => (
                 <SelectItem key={name} value={name}>

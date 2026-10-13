@@ -92,7 +92,7 @@ test.describe('auth flows', () => {
 
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
-    await dialog.getByLabel('DAG Name').fill(dagName);
+    await dialog.getByLabel('Workflow name').fill(dagName);
     await dialog.getByRole('button', { name: 'Create' }).click();
     await expect(page).toHaveURL(new RegExp(`/dags/${dagName}/spec$`));
     await expect(

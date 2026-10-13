@@ -191,7 +191,7 @@ steps:
     await page.goto(`/dags/${encodeURIComponent(fileName)}`);
     await page.getByRole('button', { name: 'Start', exact: true }).first().click();
     const dialog = page.getByRole('dialog');
-    await dialog.getByLabel('DAG-Run ID (optional)').fill(runId);
+    await dialog.getByLabel('Run ID (optional)').fill(runId);
     await dialog.getByRole('button', { name: 'Start', exact: true }).click();
     await expect
       .poll(() => new URL(page.url()).pathname)
@@ -404,8 +404,8 @@ steps:
 
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
-    await dialog.getByLabel('Reschedule with new DAG-run').click();
-    await dialog.getByLabel('New DAG-Run ID (optional)').fill(newRunId);
+    await dialog.getByLabel('Reschedule as a new run').click();
+    await dialog.getByLabel('New run ID (optional)').fill(newRunId);
     await dialog.getByRole('button', { name: 'Reschedule' }).click();
 
     await expect

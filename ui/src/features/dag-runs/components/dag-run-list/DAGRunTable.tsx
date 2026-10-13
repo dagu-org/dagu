@@ -281,10 +281,10 @@ function DAGRunTable({
     <div className="flex flex-col items-center justify-center py-12 px-4 border rounded-md bg-card">
       <div className="text-6xl mb-4">🔍</div>
       <h3 className="text-lg font-normal text-foreground mb-2">
-        <I18nText text={"No DAG runs found"} />
+        <I18nText text={"No runs found"} />
       </h3>
       <p className="text-sm text-muted-foreground text-center max-w-md mb-4">
-        <I18nText text={"No DAG runs in the selected time range. Adjust the date range or filters, or start a workflow from the Workflows page."} />
+        <I18nText text={"No runs in the selected time range. Adjust the date range or filters, or start a workflow from the Workflows page."} />
       </p>
     </div>
   );
@@ -294,7 +294,7 @@ function DAGRunTable({
     if (isLoading) {
       return (
         <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
-          <I18nText text={"Loading DAG runs..."} />
+          <I18nText text={"Loading runs..."} />
         </div>
       );
     }
@@ -476,7 +476,7 @@ function DAGRunTable({
             {onToggleBulkSelect && (
               <TableHead className="w-10"><I18nText text={"Select"} /></TableHead>
             )}
-            <TableHead><I18nText text={"DAG Name"} /></TableHead>
+            <TableHead><I18nText text={"Workflow name"} /></TableHead>
             <TableHead><I18nText text={"Run ID"} /></TableHead>
             <TableHead><I18nText text={"Status"} /></TableHead>
             <TableHead><I18nText text={"Trigger"} /></TableHead>

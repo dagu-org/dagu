@@ -87,9 +87,6 @@ describe('Layout', () => {
       within(breadcrumbs).getByRole('link', { name: 'Executions' })
     ).toHaveAttribute('href', '/dag-runs');
     expect(
-      within(breadcrumbs).getByRole('link', { name: 'DAG Runs' })
-    ).toHaveAttribute('href', '/dag-runs');
-    expect(
       within(breadcrumbs).getByRole('link', {
         name: 'briefing_gmail_fetch_test',
       })
@@ -107,7 +104,7 @@ describe('Layout', () => {
         name: '019df6cf-0127-7340-bd96-d51bc1453045',
       })
     ).toHaveAttribute('aria-current', 'page');
-    expect(within(breadcrumbs).getAllByRole('link')).toHaveLength(5);
+    expect(within(breadcrumbs).getAllByRole('link')).toHaveLength(4);
   });
 
   it('opens the mobile navigation as a keyboard-contained dialog', async () => {
@@ -162,9 +159,6 @@ describe('Layout', () => {
     ).toBeVisible();
     expect(
       within(breadcrumbs).getByRole('link', { name: '执行记录' })
-    ).toBeVisible();
-    expect(
-      within(breadcrumbs).getByRole('link', { name: 'DAG 运行' })
     ).toBeVisible();
   });
 

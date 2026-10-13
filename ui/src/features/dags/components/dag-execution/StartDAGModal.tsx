@@ -618,9 +618,9 @@ function StartDAGModal({
         <DialogHeader className="min-h-12 shrink-0 border-b border-border px-6 py-3 pr-24">
           <DialogTitle>
             {forceEnqueue ? (
-              <I18nText text={'Enqueue the DAG'} />
+              <I18nText text={'Enqueue workflow'} />
             ) : (
-              <I18nText text={'Start the DAG'} />
+              <I18nText text={'Start workflow'} />
             )}
           </DialogTitle>
           <DialogDescription className="sr-only">
@@ -677,12 +677,12 @@ function StartDAGModal({
 
               <div className="space-y-1.5">
                 <Label htmlFor="dagRun-id">
-                  <I18nText text={'DAG-Run ID (optional)'} />
+                  <I18nText text={'Run ID (optional)'} />
                 </Label>
                 <I18nProps>
                   <Input
                     id="dagRun-id"
-                    placeholder="Enter custom DAG-Run ID"
+                    placeholder="Enter a custom run ID"
                     value={dagRunId}
                     readOnly={runIdReadOnly}
                     disabled={runIdReadOnly || loading || submitting}
@@ -865,7 +865,7 @@ function StartDAGModal({
 
               {loading && (
                 <div className="rounded-md border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
-                  <I18nText text={'Loading DAG details...'} />
+                  <I18nText text={'Loading workflow...'} />
                 </div>
               )}
 

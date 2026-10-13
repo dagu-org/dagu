@@ -33,12 +33,12 @@ const STATIC_ROUTE_LABELS: Record<string, TranslationKey> = {
   '/incidents': 'navigation.incidents',
   '/incident-providers': 'navigation.incidentConnections',
   '/incident-policies': 'navigation.incidentRouting',
-  '/dags': 'navigation.dags',
+  '/dags': 'navigation.workflows',
   '/search': 'navigation.search',
   '/base-config': 'navigation.baseConfig',
   '/wiki': 'navigation.wiki',
   '/queues': 'navigation.queues',
-  '/dag-runs': 'navigation.dagRuns',
+  '/dag-runs': 'navigation.executions',
   '/artifacts': 'navigation.artifacts',
   '/system-status': 'navigation.systemStatus',
   '/users': 'navigation.users',
@@ -88,10 +88,7 @@ export function getBreadcrumbItems(
   }
 
   if (segments[0] === 'dags') {
-    items.push(
-      { label: t('navigation.workflows'), to: '/dags' },
-      { label: t('navigation.dags'), to: '/dags' }
-    );
+    items.push({ label: t('navigation.workflows'), to: '/dags' });
     if (segments[1]) {
       items.push({
         label: decodePathSegment(segments[1]),
@@ -108,10 +105,7 @@ export function getBreadcrumbItems(
   }
 
   if (segments[0] === 'dag-runs') {
-    items.push(
-      { label: t('navigation.executions'), to: '/dag-runs' },
-      { label: t('navigation.dagRuns'), to: '/dag-runs' }
-    );
+    items.push({ label: t('navigation.executions'), to: '/dag-runs' });
     if (segments[1]) {
       const dagName = decodePathSegment(segments[1]);
       items.push({

@@ -223,7 +223,7 @@ function DAGRunActions({
             </TooltipTrigger>
             <TooltipContent>
               <p>
-                <I18nText text={'Reject DAG run'} />
+                <I18nText text={'Reject this run'} />
               </p>
             </TooltipContent>
           </Tooltip>
@@ -275,10 +275,10 @@ function DAGRunActions({
             <TooltipContent>
               <p>
                 {isRootLevel ? (
-                  <I18nText text={'Retry DAGRun execution'} />
+                  <I18nText text={'Retry this run'} />
                 ) : (
                   <I18nText
-                    text={'Retry action only available at root dagRun level'}
+                    text={'Retry is only available on the top-level run'}
                   />
                 )}
               </p>
@@ -305,10 +305,10 @@ function DAGRunActions({
             <TooltipContent>
               <p>
                 {isRootLevel ? (
-                  <I18nText text={'Remove DAGRun from queue'} />
+                  <I18nText text={'Remove this run from the queue'} />
                 ) : (
                   <I18nText
-                    text={'Dequeue action only available at root dagRun level'}
+                    text={'Dequeue is only available on the top-level run'}
                   />
                 )}
               </p>
@@ -450,14 +450,14 @@ function DAGRunActions({
                 </p>
               )}
               <I18nProps>
-                <LabeledItem label="DAGRun-Name">
+                <LabeledItem label="Workflow">
                   <span className="font-mono text-sm">
                     {dagRun?.name || 'N/A'}
                   </span>
                 </LabeledItem>
               </I18nProps>
               <I18nProps>
-                <LabeledItem label="DAGRun-ID">
+                <LabeledItem label="Run ID">
                   <span className="font-mono text-sm">
                     {dagRun?.dagRunId || 'N/A'}
                   </span>
@@ -493,7 +493,7 @@ function DAGRunActions({
                   className="border-border"
                 />
                 <Label htmlFor="reschedule" className="cursor-pointer text-sm">
-                  <I18nText text={'Reschedule with new DAG-run'} />
+                  <I18nText text={'Reschedule as a new run'} />
                 </Label>
               </div>
 
@@ -502,7 +502,7 @@ function DAGRunActions({
                 <div className="space-y-3 pt-2">
                   <div className="space-y-1.5">
                     <Label htmlFor="new-dagrun-id" className="text-sm">
-                      <I18nText text={'New DAG-Run ID (optional)'} />
+                      <I18nText text={'New run ID (optional)'} />
                     </Label>
                     <I18nProps>
                       <Input
@@ -644,14 +644,14 @@ function DAGRunActions({
                 />
               </p>
               <I18nProps>
-                <LabeledItem label="DAGRun-Name">
+                <LabeledItem label="Workflow">
                   <span className="font-mono text-sm">
                     {dagRun?.name || 'N/A'}
                   </span>
                 </LabeledItem>
               </I18nProps>
               <I18nProps>
-                <LabeledItem label="DAGRun-ID">
+                <LabeledItem label="Run ID">
                   <span className="font-mono text-sm">
                     {dagRun?.dagRunId || 'N/A'}
                   </span>

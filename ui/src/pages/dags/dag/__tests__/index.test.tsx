@@ -54,6 +54,7 @@ const useQueryMock = useQuery as unknown as {
 
 const appBarValue = {
   selectedRemoteNode: 'local',
+  setTitle: vi.fn(),
   workspaceSelection: { kind: WorkspaceKind.all },
 } as never;
 

@@ -451,7 +451,7 @@ function DAGRunBatchActions({
                       {phase === 'running' ? (
                         <I18nText text={'Submitting requests...'} />
                       ) : progress.isRefreshing ? (
-                        <I18nText text={'Refreshing DAG runs...'} />
+                        <I18nText text={'Refreshing runs...'} />
                       ) : (
                         <I18nText text={'Finished submitting requests'} />
                       )}

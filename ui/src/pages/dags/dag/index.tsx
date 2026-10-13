@@ -83,6 +83,7 @@ function DAGDetails() {
   const fileName = params.fileName || '';
 
   const dagSSE = useDAGSSE(fileName, !!fileName, remoteNode);
+  const { setTitle } = appBarContext;
 
   // Determine active tab
   const tab = params.tab === 'docs' ? 'wiki' : params.tab || 'status';
@@ -156,6 +157,11 @@ function DAGDetails() {
     sseFallbackOptions(dagSSE)
   );
   useSSECacheSync(dagSSE, mutateDag);
+  const dagTitle = dagData?.dag?.name || fileName;
+  useEffect(() => {
+    setTitle(dagTitle);
+  }, [dagTitle, setTitle]);
+
   const dagLabels = [
     ...(dagData?.dag?.labels ?? []),
     ...(dagData?.dag?.tags ?? []),
@@ -345,7 +351,7 @@ function DAGDetails() {
               {dagData?.dag && !dagMatchesWorkspace && (
                 <div className="p-6 text-sm text-muted-foreground">
                   <I18nText
-                    text={'This DAG is not in the selected workspace.'}
+                    text={'This workflow is not in the selected workspace.'}
                   />
                 </div>
               )}

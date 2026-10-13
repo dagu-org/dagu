@@ -52,7 +52,7 @@ steps:
       await page.getByText(newerRun, { exact: true }).click();
     } else {
       await page.goto('/dashboard');
-      await page.getByRole('combobox').filter({ hasText: 'All DAGs' }).click();
+      await page.getByRole('combobox').filter({ hasText: 'All workflows' }).click();
       await page.getByRole('option', { name: dagName, exact: true }).click();
       await page
         .locator('.vis-item-content')

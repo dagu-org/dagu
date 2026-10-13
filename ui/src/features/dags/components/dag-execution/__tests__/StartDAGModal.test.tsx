@@ -105,7 +105,7 @@ describe('StartDAGModal', () => {
     ).toBeInTheDocument();
     expect(
       within(runSettings).getByRole('textbox', {
-        name: 'DAG-Run ID (optional)',
+        name: 'Run ID (optional)',
       })
     ).toBeInTheDocument();
     expect(
