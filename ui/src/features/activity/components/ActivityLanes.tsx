@@ -4,7 +4,9 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Status } from '@/api/v1/schema';
+import { DAGRunDetailsModal } from '@/features/dag-runs/components/dag-run-details';
 import { buildDAGRunPageURL } from '@/features/dag-runs/lib/dagRunUrls';
+import type { StatusTab } from '@/features/dags/components/DAGStatus';
 import { formatDurationMs } from '@/lib/formatDuration';
 import dayjs from '@/lib/dayjs';
 import { runStatusText } from '@/lib/status-utils';
@@ -167,6 +169,11 @@ export function ActivityLanes({
     lane: string;
     index: number;
   } | null>(null);
+  const [peek, setPeek] = React.useState<{
+    name: string;
+    dagRunId: string;
+  } | null>(null);
+  const [peekTab, setPeekTab] = React.useState<StatusTab>('status');
   const lanes = React.useMemo(
     () => sortLanes(activity.workflows),
     [activity.workflows]
@@ -194,16 +201,33 @@ export function ActivityLanes({
       .format('HH:mm');
   const nowPercent = percentOf(range, nowSeconds);
 
+  // A plain open peeks at the run in a modal and keeps the Overview behind
+  // it; a modifier opens the run page in a new tab.
   const openRun = (name: string, run: ActivityRun, newTab: boolean) => {
-    const url = buildDAGRunPageURL({
-      rootDAGRunName: name,
-      rootDAGRunId: run.dagRunId,
-      remoteNode,
-    });
     if (newTab) {
+      const url = buildDAGRunPageURL({
+        rootDAGRunName: name,
+        rootDAGRunId: run.dagRunId,
+        remoteNode,
+      });
       window.open(url, '_blank', 'noopener');
     } else {
-      navigate(url);
+      setPeekTab('status');
+      setPeek({ name, dagRunId: run.dagRunId });
+    }
+  };
+
+  // Arrow keys in the modal step through the lane's listed runs and keep the
+  // open tab; down is older, as in the run history lists.
+  const navigatePeek = (direction: 'up' | 'down') => {
+    if (!peek) return;
+    const runs = [
+      ...(lanes.find((workflow) => workflow.name === peek.name)?.runs ?? []),
+    ].sort((left, right) => (right.startedAt ?? 0) - (left.startedAt ?? 0));
+    const index = runs.findIndex((run) => run.dagRunId === peek.dagRunId);
+    const next = runs[index + (direction === 'down' ? 1 : -1)];
+    if (index >= 0 && next) {
+      setPeek({ name: peek.name, dagRunId: next.dagRunId });
     }
   };
 
@@ -509,6 +533,17 @@ export function ActivityLanes({
         })}
       </ul>
       {tooltip}
+      {peek && (
+        <DAGRunDetailsModal
+          name={peek.name}
+          dagRunId={peek.dagRunId}
+          isOpen
+          onClose={() => setPeek(null)}
+          onNavigate={navigatePeek}
+          activeTab={peekTab}
+          onTabChange={setPeekTab}
+        />
+      )}
     </div>
   );
 }

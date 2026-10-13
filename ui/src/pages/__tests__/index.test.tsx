@@ -25,6 +25,10 @@ vi.mock('../../features/dags/components/common', () => ({
   CreateDAGModal: () => <button type="button">New workflow</button>,
 }));
 
+vi.mock('@/features/dag-runs/components/dag-run-details', () => ({
+  DAGRunDetailsModal: () => null,
+}));
+
 vi.mock('@/features/dag-runs/components/common', () => ({
   DAGRunActions: () => <button type="button">Retry</button>,
 }));

@@ -8,6 +8,24 @@ import { Status } from '@/api/v1/schema';
 import type { DAGRunActivity } from '../../lib/activityModel';
 import { ActivityLanes, stripGradient } from '../ActivityLanes';
 
+vi.mock('@/features/dag-runs/components/dag-run-details', () => ({
+  DAGRunDetailsModal: ({
+    name,
+    dagRunId,
+    onNavigate,
+  }: {
+    name: string;
+    dagRunId: string;
+    onNavigate: (direction: 'up' | 'down') => void;
+  }) => (
+    <div role="dialog" aria-label={`${name} ${dagRunId}`}>
+      <button type="button" onClick={() => onNavigate('down')}>
+        Older run
+      </button>
+    </div>
+  ),
+}));
+
 const FROM = 1_790_000_000 - (1_790_000_000 % 900);
 const TO = FROM + 96 * 900;
 
@@ -122,12 +140,21 @@ describe('ActivityLanes', () => {
 
     lane.focus();
     fireEvent.keyDown(lane, { key: 'ArrowRight' });
-    fireEvent.keyDown(lane, { key: 'ArrowLeft' });
     expect(screen.getByRole('tooltip')).toHaveTextContent('report');
-
     fireEvent.keyDown(lane, { key: 'Enter' });
-    expect(screen.getByTestId('location')).toHaveTextContent(
-      '/dag-runs/report/report-1'
-    );
+
+    expect(screen.getByRole('dialog')).toHaveAccessibleName('report report-2');
+  });
+
+  it('steps the run modal through the lane’s runs, newest to oldest', () => {
+    renderLanes();
+    const lane = screen.getByRole('group', { name: /^report:/ });
+    lane.focus();
+    fireEvent.keyDown(lane, { key: 'ArrowRight' });
+    fireEvent.keyDown(lane, { key: 'Enter' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Older run' }));
+
+    expect(screen.getByRole('dialog')).toHaveAccessibleName('report report-1');
   });
 });
