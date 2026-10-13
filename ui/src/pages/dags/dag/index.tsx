@@ -160,10 +160,11 @@ function DAGDetails() {
         rootDAGRunId: dagRunId,
         subDAGRunId: subDAGRunId ?? undefined,
         remoteNode,
+        step: stepName ?? undefined,
       }),
       { replace: true }
     );
-  }, [dagRunId, navigate, remoteNode, runRootName, subDAGRunId, tab]);
+  }, [dagRunId, navigate, remoteNode, runRootName, stepName, subDAGRunId, tab]);
 
   const dagLabels = [
     ...(dagData?.dag?.labels ?? []),
