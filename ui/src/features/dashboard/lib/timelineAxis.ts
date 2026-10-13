@@ -1,7 +1,15 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-export type TimelineAxisScale = 'minute' | 'hour' | 'day' | 'week' | 'month';
+export type TimelineAxisScale =
+  | 'minute'
+  | 'hour'
+  | 'day'
+  | 'week'
+  | 'month'
+  | 'year';
+
+export type TimelineAxis = { scale: TimelineAxisScale; step: number };
 
 /** Room a minor axis label such as "HH:mm" needs to stay legible. */
 const MIN_LABEL_SPACING_PX = 40;
@@ -12,37 +20,45 @@ const SCALE_DURATION_MS: Record<TimelineAxisScale, number> = {
   day: 86_400_000,
   week: 604_800_000,
   month: 2_592_000_000,
+  year: 31_536_000_000,
 };
 
-// Steps that divide their parent unit evenly, so labels land on round times.
-const STEP_CHOICES: Record<TimelineAxisScale, readonly number[]> = {
-  minute: [1, 2, 5, 10, 15, 30],
-  hour: [1, 2, 3, 4, 6, 12],
-  day: [1, 2, 7, 14],
-  week: [1, 2, 4],
-  month: [1, 2, 3, 6],
-};
+// Fallback axes from finest to coarsest. Each step divides its parent unit,
+// so labels land on round times. Multi-day and multi-week steps are left out
+// because vis-timeline snaps them to the first of the month or inserts
+// month-start ticks, which can put two labels a day apart.
+const FALLBACK_AXES: readonly TimelineAxis[] = [
+  ...[1, 2, 5, 10, 15, 30].map((step) => ({ scale: 'minute' as const, step })),
+  ...[1, 2, 3, 4, 6, 12].map((step) => ({ scale: 'hour' as const, step })),
+  { scale: 'day', step: 1 },
+  ...[1, 2, 3, 6].map((step) => ({ scale: 'month' as const, step })),
+  ...[1, 2, 5, 10].map((step) => ({ scale: 'year' as const, step })),
+];
+
+function axisDuration(axis: TimelineAxis): number {
+  return SCALE_DURATION_MS[axis.scale] * axis.step;
+}
 
 /**
- * Returns the smallest step at least `step` that leaves each axis label
- * MIN_LABEL_SPACING_PX of room when `rangeMs` spans `widthPx`. Labels at
- * the largest available step are returned when none fits.
+ * Returns `axis` when each of its labels gets MIN_LABEL_SPACING_PX of room
+ * when `rangeMs` spans `widthPx`. Otherwise returns the finest coarser axis
+ * that does, switching scale if needed, or the coarsest axis when none fits.
  */
-export function legibleAxisStep(
-  scale: TimelineAxisScale,
-  step: number,
+export function legibleTimeAxis(
+  axis: TimelineAxis,
   rangeMs: number,
   widthPx: number
-): number {
+): TimelineAxis {
   if (widthPx <= 0 || rangeMs <= 0) {
-    return step;
+    return axis;
   }
-  const fits = (candidate: number) =>
-    widthPx / (rangeMs / (SCALE_DURATION_MS[scale] * candidate)) >=
-    MIN_LABEL_SPACING_PX;
-  if (fits(step)) {
-    return step;
+  const fits = (candidate: TimelineAxis) =>
+    (widthPx * axisDuration(candidate)) / rangeMs >= MIN_LABEL_SPACING_PX;
+  if (fits(axis)) {
+    return axis;
   }
-  const choices = STEP_CHOICES[scale].filter((candidate) => candidate > step);
-  return choices.find(fits) ?? choices[choices.length - 1] ?? step;
+  const coarser = FALLBACK_AXES.filter(
+    (candidate) => axisDuration(candidate) > axisDuration(axis)
+  );
+  return coarser.find(fits) ?? coarser[coarser.length - 1] ?? axis;
 }

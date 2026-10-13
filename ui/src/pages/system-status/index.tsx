@@ -254,7 +254,11 @@ function SystemStatus() {
       <h2 className="text-xl font-semibold mt-8 mb-4">
         <I18nText text={'Workers'} />
       </h2>
-      <div className="card-obsidian flex flex-col" style={{ minHeight: '200px' }}>
+      {/* Bounded so a long worker list scrolls inside the card. */}
+      <div
+        className="card-obsidian flex max-h-[60vh] flex-col overflow-hidden"
+        style={{ minHeight: '200px' }}
+      >
         <WorkersSummary
           workers={workersData?.workers || []}
           isLoading={!workersData && !workersError}
