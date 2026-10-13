@@ -2438,6 +2438,7 @@ const english = {
   "Dagu Console stops monitoring this server, and its free slot becomes available to another server.": "Dagu Console stops monitoring this server, and its free slot becomes available to another server.",
   "The Free plan supports up to 2 API keys.": "The Free plan supports up to 2 API keys.",
   "Existing keys remain active. Revoke a key to create another, or move to Team or Pro to remove the limit.": "Existing keys remain active. Revoke a key to create another, or move to Team or Pro to remove the limit.",
+  "Choose a workspace in the sidebar to create pages.": "Choose a workspace in the sidebar to create pages.",
 } as const;
 
 export type StaticMessage = keyof typeof english;
@@ -4818,6 +4819,7 @@ const chinese = {
   "Dagu Console stops monitoring this server, and its free slot becomes available to another server.": "Dagu Console 将停止监控此服务器，其免费名额可供其他服务器使用。",
   "The Free plan supports up to 2 API keys.": "免费套餐最多支持 2 个 API 密钥。",
   "Existing keys remain active. Revoke a key to create another, or move to Team or Pro to remove the limit.": "现有密钥保持有效。撤销一个密钥即可创建新密钥，或升级到 Team 或 Pro 以取消此限制。",
+  "Choose a workspace in the sidebar to create pages.": "在侧边栏选择一个工作区后即可创建页面。",
 } as const satisfies Record<StaticMessage, string>;
 
 const japanese = {
@@ -7280,6 +7282,7 @@ const japanese = {
   "Dagu Console stops monitoring this server, and its free slot becomes available to another server.": "Dagu Console はこのサーバーの監視を停止し、無料枠は他のサーバーで使えるようになります。",
   "The Free plan supports up to 2 API keys.": "無料プランでは最大2つのAPIキーを管理できます。",
   "Existing keys remain active. Revoke a key to create another, or move to Team or Pro to remove the limit.": "既存のキーは有効のままです。キーを 1 つ失効させると新しいキーを作成できます。Team または Pro に移行すると上限がなくなります。",
+  "Choose a workspace in the sidebar to create pages.": "ページを作成するには、サイドバーでワークスペースを選択してください。",
 } as const satisfies Record<StaticMessage, string>;
 
 export const staticMessages = {
