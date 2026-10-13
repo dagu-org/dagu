@@ -102,7 +102,11 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
   // Following keeps the newest lines in view. Reading earlier lines pauses
   // it and holds the shown lines, since a live tail drops its oldest lines.
   const [following, setFollowing] = useState(true);
-  const [pausedData, setPausedData] = useState<LogWithPagination | null>(null);
+  // Lines held while reading, with the range they were read from.
+  const [pausedData, setPausedData] = useState<{
+    range: string;
+    data: LogWithPagination;
+  } | null>(null);
 
   // Keep track of previous data to prevent flashing
   const [cachedData, setCachedData] = useState<LogWithPagination | null>(null);
@@ -221,12 +225,14 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
   const latestDataRef = useRef(latestData);
   latestDataRef.current = latestData;
   const canFollow = viewMode === 'tail' && isLiveMode;
+  const range = `${viewMode}:${pageSize}:${currentPage}`;
 
   const pauseFollowing = useCallback(() => {
     if (!following || !canFollow) return;
     setFollowing(false);
-    setPausedData(latestDataRef.current ?? null);
-  }, [canFollow, following]);
+    const held = latestDataRef.current;
+    setPausedData(held ? { range, data: held } : null);
+  }, [canFollow, following, range]);
 
   const resumeFollowing = useCallback(() => {
     setPausedData(null);
@@ -239,7 +245,7 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
     if (following && viewMode === 'tail') {
       scrollToBottom();
     }
-  }, [latestData?.content, following, viewMode, scrollToBottom]);
+  }, [latestData?.content, displayMode, following, viewMode, scrollToBottom]);
 
   // Handle data loading and navigation state
   useEffect(() => {
@@ -385,10 +391,10 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
     return <LoadingIndicator />;
   }
 
-  // Prioritize held lines while reading, then SSE, REST, and cached data
-  const logData = (pausedData || latestData) as LogWithPagination;
-  const hasNewOutput =
-    !!pausedData && latestData?.content !== pausedData.content;
+  // Prioritize lines held for the shown range, then SSE, REST, and cached data
+  const heldData = pausedData?.range === range ? pausedData.data : null;
+  const logData = (heldData || latestData) as LogWithPagination;
+  const hasNewOutput = !!heldData && latestData?.content !== heldData.content;
 
   // Handle error state (but not 404 - that just means no log file exists yet)
   if (error && !logData) {

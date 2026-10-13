@@ -388,6 +388,44 @@ describe('ExecutionLog follow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Back to live' }));
     expect(screen.getByText('step done')).toBeInTheDocument();
   });
+
+  it('keeps the newest lines in view when the display changes', () => {
+    render(<ExecutionLog name="example" dagRunId="run" dagRun={runningRun} />, {
+      wrapper: UserPreferencesProvider,
+    });
+    const region = screen.getByRole('region', { name: 'Run log' });
+    Object.defineProperty(region, 'scrollHeight', {
+      configurable: true,
+      value: 1000,
+    });
+    region.scrollTop = 0;
+
+    fireEvent.click(screen.getByRole('button', { name: 'Raw' }));
+
+    expect(region.scrollTop).toBe(1000);
+  });
+
+  it('shows another range instead of the held lines', () => {
+    logs.data = {
+      content: 'line 9\nline 10',
+      totalLines: 10,
+      lineCount: 2,
+      hasMore: true,
+    };
+    logs.head = { content: 'line 1\nline 2' };
+    render(<ExecutionLog name="example" dagRunId="run" dagRun={runningRun} />, {
+      wrapper: UserPreferencesProvider,
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Raw' }));
+    fireEvent.wheel(screen.getByRole('region', { name: 'Run log' }), {
+      deltaY: -120,
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show beginning' }));
+
+    expect(screen.getByText('line 1')).toBeInTheDocument();
+    expect(screen.queryByText('line 10')).not.toBeInTheDocument();
+  });
 });
 
 describe('ExecutionLog ZIP download', () => {
