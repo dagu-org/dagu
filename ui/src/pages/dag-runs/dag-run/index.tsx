@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import React, { useCallback, useContext } from 'react';
+import React, { useCallback, useContext, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { AppBarContext } from '../../../contexts/AppBarContext';
 import { RemoteNodeProvider } from '../../../contexts/RemoteNodeContext';
@@ -121,6 +121,11 @@ function DAGRunDetailsPage() {
     return name || '';
   }
   const displayName = getDisplayName();
+  const { setTitle } = appBarContext;
+
+  useEffect(() => {
+    setTitle(displayName);
+  }, [displayName, setTitle]);
 
   if (error && !dagRunDetails) {
     return (

@@ -7,6 +7,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import ViewPage from '..';
 import { useViews } from '@/hooks/useViews';
+import { AppBarContext } from '@/contexts/AppBarContext';
 
 vi.mock('@/hooks/useViews', () => ({ useViews: vi.fn() }));
 
@@ -77,5 +78,20 @@ describe('ViewPage', () => {
     expect(
       screen.getByRole('link', { name: 'Go to Overview' })
     ).toHaveAttribute('href', '/');
+  });
+
+  it('names the browser tab after the view', () => {
+    const setTitle = vi.fn();
+    render(
+      <MemoryRouter initialEntries={['/views/v1']}>
+        <AppBarContext.Provider value={{ setTitle } as never}>
+          <Routes>
+            <Route path="/views/:viewId" element={<ViewPage />} />
+          </Routes>
+        </AppBarContext.Provider>
+      </MemoryRouter>
+    );
+
+    expect(setTitle).toHaveBeenCalledWith('My View');
   });
 });

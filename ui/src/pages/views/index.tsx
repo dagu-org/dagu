@@ -1,9 +1,10 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import React, { useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Pencil } from 'lucide-react';
+import { AppBarContext } from '@/contexts/AppBarContext';
 import { useCanWriteForWorkspace } from '@/contexts/AuthContext';
 import { ViewEditorDialog } from '@/features/views/ViewEditorDialog';
 import { ViewPanel } from '@/features/views/ViewPanel';
@@ -29,6 +30,12 @@ export default function ViewPage(): React.ReactElement | null {
   const view = views.find((v) => v.id === viewId);
   const canWrite = useCanWriteForWorkspace(view?.workspace ?? '');
   const [editorOpen, setEditorOpen] = useState(false);
+  const { setTitle } = useContext(AppBarContext);
+  const viewTitle = view?.name ?? ts('View not found');
+
+  useEffect(() => {
+    setTitle(viewTitle);
+  }, [setTitle, viewTitle]);
 
   if (!view) {
     if (isLoading) {

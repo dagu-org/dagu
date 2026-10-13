@@ -34,6 +34,7 @@ function renderPage() {
         value={
           {
             selectedRemoteNode: 'local',
+            setTitle: vi.fn(),
           } as never
         }
       >
