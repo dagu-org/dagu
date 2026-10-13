@@ -243,7 +243,7 @@ function LicensedRoute({
 }): React.ReactElement {
   const hasFeature = useHasFeature(feature);
   if (hasFeature) return children;
-  return <LicenseFeaturePrompt feature={feature} />;
+  return <LicenseFeaturePrompt feature={feature} headingLevel={1} />;
 }
 
 function ActiveLicenseDeveloperElement({
@@ -255,7 +255,11 @@ function ActiveLicenseDeveloperElement({
   const licensed = hasActiveLicense(license);
   return (
     <DeveloperElement>
-      {licensed ? children : <LicenseFeaturePrompt feature="incidents" />}
+      {licensed ? (
+        children
+      ) : (
+        <LicenseFeaturePrompt feature="incidents" headingLevel={1} />
+      )}
     </DeveloperElement>
   );
 }

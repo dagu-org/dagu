@@ -267,7 +267,7 @@ export default function UsersPage() {
 
       {!hasRbac && (
         <div className="space-y-2">
-          <LicenseFeaturePrompt feature="rbac" />
+          <LicenseFeaturePrompt feature="rbac" inline />
           <p className="text-xs text-muted-foreground">
             <I18nText text="Password reset remains available to administrators." />
           </p>
