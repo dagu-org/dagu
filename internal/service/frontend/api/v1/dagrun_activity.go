@@ -34,7 +34,7 @@ const (
 	// activityFewRuns is the run count up to which a DAG lists every run.
 	activityFewRuns = 24
 	// activityRunCap bounds the runs listed across all DAGs.
-	activityRunCap = 500
+	activityRunCap = 300
 	// activityFailureDetails bounds the status files read for failure details.
 	activityFailureDetails = 20
 	activityUpcomingLimit  = 5
@@ -175,8 +175,29 @@ type activityRun struct {
 type activityWorkflow struct {
 	name             string
 	runs             []activityRun
-	buckets          map[int]*api.DAGRunActivityBucket
+	failedCount      int
+	strip            []byte
 	successDurations []int64
+}
+
+// Strip characters name the most severe run in a bucket.
+const (
+	stripEmpty     = '.'
+	stripSucceeded = 's'
+	stripActive    = 'r'
+	stripPartial   = 'p'
+	stripAborted   = 'a'
+	stripFailed    = 'f'
+)
+
+// stripSeverity orders strip characters; a bucket shows its most severe run.
+var stripSeverity = map[byte]int{
+	stripEmpty:     0,
+	stripSucceeded: 1,
+	stripActive:    2,
+	stripPartial:   3,
+	stripAborted:   4,
+	stripFailed:    5,
 }
 
 func (a *API) dagRunActivity(ctx context.Context, query activityQuery) (api.DAGRunActivity, error) {
@@ -200,14 +221,17 @@ func (a *API) readDAGRunActivity(ctx context.Context, query activityQuery) (api.
 		workflow := workflows[status.Name]
 		if workflow == nil {
 			workflow = &activityWorkflow{
-				name:    status.Name,
-				buckets: make(map[int]*api.DAGRunActivityBucket),
+				name:  status.Name,
+				strip: []byte(strings.Repeat(string(stripEmpty), activityBucketCount)),
 			}
 			workflows[status.Name] = workflow
 		}
 		run := newActivityRun(status)
 		workflow.runs = append(workflow.runs, run)
-		workflow.addToBucket(query, run)
+		workflow.addToStrip(query, run)
+		if status.Status == ir.Failed || status.Status == ir.Rejected {
+			workflow.failedCount++
+		}
 		if status.Status == ir.Succeeded && run.started > 0 && run.finished >= run.started {
 			workflow.successDurations = append(workflow.successDurations, run.finished-run.started)
 		}
@@ -245,11 +269,12 @@ func (a *API) readDAGRunActivity(ctx context.Context, query activityQuery) (api.
 		runs := runsByWorkflow[name]
 		slices.SortFunc(runs, compareActivityRunsNewestFirst)
 		item := api.DAGRunActivityWorkflow{
-			Name:     name,
-			RunCount: len(workflow.runs),
-			Buckets:  workflow.sortedBuckets(),
-			Runs:     make([]api.DAGRunActivityRun, 0, len(runs)),
-			Latest:   toActivityRun(workflow.runs[0], ""),
+			Name:        name,
+			RunCount:    len(workflow.runs),
+			FailedCount: workflow.failedCount,
+			Strip:       string(workflow.strip),
+			Runs:        make([]api.DAGRunActivityRun, 0, len(runs)),
+			Latest:      toActivityRun(workflow.runs[0], ""),
 		}
 		for _, run := range runs {
 			item.Runs = append(item.Runs, toActivityRun(run, ""))
@@ -284,40 +309,31 @@ func newActivityRun(status *ir.DAGRunStatus) activityRun {
 	return run
 }
 
-func (w *activityWorkflow) addToBucket(query activityQuery, run activityRun) {
+func (w *activityWorkflow) addToStrip(query activityQuery, run activityRun) {
 	index := 0
 	if !run.at.IsZero() {
 		index = int(run.at.Sub(query.from) / query.bucket)
 	}
 	index = min(max(index, 0), activityBucketCount-1)
-	bucket := w.buckets[index]
-	if bucket == nil {
-		bucket = &api.DAGRunActivityBucket{Index: index}
-		w.buckets[index] = bucket
-	}
-	switch run.status {
-	case ir.Succeeded:
-		bucket.Succeeded++
-	case ir.PartiallySucceeded:
-		bucket.Partial++
-	case ir.Failed, ir.Rejected:
-		bucket.Failed++
-	case ir.Aborted:
-		bucket.Aborted++
-	case ir.NotStarted, ir.Running, ir.Queued, ir.Waiting:
-		bucket.Active++
+	if mark := stripMark(run.status); stripSeverity[mark] > stripSeverity[w.strip[index]] {
+		w.strip[index] = mark
 	}
 }
 
-func (w *activityWorkflow) sortedBuckets() []api.DAGRunActivityBucket {
-	buckets := make([]api.DAGRunActivityBucket, 0, len(w.buckets))
-	for _, bucket := range w.buckets {
-		buckets = append(buckets, *bucket)
+func stripMark(status ir.Status) byte {
+	switch status {
+	case ir.Succeeded:
+		return stripSucceeded
+	case ir.PartiallySucceeded:
+		return stripPartial
+	case ir.Failed, ir.Rejected:
+		return stripFailed
+	case ir.Aborted:
+		return stripAborted
+	case ir.NotStarted, ir.Running, ir.Queued, ir.Waiting:
+		return stripActive
 	}
-	slices.SortFunc(buckets, func(left, right api.DAGRunActivityBucket) int {
-		return cmp.Compare(left.Index, right.Index)
-	})
-	return buckets
+	return stripEmpty
 }
 
 func activityCounts(counts map[ir.Status]int) []api.DAGRunActivityCount {

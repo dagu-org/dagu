@@ -11818,11 +11818,16 @@ components:
         runCount:
           type: integer
           description: "Number of runs in the window"
-        buckets:
-          type: array
-          description: "Run counts per non-empty bucket"
-          items:
-            $ref: "#/components/schemas/DAGRunActivityBucket"
+        failedCount:
+          type: integer
+          description: "Number of failed and rejected runs in the window"
+        strip:
+          type: string
+          description: |
+            One character per bucket from the window start, naming the most
+            severe run in the bucket: "f" failed or rejected, "a" aborted,
+            "p" partially succeeded, "r" running, waiting, or queued,
+            "s" succeeded, "." no run.
         runs:
           type: array
           description: "Every run when there are few, otherwise the unsuccessful and active ones plus the latest; newest first"
@@ -11836,37 +11841,10 @@ components:
       required:
         - name
         - runCount
-        - buckets
+        - failedCount
+        - strip
         - runs
         - latest
-
-    DAGRunActivityBucket:
-      type: object
-      description: "Run counts in one bucket of the window"
-      properties:
-        index:
-          type: integer
-          description: "Zero-based bucket position from the window start"
-        succeeded:
-          type: integer
-        partial:
-          type: integer
-          description: "Partially succeeded runs"
-        failed:
-          type: integer
-          description: "Failed and rejected runs"
-        aborted:
-          type: integer
-        active:
-          type: integer
-          description: "Running, waiting, queued, and not started runs"
-      required:
-        - index
-        - succeeded
-        - partial
-        - failed
-        - aborted
-        - active
 
     DAGRunActivityRun:
       type: object

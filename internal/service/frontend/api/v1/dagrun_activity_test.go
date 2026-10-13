@@ -114,9 +114,10 @@ func TestDAGRunActivitySummarizesWindow(t *testing.T) {
 	assert.Equal(t, "load", valueOf(etl.Latest.FailedStep))
 	assert.Equal(t, "connection refused", valueOf(etl.Latest.Error))
 	assert.Equal(t, 20, valueOf(etl.MedianSuccessSeconds))
-	require.Len(t, etl.Buckets, 4)
-	assert.Equal(t, 4, etl.Buckets[0].Index)
-	assert.Equal(t, 1, etl.Buckets[3].Failed)
+	assert.Equal(t, 1, etl.FailedCount)
+	// 15-minute buckets: runs at 01:00, 02:00, 03:00, and a failure at 04:00.
+	assert.Equal(t, "....s...s...s...f", etl.Strip[:17])
+	assert.Len(t, etl.Strip, activityBucketCount)
 
 	ping := activity.Workflows[1]
 	assert.Equal(t, "ping", ping.Name)
