@@ -131,7 +131,7 @@ function SummaryStat({
       >
         {value}
       </div>
-      <div className="mt-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+      <div className="mt-2 text-[11px] font-medium text-muted-foreground">
         {label}
       </div>
     </div>

@@ -200,10 +200,8 @@ function Graph({
 
   const mermaidStyle: React.CSSProperties = React.useMemo(() => {
     const gridBackground = isDarkMode
-      ? `linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px),
-         linear-gradient(180deg, rgba(255,255,255,0.05) 1px, transparent 1px)`
-      : `linear-gradient(90deg, rgba(0,0,0,0.08) 1px, transparent 1px),
-         linear-gradient(180deg, rgba(0,0,0,0.08) 1px, transparent 1px)`;
+      ? 'radial-gradient(circle, rgba(255,255,255,0.09) 1px, transparent 1.2px)'
+      : 'radial-gradient(circle, rgba(17,17,20,0.14) 1px, transparent 1.2px)';
 
     return {
       display: 'flex',
@@ -213,7 +211,7 @@ function Graph({
       cursor: 'grab',
       userSelect: 'none',
       background: gridBackground,
-      backgroundSize: '20px 20px',
+      backgroundSize: '16px 16px',
     };
   }, [isDarkMode]);
 
@@ -396,8 +394,8 @@ function Graph({
 
     // Define node styles for different states
     // Use theme-appropriate colors for light/dark modes
-    const nodeFill = isDarkMode ? '#12141b' : '#fbfaf6'; // --card per mode
-    const nodeColor = isDarkMode ? '#f2f1ec' : '#14161b'; // --foreground per mode
+    const nodeFill = isDarkMode ? '#141417' : '#ffffff'; // --card per mode
+    const nodeColor = isDarkMode ? '#ededf0' : '#111114'; // --foreground per mode
 
     // Status shows in the border and a light tint of the same color, so a
     // node stays readable in both themes.

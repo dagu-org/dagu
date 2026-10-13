@@ -641,10 +641,10 @@ export default function AuditLogsPage() {
   ].filter(Boolean).length;
 
   return (
-    <div className="flex flex-col gap-4 max-w-7xl h-full">
+    <div className="flex flex-col gap-4 h-full">
       <div className="flex items-center justify-between flex-shrink-0">
         <div>
-          <h1 className="text-lg font-semibold">
+          <h1 className="text-2xl font-semibold tracking-[-0.01em]">
             <I18nText text={'Audit Logs'} />
           </h1>
           <p className="text-sm text-muted-foreground">

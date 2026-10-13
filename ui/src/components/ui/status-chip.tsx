@@ -25,7 +25,7 @@ function StatusChip({
   const label =
     typeof children === 'string' ? ts(statusLabelText(children)) : children;
   const sizeClasses = {
-    xs: 'h-5 px-1.5 text-[10px]',
+    xs: 'h-5 px-1.5 text-[11px]',
     sm: 'h-5 px-2 text-[11px]',
     md: 'h-6 px-2.5 text-xs',
     lg: 'h-7 px-3 text-sm',
@@ -35,7 +35,7 @@ function StatusChip({
     <Badge
       variant="outline"
       className={cn(
-        'normal-case tracking-normal border-current/20 bg-current/[0.06]',
+        'rounded-full normal-case tracking-normal',
         statusClass,
         sizeClasses[size]
       )}

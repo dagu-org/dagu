@@ -35,6 +35,9 @@ import { useQuery } from '@/hooks/api';
 import Title from '@/components/ui/title';
 import { I18nText } from '@/i18n/I18nText';
 import { useI18n } from '@/i18n/I18nProvider';
+import { I18nTemplate } from '@/i18n/I18nTemplate';
+import { LoadErrorState, NotFoundState } from '@/components/PageStates';
+import { isNotFoundQueryError } from '@/lib/queryErrors';
 
 function useAutoLoadMore(
   sentinelRef: React.RefObject<HTMLDivElement | null>,
@@ -246,29 +249,32 @@ function QueueDetailsPage() {
   }
 
   if (error && !queue) {
-    const errorData = error as components['schemas']['Error'];
+    if (isNotFoundQueryError(error)) {
+      return (
+        <NotFoundState
+          title={ts('Queue not found')}
+          description={
+            <I18nTemplate
+              text="No queue named {name} exists."
+              values={{ name: <code>{queueName}</code> }}
+            />
+          }
+          action={{ to: '/queues', label: ts('Back to queues') }}
+        />
+      );
+    }
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="space-y-3 text-center">
-          <Layers className="mx-auto h-10 w-10 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">
-            {errorData?.message || (
-              <I18nText text={'Failed to load queue details'} />
-            )}
-          </p>
-          <Button variant="outline" asChild>
-            <Link to="/queues">
-              <I18nText text={'Back to queues'} />
-            </Link>
-          </Button>
-        </div>
-      </div>
+      <LoadErrorState
+        title={ts('Failed to load queue details')}
+        error={error}
+        onRetry={() => void handleRefresh()}
+      />
     );
   }
 
   return (
     <>
-      <div className="flex h-full max-w-7xl flex-col gap-4 overflow-hidden">
+      <div className="flex h-full flex-col gap-4 overflow-hidden">
         <Title>
           <I18nText text={'Queue'} />
         </Title>
@@ -345,7 +351,7 @@ function QueueDetailsPage() {
         <div className="flex-1 min-h-0 overflow-auto space-y-4 pr-1">
           <section className="card-obsidian">
             <div className="border-b px-3 py-2">
-              <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <span className="text-xs font-medium text-muted-foreground">
                 <I18nText text={'Running ('} />
                 {queue?.runningCount || 0})
               </span>
@@ -368,7 +374,7 @@ function QueueDetailsPage() {
             <div className="border-b px-3 py-2">
               <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex flex-wrap items-center gap-3">
-                  <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <span className="text-xs font-medium text-muted-foreground">
                     <I18nText text={'Queued ('} />
                     {formatQueuedCount(
                       queue?.queuedCount || 0,
@@ -620,7 +626,7 @@ function QueueDetailsPage() {
               </div>
 
               <div className="rounded-md border bg-muted/20 p-3">
-                <div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <div className="mb-1 text-xs font-medium text-muted-foreground">
                   <I18nText text={'Current item'} />
                 </div>
                 {progress.currentItem ? (
@@ -650,7 +656,7 @@ function QueueDetailsPage() {
               )}
 
               <div className="rounded-md border">
-                <div className="border-b px-3 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <div className="border-b px-3 py-2 text-xs font-medium text-muted-foreground">
                   <I18nText text={'Results'} />
                 </div>
                 <div className="min-h-40 max-h-[45vh] space-y-3 overflow-y-auto p-3">

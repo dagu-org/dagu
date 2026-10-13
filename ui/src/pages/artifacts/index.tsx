@@ -1010,7 +1010,7 @@ function Artifacts() {
           {artifactViewError}
         </p>
       )}
-      <div className="mb-3 space-y-3 rounded-lg border border-border bg-card/50 p-3">
+      <div className="mb-4 space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <I18nProps>
             <Input
@@ -1141,7 +1141,7 @@ function Artifacts() {
             <p className="mt-1 max-w-md text-center">
               <I18nText
                 text={
-                  'No DAG-runs in the selected time range produced artifact files. Adjust the date range or filters.'
+                  'No runs in the selected time range produced artifact files. Adjust the date range or filters.'
                 }
               />
             </p>

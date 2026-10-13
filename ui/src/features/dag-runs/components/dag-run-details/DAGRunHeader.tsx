@@ -170,7 +170,7 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({
   }, [handleRefresh]);
 
   return (
-    <div className="space-y-4 rounded-2xl border border-border bg-card p-6 shadow-sm">
+    <div className="space-y-4">
       {/* Header with title and actions */}
       <div className="flex items-start justify-between gap-6">
         <div className="flex-1 min-w-0">
@@ -225,7 +225,7 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({
 
           <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
             <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-              <h1 className="min-w-0 break-all text-2xl font-bold text-foreground">
+              <h1 className="min-w-0 break-all text-2xl font-semibold tracking-[-0.01em] text-foreground">
                 {dagRun.name}
               </h1>
               {dagRun.status != Status.NotStarted && dagRun.status && (

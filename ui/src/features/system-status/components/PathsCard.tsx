@@ -86,7 +86,7 @@ function PathGroup({ icon, title, children }: PathGroupProps) {
     <div className="space-y-1">
       <div className="flex items-center gap-2 px-3 py-1.5">
         <span className="text-muted-foreground">{icon}</span>
-        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+        <span className="text-xs font-medium text-muted-foreground">
           {title}
         </span>
       </div>

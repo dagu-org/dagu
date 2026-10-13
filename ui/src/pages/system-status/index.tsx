@@ -159,11 +159,11 @@ function SystemStatus() {
   }, [resourceData]);
 
   return (
-    <div className="flex flex-col gap-4 max-w-7xl">
+    <div className="flex flex-col gap-4">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">
+          <h1 className="text-2xl font-semibold tracking-[-0.01em]">
             <I18nText text={'System Status'} />
           </h1>
           <p className="text-sm text-muted-foreground">
@@ -313,7 +313,7 @@ function SystemStatus() {
         </I18nProps>
         <I18nProps>
           <ResourceChart
-            title="Load Average"
+            title="Load average"
             data={resourceData?.load}
             color="#73BF69"
             unit=""

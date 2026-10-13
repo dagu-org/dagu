@@ -56,7 +56,7 @@ describe('DAGRunActions', () => {
     ).toMatchObject({
       action: 'stop',
       buttonText: 'Stop',
-      tooltipText: 'Stop DAGRun execution',
+      tooltipText: 'Stop this run',
       errorTitle: 'Failed to stop DAG run',
     });
   });
@@ -85,7 +85,7 @@ describe('DAGRunActions', () => {
     ).toMatchObject({
       action: 'cancel',
       buttonText: 'Cancel',
-      tooltipText: 'Cancel auto-retry for this failed DAGRun',
+      tooltipText: 'Cancel auto-retry for this run',
       errorTitle: 'Failed to cancel DAG run',
     });
   });

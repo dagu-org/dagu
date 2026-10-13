@@ -86,7 +86,7 @@ function WorkersSummary({
               {metrics.totalWorkers}
             </span>
             <span>{ts(metrics.totalWorkers === 1 ? 'worker' : 'workers')}</span>
-            <span className="text-muted-foreground/60">
+            <span className="text-muted-foreground">
               {ts('({count} up)', { count: metrics.healthyWorkers })}
             </span>
           </div>

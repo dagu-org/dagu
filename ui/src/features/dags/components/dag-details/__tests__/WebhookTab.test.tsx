@@ -64,7 +64,7 @@ describe('WebhookTab', () => {
     render(<WebhookTab fileName="deploy" />);
 
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Regenerate Token' })
+      await screen.findByRole('button', { name: 'Regenerate token' })
     );
 
     const dialog = await screen.findByRole('dialog');

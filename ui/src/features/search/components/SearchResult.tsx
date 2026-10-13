@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { Button } from '@/components/ui/button';
+import { useOverflowFocusable } from '@/hooks/useOverflowFocusable';
 import { useClient } from '@/hooks/api';
 import { cn } from '@/lib/utils';
 import { encodeWikiPagePathForURL } from '@/pages/wiki/lib/wiki-page-path';
@@ -79,9 +80,14 @@ async function fetchSearchMatches(
 
 function SearchSnippet({ match }: { match: SearchMatch }) {
   const lines = match.line.split('\n');
+  const [scrollRef, scrollTabIndex] = useOverflowFocusable<HTMLPreElement>();
 
   return (
-    <pre className="overflow-x-auto rounded-md border bg-muted/25 p-3 text-xs leading-5">
+    <pre
+      ref={scrollRef}
+      tabIndex={scrollTabIndex}
+      className="overflow-x-auto rounded-md border bg-muted/25 p-3 text-xs leading-5 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
       {lines.map((line, index) => {
         const lineNumber = match.startLine + index;
         const isHit = lineNumber === match.lineNumber;
@@ -94,7 +100,12 @@ function SearchSnippet({ match }: { match: SearchMatch }) {
               isHit && 'rounded bg-primary/10'
             )}
           >
-            <span className="w-8 select-none text-right text-[11px] tabular-nums text-muted-foreground">
+            <span
+              className={cn(
+                'w-8 select-none text-right text-[11px] tabular-nums',
+                isHit ? 'text-foreground' : 'text-muted-foreground'
+              )}
+            >
               {lineNumber}
             </span>
             <code className="whitespace-pre font-mono text-foreground">

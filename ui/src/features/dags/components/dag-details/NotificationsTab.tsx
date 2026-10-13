@@ -88,15 +88,15 @@ function DAGNotificationHeader({
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-normal text-foreground">
-            <I18nText text={"DAG Notifications"} />
-          </h1>
+        <div className="min-w-0 max-w-2xl space-y-1">
+          <h2 className="text-lg font-semibold text-foreground">
+            <I18nText text={"Workflow notifications"} />
+          </h2>
           <p className="text-sm text-muted-foreground">
-            <I18nText text={"This DAG inherits rules by default. Configure a DAG override only when this DAG needs different events or destinations."} />
+            <I18nText text={"This workflow inherits rules by default. Configure a workflow override only when it needs different events or destinations."} />
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
           <Button variant="outline" size="sm" onClick={onRefresh}>
             <RefreshCw className="h-4 w-4" />
             <I18nText text={"Refresh"} />
@@ -151,7 +151,7 @@ function DAGNotificationHeader({
               ) : (
                 <Button size="sm" onClick={onConfigureDAG}>
                   <Settings className="h-4 w-4" />
-                  <I18nText text={"Configure DAG override"} />
+                  <I18nText text={"Configure workflow override"} />
                 </Button>
               )}
             </>
@@ -162,7 +162,7 @@ function DAGNotificationHeader({
       <div className="flex items-center gap-1 border-b border-border">
         <span className="inline-flex h-10 items-center gap-2 border-b-2 border-primary px-3 text-sm font-medium text-foreground">
           <Bell className="h-4 w-4 text-primary" />
-          <I18nText text={"This DAG"} />
+          <I18nText text={"This workflow"} />
         </span>
         <Link
           to="/notification-rules"
@@ -560,17 +560,17 @@ function NotificationsTab({ fileName, workspaceName }: NotificationsTabProps) {
       )}
 
       <I18nProps><ConfirmDialog
-        title="Reset DAG Override"
+        title="Reset workflow override"
         buttonText="Reset"
         visible={resetVisible}
         dismissModal={() => setResetVisible(false)}
         onSubmit={resetDAGSettings}
       >
-        <I18nText text={"Remove this DAG override and inherit workspace or Global notification rules?"} />
+        <I18nText text={"Remove this workflow override and inherit workspace or Global notification rules?"} />
       </ConfirmDialog></I18nProps>
 
       <I18nProps><ConfirmDialog
-        title="Delete Destination"
+        title="Delete destination"
         buttonText="Delete"
         visible={deleteTargetIndex !== null}
         dismissModal={() => setDeleteTargetIndex(null)}
@@ -584,7 +584,7 @@ function NotificationsTab({ fileName, workspaceName }: NotificationsTabProps) {
       </ConfirmDialog></I18nProps>
 
       <I18nProps><ConfirmDialog
-        title="Delete Subscription"
+        title="Delete subscription"
         buttonText="Delete"
         visible={deleteSubscriptionIndex !== null}
         dismissModal={() => setDeleteSubscriptionIndex(null)}

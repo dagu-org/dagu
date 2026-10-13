@@ -186,7 +186,7 @@ export function ResetPasswordModal({
               {isLoading ? (
                 <I18nText text={'Resetting...'} />
               ) : (
-                <I18nText text={'Reset Password'} />
+                <I18nText text={'Reset password'} />
               )}
             </Button>
           </div>

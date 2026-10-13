@@ -216,7 +216,7 @@ function DAGRunBatchActions({
           'mb-3 flex min-h-11 flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-1.5 transition-colors',
           selectedCount > 0
             ? 'border-primary/40 bg-primary/5'
-            : 'border-border bg-card'
+            : 'border-transparent'
         )}
       >
         <div
@@ -473,7 +473,7 @@ function DAGRunBatchActions({
               </div>
 
               <div className="rounded-md border bg-muted/20 p-3">
-                <div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <div className="mb-1 text-xs font-medium text-muted-foreground">
                   <I18nText text={'Current item'} />
                 </div>
                 {progress.currentItem ? (
@@ -503,7 +503,7 @@ function DAGRunBatchActions({
               )}
 
               <div className="rounded-md border">
-                <div className="border-b px-3 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <div className="border-b px-3 py-2 text-xs font-medium text-muted-foreground">
                   <I18nText text={'Results'} />
                 </div>
                 <div className="min-h-40 max-h-[45vh] space-y-3 overflow-y-auto p-3">

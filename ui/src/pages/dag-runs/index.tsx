@@ -1361,7 +1361,7 @@ function DAGRuns() {
     activeRunViewId === null && areFiltersEqual(currentFilters, defaultFilters);
 
   return (
-    <div className="max-w-7xl">
+    <div>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-3">
           <Title>
@@ -1422,7 +1422,7 @@ function DAGRuns() {
         </I18nProps>
       </div>
       <div>
-        <div className="mb-3 space-y-3 rounded-lg border border-border bg-card/50 p-3">
+        <div className="mb-4 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
             <I18nProps>
               <AutocompleteInput

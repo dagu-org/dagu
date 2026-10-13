@@ -196,7 +196,7 @@ describe('UsersPage', () => {
     );
 
     expect(
-      screen.queryByRole('menuitem', { name: 'Reset Password' })
+      screen.queryByRole('menuitem', { name: 'Reset password' })
     ).not.toBeInTheDocument();
   });
 
@@ -219,7 +219,7 @@ describe('UsersPage', () => {
       screen.getByRole('button', { name: 'Actions for proxy-user' })
     );
     expect(
-      screen.queryByRole('menuitem', { name: 'Reset Password' })
+      screen.queryByRole('menuitem', { name: 'Reset password' })
     ).not.toBeInTheDocument();
   });
 
@@ -242,7 +242,7 @@ describe('UsersPage', () => {
     );
 
     expect(
-      screen.getByRole('menuitem', { name: 'Reset Password' })
+      screen.getByRole('menuitem', { name: 'Reset password' })
     ).toBeVisible();
   });
 

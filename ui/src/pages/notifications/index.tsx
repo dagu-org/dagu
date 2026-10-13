@@ -336,9 +336,9 @@ function NotificationHomeSectionLinks({
 }): ReactElement {
   return (
     <section className="space-y-2">
-      <h3 className="text-xs font-semibold uppercase text-muted-foreground">
+      <h2 className="text-sm font-medium text-muted-foreground">
         {section.title}
-      </h3>
+      </h2>
       <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
         {section.links.map((link) => (
           <Link
@@ -433,7 +433,7 @@ function NotificationHeader({
     <header className="flex flex-col gap-4">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-lg font-semibold">
+          <h1 className="text-2xl font-semibold tracking-[-0.01em]">
             <I18nText text={'Notifications'} />
           </h1>
           <p className="text-sm text-muted-foreground">
@@ -839,7 +839,7 @@ function RouteRuleCard({
                 <Checkbox
                   checked={checked}
                   disabled={readOnly}
-                  className="size-4 border-muted-foreground/70 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground data-[state=checked]:border-primary"
+                  className="size-4 border-muted-foreground/70 data-[state=checked]:bg-primary-fill data-[state=checked]:text-primary-foreground data-[state=checked]:border-primary"
                   onCheckedChange={(checked) =>
                     onUpdate(index, (current) => ({
                       ...current,
@@ -1185,6 +1185,13 @@ function NotificationRulesContent() {
     isWorkspaceScope ? workspaceRoutesData : globalRoutesData
   );
   const hasUnsavedChanges = !sameRouteSet(activeDraft, savedDraft);
+  // The save bar appears with the first edit and then keeps reporting state.
+  const [hasEdited, setHasEdited] = useState(false);
+  useEffect(() => {
+    if (hasUnsavedChanges) {
+      setHasEdited(true);
+    }
+  }, [hasUnsavedChanges]);
   const activeSaving = isSavingGlobalRoutes || isSavingWorkspaceRoutes;
   const inherited = isWorkspaceScope && workspaceRoutes.inheritGlobal;
   const displayedDraft = inherited ? globalRoutes : activeDraft;
@@ -1248,7 +1255,7 @@ function NotificationRulesContent() {
     : saveGlobalRoutes;
 
   return (
-    <div className="flex max-w-7xl flex-col gap-4">
+    <div className="flex max-w-5xl flex-col gap-4">
       <NotificationHeader />
       <StatusCard error={error ?? loadError} notice={notice} />
       {isLoading ? (
@@ -1422,52 +1429,47 @@ function NotificationRulesContent() {
             </p>
           </div>
 
-          <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-4 rounded-lg border border-border-strong bg-card px-5 py-4 shadow-sm">
-            <div className="flex items-start gap-3" role="status">
-              <span
-                aria-hidden="true"
-                className={cn(
-                  'mt-1.5 size-2.5 shrink-0 rounded-full',
-                  hasUnsavedChanges ? 'bg-warning' : 'bg-success'
-                )}
-              />
-              <div>
-                <p className="font-medium">
-                  <I18nText
-                    text={
-                      activeSaving
-                        ? 'Saving...'
-                        : hasUnsavedChanges
-                          ? 'Unsaved changes'
-                          : 'All changes saved'
-                    }
-                  />
-                </p>
-                <p className="mt-0.5 text-sm text-muted-foreground">
-                  <I18nText text={'Rules take effect after saving.'} />
-                </p>
+          {(hasEdited || activeSaving) && (
+            <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-4 rounded-lg border border-border-strong bg-card px-5 py-4 shadow-sm">
+              <div className="flex items-start gap-3" role="status">
+                <div>
+                  <p className="font-medium">
+                    <I18nText
+                      text={
+                        activeSaving
+                          ? 'Saving...'
+                          : hasUnsavedChanges
+                            ? 'Unsaved changes'
+                            : 'All changes saved'
+                      }
+                    />
+                  </p>
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    <I18nText text={'Rules take effect after saving.'} />
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  className="px-5"
+                  onClick={cancelChanges}
+                  disabled={!hasUnsavedChanges || activeSaving}
+                >
+                  <I18nText text={'Cancel'} />
+                </Button>
+                <Button
+                  variant="primary"
+                  className="px-5"
+                  onClick={saveActiveRoutes}
+                  disabled={!canSave}
+                >
+                  {activeSaving && <Loader2 className="size-4 animate-spin" />}
+                  <I18nText text={'Save changes'} />
+                </Button>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <Button
-                variant="outline"
-                className="px-5"
-                onClick={cancelChanges}
-                disabled={!hasUnsavedChanges || activeSaving}
-              >
-                <I18nText text={'Cancel'} />
-              </Button>
-              <Button
-                variant="primary"
-                className="px-5"
-                onClick={saveActiveRoutes}
-                disabled={!canSave}
-              >
-                {activeSaving && <Loader2 className="size-4 animate-spin" />}
-                <I18nText text={'Save changes'} />
-              </Button>
-            </div>
-          </div>
+          )}
         </>
       )}
       <AddRuleDialog
@@ -1655,7 +1657,7 @@ function NotificationChannelsContent({ remoteNode }: { remoteNode: string }) {
   };
 
   return (
-    <div className="flex max-w-7xl flex-col gap-4">
+    <div className="flex max-w-5xl flex-col gap-4">
       <NotificationHeader activeTab="channels" />
       <StatusCard error={loadError} notice={notice} />
       {isLoading && (
@@ -1687,7 +1689,7 @@ function NotificationChannelsContent({ remoteNode }: { remoteNode: string }) {
                   </h2>
                   <Badge variant={emailConfigured ? 'success' : 'default'}>
                     <I18nText
-                      text={emailConfigured ? 'Configured' : 'Not Configured'}
+                      text={emailConfigured ? 'Configured' : 'Not configured'}
                     />
                   </Badge>
                 </div>

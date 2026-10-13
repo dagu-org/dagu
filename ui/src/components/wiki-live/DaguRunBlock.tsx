@@ -234,7 +234,7 @@ export function DaguRunBlock({ source }: Props) {
                   ? ts('Requires operator access in this workspace')
                   : undefined
             }
-            className="flex items-center gap-1 px-2 py-0.5 text-xs rounded-md border border-border bg-primary text-primary-foreground disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
+            className="flex items-center gap-1 px-2 py-0.5 text-xs rounded-md border border-border bg-primary-fill text-primary-foreground disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
           >
             <Play className="h-3 w-3" />
             {posting ? <I18nText text="Starting…" /> : actionLabel}

@@ -243,7 +243,7 @@ function LicensedRoute({
 }): React.ReactElement {
   const hasFeature = useHasFeature(feature);
   if (hasFeature) return children;
-  return <LicenseFeaturePrompt feature={feature} />;
+  return <LicenseFeaturePrompt feature={feature} headingLevel={1} />;
 }
 
 function ActiveLicenseDeveloperElement({
@@ -255,7 +255,11 @@ function ActiveLicenseDeveloperElement({
   const licensed = hasActiveLicense(license);
   return (
     <DeveloperElement>
-      {licensed ? children : <LicenseFeaturePrompt feature="incidents" />}
+      {licensed ? (
+        children
+      ) : (
+        <LicenseFeaturePrompt feature="incidents" headingLevel={1} />
+      )}
     </DeveloperElement>
   );
 }
@@ -297,7 +301,7 @@ class LazyRouteErrorBoundary extends React.Component<
           </p>
           <button
             type="button"
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+            className="rounded-md bg-primary-fill px-4 py-2 text-sm font-medium text-primary-foreground"
             onClick={() => window.location.reload()}
           >
             <I18nText text={'Reload'} />

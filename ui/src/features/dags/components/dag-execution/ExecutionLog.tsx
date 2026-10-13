@@ -433,7 +433,7 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
                   onClick={() => handleViewModeChange('tail')}
                   disabled={isNavigating}
                 >
-                  <I18nText text={'Show End'} />
+                  <I18nText text={'Show end'} />
                 </Button>
                 <Button
                   size="sm"
@@ -441,7 +441,7 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
                   onClick={() => handleViewModeChange('head')}
                   disabled={isNavigating}
                 >
-                  <I18nText text={'Show Beginning'} />
+                  <I18nText text={'Show beginning'} />
                 </Button>
                 <Button
                   size="sm"

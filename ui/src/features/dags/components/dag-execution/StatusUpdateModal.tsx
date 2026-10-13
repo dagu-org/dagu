@@ -107,7 +107,7 @@ function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
       <DialogContent className="sm:max-w-[400px]">
         <DialogHeader>
           <DialogTitle className="text-base font-mono">
-            <I18nText text={"Update Status"} />
+            <I18nText text={"Update status"} />
           </DialogTitle>
           <p className="text-sm text-muted-foreground font-mono mt-1">
             {step.name}

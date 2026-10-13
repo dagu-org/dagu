@@ -64,9 +64,9 @@ export function SchemaDocSidebar({
       <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/30">
         <div className="flex items-center gap-1.5">
           <BookOpen className="w-4 h-4 text-muted-foreground" />
-          <span className="text-xs font-medium text-foreground">
+          <h2 className="text-xs font-medium text-foreground">
             <I18nText text={'Schema Docs'} />
-          </span>
+          </h2>
         </div>
         <I18nProps>
           <button
@@ -80,7 +80,10 @@ export function SchemaDocSidebar({
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-3 min-h-0">
+      <div
+        tabIndex={0}
+        className="flex-1 overflow-y-auto p-3 min-h-0 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+      >
         {/* Loading State */}
         {isLoading && (
           <div className="flex items-center justify-center py-8 text-muted-foreground">
@@ -145,9 +148,9 @@ export function SchemaDocSidebar({
             ) : path.length === 0 && activeSchema?.properties ? (
               // Root level - show all top-level properties
               <div>
-                <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+                <h3 className="text-xs font-medium text-muted-foreground mb-2">
                   <I18nText text={'DAG Properties'} />
-                </h4>
+                </h3>
                 <div className="border border-border rounded p-1">
                   <NestedPropertiesTree
                     properties={Object.fromEntries(
@@ -197,11 +200,11 @@ export function SchemaDocSidebar({
             {/* Sibling Properties */}
             {siblingProperties.length > 0 && path.length > 0 && (
               <div className="mt-4 pt-3 border-t border-border">
-                <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+                <h3 className="text-xs font-medium text-muted-foreground mb-1">
                   {ts('Sibling Properties ({count})', {
                     count: siblingProperties.length,
                   })}
-                </h4>
+                </h3>
                 <div className="flex flex-wrap gap-1">
                   {siblingProperties
                     .filter((p) => p !== path[path.length - 1])

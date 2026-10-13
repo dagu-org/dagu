@@ -863,17 +863,15 @@ export default function EventLogsPage() {
 
   return (
     <>
-      <div className="flex flex-col gap-4 max-w-7xl h-full">
+      <div className="flex flex-col gap-4 h-full">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
-            <h1 className="text-lg font-semibold">
+            <h1 className="text-2xl font-semibold tracking-[-0.01em]">
               <I18nText text={'Events'} />
             </h1>
             <p className="text-sm text-muted-foreground">
               <I18nText
-                text={
-                  'Recent DAG-run outcome events for the selected remote node'
-                }
+                text={'Recent run outcome events for the selected remote node'}
               />
             </p>
             <p className="text-xs text-muted-foreground mt-1">
@@ -937,13 +935,16 @@ export default function EventLogsPage() {
           </div>
         </div>
 
-        <div className="card-obsidian p-4 flex flex-col gap-4">
+        <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
             <Select
               value={draftFilters.type}
               onValueChange={(value) => updateDraftFilters({ type: value })}
             >
-              <SelectTrigger className="w-[180px] h-8">
+              <SelectTrigger
+                className="w-[180px] h-8"
+                aria-label={ts('Outcome')}
+              >
                 <I18nProps>
                   <SelectValue placeholder="All outcomes" />
                 </I18nProps>
@@ -993,7 +994,8 @@ export default function EventLogsPage() {
               />
             </I18nProps>
             <Button type="button" size="sm" onClick={handleApplyFilters}>
-              <I18nText text={'Apply Filters'} />
+              <Search className="h-4 w-4" />
+              <I18nText text={'Search'} />
             </Button>
             <Button
               type="button"
@@ -1047,7 +1049,10 @@ export default function EventLogsPage() {
                 value={draftFilters.datePreset}
                 onValueChange={handleDatePresetChange}
               >
-                <SelectTrigger className="w-[180px] h-8">
+                <SelectTrigger
+                  className="w-[180px] h-8"
+                  aria-label={ts('Time range')}
+                >
                   <I18nProps>
                     <SelectValue placeholder="Select period" />
                   </I18nProps>
@@ -1079,7 +1084,10 @@ export default function EventLogsPage() {
                   value={draftFilters.specificPeriod}
                   onValueChange={handleSpecificPeriodSelect}
                 >
-                  <SelectTrigger className="w-[110px] h-8">
+                  <SelectTrigger
+                    className="w-[110px] h-8"
+                    aria-label={ts('Period')}
+                  >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1241,7 +1249,7 @@ export default function EventLogsPage() {
                             <span className="text-muted-foreground">-</span>
                           )}
                         </TableCell>
-                        <TableCell className="font-mono break-all">
+                        <TableCell className="font-mono whitespace-nowrap">
                           {runPath && entry.dagRunId ? (
                             <Link
                               to={runPath}
@@ -1255,7 +1263,7 @@ export default function EventLogsPage() {
                             <span className="text-muted-foreground">-</span>
                           )}
                         </TableCell>
-                        <TableCell className="font-mono break-all">
+                        <TableCell className="font-mono whitespace-nowrap">
                           {entry.attemptId || '-'}
                         </TableCell>
                         <TableCell>
@@ -1274,7 +1282,7 @@ export default function EventLogsPage() {
                               <Button variant="ghost" size="sm" asChild>
                                 <Link to={runPath}>
                                   <ExternalLink className="h-4 w-4" />
-                                  <I18nText text={'Open Run'} />
+                                  <I18nText text={'Open run'} />
                                 </Link>
                               </Button>
                             ) : null}
@@ -1285,7 +1293,7 @@ export default function EventLogsPage() {
                               onClick={() => setSelectedEvent(entry)}
                             >
                               <FileJson className="h-4 w-4" />
-                              <I18nText text={'View Raw'} />
+                              <I18nText text={'View raw'} />
                             </Button>
                           </div>
                         </TableCell>
@@ -1322,7 +1330,7 @@ export default function EventLogsPage() {
                   {isLoadingMore ? (
                     <I18nText text={'Loading...'} />
                   ) : (
-                    <I18nText text={'Load More'} />
+                    <I18nText text={'Load more'} />
                   )}
                 </Button>
               ) : null}

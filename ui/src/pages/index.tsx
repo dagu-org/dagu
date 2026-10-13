@@ -217,7 +217,7 @@ function NoRunsNotice({
 }
 
 function Dashboard(): React.ReactElement | null {
-  const { locale } = useI18n();
+  const { locale, ts } = useI18n();
   const appBarContext = React.useContext(AppBarContext);
   const client = useClient();
   const config = useConfig();
@@ -555,7 +555,7 @@ function Dashboard(): React.ReactElement | null {
   const stat = (value: number) => (isLoading ? '-' : value);
 
   return (
-    <div className="flex flex-col max-w-7xl h-full overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden">
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-h-0 gap-3 p-1">
         {/* Toolbar - Top */}
@@ -565,7 +565,10 @@ function Dashboard(): React.ReactElement | null {
             onValueChange={handleDAGRunChange}
             disabled={isLoading}
           >
-            <SelectTrigger className="h-9 w-[140px]">
+            <SelectTrigger
+              className="h-9 w-[168px]"
+              aria-label={ts('Workflow')}
+            >
               <Filter className="h-4 w-4 mr-1.5 text-muted-foreground" />
               <I18nProps>
                 <SelectValue
@@ -587,6 +590,7 @@ function Dashboard(): React.ReactElement | null {
 
           <Input
             type="date"
+            aria-label={ts('Date')}
             value={dayjs.unix(dateRange.startDate).format('YYYY-MM-DD')}
             onChange={(e) => {
               const newDate = e.target.value;
@@ -645,7 +649,7 @@ function Dashboard(): React.ReactElement | null {
               </div>
               <div className="flex items-baseline gap-1">
                 <span
-                  className={`text-lg sm:text-xl font-light tabular-nums ${hasFailures ? 'text-foreground' : 'text-muted-foreground/50'}`}
+                  className={`text-lg sm:text-xl font-light tabular-nums ${hasFailures ? 'text-foreground' : 'text-muted-foreground'}`}
                 >
                   {stat(metrics[Status.Failed])}
                 </span>

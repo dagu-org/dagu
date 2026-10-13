@@ -244,7 +244,7 @@ function BaseConfigPage(): React.ReactNode {
   return (
     <div className="flex flex-col flex-1 min-h-0 space-y-4 p-4">
       <div>
-        <h1 className="text-lg font-semibold">
+        <h1 className="text-2xl font-semibold tracking-[-0.01em]">
           <I18nText text={'Base Configuration'} />
         </h1>
         <p className="text-sm text-muted-foreground">
@@ -254,9 +254,7 @@ function BaseConfigPage(): React.ReactNode {
               values={{ workspace: selectedWorkspace ?? '' }}
             />
           ) : (
-            <I18nText
-              text={'Global defaults inherited by all DAG definitions'}
-            />
+            <I18nText text={'Global defaults inherited by all workflows'} />
           )}
         </p>
       </div>
@@ -329,6 +327,7 @@ function BaseConfigPage(): React.ReactNode {
                 </I18nProps>
                 <I18nProps>
                   <Button
+                    variant="primary"
                     title="Save changes (Ctrl+S / Cmd+S)"
                     disabled={!hasUnsavedChanges}
                     onClick={handleSave}

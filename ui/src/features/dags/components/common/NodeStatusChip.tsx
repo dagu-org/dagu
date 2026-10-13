@@ -64,7 +64,7 @@ function NodeStatusChip({ status, children, size = 'md' }: Props) {
   return (
     <div
       className={cn(
-        'inline-flex items-center font-medium',
+        'inline-flex items-center rounded-full font-medium',
         statusClass,
         sizeClasses[size]
       )}

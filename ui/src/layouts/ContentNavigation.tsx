@@ -53,6 +53,21 @@ const STATIC_ROUTE_LABELS: Record<string, TranslationKey> = {
   '/git-sync': 'navigation.gitSync',
 };
 
+// Top-level routes that exist but have no static label above.
+const UNLABELED_ROUTE_ROOTS = new Set([
+  'docs',
+  'login',
+  'profiles',
+  'secrets',
+  'setup',
+]);
+
+function isKnownRouteRoot(segment: string): boolean {
+  return (
+    UNLABELED_ROUTE_ROOTS.has(segment) || `/${segment}` in STATIC_ROUTE_LABELS
+  );
+}
+
 type Translate = (key: TranslationKey) => string;
 
 function decodePathSegment(segment: string): string {
@@ -263,6 +278,11 @@ export function getBreadcrumbItems(
     return items;
   }
 
+  if (!isKnownRouteRoot(segments[0] ?? '')) {
+    items.push({ label: t('navigation.pageNotFound'), to: normalized });
+    return items;
+  }
+
   for (let index = 0; index < segments.length; index += 1) {
     const path = `/${segments.slice(0, index + 1).join('/')}`;
     items.push({
@@ -298,7 +318,11 @@ export function ContentNavigation({
             const isLast = index === items.length - 1;
             return (
               <React.Fragment key={`${item.label}-${index}`}>
-                {index > 0 && <BreadcrumbSeparator className="shrink-0" />}
+                {index > 0 && (
+                  <BreadcrumbSeparator className="shrink-0 text-muted-foreground/50">
+                    /
+                  </BreadcrumbSeparator>
+                )}
                 <BreadcrumbItem className="min-w-0">
                   <Link
                     to={item.to}

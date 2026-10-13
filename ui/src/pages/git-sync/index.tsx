@@ -72,7 +72,11 @@ import {
   type SyncKind,
 } from './sync-kind';
 import { useSyncReconcile } from './useSyncReconcile';
-import { LoadErrorState, PageLoading } from '@/components/PageStates';
+import {
+  EmptyState,
+  LoadErrorState,
+  PageLoading,
+} from '@/components/PageStates';
 
 type SyncStatusResponse = components['schemas']['SyncStatusResponse'];
 type SyncConfigResponse = components['schemas']['SyncConfigResponse'];
@@ -658,28 +662,27 @@ export default function GitSyncPage() {
   // Not configured state
   if (!status.enabled) {
     return (
-      <div className="flex flex-col items-center justify-center h-[60vh] text-center">
-        <GitBranch className="h-16 w-16 text-muted-foreground/30 mb-4" />
-        <h2 className="text-xl font-semibold mb-2">
-          <I18nText text={'Git Sync Not Configured'} />
-        </h2>
-        <p className="text-muted-foreground max-w-md">
+      <EmptyState
+        headingLevel={1}
+        icon={<GitBranch />}
+        title={<I18nText text={'Git sync is not configured'} />}
+        description={
           <I18nText
             text={
               'Git sync allows you to synchronize workflow definitions and Wiki pages with a remote Git repository. Configure it in your server settings.'
             }
           />
-        </p>
-      </div>
+        }
+      />
     );
   }
 
   return (
-    <div className="flex flex-col gap-4 max-w-7xl pb-8">
+    <div className="flex flex-col gap-4 pb-8">
       {/* Compact Header */}
       <div className="flex items-center justify-between py-2">
         <div className="flex items-center gap-4">
-          <h1 className="text-lg font-semibold">
+          <h1 className="text-2xl font-semibold tracking-[-0.01em]">
             <I18nText text={'Git Sync'} />
           </h1>
           <span className="text-xs text-muted-foreground font-mono">
@@ -776,7 +779,7 @@ export default function GitSyncPage() {
                 title="Delete all missing items from remote repository"
               >
                 <Trash2 className="h-4 w-4 mr-1" />
-                <I18nText text={'Delete Missing'} />
+                <I18nText text={'Delete missing'} />
               </Button>
             </I18nProps>
           )}
@@ -913,7 +916,11 @@ export default function GitSyncPage() {
               <TableHead className="w-28">
                 <I18nText text={'Synced'} />
               </TableHead>
-              <TableHead className="w-28"></TableHead>
+              <TableHead className="w-28">
+                <span className="sr-only">
+                  <I18nText text={'Actions'} />
+                </span>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -1123,7 +1130,7 @@ export default function GitSyncPage() {
                 className="w-full mt-2"
                 onClick={handleTestConnection}
               >
-                <I18nText text={'Test Connection'} />
+                <I18nText text={'Test connection'} />
               </Button>
             )}
           </div>

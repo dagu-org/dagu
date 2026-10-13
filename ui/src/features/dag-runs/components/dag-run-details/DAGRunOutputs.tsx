@@ -223,7 +223,11 @@ function DAGRunOutputs({ dagName, dagRunId }: Props) {
                   <ArrowUpDown className="h-3 w-3 text-muted-foreground" />
                 </button></I18nProps>
               </TableHead>
-              <TableHead className="w-[50px]"></TableHead>
+              <TableHead className="w-[50px]">
+                <span className="sr-only">
+                  <I18nText text={'Actions'} />
+                </span>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

@@ -106,7 +106,7 @@ function LiveSwitch({ dag, refresh, 'aria-label': ariaLabel }: Props) {
       />
       <I18nProps>
         <ConfirmModal
-          title={pendingState ? 'Enable Schedule' : 'Disable Schedule'}
+          title={pendingState ? 'Enable schedule' : 'Disable schedule'}
           buttonText={pendingState ? 'Enable' : 'Disable'}
           visible={showConfirm}
           dismissModal={handleCancel}

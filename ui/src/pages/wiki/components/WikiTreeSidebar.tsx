@@ -684,7 +684,7 @@ function WikiTreeSidebar({
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <span className="text-xs font-medium text-muted-foreground">
           <I18nText text={'Wiki'} />
         </span>
         <div className="flex items-center gap-0.5">
@@ -834,7 +834,7 @@ function WikiTreeSidebar({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search Wiki pages..."
-                className="w-full text-xs bg-muted/50 border border-border rounded px-2 py-1 pl-6 pr-6 outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground/60"
+                className="w-full text-xs bg-muted/50 border border-border rounded px-2 py-1 pl-6 pr-6 outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground"
                 tabIndex={selectionOverlayActive ? -1 : undefined}
                 disabled={selectionOverlayActive}
               />

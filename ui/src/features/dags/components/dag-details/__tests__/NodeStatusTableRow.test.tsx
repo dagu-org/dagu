@@ -1005,7 +1005,7 @@ describe('NodeStatusTableRow', () => {
       await user.click(screen.getByRole('button', { name: 'Step actions' }));
       await user.click(screen.getByRole('menuitem', { name: 'Change status' }));
 
-      expect(screen.getByText('Update Status')).toBeVisible();
+      expect(screen.getByText('Update status')).toBeVisible();
     }
   );
 
@@ -1067,7 +1067,7 @@ describe('NodeStatusTableRow', () => {
 
     fireEvent.click(screen.getByText('Waiting'));
 
-    expect(screen.queryByText('Update Status')).not.toBeInTheDocument();
+    expect(screen.queryByText('Update status')).not.toBeInTheDocument();
   });
 
   it.each(['desktop', 'mobile'] as const)(

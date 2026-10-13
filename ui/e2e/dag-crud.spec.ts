@@ -365,7 +365,7 @@ steps:
     await scheduleToggle.click();
     const disableDialog = page.getByRole('dialog');
     await expect(disableDialog).toBeVisible();
-    await expect(disableDialog).toContainText('Disable Schedule');
+    await expect(disableDialog).toContainText('Disable schedule');
     await disableDialog.getByRole('button', { name: 'Disable' }).click();
     await expect(disableDialog).toBeHidden();
 
@@ -393,7 +393,7 @@ steps:
     await scheduleToggle.click();
     const enableDialog = page.getByRole('dialog');
     await expect(enableDialog).toBeVisible();
-    await expect(enableDialog).toContainText('Enable Schedule');
+    await expect(enableDialog).toContainText('Enable schedule');
     await enableDialog.getByRole('button', { name: 'Enable' }).click();
     await expect(enableDialog).toBeHidden();
 

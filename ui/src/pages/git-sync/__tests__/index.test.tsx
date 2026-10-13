@@ -103,7 +103,7 @@ describe('GitSyncPage', () => {
     await user.click(screen.getByTitle('Configuration'));
 
     expect(
-      screen.queryByRole('button', { name: 'Test Connection' })
+      screen.queryByRole('button', { name: 'Test connection' })
     ).not.toBeInTheDocument();
   });
 

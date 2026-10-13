@@ -14,23 +14,14 @@ interface ActionButtonProps
 
 const ActionButton = forwardRef<HTMLButtonElement, ActionButtonProps>(
   (
-    {
-      label,
-      children,
-      icon,
-      className,
-      disabled,
-      onClick,
-      variant = 'secondary',
-      ...props
-    },
+    { label, children, icon, className, disabled, onClick, variant, ...props },
     ref
   ) => {
     return label ? (
       <Button
         ref={ref}
         size="sm"
-        variant={variant}
+        variant={variant ?? 'default'}
         disabled={disabled}
         onClick={onClick}
         className={cn('font-semibold', className)}
@@ -43,7 +34,7 @@ const ActionButton = forwardRef<HTMLButtonElement, ActionButtonProps>(
       <Button
         ref={ref}
         size="icon-sm"
-        variant={variant}
+        variant={variant ?? 'ghost'}
         disabled={disabled}
         onClick={onClick}
         className={className}

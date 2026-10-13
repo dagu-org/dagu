@@ -139,10 +139,14 @@ export default function OverviewPage({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
+      <h1 className="sr-only">
+        <I18nText text={'Overview'} />
+      </h1>
+      <div className="mb-3 flex shrink-0 items-center overflow-x-auto border-b border-border">
       <I18nProps><Tabs
         role="tablist"
         aria-label="Overview views"
-        className="mb-3 shrink-0 overflow-x-auto"
+        className="shrink-0 border-b-0"
       >
         <Tab
           id={tabElementId('timeline')}
@@ -186,18 +190,19 @@ export default function OverviewPage({
             </Tab>
           );
         })}
+      </Tabs></I18nProps>
         {canWrite && (
           <I18nProps><button
             type="button"
             onClick={openCreate}
             aria-label="Create view"
-            className="inline-flex h-12 cursor-pointer items-center gap-1 px-3 text-sm font-medium text-text-secondary hover:text-foreground"
+            className="inline-flex h-11 shrink-0 cursor-pointer items-center gap-1 px-3 text-sm font-medium text-muted-foreground hover:text-foreground"
           >
             <Plus className="h-4 w-4" />
             <I18nText text={"New view"} />
           </button></I18nProps>
         )}
-      </Tabs></I18nProps>
+      </div>
 
       <div
         id="overview-panel"

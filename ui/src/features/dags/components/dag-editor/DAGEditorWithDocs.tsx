@@ -140,7 +140,9 @@ function DAGEditorWithDocs({
           ) : (
             <div />
           )}
-          {headerActions}
+          {headerActions && (
+            <div className="flex items-center gap-2">{headerActions}</div>
+          )}
         </div>
       )}
 

@@ -50,7 +50,9 @@ export function NotFoundState({
         <EmptyMedia>
           <FileQuestion />
         </EmptyMedia>
-        <EmptyTitle>{title}</EmptyTitle>
+        <EmptyTitle asChild>
+          <h1>{title}</h1>
+        </EmptyTitle>
         <EmptyDescription>{description}</EmptyDescription>
       </EmptyHeader>
       {action && (
@@ -96,6 +98,41 @@ export function LoadErrorState({
           </Button>
         </EmptyContent>
       )}
+    </Empty>
+  );
+}
+
+type EmptyStateProps = {
+  icon: ReactNode;
+  title: ReactNode;
+  description?: ReactNode;
+  /** Next step, such as a create button or a link. */
+  action?: ReactNode;
+  /** Use 1 when the state replaces the whole page. */
+  headingLevel?: 1 | 2;
+  className?: string;
+};
+
+/** Explains that a collection or feature has nothing to show yet. */
+export function EmptyState({
+  icon,
+  title,
+  description,
+  action,
+  headingLevel = 2,
+  className,
+}: EmptyStateProps): ReactNode {
+  const Heading = headingLevel === 1 ? 'h1' : 'h2';
+  return (
+    <Empty className={className}>
+      <EmptyHeader>
+        <EmptyMedia>{icon}</EmptyMedia>
+        <EmptyTitle asChild>
+          <Heading>{title}</Heading>
+        </EmptyTitle>
+        {description && <EmptyDescription>{description}</EmptyDescription>}
+      </EmptyHeader>
+      {action && <EmptyContent>{action}</EmptyContent>}
     </Empty>
   );
 }

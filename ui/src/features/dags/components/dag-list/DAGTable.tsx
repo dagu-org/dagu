@@ -144,7 +144,7 @@ function RenameDAGButton({
     <I18nProps>
       <Button
         type="button"
-        variant="secondary"
+        variant="ghost"
         size="icon-sm"
         aria-label={`Rename workflow ${dag.dag.name}`}
         title="Rename workflow"
@@ -167,9 +167,9 @@ function DeleteDAGButton({
     <I18nProps>
       <Button
         type="button"
-        variant="secondary"
+        variant="ghost"
         size="icon-sm"
-        className="text-muted-foreground hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive focus-visible:text-destructive"
+        className="hover:bg-destructive/10 hover:text-destructive focus-visible:text-destructive"
         aria-label={`Delete workflow ${dag.dag.name}`}
         title="Delete workflow"
         onClick={() => onDelete(dag)}
@@ -271,7 +271,7 @@ function DAGCard({
           <Badge
             key={getScheduleKey(schedule, idx)}
             variant="outline"
-            className={`text-xs font-normal px-1 py-0 h-3 normal-case tracking-normal ${schedule.kind === 'at' ? 'border-0' : ''}`}
+            className={`h-[18px] rounded px-1.5 py-0 font-mono text-[11px] font-normal normal-case tracking-normal ${schedule.kind === 'at' ? 'border-0' : ''}`}
           >
             {getScheduleLabel(schedule)}
           </Badge>
@@ -325,13 +325,12 @@ function DAGCard({
               <Badge
                 key={label}
                 variant="outline"
-                className="text-xs px-1 py-0 h-3 rounded-sm border-primary/30 bg-primary/10 text-primary"
+                className="h-[18px] rounded border-transparent bg-muted px-1.5 py-0 text-[11px] font-normal text-muted-foreground"
                 onClick={(e) => {
                   e.stopPropagation();
                   onLabelClick(label);
                 }}
               >
-                <div className="h-1 w-1 rounded-full bg-primary/70 mr-0.5"></div>
                 {label}
               </Badge>
             ))}
@@ -396,7 +395,7 @@ function countLeadingPinnedRows(rows: Row<Data>[]): number {
 
 function PinnedSectionLabel() {
   return (
-    <span className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+    <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
       <Pin className="h-3 w-3" aria-hidden="true" />
       <I18nText text={'Pinned'} />
     </span>
@@ -697,7 +696,7 @@ const defaultColumns = [
           >
             <Link
               to={`/dags/${data.dag.fileName}`}
-              className="block font-medium text-foreground tracking-tight text-xs truncate hover:underline"
+              className="block truncate text-sm font-medium text-foreground hover:underline"
               onClick={(event) => event.stopPropagation()}
             >
               {getValue()}
@@ -721,7 +720,7 @@ const defaultColumns = [
                       <Badge
                         key={label}
                         variant="outline"
-                        className="text-xs px-1 py-0 h-3.5 rounded-sm border-primary/30 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary transition-colors duration-200 cursor-pointer font-normal whitespace-normal break-words focus-visible:outline-none"
+                        className="h-[18px] gap-0.5 rounded border-transparent bg-muted px-1.5 py-0 text-[11px] font-normal text-muted-foreground transition-colors duration-150 cursor-pointer whitespace-normal break-words hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         role="button"
                         tabIndex={0}
                         onKeyDown={(e) => {
@@ -741,10 +740,11 @@ const defaultColumns = [
                           if (handleLabelClick) handleLabelClick(label);
                         }}
                       >
-                        <div className="h-1 w-1 rounded-full bg-primary/70 mr-0.5"></div>
                         {value !== null ? (
                           <>
-                            <span className="font-medium">{key}</span>
+                            <span className="font-medium text-foreground/80">
+                              {key}
+                            </span>
                             <span className="opacity-60">=</span>
                             <span>{value}</span>
                           </>
@@ -930,7 +930,7 @@ const defaultColumns = [
             <Badge
               key={getScheduleKey(schedule, index)}
               variant="outline"
-              className="text-xs font-normal px-1 py-0 h-3.5 normal-case tracking-normal"
+              className="h-[18px] rounded px-1.5 py-0 font-mono text-[11px] font-normal normal-case tracking-normal"
             >
               {getScheduleLabel(schedule)}
             </Badge>
@@ -996,7 +996,7 @@ const defaultColumns = [
     minSize: 160,
     maxSize: 160,
     header: () => (
-      <span className="block text-center text-xs">
+      <span className="sr-only">
         <I18nText text={'Actions'} />
       </span>
     ),
@@ -1010,7 +1010,7 @@ const defaultColumns = [
       return (
         // Wrap DAGActions in a div and stop propagation on its click
         <div
-          className="flex items-center justify-center gap-1 scale-90" // Scale down for density
+          className="flex items-center justify-center gap-0.5 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100 pointer-coarse:opacity-100"
           onClick={(e) => e.stopPropagation()}
         >
           <DAGActions
@@ -1764,7 +1764,7 @@ function DAGTable({
       {/* Search, Filter and Pagination Controls */}
       <div
         data-testid="workflow-controls"
-        className={`mb-3 space-y-3 rounded-lg border border-border bg-card/50 p-3 ${
+        className={`mb-4 space-y-2 ${
           isLoading ? 'opacity-70 pointer-events-none' : ''
         }`}
       >
@@ -2127,7 +2127,7 @@ function DAGTable({
                           <ChevronDown className="h-4 w-4 text-muted-foreground" />
                         )}
                       </div>
-                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide truncate">
+                      <span className="text-xs font-semibold text-muted-foreground truncate">
                         {groupRow.name}
                       </span>
                     </div>

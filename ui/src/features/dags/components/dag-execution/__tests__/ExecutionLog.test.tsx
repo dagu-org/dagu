@@ -176,7 +176,7 @@ describe('StepLog', () => {
     const view = render(<StepLog {...props} />, {
       wrapper: UserPreferencesProvider,
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Show Beginning' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show beginning' }));
     logs.head = { content: 'beginning output' };
     view.rerender(<StepLog {...props} />);
     expect(await screen.findByText('beginning output')).toBeVisible();
