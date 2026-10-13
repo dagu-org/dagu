@@ -108,6 +108,7 @@ function Content({ navbarColor, children }: LayoutProps) {
         backgroundColor: navbarColor,
         color: contrastColor,
         '--sidebar-foreground': contrastColor,
+        '--sidebar-accent-foreground': contrastColor,
         '--sidebar-primary': contrastColor,
         '--sidebar-ring': contrastColor,
         '--sidebar-hover': getSidebarOverlayColor(contrastColor ?? '#fff', 0.1),

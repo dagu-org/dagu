@@ -661,7 +661,10 @@ export const mainListItems = React.forwardRef<
               {isOpen ? (
                 <div
                   aria-hidden="true"
-                  className="overflow-hidden whitespace-nowrap px-3 pb-1 text-xs font-medium text-muted-foreground"
+                  className={cn(
+                    'overflow-hidden whitespace-nowrap px-3 pb-1 text-xs font-medium text-muted-foreground',
+                    customColor && 'opacity-70'
+                  )}
                 >
                   {section.label}
                 </div>

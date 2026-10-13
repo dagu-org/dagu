@@ -162,6 +162,30 @@ describe('Layout', () => {
     ).toBeVisible();
   });
 
+  // Custom navbar colors drive every sidebar text token, so labels stay
+  // readable on any background brightness.
+  it('derives sidebar text colors from a custom navbar color', () => {
+    render(
+      <UserPreferencesProvider>
+        <I18nProvider>
+          <MemoryRouter initialEntries={['/dags']}>
+            <ConfigContext.Provider value={config}>
+              <Layout navbarColor="#1e3a8a">
+                <div>Page Content</div>
+              </Layout>
+            </ConfigContext.Provider>
+          </MemoryRouter>
+        </I18nProvider>
+      </UserPreferencesProvider>
+    );
+
+    const sidebar = screen.getByTestId('app-sidebar');
+    expect(sidebar.style.getPropertyValue('--sidebar-foreground')).toBe('#fff');
+    expect(sidebar.style.getPropertyValue('--sidebar-accent-foreground')).toBe(
+      '#fff'
+    );
+  });
+
   it('leaves license and monitoring notices to the license page', () => {
     const { unmount } = renderLayout('/home');
     expect(screen.getByTestId('license-banner')).toBeInTheDocument();
