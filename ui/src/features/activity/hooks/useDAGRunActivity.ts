@@ -7,6 +7,7 @@ import { useQuery } from '@/hooks/api';
 import { useDAGRunActivitySSE } from '@/hooks/useDAGRunActivitySSE';
 import { usePageVisible } from '@/hooks/usePageVisible';
 import { sseFallbackOptions, useSSECacheSync } from '@/hooks/useSSECacheSync';
+import { getQueryErrorStatus, isNotFoundQueryError } from '@/lib/queryErrors';
 import type { DAGRunActivity } from '../lib/activityModel';
 
 /** Hours covered by the live window. */
@@ -31,11 +32,15 @@ export type DAGRunActivityState = {
   refresh: () => Promise<unknown>;
 };
 
+function isMissingEndpointError(error: unknown): boolean {
+  return isNotFoundQueryError(error) || getQueryErrorStatus(error) === 501;
+}
+
 /**
  * Reads DAG-run activity for a window. A live window streams updates while
- * the tab is visible; a fixed window is read once. A node that fails the
- * read stops retrying until refresh is called, so an older remote node
- * without the endpoint is not polled forever.
+ * the tab is visible; a fixed window is read once. A node without the
+ * endpoint, such as an older remote node, is not read again until refresh
+ * is called, so it is not polled forever.
  */
 export function useDAGRunActivity(
   window: ActivityWindow,
@@ -71,7 +76,7 @@ export function useDAGRunActivity(
   useSSECacheSync(sse, mutate);
 
   useEffect(() => {
-    if (error && !data) {
+    if (!data && isMissingEndpointError(error)) {
       setFailedNode(remoteNode);
     }
   }, [data, error, remoteNode]);

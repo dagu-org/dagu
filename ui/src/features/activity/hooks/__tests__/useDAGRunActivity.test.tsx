@@ -86,8 +86,8 @@ describe('useDAGRunActivity', () => {
 
   // An older remote node answers 404; polling it forever would only repeat
   // the error.
-  it('stops streaming and polling a node that fails the read until refreshed', () => {
-    queryResult = { error: { message: 'not found' } };
+  it('stops streaming and polling a node without the endpoint until refreshed', () => {
+    queryResult = { error: { status: 404, message: 'not found' } };
     const { result } = renderHook(() =>
       useDAGRunActivity({ kind: 'live' }, {}, 'old-node')
     );
@@ -100,6 +100,16 @@ describe('useDAGRunActivity', () => {
     act(() => {
       void result.current.refresh();
     });
+    expect(result.current.unavailable).toBe(false);
+    expect(lastSSEEnabled()).toBe(true);
+  });
+
+  it('keeps a live window streaming through a transient read error', () => {
+    queryResult = { error: { status: 503, message: 'unavailable' } };
+    const { result } = renderHook(() =>
+      useDAGRunActivity({ kind: 'live' }, {}, 'local')
+    );
+
     expect(result.current.unavailable).toBe(false);
     expect(lastSSEEnabled()).toBe(true);
   });
