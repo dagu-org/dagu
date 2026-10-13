@@ -220,7 +220,12 @@ function DAGRunGroupedView({
               >
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                   <button
+                    type="button"
                     className="flex-shrink-0 p-1 hover:bg-muted rounded"
+                    aria-expanded={isExpanded}
+                    aria-label={ts(isExpanded ? 'Collapse {name}' : 'Expand {name}', {
+                      name: dagName,
+                    })}
                     onClick={(e) => {
                       e.stopPropagation();
                       toggleGroup(dagName);

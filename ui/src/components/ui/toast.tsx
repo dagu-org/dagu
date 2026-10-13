@@ -55,6 +55,8 @@ const ToastClose = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <button
     ref={ref}
+    type="button"
+    aria-label="Close"
     className={cn(
       'absolute right-2 top-2 rounded-md p-1 text-foreground/50 opacity-0 transition-opacity hover:text-foreground focus:opacity-100 focus:outline-none group-hover:opacity-100',
       className

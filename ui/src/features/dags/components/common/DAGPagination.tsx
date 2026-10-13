@@ -7,6 +7,7 @@ import {
 } from '@/components/ui/pagination'; // Import shadcn Pagination components
 import React from 'react';
 import { I18nText } from '@/i18n/I18nText';
+import { useI18n } from '@/i18n/I18nProvider';
 import { I18nProps } from '@/i18n/I18nProps';
 
 /**
@@ -232,6 +233,7 @@ const DAGPagination = ({
   onPageLimitChange,
   showPageLimitSelector = !!onPageLimitChange,
 }: DAGPaginationProps) => {
+  const { ts } = useI18n();
   // State for the input field value
   const [inputValue, setInputValue] = React.useState(pageLimit.toString());
 
@@ -287,6 +289,8 @@ const DAGPagination = ({
           <span className="text-xs text-muted-foreground">{pageLimit}</span>
           <div className="relative group">
             <Button
+              aria-label={ts('Items per page')}
+              title={ts('Items per page')}
               variant="ghost"
               size="icon"
               className="h-6 w-6 rounded-md hover:bg-muted flex items-center justify-center cursor-pointer"
