@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/dagucloud/dagu/v2/internal/llm"
@@ -346,7 +347,7 @@ func (p *Provider) buildGenerationConfig(req *llm.ChatRequest) *generationConfig
 		if req.Thinking.BudgetTokens != nil {
 			genConfig.ThinkingConfig = &thinkingConfig{ThinkingBudget: req.Thinking.BudgetTokens}
 			thinkingBudget = *req.Thinking.BudgetTokens
-		} else if strings.Contains(model, "gemini-3") || strings.Contains(model, "gemini-robotics-er-2-") {
+		} else if thinkingLevelSupported(model) {
 			// Level-based models use their nearest supported effort level.
 			level := p.mapEffortToThinkingLevel(model, req.Thinking.Effort)
 			genConfig.ThinkingConfig = &thinkingConfig{
@@ -390,6 +391,21 @@ func (p *Provider) buildGenerationConfig(req *llm.ChatRequest) *generationConfig
 		return nil
 	}
 	return genConfig
+}
+
+// thinkingLevelSupported reports whether a model takes thinkingLevel, which
+// Gemini documents from version 3 and Robotics-ER 2. Unrecognized IDs, such as
+// -latest aliases, are assumed to support it.
+func thinkingLevelSupported(model string) bool {
+	if strings.Contains(model, "gemini-robotics-er-1.") {
+		return false
+	}
+	match := geminiVersionPattern.FindStringSubmatch(model)
+	if match == nil {
+		return true
+	}
+	major, _ := strconv.Atoi(match[1])
+	return major >= 3
 }
 
 // thinkingLevels orders Gemini thinking levels from least to most reasoning.

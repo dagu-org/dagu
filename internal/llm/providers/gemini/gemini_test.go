@@ -333,6 +333,24 @@ func TestThinkingConfig(t *testing.T) {
 			wantThinking: `{"thinkingBudget":0}`,
 		},
 		{
+			name:         "Robotics 1.5 uses a budget",
+			model:        "gemini-robotics-er-1.5-preview",
+			thinking:     &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortLow},
+			wantThinking: `{"thinkingBudget":1024}`,
+		},
+		{
+			name:         "later major version uses a level",
+			model:        "gemini-4-flash",
+			thinking:     &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortHigh},
+			wantThinking: `{"thinkingLevel":"HIGH"}`,
+		},
+		{
+			name:         "unversioned alias uses a level",
+			model:        "gemini-flash-latest",
+			thinking:     &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortHigh},
+			wantThinking: `{"thinkingLevel":"HIGH"}`,
+		},
+		{
 			name:         "Robotics 2 uses a level",
 			model:        "gemini-robotics-er-2-preview",
 			thinking:     &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortLow},
