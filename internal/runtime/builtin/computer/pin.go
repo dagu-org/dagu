@@ -6,6 +6,7 @@ package computer
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"runtime"
 	"strings"
@@ -45,6 +46,9 @@ type pinnedStep struct {
 	Key         string            `json:"key,omitempty"`
 	Scroll      *pinnedScroll     `json:"scroll,omitempty"`
 	Wait        string            `json:"wait,omitempty"`
+	// Focus is the element a key step focuses before it presses its keys,
+	// so the keys reach the element they went to when the step was learned.
+	Focus *desktop.Selector `json:"focus,omitempty"`
 }
 
 type pinnedType struct {
@@ -109,6 +113,14 @@ func (s pinnedStep) validate() error {
 	if n := s.actionCount(); n != 1 {
 		return fmt.Errorf("a pinned step must set exactly one action, not %d", n)
 	}
+	if s.Focus != nil {
+		if s.Key == "" {
+			return errors.New("focus applies to a key step only")
+		}
+		if err := s.Focus.Validate(); err != nil {
+			return fmt.Errorf("focus: %w", err)
+		}
+	}
 	for _, sel := range []*desktop.Selector{s.Click, s.DoubleClick, s.RightClick} {
 		if sel != nil {
 			return sel.Validate()
@@ -134,7 +146,7 @@ func (s pinnedStep) validate() error {
 // instruction's, so a typo or a reference to a skipped ask is caught.
 func (s pinnedStep) references() []string {
 	var texts []string
-	for _, sel := range []*desktop.Selector{s.Click, s.DoubleClick, s.RightClick} {
+	for _, sel := range []*desktop.Selector{s.Click, s.DoubleClick, s.RightClick, s.Focus} {
 		if sel != nil {
 			texts = append(texts, selectorTexts(*sel)...)
 		}
@@ -250,7 +262,11 @@ func (s pinnedStep) recordedAction() (recordedAction, bool) {
 	case s.Scroll != nil:
 		return recordedAction{Action: computeruse.Action{Kind: computeruse.KindScroll, ScrollY: s.Scroll.Dy, Point: &computeruse.Point{}}, Element: new(pinnedElement(s.Scroll.On))}, true
 	case s.Key != "":
-		return recordedAction{Action: computeruse.Action{Kind: computeruse.KindKey, Keys: strings.Split(s.Key, "+")}}, true
+		rec := recordedAction{Action: computeruse.Action{Kind: computeruse.KindKey, Keys: strings.Split(s.Key, "+")}}
+		if s.Focus != nil {
+			rec.Element = new(pinnedElement(*s.Focus))
+		}
+		return rec, true
 	}
 	return recordedAction{}, false
 }

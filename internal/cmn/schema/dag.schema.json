@@ -8018,9 +8018,11 @@
             "dy": { "type": "integer" }
           }
         },
-        "wait": { "type": "string", "minLength": 1, "description": "A time to pause, such as 1s." }
+        "wait": { "type": "string", "minLength": 1, "description": "A time to pause, such as 1s." },
+        "focus": { "$ref": "#/definitions/computerSelector", "description": "With key: the element to focus before pressing the keys." }
       },
-      "description": "One pinned step of an act: exactly one of click, double_click, right_click (a selector), type (into, text), key (a chord), scroll (on, dy), or wait."
+      "dependencies": { "focus": ["key"] },
+      "description": "One pinned step of an act: exactly one of click, double_click, right_click (a selector), type (into, text), key (a chord, with an optional focus), scroll (on, dy), or wait."
     },
     "computerPinnedField": {
       "type": "object",

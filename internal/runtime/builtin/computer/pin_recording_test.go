@@ -60,9 +60,9 @@ func TestPinnedRecordingRunsOnAnotherDevice(t *testing.T) {
 	assert.JSONEq(t, `[
 		{"click": {"app": "expense", "role": "text_field", "id": "amountBox"}},
 		{"type": {"into": {"app": "expense", "role": "text_field", "id": "amountBox"}, "text": "%amount%"}},
-		{"key": "ctrl+s"},
+		{"key": "ctrl+s", "focus": {"app": "expense", "role": "text_field", "id": "amountBox"}},
 		{"click": {"app": "expense", "role": "button", "name": "保存", "id": "saveButton"}}
-	]`, steps, "typed values keep their placeholder")
+	]`, steps, "typed values keep their placeholder, and keys the element they went to")
 
 	device := elementRun(t)
 	replayed := device.execute(`{"ai": "never", "variables": {"amount": "8,500"}, "do": [{"act": {"instruction": "Post the invoice", "recorded": {"windows": `+steps+`}}}]}`, nil)
@@ -71,7 +71,7 @@ func TestPinnedRecordingRunsOnAnotherDevice(t *testing.T) {
 	require.Len(t, events, 1)
 	assert.Equal(t, agentstep.StatusCacheHit, events[0].Status)
 	assert.Equal(t, agentstep.ViaElement, events[0].Via)
-	assert.Equal(t, []string{"move 290,152", "left down #1", "focus amountBox", "type 8,500", "key ctrl", "key s", "move 235,194", "left down #1"}, device.backend.inputs())
+	assert.Equal(t, []string{"move 290,152", "left down #1", "focus amountBox", "type 8,500", "focus amountBox", "key ctrl", "key s", "move 235,194", "left down #1"}, device.backend.inputs())
 }
 
 // When a pinned step misses and the model finishes the act, the recording
@@ -126,8 +126,10 @@ func TestPinnedRecordingNamesTheContainer(t *testing.T) {
 func TestPinnedRecordingConvertsEachAction(t *testing.T) {
 	t.Parallel()
 
-	save := &recordedElement{Selector: desktop.Selector{Role: desktop.RoleButton, Name: "保存", ID: "saveButton"}, App: "expense"}
-	untitled := &recordedElement{Selector: desktop.Selector{Role: desktop.RoleButton, Name: "OK"}, Window: "確認 - %invoice%"}
+	save := &recordedElement{Selector: desktop.Selector{Role: desktop.RoleButton, Name: "保存", ID: "saveButton"}, App: "expense", FractionX: 0.5, FractionY: 0.5}
+	untitled := &recordedElement{Selector: desktop.Selector{Role: desktop.RoleButton, Name: "OK"}, Window: "確認 - %invoice%", FractionX: 0.7, FractionY: 0.3}
+	saveEdge := &recordedElement{Selector: save.Selector, App: "expense", FractionX: 0.95, FractionY: 0.5}
+	amount := &recordedElement{Selector: desktop.Selector{Role: desktop.RoleTextField, ID: "amountBox"}, App: "expense", FractionX: 0.05, FractionY: 0.5}
 	at := &computeruse.Point{X: 235, Y: 194}
 	for _, tc := range []struct {
 		name       string
@@ -144,6 +146,8 @@ func TestPinnedRecordingConvertsEachAction(t *testing.T) {
 				{Action: computeruse.Action{Kind: computeruse.KindClick, Button: computeruse.ButtonRight, Point: at}, Element: untitled},
 				{Action: computeruse.Action{Kind: computeruse.KindScroll, ScrollY: -3, Point: at}, Element: save},
 				{Action: computeruse.Action{Kind: computeruse.KindKey, Keys: []string{"tab"}, Repeat: 2}},
+				{Action: computeruse.Action{Kind: computeruse.KindClick, Point: at}, Element: amount},
+				{Action: computeruse.Action{Kind: computeruse.KindKey, Keys: []string{"shift", "tab"}, Repeat: 2}, Element: amount},
 				{Action: computeruse.Action{Kind: computeruse.KindWait, Duration: 1500 * time.Millisecond}},
 				{Action: computeruse.Action{Kind: computeruse.KindWait, Duration: 5 * time.Minute}},
 			},
@@ -153,6 +157,8 @@ func TestPinnedRecordingConvertsEachAction(t *testing.T) {
 				{"right_click": {"window": "確認 - %invoice%", "role": "button", "name": "OK"}},
 				{"scroll": {"on": {"app": "expense", "role": "button", "name": "保存", "id": "saveButton"}, "dy": -3}},
 				{"key": "tab"}, {"key": "tab"},
+				{"click": {"app": "expense", "role": "text_field", "id": "amountBox"}},
+				{"key": "shift+tab", "focus": {"app": "expense", "role": "text_field", "id": "amountBox"}}, {"key": "shift+tab"},
 				{"wait": "1.5s"}, {"wait": "1m0s"}
 			]`,
 		},
@@ -165,6 +171,8 @@ func TestPinnedRecordingConvertsEachAction(t *testing.T) {
 				{Action: computeruse.Action{Kind: computeruse.KindDrag, Path: []computeruse.Point{{X: 1, Y: 2}, {X: 3, Y: 4}}}, Element: save},
 				{Action: computeruse.Action{Kind: computeruse.KindMove, Point: at}, Element: save},
 				{Action: computeruse.Action{Kind: computeruse.KindType, Text: "%amount%"}},
+				{Action: computeruse.Action{Kind: computeruse.KindClick, Point: at}, Element: saveEdge},
+				{Action: computeruse.Action{Kind: computeruse.KindScroll, ScrollY: 3, Point: at}, Element: saveEdge},
 			},
 			unpinnable: []UnpinnableAction{
 				{Turn: 2, Action: "click at 235,194", Reason: "no element could be read where it landed"},
@@ -172,6 +180,8 @@ func TestPinnedRecordingConvertsEachAction(t *testing.T) {
 				{Turn: 2, Action: "drag from 1,2 to 3,4", Reason: "a drag has no pinned form"},
 				{Turn: 2, Action: "move at 235,194", Reason: "moving the pointer alone, such as to open a menu by hovering, has no pinned form"},
 				{Turn: 2, Action: `type "%amount%"`, Reason: "the field it typed into could not be read"},
+				{Turn: 2, Action: "click at 235,194", Reason: "the click landed near the edge of its element, and a pin clicks its centre"},
+				{Turn: 2, Action: "scroll 0,3 at 235,194", Reason: "the scroll landed near the edge of its element, and a pin scrolls at its centre"},
 			},
 		},
 	} {

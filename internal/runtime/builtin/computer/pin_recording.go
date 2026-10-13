@@ -5,6 +5,7 @@ package computer
 
 import (
 	"encoding/json"
+	"math"
 	"slices"
 	"strings"
 	"time"
@@ -124,6 +125,9 @@ func pinAction(rec recordedAction) ([]pinnedStep, string) {
 		if rec.Element == nil {
 			return nil, "no element could be read where it landed"
 		}
+		if offCentre(*rec.Element) {
+			return nil, "the click landed near the edge of its element, and a pin clicks its centre"
+		}
 		if len(action.Modifiers) > 0 {
 			return nil, "a click holding keys has no pinned form"
 		}
@@ -148,10 +152,20 @@ func pinAction(rec recordedAction) ([]pinnedStep, string) {
 		if step.validate() != nil {
 			return nil, "the keys cannot be written as a chord such as ctrl+s"
 		}
-		return slices.Repeat([]pinnedStep{step}, max(action.Repeat, 1)), ""
+		steps := slices.Repeat([]pinnedStep{step}, max(action.Repeat, 1))
+		if rec.Element != nil {
+			// Only the first press focuses the element the keys went to; each
+			// press after it starts from where the one before left the focus,
+			// as the recording did.
+			steps[0].Focus = new(pinnedSelector(*rec.Element))
+		}
+		return steps, ""
 	case computeruse.KindScroll:
 		if rec.Element == nil {
 			return nil, "no element could be read where it landed"
+		}
+		if offCentre(*rec.Element) {
+			return nil, "the scroll landed near the edge of its element, and a pin scrolls at its centre"
 		}
 		if action.ScrollX != 0 || len(action.Modifiers) > 0 {
 			return nil, "only a plain vertical scroll has a pinned form"
@@ -172,6 +186,22 @@ func pinAction(rec recordedAction) ([]pinnedStep, string) {
 		return nil, "pressing or releasing a mouse button alone has no pinned form"
 	}
 	return nil, string(action.Kind) + " has no pinned form"
+}
+
+// maxCentreOffset is how far from its element's centre, as a share of the
+// element's width or height, a pointer action may have landed and still be
+// pinned to the centre.
+const maxCentreOffset = 0.3
+
+// offCentre reports a pointer action that landed near its element's edge,
+// where a pin, which acts at the centre, may reach another part of it, such
+// as a split button's arrow. A text field takes the focus wherever it is
+// clicked.
+func offCentre(rec recordedElement) bool {
+	if rec.Selector.Role == desktop.RoleTextField {
+		return false
+	}
+	return math.Abs(rec.FractionX-0.5) > maxCentreOffset || math.Abs(rec.FractionY-0.5) > maxCentreOffset
 }
 
 // containerRoles are the roles of the elements a pinned selector is looked
