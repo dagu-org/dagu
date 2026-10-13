@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import React from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -67,10 +67,15 @@ describe('ViewPage', () => {
     expect(screen.queryByRole('tab')).not.toBeInTheDocument();
   });
 
-  it('redirects home when the view is missing', async () => {
+  it('explains when the view is missing', () => {
     mockViews([]);
     renderAt('ghost');
 
-    await waitFor(() => expect(screen.getByText('home')).toBeInTheDocument());
+    expect(
+      screen.getByRole('heading', { name: 'View not found' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Go to Overview' })
+    ).toHaveAttribute('href', '/');
   });
 });

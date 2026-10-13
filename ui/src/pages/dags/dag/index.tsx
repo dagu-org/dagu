@@ -31,6 +31,14 @@ import {
   workspaceNameFromLabels,
 } from '../../../lib/workspace';
 import { I18nText } from '@/i18n/I18nText';
+import { I18nTemplate } from '@/i18n/I18nTemplate';
+import { useI18n } from '@/i18n/I18nProvider';
+import {
+  LoadErrorState,
+  NotFoundState,
+  PageLoading,
+} from '@/components/PageStates';
+import { isNotFoundQueryError } from '@/lib/queryErrors';
 
 type Params = {
   fileName: string;
@@ -45,6 +53,7 @@ function DAGDetails() {
   const navigate = useNavigate();
   const appBarContext = useContext(AppBarContext);
   const [searchParams] = useSearchParams();
+  const { ts } = useI18n();
 
   const dagRunId = searchParams.get('dagRunId');
   const stepName = searchParams.get('step');
@@ -132,7 +141,11 @@ function DAGDetails() {
   }, [buildUrl, fileName, navigate, params.tab]);
 
   // Fetch DAG details — SWR is the single source of truth, refreshed by live invalidations
-  const { data: dagData, mutate: mutateDag } = useQuery(
+  const {
+    data: dagData,
+    error: dagError,
+    mutate: mutateDag,
+  } = useQuery(
     '/dags/{fileName}',
     {
       params: {
@@ -271,6 +284,32 @@ function DAGDetails() {
             }}
           >
             <div className="flex h-full min-h-0 w-full min-w-0 flex-col">
+              {!dagData?.dag &&
+                (dagError ? (
+                  isNotFoundQueryError(dagError) ? (
+                    <NotFoundState
+                      title={ts('Workflow not found')}
+                      description={
+                        <I18nTemplate
+                          text="No workflow named {name} exists. It may have been renamed or deleted."
+                          values={{ name: <code>{fileName}</code> }}
+                        />
+                      }
+                      action={{
+                        to: buildUrl('/dags'),
+                        label: ts('Back to Workflows'),
+                      }}
+                    />
+                  ) : (
+                    <LoadErrorState
+                      title={ts("Couldn't load this workflow")}
+                      error={dagError}
+                      onRetry={() => void mutateDag()}
+                    />
+                  )
+                ) : (
+                  <PageLoading />
+                ))}
               {dagData?.dag && dagMatchesWorkspace && (
                 <>
                   <DAGHeader
