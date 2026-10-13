@@ -56,7 +56,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
   const title =
     logType === 'execution'
       ? `Execution Log: ${dagName}`
-      : `Step Log (${stream}): ${stepTitle}`;
+      : `Step log: ${stepTitle}`;
 
   const remoteNode = useRemoteNode();
   const sourceFile = dagRun?.sourceFileName || fileName;

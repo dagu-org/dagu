@@ -166,6 +166,32 @@ describe('StepLog', () => {
     expect(filename).toBe('example-run-each-2.inner.0-body-stderr.log');
   });
 
+  it('switches between stdout and stderr in place', () => {
+    render(
+      <StepLog
+        dagName="example"
+        dagRunId="run"
+        stepName="build"
+        node={{ status: NodeStatus.Success } as never}
+      />,
+      { wrapper: UserPreferencesProvider }
+    );
+    expect(screen.getByRole('button', { name: 'stdout' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'stderr' }));
+
+    expect(logs.queries[logs.queries.length - 1]).toMatchObject({
+      stream: Stream.stderr,
+    });
+    expect(screen.getByRole('button', { name: 'stderr' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+  });
+
   it('shows the beginning of an active log when requested', async () => {
     const props = {
       dagName: 'example',

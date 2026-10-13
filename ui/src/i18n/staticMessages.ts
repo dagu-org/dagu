@@ -2487,6 +2487,7 @@ const english = {
   "Sub-DAG": "Sub-DAG",
   "Catch-up": "Catch-up",
   "Run log": "Run log",
+  "Stream": "Stream",
 } as const;
 
 export type StaticMessage = keyof typeof english;
@@ -4920,6 +4921,7 @@ const chinese = {
   "Sub-DAG": "子工作流",
   "Catch-up": "补跑",
   "Run log": "运行日志",
+  "Stream": "输出流",
 } as const satisfies Record<StaticMessage, string>;
 
 const japanese = {
@@ -7429,6 +7431,7 @@ const japanese = {
   "Sub-DAG": "サブワークフロー",
   "Catch-up": "キャッチアップ",
   "Run log": "実行ログ",
+  "Stream": "出力ストリーム",
 } as const satisfies Record<StaticMessage, string>;
 
 export const staticMessages = {

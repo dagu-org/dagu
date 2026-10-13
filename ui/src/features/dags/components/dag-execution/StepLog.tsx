@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ReloadButton } from '@/components/ui/reload-button';
 import { Switch } from '@/components/ui/switch';
+import { ToggleButton, ToggleGroup } from '@/components/ui/toggle-group';
 import { downloadFromUrl } from '@/lib/download';
 import { useConfig } from '../../../../contexts/ConfigContext';
 import { useRemoteNode } from '../../../../contexts/RemoteNodeContext';
@@ -80,25 +81,43 @@ type Props = {
   onSettled?: (stepName: string) => void;
 };
 
+type ContentProps = Props & {
+  /** Switches the shown stream; absent when the caller owns the stream. */
+  onStreamChange?: (stream: Stream) => void;
+};
+
 /**
  * StepLog displays the log output for a specific step in a DAG run
  * Fetches log data from the API and refreshes every 30 seconds
  */
 function StepLog(props: Props) {
   const remoteNode = useRemoteNode();
+  // The viewer switches streams itself unless a caller that follows the tail,
+  // such as Run progress, owns the stream.
+  const [stream, setStream] = useState(props.stream ?? Stream.stdout);
+  useEffect(() => {
+    setStream(props.stream ?? Stream.stdout);
+  }, [props.stream]);
   // A log identity owns its search, cache and scroll position.
   const identity = JSON.stringify([
     remoteNode,
     props.dagName,
     props.dagRunId,
     props.stepName,
-    props.stream,
+    stream,
     props.dagRun?.rootDAGRunName,
     props.dagRun?.rootDAGRunId,
     props.foreach?.stepName,
     props.foreach?.item,
   ]);
-  return <StepLogContent key={identity} {...props} />;
+  return (
+    <StepLogContent
+      key={identity}
+      {...props}
+      stream={stream}
+      onStreamChange={props.followTail === undefined ? setStream : undefined}
+    />
+  );
 }
 
 function StepLogContent({
@@ -113,7 +132,8 @@ function StepLogContent({
   followTail,
   onFollowTailChange,
   onSettled,
-}: Props) {
+  onStreamChange,
+}: ContentProps) {
   const { ts } = useI18n();
   const remoteNode = useRemoteNode();
   const config = useConfig();
@@ -529,6 +549,21 @@ function StepLogContent({
       {/* Controls for log navigation */}
       <div className="mb-2 flex shrink-0 flex-col gap-2 rounded bg-muted p-2">
         <div className="flex flex-wrap items-center gap-2">
+          {onStreamChange && (
+            <ToggleGroup aria-label={ts('Stream')} className="p-0.5">
+              {[Stream.stdout, Stream.stderr].map((option) => (
+                <ToggleButton
+                  key={option}
+                  value={option}
+                  groupValue={stream}
+                  onClick={() => onStreamChange(option)}
+                  className="h-7 px-2.5 font-mono"
+                >
+                  {option}
+                </ToggleButton>
+              ))}
+            </ToggleGroup>
+          )}
           {/* Responsive button container */}
           {showNavigation && (
             <div className="flex flex-wrap gap-1">
