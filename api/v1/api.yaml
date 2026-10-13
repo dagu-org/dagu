@@ -11488,7 +11488,7 @@ components:
     DateTimeFrom:
       name: fromDate
       in: query
-      description: start datetime for filtering DAG-runs in ISO 8601 format with timezone
+      description: start of the time range for filtering DAG-runs, as a Unix timestamp in seconds
       required: false
       schema:
         $ref: "#/components/schemas/UnixTimestamp"
@@ -11496,7 +11496,7 @@ components:
     DateTimeTo:
       name: toDate
       in: query
-      description: end datetime for filtering DAG-runs in ISO 8601 format with timezone
+      description: end of the time range for filtering DAG-runs, as a Unix timestamp in seconds
       required: false
       schema:
         $ref: "#/components/schemas/UnixTimestamp"
@@ -11780,7 +11780,7 @@ components:
             $ref: "#/components/schemas/DAGRunActivityWorkflow"
         active:
           type: array
-          description: "Runs still running, waiting, or queued, including ones created before the window"
+          description: "Runs still running, waiting, or queued, including up to 50 live runs created before the window"
           items:
             $ref: "#/components/schemas/DAGRunActivityRun"
         upcoming:

@@ -4207,7 +4207,7 @@ export interface components {
             counts: components["schemas"]["DAGRunActivityCount"][];
             /** @description DAGs with runs in the window, ordered by name */
             workflows: components["schemas"]["DAGRunActivityWorkflow"][];
-            /** @description Runs still running, waiting, or queued, including ones created before the window */
+            /** @description Runs still running, waiting, or queued, including up to 50 live runs created before the window */
             active: components["schemas"]["DAGRunActivityRun"][];
             /** @description Next scheduled runs, soonest first */
             upcoming: components["schemas"]["DAGRunActivityUpcoming"][];
@@ -7703,9 +7703,9 @@ export interface components {
         DAGRunName: string;
         /** @description status of the DAG-run. Repeat the parameter to match multiple statuses. */
         StatusList: components["schemas"]["Status"][];
-        /** @description start datetime for filtering DAG-runs in ISO 8601 format with timezone */
+        /** @description start of the time range for filtering DAG-runs, as a Unix timestamp in seconds */
         DateTimeFrom: components["schemas"]["UnixTimestamp"];
-        /** @description end datetime for filtering DAG-runs in ISO 8601 format with timezone */
+        /** @description end of the time range for filtering DAG-runs, as a Unix timestamp in seconds */
         DateTimeTo: components["schemas"]["UnixTimestamp"];
         /** @description Number of lines to return from the end of the file */
         Tail: number;
@@ -9920,9 +9920,9 @@ export interface operations {
                 remoteNode?: components["parameters"]["RemoteNode"];
                 /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. */
                 workspace?: components["parameters"]["Workspace"];
-                /** @description start datetime for filtering DAG-runs in ISO 8601 format with timezone */
+                /** @description start of the time range for filtering DAG-runs, as a Unix timestamp in seconds */
                 fromDate?: components["parameters"]["DateTimeFrom"];
-                /** @description end datetime for filtering DAG-runs in ISO 8601 format with timezone */
+                /** @description end of the time range for filtering DAG-runs, as a Unix timestamp in seconds */
                 toDate?: components["parameters"]["DateTimeTo"];
                 /** @description Filter by DAG names containing this value */
                 name?: components["parameters"]["ArtifactDAGName"];
@@ -10043,9 +10043,9 @@ export interface operations {
                 remoteNode?: components["parameters"]["RemoteNode"];
                 /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. */
                 workspace?: components["parameters"]["Workspace"];
-                /** @description start datetime for filtering DAG-runs in ISO 8601 format with timezone */
+                /** @description start of the time range for filtering DAG-runs, as a Unix timestamp in seconds */
                 fromDate?: components["parameters"]["DateTimeFrom"];
-                /** @description end datetime for filtering DAG-runs in ISO 8601 format with timezone */
+                /** @description end of the time range for filtering DAG-runs, as a Unix timestamp in seconds */
                 toDate?: components["parameters"]["DateTimeTo"];
                 /** @description Length of a window that ends now. Ignored when fromDate is set. */
                 hours?: number;
@@ -10092,9 +10092,9 @@ export interface operations {
             query?: {
                 /** @description status of the DAG-run. Repeat the parameter to match multiple statuses. */
                 status?: components["parameters"]["StatusList"];
-                /** @description start datetime for filtering DAG-runs in ISO 8601 format with timezone */
+                /** @description start of the time range for filtering DAG-runs, as a Unix timestamp in seconds */
                 fromDate?: components["parameters"]["DateTimeFrom"];
-                /** @description end datetime for filtering DAG-runs in ISO 8601 format with timezone */
+                /** @description end of the time range for filtering DAG-runs, as a Unix timestamp in seconds */
                 toDate?: components["parameters"]["DateTimeTo"];
                 /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
                 dagRunId?: components["parameters"]["DAGRunIdSearch"];
@@ -10333,9 +10333,9 @@ export interface operations {
             query?: {
                 /** @description status of the DAG-run. Repeat the parameter to match multiple statuses. */
                 status?: components["parameters"]["StatusList"];
-                /** @description start datetime for filtering DAG-runs in ISO 8601 format with timezone */
+                /** @description start of the time range for filtering DAG-runs, as a Unix timestamp in seconds */
                 fromDate?: components["parameters"]["DateTimeFrom"];
-                /** @description end datetime for filtering DAG-runs in ISO 8601 format with timezone */
+                /** @description end of the time range for filtering DAG-runs, as a Unix timestamp in seconds */
                 toDate?: components["parameters"]["DateTimeTo"];
                 /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
                 dagRunId?: components["parameters"]["DAGRunIdSearch"];
