@@ -16,6 +16,10 @@ import dayjs from '../../../lib/dayjs';
 import DAGRunDetailsModal from '../../dag-runs/components/dag-run-details/DAGRunDetailsModal';
 import type { StatusTab } from '../../dags/components/DAGStatus';
 import { I18nText } from '@/i18n/I18nText';
+import {
+  legibleAxisStep,
+  type TimelineAxisScale,
+} from '../lib/timelineAxis';
 
 type Props = {
   data: components['schemas']['DAGRunSummary'][];
@@ -75,7 +79,10 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
       const rangeInHours = rangeInMinutes / 60;
       const rangeInDays = rangeInHours / 24;
 
-      let options = {};
+      let options: {
+        timeAxis?: { scale: TimelineAxisScale; step: number };
+        format?: object;
+      } = {};
 
       if (rangeInMinutes < 30) {
         // Less than 30 minutes - show 1-minute intervals
@@ -224,6 +231,14 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
         };
       }
 
+      if (options.timeAxis) {
+        options.timeAxis.step = legibleAxisStep(
+          options.timeAxis.scale,
+          options.timeAxis.step,
+          rangeInMs,
+          timelineRef.current?.clientWidth ?? 0
+        );
+      }
       timeline.setOptions(options);
     } catch (error) {
       console.warn('Error updating time axis:', error);
@@ -322,7 +337,19 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
     // Initial update based on current view
     updateTimeAxisBasedOnZoom(timelineInstance.current);
 
+    // Label spacing depends on the width, so recompute it on resize.
+    const resizeObserver =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(() => {
+            if (timelineInstance.current) {
+              updateTimeAxisBasedOnZoom(timelineInstance.current);
+            }
+          });
+    resizeObserver?.observe(timelineRef.current);
+
     return () => {
+      resizeObserver?.disconnect();
       if (timelineInstance.current) {
         timelineInstance.current.off('rangechanged');
         timelineInstance.current.off('click');
