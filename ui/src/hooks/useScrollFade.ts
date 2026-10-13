@@ -1,13 +1,7 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import {
-  type CSSProperties,
-  type RefObject,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from 'react';
+import { type CSSProperties, useLayoutEffect, useState } from 'react';
 
 /** Width of the fade at an edge that has more content beyond it. */
 const FADE_PX = 24;
@@ -25,16 +19,16 @@ function fadeMask(axis: 'x' | 'y', { start, end }: Edges): string | undefined {
 /**
  * Fades the edges of a scroll container that hide more content, so a row
  * of tabs or a list shows it can scroll even where scrollbars are hidden.
- * Returns the ref to attach and the style that draws the fades.
+ * Returns the ref to attach, which also works on an element that mounts
+ * later, and the style that draws the fades.
  */
 export function useScrollFade<T extends HTMLElement>(
   axis: 'x' | 'y'
-): [RefObject<T | null>, CSSProperties] {
-  const ref = useRef<T>(null);
+): [(element: T | null) => void, CSSProperties] {
+  const [element, setElement] = useState<T | null>(null);
   const [edges, setEdges] = useState<Edges>({ start: false, end: false });
 
   useLayoutEffect(() => {
-    const element = ref.current;
     if (!element) return;
     const update = () => {
       const position = axis === 'x' ? element.scrollLeft : element.scrollTop;
@@ -63,8 +57,8 @@ export function useScrollFade<T extends HTMLElement>(
       element.removeEventListener('scroll', update);
       observer?.disconnect();
     };
-  }, [axis]);
+  }, [axis, element]);
 
   const mask = fadeMask(axis, edges);
-  return [ref, mask ? { maskImage: mask, WebkitMaskImage: mask } : {}];
+  return [setElement, mask ? { maskImage: mask, WebkitMaskImage: mask } : {}];
 }
