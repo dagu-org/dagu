@@ -28,6 +28,8 @@ import {
   policySetInput,
 } from '@/features/incidents/incidentDrafts';
 import { I18nText } from '@/i18n/I18nText';
+import { I18nProps } from '@/i18n/I18nProps';
+import ConfirmModal from '@/components/ui/confirm-dialog';
 import { I18nTemplate } from '@/i18n/I18nTemplate';
 
 type IncidentsTabProps = {
@@ -63,6 +65,7 @@ export default function IncidentsTab({
   );
   const [saving, setSaving] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
   const [localOverrideStarted, setLocalOverrideStarted] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -222,7 +225,7 @@ export default function IncidentsTab({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={reset}
+                  onClick={() => (data?.id ? setConfirmReset(true) : reset())}
                   disabled={resetting || saving}
                 >
                   {resetting ? (
@@ -281,6 +284,27 @@ export default function IncidentsTab({
           setDraft(next);
         }}
       />
+
+      <I18nProps>
+        <ConfirmModal
+          title="Reset to inherit"
+          buttonText="Reset"
+          visible={confirmReset}
+          dismissModal={() => setConfirmReset(false)}
+          onSubmit={() => {
+            setConfirmReset(false);
+            void reset();
+          }}
+        >
+          <p>
+            <I18nText
+              text={
+                "Remove this workflow's incident routing and use the inherited routing instead?"
+              }
+            />
+          </p>
+        </ConfirmModal>
+      </I18nProps>
     </div>
   );
 }
