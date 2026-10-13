@@ -6,7 +6,13 @@
  *
  * @module features/dags/components/dag-execution
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { Download, FileArchive } from 'lucide-react';
 import { components, Status } from '../../../../api/v1/schema';
 import { Button } from '@/components/ui/button';
@@ -28,11 +34,14 @@ import { ActivityLine } from './ActivityLine';
 import LogPageSizeSelect from './LogPageSizeSelect';
 import { I18nText } from '@/i18n/I18nText';
 import { I18nProps } from '@/i18n/I18nProps';
+import { useI18n } from '@/i18n/I18nProvider';
 import { LogChunks } from './LogChunks';
 
 // Largest tail size streamed over SSE; larger page sizes fall back to REST
 // polling so a live stream does not push very large payloads on every update.
 const MAX_SSE_TAIL_LINES = 10000;
+/** Distance from the bottom, in pixels, that still counts as following. */
+const TAIL_THRESHOLD_PX = 4;
 
 // Extended Log type with pagination fields
 interface LogWithPagination {
@@ -64,6 +73,7 @@ type Props = {
  * Fetches log data from the API and refreshes every 30 seconds
  */
 function ExecutionLog({ name, dagRunId, dagRun }: Props) {
+  const { ts } = useI18n();
   const remoteNode = useRemoteNode();
   const config = useConfig();
   const { showToast } = useSimpleToast();
@@ -86,6 +96,11 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
       setIsLiveMode(false);
     }
   }, [isRunning]);
+
+  // Following keeps the newest lines in view. Reading earlier lines pauses
+  // it and holds the shown lines, since a live tail drops its oldest lines.
+  const [following, setFollowing] = useState(true);
+  const [pausedData, setPausedData] = useState<LogWithPagination | null>(null);
 
   // Keep track of previous data to prevent flashing
   const [cachedData, setCachedData] = useState<LogWithPagination | null>(null);
@@ -197,6 +212,33 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
     }
   }, []);
 
+  const latestData = (sseLogData || data || cachedData) as
+    | LogWithPagination
+    | null
+    | undefined;
+  const latestDataRef = useRef(latestData);
+  latestDataRef.current = latestData;
+  const canFollow = viewMode === 'tail' && isLiveMode;
+
+  const pauseFollowing = useCallback(() => {
+    if (!following || !canFollow) return;
+    setFollowing(false);
+    setPausedData(latestDataRef.current ?? null);
+  }, [canFollow, following]);
+
+  const resumeFollowing = useCallback(() => {
+    setPausedData(null);
+    setViewMode('tail');
+    setCurrentPage(1);
+    setFollowing(true);
+  }, []);
+
+  useLayoutEffect(() => {
+    if (following && viewMode === 'tail') {
+      scrollToBottom();
+    }
+  }, [latestData?.content, following, viewMode, scrollToBottom]);
+
   // Handle data loading and navigation state
   useEffect(() => {
     const activeData = sseLogData || data;
@@ -210,16 +252,12 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
         clearTimeout(navigationTimeoutRef.current);
         navigationTimeoutRef.current = null;
       }
-
-      if (viewMode === 'tail') {
-        setTimeout(scrollToBottom, 100);
-      }
     }
 
     if (!isLoading && !activeData && cachedData && !isInitialLoad.current) {
       setIsNavigating(false);
     }
-  }, [data, sseLogData, isLoading, cachedData, viewMode, scrollToBottom]);
+  }, [data, sseLogData, isLoading, cachedData]);
 
   // Track navigation state when view parameters change
   useEffect(() => {
@@ -344,8 +382,10 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
     return <LoadingIndicator />;
   }
 
-  // Prioritize SSE data, then REST data, then cached data
-  const logData = (sseLogData || data || cachedData) as LogWithPagination;
+  // Prioritize held lines while reading, then SSE, REST, and cached data
+  const logData = (pausedData || latestData) as LogWithPagination;
+  const hasNewOutput =
+    !!pausedData && latestData?.content !== pausedData.content;
 
   // Handle error state (but not 404 - that just means no log file exists yet)
   if (error && !logData) {
@@ -532,6 +572,18 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
                 <I18nText text={'LIVE'} />
               </Button>
             )}
+            {!following && (
+              <>
+                {hasNewOutput && (
+                  <span role="status" className="text-xs text-muted-foreground">
+                    <I18nText text={'New output available'} />
+                  </span>
+                )}
+                <Button size="sm" onClick={resumeFollowing}>
+                  <I18nText text="Back to live" />
+                </Button>
+              </>
+            )}
           </div>
         </div>
 
@@ -660,6 +712,30 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
 
       <div
         ref={logContainerRef}
+        role="region"
+        aria-label={ts('Run log')}
+        tabIndex={0}
+        onWheel={(event) => {
+          if (event.deltaY < 0) {
+            pauseFollowing();
+          }
+        }}
+        onPointerDown={pauseFollowing}
+        onTouchStart={pauseFollowing}
+        onKeyDown={(event) => {
+          if (['ArrowUp', 'PageUp', 'Home'].includes(event.key)) {
+            pauseFollowing();
+          }
+        }}
+        onScroll={(event) => {
+          const element = event.currentTarget;
+          if (
+            element.scrollHeight - element.clientHeight - element.scrollTop >
+            TAIL_THRESHOLD_PX
+          ) {
+            pauseFollowing();
+          }
+        }}
         className={`relative flex-1 overflow-auto rounded-lg ${displayMode === 'raw' ? `bg-muted pb-4 pr-4 pt-4 ${preferences.logWrap ? '' : 'overflow-x-auto'}` : 'border border-border bg-card'}`}
       >
         {isNavigating && (
