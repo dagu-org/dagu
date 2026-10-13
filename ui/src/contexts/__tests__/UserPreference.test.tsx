@@ -4,7 +4,11 @@
 import { act, renderHook } from '@testing-library/react';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { UserPreferencesProvider, useUserPreferences } from '../UserPreference';
+import {
+  UserPreferencesProvider,
+  useResolvedTheme,
+  useUserPreferences,
+} from '../UserPreference';
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
   <UserPreferencesProvider>{children}</UserPreferencesProvider>
@@ -122,6 +126,71 @@ describe('UserPreferencesProvider', () => {
     expect(result.current.preferences.pinnedViewOrder).toEqual({
       local: ['reports', 'workflows'],
     });
-    expect(result.current.preferences.theme).toBe('light');
+    expect(result.current.preferences.theme).toBe('system');
+  });
+
+  describe('useResolvedTheme', () => {
+    let prefersDark = false;
+    let notifyChange: (() => void) | undefined;
+
+    beforeEach(() => {
+      prefersDark = false;
+      notifyChange = undefined;
+      vi.stubGlobal(
+        'matchMedia',
+        vi.fn(() => ({
+          get matches() {
+            return prefersDark;
+          },
+          addEventListener: (_: string, listener: () => void) => {
+            notifyChange = listener;
+          },
+          removeEventListener: vi.fn(),
+        }))
+      );
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    const useThemeState = () => ({
+      resolved: useResolvedTheme(),
+      ...useUserPreferences(),
+    });
+
+    it('follows the operating system by default', () => {
+      const { result } = renderHook(useThemeState, { wrapper });
+      expect(result.current.preferences.theme).toBe('system');
+      expect(result.current.resolved).toBe('light');
+
+      act(() => {
+        prefersDark = true;
+        notifyChange?.();
+      });
+      expect(result.current.resolved).toBe('dark');
+    });
+
+    it('uses an explicit choice over the operating system', () => {
+      prefersDark = true;
+      const { result } = renderHook(useThemeState, { wrapper });
+
+      act(() => result.current.updatePreference('theme', 'light'));
+
+      expect(result.current.resolved).toBe('light');
+    });
+
+    it('treats an unknown saved theme as system', () => {
+      prefersDark = true;
+      localStorage.setItem(
+        'user_preferences',
+        JSON.stringify({ theme: 'sepia' })
+      );
+
+      const { result } = renderHook(useThemeState, { wrapper });
+
+      expect(result.current.preferences.theme).toBe('system');
+      expect(result.current.resolved).toBe('dark');
+    });
   });
 });

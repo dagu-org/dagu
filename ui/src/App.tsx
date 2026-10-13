@@ -27,7 +27,7 @@ import { SchemaProvider } from './contexts/SchemaContext';
 import { SearchStateProvider } from './contexts/SearchStateContext';
 import {
   UserPreferencesProvider,
-  useUserPreferences,
+  useResolvedTheme,
 } from './contexts/UserPreference';
 import Layout from './layouts/Layout';
 import fetchJson from './lib/fetchJson';
@@ -333,8 +333,7 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
   }, []);
 
   const [title, setTitle] = React.useState<string>('');
-  const { preferences } = useUserPreferences();
-  const theme = preferences.theme || 'dark';
+  const theme = useResolvedTheme();
 
   const [remoteNodes, setRemoteNodes] = React.useState<string[]>(() =>
     parseRemoteNodes(config.remoteNodes)
@@ -580,6 +579,7 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
 
   React.useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
+    document.documentElement.style.colorScheme = theme;
     document.documentElement.style.backgroundColor = 'var(--background)';
   }, [theme]);
 

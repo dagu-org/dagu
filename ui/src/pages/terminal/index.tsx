@@ -1,7 +1,7 @@
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { TOKEN_KEY, useAuth, useIsAdmin } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
-import { useUserPreferences } from '@/contexts/UserPreference';
+import { useResolvedTheme } from '@/contexts/UserPreference';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { Terminal } from '@xterm/xterm';
@@ -69,8 +69,7 @@ export default function TerminalPage() {
     useState<ConnectionStatus>('disconnected');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const { preferences } = useUserPreferences();
-  const theme = preferences.theme || 'dark';
+  const theme = useResolvedTheme();
 
   // Set page title on mount
   useEffect(() => {

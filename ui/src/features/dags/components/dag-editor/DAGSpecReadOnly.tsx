@@ -24,7 +24,7 @@ import { useErrorModal } from '@/components/ui/error-modal';
 import { useSimpleToast } from '@/components/ui/simple-toast';
 import { useCanWrite } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
-import { useUserPreferences } from '@/contexts/UserPreference';
+import { useResolvedTheme } from '@/contexts/UserPreference';
 import { cn } from '@/lib/utils';
 import { RefreshCw, Save, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -884,8 +884,7 @@ function SourceDAGDiffDialog({
   saving: boolean;
   onSave: () => void;
 }) {
-  const preferencesContext = useUserPreferences();
-  const isDarkMode = preferencesContext?.preferences.theme === 'dark';
+  const isDarkMode = useResolvedTheme() === 'dark';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

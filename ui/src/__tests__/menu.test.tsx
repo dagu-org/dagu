@@ -198,9 +198,9 @@ describe('sidebar menu', () => {
       'href',
       '/administration'
     );
-    expect(
-      screen.getByRole('button', { name: '深色模式' })
-    ).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: '主题' })).toHaveTextContent(
+      '跟随系统'
+    );
   });
 
   it('keeps the compact language selector within its trigger', () => {

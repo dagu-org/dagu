@@ -37,6 +37,7 @@ vi.mock('@/contexts/AuthContext', () => ({
 
 vi.mock('@/contexts/UserPreference', () => ({
   useUserPreferences: () => ({ preferences: { theme: 'light' } }),
+  useResolvedTheme: () => 'light',
 }));
 
 vi.mock('@/contexts/ConfigContext', () => ({

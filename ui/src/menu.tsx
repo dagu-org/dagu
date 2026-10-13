@@ -38,12 +38,10 @@ import {
   Globe,
   GripVertical,
   History,
-  Moon,
   Network,
   PanelLeft,
   SlidersHorizontal,
   Star,
-  Sun,
   Webhook,
 } from 'lucide-react';
 import * as React from 'react';
@@ -51,6 +49,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { AppBarContext } from './contexts/AppBarContext';
 import { useViews } from '@/hooks/useViews';
 import { useUserPreferences } from './contexts/UserPreference';
+import { ThemeSelector } from './components/ThemeSelector';
 import { WorkspaceSelector } from './components/workspace/WorkspaceSelector';
 import { LanguageSelector } from './components/LanguageSelector';
 import { useI18n } from './i18n/I18nProvider';
@@ -124,48 +123,6 @@ function RemoteNodeSelectContent({
         </SelectItem>
       ))}
     </SelectContent>
-  );
-}
-
-type SidebarButtonProps = {
-  onClick: () => void;
-  icon: React.ReactNode;
-  label: string;
-  isOpen: boolean;
-};
-
-// Developer-tool Sidebar Button - Clean & Minimal
-function SidebarButton({
-  onClick,
-  icon,
-  label,
-  isOpen,
-}: SidebarButtonProps): React.ReactElement {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        'flex items-center gap-3 w-full p-2 rounded-md group',
-        sidebarItemClassName
-      )}
-      title={isOpen ? '' : label}
-    >
-      <div className="flex items-center justify-center flex-shrink-0 text-sidebar-foreground">
-        {icon}
-      </div>
-      <span
-        className="text-sm font-medium text-sidebar-foreground whitespace-nowrap overflow-hidden"
-        style={{
-          transition:
-            'opacity 200ms cubic-bezier(0.4, 0, 0.2, 1), transform 200ms cubic-bezier(0.4, 0, 0.2, 1), max-width 280ms cubic-bezier(0.4, 0, 0.2, 1)',
-          opacity: isOpen ? 1 : 0,
-          maxWidth: isOpen ? '180px' : '0px',
-          transform: isOpen ? 'translateX(0)' : 'translateX(-8px)',
-        }}
-      >
-        {label}
-      </span>
-    </button>
   );
 }
 
@@ -669,16 +626,10 @@ export const mainListItems = React.forwardRef<
   const canManageProfiles = useCanManageProfiles();
   const canViewEventLogs = useCanViewEventLogs();
   const canViewAuditLogs = useCanViewAuditLogs();
-  const { preferences, updatePreference } = useUserPreferences();
   const { t } = useI18n();
 
-  const theme = preferences.theme || 'dark';
   const title = config.title || DEFAULT_TITLE;
   const titleInitial = getTitleInitial(title);
-
-  function toggleTheme(): void {
-    updatePreference('theme', theme === 'dark' ? 'light' : 'dark');
-  }
 
   return (
     <div ref={ref} className="flex flex-col h-full">
@@ -1170,14 +1121,7 @@ export const mainListItems = React.forwardRef<
             !isOpen && 'flex flex-col items-center gap-1.5'
           )}
         >
-          <SidebarButton
-            onClick={toggleTheme}
-            icon={theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-            label={
-              theme === 'dark' ? t('theme.lightMode') : t('theme.darkMode')
-            }
-            isOpen={isOpen}
-          />
+          <ThemeSelector compact={!isOpen} />
           <LanguageSelector variant="sidebar" compact={!isOpen} />
           <UserMenu isCollapsed={!isOpen} />
         </div>

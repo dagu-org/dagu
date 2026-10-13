@@ -91,13 +91,15 @@ test('shows activation, benefits, and deactivation on desktop and mobile', async
     path: testInfo.outputPath('license-active-desktop.png'),
     fullPage: true,
   });
-  await sidebar.getByRole('button', { name: 'Dark Mode' }).click();
+  await sidebar.getByRole('combobox', { name: 'Theme' }).click();
+  await page.getByRole('option', { name: 'Dark' }).click();
   await expect(page.locator('html')).toHaveClass(/dark/);
   await page.screenshot({
     path: testInfo.outputPath('license-active-dark.png'),
     fullPage: true,
   });
-  await sidebar.getByRole('button', { name: 'Light Mode' }).click();
+  await sidebar.getByRole('combobox', { name: 'Theme' }).click();
+  await page.getByRole('option', { name: 'Light' }).click();
   await badge.focus();
   await expect(page.getByRole('tooltip')).toContainText('Team · Active');
   await page.keyboard.press('Escape');
