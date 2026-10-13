@@ -180,7 +180,7 @@ describe('DAGDetails page', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('location')).toHaveTextContent(
-        '/dag-runs/release-notes/run-7?remoteNode=local&subDAGRunId=child-2&dagRunId=run-7&dagRunName=release-notes&step=deploy'
+        '/dag-runs/release-notes/run-7?remoteNode=local&subDAGRunId=child-2&dagRunId=run-7&dagRunName=release-notes'
       );
     });
   });

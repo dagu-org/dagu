@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import React, { useCallback, useContext, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { AppBarContext } from '../../../contexts/AppBarContext';
 import { RemoteNodeProvider } from '../../../contexts/RemoteNodeContext';
 import { DAGRunDetailsContent } from '../../../features/dag-runs/components/dag-run-details';
@@ -17,6 +17,8 @@ import {
 import { useI18n } from '@/i18n/I18nProvider';
 import { I18nTemplate } from '@/i18n/I18nTemplate';
 import { isNotFoundQueryError } from '@/lib/queryErrors';
+import type { StatusTab } from '@/features/dags/components/DAGStatus';
+import { parseStatusTab } from '@/features/dags/lib/statusTabs';
 
 type ErrorDisplayProps = {
   error: unknown;
@@ -62,8 +64,47 @@ function DAGRunDetailsPage() {
   const { name, dagRunId = 'latest' } = useParams();
   const appBarContext = useContext(AppBarContext);
 
-  const searchParams = new URLSearchParams(window.location.search);
+  const [searchParams, setSearchParams] = useSearchParams();
   const subDAGRunId = searchParams.get('subDAGRunId');
+  // Without a tab in the URL the run picks one, such as a waiting approval,
+  // so only a tab the user picked is written back.
+  const urlTab = parseStatusTab(searchParams.get('tab')) ?? 'status';
+  const urlStep = searchParams.get('step') ?? undefined;
+  const handleTabSelect = useCallback(
+    (tab: StatusTab) => {
+      setSearchParams(
+        (current) => {
+          const next = new URLSearchParams(current);
+          if (tab === 'status') {
+            next.delete('tab');
+          } else {
+            next.set('tab', tab);
+          }
+          next.delete('step');
+          return next;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
+  const handleStepSelect = useCallback(
+    (stepName: string | undefined) => {
+      setSearchParams(
+        (current) => {
+          const next = new URLSearchParams(current);
+          if (stepName) {
+            next.set('step', stepName);
+          } else {
+            next.delete('step');
+          }
+          return next;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
   const parentDAGRunId = searchParams.get('dagRunId');
   const parentName = searchParams.get('dagRunName') || name;
 
@@ -158,6 +199,10 @@ function DAGRunDetailsPage() {
             refreshFn={refreshFn}
             dagRunId={displayDAGRunId}
             fillHeight
+            initialTab={urlTab}
+            onTabSelect={handleTabSelect}
+            initialStepName={urlStep}
+            onStepSelect={handleStepSelect}
           />
         </DAGRunContext.Provider>
       </RemoteNodeProvider>

@@ -513,6 +513,72 @@ describe('DAGStatus', () => {
     ).not.toBeInTheDocument();
   });
 
+  describe('URL state', () => {
+    function renderWithURLState(
+      selectedRun: components['schemas']['DAGRunDetails'],
+      props: Partial<React.ComponentProps<typeof DAGStatus>>
+    ) {
+      vi.mocked(useClient).mockReturnValue({
+        PATCH: patchMock,
+      } as unknown as ReturnType<typeof useClient>);
+      return render(
+        <MemoryRouter>
+          <AppBarContext.Provider value={appBarValue}>
+            <DAGContext.Provider
+              value={{
+                refresh: vi.fn(),
+                name: selectedRun.name,
+                fileName: 'example.yaml',
+              }}
+            >
+              <DAGStatus
+                dagRun={selectedRun}
+                fileName="example.yaml"
+                {...props}
+              />
+            </DAGContext.Provider>
+          </AppBarContext.Provider>
+        </MemoryRouter>
+      );
+    }
+
+    // Writing an automatic switch into the URL would pin it there, so a
+    // later visit could not surface a newer action.
+    it('reports tabs the user picks but not automatic switches', () => {
+      const onTabSelect = vi.fn();
+      renderWithURLState(waitingHumanTaskRun('run-1'), { onTabSelect });
+
+      expect(screen.getByText('Human task panel')).toBeVisible();
+      expect(onTabSelect).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Outputs' }));
+      expect(onTabSelect).toHaveBeenCalledWith('outputs');
+    });
+
+    it('opens the details of a step named on load and reports closing them', async () => {
+      const onStepSelect = vi.fn();
+      renderWithURLState(dagRun, { initialStepName: 'step', onStepSelect });
+
+      const drawer = await screen.findByRole('dialog', { name: 'step' });
+      expect(drawer).toBeVisible();
+
+      fireEvent.keyDown(drawer, { key: 'Escape' });
+      expect(onStepSelect).toHaveBeenLastCalledWith(undefined);
+    });
+
+    it('reports a step opened from the graph', async () => {
+      const onStepSelect = vi.fn();
+      renderWithURLState(dagRun, { onStepSelect });
+
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Open step details' })
+      );
+
+      expect(await screen.findByRole('dialog', { name: 'step' })).toBeVisible();
+      expect(onStepSelect).toHaveBeenCalledWith('step');
+    });
+  });
+
   it('shows the failure and opens stderr from the step drawer', async () => {
     const failedRun = {
       ...dagRun,

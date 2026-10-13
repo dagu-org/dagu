@@ -78,6 +78,12 @@ type Props = {
    * link to the run page for the other run views.
    */
   summary?: boolean;
+  /** Called when the user picks a tab; automatic switches do not call it. */
+  onTabSelect?: (tab: StatusTab) => void;
+  /** Step whose details open on load, such as one named in the URL. */
+  initialStepName?: string;
+  /** Called with the step whose details open, or undefined when they close. */
+  onStepSelect?: (stepName: string | undefined) => void;
 };
 
 export type StatusTab =
@@ -153,6 +159,9 @@ function DAGStatus({
   onTabChange,
   fillHeight = false,
   summary = false,
+  onTabSelect,
+  initialStepName,
+  onStepSelect,
 }: Props) {
   const { ts } = useI18n();
   const dagContext = React.useContext(DAGContext);
@@ -176,6 +185,11 @@ function DAGStatus({
     if (nextTab !== activeTab) {
       onTabChange?.(nextTab);
     }
+  }
+
+  function selectTab(tab: StatusTab): void {
+    setActiveTab(tab);
+    onTabSelect?.(tab);
   }
 
   useEffect(() => {
@@ -204,15 +218,42 @@ function DAGStatus({
   >(undefined);
   const [isStepDetailsOpen, setIsStepDetailsOpen] = useState(false);
 
+  // Held in a ref so a parent's inline callback does not churn the
+  // callbacks below.
+  const onStepSelectRef = React.useRef(onStepSelect);
+  onStepSelectRef.current = onStepSelect;
+
   const closeStepDetails = React.useCallback(() => {
     setIsStepDetailsOpen(false);
+    onStepSelectRef.current?.(undefined);
   }, []);
+
+  const openStepDetails = React.useCallback((stepName: string) => {
+    setSelectedDetailStepName(stepName);
+    setIsStepDetailsOpen(true);
+    onStepSelectRef.current?.(stepName);
+  }, []);
+
+  // A step named on load opens once the run lists it.
+  const initialStepOpened = React.useRef(false);
+  useEffect(() => {
+    if (
+      initialStepOpened.current ||
+      !initialStepName ||
+      !dagRun.nodes?.some((node) => node.step.name === initialStepName)
+    ) {
+      return;
+    }
+    initialStepOpened.current = true;
+    setSelectedDetailStepName(initialStepName);
+    setIsStepDetailsOpen(true);
+  }, [dagRun.nodes, initialStepName]);
 
   useEffect(() => {
     if (activeTab !== 'status') {
-      closeStepDetails();
+      setIsStepDetailsOpen(false);
     }
-  }, [activeTab, closeStepDetails]);
+  }, [activeTab]);
 
   // State for log viewer
   const [logViewer, setLogViewer] = useState<{
@@ -340,10 +381,9 @@ function DAGStatus({
       if (!n) {
         return;
       }
-      setSelectedDetailStepName(n.step.name);
-      setIsStepDetailsOpen(true);
+      openStepDetails(n.step.name);
     },
-    [displayDAGRun]
+    [displayDAGRun, openStepDetails]
   );
 
   const selectedDetailNode = React.useMemo(
@@ -408,7 +448,6 @@ function DAGStatus({
           rootDAGRunName: displayDAGRun.rootDAGRunName || displayDAGRun.name,
           rootDAGRunId: displayDAGRun.rootDAGRunId || displayDAGRun.dagRunId,
           subDAGRunId: subDAGRun.dagRunId,
-          step: node.step.name,
           remoteNode,
         });
 
@@ -632,7 +671,7 @@ function DAGStatus({
                   <Tab
                     aria-label="Status"
                     isActive={activeTab === 'status'}
-                    onClick={() => setActiveTab('status')}
+                    onClick={() => selectTab('status')}
                     className="flex cursor-pointer items-center gap-2 px-3 sm:px-4"
                   >
                     <ActivitySquare className="h-4 w-4" />
@@ -646,7 +685,7 @@ function DAGStatus({
                     <Tab
                       aria-label="Agent"
                       isActive={activeTab === 'agent'}
-                      onClick={() => setActiveTab('agent')}
+                      onClick={() => selectTab('agent')}
                       className="flex cursor-pointer items-center gap-2 px-3 sm:px-4"
                     >
                       <Bot className="h-4 w-4" />
@@ -666,7 +705,7 @@ function DAGStatus({
                     <Tab
                       aria-label="Human tasks"
                       isActive={activeTab === 'human-tasks'}
-                      onClick={() => setActiveTab('human-tasks')}
+                      onClick={() => selectTab('human-tasks')}
                       className="flex cursor-pointer items-center gap-2 px-3 sm:px-4"
                     >
                       <ClipboardCheck className="h-4 w-4" />
@@ -686,7 +725,7 @@ function DAGStatus({
                     <Tab
                       aria-label="Approval"
                       isActive={activeTab === 'approval'}
-                      onClick={() => setActiveTab('approval')}
+                      onClick={() => selectTab('approval')}
                       className="flex cursor-pointer items-center gap-2 px-3 sm:px-4"
                     >
                       <ShieldCheck className="h-4 w-4" />
@@ -704,7 +743,7 @@ function DAGStatus({
                     <Tab
                       aria-label="Timeline"
                       isActive={activeTab === 'timeline'}
-                      onClick={() => setActiveTab('timeline')}
+                      onClick={() => selectTab('timeline')}
                       className="flex cursor-pointer items-center gap-2 px-3 sm:px-4"
                     >
                       <GanttChart className="h-4 w-4" />
@@ -718,7 +757,7 @@ function DAGStatus({
                   <Tab
                     aria-label="Outputs"
                     isActive={activeTab === 'outputs'}
-                    onClick={() => setActiveTab('outputs')}
+                    onClick={() => selectTab('outputs')}
                     className="flex cursor-pointer items-center gap-2 px-3 sm:px-4"
                   >
                     <Package className="h-4 w-4" />
@@ -732,7 +771,7 @@ function DAGStatus({
                     <Tab
                       aria-label="Artifacts"
                       isActive={activeTab === 'artifacts'}
-                      onClick={() => setActiveTab('artifacts')}
+                      onClick={() => selectTab('artifacts')}
                       className="flex cursor-pointer items-center gap-2 px-3 sm:px-4"
                     >
                       <Archive className="h-4 w-4" />
@@ -747,7 +786,7 @@ function DAGStatus({
                     <Tab
                       aria-label="Tasks"
                       isActive={activeTab === 'tasks'}
-                      onClick={() => setActiveTab('tasks')}
+                      onClick={() => selectTab('tasks')}
                       className="flex cursor-pointer items-center gap-2 px-3 sm:px-4"
                     >
                       <ListChecks className="h-4 w-4" />
@@ -762,7 +801,7 @@ function DAGStatus({
                     <Tab
                       aria-label="Chat"
                       isActive={activeTab === 'chat'}
-                      onClick={() => setActiveTab('chat')}
+                      onClick={() => selectTab('chat')}
                       className="flex cursor-pointer items-center gap-2 px-3 sm:px-4"
                     >
                       <MessageSquare className="h-4 w-4" />
@@ -776,7 +815,7 @@ function DAGStatus({
                   <Tab
                     aria-label="Spec"
                     isActive={activeTab === 'spec'}
-                    onClick={() => setActiveTab('spec')}
+                    onClick={() => selectTab('spec')}
                     className="flex cursor-pointer items-center gap-2 px-3 sm:px-4"
                   >
                     <FileCode className="h-4 w-4" />

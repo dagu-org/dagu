@@ -505,7 +505,6 @@ function NodeStatusTableRow({
           : dagRun?.name || name,
         rootDAGRunId: dagRun?.rootDAGRunId || dagRunId || '',
         subDAGRunId,
-        step: node.step.name,
         remoteNode,
       });
       if (modifierClick) {

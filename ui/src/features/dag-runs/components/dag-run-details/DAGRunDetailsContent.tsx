@@ -17,6 +17,9 @@ type DAGRunDetailsContentProps = {
   activeTab?: StatusTab;
   onTabChange?: (tab: StatusTab) => void;
   fillHeight?: boolean;
+  onTabSelect?: (tab: StatusTab) => void;
+  initialStepName?: string;
+  onStepSelect?: (stepName: string | undefined) => void;
 };
 
 const DAGRunDetailsContent: React.FC<DAGRunDetailsContentProps> = ({
@@ -28,6 +31,9 @@ const DAGRunDetailsContent: React.FC<DAGRunDetailsContentProps> = ({
   activeTab,
   onTabChange,
   fillHeight = false,
+  onTabSelect,
+  initialStepName,
+  onStepSelect,
 }) => {
   const remoteNode = useRemoteNode();
   const isSubDAGRun =
@@ -77,6 +83,9 @@ const DAGRunDetailsContent: React.FC<DAGRunDetailsContentProps> = ({
             activeTab={activeTab}
             onTabChange={onTabChange}
             fillHeight={fillHeight}
+            onTabSelect={onTabSelect}
+            initialStepName={initialStepName}
+            onStepSelect={onStepSelect}
           />
         </div>
       </div>
