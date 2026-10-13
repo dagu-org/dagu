@@ -57,7 +57,7 @@ func TestComputerCacheShow(t *testing.T) {
 		{"step": "post", "op": 1, "kind": "act", "system": "windows", "saved_at": "2026-10-01T09:00:00Z",
 		 "recorded": [{"key": "ctrl+s"}]},
 		{"step": "post", "op": 2, "kind": "act", "system": "windows",
-		 "unpinnable": [{"turn": 1, "action": "drag from 1,2 to 3,4", "reason": "a drag has no pinned form"}]},
+		 "unpinnable": [{"turn": 1, "action": "drag from 1,2 to 3,4", "code": "drag", "reason": "a drag has no pinned form"}]},
 		{"step": "post", "op": 3, "kind": "extract", "system": "windows",
 		 "fields": {"amount": {"app": "expense", "role": "text_field", "id": "amountBox"}}}
 	]}`, out)

@@ -473,7 +473,10 @@ with its turn and why, instead of steps, since a pin that skipped an action
 would report success without doing the task. An extract's bindings become
 its fields. `--format json` prints `{"operations": [...]}`, each with
 `step`, `op`, `kind`, `system`, `saved_at`, and `recorded`, `fields`, or
-`unpinnable`.
+`unpinnable`, whose items carry `turn`, `action`, `reason`, and a `code` for
+a program: `no_element`, `edge_click`, `click_with_keys`, `click`,
+`no_field`, `keys`, `edge_scroll`, `scroll`, `move`, `drag`, `hold_key`,
+`button`, or `unsupported`.
 
 ### Elements
 

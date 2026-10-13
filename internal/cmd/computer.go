@@ -173,7 +173,7 @@ other parameters, has a recording for each; the newest comes first.
 
 With --format json, the result is one JSON object holding operations, each
 with step, op, kind, system, saved_at, and either recorded, fields, or
-unpinnable.
+unpinnable, whose items carry turn, action, code, and reason.
 
 Examples:
   dagu computer cache show invoices                        # Every step

@@ -36,12 +36,47 @@ type PinnedOperation struct {
 	Unpinnable []UnpinnableAction `json:"unpinnable,omitempty"`
 }
 
-// UnpinnableAction is a recorded action with no pinned form and why.
+// UnpinnableAction is a recorded action with no pinned form and why: Code
+// for a program to act on, and Reason for a person to read.
 type UnpinnableAction struct {
 	// Turn is the recorded turn the action belongs to, counted from 1.
 	Turn   int    `json:"turn"`
 	Action string `json:"action"`
+	Code   string `json:"code"`
 	Reason string `json:"reason"`
+}
+
+// Codes of why a recorded action has no pinned form.
+const (
+	unpinnableNoElement     = "no_element"
+	unpinnableEdgeClick     = "edge_click"
+	unpinnableClickWithKeys = "click_with_keys"
+	unpinnableClick         = "click"
+	unpinnableNoField       = "no_field"
+	unpinnableKeys          = "keys"
+	unpinnableEdgeScroll    = "edge_scroll"
+	unpinnableScroll        = "scroll"
+	unpinnableMove          = "move"
+	unpinnableDrag          = "drag"
+	unpinnableHoldKey       = "hold_key"
+	unpinnableButton        = "button"
+	unpinnableUnsupported   = "unsupported"
+)
+
+// unpinnableReasons words each code for a person.
+var unpinnableReasons = map[string]string{
+	unpinnableNoElement:     "no element could be read where it landed",
+	unpinnableEdgeClick:     "the click landed near the edge of its element, and a pin clicks its centre",
+	unpinnableClickWithKeys: "a click holding keys has no pinned form",
+	unpinnableClick:         "only a single or double left click and a single right click have a pinned form",
+	unpinnableNoField:       "the field it typed into could not be read",
+	unpinnableKeys:          "the keys cannot be written as a chord such as ctrl+s",
+	unpinnableEdgeScroll:    "the scroll landed near the edge of its element, and a pin scrolls at its centre",
+	unpinnableScroll:        "only a plain vertical scroll has a pinned form",
+	unpinnableMove:          "moving the pointer alone, such as to open a menu by hovering, has no pinned form",
+	unpinnableDrag:          "a drag has no pinned form",
+	unpinnableHoldKey:       "holding keys has no pinned form",
+	unpinnableButton:        "pressing or releasing a mouse button alone has no pinned form",
 }
 
 // PinRecording converts one entry of a step's replay cache into its pinned
@@ -94,9 +129,13 @@ func pinAct(turns []recordedTurn) ([]pinnedStep, []UnpinnableAction) {
 			// A pointer step moves the pointer onto its element itself.
 			continue
 		}
-		pinned, reason := pinAction(rec.recordedAction)
-		if reason != "" {
-			unpinnable = append(unpinnable, UnpinnableAction{Turn: rec.turn, Action: describeAction(rec.Action), Reason: reason})
+		pinned, code := pinAction(rec.recordedAction)
+		if code != "" {
+			reason, ok := unpinnableReasons[code]
+			if !ok {
+				reason = string(rec.Action.Kind) + " has no pinned form"
+			}
+			unpinnable = append(unpinnable, UnpinnableAction{Turn: rec.turn, Action: describeAction(rec.Action), Code: code, Reason: reason})
 			continue
 		}
 		steps = append(steps, pinned...)
@@ -116,20 +155,21 @@ func sameTarget(move, next recordedAction) bool {
 	return move.Element.App == next.Element.App && move.Element.Selector == next.Element.Selector
 }
 
-// pinAction converts one recorded action into pinned steps, or says why it
-// has no pinned form. A wait of no time converts into no steps.
+// pinAction converts one recorded action into pinned steps, or returns the
+// code of why it has no pinned form. A wait of no time converts into no
+// steps.
 func pinAction(rec recordedAction) ([]pinnedStep, string) {
 	action := rec.Action
 	switch action.Kind {
 	case computeruse.KindClick:
 		if rec.Element == nil {
-			return nil, "no element could be read where it landed"
+			return nil, unpinnableNoElement
 		}
 		if offCentre(*rec.Element) {
-			return nil, "the click landed near the edge of its element, and a pin clicks its centre"
+			return nil, unpinnableEdgeClick
 		}
 		if len(action.Modifiers) > 0 {
-			return nil, "a click holding keys has no pinned form"
+			return nil, unpinnableClickWithKeys
 		}
 		sel := pinnedSelector(*rec.Element)
 		left := action.Button == "" || action.Button == computeruse.ButtonLeft
@@ -141,16 +181,16 @@ func pinAction(rec recordedAction) ([]pinnedStep, string) {
 		case action.Button == computeruse.ButtonRight && action.Count <= 1:
 			return []pinnedStep{{RightClick: &sel}}, ""
 		}
-		return nil, "only a single or double left click and a single right click have a pinned form"
+		return nil, unpinnableClick
 	case computeruse.KindType:
 		if rec.Element == nil {
-			return nil, "the field it typed into could not be read"
+			return nil, unpinnableNoField
 		}
 		return []pinnedStep{{Type: &pinnedType{Into: pinnedSelector(*rec.Element), Text: action.Text}}}, ""
 	case computeruse.KindKey:
 		step := pinnedStep{Key: strings.Join(action.Keys, "+")}
 		if step.validate() != nil {
-			return nil, "the keys cannot be written as a chord such as ctrl+s"
+			return nil, unpinnableKeys
 		}
 		steps := slices.Repeat([]pinnedStep{step}, max(action.Repeat, 1))
 		if rec.Element != nil {
@@ -162,13 +202,13 @@ func pinAction(rec recordedAction) ([]pinnedStep, string) {
 		return steps, ""
 	case computeruse.KindScroll:
 		if rec.Element == nil {
-			return nil, "no element could be read where it landed"
+			return nil, unpinnableNoElement
 		}
 		if offCentre(*rec.Element) {
-			return nil, "the scroll landed near the edge of its element, and a pin scrolls at its centre"
+			return nil, unpinnableEdgeScroll
 		}
 		if action.ScrollX != 0 || len(action.Modifiers) > 0 {
-			return nil, "only a plain vertical scroll has a pinned form"
+			return nil, unpinnableScroll
 		}
 		return []pinnedStep{{Scroll: &pinnedScroll{On: pinnedSelector(*rec.Element), Dy: action.ScrollY}}}, ""
 	case computeruse.KindWait:
@@ -177,15 +217,15 @@ func pinAction(rec recordedAction) ([]pinnedStep, string) {
 		}
 		return []pinnedStep{{Wait: min(action.Duration, maxActionPause).String()}}, ""
 	case computeruse.KindMove:
-		return nil, "moving the pointer alone, such as to open a menu by hovering, has no pinned form"
+		return nil, unpinnableMove
 	case computeruse.KindDrag:
-		return nil, "a drag has no pinned form"
+		return nil, unpinnableDrag
 	case computeruse.KindHoldKey:
-		return nil, "holding keys has no pinned form"
+		return nil, unpinnableHoldKey
 	case computeruse.KindMouseDown, computeruse.KindMouseUp:
-		return nil, "pressing or releasing a mouse button alone has no pinned form"
+		return nil, unpinnableButton
 	}
-	return nil, string(action.Kind) + " has no pinned form"
+	return nil, unpinnableUnsupported
 }
 
 // maxCentreOffset is how far from its element's centre, as a share of the
