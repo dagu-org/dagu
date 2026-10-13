@@ -39,6 +39,7 @@ import { I18nText } from '@/i18n/I18nText';
 import { I18nProps } from '@/i18n/I18nProps';
 import { useI18n } from '@/i18n/I18nProvider';
 import { LogChunks } from './LogChunks';
+import { LogViewModeSwitch } from './LogViewModeSwitch';
 
 const TAIL_THRESHOLD_PX = 4;
 const SSE_TAIL_LINES = 1000;
@@ -564,34 +565,12 @@ function StepLogContent({
               ))}
             </ToggleGroup>
           )}
-          {/* Responsive button container */}
           {showNavigation && (
-            <div className="flex flex-wrap gap-1">
-              <Button
-                size="sm"
-                variant={viewMode === 'tail' ? 'primary' : 'default'}
-                onClick={() => handleViewModeChange('tail')}
-                disabled={isNavigating}
-              >
-                <I18nText text={'Show end'} />
-              </Button>
-              <Button
-                size="sm"
-                variant={viewMode === 'head' ? 'primary' : 'default'}
-                onClick={() => handleViewModeChange('head')}
-                disabled={isNavigating}
-              >
-                <I18nText text={'Show beginning'} />
-              </Button>
-              <Button
-                size="sm"
-                variant={viewMode === 'page' ? 'primary' : 'default'}
-                onClick={() => handleViewModeChange('page')}
-                disabled={isNavigating}
-              >
-                <I18nText text={'Page View'} />
-              </Button>
-            </div>
+            <LogViewModeSwitch
+              value={viewMode}
+              onChange={handleViewModeChange}
+              disabled={isNavigating}
+            />
           )}
 
           {showNavigation && (

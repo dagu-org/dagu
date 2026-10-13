@@ -36,6 +36,8 @@ import { I18nText } from '@/i18n/I18nText';
 import { I18nProps } from '@/i18n/I18nProps';
 import { useI18n } from '@/i18n/I18nProvider';
 import { LogChunks } from './LogChunks';
+import { LogViewModeSwitch } from './LogViewModeSwitch';
+import { ToggleButton, ToggleGroup } from '@/components/ui/toggle-group';
 
 // Largest tail size streamed over SSE; larger page sizes fall back to REST
 // polling so a live stream does not push very large payloads on every update.
@@ -447,53 +449,32 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
       {/* Controls for log navigation */}
       <div className="mb-2 flex flex-col gap-2 rounded bg-muted p-3">
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex gap-1">
-            <Button
-              size="sm"
-              variant={displayMode === 'activity' ? 'primary' : 'default'}
+          <ToggleGroup aria-label={ts('Log display')} className="p-0.5">
+            <ToggleButton
+              value="activity"
+              groupValue={displayMode}
               onClick={() => setDisplayMode('activity')}
-              aria-pressed={displayMode === 'activity'}
+              className="h-7 px-2.5"
             >
-              <I18nText text={'Activity'} />
-            </Button>
-            <Button
-              size="sm"
-              variant={displayMode === 'raw' ? 'primary' : 'default'}
+              {ts('Activity')}
+            </ToggleButton>
+            <ToggleButton
+              value="raw"
+              groupValue={displayMode}
               onClick={() => setDisplayMode('raw')}
-              aria-pressed={displayMode === 'raw'}
+              className="h-7 px-2.5"
             >
-              <I18nText text={'Raw'} />
-            </Button>
-          </div>
+              {ts('Raw')}
+            </ToggleButton>
+          </ToggleGroup>
 
           {showNavigation && (
             <>
-              <div className="flex flex-wrap gap-1">
-                <Button
-                  size="sm"
-                  variant={viewMode === 'tail' ? 'primary' : 'default'}
-                  onClick={() => handleViewModeChange('tail')}
-                  disabled={isNavigating}
-                >
-                  <I18nText text={'Show end'} />
-                </Button>
-                <Button
-                  size="sm"
-                  variant={viewMode === 'head' ? 'primary' : 'default'}
-                  onClick={() => handleViewModeChange('head')}
-                  disabled={isNavigating}
-                >
-                  <I18nText text={'Show beginning'} />
-                </Button>
-                <Button
-                  size="sm"
-                  variant={viewMode === 'page' ? 'primary' : 'default'}
-                  onClick={() => handleViewModeChange('page')}
-                  disabled={isNavigating}
-                >
-                  <I18nText text={'Page View'} />
-                </Button>
-              </div>
+              <LogViewModeSwitch
+                value={viewMode}
+                onChange={handleViewModeChange}
+                disabled={isNavigating}
+              />
 
               <LogPageSizeSelect
                 pageSize={pageSize}

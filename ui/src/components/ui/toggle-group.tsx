@@ -84,6 +84,7 @@ type ToggleButtonProps = {
   'aria-label'?: string;
   title?: string;
   position?: 'first' | 'middle' | 'last' | 'single';
+  disabled?: boolean;
 };
 
 export function ToggleButton({
@@ -94,6 +95,7 @@ export function ToggleButton({
   className,
   'aria-label': ariaLabel,
   title,
+  disabled,
 }: ToggleButtonProps): React.ReactElement {
   const isSelected = groupValue === value;
 
@@ -101,13 +103,14 @@ export function ToggleButton({
     <button
       type="button"
       className={cn(
-        'inline-flex items-center justify-center h-8 px-3 text-xs font-medium transition-colors rounded-md cursor-pointer',
+        'inline-flex items-center justify-center h-8 px-3 text-xs font-medium transition-colors rounded-md cursor-pointer disabled:cursor-not-allowed disabled:opacity-50',
         isSelected
           ? 'bg-card text-foreground shadow-sm dark:bg-accent'
           : 'text-muted-foreground hover:text-foreground',
         className
       )}
       onClick={onClick}
+      disabled={disabled}
       aria-pressed={isSelected}
       aria-label={ariaLabel}
       title={title}
