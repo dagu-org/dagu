@@ -4501,14 +4501,16 @@ func (a *API) getDAGRunLogsData(ctx context.Context, identifier string) (DAGRunL
 	}, nil
 }
 
-// GetStepLogData returns step log for SSE.
+// GetStepLogData returns the stdout log of a step for SSE.
 // Identifier format: "dagName/dagRunId/stepName"
 func (a *API) GetStepLogData(ctx context.Context, identifier string) (any, error) {
 	parts := strings.SplitN(identifier, "/", 3)
 	if len(parts) != 3 {
 		return nil, fmt.Errorf("invalid identifier format: %s (expected 'dagName/dagRunId/stepName')", identifier)
 	}
-	return a.GetStepLogDataByRef(ctx, ir.NewDAGRunRef(parts[0], parts[1]), parts[2], StepLogReadOptions{})
+	return a.GetStepLogDataByRef(ctx, ir.NewDAGRunRef(parts[0], parts[1]), parts[2], StepLogReadOptions{
+		Stream: string(api.StreamStdout),
+	})
 }
 
 // StepLogReadOptions selects which step log streams and lines to return.

@@ -1252,6 +1252,7 @@ function NodeStatusTableRow({
                   stepName={node.step.name}
                   stream={currentStream}
                   dagRun={dagRun}
+                  live={isActiveNode}
                 />
               </div>
             </TableCell>

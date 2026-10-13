@@ -1655,6 +1655,44 @@ func TestSubDAGRunDataRequiresRootAndChildWorkspaceAccess(t *testing.T) {
 	require.Equal(t, http.StatusNotFound, apiErr.HTTPStatus)
 }
 
+// The live step log stream feeds a stdout-only viewer, so reading stderr on
+// every refresh is wasted I/O.
+func TestStepLogStreamReadsOnlyStdout(t *testing.T) {
+	ctx := t.Context()
+	dir := t.TempDir()
+	stdoutPath := filepath.Join(dir, "stdout.log")
+	stderrPath := filepath.Join(dir, "stderr.log")
+	require.NoError(t, os.WriteFile(stdoutPath, []byte("out\n"), 0o600))
+	require.NoError(t, os.WriteFile(stderrPath, []byte("err\n"), 0o600))
+
+	repository := testutil.NewFileDAGRunRepository(t.TempDir(), persis.DAGRunRepositoryOptions{})
+	dag := &ir.DAG{Name: "logs"}
+	attempt, err := repository.CreateAttempt(ctx, dag, time.Now(), "run-1", persis.DAGRunCreateAttemptOptions{})
+	require.NoError(t, err)
+	require.NoError(t, attempt.Open(ctx))
+	status := ir.InitialStatus(dag)
+	status.DAGRunID = "run-1"
+	status.AttemptID = attempt.ID()
+	status.Nodes = []*ir.Node{{Step: ir.Step{Name: "main"}, Stdout: stdoutPath, Stderr: stderrPath}}
+	require.NoError(t, attempt.Write(ctx, status))
+	require.NoError(t, attempt.Close(ctx))
+
+	cfg := &config.Config{}
+	a := &API{
+		dagRunRepository: repository,
+		dagRunMgr:        runtimepkg.NewManager(repository, nil, cfg),
+		config:           cfg,
+	}
+
+	result, err := a.GetStepLogData(ctx, "logs/run-1/main")
+
+	require.NoError(t, err)
+	resp, ok := result.(StepLogResponse)
+	require.True(t, ok)
+	require.Equal(t, "out", resp.StdoutContent)
+	require.Empty(t, resp.StderrContent)
+}
+
 func TestStepLogLimitWithoutOffsetReadsFromBeginning(t *testing.T) {
 	stdoutPath := filepath.Join(t.TempDir(), "stdout.log")
 	require.NoError(t, os.WriteFile(stdoutPath, []byte("one\ntwo\nthree\n"), 0o600))
