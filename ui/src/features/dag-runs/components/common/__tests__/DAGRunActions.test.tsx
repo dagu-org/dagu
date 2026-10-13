@@ -182,4 +182,45 @@ describe('DAGRunActions', () => {
 
     expect(screen.getByRole('button', { name: 'Stop' })).toBeDisabled();
   });
+
+  it('hides actions that do not apply when asked', () => {
+    const finishedRun = {
+      name: 'nightly',
+      dagRunId: 'run-1',
+      status: Status.Success,
+      statusLabel: StatusLabel.succeeded,
+      artifactsAvailable: false,
+      autoRetryCount: 0,
+      startedAt: '',
+      finishedAt: '',
+    };
+    const { rerender } = render(
+      <DAGRunActions
+        dagRun={finishedRun}
+        name="nightly"
+        displayMode="full"
+        hideUnavailable
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Stop' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Dequeue' })).toBeNull();
+
+    rerender(
+      <DAGRunActions
+        dagRun={{
+          ...finishedRun,
+          status: Status.Queued,
+          statusLabel: StatusLabel.queued,
+        }}
+        name="nightly"
+        displayMode="full"
+        hideUnavailable
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Dequeue' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+  });
 });
