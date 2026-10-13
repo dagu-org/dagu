@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { Check, FileText, Link2, RefreshCw } from 'lucide-react';
+import { Check, FileText, Link2 } from 'lucide-react';
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { components, Status } from '../../../../api/v1/schema';
@@ -15,7 +15,7 @@ import { RunMetaLine } from '../common/RunMetaLine';
 import { buildDAGPageURL, buildDAGRunPageURL } from '../../lib/dagRunUrls';
 import { I18nText } from '@/i18n/I18nText';
 import { I18nProps } from '@/i18n/I18nProps';
-import { Button } from '@/components/ui/button';
+import { RefreshButton } from '@/components/ui/refresh-button';
 
 interface DAGRunHeaderProps {
   dagRun: components['schemas']['DAGRunDetails'];
@@ -31,7 +31,6 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({
   const navigate = useNavigate();
   const remoteNode = useRemoteNode();
   const config = useConfig();
-  const [isRefreshing, setIsRefreshing] = React.useState(false);
   const { copied: linkCopied, copy: copyLink } = useCopyFeedback();
   const { copied: runIdCopied, copy: copyRunId } = useCopyFeedback();
   // Announces whichever copy happened last, even while the other's feedback
@@ -76,11 +75,9 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({
     }
   };
 
-  const handleRefresh = () => {
-    setIsRefreshing(true);
+  const handleRefresh = React.useCallback(() => {
     refreshFn();
-    setTimeout(() => setIsRefreshing(false), 600);
-  };
+  }, [refreshFn]);
 
   // Add keyboard shortcut for refresh
   useEffect(() => {
@@ -186,18 +183,7 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({
             </div>
             {dagRun.status != Status.NotStarted && (
               <div className="flex shrink-0 items-center gap-2">
-                <I18nProps>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={handleRefresh}
-                    disabled={isRefreshing}
-                    title="Refresh (R)"
-                    aria-label="Refresh"
-                  >
-                    <RefreshCw className={isRefreshing ? 'animate-spin' : ''} />
-                  </Button>
-                </I18nProps>
+                <RefreshButton onRefresh={refreshFn} />
                 <DAGRunActions
                   dagRun={dagRun}
                   name={dagRun.name}

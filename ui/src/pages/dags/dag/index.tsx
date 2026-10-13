@@ -252,14 +252,17 @@ function DAGDetails() {
     DAGRunDetails | undefined
   >(undefined);
 
-  // Refresh all relevant data based on current view
-  const refreshData = useCallback(() => {
-    mutateDag();
-    if (subDAGRunId) {
-      mutateSubDagRun();
-    } else if (effectiveDAGRunId) {
-      mutateDagRun();
-    }
+  // Refresh all relevant data based on current view. The returned promise
+  // settles when the reads finish, so a refresh button can show progress.
+  const refreshData = useCallback(async () => {
+    await Promise.all([
+      mutateDag(),
+      subDAGRunId
+        ? mutateSubDagRun()
+        : effectiveDAGRunId
+          ? mutateDagRun()
+          : undefined,
+    ]);
   }, [
     mutateDag,
     mutateDagRun,

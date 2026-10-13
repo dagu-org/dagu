@@ -1,7 +1,8 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { Check, Copy, Link2, RefreshCw } from 'lucide-react';
+import { Check, Copy, Link2 } from 'lucide-react';
+import { RefreshButton } from '@/components/ui/refresh-button';
 import React, { useCallback, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useRemoteNode } from '@/contexts/RemoteNodeContext';
@@ -17,7 +18,6 @@ import { RootDAGRunContext } from '../../contexts/RootDAGRunContext';
 import { DAGActions } from '../common';
 import DAGPinButton from './DAGPinButton';
 import { I18nText } from '@/i18n/I18nText';
-import { I18nProps } from '@/i18n/I18nProps';
 import { useI18n } from '@/i18n/I18nProvider';
 
 interface DAGHeaderProps {
@@ -46,7 +46,6 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
   const remoteNode = useRemoteNode();
   const params = useParams<{ tab?: string }>();
   const rootDAGRunContext = React.useContext(RootDAGRunContext);
-  const [isRefreshing, setIsRefreshing] = React.useState(false);
   const { copied: nameCopied, copy: copyName } = useCopyFeedback();
   const { copied: linkCopied, copy: copyLink } = useCopyFeedback();
   const config = useConfig();
@@ -98,11 +97,9 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
     navigate(url);
   };
 
-  const handleRefresh = () => {
-    setIsRefreshing(true);
-    refreshFn();
-    setTimeout(() => setIsRefreshing(false), 600);
-  };
+  const handleRefresh = useCallback(() => {
+    void refreshFn();
+  }, [refreshFn]);
 
   // Add keyboard shortcut for refresh
   useEffect(() => {
@@ -270,6 +267,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
 
         {showActions && (
           <div className="flex min-w-0 flex-wrap items-center gap-2 sm:flex-shrink-0 sm:justify-end">
+            {dagRunToDisplay && <RefreshButton onRefresh={refreshFn} />}
             <DAGActions
               status={dagRunToDisplay}
               dag={dag}
@@ -294,22 +292,6 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
               count={dagRunToDisplay.autoRetryCount}
               limit={dagRunToDisplay.autoRetryLimit}
             />
-
-            <I18nProps>
-              <button
-                onClick={handleRefresh}
-                disabled={isRefreshing}
-                className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                title="Refresh (R)"
-              >
-                <RefreshCw
-                  className={`h-3 w-3 ${isRefreshing ? 'animate-spin' : ''}`}
-                />
-                <span>
-                  <I18nText text={'Refresh'} />
-                </span>
-              </button>
-            </I18nProps>
 
             <RunMetaLine dagRun={dagRunToDisplay} />
           </div>

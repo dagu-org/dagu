@@ -184,7 +184,7 @@ function DAGRunDetailsPage() {
   }
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col px-4">
+    <div className="flex h-full min-h-0 w-full flex-col">
       <RemoteNodeProvider remoteNode={remoteNode}>
         <DAGRunContext.Provider
           value={{

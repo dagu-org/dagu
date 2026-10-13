@@ -510,8 +510,9 @@ describe('Graph zoom', () => {
     expect(boxHeight(small.container)).toBe('200px');
     small.unmount();
 
+    // 45% of jsdom's 768px window is below the 380px floor.
     const large = await renderGraph(LARGE_SVG);
-    expect(boxHeight(large.container)).toBe('461px');
+    expect(boxHeight(large.container)).toBe('380px');
   });
 
   it('keeps an explicit box height', async () => {
