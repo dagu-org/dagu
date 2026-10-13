@@ -1248,7 +1248,6 @@ const english = {
   Queues: 'Queues',
   Quick: 'Quick',
   'Quick select': 'Quick select',
-  R: 'R',
   Raw: 'Raw',
   'Raw Event': 'Raw Event',
   Reason: 'Reason',
@@ -1427,7 +1426,6 @@ const english = {
   'Schema unavailable': 'Schema unavailable',
   Scope: 'Scope',
   'Script Content': 'Script Content',
-  'Script defined': 'Script defined',
   Search: 'Search',
   'Search by ID or labels...': 'Search by ID or labels...',
   'Search DAGs...': 'Search DAGs...',
@@ -2438,6 +2436,14 @@ const english = {
   "Dagu Console stops monitoring this server, and its free slot becomes available to another server.": "Dagu Console stops monitoring this server, and its free slot becomes available to another server.",
   "The Free plan supports up to 2 API keys.": "The Free plan supports up to 2 API keys.",
   "Existing keys remain active. Revoke a key to create another, or move to Team or Pro to remove the limit.": "Existing keys remain active. Revoke a key to create another, or move to Team or Pro to remove the limit.",
+  "Click a step for details": "Click a step for details",
+  "Show logs": "Show logs",
+  "Hide logs": "Hide logs",
+  "View script": "View script",
+  "+{count} line": "+{count} line",
+  "+{count} lines": "+{count} lines",
+  "Lifecycle handlers": "Lifecycle handlers",
+  "Copy run ID": "Copy run ID",
 } as const;
 
 export type StaticMessage = keyof typeof english;
@@ -3660,7 +3666,6 @@ const chinese = {
   Queues: '队列',
   Quick: '快速',
   'Quick select': '快速选择',
-  R: 'R',
   Raw: '原始',
   'Raw Event': '原始事件',
   Reason: '原因',
@@ -3837,7 +3842,6 @@ const chinese = {
   'Schema unavailable': '模式不可用',
   Scope: '作用域',
   'Script Content': '脚本内容',
-  'Script defined': '已定义脚本',
   Search: '搜索',
   'Search by ID or labels...': '按 ID 或标签搜索...',
   'Search DAGs...': '搜索 DAG...',
@@ -4818,6 +4822,14 @@ const chinese = {
   "Dagu Console stops monitoring this server, and its free slot becomes available to another server.": "Dagu Console 将停止监控此服务器，其免费名额可供其他服务器使用。",
   "The Free plan supports up to 2 API keys.": "免费套餐最多支持 2 个 API 密钥。",
   "Existing keys remain active. Revoke a key to create another, or move to Team or Pro to remove the limit.": "现有密钥保持有效。撤销一个密钥即可创建新密钥，或升级到 Team 或 Pro 以取消此限制。",
+  "Click a step for details": "点击步骤查看详情",
+  "Show logs": "显示日志",
+  "Hide logs": "隐藏日志",
+  "View script": "查看脚本",
+  "+{count} line": "另外 {count} 行",
+  "+{count} lines": "另外 {count} 行",
+  "Lifecycle handlers": "生命周期处理器",
+  "Copy run ID": "复制运行 ID",
 } as const satisfies Record<StaticMessage, string>;
 
 const japanese = {
@@ -6080,7 +6092,6 @@ const japanese = {
   Queues: 'キュー',
   Quick: 'クイック',
   'Quick select': 'クイック選択',
-  R: 'R',
   Raw: '生データ',
   'Raw Event': '生イベント',
   Reason: '理由',
@@ -6262,7 +6273,6 @@ const japanese = {
   'Schema unavailable': 'スキーマが利用できません',
   Scope: 'スコープ',
   'Script Content': 'スクリプト内容',
-  'Script defined': 'スクリプト定義済み',
   Search: '検索',
   'Search by ID or labels...': 'ID またはラベルで検索...',
   'Search DAGs...': 'DAG を検索...',
@@ -7280,6 +7290,14 @@ const japanese = {
   "Dagu Console stops monitoring this server, and its free slot becomes available to another server.": "Dagu Console はこのサーバーの監視を停止し、無料枠は他のサーバーで使えるようになります。",
   "The Free plan supports up to 2 API keys.": "無料プランでは最大2つのAPIキーを管理できます。",
   "Existing keys remain active. Revoke a key to create another, or move to Team or Pro to remove the limit.": "既存のキーは有効のままです。キーを 1 つ失効させると新しいキーを作成できます。Team または Pro に移行すると上限がなくなります。",
+  "Click a step for details": "ステップをクリックして詳細を表示",
+  "Show logs": "ログを表示",
+  "Hide logs": "ログを隠す",
+  "View script": "スクリプトを表示",
+  "+{count} line": "ほか {count} 行",
+  "+{count} lines": "ほか {count} 行",
+  "Lifecycle handlers": "ライフサイクルハンドラー",
+  "Copy run ID": "実行 ID をコピー",
 } as const satisfies Record<StaticMessage, string>;
 
 export const staticMessages = {
