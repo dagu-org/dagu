@@ -1605,7 +1605,7 @@ const english = {
   "Items per page": "Items per page",
   "Open in fullscreen": "Open in fullscreen",
   "{selected} of {loaded} selected": "{selected} of {loaded} selected",
-  "Toggle {name}": "Toggle {name}",
+  "Schedule for {name}": "Schedule for {name}",
   'Target name': 'Target name',
   'Target:': 'Target:',
   'Task input is safely stored, but the DAG-run still needs to be queued for resume.':
@@ -4013,7 +4013,7 @@ const chinese = {
   "Items per page": "每页条数",
   "Open in fullscreen": "全屏打开",
   "{selected} of {loaded} selected": "已选择 {loaded} 项中的 {selected} 项",
-  "Toggle {name}": "切换 {name}",
+  "Schedule for {name}": "{name} 的调度",
   'Target name': '目标名称',
   'Target:': '目标:',
   'Task input is safely stored, but the DAG-run still needs to be queued for resume.':
@@ -6451,7 +6451,7 @@ const japanese = {
   "Items per page": "1 ページの件数",
   "Open in fullscreen": "全画面で開く",
   "{selected} of {loaded} selected": "{loaded} 件中 {selected} 件を選択",
-  "Toggle {name}": "{name} を切り替え",
+  "Schedule for {name}": "{name} のスケジュール",
   'Target name': 'ターゲット名',
   'Target:': 'ターゲット:',
   'Task input is safely stored, but the DAG-run still needs to be queued for resume.':
