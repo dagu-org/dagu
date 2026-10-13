@@ -40,13 +40,15 @@ function mockViews(views: Array<{ id: string; name: string }>) {
   } as unknown as ReturnType<typeof useViews>);
 }
 
-function renderAt(viewId: string) {
+function renderAt(viewId: string, setTitle = vi.fn()) {
   render(
     <MemoryRouter initialEntries={[`/views/${viewId}`]}>
-      <Routes>
-        <Route path="/views/:viewId" element={<ViewPage />} />
-        <Route path="/" element={<div>home</div>} />
-      </Routes>
+      <AppBarContext.Provider value={{ setTitle } as never}>
+        <Routes>
+          <Route path="/views/:viewId" element={<ViewPage />} />
+          <Route path="/" element={<div>home</div>} />
+        </Routes>
+      </AppBarContext.Provider>
     </MemoryRouter>
   );
 }
@@ -82,16 +84,21 @@ describe('ViewPage', () => {
 
   it('names the browser tab after the view', () => {
     const setTitle = vi.fn();
-    render(
-      <MemoryRouter initialEntries={['/views/v1']}>
-        <AppBarContext.Provider value={{ setTitle } as never}>
-          <Routes>
-            <Route path="/views/:viewId" element={<ViewPage />} />
-          </Routes>
-        </AppBarContext.Provider>
-      </MemoryRouter>
-    );
+    renderAt('v1', setTitle);
 
     expect(setTitle).toHaveBeenCalledWith('My View');
+  });
+
+  it('keeps a neutral tab title while views load', () => {
+    useViewsMock.mockReturnValue({
+      ...useViewsMock(),
+      views: [],
+      isLoading: true,
+    });
+    const setTitle = vi.fn();
+    renderAt('v1', setTitle);
+
+    expect(setTitle).toHaveBeenCalledWith('');
+    expect(setTitle).not.toHaveBeenCalledWith('View not found');
   });
 });

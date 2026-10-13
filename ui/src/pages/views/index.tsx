@@ -31,7 +31,8 @@ export default function ViewPage(): React.ReactElement | null {
   const canWrite = useCanWriteForWorkspace(view?.workspace ?? '');
   const [editorOpen, setEditorOpen] = useState(false);
   const { setTitle } = useContext(AppBarContext);
-  const viewTitle = view?.name ?? ts('View not found');
+  const viewTitle =
+    view?.name ?? (isLoading || error ? '' : ts('View not found'));
 
   useEffect(() => {
     setTitle(viewTitle);
