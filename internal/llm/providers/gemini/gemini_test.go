@@ -436,6 +436,20 @@ func TestThinkingConfig(t *testing.T) {
 			wantMaxTokens: 8192 + 4096,
 		},
 		{
+			// Low sits between minimal and medium; the higher one wins.
+			name:          "Nano Banana 2.1 low rounds up to medium",
+			model:         "gemini-nano-banana-2.1",
+			thinking:      &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortLow},
+			wantThinking:  `{"thinkingLevel":"MEDIUM"}`,
+			wantMaxTokens: 4096 + 4096,
+		},
+		{
+			name:         "Pro alias minimal falls back to low",
+			model:        "gemini-pro-latest",
+			thinking:     &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortMinimal},
+			wantThinking: `{"thinkingLevel":"LOW"}`,
+		},
+		{
 			name:         "3 series minimal level",
 			model:        "gemini-3-flash-preview",
 			thinking:     &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortMinimal},
