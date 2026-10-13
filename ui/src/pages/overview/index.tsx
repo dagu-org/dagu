@@ -6,7 +6,7 @@ import { useCanWrite, useCanWriteForWorkspace } from '@/contexts/AuthContext';
 import { ViewEditorDialog } from '@/features/views/ViewEditorDialog';
 import { ViewPanel } from '@/features/views/ViewPanel';
 import { View, useViews } from '@/hooks/useViews';
-import { Clock3, Gauge, LayoutGrid, Pencil, Plus } from 'lucide-react';
+import { Activity, Gauge, LayoutGrid, Pencil, Plus } from 'lucide-react';
 import React from 'react';
 import Dashboard from '..';
 import CockpitPage from '../cockpit';
@@ -157,8 +157,8 @@ export default function OverviewPage({
           onClick={() => setActiveTab('timeline')}
           className="cursor-pointer gap-2"
         >
-          <Clock3 className="h-4 w-4" />
-          <I18nText text={"Timeline"} />
+          <Activity className="h-4 w-4" />
+          <I18nText text={"Activity"} />
         </Tab>
         <Tab
           id={tabElementId('cockpit')}

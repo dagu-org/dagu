@@ -714,6 +714,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dag-run-activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Summarize DAG-run activity
+         * @description Aggregates the DAG-runs created in a time window: exact counts per
+         *     status, per-DAG time buckets, the runs worth showing one by one, runs
+         *     that are still active (including ones created before the window), and
+         *     the next scheduled runs. Without fromDate, the window is the last
+         *     `hours` hours, aligned to bucket boundaries.
+         *
+         */
+        get: operations["getDAGRunActivity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dag-runs": {
         parameters: {
             query?: never;
@@ -4161,6 +4186,84 @@ export interface components {
             dagRuns: components["schemas"]["DAGRunSummary"][];
             /** @description Opaque cursor for loading the next page of older DAG-runs */
             nextCursor?: string;
+        };
+        /** @description Aggregated DAG-run activity for one time window */
+        DAGRunActivity: {
+            /**
+             * Format: int64
+             * @description Window start as Unix seconds
+             */
+            from: number;
+            /**
+             * Format: int64
+             * @description Window end as Unix seconds
+             */
+            to: number;
+            /** @description Length of each bucket in seconds */
+            bucketSeconds: number;
+            /** @description True when runs were left out of the per-DAG run lists; counts and buckets stay exact */
+            truncated: boolean;
+            /** @description Number of runs per status in the window */
+            counts: components["schemas"]["DAGRunActivityCount"][];
+            /** @description DAGs with runs in the window, ordered by name */
+            workflows: components["schemas"]["DAGRunActivityWorkflow"][];
+            /** @description Runs still running, waiting, or queued, including ones created before the window */
+            active: components["schemas"]["DAGRunActivityRun"][];
+            /** @description Next scheduled runs, soonest first */
+            upcoming: components["schemas"]["DAGRunActivityUpcoming"][];
+        };
+        DAGRunActivityCount: {
+            status: components["schemas"]["Status"];
+            count: number;
+        };
+        /** @description Activity of one DAG in the window */
+        DAGRunActivityWorkflow: {
+            name: string;
+            /** @description Number of runs in the window */
+            runCount: number;
+            /** @description Number of failed and rejected runs in the window */
+            failedCount: number;
+            /** @description One character per bucket from the window start, naming the most
+             *     severe run in the bucket: "f" failed or rejected, "a" aborted,
+             *     "p" partially succeeded, "r" running, waiting, or queued,
+             *     "s" succeeded, "." no run.
+             *      */
+            strip: string;
+            /** @description Every run when there are few, otherwise the unsuccessful and active ones plus the latest; newest first */
+            runs: components["schemas"]["DAGRunActivityRun"][];
+            latest: components["schemas"]["DAGRunActivityRun"];
+            /** @description Median duration of successful runs, when at least three succeeded */
+            medianSuccessSeconds?: number;
+        };
+        /** @description One DAG-run in an activity summary */
+        DAGRunActivityRun: {
+            /** @description DAG name; set on active runs */
+            name?: string;
+            dagRunId: string;
+            status: components["schemas"]["Status"];
+            /**
+             * Format: int64
+             * @description Start as Unix seconds, or the queue time when the run has not started
+             */
+            startedAt?: number;
+            /**
+             * Format: int64
+             * @description Finish as Unix seconds
+             */
+            finishedAt?: number;
+            /** @description First failed step; set on the latest run when it failed */
+            failedStep?: string;
+            /** @description Error of the failed step, shortened; set with failedStep */
+            error?: string;
+        };
+        DAGRunActivityUpcoming: {
+            name: string;
+            fileName: string;
+            /**
+             * Format: int64
+             * @description Next scheduled run as Unix seconds
+             */
+            nextRun: number;
         };
         /** @description Request body for approving a waiting step */
         ApproveStepRequest: {
@@ -9920,6 +10023,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListTagResponse"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getDAGRunActivity: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. */
+                workspace?: components["parameters"]["Workspace"];
+                /** @description start datetime for filtering DAG-runs in ISO 8601 format with timezone */
+                fromDate?: components["parameters"]["DateTimeFrom"];
+                /** @description end datetime for filtering DAG-runs in ISO 8601 format with timezone */
+                toDate?: components["parameters"]["DateTimeTo"];
+                /** @description Length of a window that ends now. Ignored when fromDate is set. */
+                hours?: number;
+                /** @description Only count runs of DAGs that have ALL these comma-separated labels */
+                labels?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DAGRunActivity"];
+                };
+            };
+            /** @description The window or filters are invalid */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Generic error response */
