@@ -52,7 +52,7 @@ function ErrorDisplay({ error, name, dagRunId, onRetry }: ErrorDisplayProps) {
       }
       action={{
         to: name ? `/dag-runs?name=${encodeURIComponent(name)}` : '/dag-runs',
-        label: ts('Show all runs'),
+        label: ts(name ? "Show this workflow's runs" : 'Show all runs'),
       }}
     />
   );

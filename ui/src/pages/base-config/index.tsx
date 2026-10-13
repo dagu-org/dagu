@@ -13,7 +13,7 @@ import { AppBarContext } from '../../contexts/AppBarContext';
 import { useConfig } from '../../contexts/ConfigContext';
 import { I18nText } from '@/i18n/I18nText';
 import { I18nProps } from '@/i18n/I18nProps';
-import { LoadErrorState } from '@/components/PageStates';
+import { LoadErrorState, PageLoading } from '@/components/PageStates';
 
 type ConfigScope = 'global' | 'workspace';
 
@@ -114,6 +114,7 @@ function BaseConfigPage(): React.ReactNode {
     activeScope === 'workspace' ? workspaceValue : globalValue;
   const currentSpec =
     activeScope === 'workspace' ? workspaceData?.spec : globalData?.spec;
+  const currentData = activeScope === 'workspace' ? workspaceData : globalData;
   const currentLoadError =
     activeScope === 'workspace'
       ? !workspaceData && workspaceError
@@ -301,6 +302,8 @@ function BaseConfigPage(): React.ReactNode {
               : mutateGlobal())
           }
         />
+      ) : !currentData ? (
+        <PageLoading />
       ) : (
         <DAGEditorWithDocs
           value={

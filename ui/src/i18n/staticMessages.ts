@@ -2457,6 +2457,7 @@ const english = {
   "This view may have been deleted.": "This view may have been deleted.",
   "Go to Overview": "Go to Overview",
   "The server did not respond.": "The server did not respond.",
+  "Show this workflow's runs": "Show this workflow's runs",
 } as const;
 
 export type StaticMessage = keyof typeof english;
@@ -4856,6 +4857,7 @@ const chinese = {
   "This view may have been deleted.": "此视图可能已被删除。",
   "Go to Overview": "前往概览",
   "The server did not respond.": "服务器没有响应。",
+  "Show this workflow's runs": "显示此工作流的运行记录",
 } as const satisfies Record<StaticMessage, string>;
 
 const japanese = {
@@ -7337,6 +7339,7 @@ const japanese = {
   "This view may have been deleted.": "このビューは削除された可能性があります。",
   "Go to Overview": "概要へ移動",
   "The server did not respond.": "サーバーから応答がありませんでした。",
+  "Show this workflow's runs": "このワークフローの実行を表示",
 } as const satisfies Record<StaticMessage, string>;
 
 export const staticMessages = {
