@@ -70,11 +70,11 @@
 
   /* Font Family */
   --font-sans:
-    'Hanken Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
-    sans-serif;
+    'Hanken Grotesk Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    Roboto, sans-serif;
   --font-heading:
-    'Hanken Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
-    sans-serif;
+    'Hanken Grotesk Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    Roboto, sans-serif;
 
   /* Font Sizes */
   --text-xs: 11px;

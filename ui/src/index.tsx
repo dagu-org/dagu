@@ -2,6 +2,7 @@ import { createRoot } from 'react-dom/client';
 
 import { CookiesProvider } from 'react-cookie';
 import App from './App';
+import '@fontsource-variable/hanken-grotesk';
 import './styles/global.css';
 import './styles/prism.css';
 
