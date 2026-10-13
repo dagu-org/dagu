@@ -72,7 +72,11 @@ import {
   type SyncKind,
 } from './sync-kind';
 import { useSyncReconcile } from './useSyncReconcile';
-import { LoadErrorState, PageLoading } from '@/components/PageStates';
+import {
+  EmptyState,
+  LoadErrorState,
+  PageLoading,
+} from '@/components/PageStates';
 
 type SyncStatusResponse = components['schemas']['SyncStatusResponse'];
 type SyncConfigResponse = components['schemas']['SyncConfigResponse'];
@@ -658,19 +662,17 @@ export default function GitSyncPage() {
   // Not configured state
   if (!status.enabled) {
     return (
-      <div className="flex flex-col items-center justify-center h-[60vh] text-center">
-        <GitBranch className="h-16 w-16 text-muted-foreground/30 mb-4" />
-        <h2 className="text-xl font-semibold mb-2">
-          <I18nText text={'Git Sync Not Configured'} />
-        </h2>
-        <p className="text-muted-foreground max-w-md">
+      <EmptyState
+        icon={<GitBranch />}
+        title={<I18nText text={'Git sync is not configured'} />}
+        description={
           <I18nText
             text={
               'Git sync allows you to synchronize workflow definitions and Wiki pages with a remote Git repository. Configure it in your server settings.'
             }
           />
-        </p>
-      </div>
+        }
+      />
     );
   }
 

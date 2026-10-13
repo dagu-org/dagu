@@ -100,6 +100,35 @@ export function LoadErrorState({
   );
 }
 
+type EmptyStateProps = {
+  icon: ReactNode;
+  title: ReactNode;
+  description?: ReactNode;
+  /** Next step, such as a create button or a link. */
+  action?: ReactNode;
+  className?: string;
+};
+
+/** Explains that a collection or feature has nothing to show yet. */
+export function EmptyState({
+  icon,
+  title,
+  description,
+  action,
+  className,
+}: EmptyStateProps): ReactNode {
+  return (
+    <Empty className={className}>
+      <EmptyHeader>
+        <EmptyMedia>{icon}</EmptyMedia>
+        <EmptyTitle>{title}</EmptyTitle>
+        {description && <EmptyDescription>{description}</EmptyDescription>}
+      </EmptyHeader>
+      {action && <EmptyContent>{action}</EmptyContent>}
+    </Empty>
+  );
+}
+
 type InlineLoadErrorProps = {
   error: unknown;
   onRetry?: () => void;

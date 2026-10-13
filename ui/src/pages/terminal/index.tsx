@@ -13,6 +13,9 @@ import {
   stringToBase64,
 } from './encoding';
 import { I18nText } from '@/i18n/I18nText';
+import { I18nTemplate } from '@/i18n/I18nTemplate';
+import { EmptyState } from '@/components/PageStates';
+import { Lock, SquareTerminal } from 'lucide-react';
 
 type MessageType = 'input' | 'output' | 'resize' | 'close' | 'error';
 type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
@@ -245,25 +248,27 @@ export default function TerminalPage() {
 
   if (!isAdmin) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">
+      <EmptyState
+        icon={<Lock />}
+        title={
           <I18nText text={'You do not have permission to access this page.'} />
-        </p>
-      </div>
+        }
+      />
     );
   }
 
   if (!config.terminalEnabled) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">
-          <I18nText
-            text={
-              'Terminal is not enabled. Set DAGU_TERMINAL_ENABLED=true to enable.'
-            }
+      <EmptyState
+        icon={<SquareTerminal />}
+        title={<I18nText text={'Terminal is turned off'} />}
+        description={
+          <I18nTemplate
+            text="Set {setting} on the server to enable it."
+            values={{ setting: <code>DAGU_TERMINAL_ENABLED=true</code> }}
           />
-        </p>
-      </div>
+        }
+      />
     );
   }
 

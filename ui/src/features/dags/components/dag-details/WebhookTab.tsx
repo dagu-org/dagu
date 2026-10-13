@@ -48,6 +48,7 @@ import { useRemoteNode } from '../../../../contexts/RemoteNodeContext';
 import { useClient } from '../../../../hooks/api';
 import dayjs from '../../../../lib/dayjs';
 import ConfirmModal from '@/components/ui/confirm-dialog';
+import { EmptyState } from '@/components/PageStates';
 import WebhookProfileSelectionCard from './WebhookProfileSelectionCard';
 import WebhookProfileTokensCard from './WebhookProfileTokensCard';
 import {
@@ -599,34 +600,29 @@ function WebhookTab({ fileName }: WebhookTabProps) {
   // No webhook configured
   if (!webhook) {
     return (
-      <Card className="max-w-xl gap-0 py-0">
-        <CardHeader className="pb-2 px-4 pt-3">
-          <div className="flex items-center gap-2">
-            <WebhookOff className="h-4 w-4 text-muted-foreground" />
-            <CardTitle className="text-sm">
-              <I18nText text={'No Webhook Configured'} />
-            </CardTitle>
-          </div>
-          <CardDescription className="text-xs">
-            <I18nText text={'Create a webhook to trigger this DAG via HTTP'} />
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="px-4 pb-3 pt-3">
+      <EmptyState
+        icon={<WebhookOff />}
+        title={<I18nText text={'No webhook yet'} />}
+        description={
+          <I18nText
+            text={'Create a webhook to trigger this workflow over HTTP.'}
+          />
+        }
+        action={
           <Button
             variant="primary"
-            size="sm"
             onClick={handleCreate}
             disabled={isActioning}
           >
             {isActioning ? (
-              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <Plus className="h-4 w-4 mr-1" />
+              <Plus className="h-4 w-4" />
             )}
-            <I18nText text={'Create Webhook'} />
+            <I18nText text={'Create webhook'} />
           </Button>
-        </CardContent>
-      </Card>
+        }
+      />
     );
   }
 

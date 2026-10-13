@@ -35,6 +35,9 @@ import { useQuery } from '@/hooks/api';
 import Title from '@/components/ui/title';
 import { I18nText } from '@/i18n/I18nText';
 import { useI18n } from '@/i18n/I18nProvider';
+import { I18nTemplate } from '@/i18n/I18nTemplate';
+import { LoadErrorState, NotFoundState } from '@/components/PageStates';
+import { isNotFoundQueryError } from '@/lib/queryErrors';
 
 function useAutoLoadMore(
   sentinelRef: React.RefObject<HTMLDivElement | null>,
@@ -246,23 +249,26 @@ function QueueDetailsPage() {
   }
 
   if (error && !queue) {
-    const errorData = error as components['schemas']['Error'];
+    if (isNotFoundQueryError(error)) {
+      return (
+        <NotFoundState
+          title={ts('Queue not found')}
+          description={
+            <I18nTemplate
+              text="No queue named {name} exists."
+              values={{ name: <code>{queueName}</code> }}
+            />
+          }
+          action={{ to: '/queues', label: ts('Back to queues') }}
+        />
+      );
+    }
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="space-y-3 text-center">
-          <Layers className="mx-auto h-10 w-10 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">
-            {errorData?.message || (
-              <I18nText text={'Failed to load queue details'} />
-            )}
-          </p>
-          <Button variant="outline" asChild>
-            <Link to="/queues">
-              <I18nText text={'Back to queues'} />
-            </Link>
-          </Button>
-        </div>
-      </div>
+      <LoadErrorState
+        title={ts('Failed to load queue details')}
+        error={error}
+        onRetry={() => void handleRefresh()}
+      />
     );
   }
 

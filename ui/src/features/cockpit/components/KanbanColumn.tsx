@@ -72,7 +72,7 @@ export function KanbanColumn({
     >
       {!hideHeader && (
         <div className="flex items-center gap-2 px-1 pb-2">
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          <span className="text-xs font-medium text-muted-foreground">
             {localizedTitle}
           </span>
           <span className="text-[11px] text-muted-foreground">
@@ -101,6 +101,11 @@ export function KanbanColumn({
           </div>
         ) : (
           <>
+            {runs.length === 0 && (
+              <div className="rounded-md border border-dashed border-border px-2 py-6 text-center text-xs text-muted-foreground">
+                <I18nText text={'No runs'} />
+              </div>
+            )}
             <LayoutGroup>
               <AnimatePresence mode="popLayout">
                 {runs.map((run) => (

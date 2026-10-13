@@ -36,6 +36,7 @@ import { I18nProps } from '@/i18n/I18nProps';
 import { I18nText } from '@/i18n/I18nText';
 import dayjs from '@/lib/dayjs';
 import ConfirmModal from '@/components/ui/confirm-dialog';
+import { EmptyState } from '@/components/PageStates';
 import {
   Check,
   Copy,
@@ -280,7 +281,24 @@ export default function WebhooksPage() {
         </div>
       )}
 
-      <div className="card-obsidian overflow-auto">
+      {!isLoading && webhooks.length === 0 ? (
+        <EmptyState
+          icon={<Webhook />}
+          title={<I18nText text={'No webhooks yet'} />}
+          description={
+            <I18nText
+              text={
+                "Create a webhook from a workflow's Webhook tab to trigger it over HTTP."
+              }
+            />
+          }
+          action={
+            <Button variant="outline" onClick={() => navigate('/dags')}>
+              <I18nText text={'Go to Workflows'} />
+            </Button>
+          }
+        />
+      ) : (
         <Table className="text-xs">
           <TableHeader>
             <TableRow>
@@ -316,19 +334,6 @@ export default function WebhooksPage() {
                   className="text-center text-muted-foreground py-8"
                 >
                   <I18nText text={'Loading webhooks...'} />
-                </TableCell>
-              </TableRow>
-            ) : webhooks.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={8}
-                  className="text-center text-muted-foreground py-8"
-                >
-                  <I18nText
-                    text={
-                      'No webhooks found. Create webhooks from individual DAG pages.'
-                    }
-                  />
                 </TableCell>
               </TableRow>
             ) : (
@@ -435,7 +440,7 @@ export default function WebhooksPage() {
             )}
           </TableBody>
         </Table>
-      </div>
+      )}
 
       {/* Regenerate Token Confirmation / Token Display */}
       {regeneratingWebhook && !newToken && (

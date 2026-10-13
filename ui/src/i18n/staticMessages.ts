@@ -465,8 +465,6 @@ const english = {
     'Create a channel before adding notification routes.',
   'Create a DAG override only when this DAG needs different events or destinations. The effective order is DAG, then workspace, then Global.':
     'Create a DAG override only when this DAG needs different events or destinations. The effective order is DAG, then workspace, then Global.',
-  'Create a webhook to trigger this DAG via HTTP':
-    'Create a webhook to trigger this DAG via HTTP',
   'Create an incoming-webhook Workflow in Teams, select its destination, save it, and copy the generated URL. Dagu sends the compatible MessageCard format automatically.':
     'Create an incoming-webhook Workflow in Teams, select its destination, save it, and copy the generated URL. Dagu sends the compatible MessageCard format automatically.',
   'Create and test notification channels before using them in routes.':
@@ -477,7 +475,6 @@ const english = {
   'Create New Wiki page': 'Create New Wiki page',
   'Create User': 'Create User',
   'Create view': 'Create view',
-  'Create Webhook': 'Create Webhook',
   'Create your first Wiki page': 'Create your first Wiki page',
   'Create your first workflow': 'Create your first workflow',
   Created: 'Created',
@@ -782,7 +779,6 @@ const english = {
   'Git Sync': 'Git Sync',
   'Git sync allows you to synchronize workflow definitions and Wiki pages with a remote Git repository. Configure it in your server settings.':
     'Git sync allows you to synchronize workflow definitions and Wiki pages with a remote Git repository. Configure it in your server settings.',
-  'Git Sync Not Configured': 'Git Sync Not Configured',
   Global: 'Global',
   'Global defaults inherited by all DAG definitions':
     'Global defaults inherited by all DAG definitions',
@@ -1088,11 +1084,22 @@ const english = {
   'No profile': 'No profile',
   'No profiles found.': 'No profiles found.',
   'No queued items in this queue.': 'No queued items in this queue.',
-  'No queues found': 'No queues found',
   'No remote nodes configured': 'No remote nodes configured',
   'No running, retrying, or failed steps at the moment.':
     'No running, retrying, or failed steps at the moment.',
   'No runs': 'No runs',
+  "No webhooks yet": "No webhooks yet",
+  "Create a webhook from a workflow's Webhook tab to trigger it over HTTP.": "Create a webhook from a workflow's Webhook tab to trigger it over HTTP.",
+  "No webhook yet": "No webhook yet",
+  "Create a webhook to trigger this workflow over HTTP.": "Create a webhook to trigger this workflow over HTTP.",
+  "Create webhook": "Create webhook",
+  "Queue not found": "Queue not found",
+  "No queue named {name} exists.": "No queue named {name} exists.",
+  "Terminal is turned off": "Terminal is turned off",
+  "Set {setting} on the server to enable it.": "Set {setting} on the server to enable it.",
+  "Git sync is not configured": "Git sync is not configured",
+  "No active queues": "No active queues",
+  "Queues defined in the server configuration appear here, along with any queue that has running or waiting runs.": "Queues defined in the server configuration appear here, along with any queue that has running or waiting runs.",
   'No runs on': 'No runs on',
   'No saved artifact views yet.': 'No saved artifact views yet.',
   'No saved run views yet.': 'No saved run views yet.',
@@ -1114,9 +1121,6 @@ const english = {
   'No users found': 'No users found',
   'No visible queued items were returned for this queue.':
     'No visible queued items were returned for this queue.',
-  'No Webhook Configured': 'No Webhook Configured',
-  'No webhooks found. Create webhooks from individual DAG pages.':
-    'No webhooks found. Create webhooks from individual DAG pages.',
   'No Wiki pages reference this DAG yet.':
     'No Wiki pages reference this DAG yet.',
   'No Wiki pages yet.': 'No Wiki pages yet.',
@@ -1666,8 +1670,6 @@ const english = {
   'Telegram topic ID': 'Telegram topic ID',
   Template: 'Template',
   Terminal: 'Terminal',
-  'Terminal is not enabled. Set DAGU_TERMINAL_ENABLED=true to enable.':
-    'Terminal is not enabled. Set DAGU_TERMINAL_ENABLED=true to enable.',
   Test: 'Test',
   'Test Connection': 'Test Connection',
   'Testing...': 'Testing...',
@@ -2946,8 +2948,6 @@ const chinese = {
     '在添加通知路由之前，请先创建频道。',
   'Create a DAG override only when this DAG needs different events or destinations. The effective order is DAG, then workspace, then Global.':
     '仅当此 DAG 需要不同的事件或目标时，才创建 DAG 覆盖。生效顺序为 DAG，然后是工作区，最后是全局。',
-  'Create a webhook to trigger this DAG via HTTP':
-    '创建 Webhook 以通过 HTTP 触发此 DAG',
   'Create an incoming-webhook Workflow in Teams, select its destination, save it, and copy the generated URL. Dagu sends the compatible MessageCard format automatically.':
     '在 Teams 中创建一个传入 Webhook 工作流，选择其目标，保存它，并复制生成的 URL。Dagu 会自动发送兼容的 MessageCard 格式。',
   'Create and test notification channels before using them in routes.':
@@ -2958,7 +2958,6 @@ const chinese = {
   'Create New Wiki page': '创建新 Wiki 页面',
   'Create User': '创建用户',
   'Create view': '创建视图',
-  'Create Webhook': '创建 Webhook',
   'Create your first Wiki page': '创建您的第一个 Wiki 页面',
   'Create your first workflow': '创建您的第一个工作流',
   Created: '创建时间',
@@ -3256,7 +3255,6 @@ const chinese = {
   'Git Sync': 'Git 同步',
   'Git sync allows you to synchronize workflow definitions and Wiki pages with a remote Git repository. Configure it in your server settings.':
     'Git 同步允许您将工作流定义和 Wiki 页面与远程 Git 仓库进行同步。请在服务器设置中进行配置。',
-  'Git Sync Not Configured': '未配置 Git 同步',
   Global: '全局',
   'Global defaults inherited by all DAG definitions':
     '所有 DAG 定义继承的全局默认值',
@@ -3550,11 +3548,22 @@ const chinese = {
   'No profile': '无配置',
   'No profiles found.': '未找到配置文件。',
   'No queued items in this queue.': '此队列中没有排队项。',
-  'No queues found': '未找到队列',
   'No remote nodes configured': '未配置远程节点',
   'No running, retrying, or failed steps at the moment.':
     '当前没有正在运行、重试或失败的步骤。',
   'No runs': '暂无运行',
+  "No webhooks yet": "还没有 Webhook",
+  "Create a webhook from a workflow's Webhook tab to trigger it over HTTP.": "在工作流的 Webhook 标签页中创建 Webhook，即可通过 HTTP 触发它。",
+  "No webhook yet": "还没有 Webhook",
+  "Create a webhook to trigger this workflow over HTTP.": "创建 Webhook，即可通过 HTTP 触发此工作流。",
+  "Create webhook": "创建 Webhook",
+  "Queue not found": "未找到队列",
+  "No queue named {name} exists.": "不存在名为 {name} 的队列。",
+  "Terminal is turned off": "终端已关闭",
+  "Set {setting} on the server to enable it.": "在服务器上设置 {setting} 即可启用。",
+  "Git sync is not configured": "未配置 Git 同步",
+  "No active queues": "没有活跃的队列",
+  "Queues defined in the server configuration appear here, along with any queue that has running or waiting runs.": "服务器配置中定义的队列，以及有运行中或等待中运行的队列，会显示在这里。",
   'No runs on': '没有',
   'No saved artifact views yet.': '尚未保存产物视图。',
   'No saved run views yet.': '尚未保存运行视图。',
@@ -3576,9 +3585,6 @@ const chinese = {
   'No users found': '未找到用户',
   'No visible queued items were returned for this queue.':
     '此队列未返回可见的排队项。',
-  'No Webhook Configured': '未配置 Webhook',
-  'No webhooks found. Create webhooks from individual DAG pages.':
-    '未找到 Webhook。请从单独的 DAG 页面创建 Webhook。',
   'No Wiki pages reference this DAG yet.': '还没有 Wiki 页面引用此 DAG。',
   'No Wiki pages yet.': '还没有百科页面',
   'No workers connected': '暂无连接的 Worker',
@@ -4119,8 +4125,6 @@ const chinese = {
   'Telegram topic ID': 'Telegram 话题 ID',
   Template: '模板',
   Terminal: '终端',
-  'Terminal is not enabled. Set DAGU_TERMINAL_ENABLED=true to enable.':
-    '终端未启用。设置 DAGU_TERMINAL_ENABLED=true 以启用。',
   Test: '测试',
   'Test Connection': '测试连接',
   'Testing...': '测试中...',
@@ -5385,8 +5389,6 @@ const japanese = {
     '通知ルートを追加する前にチャネルを作成します。',
   'Create a DAG override only when this DAG needs different events or destinations. The effective order is DAG, then workspace, then Global.':
     'このDAGが異なるイベントまたは宛先を必要とする場合のみ、DAGオーバーライドを作成します。有効な順序はDAG、次にワークスペース、最後にグローバルです。',
-  'Create a webhook to trigger this DAG via HTTP':
-    'HTTP経由でこのDAGをトリガーするWebhookを作成',
   'Create an incoming-webhook Workflow in Teams, select its destination, save it, and copy the generated URL. Dagu sends the compatible MessageCard format automatically.':
     'Teams で受信 Webhook ワークフローを作成し、その宛先を選択して保存し、生成された URL をコピーします。Dagu は互換性のある MessageCard 形式を自動的に送信します。',
   'Create and test notification channels before using them in routes.':
@@ -5397,7 +5399,6 @@ const japanese = {
   'Create New Wiki page': '新しいWikiページを作成',
   'Create User': 'ユーザーを作成',
   'Create view': 'ビューを作成',
-  'Create Webhook': 'Webhook を作成',
   'Create your first Wiki page': '最初のWikiページを作成',
   'Create your first workflow': '最初のワークフローを作成',
   Created: '作成済み',
@@ -5704,7 +5705,6 @@ const japanese = {
   'Git Sync': 'Git 同期',
   'Git sync allows you to synchronize workflow definitions and Wiki pages with a remote Git repository. Configure it in your server settings.':
     'Git 同期により、ワークフロー定義と Wiki ページをリモートの Git リポジトリと同期できます。サーバー設定で構成してください。',
-  'Git Sync Not Configured': 'Git 同期が未設定です',
   Global: 'グローバル',
   'Global defaults inherited by all DAG definitions':
     'すべてのDAG定義に継承されるグローバルデフォルト',
@@ -6017,11 +6017,22 @@ const japanese = {
   'No profiles found.': 'プロファイルが見つかりません。',
   'No queued items in this queue.':
     'このキューにキューイングされた項目はありません。',
-  'No queues found': 'キューが見つかりません',
   'No remote nodes configured': 'リモートノードが設定されていません',
   'No running, retrying, or failed steps at the moment.':
     '現在、実行中、再試行中、または失敗したステップはありません。',
   'No runs': '実行なし',
+  "No webhooks yet": "Webhook はまだありません",
+  "Create a webhook from a workflow's Webhook tab to trigger it over HTTP.": "ワークフローの Webhook タブで Webhook を作成すると、HTTP で起動できます。",
+  "No webhook yet": "Webhook はまだありません",
+  "Create a webhook to trigger this workflow over HTTP.": "Webhook を作成すると、このワークフローを HTTP で起動できます。",
+  "Create webhook": "Webhook を作成",
+  "Queue not found": "キューが見つかりません",
+  "No queue named {name} exists.": "{name} という名前のキューは存在しません。",
+  "Terminal is turned off": "ターミナルは無効です",
+  "Set {setting} on the server to enable it.": "サーバーで {setting} を設定すると有効になります。",
+  "Git sync is not configured": "Git 同期は設定されていません",
+  "No active queues": "アクティブなキューはありません",
+  "Queues defined in the server configuration appear here, along with any queue that has running or waiting runs.": "サーバー設定で定義したキューと、実行中または待機中の実行があるキューがここに表示されます。",
   'No runs on': 'に実行はありません',
   'No saved artifact views yet.': '保存された成果物ビューはまだありません。',
   'No saved run views yet.': '保存されたランビューはまだありません。',
@@ -6044,9 +6055,6 @@ const japanese = {
   'No users found': 'ユーザーが見つかりません',
   'No visible queued items were returned for this queue.':
     'このキューには表示可能なキューイング項目が返されませんでした。',
-  'No Webhook Configured': 'Webhook が設定されていません',
-  'No webhooks found. Create webhooks from individual DAG pages.':
-    'Webhook が見つかりません。個々の DAG ページから Webhook を作成してください。',
   'No Wiki pages reference this DAG yet.':
     'まだこの DAG を参照する Wiki ページはありません。',
   'No Wiki pages yet.': 'まだ Wiki ページはありません。',
@@ -6602,8 +6610,6 @@ const japanese = {
   'Telegram topic ID': 'Telegram トピック ID',
   Template: 'テンプレート',
   Terminal: 'ターミナル',
-  'Terminal is not enabled. Set DAGU_TERMINAL_ENABLED=true to enable.':
-    'ターミナルは有効化されていません。有効にするには DAGU_TERMINAL_ENABLED=true を設定してください。',
   Test: 'テスト',
   'Test Connection': '接続テスト',
   'Testing...': 'テスト中...',
