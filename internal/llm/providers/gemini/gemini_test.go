@@ -369,6 +369,20 @@ func TestThinkingConfig(t *testing.T) {
 			wantThinking: `{"thinkingLevel":"LOW"}`,
 		},
 		{
+			name:         "3 Pro minimal falls back to low",
+			model:        "gemini-3-pro-preview",
+			thinking:     &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortMinimal},
+			wantThinking: `{"thinkingLevel":"LOW"}`,
+		},
+		{
+			// Medium sits between the two supported levels; the higher one wins.
+			name:          "3 Pro medium rounds up to high",
+			model:         "gemini-3-pro-preview",
+			thinking:      &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortMedium},
+			wantThinking:  `{"thinkingLevel":"HIGH"}`,
+			wantMaxTokens: 8192 + 4096,
+		},
+		{
 			name:         "Flash Lite Image low falls back to minimal",
 			model:        "gemini-3.1-flash-lite-image",
 			thinking:     &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortLow},

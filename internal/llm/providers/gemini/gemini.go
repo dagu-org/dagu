@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 
 	"github.com/dagucloud/dagu/v2/internal/llm"
@@ -349,11 +350,11 @@ func (p *Provider) buildGenerationConfig(req *llm.ChatRequest) *generationConfig
 			// Level-based models use their nearest supported effort level.
 			level := p.mapEffortToThinkingLevel(model, req.Thinking.Effort)
 			genConfig.ThinkingConfig = &thinkingConfig{
-				ThinkingLevel: strings.ToUpper(level),
+				ThinkingLevel: strings.ToUpper(string(level)),
 			}
 			thinkingBudget = max(
 				p.estimateThinkingBudget(req.Thinking.Effort),
-				p.estimateThinkingBudget(llm.ThinkingEffort(level)),
+				p.estimateThinkingBudget(level),
 			)
 		} else {
 			thinkingBudget = p.estimateThinkingBudget(req.Thinking.Effort)
@@ -391,31 +392,60 @@ func (p *Provider) buildGenerationConfig(req *llm.ChatRequest) *generationConfig
 	return genConfig
 }
 
+// thinkingLevels orders Gemini thinking levels from least to most reasoning.
+var thinkingLevels = []llm.ThinkingEffort{
+	llm.ThinkingEffortMinimal, llm.ThinkingEffortLow, llm.ThinkingEffortMedium, llm.ThinkingEffortHigh,
+}
+
+// limitedThinkingLevels lists models that accept only some thinking levels,
+// each in ascending order. Other level-based models accept every level.
+var limitedThinkingLevels = []struct {
+	model  string
+	levels []llm.ThinkingEffort
+}{
+	{"gemini-3-pro", []llm.ThinkingEffort{llm.ThinkingEffortLow, llm.ThinkingEffortHigh}},
+	{"gemini-3.1-pro", []llm.ThinkingEffort{llm.ThinkingEffortLow, llm.ThinkingEffortMedium, llm.ThinkingEffortHigh}},
+	{"gemini-3.8-flash", []llm.ThinkingEffort{llm.ThinkingEffortLow, llm.ThinkingEffortMedium, llm.ThinkingEffortHigh}},
+	{"gemini-3.1-flash-image", []llm.ThinkingEffort{llm.ThinkingEffortMinimal, llm.ThinkingEffortHigh}},
+	{"gemini-3.1-flash-lite-image", []llm.ThinkingEffort{llm.ThinkingEffortMinimal, llm.ThinkingEffortHigh}},
+}
+
 // mapEffortToThinkingLevel maps effort to the nearest level supported by the model.
-func (p *Provider) mapEffortToThinkingLevel(model string, effort llm.ThinkingEffort) string {
-	level := "medium"
+func (p *Provider) mapEffortToThinkingLevel(model string, effort llm.ThinkingEffort) llm.ThinkingEffort {
+	level := llm.ThinkingEffortMedium
 	switch effort {
 	case llm.ThinkingEffortNone, llm.ThinkingEffortMinimal:
-		level = "minimal"
+		level = llm.ThinkingEffortMinimal
 	case llm.ThinkingEffortLow:
-		level = "low"
+		level = llm.ThinkingEffortLow
 	case llm.ThinkingEffortMedium:
-		level = "medium"
+		level = llm.ThinkingEffortMedium
 	case llm.ThinkingEffortHigh, llm.ThinkingEffortXHigh, llm.ThinkingEffortMax:
-		level = "high"
+		level = llm.ThinkingEffortHigh
 	}
-	if level == "minimal" && (strings.Contains(model, "gemini-3.1-pro") || strings.Contains(model, "gemini-3.8-flash")) {
-		return "low"
-	}
-	if strings.Contains(model, "gemini-3.1-flash-lite-image") || strings.Contains(model, "gemini-3.1-flash-image") {
-		switch level {
-		case "low":
-			return "minimal"
-		case "medium":
-			return "high"
+	for _, limited := range limitedThinkingLevels {
+		if strings.Contains(model, limited.model) {
+			return nearestThinkingLevel(level, limited.levels)
 		}
 	}
 	return level
+}
+
+// nearestThinkingLevel returns the supported level closest to want, preferring
+// the higher one on a tie. Supported levels must be in ascending order.
+func nearestThinkingLevel(want llm.ThinkingEffort, supported []llm.ThinkingEffort) llm.ThinkingEffort {
+	wantRank := slices.Index(thinkingLevels, want)
+	nearest, nearestDistance := supported[0], len(thinkingLevels)
+	for _, level := range supported {
+		distance := slices.Index(thinkingLevels, level) - wantRank
+		if distance < 0 {
+			distance = -distance
+		}
+		if distance <= nearestDistance {
+			nearest, nearestDistance = level, distance
+		}
+	}
+	return nearest
 }
 
 // estimateThinkingBudget estimates token budget for effort levels when using thinkingLevel.
