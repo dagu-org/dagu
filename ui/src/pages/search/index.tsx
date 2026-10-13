@@ -472,7 +472,7 @@ function Search() {
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
 
   return (
-    <div className="max-w-5xl">
+    <div>
       <div className="w-full">
         <Title>
           <I18nText text={'Search'} />

@@ -664,7 +664,7 @@ export default function ProfilesPage(): React.ReactNode {
   }
 
   return (
-    <div className="flex h-full min-h-0 max-w-7xl flex-col gap-4 overflow-hidden">
+    <div className="flex h-full min-h-0 flex-col gap-4 overflow-hidden">
       <div className="shrink-0">
         <h1 className="text-2xl font-semibold tracking-[-0.01em]">
           <I18nText text={'Profiles & Secrets'} />

@@ -149,7 +149,7 @@ export default function APIKeysPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4 max-w-7xl">
+    <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-[-0.01em]">

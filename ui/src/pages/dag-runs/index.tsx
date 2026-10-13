@@ -1361,7 +1361,7 @@ function DAGRuns() {
     activeRunViewId === null && areFiltersEqual(currentFilters, defaultFilters);
 
   return (
-    <div className="max-w-7xl">
+    <div>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-3">
           <Title>

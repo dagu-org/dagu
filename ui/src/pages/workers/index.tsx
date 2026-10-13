@@ -153,7 +153,7 @@ function Workers() {
   }
 
   return (
-    <div className="flex flex-col gap-3 max-w-7xl h-full overflow-hidden">
+    <div className="flex flex-col gap-3 h-full overflow-hidden">
       {/* Header with search and refresh */}
       <div className="card-obsidian flex-shrink-0">
         <div className="flex items-center justify-between p-3">

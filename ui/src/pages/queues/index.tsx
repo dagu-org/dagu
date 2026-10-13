@@ -141,7 +141,7 @@ function Queues() {
   }
 
   return (
-    <div className="flex h-full max-w-7xl flex-col gap-4 overflow-hidden">
+    <div className="flex h-full flex-col gap-4 overflow-hidden">
       <div className="flex flex-col gap-1">
         <Title><I18nText text={"Queues"} /></Title>
         <p className="text-sm text-muted-foreground">

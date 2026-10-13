@@ -1152,7 +1152,7 @@ function DAGsContent() {
   );
 
   return (
-    <div className="max-w-7xl">
+    <div>
       <DAGListHeader onRefresh={refreshFn} />
       {filtersReady && data ? (
         <>

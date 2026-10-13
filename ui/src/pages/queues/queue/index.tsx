@@ -274,7 +274,7 @@ function QueueDetailsPage() {
 
   return (
     <>
-      <div className="flex h-full max-w-7xl flex-col gap-4 overflow-hidden">
+      <div className="flex h-full flex-col gap-4 overflow-hidden">
         <Title>
           <I18nText text={'Queue'} />
         </Title>
