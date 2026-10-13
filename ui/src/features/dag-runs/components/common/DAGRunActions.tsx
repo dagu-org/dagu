@@ -53,6 +53,12 @@ type Props = {
   displayMode?: 'compact' | 'full';
   /** Whether this is a root level dagRun (controls availability of retry/stop actions) */
   isRootLevel?: boolean;
+  /**
+   * Hide actions that do not apply to the run's current state instead of
+   * disabling them. A sub-run still shows Retry, disabled, so its tooltip
+   * can point to the top-level run.
+   */
+  hideUnavailable?: boolean;
 };
 
 /**
@@ -64,6 +70,7 @@ function DAGRunActions({
   refresh,
   displayMode = 'compact',
   isRootLevel = true,
+  hideUnavailable = false,
 }: Props) {
   const { ts } = useI18n();
   const remoteNode = useRemoteNode();
@@ -197,7 +204,9 @@ function DAGRunActions({
         className={`flex items-center ${displayMode === 'compact' ? 'space-x-1' : 'space-x-2'}`}
       >
         {/* Stop / Reject Button */}
-        {isWaiting && hasWaitingApprovals ? (
+        {hideUnavailable &&
+        !buttonState.terminate &&
+        !buttonState.reject ? null : isWaiting && hasWaitingApprovals ? (
           <Tooltip>
             <TooltipTrigger asChild>
               <span>
@@ -246,60 +255,66 @@ function DAGRunActions({
         )}
 
         {/* Retry Button */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span>
-              <ActionButton
-                label={displayMode !== 'compact'}
-                icon={<RefreshCw className="h-4 w-4" />}
-                disabled={!buttonState['retry']}
-                onClick={() => setIsRetryModal(true)}
-                className="cursor-pointer"
-              >
-                <I18nText text={'Retry'} />
-              </ActionButton>
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>
-              {isRootLevel ? (
-                <I18nText text={'Retry DAGRun execution'} />
-              ) : (
-                <I18nText
-                  text={'Retry action only available at root dagRun level'}
-                />
-              )}
-            </p>
-          </TooltipContent>
-        </Tooltip>
+        {(!hideUnavailable || buttonState.retry || !isRootLevel) && (
+          <Tooltip>
+            {/* On a sub-run the disabled button cannot take focus, so the
+                wrapper does, letting keyboard users read why. */}
+            <TooltipTrigger asChild>
+              <span tabIndex={isRootLevel ? undefined : 0}>
+                <ActionButton
+                  label={displayMode !== 'compact'}
+                  icon={<RefreshCw className="h-4 w-4" />}
+                  disabled={!buttonState['retry']}
+                  onClick={() => setIsRetryModal(true)}
+                  className="cursor-pointer"
+                >
+                  <I18nText text={'Retry'} />
+                </ActionButton>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>
+                {isRootLevel ? (
+                  <I18nText text={'Retry DAGRun execution'} />
+                ) : (
+                  <I18nText
+                    text={'Retry action only available at root dagRun level'}
+                  />
+                )}
+              </p>
+            </TooltipContent>
+          </Tooltip>
+        )}
 
         {/* Dequeue Button */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span>
-              <ActionButton
-                label={displayMode !== 'compact'}
-                icon={<X className="h-4 w-4" />}
-                disabled={!buttonState['dequeue']}
-                onClick={() => setIsDequeueModal(true)}
-                className="cursor-pointer"
-              >
-                <I18nText text={'Dequeue'} />
-              </ActionButton>
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>
-              {isRootLevel ? (
-                <I18nText text={'Remove DAGRun from queue'} />
-              ) : (
-                <I18nText
-                  text={'Dequeue action only available at root dagRun level'}
-                />
-              )}
-            </p>
-          </TooltipContent>
-        </Tooltip>
+        {(!hideUnavailable || buttonState.dequeue) && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span>
+                <ActionButton
+                  label={displayMode !== 'compact'}
+                  icon={<X className="h-4 w-4" />}
+                  disabled={!buttonState['dequeue']}
+                  onClick={() => setIsDequeueModal(true)}
+                  className="cursor-pointer"
+                >
+                  <I18nText text={'Dequeue'} />
+                </ActionButton>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>
+                {isRootLevel ? (
+                  <I18nText text={'Remove DAGRun from queue'} />
+                ) : (
+                  <I18nText
+                    text={'Dequeue action only available at root dagRun level'}
+                  />
+                )}
+              </p>
+            </TooltipContent>
+          </Tooltip>
+        )}
 
         {/* Stop Confirmation Modal */}
         <I18nProps>

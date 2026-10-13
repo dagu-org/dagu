@@ -862,6 +862,7 @@ function NodeStatusTableRow({
             <div className="flex items-center justify-center gap-2">
               {hasLogs && (
                 <button
+                  type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     setIsLogExpanded(!isLogExpanded);
@@ -870,6 +871,8 @@ function NodeStatusTableRow({
                     }
                   }}
                   className="text-muted-foreground hover:text-foreground/90"
+                  aria-expanded={isLogExpanded}
+                  aria-label={ts(isLogExpanded ? 'Hide logs' : 'Show logs')}
                 >
                   {isLogExpanded ? (
                     <ChevronDown className="h-4 w-4" />
@@ -978,7 +981,7 @@ function NodeStatusTableRow({
 
           {/* Combined Command & Args */}
           <TableCell>
-            <div className="space-y-1.5">
+            <div className="min-w-0 space-y-1.5">
               {isHarnessStep(node.step) ? (
                 <HarnessStepSummary step={node.step} />
               ) : logStepDisplayMessage !== null ? (
@@ -1143,7 +1146,10 @@ function NodeStatusTableRow({
 
               {/* Errors - Simplified */}
               {node.error && (
-                <div className="text-xs text-error leading-relaxed whitespace-normal break-words">
+                <div
+                  className="line-clamp-3 text-xs leading-relaxed whitespace-pre-wrap break-words text-error"
+                  title={node.error}
+                >
                   {node.error}
                 </div>
               )}

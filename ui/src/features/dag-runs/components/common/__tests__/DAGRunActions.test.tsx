@@ -182,4 +182,71 @@ describe('DAGRunActions', () => {
 
     expect(screen.getByRole('button', { name: 'Stop' })).toBeDisabled();
   });
+
+  it('hides actions that do not apply when asked', () => {
+    const finishedRun = {
+      name: 'nightly',
+      dagRunId: 'run-1',
+      status: Status.Success,
+      statusLabel: StatusLabel.succeeded,
+      artifactsAvailable: false,
+      autoRetryCount: 0,
+      startedAt: '',
+      finishedAt: '',
+    };
+    const { rerender } = render(
+      <DAGRunActions
+        dagRun={finishedRun}
+        name="nightly"
+        displayMode="full"
+        hideUnavailable
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Stop' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Dequeue' })).toBeNull();
+
+    rerender(
+      <DAGRunActions
+        dagRun={{
+          ...finishedRun,
+          status: Status.Queued,
+          statusLabel: StatusLabel.queued,
+        }}
+        name="nightly"
+        displayMode="full"
+        hideUnavailable
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Dequeue' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+  });
+
+  it('keeps a disabled Retry on sub-runs when hiding unavailable actions', () => {
+    render(
+      <DAGRunActions
+        dagRun={{
+          name: 'child',
+          dagRunId: 'run-2',
+          status: Status.Success,
+          statusLabel: StatusLabel.succeeded,
+          artifactsAvailable: false,
+          autoRetryCount: 0,
+          startedAt: '',
+          finishedAt: '',
+        }}
+        name="child"
+        displayMode="full"
+        hideUnavailable
+        isRootLevel={false}
+      />
+    );
+
+    const retry = screen.getByRole('button', { name: 'Retry' });
+    expect(retry).toBeDisabled();
+    // The disabled button cannot take focus, so its wrapper does.
+    expect(retry.parentElement).toHaveAttribute('tabindex', '0');
+  });
 });

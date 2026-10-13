@@ -664,11 +664,12 @@ function DAGSpec({ fileName, localDags, editorHints }: Props) {
                 <BorderedBox
                   className={
                     fillGraph
-                      ? 'flex min-h-0 flex-1 flex-col p-4'
-                      : 'py-4 px-4 flex flex-col overflow-x-auto'
+                      ? 'flex min-h-0 flex-1 flex-col gap-0 overflow-hidden p-0'
+                      : 'flex flex-col gap-0 overflow-x-auto p-0'
                   }
                 >
                   <Graph
+                    toolbarStart={<GraphInteractionsHint inspect />}
                     steps={dag.steps}
                     name={dag.name}
                     type="config"
@@ -679,7 +680,6 @@ function DAGSpec({ fileName, localDags, editorHints }: Props) {
                     height={fillGraph ? '100%' : undefined}
                   />
                 </BorderedBox>
-                <GraphInteractionsHint className="mt-2" inspect />
               </div>
             )}
 
