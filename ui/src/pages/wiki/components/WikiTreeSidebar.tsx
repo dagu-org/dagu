@@ -1042,6 +1042,13 @@ function WikiTreeSidebar({
                     <I18nText text={'Create your first Wiki page'} />
                   </button>
                 )}
+                {canEdit && !canCreateNew && (
+                  <p className="max-w-56 text-xs text-muted-foreground">
+                    <I18nText
+                      text={'Choose a workspace in the sidebar to create pages.'}
+                    />
+                  </p>
+                )}
               </>
             )}
           </div>

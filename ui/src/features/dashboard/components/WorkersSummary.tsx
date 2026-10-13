@@ -74,14 +74,11 @@ function WorkersSummary({
   }, [workers]);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex min-h-0 flex-1 flex-col">
       {/* Header with metrics */}
-      <div className="flex items-center justify-between px-3 py-2 border-b flex-shrink-0">
-        <div className="flex items-center gap-2">
-          <Activity className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-medium"><I18nText text={"Workers"} /></span>
-        </div>
-        <div className="flex items-center gap-5 text-xs text-muted-foreground">
+      <div className="flex flex-shrink-0 items-center gap-2 border-b px-3 py-2">
+        <Activity className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-muted-foreground">
           <div className="flex items-baseline gap-1">
             <span className="text-sm font-light tabular-nums text-foreground">
               {metrics.totalWorkers}
@@ -113,9 +110,9 @@ function WorkersSummary({
       </div>
 
       {/* Worker list */}
-      <div className="flex-1 min-h-0 overflow-auto">
+      <div className="flex min-h-0 flex-1 flex-col overflow-auto">
         {isLoading && workers.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+          <div className="flex flex-1 items-center justify-center py-6 text-sm text-muted-foreground">
             <I18nText text={"Loading workers..."} />
           </div>
         ) : errors && errors.length > 0 ? (
@@ -125,7 +122,7 @@ function WorkersSummary({
             ))}
           </div>
         ) : workers.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+          <div className="flex flex-1 items-center justify-center py-6 text-sm text-muted-foreground">
             <I18nText text={"No workers connected"} />
           </div>
         ) : (
