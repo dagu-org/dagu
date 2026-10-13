@@ -257,8 +257,10 @@ function DAGRunActions({
         {/* Retry Button */}
         {(!hideUnavailable || buttonState.retry || !isRootLevel) && (
           <Tooltip>
+            {/* On a sub-run the disabled button cannot take focus, so the
+                wrapper does, letting keyboard users read why. */}
             <TooltipTrigger asChild>
-              <span>
+              <span tabIndex={isRootLevel ? undefined : 0}>
                 <ActionButton
                   label={displayMode !== 'compact'}
                   icon={<RefreshCw className="h-4 w-4" />}

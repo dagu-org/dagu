@@ -66,6 +66,9 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const { copied: linkCopied, copy: copyLink } = useCopyFeedback();
   const { copied: runIdCopied, copy: copyRunId } = useCopyFeedback();
+  // Announces whichever copy happened last, even while the other's feedback
+  // is still showing.
+  const [lastCopy, setLastCopy] = React.useState<'link' | 'runId' | null>(null);
 
   const copyRunLink = () => {
     const basePrefix = config.basePath === '/' ? '' : (config.basePath ?? '');
@@ -76,6 +79,7 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({
       subDAGRunId:
         dagRun.dagRunId !== dagRun.rootDAGRunId ? dagRun.dagRunId : undefined,
     });
+    setLastCopy('link');
     void copyLink(`${window.location.origin}${basePrefix}${runPath}`);
   };
 
@@ -295,7 +299,10 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({
               <I18nProps>
                 <button
                   type="button"
-                  onClick={() => void copyRunId(dagRun.dagRunId)}
+                  onClick={() => {
+                    setLastCopy('runId');
+                    void copyRunId(dagRun.dagRunId);
+                  }}
                   className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                   title={runIdCopied ? 'Copied' : 'Copy run ID'}
                   aria-label={runIdCopied ? 'Copied' : 'Copy run ID'}
@@ -360,10 +367,10 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({
             </button>
           </I18nProps>
           <span className="sr-only" aria-live="polite">
-            {linkCopied ? (
-              <I18nText text={'Run link copied to clipboard'} />
-            ) : runIdCopied ? (
+            {lastCopy === 'runId' && runIdCopied ? (
               <I18nText text={'Run ID copied to clipboard'} />
+            ) : lastCopy === 'link' && linkCopied ? (
+              <I18nText text={'Run link copied to clipboard'} />
             ) : (
               ''
             )}

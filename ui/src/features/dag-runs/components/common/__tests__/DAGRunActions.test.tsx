@@ -244,6 +244,9 @@ describe('DAGRunActions', () => {
       />
     );
 
-    expect(screen.getByRole('button', { name: 'Retry' })).toBeDisabled();
+    const retry = screen.getByRole('button', { name: 'Retry' });
+    expect(retry).toBeDisabled();
+    // The disabled button cannot take focus, so its wrapper does.
+    expect(retry.parentElement).toHaveAttribute('tabindex', '0');
   });
 });
