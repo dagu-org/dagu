@@ -514,14 +514,11 @@ describe('DAGStatus', () => {
   });
 
   describe('URL state', () => {
-    function renderWithURLState(
+    function urlStateView(
       selectedRun: components['schemas']['DAGRunDetails'],
       props: Partial<React.ComponentProps<typeof DAGStatus>>
     ) {
-      vi.mocked(useClient).mockReturnValue({
-        PATCH: patchMock,
-      } as unknown as ReturnType<typeof useClient>);
-      return render(
+      return (
         <MemoryRouter>
           <AppBarContext.Provider value={appBarValue}>
             <DAGContext.Provider
@@ -540,6 +537,16 @@ describe('DAGStatus', () => {
           </AppBarContext.Provider>
         </MemoryRouter>
       );
+    }
+
+    function renderWithURLState(
+      selectedRun: components['schemas']['DAGRunDetails'],
+      props: Partial<React.ComponentProps<typeof DAGStatus>>
+    ) {
+      vi.mocked(useClient).mockReturnValue({
+        PATCH: patchMock,
+      } as unknown as ReturnType<typeof useClient>);
+      return render(urlStateView(selectedRun, props));
     }
 
     // Writing an automatic switch into the URL would pin it there, so a
@@ -564,6 +571,33 @@ describe('DAGStatus', () => {
 
       fireEvent.keyDown(drawer, { key: 'Escape' });
       expect(onStepSelect).toHaveBeenLastCalledWith(undefined);
+    });
+
+    // A link to a step outranks the switch to a waiting action.
+    it('keeps a step named on load open on a run that waits for action', async () => {
+      renderWithURLState(waitingHumanTaskRun('run-1'), {
+        initialStepName: 'step',
+      });
+
+      expect(await screen.findByRole('dialog', { name: 'step' })).toBeVisible();
+      expect(screen.queryByText('Human task panel')).not.toBeInTheDocument();
+    });
+
+    it('follows the tab and step when the URL changes', async () => {
+      const { rerender } = renderWithURLState(dagRun, {
+        initialTab: 'outputs',
+      });
+      expect(screen.getByText('Outputs panel')).toBeVisible();
+
+      rerender(urlStateView(dagRun, { initialStepName: 'step' }));
+      expect(await screen.findByRole('dialog', { name: 'step' })).toBeVisible();
+
+      rerender(urlStateView(dagRun, {}));
+      await waitFor(() =>
+        expect(
+          screen.queryByRole('dialog', { name: 'step' })
+        ).not.toBeInTheDocument()
+      );
     });
 
     it('reports a step opened from the graph', async () => {

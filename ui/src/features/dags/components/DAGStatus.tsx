@@ -176,6 +176,12 @@ function DAGStatus({
   const [internalActiveTab, setInternalActiveTab] = useState<StatusTab>(initialTab);
   const activeTab = controlledActiveTab ?? internalActiveTab;
   const isTabControlled = controlledActiveTab !== undefined;
+  // Follows a tab change from the URL, such as navigating to another run.
+  useEffect(() => {
+    if (!isTabControlled) {
+      setInternalActiveTab(initialTab);
+    }
+  }, [initialTab, isTabControlled]);
   const [selectedAgentStep, setSelectedAgentStep] = useState('');
   const [displayDAGRun, setDisplayDAGRun] = useState(dagRun);
 
@@ -237,17 +243,24 @@ function DAGStatus({
     onStepSelectRef.current?.(stepName);
   }, []);
 
-  // A step named on load opens once the run lists it.
-  const initialStepOpened = React.useRef(false);
+  // Each step named by the URL opens once the run lists it, and the drawer
+  // closes when the URL stops naming one.
+  const appliedStepName = React.useRef<string | undefined>(undefined);
+  const stepLinked = React.useRef(initialStepName);
+  stepLinked.current = initialStepName;
   useEffect(() => {
-    if (
-      initialStepOpened.current ||
-      !initialStepName ||
-      !dagRun.nodes?.some((node) => node.step.name === initialStepName)
-    ) {
+    if (initialStepName === appliedStepName.current) {
       return;
     }
-    initialStepOpened.current = true;
+    if (!initialStepName) {
+      appliedStepName.current = undefined;
+      setIsStepDetailsOpen(false);
+      return;
+    }
+    if (!dagRun.nodes?.some((node) => node.step.name === initialStepName)) {
+      return;
+    }
+    appliedStepName.current = initialStepName;
     setSelectedDetailStepName(initialStepName);
     setIsStepDetailsOpen(true);
   }, [dagRun.nodes, initialStepName]);
@@ -620,9 +633,10 @@ function DAGStatus({
   ]);
 
   // Surface a newly available manual action from the default status tab.
-  // A summary shows the action inline instead.
+  // A summary shows the action inline instead, and a step named by the URL
+  // stays in view.
   useEffect(() => {
-    if (summary) {
+    if (summary || stepLinked.current) {
       return;
     }
     setActiveTab((currentTab) => {
