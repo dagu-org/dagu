@@ -1255,7 +1255,7 @@ function NotificationRulesContent() {
     : saveGlobalRoutes;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex max-w-5xl flex-col gap-4">
       <NotificationHeader />
       <StatusCard error={error ?? loadError} notice={notice} />
       {isLoading ? (
@@ -1657,7 +1657,7 @@ function NotificationChannelsContent({ remoteNode }: { remoteNode: string }) {
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex max-w-5xl flex-col gap-4">
       <NotificationHeader activeTab="channels" />
       <StatusCard error={loadError} notice={notice} />
       {isLoading && (
