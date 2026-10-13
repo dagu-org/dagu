@@ -368,7 +368,7 @@ function Dashboard(): React.ReactElement {
             </section>
           </div>
           {live && (
-            <aside className="flex flex-col gap-6">
+            <div className="flex flex-col gap-6">
               <InProgress
                 runs={inProgressRuns(filteredActivity)}
                 remoteNode={remoteNode}
@@ -378,7 +378,7 @@ function Dashboard(): React.ReactElement {
                 remoteNode={remoteNode}
                 tzOffsetSeconds={tzOffset}
               />
-            </aside>
+            </div>
           )}
         </div>
       </>
