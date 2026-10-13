@@ -115,7 +115,7 @@ describe('DAGDetailsContent', () => {
     renderContent();
 
     for (const label of [
-      'Latest Run',
+      'Overview',
       'Incidents',
       'Spec',
       'Webhook',

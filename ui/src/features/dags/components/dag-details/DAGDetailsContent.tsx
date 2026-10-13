@@ -153,7 +153,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
 
   const showLogTab = activeTab === 'log' || activeTab === 'dagRun-log';
   const tabs: DetailTab[] = [
-    { value: 'status', label: 'Latest Run', icon: PlayCircle, path: '' },
+    { value: 'status', label: 'Overview', icon: PlayCircle, path: '' },
     { value: 'spec', label: 'Spec', icon: FileCode, path: '/spec' },
     { value: 'webhook', label: 'Webhook', icon: Webhook, path: '/webhook' },
     {
@@ -277,6 +277,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
                 fileName={fileName || ''}
                 artifactEnabled={!!dag.artifacts?.enabled}
                 fillHeight={fillHeight}
+                summary
               />
               <div className="h-6 flex-shrink-0" />
             </>

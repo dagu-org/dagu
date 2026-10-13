@@ -721,6 +721,51 @@ describe('DAGStatus', () => {
     expect(refresh).not.toHaveBeenCalled();
   });
 
+  describe('summary', () => {
+    function renderSummary(
+      selectedRun: components['schemas']['DAGRunDetails']
+    ) {
+      return render(
+        <MemoryRouter>
+          <AppBarContext.Provider value={appBarValue}>
+            <DAGContext.Provider
+              value={{
+                refresh: vi.fn(),
+                name: selectedRun.name,
+                fileName: 'example.yaml',
+              }}
+            >
+              <DAGStatus dagRun={selectedRun} fileName="example.yaml" summary />
+            </DAGContext.Provider>
+          </AppBarContext.Provider>
+        </MemoryRouter>
+      );
+    }
+
+    it('shows the run status without run tabs and links to the run page', () => {
+      renderSummary(dagRun);
+
+      expect(
+        screen.queryByRole('button', { name: 'Outputs' })
+      ).not.toBeInTheDocument();
+      expect(screen.getByText('Node status table')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /Open run/ })).toHaveAttribute(
+        'href',
+        `/dag-runs/${dagRun.name}/${dagRun.dagRunId}?remoteNode=local`
+      );
+    });
+
+    // Answering a human task must not require leaving the workflow page.
+    it('keeps a waiting human task on the page instead of switching tabs', () => {
+      renderSummary(waitingHumanTaskRun('run-1'));
+
+      expect(
+        screen.getByRole('region', { name: 'Action required' })
+      ).toHaveTextContent('Human task panel');
+      expect(screen.getByText('Node status table')).toBeInTheDocument();
+    });
+  });
+
   it('passes the DAG run name to the approval tab when fileName differs', () => {
     vi.mocked(useClient).mockReturnValue({
       PATCH: patchMock,

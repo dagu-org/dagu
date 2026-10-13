@@ -7,6 +7,7 @@ import {
   ActivitySquare,
   AlertTriangle,
   Archive,
+  ArrowRight,
   Bot,
   ClipboardCheck,
   FileCode,
@@ -19,7 +20,7 @@ import {
 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { useCookies } from 'react-cookie';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { components, NodeStatus, Status, Stream } from '../../../api/v1/schema';
 import { useConfig } from '../../../contexts/ConfigContext';
 import { useRemoteNode } from '../../../contexts/RemoteNodeContext';
@@ -27,6 +28,7 @@ import { useClient } from '../../../hooks/api';
 import { cn, toMermaidNodeId } from '../../../lib/utils';
 import BorderedBox from '@/components/ui/bordered-box';
 import { DAGRunOutputs } from '../../dag-runs/components/dag-run-details';
+import { buildDAGRunPageURL } from '../../dag-runs/lib/dagRunUrls';
 import { getManualActionState } from '../../dag-runs/lib/manualActionState';
 import { DAGContext } from '../contexts/DAGContext';
 import { getEventHandlers } from '../lib/getEventHandlers';
@@ -71,6 +73,11 @@ type Props = {
   activeTab?: StatusTab;
   onTabChange?: (tab: StatusTab) => void;
   fillHeight?: boolean;
+  /**
+   * Shows only the run's status and any action waiting on a person, with a
+   * link to the run page for the other run views.
+   */
+  summary?: boolean;
 };
 
 export type StatusTab =
@@ -94,6 +101,49 @@ function isSubDAGRun(dagRun: components['schemas']['DAGRunDetails']): boolean {
   );
 }
 
+/**
+ * Names the shown run and links to its page, where the timeline, outputs,
+ * artifacts, and run spec live. An agent waiting for an answer is pointed
+ * there too, since its conversation needs the full view.
+ */
+function RunSummaryBar({
+  dagRun,
+  remoteNode,
+  waitingAgentCount,
+}: {
+  dagRun: components['schemas']['DAGRunDetails'];
+  remoteNode: string;
+  waitingAgentCount: number;
+}) {
+  const subRun = isSubDAGRun(dagRun);
+  const runURL = buildDAGRunPageURL({
+    rootDAGRunName: subRun ? dagRun.rootDAGRunName : dagRun.name,
+    rootDAGRunId: subRun ? dagRun.rootDAGRunId : dagRun.dagRunId,
+    subDAGRunId: subRun ? dagRun.dagRunId : undefined,
+    remoteNode,
+  });
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <p className="text-sm text-muted-foreground">
+        {waitingAgentCount > 0 ? (
+          <I18nText text={'An agent is waiting for an answer.'} />
+        ) : (
+          <I18nText
+            text={'Timeline, outputs, and artifacts are on the run page.'}
+          />
+        )}
+      </p>
+      <Link
+        to={runURL}
+        className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+      >
+        <I18nText text={'Open run'} />
+        <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+      </Link>
+    </div>
+  );
+}
+
 function DAGStatus({
   dagRun,
   fileName,
@@ -102,6 +152,7 @@ function DAGStatus({
   activeTab: controlledActiveTab,
   onTabChange,
   fillHeight = false,
+  summary = false,
 }: Props) {
   const { ts } = useI18n();
   const dagContext = React.useContext(DAGContext);
@@ -562,7 +613,11 @@ function DAGStatus({
   ]);
 
   // Surface a newly available manual action from the default status tab.
+  // A summary shows the action inline instead.
   useEffect(() => {
+    if (summary) {
+      return;
+    }
     setActiveTab((currentTab) => {
       if (currentTab !== 'status') {
         return currentTab;
@@ -583,6 +638,7 @@ function DAGStatus({
     waitingAgentCount,
     hasHumanTaskWork,
     hasWaitingApprovals,
+    summary,
   ]);
 
   const scrollPaneClassName = fillHeight
@@ -599,6 +655,7 @@ function DAGStatus({
         )}
       >
         {/* Status Detail Tabs */}
+        {!summary && (
         <div
           className={cn(
             'w-full min-w-0 max-w-full overflow-hidden',
@@ -769,6 +826,7 @@ function DAGStatus({
             </div>
           </div>
         </div>
+        )}
 
         {displayDAGRun.status === Status.Waiting &&
           displayDAGRun.approvalResumePending && (
@@ -787,6 +845,40 @@ function DAGStatus({
             stack={childRunStack}
             onChange={setChildRunStack}
           />
+        )}
+
+        {summary && (
+          <RunSummaryBar
+            dagRun={displayDAGRun}
+            remoteNode={remoteNode}
+            waitingAgentCount={waitingAgentCount}
+          />
+        )}
+        {summary && (hasWaitingApprovals || hasHumanTaskWork) && (
+          <section
+            aria-labelledby="action-required-title"
+            className="space-y-3 rounded-lg border border-warning/40 bg-warning/5 p-4"
+          >
+            <h2
+              id="action-required-title"
+              className="text-sm font-semibold text-foreground"
+            >
+              <I18nText text={'Action required'} />
+            </h2>
+            {hasHumanTaskWork && (
+              <HumanTasksTab
+                key={displayDAGRunIdentity}
+                dagRun={displayDAGRun}
+                onChanged={dagContext.refresh}
+              />
+            )}
+            {hasWaitingApprovals && (
+              <ApprovalTab
+                dagRun={displayDAGRun}
+                dagName={displayDAGRun.name}
+              />
+            )}
+          </section>
         )}
 
         {activeTab === 'status' && (
