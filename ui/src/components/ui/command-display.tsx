@@ -66,16 +66,19 @@ export const CommandDisplay: React.FC<CommandDisplayProps> = ({
 
     const element = (
       <div
-        className={`flex items-center gap-1.5 text-xs font-medium ${className}`}
+        className={`flex min-w-0 max-w-full items-center gap-1.5 text-xs font-medium ${className}`}
       >
         <Icon className="h-4 w-4 text-primary flex-shrink-0" />
-        <span className="bg-muted rounded-md px-1.5 py-0.5 text-foreground/90 font-mono">
+        <span className="min-w-0 truncate whitespace-pre rounded-md bg-muted px-1.5 py-0.5 font-mono text-foreground/90">
           {truncated}
         </span>
       </div>
     );
 
-    if (!showFullInTooltip || !isTruncated) return element;
+    // The cell may also clip the text, so long commands always get a tooltip.
+    if (!showFullInTooltip || (!isTruncated && fullCmd.length <= 24)) {
+      return element;
+    }
 
     return (
       <Tooltip>

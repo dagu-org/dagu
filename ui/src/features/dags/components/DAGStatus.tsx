@@ -921,14 +921,19 @@ function DAGStatus({
 
             {/* Lifecycle Hooks */}
             {handlers?.length ? (
-              <NodeStatusTable
-                nodes={handlers}
-                status={displayDAGRun}
-                fileName={fileName}
-                onViewLog={handleViewLog}
-                onNodeStatusUpdated={applyDisplayNodeStatus}
-                hideActions
-              />
+              <section className="space-y-2">
+                <h3 className="text-sm font-semibold text-foreground">
+                  <I18nText text={'Lifecycle handlers'} />
+                </h3>
+                <NodeStatusTable
+                  nodes={handlers}
+                  status={displayDAGRun}
+                  fileName={fileName}
+                  onViewLog={handleViewLog}
+                  onNodeStatusUpdated={applyDisplayNodeStatus}
+                  hideActions
+                />
+              </section>
             ) : null}
           </div>
         )}

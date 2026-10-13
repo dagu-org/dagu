@@ -68,19 +68,19 @@ function NodeStatusTable({
       {/* Desktop view - Table with horizontal scroll for intermediate sizes */}
       <div className="hidden md:block w-full overflow-x-auto">
         <div className="min-w-[900px]">
-          <Table className="w-full">
+          <Table className="w-full table-fixed">
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[5%] text-center"><I18nText text={"No"} /></TableHead>
-                <TableHead className="w-[20%]"><I18nText text={"Step Name"} /></TableHead>
-                <TableHead className="w-[15%]"><I18nText text={"Execution"} /></TableHead>
-                <TableHead className="w-[15%]"><I18nText text={"Last Run"} /></TableHead>
-                <TableHead className="w-[10%] text-center"><I18nText text={"Status"} /></TableHead>
-                <TableHead className="w-[35%] min-w-[150px]">
+                <TableHead className="w-14 text-center"><I18nText text={"No"} /></TableHead>
+                <TableHead className="w-[22%]"><I18nText text={"Step Name"} /></TableHead>
+                <TableHead className="w-[22%]"><I18nText text={"Execution"} /></TableHead>
+                <TableHead className="w-[14%]"><I18nText text={"Last Run"} /></TableHead>
+                <TableHead className="w-28 text-center"><I18nText text={"Status"} /></TableHead>
+                <TableHead>
                   <I18nText text={"Error / Logs"} />
                 </TableHead>
                 {showActionsColumn && (
-                  <TableHead className="w-[8%] text-center"><I18nText text={"Actions"} /></TableHead>
+                  <TableHead className="w-20 text-center"><I18nText text={"Actions"} /></TableHead>
                 )}
               </TableRow>
             </TableHeader>
