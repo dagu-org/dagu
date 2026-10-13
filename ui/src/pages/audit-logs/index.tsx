@@ -594,7 +594,7 @@ export default function AuditLogsPage() {
       .slice(0, 3)
       .map(([key, value]) => {
         if (Array.isArray(value)) {
-          return `${key}: ${value.length} items`;
+          return `${key}: ${value.length} ${value.length === 1 ? 'item' : 'items'}`;
         }
         if (value && typeof value === 'object') {
           return `${key}: structured data`;

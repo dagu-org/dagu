@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import StatusChip from '@/components/ui/status-chip';
 import dayjs from '@/lib/dayjs';
 import { I18nText } from '@/i18n/I18nText';
+import { useI18n } from '@/i18n/I18nProvider';
 import { I18nProps } from '@/i18n/I18nProps';
 
 // Convert StatusLabel string to Status enum
@@ -53,6 +54,7 @@ type SortConfig = {
 };
 
 function DAGRunOutputs({ dagName, dagRunId }: Props) {
+  const { ts } = useI18n();
   const remoteNode = useRemoteNode();
   const [filter, setFilter] = useState('');
   const [sortConfig, setSortConfig] = useState<SortConfig>({
@@ -155,7 +157,9 @@ function DAGRunOutputs({ dagName, dagRunId }: Props) {
           <Package className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm font-semibold"><I18nText text={"Outputs"} /></span>
           <span className="text-xs text-muted-foreground">
-            ({outputCount} <I18nText text={"items)"} />
+            ({ts(outputCount === 1 ? '{count} item' : '{count} items', {
+              count: outputCount,
+            })})
           </span>
         </div>
 

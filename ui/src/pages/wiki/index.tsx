@@ -484,9 +484,21 @@ function WikiContent() {
       const { deletedCount, failedCount } =
         await deleteBatch(batchDeleteTargets);
       if (failedCount > 0) {
-        showToast(`Deleted ${deletedCount}, ${failedCount} failed`);
+        showToast(
+          ts('Deleted {deleted}, {failed} failed', {
+            deleted: deletedCount,
+            failed: failedCount,
+          })
+        );
       } else {
-        showToast(`Deleted ${deletedCount} items`);
+        showToast(
+          ts(
+            deletedCount === 1
+              ? 'Deleted {count} item'
+              : 'Deleted {count} items',
+            { count: deletedCount }
+          )
+        );
       }
     } catch {
       showToast('Failed to delete Wiki pages');
@@ -606,19 +618,22 @@ function WikiContent() {
       <I18nProps>
         <ConfirmModal
           title="Delete Wiki"
-          buttonText={ts('Delete {count} items', {
-            count: batchDeleteTargets.length,
-          })}
+          buttonText={ts(
+            batchDeleteTargets.length === 1
+              ? 'Delete {count} item'
+              : 'Delete {count} items',
+            { count: batchDeleteTargets.length }
+          )}
           visible={batchDeleteConfirmOpen}
           dismissModal={() => setBatchDeleteConfirmOpen(false)}
           onSubmit={handleBatchDelete}
         >
           <p className="text-sm text-muted-foreground">
             {ts(
-              'Are you sure you want to delete {count} items? This cannot be undone.',
-              {
-                count: batchDeleteTargets.length,
-              }
+              batchDeleteTargets.length === 1
+                ? 'Are you sure you want to delete {count} item? This cannot be undone.'
+                : 'Are you sure you want to delete {count} items? This cannot be undone.',
+              { count: batchDeleteTargets.length }
             )}
           </p>
         </ConfirmModal>
