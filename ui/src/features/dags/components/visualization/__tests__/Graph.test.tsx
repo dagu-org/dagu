@@ -76,7 +76,7 @@ describe('Graph', () => {
     }
     const definition = firstCall[1] as string;
     expect(definition).toContain(
-      'classDef done color:#14161b,fill:#fbfaf6,stroke:#22c55e'
+      'classDef done color:#14161b,fill:#e5f5e7,stroke:#22c55e'
     );
     expect(definition).toContain(
       'linkStyle 0 stroke:#3fa76b,stroke-width:1.8px'
@@ -108,7 +108,7 @@ describe('Graph', () => {
     }
     const definition = firstCall[1] as string;
     expect(definition).toContain(
-      'classDef running color:#14161b,fill:#fbfaf6,stroke:#7c6ef4'
+      'classDef running color:#14161b,fill:#eeecf6,stroke:#7c6ef4'
     );
     expect(definition).not.toContain('#81c784');
   });
@@ -138,9 +138,10 @@ describe('Graph', () => {
     const runningNode = await screen.findByTestId('running-node');
 
     expect(doneNode).toHaveAttribute('stroke', '#22c55e');
-    expect(doneNode).toHaveAttribute('stroke-width', '2.5px');
+    expect(doneNode).toHaveAttribute('stroke-width', '2px');
+    expect(doneNode).toHaveAttribute('rx', '6');
     expect(runningNode).toHaveAttribute('stroke', '#7c6ef4');
-    expect(runningNode).toHaveAttribute('stroke-width', '2.5px');
+    expect(runningNode).toHaveAttribute('stroke-width', '2px');
   });
 
   it('labels a step with its name when it also has an id', async () => {
@@ -272,7 +273,9 @@ describe('Graph', () => {
     ).toBeInTheDocument();
   });
 
-  it('keeps graph controls constrained above the graph on narrow screens', async () => {
+  // The controls sit in a toolbar row ahead of the canvas so they never cover
+  // the drawing.
+  it('shows the toolbar ahead of the graph canvas', async () => {
     mermaidRenderMock.mockResolvedValueOnce({
       svg: '<svg></svg>',
       bindFunctions: vi.fn(),
@@ -284,25 +287,23 @@ describe('Graph', () => {
         steps={[node('load', NodeStatus.Running)]}
         flowchart="LR"
         onChangeFlowchart={vi.fn()}
+        toolbarStart={<span>graph hint</span>}
       />
     );
 
     const controls = screen.getByRole('group', { name: 'Graph controls' });
-    expect(controls).toHaveClass('min-w-max');
-
-    const controlsViewport = controls.parentElement;
-    expect(controlsViewport).toHaveClass('inset-x-2');
-    expect(controlsViewport).toHaveClass('max-w-[calc(100%-1rem)]');
-    expect(controlsViewport).toHaveClass('overflow-x-auto');
-
+    const toolbar = controls.parentElement!;
+    expect(toolbar).toContainElement(screen.getByText('graph hint'));
     expect(
       screen.getByRole('button', { name: 'Horizontal layout' })
-    ).toHaveClass('w-9');
-    expect(screen.getByRole('button', { name: 'Expand graph' })).toHaveClass(
-      'w-9'
-    );
+    ).toHaveAttribute('aria-pressed', 'true');
 
-    expect(container.querySelector('.custom-scrollbar')).toHaveClass('pt-14');
+    const canvas = container.querySelector('.custom-scrollbar')!;
+    expect(
+      toolbar.compareDocumentPosition(canvas) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(toolbar).not.toContainElement(canvas as HTMLElement);
   });
   it('draws inferred dependencies as dashed arrows after explicit ones', async () => {
     mermaidRenderMock.mockResolvedValueOnce({

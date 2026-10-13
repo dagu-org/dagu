@@ -861,15 +861,16 @@ function DAGStatus({
               displayDAGRun.nodes &&
               displayDAGRun.nodes.length > 0 && (
                 <div className="flex flex-col">
-                  <BorderedBox className="pt-4 px-4 pb-0 flex flex-col items-stretch overflow-hidden">
-                    <GraphInteractionsHint
-                      className="mb-2"
-                      inspect
-                      openSubRun
-                      updateStatus={config.permissions.runDags}
-                    />
+                  <BorderedBox className="flex flex-col items-stretch gap-0 overflow-hidden p-0">
                     <div ref={graphBoxRef} className="w-full min-w-0">
                       <Graph
+                        toolbarStart={
+                          <GraphInteractionsHint
+                            inspect
+                            openSubRun
+                            updateStatus={config.permissions.runDags}
+                          />
+                        }
                         steps={displayDAGRun.nodes}
                         name={displayDAGRun.name}
                         type="status"

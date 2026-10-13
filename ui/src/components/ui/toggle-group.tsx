@@ -82,6 +82,7 @@ type ToggleButtonProps = {
   children: React.ReactNode;
   className?: string;
   'aria-label'?: string;
+  title?: string;
   position?: 'first' | 'middle' | 'last' | 'single';
 };
 
@@ -92,6 +93,7 @@ export function ToggleButton({
   children,
   className,
   'aria-label': ariaLabel,
+  title,
 }: ToggleButtonProps): React.ReactElement {
   const isSelected = groupValue === value;
 
@@ -108,6 +110,7 @@ export function ToggleButton({
       onClick={onClick}
       aria-pressed={isSelected}
       aria-label={ariaLabel}
+      title={title}
     >
       {children}
     </button>
