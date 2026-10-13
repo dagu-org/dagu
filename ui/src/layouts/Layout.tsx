@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { LicenseBadge } from '@/components/LicenseBadge';
+import { CommandPaletteProvider } from '@/components/command-palette/CommandPaletteProvider';
 import { LicenseBanner } from '@/components/LicenseBanner';
 import { MonitoringNotice } from '@/components/MonitoringNotice';
 import { SchedulerPauseBanner } from '@/components/SchedulerPauseBanner';
@@ -331,5 +332,9 @@ function Content({ navbarColor, children }: LayoutProps) {
 
 // Default export Layout component
 export default function Layout({ navbarColor, children }: LayoutProps) {
-  return <Content navbarColor={navbarColor}>{children}</Content>;
+  return (
+    <CommandPaletteProvider>
+      <Content navbarColor={navbarColor}>{children}</Content>
+    </CommandPaletteProvider>
+  );
 }
