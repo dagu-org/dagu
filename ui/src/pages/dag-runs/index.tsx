@@ -1357,7 +1357,7 @@ function DAGRuns() {
 
   return (
     <div className="max-w-7xl">
-      <div className="flex items-center justify-between mb-2">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-3">
           <Title>
             <I18nText text={'Executions'} />
@@ -1392,8 +1392,10 @@ function DAGRuns() {
                 aria-label="List view"
                 className="h-8 px-3"
               >
-                <List size={16} className="mr-1.5" />
-                <I18nText text={'List'} />
+                <List size={16} className="sm:mr-1.5" />
+                <span className="hidden sm:inline">
+                  <I18nText text={'List'} />
+                </span>
               </ToggleButton>
             </I18nProps>
             <I18nProps>
@@ -1405,8 +1407,10 @@ function DAGRuns() {
                 aria-label="Grouped view"
                 className="h-8 px-3"
               >
-                <Layers size={16} className="mr-1.5" />
-                <I18nText text={'Grouped'} />
+                <Layers size={16} className="sm:mr-1.5" />
+                <span className="hidden sm:inline">
+                  <I18nText text={'Grouped'} />
+                </span>
               </ToggleButton>
             </I18nProps>
           </ToggleGroup>
