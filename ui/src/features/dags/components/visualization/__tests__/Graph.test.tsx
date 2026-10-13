@@ -24,6 +24,7 @@ vi.mock('@/lib/download', () => ({
 
 vi.mock('@/contexts/UserPreference', () => ({
   useUserPreferences: () => ({ preferences: { theme: 'light' } }),
+  useResolvedTheme: () => 'light',
 }));
 
 beforeEach(() => {

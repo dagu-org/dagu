@@ -66,6 +66,25 @@
         };
       }
     </script>
+    <script>
+      // Apply the saved or system theme before the app loads so the page
+      // does not flash the other theme.
+      (function () {
+        var theme;
+        try {
+          theme = JSON.parse(localStorage.getItem('user_preferences') || '{}').theme;
+        } catch (e) {}
+        var dark =
+          theme === 'dark' ||
+          (theme !== 'light' &&
+            !!window.matchMedia &&
+            window.matchMedia('(prefers-color-scheme: dark)').matches);
+        var root = document.documentElement;
+        root.classList.toggle('dark', dark);
+        root.style.colorScheme = dark ? 'dark' : 'light';
+        root.style.backgroundColor = dark ? '#0b0d12' : '#f4f2ed';
+      })();
+    </script>
     <script
       defer="defer"
       src="{{ basePath }}/assets/bundle.js?v={{ assetVersion }}"

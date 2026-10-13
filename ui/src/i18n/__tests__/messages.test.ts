@@ -21,7 +21,7 @@ describe('translations', () => {
     expect(translate('zh-CN', 'navigation.integrations')).toBe('集成');
     expect(translate('zh-CN', 'navigation.profilesSecrets')).toBe('配置与密钥');
     expect(translate('zh-CN', 'navigation.administration')).toBe('系统管理');
-    expect(translate('zh-CN', 'theme.darkMode')).toBe('深色模式');
+    expect(translate('zh-CN', 'theme.dark')).toBe('深色');
   });
 
   it('keeps every Chinese catalog key aligned with English', () => {

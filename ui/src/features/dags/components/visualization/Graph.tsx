@@ -5,7 +5,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ToggleButton, ToggleGroup } from '@/components/ui/toggle-group';
-import { useUserPreferences } from '@/contexts/UserPreference';
+import { useResolvedTheme } from '@/contexts/UserPreference';
 import { cn, toMermaidNodeId } from '@/lib/utils';
 import {
   ArrowDownUp,
@@ -151,8 +151,7 @@ function Graph({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const viewportRef = React.useRef<HTMLDivElement>(null);
-  const { preferences } = useUserPreferences();
-  const isDarkMode = preferences.theme !== 'light';
+  const isDarkMode = useResolvedTheme() === 'dark';
   const applyGraphStyles = React.useCallback(applyRenderedGraphStyles, []);
   const graphControlButtonClass = 'h-8 w-9 shrink-0 px-0 sm:w-auto sm:px-4';
 
