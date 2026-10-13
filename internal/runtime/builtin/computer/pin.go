@@ -65,6 +65,18 @@ type pinnedField struct {
 	Columns   map[string]string `json:"columns,omitempty"`
 }
 
+// MarshalJSON writes a table field as its container and columns alone, and
+// a scalar field as its selector.
+func (f pinnedField) MarshalJSON() ([]byte, error) {
+	if f.Container != nil {
+		return json.Marshal(struct {
+			Container *desktop.Selector `json:"container"`
+			Columns   map[string]string `json:"columns"`
+		}{f.Container, f.Columns})
+	}
+	return json.Marshal(f.Selector)
+}
+
 // pinnedStep.UnmarshalJSON enforces exactly one action key, so a malformed
 // pin is caught at load, not at replay.
 func (s *pinnedStep) UnmarshalJSON(data []byte) error {

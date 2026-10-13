@@ -445,6 +445,29 @@ Pins are kept per system because UI Automation and the macOS accessibility
 API expose an application differently, so a pin made on Windows serves
 Windows devices. Pins travel with the step; the device cache does not.
 
+A recording keeps the system it was made on and when its run ran, and
+`dagu computer cache show <dag>` prints a host's recordings in their pinned
+form for a person to review and write into the step: every step, or one
+with `--step <id>`, and one task with `--op <position>`. A task whose
+instruction changed, or that ran with other parameters, has a recording for
+each, and the newest comes first. Each recorded element becomes a selector
+by its role, name, and id in its application, or in its window's title when
+the application could not be read. An element without an id is looked for
+`in` its closest named `group`, `list`, `tab`, or `other` ancestor, since a
+name alone often repeats in a window; a row or a cell is never the
+container, since its name is the data shown. A single or double left click,
+a single right click, typing into a field that was read, a key chord
+(once per press), a plain vertical scroll on an element, and a wait each
+become one step, and a pointer move onto the element the next action uses
+is dropped. Any other action has no pinned form: a drag, a click holding
+keys or where no element could be read, a move alone, a held key, or a
+button pressed or released alone. An act with one lists each such action
+with its turn and why, instead of steps, since a pin that skipped an action
+would report success without doing the task. An extract's bindings become
+its fields. `--format json` prints `{"operations": [...]}`, each with
+`step`, `op`, `kind`, `system`, `saved_at`, and `recorded`, `fields`, or
+`unpinnable`.
+
 ### Elements
 
 A step checks elements through exact conditions (see Conditions), and a

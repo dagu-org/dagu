@@ -711,6 +711,7 @@ func (l *actLoop) finish(ctx context.Context, turn *computeruse.Turn) error {
 	}
 	l.outcome.recording.Final = desktop.FingerprintOf(final)
 	l.outcome.recording.Version = recordingVersion
+	l.outcome.recording.System, l.outcome.recording.SavedAt = l.r.system, time.Now().UTC()
 	if len(l.elements) > 0 {
 		l.r.landmarks(&l.outcome.recording, l.elements)
 	}
