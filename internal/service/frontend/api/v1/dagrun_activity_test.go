@@ -4,6 +4,7 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"testing"
@@ -168,6 +169,37 @@ func TestDAGRunActivityListsActiveRuns(t *testing.T) {
 	assert.Equal(t, "approve-1", activity.Active[0].DagRunId)
 	assert.Equal(t, "approve", valueOf(activity.Active[0].Name))
 	assert.Equal(t, "train-1", activity.Active[1].DagRunId)
+}
+
+// aliveProcs reports the given runs as having live processes.
+type aliveProcs struct {
+	processRepository
+	refs []ir.DAGRunRef
+}
+
+func (p aliveProcs) ListAllAlive(context.Context) (map[string][]ir.DAGRunRef, error) {
+	return map[string][]ir.DAGRunRef{"default": p.refs}, nil
+}
+
+// Runs that started before the window appear while their process lives, up
+// to a bound on the status files read for them.
+func TestDAGRunActivityListsLiveRunsFromBeforeWindow(t *testing.T) {
+	f := newActivityFixture(t)
+	day := time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC)
+	var refs []ir.DAGRunRef
+	for i := range activityLiveRunReads + 1 {
+		id := fmt.Sprintf("train-%02d", i)
+		f.addRun("train", id, ir.Running, day.Add(-time.Hour).Add(time.Duration(i)*time.Second), 0)
+		refs = append(refs, ir.NewDAGRunRef("train", id))
+	}
+	f.api.procRepository = aliveProcs{refs: refs}
+
+	activity := f.activity(day, day.Add(24*time.Hour))
+
+	require.Len(t, activity.Active, activityLiveRunReads)
+	assert.Equal(t, "train-00", activity.Active[0].DagRunId)
+	assert.Equal(t, "train", valueOf(activity.Active[0].Name))
+	assert.Empty(t, activity.Workflows)
 }
 
 func TestDAGRunActivityRejectsInvalidWindows(t *testing.T) {

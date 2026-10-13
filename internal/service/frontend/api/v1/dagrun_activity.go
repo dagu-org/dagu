@@ -7,6 +7,7 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/url"
 	"slices"
@@ -37,8 +38,11 @@ const (
 	activityRunCap = 300
 	// activityFailureDetails bounds the status files read for failure details.
 	activityFailureDetails = 20
-	activityUpcomingLimit  = 5
-	activityErrorMaxBytes  = 200
+	// activityLiveRunReads bounds the status files read for live runs that
+	// started before the window.
+	activityLiveRunReads  = 50
+	activityUpcomingLimit = 5
+	activityErrorMaxBytes = 200
 )
 
 // GetDAGRunActivity summarizes the DAG-runs of a time window.
@@ -500,13 +504,19 @@ func (a *API) activeRuns(ctx context.Context, query activityQuery, workflows map
 		alive, err := a.procRepository.ListAllAlive(ctx)
 		if err == nil {
 			labelFilters := parseLabelFilters(query.labels)
-			for _, refs := range alive {
-				for _, ref := range refs {
+			reads := 0
+		groups:
+			for _, group := range slices.Sorted(maps.Keys(alive)) {
+				for _, ref := range alive[group] {
 					if _, ok := seen[ref]; ok {
 						continue
 					}
+					if reads == activityLiveRunReads {
+						break groups
+					}
+					reads++
 					seen[ref] = struct{}{}
-					status, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
+					status, err := a.readLiveRunStatus(ctx, ref)
 					if err != nil || !isActiveRunStatus(status.Status) {
 						continue
 					}
@@ -527,6 +537,16 @@ func (a *API) activeRuns(ctx context.Context, query activityQuery, workflows map
 		return cmp.Compare(left.DagRunId, right.DagRunId)
 	})
 	return active
+}
+
+// readLiveRunStatus reads the saved status of a run whose process heartbeat
+// is fresh, without querying the process itself.
+func (a *API) readLiveRunStatus(ctx context.Context, ref ir.DAGRunRef) (*ir.DAGRunStatus, error) {
+	attempt, err := a.dagRunRepository.FindAttempt(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+	return attempt.ReadStatus(ctx)
 }
 
 func isActiveRunStatus(status ir.Status) bool {
