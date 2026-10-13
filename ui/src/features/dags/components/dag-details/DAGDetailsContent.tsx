@@ -44,7 +44,6 @@ type DAGDetailsContentProps = {
   dag: components['schemas']['DAGDetails'];
   currentDAGRun?: components['schemas']['DAGRunDetails'];
   refreshFn: () => void;
-  formatDuration: (startDate: string, endDate: string) => string;
   activeTab: string;
   onTabChange?: (tab: string) => void;
   dagRunId?: string;
@@ -98,7 +97,6 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
   dag,
   currentDAGRun,
   refreshFn,
-  formatDuration,
   activeTab,
   onTabChange,
   dagRunId = 'latest',
@@ -222,7 +220,6 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
             currentDAGRun={currentDAGRun}
             fileName={fileName || ''}
             refreshFn={refreshFn}
-            formatDuration={formatDuration}
             buildScopedUrl={buildScopedUrl}
             pinned={pinned}
             onPinnedChange={onPinnedChange}
@@ -278,6 +275,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
                 artifactEnabled={!!dag.artifacts?.enabled}
                 fillHeight={fillHeight}
                 summary
+                showRunMeta={false}
               />
               <div className="h-6 flex-shrink-0" />
             </>

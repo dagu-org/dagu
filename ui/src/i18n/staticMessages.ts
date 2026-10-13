@@ -2482,6 +2482,10 @@ const english = {
   "Action required": "Action required",
   "An agent is waiting for an answer.": "An agent is waiting for an answer.",
   "Timeline, outputs, and artifacts are on the run page.": "Timeline, outputs, and artifacts are on the run page.",
+  "Queue wait": "Queue wait",
+  "Manual": "Manual",
+  "Sub-DAG": "Sub-DAG",
+  "Catch-up": "Catch-up",
 } as const;
 
 export type StaticMessage = keyof typeof english;
@@ -4910,6 +4914,10 @@ const chinese = {
   "Action required": "需要处理",
   "An agent is waiting for an answer.": "有代理正在等待回答。",
   "Timeline, outputs, and artifacts are on the run page.": "时间线、输出和产物在运行页面上。",
+  "Queue wait": "排队等待",
+  "Manual": "手动",
+  "Sub-DAG": "子工作流",
+  "Catch-up": "补跑",
 } as const satisfies Record<StaticMessage, string>;
 
 const japanese = {
@@ -7414,6 +7422,10 @@ const japanese = {
   "Action required": "対応が必要",
   "An agent is waiting for an answer.": "エージェントが回答を待っています。",
   "Timeline, outputs, and artifacts are on the run page.": "タイムライン、出力、成果物は実行ページにあります。",
+  "Queue wait": "キュー待ち",
+  "Manual": "手動",
+  "Sub-DAG": "サブワークフロー",
+  "Catch-up": "キャッチアップ",
 } as const satisfies Record<StaticMessage, string>;
 
 export const staticMessages = {

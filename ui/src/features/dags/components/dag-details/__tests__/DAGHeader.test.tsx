@@ -33,7 +33,6 @@ function renderHeader(
         currentDAGRun={currentDAGRun}
         fileName="etl"
         refreshFn={vi.fn()}
-        formatDuration={() => '--'}
         pinned={pinned}
       />
     </MemoryRouter>

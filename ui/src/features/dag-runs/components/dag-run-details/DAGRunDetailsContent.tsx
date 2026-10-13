@@ -86,6 +86,7 @@ const DAGRunDetailsContent: React.FC<DAGRunDetailsContentProps> = ({
             onTabSelect={onTabSelect}
             initialStepName={initialStepName}
             onStepSelect={onStepSelect}
+            showRunMeta={false}
           />
         </div>
       </div>

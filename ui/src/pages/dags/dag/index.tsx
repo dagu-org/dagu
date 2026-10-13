@@ -22,7 +22,6 @@ import {
   useSSECacheSync,
 } from '../../../hooks/useSSECacheSync';
 import { useSubDAGRunSSE } from '../../../hooks/useSubDAGRunSSE';
-import dayjs from '../../../lib/dayjs';
 import {
   hasWorkspaceLabel,
   sanitizeWorkspaceName,
@@ -92,23 +91,6 @@ function DAGDetails() {
 
   // Determine active tab
   const tab = params.tab === 'docs' ? 'wiki' : params.tab || 'status';
-
-  // Format duration utility function
-  const formatDuration = useCallback(
-    (startDate: string, endDate: string): string => {
-      if (!startDate || !endDate) return '--';
-
-      const duration = dayjs.duration(dayjs(endDate).diff(dayjs(startDate)));
-      const hours = Math.floor(duration.asHours());
-      const minutes = duration.minutes();
-      const seconds = duration.seconds();
-
-      if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
-      if (minutes > 0) return `${minutes}m ${seconds}s`;
-      return `${seconds}s`;
-    },
-    []
-  );
 
   // Build URL with remote node parameter if needed
   const buildUrl = useCallback(
@@ -344,7 +326,6 @@ function DAGDetails() {
                     currentDAGRun={displayDAGRun}
                     fileName={fileName}
                     refreshFn={refreshData}
-                    formatDuration={formatDuration}
                     buildScopedUrl={buildUrl}
                     pinned={dagData.pinned}
                   />
@@ -354,7 +335,6 @@ function DAGDetails() {
                       dag={dagData.dag}
                       currentDAGRun={displayDAGRun}
                       refreshFn={refreshData}
-                      formatDuration={formatDuration}
                       activeTab={tab}
                       onTabChange={handleTabChange}
                       dagRunId={displayDAGRunId}

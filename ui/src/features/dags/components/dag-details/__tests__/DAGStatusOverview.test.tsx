@@ -62,6 +62,42 @@ describe('DAGStatusOverview', () => {
     expect(screen.getByText('Queued')).toBeInTheDocument();
   });
 
+  // Pages whose header already names the run keep only progress and errors
+  // here, so nothing is said twice.
+  it('leaves run metadata to the header when asked', () => {
+    const onViewLog = vi.fn();
+    render(
+      <DAGStatusOverview
+        showRunMeta={false}
+        onViewLog={onViewLog}
+        status={{
+          dagRunId: 'run-9',
+          name: 'etl',
+          rootDAGRunName: 'etl',
+          rootDAGRunId: 'run-9',
+          log: '/tmp/test.log',
+          artifactsAvailable: false,
+          nodes: [],
+          autoRetryCount: 0,
+          autoRetryLimit: 0,
+          startedAt: '2026-03-13T10:01:00Z',
+          finishedAt: '2026-03-13T10:02:00Z',
+          status: Status.Success,
+          statusLabel: StatusLabel.succeeded,
+          workerId: 'worker-a',
+          params: 'date=2026-03-13',
+          triggerType: TriggerType.manual,
+        }}
+      />
+    );
+
+    expect(screen.queryByText('Started')).not.toBeInTheDocument();
+    expect(screen.queryByText('worker-a')).not.toBeInTheDocument();
+    expect(screen.queryByText('date=2026-03-13')).not.toBeInTheDocument();
+    screen.getByRole('button', { name: 'Log' }).click();
+    expect(onViewLog).toHaveBeenCalledWith('run-9');
+  });
+
   it('omits the scheduled label when schedule time is missing', () => {
     render(
       <DAGStatusOverview
@@ -367,7 +403,9 @@ describe('DAGStatusOverview', () => {
       />
     );
 
-    expect(screen.getByText('Worker assignment unavailable')).toBeInTheDocument();
+    expect(
+      screen.getByText('Worker assignment unavailable')
+    ).toBeInTheDocument();
     expect(screen.queryByText('Startup not observed')).not.toBeInTheDocument();
   });
 });

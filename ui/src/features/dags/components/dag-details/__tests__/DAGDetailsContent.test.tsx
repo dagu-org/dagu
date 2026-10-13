@@ -91,7 +91,6 @@ function renderContent(activeTab = 'status', isModal = true) {
         dag={dag}
         currentDAGRun={currentDAGRun}
         refreshFn={vi.fn()}
-        formatDuration={vi.fn()}
         activeTab={activeTab}
         isModal={isModal}
         fillHeight

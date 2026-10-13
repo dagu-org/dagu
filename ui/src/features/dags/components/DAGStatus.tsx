@@ -84,6 +84,8 @@ type Props = {
   initialStepName?: string;
   /** Called with the step whose details open, or undefined when they close. */
   onStepSelect?: (stepName: string | undefined) => void;
+  /** Repeats run metadata above the steps; off where a header shows it. */
+  showRunMeta?: boolean;
 };
 
 export type StatusTab =
@@ -162,6 +164,7 @@ function DAGStatus({
   onTabSelect,
   initialStepName,
   onStepSelect,
+  showRunMeta = true,
 }: Props) {
   const { ts } = useI18n();
   const dagContext = React.useContext(DAGContext);
@@ -991,6 +994,7 @@ function DAGStatus({
               <div className="bg-surface border border-border rounded-lg p-4">
                 <DAGStatusOverview
                   status={displayDAGRun}
+                  showRunMeta={showRunMeta}
                   onViewLog={(dagRunId) => {
                     setLogViewer({
                       isOpen: true,
