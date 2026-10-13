@@ -506,7 +506,7 @@ function WikiContent() {
       setBatchDeleteConfirmOpen(false);
       setBatchDeleteTargets([]);
     }
-  }, [batchDeleteTargets, canWrite, deleteBatch, showToast]);
+  }, [batchDeleteTargets, canWrite, deleteBatch, showToast, ts]);
 
   // Batch delete from selection bar
   const handleBatchDeleteFromBar = useCallback(

@@ -456,7 +456,7 @@ function DAGActions({
             </TooltipTrigger>
             <TooltipContent>
               <p>
-                <I18nText text={'Retry the latest run'} />
+                <I18nText text={'Retry this run'} />
               </p>
             </TooltipContent>
           </Tooltip>

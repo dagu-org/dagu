@@ -172,9 +172,12 @@ function SearchResultItem({
             </h3>
           </Link>
           <span className="shrink-0 text-xs text-muted-foreground">
-            {ts(matches.length === 1 ? '{count} match' : '{count} matches', {
-              count: matches.length,
-            })}
+            {ts(
+              matches.length === 1
+                ? '{count} match shown'
+                : '{count} matches shown',
+              { count: matches.length }
+            )}
           </span>
         </div>
 
