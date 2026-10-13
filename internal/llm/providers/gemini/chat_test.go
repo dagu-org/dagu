@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 
 	"github.com/dagucloud/dagu/v2/internal/llm"
@@ -27,7 +28,7 @@ func TestThinkingRequests(t *testing.T) {
 		{model: "gemini-3.8-flash", want: `{"thinkingLevel":"HIGH"}`},
 	} {
 		for _, stream := range []bool{false, true} {
-			t.Run(tt.model+"/stream="+map[bool]string{false: "false", true: "true"}[stream], func(t *testing.T) {
+			t.Run(tt.model+"/stream="+strconv.FormatBool(stream), func(t *testing.T) {
 				var requestBody []byte
 				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					wantPath := "/models/" + tt.model

@@ -307,12 +307,14 @@ func TestThinkingConfig(t *testing.T) {
 		stop          []string
 		wantThinking  string
 		wantMaxTokens int
+		noMaxTokens   bool
 	}{
 		{
 			name:         "Flash Lite none disables thinking",
 			model:        "gemini-2.5-flash-lite",
 			thinking:     &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortNone},
 			wantThinking: `{"thinkingBudget":0}`,
+			noMaxTokens:  true,
 		},
 		{
 			name:         "Pro none keeps a supported budget",
@@ -331,6 +333,7 @@ func TestThinkingConfig(t *testing.T) {
 			model:        "gemini-robotics-er-1.6-preview",
 			thinking:     &llm.ThinkingRequest{Enabled: true, Effort: llm.ThinkingEffortNone},
 			wantThinking: `{"thinkingBudget":0}`,
+			noMaxTokens:  true,
 		},
 		{
 			name:         "Robotics 1.5 uses a budget",
@@ -462,6 +465,7 @@ func TestThinkingConfig(t *testing.T) {
 			model:        "gemini-2.5-flash",
 			thinking:     &llm.ThinkingRequest{Enabled: true, BudgetTokens: new(0)},
 			wantThinking: `{"thinkingBudget":0}`,
+			noMaxTokens:  true,
 		},
 		{
 			name:         "dynamic budget is preserved",
@@ -512,7 +516,7 @@ func TestThinkingConfig(t *testing.T) {
 				require.NoError(t, json.Unmarshal(config["maxOutputTokens"], &maxTokens))
 				assert.Equal(t, tt.wantMaxTokens, maxTokens)
 			}
-			if tt.wantThinking == `{"thinkingBudget":0}` {
+			if tt.noMaxTokens {
 				assert.NotContains(t, config, "maxOutputTokens")
 			}
 			if tt.temperature != nil {

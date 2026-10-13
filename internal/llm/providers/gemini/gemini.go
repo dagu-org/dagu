@@ -363,7 +363,7 @@ func (p *Provider) buildGenerationConfig(req *llm.ChatRequest) *generationConfig
 				(strings.Contains(model, "gemini-2.5-flash") || strings.Contains(model, "gemini-robotics-er-1.6-")) {
 				thinkingBudget = 0
 			}
-			genConfig.ThinkingConfig = &thinkingConfig{ThinkingBudget: &thinkingBudget}
+			genConfig.ThinkingConfig = &thinkingConfig{ThinkingBudget: new(thinkingBudget)}
 		}
 		hasConfig = true
 	}
@@ -464,8 +464,9 @@ func nearestThinkingLevel(want llm.ThinkingEffort, supported []llm.ThinkingEffor
 	return nearest
 }
 
-// estimateThinkingBudget estimates token budget for effort levels when using thinkingLevel.
-// These are conservative estimates to ensure maxOutputTokens is sufficient.
+// estimateThinkingBudget returns the token budget for an effort level. It is
+// the budget sent to budget-based models and the thinking allowance reserved
+// in maxOutputTokens for level-based ones.
 func (p *Provider) estimateThinkingBudget(effort llm.ThinkingEffort) int {
 	switch effort {
 	case llm.ThinkingEffortNone, llm.ThinkingEffortMinimal, llm.ThinkingEffortLow:
@@ -633,11 +634,11 @@ type generationConfig struct {
 }
 
 type thinkingConfig struct {
-	// ThinkingLevel for Gemini 3 models: minimal, low, medium, high
-	// Maps from effort: none/minimal→minimal, low→low, medium→medium,
-	// high/xhigh/max→high
+	// ThinkingLevel is MINIMAL, LOW, MEDIUM or HIGH, for models from Gemini 3
+	// and Robotics-ER 2.
 	ThinkingLevel string `json:"thinkingLevel,omitempty"`
-	// ThinkingBudget for Gemini 2.5 models: 128-32768, 0=disable, -1=dynamic
+	// ThinkingBudget is a token budget: 0 disables thinking where the model
+	// allows it, and -1 lets the model decide.
 	ThinkingBudget *int `json:"thinkingBudget,omitempty"`
 }
 
