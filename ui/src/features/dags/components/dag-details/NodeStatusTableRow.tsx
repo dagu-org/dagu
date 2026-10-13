@@ -1278,14 +1278,14 @@ function NodeStatusTableRow({
           <span className="font-semibold text-foreground/90 text-sm bg-muted rounded-full w-6 h-6 flex items-center justify-center">
             {rownum}
           </span>
-          <h3 className="font-semibold text-foreground">
+          <p className="font-semibold text-foreground">
             {node.step.name}
             {hasSubDAGRun && (
               <span className="inline-flex items-center text-primary ml-1.5">
                 <GitBranch className="h-4 w-4" />
               </span>
             )}
-          </h3>
+          </p>
         </div>
         <div className="flex items-center gap-1">
           <NodeStatusChip status={node.status} size="sm">

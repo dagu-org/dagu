@@ -1,20 +1,31 @@
 import * as React from 'react';
 
+import { useOverflowFocusable } from '@/hooks/useOverflowFocusable';
 import { cn } from '@/lib/utils';
 
 const Table = React.forwardRef<
   HTMLTableElement,
   React.HTMLAttributes<HTMLTableElement>
->(({ className, ...props }, ref) => (
-  <div className="w-full overflow-auto rounded-lg border border-border bg-card">
-    <table
-      ref={ref}
-      data-slot="table"
-      className={cn('w-full caption-bottom border-collapse text-sm', className)}
-      {...props}
-    />
-  </div>
-));
+>(({ className, ...props }, ref) => {
+  const [scrollRef, scrollTabIndex] = useOverflowFocusable<HTMLDivElement>();
+  return (
+    <div
+      ref={scrollRef}
+      tabIndex={scrollTabIndex}
+      className="w-full overflow-auto rounded-lg border border-border bg-card outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <table
+        ref={ref}
+        data-slot="table"
+        className={cn(
+          'w-full caption-bottom border-collapse text-sm',
+          className
+        )}
+        {...props}
+      />
+    </div>
+  );
+});
 Table.displayName = 'Table';
 
 const TableHeader = React.forwardRef<
