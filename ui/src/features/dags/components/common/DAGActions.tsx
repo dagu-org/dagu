@@ -21,7 +21,14 @@ import {
 import dayjs from '@/lib/dayjs';
 import ActionButton from '@/components/ui/action-button';
 import StatusChip from '@/components/ui/status-chip';
-import { AlertTriangle, Ban, Play, RefreshCw, Square, X } from 'lucide-react';
+import {
+  AlertTriangle,
+  Ban,
+  CircleStop,
+  Play,
+  RefreshCw,
+  X,
+} from 'lucide-react';
 import React from 'react';
 import { components, Status } from '../../../../api/v1/schema';
 import { useCanManageProfiles } from '../../../../contexts/AuthContext';
@@ -355,7 +362,7 @@ function DAGActions({
                   terminateAction === 'cancel' ? (
                     <X className="h-4 w-4" />
                   ) : (
-                    <Square className="h-4 w-4" />
+                    <CircleStop className="h-4 w-4" />
                   )
                 }
                 disabled={!buttonState['terminate']}
