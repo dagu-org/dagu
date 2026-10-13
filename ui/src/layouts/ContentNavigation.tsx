@@ -298,7 +298,11 @@ export function ContentNavigation({
             const isLast = index === items.length - 1;
             return (
               <React.Fragment key={`${item.label}-${index}`}>
-                {index > 0 && <BreadcrumbSeparator className="shrink-0" />}
+                {index > 0 && (
+                  <BreadcrumbSeparator className="shrink-0 text-muted-foreground/50">
+                    /
+                  </BreadcrumbSeparator>
+                )}
                 <BreadcrumbItem className="min-w-0">
                   <Link
                     to={item.to}

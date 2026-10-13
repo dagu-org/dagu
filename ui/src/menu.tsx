@@ -78,10 +78,6 @@ function getTitleInitial(title: string): string {
   return title.charAt(0).toUpperCase();
 }
 
-function getActiveIndicatorStyle(): string {
-  return 'bg-sidebar-primary';
-}
-
 function getActiveLinkStyle(): string {
   return 'bg-sidebar-active';
 }
@@ -95,12 +91,12 @@ const sidebarItemBaseClassName =
 
 const sidebarItemClassName = cn(
   sidebarItemBaseClassName,
-  'hover:bg-sidebar-hover hover:shadow-[inset_3px_0_0_0_var(--sidebar-primary),inset_0_0_0_1px_var(--sidebar-border)] active:bg-sidebar-active'
+  'hover:bg-sidebar-hover active:bg-sidebar-active'
 );
 
 const sidebarItemActiveClassName = cn(
   sidebarItemBaseClassName,
-  'bg-sidebar-active shadow-[inset_3px_0_0_0_var(--sidebar-primary),inset_0_0_0_1px_var(--sidebar-border)]'
+  'bg-sidebar-active'
 );
 
 function uniqueRemoteNodes(nodes: string[]): string[] {
@@ -176,20 +172,13 @@ function NavItem({
           isOpen ? (reorderable ? t('navigation.reorderBookmark') : '') : text
         }
       >
-        {isActive && (
-          <div
-            className={cn(
-              'absolute left-0 w-[3px] h-6 rounded-r-sm',
-              getActiveIndicatorStyle()
-            )}
-            style={{ transition: 'opacity 200ms ease' }}
-          />
-        )}
         {icon && <div className={iconClassName}>{icon}</div>}
         <span
           className={cn(
             'text-sm font-medium whitespace-nowrap overflow-hidden',
-            isActive ? 'text-sidebar-foreground' : 'text-sidebar-foreground'
+            isActive
+              ? 'text-sidebar-accent-foreground'
+              : 'text-sidebar-foreground group-hover:text-sidebar-accent-foreground'
           )}
           style={{
             transition:
@@ -480,23 +469,15 @@ function NavGroup({
     transform: effectivelyExpanded ? 'rotate(0deg)' : 'rotate(-90deg)',
   };
 
-  const activeIndicator = isChildActive ? (
-    <div
-      className={cn(
-        'absolute left-0 w-[3px] h-6 rounded-r-sm',
-        getActiveIndicatorStyle()
-      )}
-      style={{ transition: 'opacity 200ms ease' }}
-    />
-  ) : null;
-
   const labelNode = (
     <>
       {icon && <div className={iconClassName}>{icon}</div>}
       <span
         className={cn(
           'text-sm font-medium whitespace-nowrap overflow-hidden',
-          isChildActive ? 'text-sidebar-foreground' : 'text-sidebar-foreground'
+          isChildActive
+            ? 'text-sidebar-accent-foreground'
+            : 'text-sidebar-foreground group-hover:text-sidebar-accent-foreground'
         )}
         style={labelStyle}
       >
@@ -513,7 +494,6 @@ function NavGroup({
             className={cn(headerClassName, 'gap-0 overflow-hidden px-0')}
             title={isOpen ? '' : label}
           >
-            {activeIndicator}
             <Link
               to={to}
               onClick={onClick}
@@ -547,7 +527,6 @@ function NavGroup({
             aria-expanded={effectivelyExpanded}
             aria-label={label}
           >
-            {activeIndicator}
             {labelNode}
             <div className="ml-auto flex-shrink-0" style={chevronStyle}>
               <ChevronDown size={14} />
@@ -677,7 +656,7 @@ export const mainListItems = React.forwardRef<
         </button>
         <span
           className={cn(
-            'font-semibold tracking-tight text-sidebar-foreground select-none whitespace-nowrap leading-tight ml-1 overflow-hidden',
+            'font-semibold tracking-tight text-sidebar-accent-foreground select-none whitespace-nowrap leading-tight ml-1 overflow-hidden',
             getResponsiveTitleClass(title, 'sidebar-expanded')
           )}
           style={{
