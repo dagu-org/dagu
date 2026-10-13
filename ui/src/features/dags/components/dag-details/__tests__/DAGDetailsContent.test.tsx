@@ -110,7 +110,8 @@ describe('DAGDetailsContent', () => {
     );
   });
 
-  it('keeps compact navigation labels visible', () => {
+  // One tab row serves every width, so each label appears once.
+  it('shows each workflow tab once', () => {
     renderContent();
 
     for (const label of [
@@ -123,16 +124,16 @@ describe('DAGDetailsContent', () => {
       'History',
       'Wiki',
     ]) {
-      expect(screen.getAllByText(label)).toHaveLength(2);
+      expect(screen.getAllByText(label)).toHaveLength(1);
     }
   });
 
   it.each(['log', 'dagRun-log'])(
-    'keeps both %s navigation labels visible',
+    'adds a Log tab while %s is open',
     (activeTab) => {
       renderContent(activeTab);
 
-      expect(screen.getAllByText('Log')).toHaveLength(2);
+      expect(screen.getAllByText('Log')).toHaveLength(1);
     }
   );
 
