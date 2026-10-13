@@ -28,6 +28,7 @@ import { ActivityLine } from './ActivityLine';
 import LogPageSizeSelect from './LogPageSizeSelect';
 import { I18nText } from '@/i18n/I18nText';
 import { I18nProps } from '@/i18n/I18nProps';
+import { LogChunks } from './LogChunks';
 
 // Largest tail size streamed over SSE; larger page sizes fall back to REST
 // polling so a live stream does not push very large payloads on every update.
@@ -670,33 +671,42 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
         )}
         {displayMode === 'activity' ? (
           <div>
-            {activityLines.map((line, index) => (
-              <ActivityLine
-                key={index}
-                line={line}
-                lineNumber={getLineNumber(index)}
-              />
-            ))}
+            <LogChunks
+              count={activityLines.length}
+              renderLine={(index) => (
+                <ActivityLine
+                  key={index}
+                  line={activityLines[index]!}
+                  lineNumber={getLineNumber(index)}
+                />
+              )}
+            />
           </div>
         ) : (
           <pre
             className={`h-full font-mono text-sm text-foreground log-content ${preferences.logWrap ? '' : 'min-w-max'}`}
           >
-            {lines.map((line, index) => (
-              <div key={index} className="flex pr-2 py-0.5">
-                <span
-                  className="text-muted-foreground mr-4 select-none w-14 text-right flex-shrink-0 self-start sticky left-0 bg-muted pl-4 pr-2 z-10"
-                  data-line-number={getLineNumber(index)}
-                >
-                  {getLineNumber(index)}
-                </span>
-                <span
-                  className={`flex-grow select-text cursor-text ${preferences.logWrap ? 'whitespace-pre-wrap break-words' : 'whitespace-pre'}`}
-                >
-                  {line ? <AnsiLine text={line} /> : ' '}
-                </span>
-              </div>
-            ))}
+            <LogChunks
+              count={lines.length}
+              renderLine={(index) => {
+                const line = lines[index];
+                return (
+                  <div key={index} className="flex pr-2 py-0.5">
+                    <span
+                      className="text-muted-foreground mr-4 select-none w-14 text-right flex-shrink-0 self-start sticky left-0 bg-muted pl-4 pr-2 z-10"
+                      data-line-number={getLineNumber(index)}
+                    >
+                      {getLineNumber(index)}
+                    </span>
+                    <span
+                      className={`flex-grow select-text cursor-text ${preferences.logWrap ? 'whitespace-pre-wrap break-words' : 'whitespace-pre'}`}
+                    >
+                      {line ? <AnsiLine text={line} /> : ' '}
+                    </span>
+                  </div>
+                );
+              }}
+            />
           </pre>
         )}
       </div>

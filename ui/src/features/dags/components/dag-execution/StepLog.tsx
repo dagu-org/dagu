@@ -37,6 +37,7 @@ import LogPageSizeSelect from './LogPageSizeSelect';
 import { I18nText } from '@/i18n/I18nText';
 import { I18nProps } from '@/i18n/I18nProps';
 import { useI18n } from '@/i18n/I18nProvider';
+import { LogChunks } from './LogChunks';
 
 const TAIL_THRESHOLD_PX = 4;
 const SSE_TAIL_LINES = 1000;
@@ -902,32 +903,38 @@ function StepLogContent({
         <pre
           className={`font-mono text-sm text-foreground log-content ${preferences.logWrap ? '' : 'min-w-max'}`}
         >
-          {lines.map((line, index) => (
-            <div
-              key={index}
-              className="flex pr-2 py-0.5"
-              data-log-index={index}
-            >
-              <span
-                className="text-muted-foreground mr-4 select-none w-14 text-right flex-shrink-0 self-start sticky left-0 bg-muted pl-4 pr-2 z-10"
-                data-line-number={getLineNumber(index)}
-              >
-                {getLineNumber(index)}
-              </span>
-              <span
-                className={`flex-grow select-text cursor-text ${preferences.logWrap ? 'whitespace-pre-wrap break-all' : 'whitespace-pre'}`}
-              >
-                {line ? (
-                  <AnsiLine
-                    text={line}
-                    highlight={trimmedSearch || undefined}
-                  />
-                ) : (
-                  ' '
-                )}
-              </span>
-            </div>
-          ))}
+          <LogChunks
+            count={lines.length}
+            renderLine={(index) => {
+              const line = lines[index];
+              return (
+                <div
+                  key={index}
+                  className="flex pr-2 py-0.5"
+                  data-log-index={index}
+                >
+                  <span
+                    className="text-muted-foreground mr-4 select-none w-14 text-right flex-shrink-0 self-start sticky left-0 bg-muted pl-4 pr-2 z-10"
+                    data-line-number={getLineNumber(index)}
+                  >
+                    {getLineNumber(index)}
+                  </span>
+                  <span
+                    className={`flex-grow select-text cursor-text ${preferences.logWrap ? 'whitespace-pre-wrap break-all' : 'whitespace-pre'}`}
+                  >
+                    {line ? (
+                      <AnsiLine
+                        text={line}
+                        highlight={trimmedSearch || undefined}
+                      />
+                    ) : (
+                      ' '
+                    )}
+                  </span>
+                </div>
+              );
+            }}
+          />
         </pre>
       </div>
     </div>
