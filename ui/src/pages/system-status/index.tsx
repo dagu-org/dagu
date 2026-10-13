@@ -15,6 +15,7 @@ import { cn } from '../../lib/utils';
 import { I18nText } from '@/i18n/I18nText';
 import { I18nProps } from '@/i18n/I18nProps';
 import { useI18n } from '@/i18n/I18nProvider';
+import { getQueryErrorMessage } from '@/lib/queryErrors';
 
 type SchedulerInstance = components['schemas']['SchedulerInstance'];
 type CoordinatorInstance = components['schemas']['CoordinatorInstance'];
@@ -30,7 +31,9 @@ type TunnelStatusResponse = components['schemas']['TunnelStatusResponse'];
  * @returns The rendered System Status UI containing service cards, resource charts, and refresh controls.
  */
 function SystemStatus() {
-  const { ts } = useI18n();
+  const { t, ts } = useI18n();
+  const errorText = (error: unknown): string | undefined =>
+    error ? getQueryErrorMessage(error, t('common.requestFailed')) : undefined;
   const appBarContext = React.useContext(AppBarContext);
   const config = useConfig();
   const [isRefreshing, setIsRefreshing] = React.useState(false);
@@ -219,7 +222,7 @@ function SystemStatus() {
             }
             icon={<Calendar className="h-4 w-4" />}
             isLoading={!schedulerData && !schedulerError}
-            error={schedulerError ? String(schedulerError) : undefined}
+            error={errorText(schedulerError)}
           />
         </I18nProps>
 
@@ -238,7 +241,7 @@ function SystemStatus() {
             }
             icon={<Server className="h-4 w-4" />}
             isLoading={!coordinatorData && !coordinatorError}
-            error={coordinatorError ? String(coordinatorError) : undefined}
+            error={errorText(coordinatorError)}
           />
         </I18nProps>
 
@@ -246,7 +249,7 @@ function SystemStatus() {
         <TunnelStatusCard
           data={tunnelData as TunnelStatusResponse}
           isLoading={!tunnelData && !tunnelError}
-          error={tunnelError ? String(tunnelError) : undefined}
+          error={errorText(tunnelError)}
         />
       </div>
 
@@ -258,7 +261,9 @@ function SystemStatus() {
         <WorkersSummary
           workers={workersData?.workers || []}
           isLoading={!workersData && !workersError}
-          errors={workersData?.errors}
+          errors={
+            workersError ? [errorText(workersError)!] : workersData?.errors
+          }
         />
       </div>
 
@@ -273,7 +278,7 @@ function SystemStatus() {
             data={resourceData?.cpu}
             color="#73BF69"
             isLoading={!resourceData && !resourceError}
-            error={resourceError ? String(resourceError) : undefined}
+            error={errorText(resourceError)}
           />
         </I18nProps>
         <I18nProps>
@@ -282,7 +287,7 @@ function SystemStatus() {
             data={resourceData?.memory}
             color="#73BF69"
             isLoading={!resourceData && !resourceError}
-            error={resourceError ? String(resourceError) : undefined}
+            error={errorText(resourceError)}
             totalBytes={resourceData?.memoryTotalBytes}
             usedBytes={resourceData?.memoryUsedBytes}
           />
@@ -293,7 +298,7 @@ function SystemStatus() {
             data={resourceData?.disk}
             color="#73BF69"
             isLoading={!resourceData && !resourceError}
-            error={resourceError ? String(resourceError) : undefined}
+            error={errorText(resourceError)}
             totalBytes={resourceData?.diskTotalBytes}
             usedBytes={resourceData?.diskUsedBytes}
           />
@@ -305,7 +310,7 @@ function SystemStatus() {
             color="#73BF69"
             unit=""
             isLoading={!resourceData && !resourceError}
-            error={resourceError ? String(resourceError) : undefined}
+            error={errorText(resourceError)}
           />
         </I18nProps>
       </div>

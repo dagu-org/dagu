@@ -53,6 +53,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { I18nText } from '@/i18n/I18nText';
 import { I18nProps } from '@/i18n/I18nProps';
 import { useI18n } from '@/i18n/I18nProvider';
+import { getQueryErrorMessage } from '@/lib/queryErrors';
 
 type EventLogEntry = components['schemas']['EventLogEntry'];
 type EventLogsResponse = components['schemas']['EventLogsResponse'];
@@ -844,7 +845,7 @@ export default function EventLogsPage() {
   } else if (error instanceof Error) {
     errorMessage = error.message;
   } else if (error) {
-    errorMessage = 'Failed to load event logs';
+    errorMessage = getQueryErrorMessage(error, 'Failed to load event logs');
   }
 
   if (!canViewEventLogs) {
