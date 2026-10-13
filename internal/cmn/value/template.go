@@ -110,7 +110,6 @@ func resolveBindings(
 	if !strings.Contains(input, "DAGU_") {
 		taken = ""
 	}
-	legacy := resolver{stepMap: scope.Steps}
 	protectOriginal := func(token string) string {
 		placeholder := uniqueToken(taken, "\uE000DAGU_UNRESOLVED_REF_")
 		// Shells get an ASCII token because Windows substitution output may not keep other runes.
@@ -120,22 +119,34 @@ func resolveBindings(
 		fromCommand = append(fromCommand, commandToken, placeholder)
 		return placeholder
 	}
+	// An item scope owns every foreach path, so quoted fields resolve and escaped ones stay literal.
+	itemPath := func(path string) bool {
+		return len(scope.Foreach) > 0 && strings.HasPrefix(path, "foreach.")
+	}
+	owned := func(path string) bool {
+		segments := strings.Split(path, ".")
+		return itemPath(path) || supportedStrictBinding(segments) || reservedBuiltinContextReference(segments)
+	}
 	// A leading non-identifier rune keeps an adjacent $NAME from absorbing a placeholder.
-	resolved, err := walkBindings(input, len(scope.Foreach) > 0, func(token string, path string, escaped bool) (string, error) {
-		if escaped {
+	resolved, err := walkBindings(input, owned, func(token string, path string, escaped bool) (string, error) {
+		item := itemPath(path)
+		switch {
+		case escaped && item:
 			return protectOriginal(token), nil
+		case escaped:
+			return token, nil
+		case item && foreachStepReference(ctx, path, scope.Steps):
+			// The legacy pass applies the field's quoting rules to step values.
+			return token, nil
 		}
 		var value any
 		var err error
-		if strings.HasPrefix(path, "foreach.") && !supportedStrictBinding(strings.Split(path, ".")) {
-			if _, ok := legacy.resolveReference(ctx, "foreach", strings.TrimPrefix(path, "foreach")); ok {
-				// Legacy step references need the field's quoting rules.
-				return token, nil
-			} else if segments, ok := quotedForeachField(path); ok {
-				value, err = bindingForeachValue(path, segments, scope.Foreach, true)
-			} else {
+		if item && !supportedStrictBinding(strings.Split(path, ".")) {
+			segments, ok := quotedForeachField(path)
+			if !ok {
 				return token, nil
 			}
+			value, err = bindingForeachValue(path, segments, scope.Foreach, true)
 		} else {
 			value, err = bindingValue(ctx, path, scope, true)
 		}
@@ -376,23 +387,18 @@ func isEscapedSingleQuote(input string, idx int) bool {
 	return backslashes%2 == 1
 }
 
-func walkBindings(input string, foreachPaths bool, visit func(token, path string, escaped bool) (string, error)) (string, error) {
+// walkBindings replaces each owned reference with the result of visit. An
+// escaped owned reference loses its escape marker.
+func walkBindings(input string, owned func(path string) bool, visit func(token, path string, escaped bool) (string, error)) (string, error) {
 	var b strings.Builder
 	last := 0
 	for _, loc := range bindingRefPattern.FindAllStringSubmatchIndex(input, -1) {
 		path := strings.TrimSpace(input[loc[2]:loc[3]])
-		segments := strings.Split(path, ".")
-		if !supportedStrictBinding(segments) && !reservedBuiltinContextReference(segments) && (!foreachPaths || !strings.HasPrefix(path, "foreach.")) {
-			continue
-		}
-		escaped := isEscapedDollar(input, loc[0])
-		if escaped && (!foreachPaths || !strings.HasPrefix(path, "foreach.")) {
-			b.WriteString(input[last : loc[0]-1])
-			b.WriteString(input[loc[0]:loc[1]])
-			last = loc[1]
+		if !owned(path) {
 			continue
 		}
 		start := loc[0]
+		escaped := isEscapedDollar(input, start)
 		if escaped {
 			start--
 		}
@@ -549,6 +555,16 @@ func quotedForeachField(path string) ([]string, bool) {
 		return nil, false
 	}
 	return []string{"foreach", itemPath[:end], field}, true
+}
+
+// foreachStepReference reports whether path reads a property of a step named
+// foreach. Such a step takes precedence over the item scope.
+func foreachStepReference(ctx context.Context, path string, steps map[string]StepInfo) bool {
+	if _, ok := steps["foreach"]; !ok {
+		return false
+	}
+	_, ok := resolveStepProperty(ctx, "foreach", strings.TrimPrefix(path, "foreach"), steps)
+	return ok
 }
 
 func bindingForeachValue(path string, segments []string, values Values, requireValue bool) (any, error) {

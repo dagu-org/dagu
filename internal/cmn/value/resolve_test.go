@@ -158,6 +158,8 @@ func TestResolverForeachStructuredScopePrecedesShadowVariable(t *testing.T) {
 	assert.Equal(t, `INV-002|{"episode":{"請求番号":"INV-002"}}`, got)
 }
 
+// A step named foreach takes precedence over item fields in every path form,
+// including when the item scope has a matching alias.
 func TestResolverForeachPreservesStepProperties(t *testing.T) {
 	t.Parallel()
 
@@ -177,13 +179,9 @@ func TestResolverForeachPreservesStepProperties(t *testing.T) {
 			},
 		})
 
-		got, err := resolver.String(context.Background(), `${foreach.outputs["value"]}|${foreach.episode["請求番号"]}`, WorkflowField("run"))
+		got, err := resolver.String(context.Background(), `${foreach.outputs.value}|${foreach.outputs["value"]}|${foreach.stdout}|${foreach.episode["請求番号"]}`, WorkflowField("run"))
 		require.NoError(t, err)
-		assert.Equal(t, "step-value|INV-001", got)
-
-		got, err = evalString(context.Background(), `${foreach.outputs.value}|${foreach.stdout}`, resolver.optionsFor(workflowValuePolicy())...)
-		require.NoError(t, err)
-		assert.Equal(t, "step-value|step-stdout", got)
+		assert.Equal(t, "step-value|step-value|step-stdout|INV-001", got)
 	}
 }
 
@@ -198,7 +196,7 @@ func TestForeachStepQuoting(t *testing.T) {
 		},
 		Steps: map[string]StepInfo{"foreach": {Outputs: &outputs}},
 	})
-	for _, ref := range []string{`${foreach.outputs."value"}`, `${foreach.outputs["value"]}`} {
+	for _, ref := range []string{`${foreach.outputs.value}`, `${foreach.outputs."value"}`, `${foreach.outputs["value"]}`} {
 		t.Run(ref, func(t *testing.T) {
 			t.Run("json", func(t *testing.T) {
 				got, err := resolver.String(t.Context(), `{"result":"`+ref+`"}`, WorkflowField("foreach.collect"))
