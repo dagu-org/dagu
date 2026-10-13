@@ -26,6 +26,7 @@ import { useConfig } from '../../../contexts/ConfigContext';
 import { useRemoteNode } from '../../../contexts/RemoteNodeContext';
 import { useClient } from '../../../hooks/api';
 import { cn, toMermaidNodeId } from '../../../lib/utils';
+import { useScrollFade } from '@/hooks/useScrollFade';
 import BorderedBox from '@/components/ui/bordered-box';
 import { DAGRunOutputs } from '../../dag-runs/components/dag-run-details';
 import { buildDAGRunPageURL } from '../../dag-runs/lib/dagRunUrls';
@@ -184,6 +185,7 @@ function DAGStatus({
   }, [initialTab, isTabControlled]);
   const [selectedAgentStep, setSelectedAgentStep] = useState('');
   const [displayDAGRun, setDisplayDAGRun] = useState(dagRun);
+  const [tabRowRef, tabRowFade] = useScrollFade<HTMLDivElement>('x');
 
   function setActiveTab(value: React.SetStateAction<StatusTab>): void {
     if (!isTabControlled) {
@@ -688,7 +690,11 @@ function DAGStatus({
           )}
         >
           <div className="flex w-full min-w-0 flex-wrap items-center gap-2">
-            <div className="min-w-0 flex-1 overflow-x-auto">
+            <div
+              ref={tabRowRef}
+              style={tabRowFade}
+              className="min-w-0 flex-1 overflow-x-auto"
+            >
               <Tabs className="min-w-max whitespace-nowrap">
                 <I18nProps>
                   <Tab
