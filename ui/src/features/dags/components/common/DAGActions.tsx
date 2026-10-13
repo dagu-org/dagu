@@ -312,7 +312,7 @@ function DAGActions({
           <TooltipTrigger asChild>
             <ActionButton
               label={displayMode !== 'compact'}
-              variant={displayMode !== 'compact' ? 'primary' : 'secondary'}
+              variant={displayMode !== 'compact' ? 'primary' : undefined}
               icon={<Play className="h-4 w-4" />}
               disabled={!buttonState['enqueue']}
               onClick={() => {

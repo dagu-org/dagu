@@ -196,7 +196,7 @@ export default function IncidentsTab({
       <div className="space-y-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-1">
-            <h1 className="text-2xl font-semibold tracking-normal text-foreground">
+            <h1 className="text-lg font-semibold text-foreground">
               <I18nText text={'DAG Incidents'} />
             </h1>
             <p className="text-sm text-muted-foreground">

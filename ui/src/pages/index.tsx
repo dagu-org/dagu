@@ -565,7 +565,7 @@ function Dashboard(): React.ReactElement | null {
             onValueChange={handleDAGRunChange}
             disabled={isLoading}
           >
-            <SelectTrigger className="h-9 w-[140px]">
+            <SelectTrigger className="h-9 w-[168px]">
               <Filter className="h-4 w-4 mr-1.5 text-muted-foreground" />
               <I18nProps>
                 <SelectValue

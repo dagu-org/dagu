@@ -163,7 +163,7 @@ function SystemStatus() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">
+          <h1 className="text-2xl font-semibold tracking-[-0.01em]">
             <I18nText text={'System Status'} />
           </h1>
           <p className="text-sm text-muted-foreground">

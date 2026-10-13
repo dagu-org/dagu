@@ -223,7 +223,9 @@ export default function LicensePage() {
     <div className="flex flex-col gap-4 max-w-4xl">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="text-lg font-semibold">{ts('Plan & features')}</h1>
+          <h1 className="text-2xl font-semibold tracking-[-0.01em]">
+            {ts('Plan & features')}
+          </h1>
           <p className="text-sm text-muted-foreground">
             {ts(
               'License, Dagu Console connection, and monitoring for this server.'

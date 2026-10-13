@@ -239,7 +239,7 @@ export default function UsersPage() {
     <div className="flex flex-col gap-4 max-w-7xl">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold">
+          <h1 className="text-2xl font-semibold tracking-[-0.01em]">
             <I18nText text={'Users'} />
           </h1>
           <p className="text-sm text-muted-foreground">

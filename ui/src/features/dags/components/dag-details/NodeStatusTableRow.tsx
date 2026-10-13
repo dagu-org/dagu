@@ -1271,7 +1271,7 @@ function NodeStatusTableRow({
 
   // Render mobile view (card)
   return (
-    <div className="p-4 rounded-2xl border border-border bg-card">
+    <div className="p-4 rounded-lg border border-border bg-card">
       {/* Header with number and status */}
       <div className="flex justify-between items-center mb-3">
         <div className="flex items-center gap-2">

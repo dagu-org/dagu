@@ -657,10 +657,10 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
         {`
         .vis-timeline {
           font-family: var(--font-sans) !important;
-          font-size: 11px !important;
-          background-color: var(--background) !important;
+          font-size: 12px !important;
+          background-color: var(--card) !important;
           border: 1px solid var(--border) !important;
-          border-radius: 12px !important;
+          border-radius: 10px !important;
           overflow: hidden !important;
         }
         .vis-timeline .vis-panel {
@@ -684,7 +684,7 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
           position: sticky;
           left: 0;
           z-index: 2;
-          background-color: var(--background) !important;
+          background-color: var(--card) !important;
           border-right: 1px solid var(--border) !important;
         }
         .vis-labelset .vis-label {
@@ -696,17 +696,17 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
           background-color: transparent !important;
         }
         .vis-background {
-          background-color: var(--background) !important;
+          background-color: var(--card) !important;
         }
         .vis-center {
-          background-color: var(--background) !important;
+          background-color: var(--card) !important;
         }
         .vis-time-axis {
           background-color: var(--card) !important;
           color: var(--foreground) !important;
         }
         .vis-time-axis .vis-text {
-          font-size: 10px !important;
+          font-size: 11px !important;
           color: var(--muted-foreground) !important;
           font-family: var(--font-sans) !important;
         }
@@ -728,7 +728,7 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
           transform: translateY(-50%) !important;
           top: 50% !important;
           white-space: nowrap !important;
-          font-size: 10px !important;
+          font-size: 11px !important;
           font-weight: 400 !important;
           color: var(--foreground) !important;
           writing-mode: horizontal-tb !important;
@@ -737,12 +737,11 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
         .vis-item {
           overflow: visible !important;
           height: 14px !important;
-          border-radius: 4px !important;
+          border-radius: 3px !important;
           border-width: 0 !important;
           cursor: pointer !important;
           transition: none !important;
           animation: none !important;
-          box-shadow: 0 0 10px rgba(0,0,0,0.3);
         }
         .vis-item,
         .vis-item * {
@@ -750,19 +749,15 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
           animation: none !important;
         }
         .vis-item:hover {
-          filter: brightness(1.2);
-          transform: scaleY(1.2);
+          filter: brightness(1.1);
           z-index: 100 !important;
         }
         .vis-item.vis-selected {
-          border-width: 1px !important;
-          border-color: var(--primary) !important;
-          box-shadow: 0 0 15px rgba(var(--primary-rgb), 0.3);
+          box-shadow: 0 0 0 2px var(--card), 0 0 0 3px var(--primary);
         }
         .vis-current-time {
           background-color: var(--primary) !important;
-          width: 2px !important;
-          box-shadow: 0 0 10px rgba(var(--primary-rgb), 0.4);
+          width: 1px !important;
         }
         /* Scrollbar styling for timeline */
         .vis-timeline::-webkit-scrollbar {
@@ -770,15 +765,15 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
           height: 8px;
         }
         .vis-timeline::-webkit-scrollbar-track {
-          background: var(--background);
+          background: var(--card);
         }
         .vis-timeline::-webkit-scrollbar-thumb {
-          background: var(--muted);
+          background: var(--border);
           border-radius: 10px;
-          border: 2px solid var(--background);
+          border: 2px solid var(--card);
         }
         .vis-timeline::-webkit-scrollbar-thumb:hover {
-          background: var(--secondary);
+          background: var(--border-strong);
         }
         `}
       </style>

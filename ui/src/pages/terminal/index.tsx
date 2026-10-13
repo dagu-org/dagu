@@ -271,7 +271,7 @@ export default function TerminalPage() {
     <div className="flex flex-col h-full max-w-7xl">
       <div className="flex items-center justify-between mb-2">
         <div>
-          <h1 className="text-lg font-semibold">
+          <h1 className="text-2xl font-semibold tracking-[-0.01em]">
             <I18nText text={'Terminal'} />
           </h1>
           <p className="text-sm text-muted-foreground">

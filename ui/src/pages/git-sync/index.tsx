@@ -679,7 +679,7 @@ export default function GitSyncPage() {
       {/* Compact Header */}
       <div className="flex items-center justify-between py-2">
         <div className="flex items-center gap-4">
-          <h1 className="text-lg font-semibold">
+          <h1 className="text-2xl font-semibold tracking-[-0.01em]">
             <I18nText text={'Git Sync'} />
           </h1>
           <span className="text-xs text-muted-foreground font-mono">
