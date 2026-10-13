@@ -1,0 +1,9 @@
+working_dir: .
+params:
+  - mode: foo
+steps:
+  - id: guard
+    run: test "${params.mode}" = foo
+  - id: main
+    depends: guard
+    run: printf '%s\n' ran > guard-step-main-ran.txt

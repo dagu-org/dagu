@@ -1,0 +1,15 @@
+working_dir: .
+params:
+  - mode: foo
+steps:
+  - id: guard
+    continue_on:
+      skipped: true
+    preconditions:
+      - condition: ${params.mode}
+        expected: foo
+        negate: true
+    run: exit 1
+  - id: main
+    depends: guard
+    run: printf '%s\n' ran > negated-guard-main-ran.txt

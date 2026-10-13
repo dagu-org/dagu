@@ -104,7 +104,7 @@ Common step fields:
 | `retry_policy` | Retry behavior for this step. |
 | `repeat_policy` | Repeat or polling behavior. |
 | `continue_on` | Continue after selected failure, skip, exit-code, or output conditions. |
-| `preconditions` | Conditions that must pass before the step starts. |
+| `preconditions` | Conditions that must pass before the step starts. An unmet condition skips the step; it does not fail it. To fail the run on an unmet condition, use a step whose command exits non-zero (see [Spec 023](./specs/023-preconditions.md)). |
 | `worker_selector` | Required worker labels. Keys and values support variable substitution (e.g. `${VAR}`); parallel sub-DAG steps can reference `${ITEM}`. |
 | `stdin` | File path piped to the step command's standard input. |
 | `stdout`, `stderr`, `log_output` | Step log output configuration. `stdout` can also publish DAG/action outputs. |
