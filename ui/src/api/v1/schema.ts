@@ -4792,6 +4792,11 @@ export interface components {
             /** @description Optional Teams message template. When omitted, Dagu sends the default notification text. */
             messageTemplate?: string;
         };
+        /** @description Local shell command run by the Dagu server when this channel delivers a notification. */
+        NotificationCommandTarget: {
+            /** @description Shell command. Notification tokens such as {{dag.name}} are rendered before the shell runs. The same fields are exported as environment variables, including DAG_NAME and STATUS. EXECUTION_LOG is the path of a temporary file containing the run log; Dagu removes that file after the command exits. Unix shells expand $DAG_NAME. Windows cmd.exe expands %DAG_NAME%. */
+            command: string;
+        };
         /** @description Notification target input */
         NotificationTargetInput: {
             /** @description Stable target ID. Omit when creating a new target. */
@@ -4838,6 +4843,7 @@ export interface components {
             slack?: components["schemas"]["NotificationSlackTargetInput"];
             telegram?: components["schemas"]["NotificationTelegramTargetInput"];
             teams?: components["schemas"]["NotificationTeamsTargetInput"];
+            command?: components["schemas"]["NotificationCommandTarget"];
         };
         /** @description Notification channel. Secrets are never returned. */
         NotificationChannel: {
@@ -4853,6 +4859,7 @@ export interface components {
             slack?: components["schemas"]["NotificationSlackTarget"];
             telegram?: components["schemas"]["NotificationTelegramTarget"];
             teams?: components["schemas"]["NotificationTeamsTarget"];
+            command?: components["schemas"]["NotificationCommandTarget"];
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -21313,7 +21320,8 @@ export enum NotificationProviderType {
     webhook = "webhook",
     slack = "slack",
     telegram = "telegram",
-    teams = "teams"
+    teams = "teams",
+    command = "command"
 }
 export enum NotificationEventType {
     dag_run_waiting = "dag.run.waiting",

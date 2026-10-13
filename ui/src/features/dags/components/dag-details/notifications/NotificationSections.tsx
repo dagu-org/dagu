@@ -52,6 +52,8 @@ import {
 } from '../../../../../api/v1/schema';
 import {
   blankChannel,
+  CHANNEL_PROVIDER_OPTIONS,
+  DEFAULT_COMMAND_PLACEHOLDER,
   DEFAULT_MESSAGE_TEMPLATE,
   DEFAULT_SUBJECT_TEMPLATE,
   DeliveryDraft,
@@ -463,6 +465,46 @@ function ProviderFields({ draft, onChange }: ProviderFieldsProps) {
             />
           </I18nProps>
         </label>
+      </div>
+    );
+  }
+
+  if (draft.type === NotificationProviderType.command) {
+    return (
+      <div className="space-y-2">
+        <Label htmlFor={`${fieldId}-command`}>
+          <I18nText text={'Command'} />
+        </Label>
+        <Textarea
+          id={`${fieldId}-command`}
+          className="min-h-24 py-1 font-mono text-xs"
+          spellCheck={false}
+          value={draft.command.command}
+          placeholder={DEFAULT_COMMAND_PLACEHOLDER}
+          onChange={(event) =>
+            update({
+              command: { command: event.target.value },
+            })
+          }
+        />
+        <p className="text-xs text-muted-foreground">
+          <I18nText
+            text={
+              'The Dagu server runs this command. Unix uses sh -c and Windows uses cmd.exe /c. The server stops it after 30 seconds, and a non-zero exit fails delivery.'
+            }
+          />
+        </p>
+        <p className="text-xs text-muted-foreground">
+          <I18nTemplate
+            text="Tokens such as {dag} are inserted into the command before the shell runs. The same values are exported as {dagEnv} and {statusEnv}. {logEnv} is a temporary file containing the run log and is removed after the command exits. On Windows, cmd.exe reads these as %DAG_NAME%, %STATUS%, and %EXECUTION_LOG%."
+            values={{
+              dag: <code>{'{{dag.name}}'}</code>,
+              dagEnv: <code>$DAG_NAME</code>,
+              statusEnv: <code>$STATUS</code>,
+              logEnv: <code>$EXECUTION_LOG</code>,
+            }}
+          />
+        </p>
       </div>
     );
   }
@@ -987,6 +1029,8 @@ function channelDestination(channel: DraftChannel): string {
       } catch {
         return 'Webhook destination';
       }
+    case NotificationProviderType.command:
+      return 'Local command';
   }
 }
 
@@ -1360,7 +1404,7 @@ export function NotificationChannelsSection({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {PROVIDER_OPTIONS.map((provider) => (
+                        {CHANNEL_PROVIDER_OPTIONS.map((provider) => (
                           <SelectItem
                             key={provider.value}
                             value={provider.value}

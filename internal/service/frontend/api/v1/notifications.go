@@ -624,6 +624,11 @@ func notificationChannelFromRequest(id string, input api.NotificationChannelInpu
 			MessageTemplate: valueOf(input.Teams.MessageTemplate),
 		}
 	}
+	if input.Command != nil {
+		channel.Command = &notificationmodel.CommandTarget{
+			Command: input.Command.Command,
+		}
+	}
 	return channel
 }
 
@@ -872,6 +877,11 @@ func toAPINotificationChannel(channel *notificationmodel.Channel) api.Notificati
 			WebhookUrlConfigured: pub.Teams.WebhookURLConfigured,
 			WebhookUrlPreview:    ptrOf(pub.Teams.WebhookURLPreview),
 			MessageTemplate:      ptrOf(pub.Teams.MessageTemplate),
+		}
+	}
+	if pub.Command != nil {
+		result.Command = &api.NotificationCommandTarget{
+			Command: pub.Command.Command,
 		}
 	}
 	return result

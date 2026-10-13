@@ -12415,6 +12415,7 @@ components:
         - slack
         - telegram
         - teams
+        - command
 
     NotificationEventType:
       type: string
@@ -12880,6 +12881,16 @@ components:
           type: string
           description: "Optional Teams message template. When omitted, Dagu sends the default notification text."
 
+    NotificationCommandTarget:
+      type: object
+      description: "Local shell command run by the Dagu server when this channel delivers a notification."
+      required:
+        - command
+      properties:
+        command:
+          type: string
+          description: "Shell command. Notification tokens such as {{dag.name}} are rendered before the shell runs. The same fields are exported as environment variables, including DAG_NAME and STATUS. EXECUTION_LOG is the path of a temporary file containing the run log; Dagu removes that file after the command exits. Unix shells expand $DAG_NAME. Windows cmd.exe expands %DAG_NAME%."
+
     NotificationTargetInput:
       type: object
       description: "Notification target input"
@@ -12975,6 +12986,8 @@ components:
           $ref: "#/components/schemas/NotificationTelegramTargetInput"
         teams:
           $ref: "#/components/schemas/NotificationTeamsTargetInput"
+        command:
+          $ref: "#/components/schemas/NotificationCommandTarget"
 
     NotificationChannel:
       type: object
@@ -13008,6 +13021,8 @@ components:
           $ref: "#/components/schemas/NotificationTelegramTarget"
         teams:
           $ref: "#/components/schemas/NotificationTeamsTarget"
+        command:
+          $ref: "#/components/schemas/NotificationCommandTarget"
         createdAt:
           type: string
           format: date-time
