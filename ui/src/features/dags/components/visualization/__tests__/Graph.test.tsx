@@ -77,7 +77,7 @@ describe('Graph', () => {
     }
     const definition = firstCall[1] as string;
     expect(definition).toContain(
-      'classDef done color:#14161b,fill:#e5f5e7,stroke:#22c55e'
+      'classDef done color:#111114,fill:#e9f9ef,stroke:#22c55e'
     );
     expect(definition).toContain(
       'linkStyle 0 stroke:#3fa76b,stroke-width:1.8px'
@@ -109,7 +109,7 @@ describe('Graph', () => {
     }
     const definition = firstCall[1] as string;
     expect(definition).toContain(
-      'classDef running color:#14161b,fill:#eeecf6,stroke:#7c6ef4'
+      'classDef running color:#111114,fill:#f2f1fe,stroke:#7c6ef4'
     );
     expect(definition).not.toContain('#81c784');
   });

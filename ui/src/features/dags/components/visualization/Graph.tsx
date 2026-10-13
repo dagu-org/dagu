@@ -394,8 +394,8 @@ function Graph({
 
     // Define node styles for different states
     // Use theme-appropriate colors for light/dark modes
-    const nodeFill = isDarkMode ? '#12141b' : '#fbfaf6'; // --card per mode
-    const nodeColor = isDarkMode ? '#f2f1ec' : '#14161b'; // --foreground per mode
+    const nodeFill = isDarkMode ? '#141417' : '#ffffff'; // --card per mode
+    const nodeColor = isDarkMode ? '#ededf0' : '#111114'; // --foreground per mode
 
     // Status shows in the border and a light tint of the same color, so a
     // node stays readable in both themes.
