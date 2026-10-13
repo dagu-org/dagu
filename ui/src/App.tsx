@@ -75,6 +75,7 @@ const IncidentProvidersPage = React.lazy(
 const IncidentsPage = React.lazy(() => import('./pages/incidents'));
 const IntegrationsPage = React.lazy(() => import('./pages/integrations'));
 const LicensePage = React.lazy(() => import('./pages/license'));
+const NotFoundPage = React.lazy(() => import('./pages/not-found'));
 const NotificationChannelsPage = React.lazy(
   () => import('./pages/notification-channels')
 );
@@ -876,6 +877,10 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
                                             <GitSyncPage />
                                           </GitSyncElement>
                                         }
+                                      />
+                                      <Route
+                                        path="*"
+                                        element={<NotFoundPage />}
                                       />
                                     </LazyRoutes>
                                   </Layout>
