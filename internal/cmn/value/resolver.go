@@ -177,9 +177,6 @@ func (r Resolver) optionsFor(policy resolverPolicy) []option {
 	if len(r.runtime.Steps) > 0 {
 		opts = append(opts, withStepMap(r.runtime.Steps))
 	}
-	if len(r.runtime.Foreach) > 0 {
-		opts = append(opts, withForeach(r.runtime.Foreach))
-	}
 	opts = append(opts, policy.options...)
 	if r.disableCommandSubstitution {
 		opts = append(opts, withoutSubstitute(), withoutShellCommandSubstitution())

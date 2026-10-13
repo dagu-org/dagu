@@ -7,8 +7,6 @@ import (
 	"context"
 	"os"
 	"strings"
-
-	"github.com/dagucloud/dagu/v2/internal/cmn/datapath"
 )
 
 // resolver provides unified variable resolution across explicit variable maps,
@@ -20,7 +18,6 @@ type resolver struct {
 	expandOS               bool
 	deferShellVars         bool
 	recognizeEscapedDollar bool
-	foreach                Values
 }
 
 // newResolver creates a resolver from the given context and options.
@@ -32,7 +29,6 @@ func newResolver(ctx context.Context, opts *options) *resolver {
 		expandOS:               opts.ExpandOS,
 		deferShellVars:         opts.DeferShellVars,
 		recognizeEscapedDollar: opts.RecognizeEscapedDollar,
-		foreach:                opts.Foreach,
 	}
 }
 
@@ -142,14 +138,6 @@ func (r *resolver) resolveReference(ctx context.Context, varName, path string) (
 		if value, ok := resolveStepProperty(ctx, varName, path, r.stepMap); ok {
 			return value, true
 		}
-	}
-	// Structured item state takes precedence over a same-named environment variable.
-	if varName == "foreach" && len(r.foreach) > 0 {
-		value, ok := datapath.Select(ctx, varName, map[string]any(r.foreach), path)
-		if !ok {
-			return "", false
-		}
-		return stringifyResolvedValue(value), true
 	}
 	jsonStr, ok := r.resolveJSONSource(varName)
 	if !ok {

@@ -110,7 +110,7 @@ func resolveBindings(
 	if !strings.Contains(input, "DAGU_") {
 		taken = ""
 	}
-	legacy := resolver{foreach: scope.Foreach, stepMap: scope.Steps}
+	legacy := resolver{stepMap: scope.Steps}
 	protectOriginal := func(token string) string {
 		placeholder := uniqueToken(taken, "\uE000DAGU_UNRESOLVED_REF_")
 		// Shells get an ASCII token because Windows substitution output may not keep other runes.
@@ -128,10 +128,11 @@ func resolveBindings(
 		var value any
 		var err error
 		if strings.HasPrefix(path, "foreach.") && !supportedStrictBinding(strings.Split(path, ".")) {
-			// Protect jq item paths with the same insertion rules as plain bindings.
-			var ok bool
-			value, ok = legacy.resolveReference(ctx, "foreach", strings.TrimPrefix(path, "foreach"))
-			if !ok {
+			if stepValue, ok := legacy.resolveReference(ctx, "foreach", strings.TrimPrefix(path, "foreach")); ok {
+				value = stepValue
+			} else if segments, ok := quotedForeachField(path); ok {
+				value, err = bindingForeachValue(path, segments, scope.Foreach, true)
+			} else {
 				return token, nil
 			}
 		} else {
@@ -520,6 +521,33 @@ func bindingMapValue(namespace, name string, values Values, requireValue bool) (
 		return nil, fmt.Errorf("unknown %s binding %q", namespace, name)
 	}
 	return value, nil
+}
+
+func quotedForeachField(path string) ([]string, bool) {
+	itemPath, ok := strings.CutPrefix(path, "foreach.")
+	if !ok {
+		return nil, false
+	}
+	end := strings.IndexAny(itemPath, ".[")
+	if end < 0 || !bindingNamePattern.MatchString(itemPath[:end]) {
+		return nil, false
+	}
+	quoted := itemPath[end+1:]
+	if itemPath[end] == '[' {
+		quoted, ok = strings.CutSuffix(quoted, "]")
+		if !ok {
+			return nil, false
+		}
+	}
+	quoted = strings.TrimSpace(quoted)
+	if !strings.HasPrefix(quoted, `"`) {
+		return nil, false
+	}
+	var field string
+	if err := json.Unmarshal([]byte(quoted), &field); err != nil {
+		return nil, false
+	}
+	return []string{"foreach", itemPath[:end], field}, true
 }
 
 func bindingForeachValue(path string, segments []string, values Values, requireValue bool) (any, error) {

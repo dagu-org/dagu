@@ -5,6 +5,7 @@ package value
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -243,6 +244,96 @@ func TestResolverForeachDollarEscapes(t *testing.T) {
 		}
 	}
 	assert.Empty(t, notices.Notices())
+}
+
+func TestForeachUnbraced(t *testing.T) {
+	t.Parallel()
+
+	resolver := NewResolver(StaticScope{}, RuntimeScope{
+		Env:     NewEnvScope(nil, false).WithEntry("SECRET", "synthetic-secret", EnvSourceStepEnv),
+		Foreach: Values{"item": map[string]any{"value": "$SECRET"}},
+	})
+	command := CommandContext{Target: CommandTargetLocal, ShellConfigured: true, Shell: []string{"sh"}}
+	for _, ref := range []string{`$foreach.item.value`, `$foreach.item."value"`, `$foreach.item["value"]`} {
+		for _, field := range []Field{
+			WorkflowField("foreach.collect"), StepEnvField("CAPTURE"),
+			ShellCommandField("run", command), CommandScriptField("script", command),
+			StepArtifactOutputField("output"),
+		} {
+			got, err := resolver.String(t.Context(), ref, field)
+			require.NoError(t, err)
+			assert.Equal(t, ref, got, "field: %s", field.Path())
+		}
+	}
+}
+
+func TestForeachMissingField(t *testing.T) {
+	t.Parallel()
+
+	for _, ref := range []string{`${foreach.item.missing}`, `${foreach.item."missing"}`, `${foreach.item["missing"]}`} {
+		t.Run(ref, func(t *testing.T) {
+			var notices ValueReferenceNoticeCollector
+			resolver := NewResolver(StaticScope{}, RuntimeScope{
+				// A missing item field must not fall back to an environment value.
+				Env:     NewEnvScope(nil, false).WithEntry("foreach", `{"item":{"missing":"shadow"}}`, EnvSourceStepEnv),
+				Foreach: Values{"item": map[string]any{"present": "value"}},
+			}, WithValueReferenceNotices(&notices))
+			got, err := resolver.String(t.Context(), ref, WorkflowField("foreach.collect"))
+			require.NoError(t, err)
+			assert.Equal(t, ref, got)
+			require.Len(t, notices.Notices(), 1)
+			assert.Equal(t, ValueReferenceReasonNamespaceUnavailable, notices.Notices()[0].Reason)
+		})
+	}
+}
+
+func TestForeachFieldValues(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name  string
+		value any
+		want  string
+	}{
+		{name: "integer", value: float64(1000000), want: "1000000"},
+		{name: "fraction", value: 0.0000042, want: "0.0000042"},
+		{name: "boolean", value: false, want: "false"},
+		{name: "null", value: nil, want: "<nil>"},
+		{name: "object", value: map[string]any{"nested": "value"}, want: `{"nested":"value"}`},
+		{name: "array", value: []any{"one", "two"}, want: `["one","two"]`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var notices ValueReferenceNoticeCollector
+			resolver := NewResolver(StaticScope{}, RuntimeScope{
+				Foreach: Values{"item": map[string]any{"value": tc.value}},
+			}, WithValueReferenceNotices(&notices))
+			for _, ref := range []string{`${foreach.item.value}`, `${foreach.item."value"}`, `${foreach.item["value"]}`} {
+				got, err := resolver.String(t.Context(), ref, WorkflowField("foreach.collect"))
+				require.NoError(t, err)
+				assert.Equal(t, tc.want, got, "reference: %s", ref)
+			}
+			assert.Empty(t, notices.Notices())
+		})
+	}
+}
+
+func TestForeachQuotedKeys(t *testing.T) {
+	t.Parallel()
+
+	for _, key := range []string{"請求番号", "column.name", "column name", `column["name"]`, ""} {
+		t.Run(key, func(t *testing.T) {
+			resolver := NewResolver(StaticScope{}, RuntimeScope{
+				Foreach: Values{"item": map[string]any{key: "value"}},
+			})
+			quoted, err := json.Marshal(key)
+			require.NoError(t, err)
+			for _, ref := range []string{"${foreach.item." + string(quoted) + "}", "${foreach.item[" + string(quoted) + "]}"} {
+				got, err := resolver.String(t.Context(), ref, WorkflowField("foreach.collect"))
+				require.NoError(t, err)
+				assert.Equal(t, "value", got, "reference: %s", ref)
+			}
+		})
+	}
 }
 
 // --- ExpandOS resolver tests ---
