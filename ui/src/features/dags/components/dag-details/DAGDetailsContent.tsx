@@ -16,7 +16,7 @@ import {
   Webhook,
 } from 'lucide-react';
 import React, { useState } from 'react';
-import { components } from '../../../../api/v1/schema';
+import { components, Stream } from '../../../../api/v1/schema';
 import { workspaceNameFromLabels } from '../../../../lib/workspace';
 import { DAGStatus } from '../../components';
 import { DAGContext } from '../../contexts/DAGContext';
@@ -48,6 +48,8 @@ type DAGDetailsContentProps = {
   onTabChange?: (tab: string) => void;
   dagRunId?: string;
   stepName?: string | null;
+  /** Stream shown by the full-page step log */
+  logStream?: Stream;
   isModal?: boolean;
   skipHeader?: boolean;
   localDags?: components['schemas']['LocalDag'][];
@@ -91,6 +93,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
   onTabChange,
   dagRunId = 'latest',
   stepName = null,
+  logStream = Stream.stdout,
   isModal = false,
   skipHeader = false,
   localDags,
@@ -608,6 +611,10 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
               dagRunId={dagRunId}
               stepName={stepName}
               dagRun={currentDAGRun}
+              stream={logStream}
+              node={currentDAGRun?.nodes?.find(
+                (node) => node.step.name === stepName
+              )}
             />
           ) : null}
 

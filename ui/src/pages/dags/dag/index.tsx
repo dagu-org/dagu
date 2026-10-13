@@ -3,7 +3,7 @@
 
 import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { components } from '../../../api/v1/schema';
+import { components, Stream } from '../../../api/v1/schema';
 import { AppBarContext } from '../../../contexts/AppBarContext';
 import { RemoteNodeProvider } from '../../../contexts/RemoteNodeContext';
 import { UnsavedChangesProvider } from '../../../contexts/UnsavedChangesContext';
@@ -57,6 +57,10 @@ function DAGDetails() {
 
   const dagRunId = searchParams.get('dagRunId');
   const stepName = searchParams.get('step');
+  const logStream =
+    searchParams.get('stream') === Stream.stderr
+      ? Stream.stderr
+      : Stream.stdout;
   const subDAGRunId = searchParams.get('subDAGRunId');
   const queriedDAGRunName = searchParams.get('dagRunName');
   const queryRemoteNode = searchParams.get('remoteNode')?.trim();
@@ -338,6 +342,7 @@ function DAGDetails() {
                       onTabChange={handleTabChange}
                       dagRunId={displayDAGRunId}
                       stepName={stepName}
+                      logStream={logStream}
                       isModal={false}
                       skipHeader={true}
                       localDags={dagData?.localDags}
