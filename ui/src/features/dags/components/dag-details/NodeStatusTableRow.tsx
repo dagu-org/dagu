@@ -111,6 +111,10 @@ type Props = {
   hideActions?: boolean;
   /** Whether the inline log starts expanded */
   defaultLogExpanded?: boolean;
+  /** Whether this step's details are open */
+  selected?: boolean;
+  /** Opens this step's details; without it a row click toggles the log */
+  onInspect?: (stepName: string) => void;
 };
 
 type BuildExecution = components['schemas']['BuildExecution'];
@@ -305,6 +309,8 @@ function NodeStatusTableRow({
   view = 'desktop',
   hideActions = false,
   defaultLogExpanded = false,
+  selected = false,
+  onInspect,
 }: Props) {
   const { ts } = useI18n();
   const { dagRunId, name: dagName } = dagRun;
@@ -790,8 +796,16 @@ function NodeStatusTableRow({
     return (
       <>
         <StyledTableRow
-          className="hover:bg-muted/50 transition-colors duration-200 h-auto cursor-pointer"
+          className={cn(
+            'hover:bg-muted/50 transition-colors duration-200 h-auto cursor-pointer',
+            selected && 'bg-primary/5 hover:bg-primary/10'
+          )}
+          data-selected={selected || undefined}
           onClick={() => {
+            if (onInspect) {
+              onInspect(node.step.name);
+              return;
+            }
             if (hasLogs) {
               setIsLogExpanded(!isLogExpanded);
               // Set default tab based on what's available

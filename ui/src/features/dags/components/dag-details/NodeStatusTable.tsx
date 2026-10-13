@@ -35,6 +35,10 @@ type Props = {
   onNodeStatusUpdated?: (stepName: string, status: NodeStatus) => void;
   /** Hide per-row actions for nodes the step APIs cannot address */
   hideActions?: boolean;
+  /** Step whose details are open */
+  selectedStepName?: string;
+  /** Opens a step's details from its row */
+  onInspectStep?: (stepName: string) => void;
 };
 
 /**
@@ -47,6 +51,8 @@ function NodeStatusTable({
   onViewLog,
   onNodeStatusUpdated,
   hideActions,
+  selectedStepName,
+  onInspectStep,
 }: Props) {
   const config = useConfig();
   const showActionsColumn = Boolean(
@@ -95,6 +101,8 @@ function NodeStatusTable({
                   onNodeStatusUpdated={onNodeStatusUpdated}
                   dagRun={status}
                   view="desktop"
+                  selected={n.step.name === selectedStepName}
+                  onInspect={onInspectStep}
                   hideActions={hideActions}
                   defaultLogExpanded={n.step.name === firstFailedStepName}
                 />

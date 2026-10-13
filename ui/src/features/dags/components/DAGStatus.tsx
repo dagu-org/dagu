@@ -389,6 +389,8 @@ function DAGStatus({
     [displayDAGRun, openStepDetails]
   );
 
+  const openStepName = isStepDetailsOpen ? selectedDetailStepName : undefined;
+
   const selectedDetailNode = React.useMemo(
     () =>
       selectedDetailStepName
@@ -982,6 +984,7 @@ function DAGStatus({
                             : undefined
                         }
                         height={graphHeight}
+                        selectedStepName={openStepName}
                       />
                     </div>
                     <GraphResizeHandle {...graphResizeHandleProps} />
@@ -1014,6 +1017,8 @@ function DAGStatus({
                 fileName={fileName}
                 onViewLog={handleViewLog}
                 onNodeStatusUpdated={applyDisplayNodeStatus}
+                selectedStepName={openStepName}
+                onInspectStep={openStepDetails}
               />
             </div>
 

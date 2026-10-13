@@ -393,6 +393,47 @@ describe('NodeStatusTableRow', () => {
     }
   );
 
+  // A row and its graph node open the same step details; the chevron keeps
+  // the quick inline log.
+  it('opens step details from a row click and keeps the log toggle', () => {
+    const onInspect = vi.fn();
+    const node = {
+      ...timedNode,
+      stdout: '/tmp/build.out',
+    } as components['schemas']['Node'];
+    render(
+      <MemoryRouter>
+        <AppBarContext.Provider value={appBarValue}>
+          <table>
+            <tbody>
+              <NodeStatusTableRow
+                rownum={1}
+                node={node}
+                name="example.yaml"
+                dagRun={dagRun}
+                view="desktop"
+                selected
+                onInspect={onInspect}
+              />
+            </tbody>
+          </table>
+        </AppBarContext.Provider>
+      </MemoryRouter>
+    );
+
+    const row = screen.getByText('build').closest('tr')!;
+    expect(row).toHaveAttribute('data-selected', 'true');
+    fireEvent.click(row);
+    expect(onInspect).toHaveBeenCalledWith('build');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show logs' }));
+    expect(screen.getByRole('button', { name: 'Hide logs' })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
+    expect(onInspect).toHaveBeenCalledTimes(1);
+  });
+
   it('falls back to the configured log message when stdout cannot be loaded', () => {
     mockedUseQuery.mockImplementation((path, init) => ({
       data: undefined,
