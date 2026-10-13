@@ -3,6 +3,7 @@
 
 import LoadingIndicator from '@/components/ui/loading-indicator';
 import { Tabs } from '@/components/ui/tabs';
+import { useScrollFade } from '@/hooks/useScrollFade';
 import { cn } from '@/lib/utils';
 import {
   AlertTriangle,
@@ -149,6 +150,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
     }
   };
 
+  const [tabRowRef, tabRowFade] = useScrollFade<HTMLDivElement>('x');
   const showLogTab = activeTab === 'log' || activeTab === 'dagRun-log';
   const tabs: DetailTab[] = [
     { value: 'status', label: 'Overview', icon: PlayCircle, path: '' },
@@ -226,7 +228,11 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
           />
         )}
         <div className="mb-4 mt-3 flex min-w-0 flex-col items-center justify-between gap-3 lg:flex-row 2xl:gap-0">
-          <div className="w-full min-w-0 overflow-x-auto lg:flex-1">
+          <div
+            ref={tabRowRef}
+            style={tabRowFade}
+            className="w-full min-w-0 overflow-x-auto lg:flex-1"
+          >
             <Tabs className="min-w-max whitespace-nowrap">
               {tabs.map((tab) =>
                 isModal ? (
