@@ -299,8 +299,8 @@ export function SecretRefsSection(): React.ReactNode {
       aria-labelledby="secret-refs-heading"
       className="flex h-full min-h-0 flex-col gap-4 overflow-hidden"
     >
-      <div className="flex shrink-0 items-center justify-between gap-3">
-        <div>
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0 flex-1 basis-64">
           <h2 id="secret-refs-heading" className="text-base font-semibold">
             <I18nText text={'DAG Secret Refs'} />
           </h2>

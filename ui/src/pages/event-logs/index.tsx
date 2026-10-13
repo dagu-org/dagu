@@ -1241,7 +1241,7 @@ export default function EventLogsPage() {
                             <span className="text-muted-foreground">-</span>
                           )}
                         </TableCell>
-                        <TableCell className="font-mono break-all">
+                        <TableCell className="font-mono whitespace-nowrap">
                           {runPath && entry.dagRunId ? (
                             <Link
                               to={runPath}
@@ -1255,7 +1255,7 @@ export default function EventLogsPage() {
                             <span className="text-muted-foreground">-</span>
                           )}
                         </TableCell>
-                        <TableCell className="font-mono break-all">
+                        <TableCell className="font-mono whitespace-nowrap">
                           {entry.attemptId || '-'}
                         </TableCell>
                         <TableCell>
