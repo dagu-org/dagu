@@ -248,7 +248,15 @@ dagu computer elements [--format json] [--limit N] [--at-pointer [--after 3s] | 
 Clear the recorded `act` operations that computer steps replay, so the next run asks the model again. Without `--step`, every step of the DAG is cleared. The cache lives on the host that ran the step; in distributed mode, run it on the worker.
 
 ```sh
-dagu computer cache clear <dag> [--step <id>]
+dagu computer cache clear <dag> [--step <id> [--op <position>]]
+```
+
+### dagu computer cache show
+
+Show what a DAG's computer steps recorded on this host in the form a step pins it, to review and write into the step's `recorded` or `fields` so every device of that system runs it with no model. Without `--step`, every step is shown; `--op` keeps one task, counted from 1. A task recorded under several instructions or parameters shows each, newest first. An act with an action that has no pinned form, such as a drag, a click where no element could be read, or one near an element's edge, lists each such action and why instead of steps. `--format json` prints `{operations}`, each with `step`, `op`, `kind`, `system`, `saved_at`, and `recorded`, `fields`, or `unpinnable` (`turn`, `action`, `code`, `reason`).
+
+```sh
+dagu computer cache show <dag> [--step <id> [--op <position>]] [--format json]
 ```
 
 ### dagu xlsx inspect

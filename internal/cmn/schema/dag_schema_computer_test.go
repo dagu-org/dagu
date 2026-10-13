@@ -47,6 +47,13 @@ steps:
         - act: {instruction: Open billing, cache: false, max_actions: 10}
           timeout: 2m
         - act: {instruction: Save it, ai: never, find_within: "0"}
+        - act:
+            instruction: Submit
+            recorded:
+              windows:
+                - click: {app: expense, role: button, name: 保存}
+                - key: enter
+                  focus: {app: expense, role: text_field, id: amountBox}
         - ask: {prompt: Enter the code, as: otp, timeout: 10m}
         - expect: The invoice is posted
         - expect: {statement: A document number is shown, within: 30s}
@@ -84,6 +91,7 @@ steps:
 		{"element role alone", "{role: text_field, near: {label: 金額, side: right}, nth: 0}", "{role: text_field}"},
 		{"unknown selector key", "{role: button, name: 保存, in: {role: group, name: 支払情報}}", "{role: button, title: 保存}"},
 		{"bad side", "side: right", "side: beside"},
+		{"focus without key", "                - key: enter\n", "                - click: {role: button, name: OK}\n"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			doc := mustParseYAMLDocument(t, strings.Replace(source, tc.from, tc.to, 1))

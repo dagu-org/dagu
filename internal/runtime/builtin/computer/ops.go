@@ -449,7 +449,7 @@ func (r *run) modelExtract(ctx context.Context, index int, spec extractSpec, key
 		// model run reads the same as every later run.
 		maps.Copy(out, bound)
 		if len(fields) > 0 {
-			r.cache.Stage(key, recording{Op: index, Version: recordingVersion, Fields: fields})
+			r.cache.Stage(key, recording{Op: index, Version: recordingVersion, Fields: fields, System: r.system, SavedAt: time.Now().UTC()})
 		} else {
 			// Nothing bound; forget any stale binding so a later on_miss run
 			// does not wait for an element that is gone before it asks again.

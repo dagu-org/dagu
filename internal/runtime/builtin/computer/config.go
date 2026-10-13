@@ -717,7 +717,8 @@ func pinnedStepSchema() *jsonschema.Schema {
 				Required:             []string{"on", "dy"},
 				Properties:           map[string]*jsonschema.Schema{"on": selector(), "dy": {Type: "integer"}},
 			},
-			"wait": agentstep.NonEmptyString(),
+			"wait":  agentstep.NonEmptyString(),
+			"focus": selector(),
 		},
 		OneOf: []*jsonschema.Schema{
 			{Required: []string{"click"}}, {Required: []string{"double_click"}}, {Required: []string{"right_click"}},

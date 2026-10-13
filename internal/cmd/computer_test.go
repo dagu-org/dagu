@@ -32,6 +32,91 @@ func TestComputerCacheClear(t *testing.T) {
 	assert.Equal(t, []string{"post"}, browserReplayCacheSteps(t, th, "invoices"), "browser steps keep their cache")
 }
 
+// The recordings of a step show as the pins to write into it, by task and
+// newest first, and an act that cannot be pinned names each action and why.
+func TestComputerCacheShow(t *testing.T) {
+	t.Parallel()
+
+	th := test.SetupCommand(t)
+	writeComputerRecordings(t, th, "invoices", "post", map[string]string{
+		"older": `{"op": 0, "version": 2, "system": "windows", "saved_at": "2026-10-01T09:00:00Z", "turns": [{"actions": [{"action": {"kind": "key", "keys": ["ctrl", "s"]}}]}]}`,
+		"newer": `{"op": 0, "version": 2, "system": "windows", "saved_at": "2026-10-02T09:00:00Z", "turns": [{"actions": [{"action": {"kind": "click", "point": {"x": 1, "y": 2}}, "element": {"selector": {"role": "button", "name": "保存", "id": "saveButton"}, "path": [], "app": "expense", "window": "経費精算", "fx": 0.5, "fy": 0.5}}]}]}`,
+		"drag":  `{"op": 1, "version": 2, "system": "windows", "turns": [{"actions": [{"action": {"kind": "drag", "path": [{"x": 1, "y": 2}, {"x": 3, "y": 4}]}}]}]}`,
+		"read":  `{"op": 2, "version": 2, "system": "windows", "fields": [{"name": "amount", "kind": "number", "element": {"selector": {"role": "text_field", "id": "amountBox"}, "path": [], "app": "expense", "window": "経費精算", "fx": 0, "fy": 0}}]}`,
+		"stale": `{"op": 0, "version": 1, "turns": [{"actions": [{"action": {"kind": "key", "keys": ["enter"]}}]}]}`,
+	})
+	writeComputerRecordings(t, th, "invoices", "check", map[string]string{
+		"enter": `{"op": 0, "version": 2, "system": "windows", "turns": [{"actions": [{"action": {"kind": "key", "keys": ["enter"]}}]}]}`,
+	})
+
+	out, err := runCommand(th, cmd.Computer(), "computer", "cache", "show", "invoices", "--step", "post", "--format", "json")
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"operations": [
+		{"step": "post", "op": 1, "kind": "act", "system": "windows", "saved_at": "2026-10-02T09:00:00Z",
+		 "recorded": [{"click": {"app": "expense", "role": "button", "name": "保存", "id": "saveButton"}}]},
+		{"step": "post", "op": 1, "kind": "act", "system": "windows", "saved_at": "2026-10-01T09:00:00Z",
+		 "recorded": [{"key": "ctrl+s"}]},
+		{"step": "post", "op": 2, "kind": "act", "system": "windows",
+		 "unpinnable": [{"turn": 1, "action": "drag from 1,2 to 3,4", "code": "drag", "reason": "a drag has no pinned form"}]},
+		{"step": "post", "op": 3, "kind": "extract", "system": "windows",
+		 "fields": {"amount": {"app": "expense", "role": "text_field", "id": "amountBox"}}}
+	]}`, out)
+
+	out, err = runCommand(th, cmd.Computer(), "computer", "cache", "show", "invoices", "--step", "post", "--op", "1")
+	require.NoError(t, err)
+	assert.Equal(t, `Step "post", task 1 (act), recorded 2026-10-02T09:00:00Z:
+recorded:
+  windows:
+  - click:
+      app: expense
+      role: button
+      name: 保存
+      id: saveButton
+
+Step "post", task 1 (act), recorded 2026-10-01T09:00:00Z:
+recorded:
+  windows:
+  - key: ctrl+s
+`, out)
+
+	out, err = runCommand(th, cmd.Computer(), "computer", "cache", "show", "invoices", "--step", "post", "--op", "2")
+	require.NoError(t, err)
+	assert.Equal(t, "Step \"post\", task 2 (act), cannot be pinned:\n  turn 1, drag from 1,2 to 3,4: a drag has no pinned form\n", out)
+
+	out, err = runCommand(th, cmd.Computer(), "computer", "cache", "show", "invoices", "--format", "json")
+	require.NoError(t, err)
+	var all struct {
+		Operations []struct {
+			Step string `json:"step"`
+			Op   int    `json:"op"`
+		} `json:"operations"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(out), &all))
+	require.Len(t, all.Operations, 5, "every step without --step")
+	assert.Equal(t, "check", all.Operations[0].Step, "steps in order")
+
+	out, err = runCommand(th, cmd.Computer(), "computer", "cache", "show", "invoices", "--step", "missing")
+	require.NoError(t, err)
+	assert.Equal(t, "No computer recordings for step \"missing\" of DAG \"invoices\"\n", out)
+}
+
+func TestComputerCacheShowInvalidInput(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"--op", "1"}, "--op needs --step"},
+		{[]string{"--step", "post", "--op", "0"}, `--op must be a position in with.do from 1, not "0"`},
+		{[]string{"--format", "yaml"}, `invalid format "yaml": use text or json`},
+	} {
+		th := test.SetupCommand(t)
+		_, err := runCommand(th, cmd.Computer(), append([]string{"computer", "cache", "show", "invoices"}, tc.args...)...)
+		require.ErrorContains(t, err, tc.want)
+	}
+}
+
 // Where the desktop cannot be automated, the JSON result names each problem
 // with a code a program can act on.
 func TestComputerCheckJSON(t *testing.T) {
@@ -146,4 +231,19 @@ func computerReplayCacheSteps(t *testing.T, th test.Command, dagName string) []s
 	steps, err := computerReplayCache(th).Steps(dagName)
 	require.NoError(t, err)
 	return steps
+}
+
+// writeComputerRecordings writes a step's replay cache file holding the
+// given recordings by key.
+func writeComputerRecordings(t *testing.T, th test.Command, dagName, step string, entries map[string]string) {
+	t.Helper()
+	raw := make(map[string]json.RawMessage, len(entries))
+	for key, entry := range entries {
+		raw[key] = json.RawMessage(entry)
+	}
+	data, err := json.Marshal(raw)
+	require.NoError(t, err)
+	path := computerReplayCache(th).Path(dagName, step)
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o700))
+	require.NoError(t, os.WriteFile(path, data, 0o600))
 }

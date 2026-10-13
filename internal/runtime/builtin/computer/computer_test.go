@@ -814,6 +814,22 @@ func TestPinnedActTypesAndWaits(t *testing.T) {
 	assert.Equal(t, []string{"focus amountBox", "type 12,000", "key ctrl", "key s"}, run.backend.inputs())
 }
 
+// A pinned key step focuses the element its keys went to before pressing
+// them, and misses, pressing nothing, when that element is not there.
+func TestPinnedKeyFocusesItsElement(t *testing.T) {
+	t.Parallel()
+
+	run := elementRun(t)
+	replayed := run.execute(`{"ai": "never", "do": [{"act": {"instruction": "Submit", "recorded": {"windows": [{"key": "enter", "focus": {"role": "text_field", "id": "amountBox"}}]}}}]}`, nil)
+	require.NoError(t, replayed.err)
+	assert.Equal(t, []string{"focus amountBox", "key enter"}, run.backend.inputs())
+
+	run.backend.events = nil
+	missed := run.execute(`{"ai": "never", "do": [{"act": {"instruction": "Submit", "recorded": {"windows": [{"key": "enter", "focus": {"role": "text_field", "id": "noteBox"}}]}}}]}`, nil)
+	require.ErrorContains(t, missed.err, "was not found")
+	assert.Empty(t, run.backend.inputs(), "keys never go to whatever else has the focus")
+}
+
 // A pinned act under input: direct drives the element's pattern.
 func TestPinnedActDirect(t *testing.T) {
 	t.Parallel()

@@ -103,11 +103,11 @@ func (r *run) act(ctx context.Context, index int, spec actSpec, timeout time.Dur
 			if err != nil {
 				return err
 			}
-			done, performed, reason, err := r.replayPinned(ctx, index, steps, direct, findWithin)
+			outcome, err := r.replayPinned(ctx, index, steps, direct, findWithin)
 			if err != nil {
 				return err
 			}
-			if done {
+			if outcome.done {
 				r.report(ctx, agentstep.Report{
 					Index: index, Kind: opAct, Subject: spec.Instruction, Status: agentstep.StatusCacheHit, Via: agentstep.ViaElement,
 					Detail: fmt.Sprintf("replayed %d pinned steps", len(steps)), Duration: time.Since(began),
@@ -115,11 +115,11 @@ func (r *run) act(ctx context.Context, index int, spec actSpec, timeout time.Dur
 				return nil
 			}
 			if choice == aiNever {
-				return replayMiss{err: errors.New(reason), via: agentstep.ViaElement}
+				return replayMiss{err: errors.New(outcome.reason), via: agentstep.ViaElement}
 			}
-			logAction(r.timeline, index, "pinned steps stopped: "+reason)
+			logAction(r.timeline, index, "pinned steps stopped: "+outcome.reason)
 			status = agentstep.StatusHealed
-			spent = performed
+			replayed, spent = outcome.ran, outcome.performed
 		}
 	}
 	if !pinned && choice != aiEveryRun {
@@ -711,6 +711,7 @@ func (l *actLoop) finish(ctx context.Context, turn *computeruse.Turn) error {
 	}
 	l.outcome.recording.Final = desktop.FingerprintOf(final)
 	l.outcome.recording.Version = recordingVersion
+	l.outcome.recording.System, l.outcome.recording.SavedAt = l.r.system, time.Now().UTC()
 	if len(l.elements) > 0 {
 		l.r.landmarks(&l.outcome.recording, l.elements)
 	}

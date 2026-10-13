@@ -6,6 +6,7 @@ package computer
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"runtime"
 	"strings"
@@ -45,6 +46,9 @@ type pinnedStep struct {
 	Key         string            `json:"key,omitempty"`
 	Scroll      *pinnedScroll     `json:"scroll,omitempty"`
 	Wait        string            `json:"wait,omitempty"`
+	// Focus is the element a key step focuses before it presses its keys,
+	// so the keys reach the element they went to when the step was learned.
+	Focus *desktop.Selector `json:"focus,omitempty"`
 }
 
 type pinnedType struct {
@@ -63,6 +67,18 @@ type pinnedField struct {
 	desktop.Selector
 	Container *desktop.Selector `json:"container,omitempty"`
 	Columns   map[string]string `json:"columns,omitempty"`
+}
+
+// MarshalJSON writes a table field as its container and columns alone, and
+// a scalar field as its selector.
+func (f pinnedField) MarshalJSON() ([]byte, error) {
+	if f.Container != nil {
+		return json.Marshal(struct {
+			Container *desktop.Selector `json:"container"`
+			Columns   map[string]string `json:"columns"`
+		}{f.Container, f.Columns})
+	}
+	return json.Marshal(f.Selector)
 }
 
 // pinnedStep.UnmarshalJSON enforces exactly one action key, so a malformed
@@ -97,6 +113,14 @@ func (s pinnedStep) validate() error {
 	if n := s.actionCount(); n != 1 {
 		return fmt.Errorf("a pinned step must set exactly one action, not %d", n)
 	}
+	if s.Focus != nil {
+		if s.Key == "" {
+			return errors.New("focus applies to a key step only")
+		}
+		if err := s.Focus.Validate(); err != nil {
+			return fmt.Errorf("focus: %w", err)
+		}
+	}
 	for _, sel := range []*desktop.Selector{s.Click, s.DoubleClick, s.RightClick} {
 		if sel != nil {
 			return sel.Validate()
@@ -122,7 +146,7 @@ func (s pinnedStep) validate() error {
 // instruction's, so a typo or a reference to a skipped ask is caught.
 func (s pinnedStep) references() []string {
 	var texts []string
-	for _, sel := range []*desktop.Selector{s.Click, s.DoubleClick, s.RightClick} {
+	for _, sel := range []*desktop.Selector{s.Click, s.DoubleClick, s.RightClick, s.Focus} {
 		if sel != nil {
 			texts = append(texts, selectorTexts(*sel)...)
 		}
@@ -238,7 +262,11 @@ func (s pinnedStep) recordedAction() (recordedAction, bool) {
 	case s.Scroll != nil:
 		return recordedAction{Action: computeruse.Action{Kind: computeruse.KindScroll, ScrollY: s.Scroll.Dy, Point: &computeruse.Point{}}, Element: new(pinnedElement(s.Scroll.On))}, true
 	case s.Key != "":
-		return recordedAction{Action: computeruse.Action{Kind: computeruse.KindKey, Keys: strings.Split(s.Key, "+")}}, true
+		rec := recordedAction{Action: computeruse.Action{Kind: computeruse.KindKey, Keys: strings.Split(s.Key, "+")}}
+		if s.Focus != nil {
+			rec.Element = new(pinnedElement(*s.Focus))
+		}
+		return rec, true
 	}
 	return recordedAction{}, false
 }
@@ -246,48 +274,76 @@ func (s pinnedStep) recordedAction() (recordedAction, bool) {
 //go:fix inline
 func ptr[T any](v T) *T { return new(v) }
 
+// pinnedOutcome is how far an act's pinned steps got.
+type pinnedOutcome struct {
+	done bool
+	// performed counts the steps that acted, waits aside.
+	performed int
+	// ran holds the steps that ran as one recorded turn, so the recording of
+	// an act the model finishes covers the whole task. It is empty when none
+	// of them acted on an element, since such a turn could replay only by
+	// pixels it never recorded.
+	ran    []recordedTurn
+	reason string
+}
+
 // replayPinned runs an act's pinned steps in order through the same element
-// replay a learned recording uses. It returns whether every step ran, how
-// many ran, and the reason one missed.
-func (r *run) replayPinned(ctx context.Context, index int, steps []pinnedStep, direct bool, findWithin time.Duration) (done bool, performed int, reason string, err error) {
+// replay a learned recording uses. It reports whether every step ran, which
+// ran, and the reason one missed.
+func (r *run) replayPinned(ctx context.Context, index int, steps []pinnedStep, direct bool, findWithin time.Duration) (pinnedOutcome, error) {
+	var result pinnedOutcome
 	els, err := r.elementsIfAvailable()
 	if err != nil {
 		// A pin replays only by element; a host that reads none, macOS
 		// until phase 8 or a 32-bit Windows, misses rather than failing, so
 		// on_miss hands the act to the model and never reports the miss.
-		return false, 0, fmt.Sprintf("pinned steps need the window's elements, which this host cannot read: %v", err), nil
+		result.reason = fmt.Sprintf("pinned steps need the window's elements, which this host cannot read: %v", err)
+		return result, nil
 	}
 	total := len(steps)
 	var outcome replayOutcome
+	var ran recordedTurn
+	byElement := false
+	keepRan := func() {
+		if byElement {
+			result.ran = []recordedTurn{ran}
+		}
+	}
 	for i, step := range steps {
 		if step.Wait != "" {
 			wait, _ := time.ParseDuration(step.Wait)
 			if err := sleep(ctx, wait); err != nil {
-				return false, performed, "", err
+				return result, err
 			}
+			ran.Actions = append(ran.Actions, recordedAction{Action: computeruse.Action{Kind: computeruse.KindWait, Duration: wait}})
 			continue
 		}
 		rec, ok := step.recordedAction()
 		if !ok {
-			return false, performed, "", fmt.Errorf("a pinned step sets no action")
+			return result, fmt.Errorf("a pinned step sets no action")
 		}
 		// Wait until nobody has touched the desktop for the idle window, as a
 		// learned replay and the model loop do, so a pinned click or text
 		// never lands in a person's window.
 		if err := r.awaitPerson(ctx); err != nil {
-			return false, performed, "", err
+			return result, err
 		}
 		turn := recordedTurn{Actions: []recordedAction{rec}}
 		reason, err := r.replayByElement(ctx, index, i, total, turn, els, findWithin, direct, &outcome)
 		if err != nil {
-			return false, performed, "", err
+			return result, err
 		}
 		if reason != "" {
-			return false, performed, reason, nil
+			result.reason = reason
+			keepRan()
+			return result, nil
 		}
-		performed++
+		result.performed++
+		ran.Actions = append(ran.Actions, rec)
+		byElement = byElement || rec.Element != nil
 	}
-	return true, performed, "", nil
+	result.done = true
+	return result, nil
 }
 
 // pinnedBindings turns an extract's pinned fields for a system into field

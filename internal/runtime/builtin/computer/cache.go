@@ -61,6 +61,10 @@ type recording struct {
 	// the value from, so a later run reads it again with no model. An act
 	// has none; an extract has no turns.
 	Fields []fieldBinding `json:"fields,omitempty"`
+	// System is the system the recording was made on, windows or macos,
+	// which keys its pinned form. SavedAt is when the run that made it ran.
+	System  string    `json:"system,omitempty"`
+	SavedAt time.Time `json:"saved_at,omitzero"`
 }
 
 // fieldBinding ties one extract output to the element its value was read

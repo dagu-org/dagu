@@ -423,15 +423,18 @@ the miss. A Windows host that cannot open UI Automation behaves the same.
 
 `recorded` is a list of steps, each exactly one of: `click`, `double_click`,
 `right_click` (a selector); `type` (`{into, text}`, where `text` keeps its
-`%name%` placeholders); `key` (a chord such as `ctrl+s`); `scroll`
-(`{on, dy}`); or `wait` (a duration). Each pointer step clicks the centre of
-the element its selector names, found the same way a replay finds a recorded
+`%name%` placeholders); `key` (a chord such as `ctrl+s`, with an optional
+`focus` selector naming the element to focus first, which a replay finds and
+focuses as it does a typed field's); `scroll` (`{on, dy}`); or `wait` (a
+duration). Each pointer step clicks the centre of the element its selector
+names, found the same way a replay finds a recorded
 element, so the window is raised by the selector's `app` and `window` and the
 action waits up to `find_within`. Under `input: direct` a step drives the
 element's pattern. When every step runs, the act is a cache hit by element
 with no model; when a step misses, `on_miss` lets the model finish and
-record a fresh device recording (which a person reviews to update the pin),
-and `never` fails naming the step. A pinned act has no screen check of its
+record a fresh device recording, which begins with the pinned steps that ran
+when any of them acted on an element, so a person can review it to update
+the pin; `never` fails naming the step. A pinned act has no screen check of its
 own; the following `expect` is its gate.
 
 `fields` maps each output name to a selector for a scalar, or to
@@ -444,6 +447,36 @@ A field with no pin falls back to the device's own binding.
 Pins are kept per system because UI Automation and the macOS accessibility
 API expose an application differently, so a pin made on Windows serves
 Windows devices. Pins travel with the step; the device cache does not.
+
+A recording keeps the system it was made on and when its run ran, and
+`dagu computer cache show <dag>` prints a host's recordings in their pinned
+form for a person to review and write into the step: every step, or one
+with `--step <id>`, and one task with `--op <position>`. A task whose
+instruction changed, or that ran with other parameters, has a recording for
+each, and the newest comes first. Each recorded element becomes a selector
+by its role, name, and id in its application, or in its window's title when
+the application could not be read. An element without an id is looked for
+`in` its closest named `group`, `list`, `tab`, or `other` ancestor, since a
+name alone often repeats in a window; a row or a cell is never the
+container, since its name is the data shown. A single or double left click,
+a single right click, typing into a field that was read, a key chord
+(once per press), a plain vertical scroll on an element, and a wait each
+become one step, and a pointer move onto the element the next action uses
+is dropped. A key chord keeps the element that had the focus as its
+`focus`, on its first press only, since each press after it starts from
+where the one before left the focus. Any other action has no pinned form: a
+drag, a click holding keys or where no element could be read, a click or
+scroll more than 30% of the element's width or height from its centre
+(except on a text field), since a pin acts at the centre, a move alone, a
+held key, or a button pressed or released alone. An act with one lists each such action
+with its turn and why, instead of steps, since a pin that skipped an action
+would report success without doing the task. An extract's bindings become
+its fields. `--format json` prints `{"operations": [...]}`, each with
+`step`, `op`, `kind`, `system`, `saved_at`, and `recorded`, `fields`, or
+`unpinnable`, whose items carry `turn`, `action`, `reason`, and a `code` for
+a program: `no_element`, `edge_click`, `click_with_keys`, `click`,
+`no_field`, `keys`, `edge_scroll`, `scroll`, `move`, `drag`, `hold_key`,
+`button`, or `unsupported`.
 
 ### Elements
 
