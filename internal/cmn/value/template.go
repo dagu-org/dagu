@@ -128,8 +128,9 @@ func resolveBindings(
 		var value any
 		var err error
 		if strings.HasPrefix(path, "foreach.") && !supportedStrictBinding(strings.Split(path, ".")) {
-			if stepValue, ok := legacy.resolveReference(ctx, "foreach", strings.TrimPrefix(path, "foreach")); ok {
-				value = stepValue
+			if _, ok := legacy.resolveReference(ctx, "foreach", strings.TrimPrefix(path, "foreach")); ok {
+				// Legacy step references need the field's quoting rules.
+				return token, nil
 			} else if segments, ok := quotedForeachField(path); ok {
 				value, err = bindingForeachValue(path, segments, scope.Foreach, true)
 			} else {

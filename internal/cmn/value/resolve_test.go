@@ -187,6 +187,49 @@ func TestResolverForeachPreservesStepProperties(t *testing.T) {
 	}
 }
 
+func TestForeachStepQuoting(t *testing.T) {
+	t.Parallel()
+
+	outputs := `{"value":"a\"b\nc\\d"}`
+	resolver := NewResolver(StaticScope{}, RuntimeScope{
+		Foreach: Values{
+			"item":    "one",
+			"outputs": map[string]any{"value": "item-value"},
+		},
+		Steps: map[string]StepInfo{"foreach": {Outputs: &outputs}},
+	})
+	for _, ref := range []string{`${foreach.outputs."value"}`, `${foreach.outputs["value"]}`} {
+		t.Run(ref, func(t *testing.T) {
+			t.Run("json", func(t *testing.T) {
+				got, err := resolver.String(t.Context(), `{"result":"`+ref+`"}`, WorkflowField("foreach.collect"))
+				require.NoError(t, err)
+				var decoded map[string]string
+				require.NoError(t, json.Unmarshal([]byte(got), &decoded))
+				assert.Equal(t, "a\"b\nc\\d", decoded["result"])
+			})
+
+			for _, tc := range []struct {
+				shell string
+				want  string
+			}{
+				{shell: "sh", want: `echo "a\"b\nc\\d"`},
+				{shell: "pwsh", want: "echo \"a\"\"b`nc\\d\""},
+			} {
+				t.Run(tc.shell, func(t *testing.T) {
+					field := ShellCommandField("run", CommandContext{
+						Target:          CommandTargetLocal,
+						Shell:           []string{tc.shell},
+						ShellConfigured: true,
+					})
+					got, err := resolver.String(t.Context(), `echo "`+ref+`"`, field)
+					require.NoError(t, err)
+					assert.Equal(t, tc.want, got)
+				})
+			}
+		})
+	}
+}
+
 func TestResolverQuotedForeachValuesStayLiteral(t *testing.T) {
 	t.Parallel()
 

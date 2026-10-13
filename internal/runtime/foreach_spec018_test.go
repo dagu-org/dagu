@@ -70,6 +70,28 @@ func TestForeachRuntimeRunsBodyAndPublishesAggregate(t *testing.T) {
 	}, state.records())
 }
 
+func TestForeachCollectStepJSON(t *testing.T) {
+	probeType, _ := registerForeachProbeExecutor(t)
+	r := setupRunner(t)
+	parent := foreachRuntimeStep(probeType, []any{
+		map[string]any{"slug": "one", "url": `a"b`},
+	}, 1)
+	parent.Foreach.Steps[0].Name = "foreach"
+	parent.Foreach.Steps[0].ID = "foreach"
+	parent.Foreach.Collect["summary"] = `{"result":"${foreach.outputs["value"]}"}`
+
+	result := r.newPlan(t, parent).assertRun(t, ir.Succeeded)
+	raw, ok := result.nodeByName(t, "each").NodeData().StringFormOutputValue()
+	require.True(t, ok)
+	var aggregate foreachAggregate
+	require.NoError(t, json.Unmarshal([]byte(raw), &aggregate))
+	require.Len(t, aggregate.Outputs, 1)
+
+	var decoded map[string]string
+	require.NoError(t, json.Unmarshal([]byte(aggregate.Outputs[0]["summary"]), &decoded))
+	assert.Equal(t, `a"b`, decoded["result"])
+}
+
 // Top-level item fields are resolved in the key, body, and collect phases.
 func TestForeachRuntimeTopLevelFieldResolution(t *testing.T) {
 	items := []any{
