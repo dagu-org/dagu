@@ -194,7 +194,7 @@ export default function OverviewPage({
             className="inline-flex h-12 cursor-pointer items-center gap-1 px-3 text-sm font-medium text-text-secondary hover:text-foreground"
           >
             <Plus className="h-4 w-4" />
-            <I18nText text={"New"} />
+            <I18nText text={"New view"} />
           </button></I18nProps>
         )}
       </Tabs></I18nProps>
