@@ -72,6 +72,7 @@ import React, {
 import { I18nText } from '@/i18n/I18nText';
 import { I18nProps } from '@/i18n/I18nProps';
 import { I18nTemplate } from '@/i18n/I18nTemplate';
+import { InlineLoadError } from '@/components/PageStates';
 
 type SecretResponse = components['schemas']['SecretResponse'];
 type CreateSecretRequest = components['schemas']['CreateSecretRequest'];
@@ -208,7 +209,12 @@ export function SecretRefsSection(): React.ReactNode {
     setSelectedScope(workspaceSelectionScope);
   }, [workspaceSelectionScope]);
 
-  const { data, mutate, isLoading } = useQuery(
+  const {
+    data,
+    error: loadError,
+    mutate,
+    isLoading,
+  } = useQuery(
     '/secrets',
     whenEnabled(canManageSecrets, {
       params: {
@@ -397,6 +403,15 @@ export function SecretRefsSection(): React.ReactNode {
                   className="py-8 text-center text-muted-foreground"
                 >
                   <I18nText text={'Loading secret refs...'} />
+                </TableCell>
+              </TableRow>
+            ) : loadError && !data ? (
+              <TableRow>
+                <TableCell colSpan={6} className="py-8">
+                  <InlineLoadError
+                    error={loadError}
+                    onRetry={() => void mutate()}
+                  />
                 </TableCell>
               </TableRow>
             ) : secrets.length === 0 ? (

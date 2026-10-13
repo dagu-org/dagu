@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -122,6 +122,49 @@ describe('DAGDetails page', () => {
     renderPage('/dags/release-notes?dagRunId=missing&dagRunName=release-notes');
 
     expect(screen.getByText('Output for run-1')).toBeVisible();
+  });
+
+  it('explains when the workflow does not exist', () => {
+    useQueryMock.mockImplementation(
+      () =>
+        ({
+          data: undefined,
+          error: { code: 'not_found', message: 'DAG is not found' },
+          mutate: vi.fn(),
+        }) as never
+    );
+
+    renderPage('/dags/missing-flow');
+
+    expect(
+      screen.getByRole('heading', { name: 'Workflow not found' })
+    ).toBeVisible();
+    expect(screen.getByText('missing-flow')).toBeVisible();
+    expect(
+      screen.getByRole('link', { name: 'Back to Workflows' })
+    ).toHaveAttribute('href', '/dags');
+    expect(screen.queryByTestId('dag-details-content')).toBeNull();
+  });
+
+  it('reports a failed load with the server message and a retry', () => {
+    const mutate = vi.fn();
+    useQueryMock.mockImplementation(
+      () =>
+        ({
+          data: undefined,
+          error: { code: 'internal_error', message: 'disk is full' },
+          mutate,
+        }) as never
+    );
+
+    renderPage();
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      "Couldn't load this workflow"
+    );
+    expect(screen.getByText('disk is full')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(mutate).toHaveBeenCalled();
   });
 
   it('redirects the legacy docs tab to the Wiki tab', async () => {

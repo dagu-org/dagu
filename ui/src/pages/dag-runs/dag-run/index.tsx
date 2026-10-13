@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import React, { useCallback, useContext } from 'react';
+import React, { useCallback, useContext, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { AppBarContext } from '../../../contexts/AppBarContext';
 import { RemoteNodeProvider } from '../../../contexts/RemoteNodeContext';
@@ -9,45 +9,52 @@ import { DAGRunDetailsContent } from '../../../features/dag-runs/components/dag-
 import { DAGRunContext } from '../../../features/dag-runs/contexts/DAGRunContext';
 import { matchesRequestedDAGRunDetails } from '../../../features/dag-runs/hooks/dagRunDetailsRequest';
 import { useBoundedDAGRunDetails } from '../../../features/dag-runs/hooks/useBoundedDAGRunDetails';
-import { I18nText } from '@/i18n/I18nText';
-
-type ApiError = {
-  response?: { status?: number };
-  message?: string;
-};
+import {
+  LoadErrorState,
+  NotFoundState,
+  PageLoading,
+} from '@/components/PageStates';
+import { useI18n } from '@/i18n/I18nProvider';
+import { I18nTemplate } from '@/i18n/I18nTemplate';
+import { isNotFoundQueryError } from '@/lib/queryErrors';
 
 type ErrorDisplayProps = {
   error: unknown;
   name: string | undefined;
   dagRunId: string | undefined;
+  onRetry: () => void;
 };
 
-function ErrorDisplay({ error, name, dagRunId }: ErrorDisplayProps) {
-  const apiError = error as ApiError;
-  const statusCode = apiError?.response?.status;
-  const isNotFound = statusCode === 404;
+function ErrorDisplay({ error, name, dagRunId, onRetry }: ErrorDisplayProps) {
+  const { ts } = useI18n();
 
-  const containerClass = isNotFound ? 'bg-muted' : 'bg-error-muted';
-  const titleClass = isNotFound ? 'text-foreground' : 'text-error';
-  const messageClass = isNotFound ? 'text-muted-foreground' : 'text-error';
-
-  const title = isNotFound ? 'DAG Run Not Found' : 'Error Loading DAG Run';
-  const message = isNotFound
-    ? 'This DAG run may have been dequeued or removed. The previous state is no longer available.'
-    : apiError?.message || 'Failed to load DAG run details';
+  if (!isNotFoundQueryError(error)) {
+    return (
+      <LoadErrorState
+        title={ts("Couldn't load this run")}
+        error={error}
+        onRetry={onRetry}
+      />
+    );
+  }
 
   return (
-    <div className="w-full px-4">
-      <div className={`${containerClass} rounded-lg p-6 m-4`}>
-        <h2 className={`text-lg font-semibold ${titleClass} mb-2`}>{title}</h2>
-        <p className={messageClass}>{message}</p>
-        {isNotFound && (
-          <p className="text-sm text-muted-foreground mt-2">
-            <I18nText text={"DAG:"} /> {name} <I18nText text={"| Run ID:"} /> {dagRunId}
-          </p>
-        )}
-      </div>
-    </div>
+    <NotFoundState
+      title={ts('Run not found')}
+      description={
+        <I18nTemplate
+          text="Run {runId} of {name} does not exist. It may have been dequeued or removed."
+          values={{
+            runId: <code>{dagRunId}</code>,
+            name: <code>{name}</code>,
+          }}
+        />
+      }
+      action={{
+        to: name ? `/dag-runs?name=${encodeURIComponent(name)}` : '/dag-runs',
+        label: ts(name ? "Show this workflow's runs" : 'Show all runs'),
+      }}
+    />
   );
 }
 
@@ -114,13 +121,25 @@ function DAGRunDetailsPage() {
     return name || '';
   }
   const displayName = getDisplayName();
+  const { setTitle } = appBarContext;
+
+  useEffect(() => {
+    setTitle(displayName);
+  }, [displayName, setTitle]);
 
   if (error && !dagRunDetails) {
-    return <ErrorDisplay error={error} name={name} dagRunId={dagRunId} />;
+    return (
+      <ErrorDisplay
+        error={error}
+        name={name}
+        dagRunId={dagRunId}
+        onRetry={() => void refresh()}
+      />
+    );
   }
 
   if (!dagRunDetails) {
-    return null;
+    return <PageLoading />;
   }
 
   return (

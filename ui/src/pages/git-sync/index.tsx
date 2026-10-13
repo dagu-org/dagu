@@ -72,6 +72,7 @@ import {
   type SyncKind,
 } from './sync-kind';
 import { useSyncReconcile } from './useSyncReconcile';
+import { LoadErrorState, PageLoading } from '@/components/PageStates';
 
 type SyncStatusResponse = components['schemas']['SyncStatusResponse'];
 type SyncConfigResponse = components['schemas']['SyncConfigResponse'];
@@ -211,7 +212,11 @@ export default function GitSyncPage() {
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
 
   // Fetch sync status
-  const { data: statusData, mutate: mutateStatus } = useQuery(
+  const {
+    data: statusData,
+    error: statusError,
+    mutate: mutateStatus,
+  } = useQuery(
     '/sync/status',
     {
       params: {
@@ -628,8 +633,20 @@ export default function GitSyncPage() {
 
   const missingCount = status?.counts?.missing || 0;
 
+  if (!status) {
+    return statusError ? (
+      <LoadErrorState
+        title={ts("Couldn't load Git sync status")}
+        error={statusError}
+        onRetry={() => void mutateStatus()}
+      />
+    ) : (
+      <PageLoading />
+    );
+  }
+
   // Not configured state
-  if (!status?.enabled) {
+  if (!status.enabled) {
     return (
       <div className="flex flex-col items-center justify-center h-[60vh] text-center">
         <GitBranch className="h-16 w-16 text-muted-foreground/30 mb-4" />

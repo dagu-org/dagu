@@ -15,6 +15,7 @@ import {
 } from '@/hooks/useDAGRunsListSSE';
 import { sseFallbackOptions, useSSECacheSync } from '@/hooks/useSSECacheSync';
 import { isAbortLikeError } from '@/lib/requestTimeout';
+import { getQueryErrorMessage } from '@/lib/queryErrors';
 
 export type DAGRunSummary = components['schemas']['DAGRunSummary'];
 export type DAGRunsPageResponse = components['schemas']['DAGRunsPageResponse'];
@@ -551,7 +552,7 @@ export function usePaginatedDAGRuns({
       error instanceof Error
         ? error
         : error
-          ? new Error('Failed to load DAG runs')
+          ? new Error(getQueryErrorMessage(error, 'Failed to load DAG runs'))
           : null,
     isInitialLoading: isLoading,
     isLoadingMore,

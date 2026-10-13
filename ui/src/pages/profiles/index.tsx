@@ -76,6 +76,7 @@ import React, {
 import { useLocation, useNavigate } from 'react-router-dom';
 import { I18nText } from '@/i18n/I18nText';
 import { I18nProps } from '@/i18n/I18nProps';
+import { InlineLoadError } from '@/components/PageStates';
 
 type RuntimeProfileResponse = components['schemas']['RuntimeProfileResponse'];
 type InheritedRuntimeProfileResponse =
@@ -390,7 +391,12 @@ export default function ProfilesPage(): React.ReactNode {
     [canManageProfiles, remoteNode]
   );
 
-  const { data, mutate, isLoading } = useQuery('/profiles', queryInit);
+  const {
+    data,
+    error: loadError,
+    mutate,
+    isLoading,
+  } = useQuery('/profiles', queryInit);
   const profiles = data?.profiles || [];
   const activeProfiles = useMemo(
     () =>
@@ -959,6 +965,15 @@ export default function ProfilesPage(): React.ReactNode {
                         className="py-8 text-center text-muted-foreground"
                       >
                         <I18nText text={'Loading profiles...'} />
+                      </TableCell>
+                    </TableRow>
+                  ) : loadError && !data ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="py-8">
+                        <InlineLoadError
+                          error={loadError}
+                          onRetry={() => void mutate()}
+                        />
                       </TableCell>
                     </TableRow>
                   ) : profiles.length === 0 ? (

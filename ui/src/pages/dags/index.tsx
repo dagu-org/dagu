@@ -50,6 +50,8 @@ import {
 import LoadingIndicator from '@/components/ui/loading-indicator';
 import { useViews, type View, type ViewSpec } from '@/hooks/useViews';
 import { I18nText } from '@/i18n/I18nText';
+import { useI18n } from '@/i18n/I18nProvider';
+import { LoadErrorState } from '@/components/PageStates';
 
 type DAGDefinitionsFilters = WorkflowFilterSet;
 
@@ -247,6 +249,7 @@ function supportsIntersectionObserver(): boolean {
 function DAGsContent() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { ts } = useI18n();
   const query = React.useMemo(
     () => new URLSearchParams(location.search),
     [location.search]
@@ -630,7 +633,7 @@ function DAGsContent() {
   );
 
   const dagsListSSE = useDAGsListSSE(queryParams, filtersReady);
-  const { data, mutate, isLoading } = useQuery(
+  const { data, error, mutate, isLoading } = useQuery(
     '/dags',
     filtersReady
       ? {
@@ -1230,6 +1233,12 @@ function DAGsContent() {
             ) : null}
           </div>
         </>
+      ) : error ? (
+        <LoadErrorState
+          title={ts("Couldn't load workflows")}
+          error={error}
+          onRetry={() => void mutate()}
+        />
       ) : (
         <LoadingIndicator />
       )}

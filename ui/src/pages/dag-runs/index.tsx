@@ -54,6 +54,8 @@ import StatusChip from '@/components/ui/status-chip';
 import Title from '@/components/ui/title';
 import type { StatusTab } from '@/features/dags/components/DAGStatus';
 import { I18nText } from '@/i18n/I18nText';
+import { useI18n } from '@/i18n/I18nProvider';
+import { LoadErrorState } from '@/components/PageStates';
 import { I18nProps } from '@/i18n/I18nProps';
 
 type DAGRunsFilters = DAGRunsFilterSet;
@@ -185,6 +187,7 @@ const NAME_SUGGESTION_DEBOUNCE_MS = 300;
 const NAME_SUGGESTION_LIMIT = 50;
 
 function DAGRuns() {
+  const { ts } = useI18n();
   const location = useLocation();
   const navigate = useNavigate();
   const appBarContext = React.useContext(AppBarContext);
@@ -842,6 +845,7 @@ function DAGRuns() {
   );
   const {
     dagRuns,
+    error: dagRunsError,
     isInitialLoading,
     isLoadingMore,
     loadMoreError,
@@ -1629,7 +1633,13 @@ function DAGRuns() {
           onReplaceSelection={replaceSelection}
           onActionComplete={refreshDagRuns}
         />
-        {viewMode === 'list' ? (
+        {dagRunsError && dagRuns.length === 0 && !isInitialLoading ? (
+          <LoadErrorState
+            title={ts("Couldn't load runs")}
+            error={dagRunsError}
+            onRetry={() => void refreshDagRuns()}
+          />
+        ) : viewMode === 'list' ? (
           <DAGRunTable
             dagRuns={dagRuns}
             isLoading={isInitialLoading}
