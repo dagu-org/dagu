@@ -497,6 +497,8 @@ Rules:
 - If any step-level precondition is not met, the step action must not start.
 - If any step-level precondition is not met, the step reaches terminal status
   `skipped`.
+- A step skipped by preconditions is not a step failure for DAG-run status
+  calculation.
 - A step skipped by preconditions must not publish step outputs.
 - A step skipped by preconditions must not run `retry_policy`.
 - A step skipped by preconditions must not run `repeat_policy`.
@@ -506,71 +508,6 @@ Rules:
   terminal status `failed`.
 - A step-level precondition evaluation error is a step failure for DAG-run
   status calculation.
-
-### Failing a Run on an Unmet Condition
-
-A condition that is not met is a normal negative result, not a failure. A step
-whose preconditions are not met is `skipped`, and a skipped step does not by
-itself fail the DAG run. A DAG-level condition that is not met is not a failure
-either: the run is `aborted`, and this spec defines no failing exit code for
-it. Preconditions therefore select what runs; they do not assert that something
-must hold.
-
-| Situation | Result |
-| --- | --- |
-| Step precondition not met | The step is `skipped`. The step action does not start and the skip does not by itself fail the run. |
-| Step precondition evaluation error | The step is `failed`. |
-| Step action exits with a non-zero code | The step is `failed`, which fails the run unless an owning continuation spec says otherwise. |
-| DAG-level precondition not met | See [DAG-Level Status Effects](#dag-level-status-effects). |
-| DAG-level precondition evaluation error | The DAG run is `failed`. |
-
-To make the run fail when a condition does not hold, make a step fail. Two
-idioms combine this spec with step failure on a non-zero exit code
-([Spec 013](013-step-run.md)), step dependencies
-([Spec 009](009-step-reference.md)), and `continue_on`, whose syntax this spec
-does not define.
-
-Guard step: a step whose command checks the condition and exits non-zero when it
-does not hold. Steps that depend on the guard do not start after it fails.
-
-```yaml
-params:
-  - mode: foo
-steps:
-  - id: guard
-    run: test "${params.mode}" = foo
-  - id: main
-    depends: guard
-    run: ./deploy.sh
-```
-
-Negated precondition: a step that always fails, gated by a negated condition so
-that it only runs when the checked condition does not hold. When the condition
-holds the step is `skipped`, so it sets `continue_on` for the skipped status to
-let dependents start.
-
-```yaml
-params:
-  - mode: foo
-steps:
-  - id: guard
-    continue_on:
-      skipped: true
-    preconditions:
-      - condition: ${params.mode}
-        expected: foo
-        negate: true
-    run: exit 1
-  - id: main
-    depends: guard
-    run: ./deploy.sh
-```
-
-Expected behavior for both examples:
-
-- With `mode=foo`, `main` starts and the DAG run succeeds.
-- With any other `mode`, `guard` is `failed`, `main` does not start, and the
-  `dagu start` command exits with a non-zero code.
 
 ## Errors
 
