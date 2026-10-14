@@ -236,12 +236,14 @@ function Dashboard(): React.ReactElement {
 
   // Telling "no workflows" from "no runs" costs one small request, sent only
   // when the window is empty. A few names are enough to spot the examples.
+  // Scheduled runs keep the page, which can then show what they wait on.
   const isEmpty =
     !!activity &&
     activity.runs.length === 0 &&
     activity.active.length === 0 &&
     activity.attention.length === 0 &&
-    activity.queues.length === 0;
+    activity.queues.length === 0 &&
+    activity.upcoming.length === 0;
   const { data: dagList } = useQuery(
     '/dags',
     isEmpty
@@ -363,7 +365,15 @@ function Dashboard(): React.ReactElement {
                   </ToggleGroup>
                 )}
               </div>
-              {filteredRuns.length === 0 ? (
+              {runs.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  {live ? (
+                    <I18nText text={'No runs in the last 24 hours'} />
+                  ) : (
+                    <I18nText text={'No runs in this range'} />
+                  )}
+                </p>
+              ) : filteredRuns.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   <I18nText text={'No workflows match the filter.'} />
                 </p>

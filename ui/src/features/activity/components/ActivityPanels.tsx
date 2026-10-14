@@ -121,118 +121,137 @@ export function NeedsAttention({
   onChanged: () => void;
 }): React.ReactElement {
   const { ts } = useI18n();
+  // Kept mounted across refreshes, so a screen reader announces the
+  // warning when a refresh adds it.
+  const schedulerStatus = (
+    <p role="status" className="sr-only">
+      {schedulerStopped
+        ? ts(
+            'The scheduler is not running, so scheduled and queued runs will not start.'
+          )
+        : ''}
+    </p>
+  );
   if (items.length === 0 && !schedulerStopped) {
     return (
-      <p className="flex items-center gap-2 text-sm text-muted-foreground">
-        <CircleCheck className="h-4 w-4 text-success" aria-hidden="true" />
-        <I18nText
-          text={'All clear. No failing workflows or runs waiting for input.'}
-        />
-      </p>
+      <>
+        {schedulerStatus}
+        <p className="flex items-center gap-2 text-sm text-muted-foreground">
+          <CircleCheck className="h-4 w-4 text-success" aria-hidden="true" />
+          <I18nText
+            text={'All clear. No failing workflows or runs waiting for input.'}
+          />
+        </p>
+      </>
     );
   }
   return (
-    <section
-      className="flex flex-col gap-2"
-      aria-labelledby="needs-attention-title"
-    >
-      <div id="needs-attention-title">
-        <SectionTitle count={items.length + (schedulerStopped ? 1 : 0)}>
-          <I18nText text={'Needs attention'} />
-        </SectionTitle>
-      </div>
-      <ul className="divide-y divide-border rounded-lg border border-border bg-card">
-        {schedulerStopped && (
-          <li className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
-            <CircleAlert
-              className="h-4 w-4 shrink-0 text-error"
-              aria-hidden="true"
-            />
-            <span className="min-w-0 flex-1 text-sm text-foreground">
-              <I18nText
-                text={
-                  'The scheduler is not running, so scheduled and queued runs will not start.'
-                }
+    <>
+      {schedulerStatus}
+      <section
+        className="flex flex-col gap-2"
+        aria-labelledby="needs-attention-title"
+      >
+        <div id="needs-attention-title">
+          <SectionTitle count={items.length + (schedulerStopped ? 1 : 0)}>
+            <I18nText text={'Needs attention'} />
+          </SectionTitle>
+        </div>
+        <ul className="divide-y divide-border rounded-lg border border-border bg-card">
+          {schedulerStopped && (
+            <li className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
+              <CircleAlert
+                className="h-4 w-4 shrink-0 text-error"
+                aria-hidden="true"
               />
-            </span>
-            <Link
-              to="/system-status"
-              className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              <I18nText text={'System Status'} />
-              <ArrowRight className="h-3 w-3" aria-hidden="true" />
-            </Link>
-          </li>
-        )}
-        {items.map((item) => {
-          const summary =
-            item.kind === 'failing' ? retrySummary(item.name, item.run) : null;
-          return (
-            <li
-              key={`${item.kind}:${item.name}:${item.run.dagRunId}`}
-              className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2"
-            >
-              <StatusChip status={item.run.status} size="xs">
-                {runStatusText(item.run.status)}
-              </StatusChip>
-              <RunLink
-                name={item.name}
-                run={item.run}
-                remoteNode={remoteNode}
-                className="text-sm font-medium text-foreground hover:underline"
-              >
-                {item.name}
-              </RunLink>
-              <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
-                {item.kind === 'failing' &&
-                  (item.run.failedStep
-                    ? `${item.run.failedStep}: ${item.run.error ?? ''}`
-                    : (item.run.error ?? ''))}
-                {item.kind === 'waiting' && ts('Waiting for input')}
-                {item.kind === 'slow' && (
-                  <Ticker intervalMs={1000}>
-                    {() => (
-                      <span>
-                        {ts('Running {elapsed}, usually {usual}', {
-                          elapsed: formatDurationMs(
-                            Date.now() - (item.run.startedAt ?? 0) * 1000
-                          ),
-                          usual: formatDurationMs(item.usualSeconds * 1000),
-                        })}
-                      </span>
-                    )}
-                  </Ticker>
-                )}
+              <span className="min-w-0 flex-1 text-sm text-foreground">
+                <I18nText
+                  text={
+                    'The scheduler is not running, so scheduled and queued runs will not start.'
+                  }
+                />
               </span>
-              <RelativeTime
-                timestamp={isoTime(item.run.startedAt)}
-                compact
-                className="text-xs text-muted-foreground"
-              />
-              <div className="flex items-center gap-1">
-                {summary && (
-                  <DAGRunActions
-                    dagRun={summary}
-                    name={item.name}
-                    refresh={onChanged}
-                    hideUnavailable
-                  />
-                )}
+              <Link
+                to="/system-status"
+                className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <I18nText text={'System Status'} />
+                <ArrowRight className="h-3 w-3" aria-hidden="true" />
+              </Link>
+            </li>
+          )}
+          {items.map((item) => {
+            const summary =
+              item.kind === 'failing'
+                ? retrySummary(item.name, item.run)
+                : null;
+            return (
+              <li
+                key={`${item.kind}:${item.name}:${item.run.dagRunId}`}
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2"
+              >
+                <StatusChip status={item.run.status} size="xs">
+                  {runStatusText(item.run.status)}
+                </StatusChip>
                 <RunLink
                   name={item.name}
                   run={item.run}
                   remoteNode={remoteNode}
-                  className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+                  className="text-sm font-medium text-foreground hover:underline"
                 >
-                  {item.kind === 'waiting' ? ts('Review') : ts('Open')}
-                  <ArrowRight className="h-3 w-3" aria-hidden="true" />
+                  {item.name}
                 </RunLink>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-    </section>
+                <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
+                  {item.kind === 'failing' &&
+                    (item.run.failedStep
+                      ? `${item.run.failedStep}: ${item.run.error ?? ''}`
+                      : (item.run.error ?? ''))}
+                  {item.kind === 'waiting' && ts('Waiting for input')}
+                  {item.kind === 'slow' && (
+                    <Ticker intervalMs={1000}>
+                      {() => (
+                        <span>
+                          {ts('Running {elapsed}, usually {usual}', {
+                            elapsed: formatDurationMs(
+                              Date.now() - (item.run.startedAt ?? 0) * 1000
+                            ),
+                            usual: formatDurationMs(item.usualSeconds * 1000),
+                          })}
+                        </span>
+                      )}
+                    </Ticker>
+                  )}
+                </span>
+                <RelativeTime
+                  timestamp={isoTime(item.run.startedAt)}
+                  compact
+                  className="text-xs text-muted-foreground"
+                />
+                <div className="flex items-center gap-1">
+                  {summary && (
+                    <DAGRunActions
+                      dagRun={summary}
+                      name={item.name}
+                      refresh={onChanged}
+                      hideUnavailable
+                    />
+                  )}
+                  <RunLink
+                    name={item.name}
+                    run={item.run}
+                    remoteNode={remoteNode}
+                    className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+                  >
+                    {item.kind === 'waiting' ? ts('Review') : ts('Open')}
+                    <ArrowRight className="h-3 w-3" aria-hidden="true" />
+                  </RunLink>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+    </>
   );
 }
 

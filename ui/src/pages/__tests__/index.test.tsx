@@ -115,8 +115,8 @@ function makeConfig(overrides: Partial<Config> = {}): Config {
   };
 }
 
-function renderPage() {
-  return render(
+function pageTree() {
+  return (
     <MemoryRouter initialEntries={['/']}>
       <ConfigContext.Provider value={makeConfig()}>
         <AppBarContext.Provider
@@ -137,6 +137,10 @@ function renderPage() {
       </ConfigContext.Provider>
     </MemoryRouter>
   );
+}
+
+function renderPage() {
+  return render(pageTree());
 }
 
 function makeActivity(overrides: Partial<DAGRunActivity> = {}): DAGRunActivity {
@@ -284,6 +288,45 @@ describe('DashboardPage', () => {
     expect(
       within(attention).getByRole('link', { name: /System Status/ })
     ).toHaveAttribute('href', '/system-status');
+  });
+
+  // Nothing has run yet precisely because the scheduler is down, so the
+  // warning must not give way to the empty state.
+  it('warns about a stopped scheduler before any run exists', () => {
+    mockScheduler(false);
+    mockActivity({
+      activity: makeActivity({
+        upcoming: [
+          { name: 'nightly', fileName: 'nightly', nextRun: NOW + 3600 },
+        ],
+      }),
+    });
+
+    renderPage();
+
+    const attention = screen.getByRole('region', { name: /Needs attention/ });
+    expect(
+      within(attention).getByText(/The scheduler is not running/)
+    ).toBeVisible();
+    expect(screen.getByText('No runs in the last 24 hours')).toBeVisible();
+    expect(screen.getByRole('link', { name: 'nightly' })).toBeVisible();
+  });
+
+  // A status region mounted before the warning appears is what makes a
+  // screen reader announce it.
+  it('announces the stopped-scheduler warning when it appears', () => {
+    mockActivity({ activity: busyActivity });
+    const { rerender } = renderPage();
+    const regions = screen.getAllByRole('status');
+
+    mockScheduler(false);
+    rerender(pageTree());
+
+    expect(
+      regions.some((region) =>
+        /The scheduler is not running/.test(region.textContent ?? '')
+      )
+    ).toBe(true);
   });
 
   it('summarizes each queue instead of listing its queued runs', () => {
