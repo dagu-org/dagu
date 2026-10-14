@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useScrollFade } from '../useScrollFade';
 
@@ -22,6 +22,17 @@ function LoadedRow({ loaded }: { loaded: boolean }) {
   return (
     <div ref={ref} data-mask={style.maskImage ?? ''} data-testid="row">
       tabs
+    </div>
+  );
+}
+
+// A child added after the row mounts, such as a tab that needs a loaded user.
+function GrowingRow({ extra }: { extra: boolean }) {
+  const [ref, style] = useScrollFade<HTMLDivElement>('x');
+  return (
+    <div ref={ref} data-mask={style.maskImage ?? ''} data-testid="row">
+      <span>tabs</span>
+      {extra && <button type="button">New view</button>}
     </div>
   );
 }
@@ -67,6 +78,24 @@ describe('useScrollFade', () => {
     expect(screen.getByTestId('row')).toHaveAttribute(
       'data-mask',
       'linear-gradient(to right, #000, #000 calc(100% - 24px), transparent)'
+    );
+  });
+
+  // A new child can make the row overflow without resizing the row itself.
+  it('fades a row that a later child makes overflow', async () => {
+    stubScroll(300, 300);
+    const { rerender } = render(<GrowingRow extra={false} />);
+    const row = screen.getByTestId('row');
+    expect(row).toHaveAttribute('data-mask', '');
+
+    stubScroll(600, 300);
+    rerender(<GrowingRow extra />);
+
+    await waitFor(() =>
+      expect(row).toHaveAttribute(
+        'data-mask',
+        'linear-gradient(to right, #000, #000 calc(100% - 24px), transparent)'
+      )
     );
   });
 

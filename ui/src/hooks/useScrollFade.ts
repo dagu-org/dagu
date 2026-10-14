@@ -53,9 +53,24 @@ export function useScrollFade<T extends HTMLElement>(
         observer.observe(child);
       }
     }
+    // A child added later, such as a tab that needs a loaded user, can make
+    // the row overflow without resizing the row itself.
+    let additions: MutationObserver | undefined;
+    if (typeof MutationObserver !== 'undefined') {
+      additions = new MutationObserver((records) => {
+        for (const record of records) {
+          for (const node of Array.from(record.addedNodes)) {
+            if (node instanceof Element) observer?.observe(node);
+          }
+        }
+        update();
+      });
+      additions.observe(element, { childList: true });
+    }
     return () => {
       element.removeEventListener('scroll', update);
       observer?.disconnect();
+      additions?.disconnect();
     };
   }, [axis, element]);
 
