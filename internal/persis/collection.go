@@ -38,6 +38,7 @@ const (
 	CollectionUsers                 = "users"
 	CollectionViews                 = "views"
 	CollectionWebhooks              = "webhooks"
+	CollectionWebhookDAGClaims      = "webhook_dag_claims"
 	CollectionWorkerHeartbeats      = "worker_heartbeats"
 	CollectionWorkspaces            = "workspaces"
 )

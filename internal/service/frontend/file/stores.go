@@ -322,6 +322,7 @@ func newBuiltinAuth(ctx context.Context, cfg *config.Config, backend persis.Back
 	}
 	webhookStore, err := store.NewWebhookStore(
 		backend.Collection(persis.CollectionWebhooks),
+		backend.Collection(persis.CollectionWebhookDAGClaims),
 		webhookEncryptor,
 	)
 	if err != nil {

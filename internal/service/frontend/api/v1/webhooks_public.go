@@ -240,7 +240,9 @@ func (a *API) checkPublicWebhookLimit(ctx context.Context, dagName string) error
 }
 
 // webhookRestoreTimeout bounds moving a webhook back after a failed rename.
-const webhookRestoreTimeout = 10 * time.Second
+// It outlasts the wait for a record lock left by a crashed process to be
+// recovered.
+const webhookRestoreTimeout = time.Minute
 
 // moveWebhookForRename moves a DAG's webhook to the DAG's new name before
 // the DAG itself moves, so a rename never succeeds with the webhook left

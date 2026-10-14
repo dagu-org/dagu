@@ -32,8 +32,15 @@ const webhookMissRebuildInterval = time.Second
 // create, and rebuilt when a lookup misses, at most once per
 // webhookMissRebuildInterval, since another process sharing the collection
 // may have written since; this process's writes keep it in sync under mu.
+//
+// One webhook per DAG holds across processes through claims: a record per
+// DAG name, created atomically, that names the webhook holding the name.
+// A write stores the webhook's record first and claims its DAG name after,
+// so a claim whose webhook is gone or names another DAG is known to be left
+// over from a crash between the two, and may be taken over.
 type WebhookStore struct {
 	col       persis.Collection
+	claims    persis.Collection
 	encryptor *crypto.Encryptor // nil = HMAC encryption disabled
 
 	mu        sync.RWMutex
@@ -43,10 +50,12 @@ type WebhookStore struct {
 	missRebuiltAt time.Time // guarded by missMu
 }
 
-// NewWebhookStore creates a WebhookStore backed by col. enc may be nil when HMAC secrets are unused.
-func NewWebhookStore(col persis.Collection, enc *crypto.Encryptor) (*WebhookStore, error) {
+// NewWebhookStore creates a WebhookStore that keeps webhooks in col and DAG
+// name claims in claims. enc may be nil when HMAC secrets are unused.
+func NewWebhookStore(col, claims persis.Collection, enc *crypto.Encryptor) (*WebhookStore, error) {
 	s := &WebhookStore{
 		col:       col,
+		claims:    claims,
 		encryptor: enc,
 		byDAGName: make(map[string]string),
 	}
@@ -157,8 +166,106 @@ func (s *WebhookStore) Create(ctx context.Context, webhook *auth.Webhook) error 
 	}); err != nil {
 		return err
 	}
+	// Another process may be creating this DAG's webhook too; the claim
+	// decides, and the loser removes its record.
+	if err := s.claim(ctx, webhook.DAGName, webhook.ID); err != nil {
+		undoCtx, cancel := undoContext(ctx)
+		defer cancel()
+		if delErr := s.col.Delete(undoCtx, webhook.ID); delErr != nil {
+			return errors.Join(err, delErr)
+		}
+		return err
+	}
 	s.byDAGName[webhook.DAGName] = webhook.ID
 	return nil
+}
+
+// webhookUndoTimeout bounds undoing half of a create or rename. It outlasts
+// the wait for a record lock left by a crashed process to be recovered.
+const webhookUndoTimeout = time.Minute
+
+// undoContext is for undoing half of a create or rename. It outlives ctx,
+// since a write the caller gave up on must still be undone.
+func undoContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.WithoutCancel(ctx), webhookUndoTimeout)
+}
+
+// webhookClaim is a DAG name's claim record: the webhook holding the name.
+type webhookClaim struct {
+	WebhookID string `json:"webhookId"`
+}
+
+// claim gives dagName to webhook id, whose record must already name
+// dagName. Returns [auth.ErrWebhookAlreadyExists] while another webhook
+// holds the name.
+func (s *WebhookStore) claim(ctx context.Context, dagName, id string) error {
+	data, err := persis.Encode(webhookClaim{WebhookID: id})
+	if err != nil {
+		return err
+	}
+	return retryConflict(ctx, func(ctx context.Context) error {
+		now := time.Now().UTC()
+		err := s.claims.Create(ctx, &persis.Record{ID: dagName, Data: data, CreatedAt: now, UpdatedAt: now})
+		if !errors.Is(err, persis.ErrConflict) {
+			return err
+		}
+		rec, err := s.claims.Get(ctx, dagName)
+		if errors.Is(err, persis.ErrNotFound) {
+			return persis.ErrConflict // released meanwhile: claim again
+		}
+		if err != nil {
+			return err
+		}
+		var held webhookClaim
+		if err := persis.Decode(rec, &held); err != nil {
+			return fmt.Errorf("webhook store: decode claim %q: %w", dagName, err)
+		}
+		if held.WebhookID == id {
+			return nil
+		}
+		live, err := s.names(ctx, held.WebhookID, dagName)
+		if err != nil {
+			return err
+		}
+		if live {
+			return auth.ErrWebhookAlreadyExists
+		}
+		err = s.claims.CompareAndSwap(ctx, dagName, rec.Data, data)
+		if errors.Is(err, persis.ErrNotFound) {
+			return persis.ErrConflict
+		}
+		return err
+	})
+}
+
+// names reports whether webhook id exists and belongs to dagName.
+func (s *WebhookStore) names(ctx context.Context, id, dagName string) (bool, error) {
+	rec, err := s.col.Get(ctx, id)
+	if errors.Is(err, persis.ErrNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	var stored auth.WebhookForStorage
+	if err := persis.Decode(rec, &stored); err != nil {
+		return false, fmt.Errorf("webhook store: decode %q: %w", id, err)
+	}
+	return stored.DAGName == dagName, nil
+}
+
+// release gives up webhook id's claim on dagName. A claim it cannot remove is
+// left over, which a later claim takes over, so failures are not reported.
+func (s *WebhookStore) release(ctx context.Context, dagName, id string) {
+	rec, err := s.claims.Get(ctx, dagName)
+	if err != nil {
+		return
+	}
+	var held webhookClaim
+	if persis.Decode(rec, &held) != nil || held.WebhookID != id {
+		return
+	}
+	_ = s.claims.CompareAndDelete(ctx, rec)
 }
 
 // GetByID retrieves a webhook by its unique ID.
@@ -321,18 +428,53 @@ func (s *WebhookStore) RenameDAG(ctx context.Context, oldName, newName string) e
 	if !ok {
 		return auth.ErrWebhookNotFound
 	}
+	if err := s.setDAGName(ctx, id, newName); err != nil {
+		return err
+	}
+	// Another process may be creating the new name's webhook; if it claims
+	// the name first, the webhook moves back.
+	if err := s.claim(ctx, newName, id); err != nil {
+		undoCtx, cancel := undoContext(ctx)
+		defer cancel()
+		return errors.Join(err, s.moveBack(undoCtx, id, oldName))
+	}
+	s.release(ctx, oldName, id)
+	delete(s.byDAGName, oldName)
+	s.byDAGName[newName] = id
+	return nil
+}
+
+// moveBack returns webhook id to dagName after a rename lost the new name.
+// While the record named the new name, the old name's claim looked left over,
+// so another process may have created a webhook for the DAG meanwhile; then
+// this one gives way and is removed, leaving the DAG one webhook.
+func (s *WebhookStore) moveBack(ctx context.Context, id, dagName string) error {
+	if err := s.setDAGName(ctx, id, dagName); err != nil {
+		return err
+	}
+	err := s.claim(ctx, dagName, id)
+	if !errors.Is(err, auth.ErrWebhookAlreadyExists) {
+		return err
+	}
+	if err := s.col.Delete(ctx, id); err != nil {
+		return err
+	}
+	return s.loadIndexLocked(ctx)
+}
+
+// setDAGName moves webhook id's record to dagName. The stored form is moved
+// as it is, so the encrypted secrets need no encryptor.
+func (s *WebhookStore) setDAGName(ctx context.Context, id, dagName string) error {
 	err := retryConflict(ctx, func(ctx context.Context) error {
 		rec, err := s.col.Get(ctx, id)
 		if err != nil {
 			return err
 		}
-		// The stored form is moved as it is, so the encrypted secrets need
-		// no encryptor.
 		var stored auth.WebhookForStorage
 		if err := persis.Decode(rec, &stored); err != nil {
 			return err
 		}
-		stored.DAGName = newName
+		stored.DAGName = dagName
 		stored.UpdatedAt = time.Now().UTC()
 		data, err := persis.Encode(stored)
 		if err != nil {
@@ -343,12 +485,7 @@ func (s *WebhookStore) RenameDAG(ctx context.Context, oldName, newName string) e
 	if errors.Is(err, persis.ErrNotFound) {
 		return auth.ErrWebhookNotFound
 	}
-	if err != nil {
-		return err
-	}
-	delete(s.byDAGName, oldName)
-	s.byDAGName[newName] = id
-	return nil
+	return err
 }
 
 // Delete removes a webhook by its ID.
@@ -376,6 +513,7 @@ func (s *WebhookStore) Delete(ctx context.Context, id string) error {
 	if err := s.col.Delete(ctx, id); err != nil {
 		return err
 	}
+	s.release(ctx, stored.DAGName, id)
 	delete(s.byDAGName, stored.DAGName)
 	return nil
 }
