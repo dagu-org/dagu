@@ -59,7 +59,29 @@ func (a *API) GetSchedulerPauseState(ctx context.Context, _ api.GetSchedulerPaus
 	if pause.Reason != "" {
 		response.Reason = ptrOf(pause.Reason)
 	}
+	if running, known := a.schedulerRunning(ctx); known {
+		response.SchedulerRunning = &running
+	}
 	return response, nil
+}
+
+// schedulerRunning reports whether any scheduler instance holds the scheduling
+// lock, and whether that can be told at all.
+func (a *API) schedulerRunning(ctx context.Context) (bool, bool) {
+	if a.serviceRegistry == nil {
+		return false, false
+	}
+	members, err := a.serviceRegistry.GetServiceMembers(ctx, serviceregistry.ServiceNameScheduler)
+	if err != nil {
+		logger.Warn(ctx, "Failed to read scheduler instances", tag.Error(err))
+		return false, false
+	}
+	for _, member := range members {
+		if member.Status == serviceregistry.ServiceStatusActive {
+			return true, true
+		}
+	}
+	return false, true
 }
 
 // UpdateSchedulerPauseState pauses or resumes scheduler-driven run creation for

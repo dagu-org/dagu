@@ -16,6 +16,8 @@ import (
 	"time"
 
 	"github.com/dagucloud/dagu/v2/api/v1"
+	"github.com/dagucloud/dagu/v2/internal/cmn/logger"
+	"github.com/dagucloud/dagu/v2/internal/cmn/logger/tag"
 	"github.com/dagucloud/dagu/v2/internal/cmn/stringutil"
 	"github.com/dagucloud/dagu/v2/internal/ir"
 	"github.com/dagucloud/dagu/v2/internal/pagination"
@@ -43,6 +45,11 @@ const (
 	activityActiveLimit   = 100
 	activityUpcomingLimit = 5
 	activityErrorMaxBytes = 200
+	// activityQueueLimit bounds the queues listed with work.
+	activityQueueLimit = 20
+	// activityQueueScanCap bounds the queued entries read to count backlogs,
+	// across all queues; larger backlogs are reported as lower bounds.
+	activityQueueScanCap = 200
 )
 
 // GetDAGRunActivity returns one page of the DAG-runs of a time window.
@@ -204,6 +211,7 @@ func (a *API) readDAGRunActivity(ctx context.Context, query activityQuery) (api.
 		Attention: []api.DAGRunActivityRun{},
 		Active:    []api.DAGRunActivityRun{},
 		Upcoming:  []api.DAGRunActivityUpcoming{},
+		Queues:    []api.DAGRunActivityQueue{},
 	}
 	if page.NextCursor != "" {
 		result.NextCursor = &page.NextCursor
@@ -226,7 +234,56 @@ func (a *API) readDAGRunActivity(ctx context.Context, query activityQuery) (api.
 	result.Attention = attentionRuns(latest)
 	result.Active = a.activeRuns(ctx, query, page.Items, latest)
 	result.Upcoming = a.upcomingRuns(ctx, query)
+	result.Queues = a.activityQueues(ctx)
 	return result, nil
+}
+
+// activityQueues lists the queues with runs running or waiting, the longest
+// wait first. A queue read failure leaves the list empty rather than failing
+// the whole summary.
+func (a *API) activityQueues(ctx context.Context) []api.DAGRunActivityQueue {
+	queues := []api.DAGRunActivityQueue{}
+	queueMap, err := a.collectQueues(ctx, "", activityQueueScanCap)
+	if err != nil {
+		logger.Warn(ctx, "Failed to read queues for activity", tag.Error(err))
+		return queues
+	}
+	for _, info := range queueMap {
+		if len(info.running) == 0 && info.queuedCount == 0 && !info.queuedCountCapped {
+			continue
+		}
+		item := api.DAGRunActivityQueue{
+			Name:    info.name,
+			Running: len(info.running),
+			Queued:  info.queuedCount,
+		}
+		if info.maxConcurrency > 0 {
+			item.MaxConcurrency = new(info.maxConcurrency)
+		}
+		if info.queuedCountCapped {
+			item.QueuedCapped = new(true)
+		}
+		if !info.nextQueuedAt.IsZero() {
+			item.NextQueuedAt = new(info.nextQueuedAt.Unix())
+		}
+		queues = append(queues, item)
+	}
+	slices.SortFunc(queues, func(left, right api.DAGRunActivityQueue) int {
+		// A queue with a waiting run sorts by how long it has waited.
+		leftWait, rightWait := left.NextQueuedAt != nil, right.NextQueuedAt != nil
+		if leftWait != rightWait {
+			if leftWait {
+				return -1
+			}
+			return 1
+		}
+		return cmp.Or(
+			cmp.Compare(valueOf(left.NextQueuedAt), valueOf(right.NextQueuedAt)),
+			cmp.Compare(right.Running, left.Running),
+			cmp.Compare(left.Name, right.Name),
+		)
+	})
+	return queues[:min(len(queues), activityQueueLimit)]
 }
 
 // toActivityRun summarizes a run. A run that has not started reports its

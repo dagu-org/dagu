@@ -15,6 +15,7 @@ import (
 	"github.com/dagucloud/dagu/v2/internal/cmn/config"
 	"github.com/dagucloud/dagu/v2/internal/cmn/logger"
 	"github.com/dagucloud/dagu/v2/internal/cmn/logger/tag"
+	"github.com/dagucloud/dagu/v2/internal/cmn/stringutil"
 	"github.com/dagucloud/dagu/v2/internal/dagrun"
 	"github.com/dagucloud/dagu/v2/internal/dispatch"
 	"github.com/dagucloud/dagu/v2/internal/ir"
@@ -69,7 +70,7 @@ func (b *scanBudget) consume() {
 
 // ListQueues implements api.StrictServerInterface.
 func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (api.ListQueuesResponseObject, error) {
-	queueMap, err := a.collectQueues(ctx, "")
+	queueMap, err := a.collectQueues(ctx, "", queuedCountRequestScanCap)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +124,7 @@ func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (ap
 
 // GetQueue implements api.StrictServerInterface.
 func (a *API) GetQueue(ctx context.Context, req api.GetQueueRequestObject) (api.GetQueueResponseObject, error) {
-	queueMap, err := a.collectQueues(ctx, req.Name)
+	queueMap, err := a.collectQueues(ctx, req.Name, queuedCountRequestScanCap)
 	if err != nil {
 		return nil, err
 	}
@@ -201,6 +202,8 @@ type queueInfo struct {
 	// queuedCountCapped reports that queuedCount hit queuedCountScanCap and is
 	// therefore a lower bound rather than an exact total.
 	queuedCountCapped bool
+	// nextQueuedAt is when the next run in line was queued.
+	nextQueuedAt time.Time
 }
 
 // getOrCreateQueue returns an existing queue from the map or creates a new one.
@@ -246,7 +249,9 @@ func normalizeQueueListLimit(raw *int) int {
 	return *raw
 }
 
-func (a *API) collectQueues(ctx context.Context, onlyQueue string) (map[string]*queueInfo, error) {
+// collectQueues gathers running runs and queued counts per queue. scanCap
+// bounds the queued entries read across all queues.
+func (a *API) collectQueues(ctx context.Context, onlyQueue string, scanCap int) (map[string]*queueInfo, error) {
 	queueMap := make(map[string]*queueInfo)
 
 	if a.config != nil && a.config.Queues.Enabled && a.config.Queues.Config != nil {
@@ -313,10 +318,10 @@ func (a *API) collectQueues(ctx context.Context, onlyQueue string) (map[string]*
 	}
 
 	// One budget shared by every queue counted in this request.
-	budget := newScanBudget(queuedCountRequestScanCap)
+	budget := newScanBudget(scanCap)
 
 	if onlyQueue != "" {
-		count, capped, err := a.countVisibleQueuedItems(ctx, onlyQueue, budget)
+		queued, err := a.countVisibleQueuedItems(ctx, onlyQueue, budget)
 		if err != nil {
 			return nil, &Error{
 				Code:       api.ErrorCodeInternalError,
@@ -326,10 +331,8 @@ func (a *API) collectQueues(ctx context.Context, onlyQueue string) (map[string]*
 		}
 		// A capped scan proves entries exist even when none seen so far were
 		// visible, so the queue must still surface rather than read as absent.
-		if count > 0 || capped {
-			queue := getOrCreateQueue(queueMap, onlyQueue, a.config)
-			queue.queuedCount = count
-			queue.queuedCountCapped = capped
+		if queued.count > 0 || queued.capped {
+			queued.applyTo(getOrCreateQueue(queueMap, onlyQueue, a.config))
 		}
 	} else {
 		queueNames, err := a.queueStore.QueueList(ctx)
@@ -341,16 +344,14 @@ func (a *API) collectQueues(ctx context.Context, onlyQueue string) (map[string]*
 			}
 		}
 		for _, queueName := range queueNames {
-			count, capped, err := a.countVisibleQueuedItems(ctx, queueName, budget)
+			queued, err := a.countVisibleQueuedItems(ctx, queueName, budget)
 			if err != nil {
 				logger.Warn(ctx, "Failed to get queue length",
 					tag.Queue(queueName),
 					tag.Error(err))
 				continue
 			}
-			queue := getOrCreateQueue(queueMap, queueName, a.config)
-			queue.queuedCount = count
-			queue.queuedCountCapped = capped
+			queued.applyTo(getOrCreateQueue(queueMap, queueName, a.config))
 		}
 	}
 
@@ -440,35 +441,53 @@ func (a *API) listVisibleQueuedItems(ctx context.Context, queueName string, limi
 	return items, currentCursor, nil
 }
 
+// visibleQueued is the queued backlog of one queue as far as its scan reached.
+type visibleQueued struct {
+	count int
+	// capped reports that the scan stopped early, so count is a lower bound.
+	capped bool
+	// nextQueuedAt is when the first visible entry, the next to run, was
+	// queued.
+	nextQueuedAt time.Time
+}
+
+func (v visibleQueued) applyTo(queue *queueInfo) {
+	queue.queuedCount = v.count
+	queue.queuedCountCapped = v.capped
+	queue.nextQueuedAt = v.nextQueuedAt
+}
+
 // countVisibleQueuedItems counts queued items that are not already running.
 //
 // The scan is bounded twice: by queuedCountScanCap for this queue, and by the
 // caller's shared budget for the request as a whole. Counting requires a status
 // read per entry to exclude entries whose run has already started, so without
 // both bounds the cost grows with queue depth and with the number of queues.
-// When either bound is reached, counting stops and the returned bool reports
-// that the count is a lower bound.
-func (a *API) countVisibleQueuedItems(ctx context.Context, queueName string, budget *scanBudget) (int, bool, error) {
+// When either bound is reached, counting stops and the result is marked as a
+// lower bound.
+func (a *API) countVisibleQueuedItems(ctx context.Context, queueName string, budget *scanBudget) (visibleQueued, error) {
+	var result visibleQueued
 	if a.queueStore == nil {
-		return 0, false, nil
+		return result, nil
 	}
 	if budget.exhausted() {
 		// Earlier queues already consumed the request budget. Report zero as a
 		// lower bound rather than spending more reads on this one.
-		return 0, true, nil
+		result.capped = true
+		return result, nil
 	}
-	count := 0
 	scanned := 0
 	cursor := ""
 	for {
 		page, err := a.queueStore.ListCursor(ctx, queueName, cursor, queueCursorScanBatch)
 		if err != nil {
-			return 0, false, err
+			return visibleQueued{}, err
 		}
 		for i, queuedItem := range page.Items {
 			if budget.exhausted() {
 				// This entry and everything after it stays unscanned.
-				return count, true, nil
+				result.capped = true
+				return result, nil
 			}
 			budget.consume()
 
@@ -482,21 +501,35 @@ func (a *API) countVisibleQueuedItems(ctx context.Context, queueName string, bud
 			if err == nil {
 				summary, err := a.fetchDAGRunSummary(ctx, *dagRunRef)
 				if err == nil && summary.Status != api.StatusRunning {
-					count++
+					if result.count == 0 {
+						result.nextQueuedAt = parseQueuedAt(summary.QueuedAt)
+					}
+					result.count++
 				}
 			}
 
 			if scanned >= queuedCountScanCap {
 				// Only a lower bound if entries actually remain unscanned.
-				remaining := i+1 < len(page.Items) || page.HasMore
-				return count, remaining, nil
+				result.capped = i+1 < len(page.Items) || page.HasMore
+				return result, nil
 			}
 		}
 		if !page.HasMore {
-			return count, false, nil
+			return result, nil
 		}
 		cursor = page.NextCursor
 	}
+}
+
+func parseQueuedAt(value *string) time.Time {
+	if value == nil {
+		return time.Time{}
+	}
+	queuedAt, err := stringutil.ParseTime(*value)
+	if err != nil {
+		return time.Time{}
+	}
+	return queuedAt
 }
 
 // GetQueuesListData returns queue list for SSE.

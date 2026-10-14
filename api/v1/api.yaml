@@ -2023,7 +2023,7 @@ paths:
         Lists the DAG-runs created in a time window, newest first, one page at
         a time. The first page also lists the DAGs whose latest run did not
         succeed, runs still in progress (including ones created before the
-        window), and the next scheduled runs. Without fromDate, the window is
+        window), queues with work, and the next scheduled runs. Without fromDate, the window is
         the last `hours` hours, aligned to a 96th of its length. To load older
         runs, pass the first page's from and to as fromDate and toDate, with
         nextCursor as cursor.
@@ -11788,6 +11788,11 @@ components:
           description: "First page only: next scheduled runs, soonest first"
           items:
             $ref: "#/components/schemas/DAGRunActivityUpcoming"
+        queues:
+          type: array
+          description: "First page only: queues with runs running or waiting, the longest wait first, at most 20"
+          items:
+            $ref: "#/components/schemas/DAGRunActivityQueue"
       required:
         - from
         - to
@@ -11795,6 +11800,34 @@ components:
         - attention
         - active
         - upcoming
+        - queues
+
+    DAGRunActivityQueue:
+      type: object
+      description: "A queue with runs running or waiting"
+      properties:
+        name:
+          type: string
+        running:
+          type: integer
+          description: "Number of runs running"
+        maxConcurrency:
+          type: integer
+          description: "Maximum number of runs the queue runs at once"
+        queued:
+          type: integer
+          description: "Number of runs waiting; a lower bound when queuedCapped is set"
+        queuedCapped:
+          type: boolean
+          description: "True when counting stopped early, so queued is a lower bound"
+        nextQueuedAt:
+          type: integer
+          format: int64
+          description: "When the next run in line was queued, as Unix seconds"
+      required:
+        - name
+        - running
+        - queued
 
     DAGRunActivityRun:
       type: object
@@ -14080,6 +14113,9 @@ components:
         reason:
           type: string
           description: "Operator-facing explanation shown while paused"
+        schedulerRunning:
+          type: boolean
+          description: "Whether a scheduler instance is running. Omitted when the server cannot tell."
       required:
         - paused
 
