@@ -4764,18 +4764,18 @@
           "description": "Result format for statements without their own FORMAT clause. jsonl is JSONEachRow; json is a JSON array of row objects; csv is CSV."
         },
         "headers": {
-          "type": "boolean",
-          "description": "Include a header row in CSV output (CSVWithNames)."
+          "type": ["boolean", "string"],
+          "description": "Include a header row in CSV output (CSVWithNames). A string is a ${...} reference resolved when the step runs."
         },
         "timeout": {
-          "type": "integer",
+          "type": ["integer", "string"],
           "minimum": 0,
           "default": 60,
-          "description": "Timeout of the whole step in seconds. 0 disables it. Default: 60."
+          "description": "Timeout of the whole step in seconds. 0 disables it. Default: 60. A string is a ${...} reference resolved when the step runs."
         },
         "tls_skip_verify": {
-          "type": "boolean",
-          "description": "Skip verification of the server certificate for https URLs."
+          "type": ["boolean", "string"],
+          "description": "Skip verification of the server certificate for https URLs. A string is a ${...} reference resolved when the step runs."
         },
         "tls_ca": {
           "type": "string",

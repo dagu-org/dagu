@@ -112,9 +112,13 @@ func validateStep(step ir.Step) error {
 		}
 		raw[k] = v
 	}
-	if _, ok := raw["url"]; !ok {
-		if v, declared := step.ExecutorConfig.Config["url"]; declared && v != "" {
-			raw["url"] = "http://reference.invalid"
+	// A reference that was left out still declares the option: url must be
+	// present and file counts as a query source.
+	for key, placeholder := range map[string]string{"url": "http://reference.invalid", "file": "reference.sql"} {
+		if _, ok := raw[key]; !ok {
+			if v, declared := step.ExecutorConfig.Config[key]; declared && v != "" {
+				raw[key] = placeholder
+			}
 		}
 	}
 	cfg, err := ParseConfig(raw)

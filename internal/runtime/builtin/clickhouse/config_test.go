@@ -147,6 +147,16 @@ func TestValidateStep(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "url is required")
 	})
+	t.Run("FileReference", func(t *testing.T) {
+		t.Parallel()
+		assert.NoError(t, validateStep(step(map[string]any{"url": "http://h", "file": "${SQL_FILE}"}, "", "")))
+	})
+	t.Run("FileReferenceWithQuery", func(t *testing.T) {
+		t.Parallel()
+		err := validateStep(step(map[string]any{"url": "http://h", "file": "${SQL_FILE}"}, "SELECT 1", ""))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "mutually exclusive")
+	})
 	t.Run("ReferencesAreNotChecked", func(t *testing.T) {
 		t.Parallel()
 		cfg := map[string]any{

@@ -24,3 +24,10 @@ steps:
       file: sql/load.sql
       tls_skip_verify: true
       tls_ca: certs/ca.pem
+  - id: from_reference
+    depends: [from_file]
+    action: clickhouse.query
+    with:
+      url: http://localhost:8123
+      file: ${SQL_FILE}
+      timeout: ${QUERY_TIMEOUT}
