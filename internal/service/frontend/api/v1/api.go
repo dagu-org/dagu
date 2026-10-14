@@ -84,7 +84,7 @@ type API struct {
 	coordinatorCli       coordinator.Client
 	serviceRegistry      serviceregistry.ServiceRegistry
 	subCmdBuilder        *launcher.SubCmdBuilder
-	resourceService      *resource.Service
+	resourceService      resourceMonitor
 	authService          AuthService
 	auditService         *audit.Service
 	eventService         *eventstore.Service
@@ -122,6 +122,12 @@ type processRepository interface {
 	CountAliveByDAGName(ctx context.Context, groupName, dagName string) (int, error)
 	IsAttemptAlive(ctx context.Context, groupName string, dagRun ir.DAGRunRef, attemptID string) (bool, error)
 	ListAllAlive(ctx context.Context) (map[string][]ir.DAGRunRef, error)
+}
+
+// resourceMonitor serves the system resource samples the server collects.
+type resourceMonitor interface {
+	GetHistory(duration time.Duration) *resource.ResourceHistory
+	DiskUsedPercent() (float64, bool)
 }
 
 type NotificationService interface {
@@ -461,9 +467,12 @@ func New(
 		coordinatorCli:      cc,
 		serviceRegistry:     sr,
 		metricsRegistry:     mr,
-		resourceService:     rs,
 		defaultExecMode:     cfg.DefaultExecMode,
 		leaseStaleThreshold: dagrun.DefaultStaleLeaseThreshold,
+	}
+	// A nil service must leave the field nil, not a typed nil.
+	if rs != nil {
+		a.resourceService = rs
 	}
 
 	for _, opt := range opts {
