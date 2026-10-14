@@ -144,7 +144,7 @@ describe('WebhookPublicURLCard', () => {
     expect(
       screen.getByText('https://hooks.dagu.sh/server/token')
     ).toBeVisible();
-    expect(screen.getByText('push')).toBeVisible();
+    expect(screen.getAllByText('push')).not.toHaveLength(0);
     expect(screen.getByRole('link', { name: '3f0c2d4e' })).toHaveAttribute(
       'href',
       '/dag-runs/deploy/3f0c2d4e-run'

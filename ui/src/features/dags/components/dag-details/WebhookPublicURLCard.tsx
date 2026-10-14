@@ -79,6 +79,11 @@ interface WebhookPublicURLCardProps {
   onSecretCreated: (secret: string) => void;
 }
 
+// formatSize shows whole bytes below a kilobyte.
+function formatSize(bytes: number): string {
+  return bytes < 1024 ? `${bytes} B` : formatBytes(bytes);
+}
+
 function parseEvents(text: string): string[] {
   return text
     .split(',')
@@ -359,6 +364,9 @@ function WebhookPublicURLCard({
                       </I18nProps>
                     )}
                   </div>
+                  <span className="block text-xs text-muted-foreground">
+                    <I18nText text={'Events'} />
+                  </span>
                   <I18nProps>
                     <Input
                       aria-label="Events"
@@ -568,62 +576,65 @@ function Deliveries({
           <I18nText text={'No deliveries yet.'} />
         </div>
       ) : (
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="text-xs">
-                  <I18nText text={'Received'} />
-                </TableHead>
-                <TableHead className="text-xs">
-                  <I18nText text={'Event'} />
-                </TableHead>
-                <TableHead className="text-xs">
-                  <I18nText text={'Size'} />
-                </TableHead>
-                <TableHead className="text-xs">
-                  <I18nText text={'Result'} />
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {deliveries.map((delivery) => (
-                <TableRow key={delivery.id}>
-                  <TableCell className="text-xs whitespace-nowrap">
-                    {dayjs(delivery.receivedAt).format('MMM D, HH:mm:ss')}
-                  </TableCell>
-                  <TableCell className="text-xs font-mono break-all">
-                    {delivery.event || '—'}
-                  </TableCell>
-                  <TableCell className="text-xs whitespace-nowrap">
-                    {formatBytes(delivery.size)}
-                  </TableCell>
-                  <TableCell className="text-xs">
-                    <div>
-                      <I18nText text={outcomeLabels[delivery.outcome]} />
-                      {delivery.dagRunId && dagName && (
-                        <>
-                          {' · '}
-                          <Link
-                            className="font-mono underline-offset-2 hover:underline"
-                            to={`/dag-runs/${encodeURIComponent(dagName)}/${encodeURIComponent(delivery.dagRunId)}`}
-                          >
-                            {delivery.dagRunId.slice(0, 8)}
-                          </Link>
-                        </>
-                      )}
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="text-xs">
+                <I18nText text={'Received'} />
+              </TableHead>
+              <TableHead className="hidden text-xs sm:table-cell">
+                <I18nText text={'Event'} />
+              </TableHead>
+              <TableHead className="hidden text-xs sm:table-cell">
+                <I18nText text={'Size'} />
+              </TableHead>
+              <TableHead className="text-xs">
+                <I18nText text={'Result'} />
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {deliveries.map((delivery) => (
+              <TableRow key={delivery.id}>
+                <TableCell className="text-xs whitespace-nowrap">
+                  {dayjs(delivery.receivedAt).format('MMM D, HH:mm:ss')}
+                  {delivery.event && (
+                    <div className="font-mono text-muted-foreground sm:hidden">
+                      {delivery.event}
                     </div>
-                    {delivery.error && (
-                      <div className="text-muted-foreground break-words">
-                        {delivery.error}
-                      </div>
+                  )}
+                </TableCell>
+                <TableCell className="hidden text-xs font-mono whitespace-nowrap sm:table-cell">
+                  {delivery.event || '—'}
+                </TableCell>
+                <TableCell className="hidden text-xs whitespace-nowrap sm:table-cell">
+                  {formatSize(delivery.size)}
+                </TableCell>
+                <TableCell className="text-xs sm:min-w-48">
+                  <div>
+                    <I18nText text={outcomeLabels[delivery.outcome]} />
+                    {delivery.dagRunId && dagName && (
+                      <>
+                        {' · '}
+                        <Link
+                          className="font-mono text-primary hover:underline"
+                          to={`/dag-runs/${encodeURIComponent(dagName)}/${encodeURIComponent(delivery.dagRunId)}`}
+                        >
+                          {delivery.dagRunId.slice(0, 8)}
+                        </Link>
+                      </>
                     )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+                  </div>
+                  {delivery.error && (
+                    <div className="text-muted-foreground break-words">
+                      {delivery.error}
+                    </div>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       )}
     </div>
   );
