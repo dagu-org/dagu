@@ -78,7 +78,6 @@ type server struct {
 	token      string
 	entries    []*upstreamEntry
 	trustedCAs []Entry
-	plainEntry *upstreamEntry
 	pac        *pacEvaluator
 	issuer     *leafIssuer
 	events     *eventLog
@@ -223,7 +222,6 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request, guard boo
 		return
 	}
 	entry := s.scopedEntry(host)
-	configured := entry != nil
 	if entry == nil {
 		if !guard {
 			s.events.add(EventRefused, host, "", fmt.Sprintf("the certificate proxy refused a connection to %s, which no certificate setting names", host))
@@ -238,7 +236,7 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request, guard boo
 	cancel()
 	if err != nil {
 		s.pending.end(pending)
-		if guard && !configured && errors.Is(err, errProxyAuth) {
+		if guard && errors.Is(err, errProxyAuth) {
 			// A reset connection makes the browser try the route after the
 			// guard; a closed guard keeps it on that route.
 			s.stopGuard(host)
@@ -333,7 +331,8 @@ func (s *server) entryFor(host string) *upstreamEntry {
 }
 
 // scopedEntry combines a host's client identity with every authority that
-// names that host. Authorities never change which identity is presented.
+// names that host. Authorities never change which identity is presented,
+// and a host without an identity keeps the guard's trust.
 func (s *server) scopedEntry(host string) *upstreamEntry {
 	entry := s.entryFor(host)
 	var selected *upstreamEntry
@@ -343,7 +342,7 @@ func (s *server) scopedEntry(host string) *upstreamEntry {
 		}
 		if selected == nil {
 			if entry == nil {
-				entry = s.plainEntry
+				entry = s.guardEntry
 			}
 			scoped := *entry
 			scoped.roots = entry.roots.Clone()

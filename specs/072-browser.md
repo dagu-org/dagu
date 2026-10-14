@@ -245,7 +245,10 @@ The host configuration `browser.trusted_cas` lists entries with `hosts` and
 It applies to workflow browsers and browser sessions, without requiring a
 client certificate. Host patterns have the same syntax as client certificates.
 All authorities matching the destination host add to its existing trust;
-they do not affect which client certificate is presented. Redirects,
+they do not affect which client certificate is presented. A named host
+without a client certificate keeps what the guard trusts, the system's CA
+certificates and every client certificate's `ca_file`, whether or not the
+guard is on, so adding an entry never removes trust. Redirects,
 subresources, and secure WebSockets use their own destination's trust.
 
 These entries never add trust to unrelated hosts through the guard. A named

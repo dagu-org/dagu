@@ -71,6 +71,30 @@ func TestScopedTrustCombinesWithIdentity(t *testing.T) {
 	assert.Equal(t, "HTTP/1.1 "+testLabel, body)
 }
 
+// An authority adds to the trust a host has without it: the system's CAs
+// and every client certificate's ca_file, with or without the guard.
+func TestScopedTrustKeepsGuardTrust(t *testing.T) {
+	t.Parallel()
+	for _, guard := range []bool{false, true} {
+		t.Run(fmt.Sprintf("Guard%t", guard), func(t *testing.T) {
+			t.Parallel()
+			corp, unrelated := newTestCA(t, "corp CA"), newTestCA(t, "unrelated CA")
+			site := newSiteAuth(t, corp, corp, tls.NoClientCert, 0)
+			upstream := newTunnelProxy(t, siteAddr(site), http.StatusOK)
+			identity := corp.clientEntry(t, testLabel, "other.test")
+			identity.CAPEM = corp.pem()
+			cfg := testConfig(t, `function FindProxyForURL() { return "PROXY `+upstream.addr+`"; }`, identity)
+			cfg.TrustedCAs = []Entry{trustEntry(unrelated, siteHost)}
+			cfg.Guard = guard
+			ready := serveProxy(t, cfg)
+
+			body, err := get(t, browserClient(ready, "http/1.1"), "https://"+siteHost+"/")
+			require.NoError(t, err)
+			assert.Equal(t, "HTTP/1.1 anonymous", body)
+		})
+	}
+}
+
 func TestScopedTrustRejectsInvalidServer(t *testing.T) {
 	t.Parallel()
 	for _, invalid := range []string{"expired", "expired authority", "hostname"} {

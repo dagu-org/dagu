@@ -116,7 +116,6 @@ func Serve(ctx context.Context, cfg Config, ready func(Ready)) error {
 		token:      cfg.Token,
 		entries:    entries,
 		trustedCAs: cfg.TrustedCAs,
-		plainEntry: newGuardEntry(nil),
 		pac:        evaluator,
 		issuer:     issuer,
 		events:     newEventLog(),
