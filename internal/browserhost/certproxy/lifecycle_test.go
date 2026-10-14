@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 const testPollInterval = 20 * time.Millisecond
@@ -50,15 +49,10 @@ func assertEnds(t *testing.T, done <-chan struct{}) {
 	}
 }
 
-// closedURL returns a loopback URL where nothing accepts connections.
-func closedURL(t *testing.T) string {
-	t.Helper()
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	addr := listener.Addr().String()
-	require.NoError(t, listener.Close())
-	return "http://" + addr
-}
+// closedURL is a loopback URL whose connections always fail. Nothing can
+// listen on port 0, so a parallel test cannot take it over the way it can
+// reuse a freed port.
+const closedURL = "http://127.0.0.1:0"
 
 func TestWatchBrowser(t *testing.T) {
 	t.Parallel()
@@ -95,7 +89,7 @@ func TestWatchBrowser(t *testing.T) {
 		t.Parallel()
 		const grace = 300 * time.Millisecond
 		began := time.Now()
-		done := watch(t, closedURL(t), grace)
+		done := watch(t, closedURL, grace)
 		assertEnds(t, done)
 		assert.GreaterOrEqual(t, time.Since(began), grace, "a browser not yet started has the grace period to answer")
 	})
