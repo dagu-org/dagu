@@ -395,20 +395,25 @@ func TestMidStreamException(t *testing.T) {
 
 	t.Run("ReportSplitAcrossWrites", func(t *testing.T) {
 		t.Parallel()
-		report := exceptionReport(tag, message)
-		fs := newFakeServer(t, func(w http.ResponseWriter, _ *http.Request, _ request) {
-			w.Header().Set("X-ClickHouse-Exception-Tag", tag)
-			_, _ = w.Write([]byte("1\n"))
-			w.(http.Flusher).Flush()
-			for _, c := range []string{report[:3], report[3:20], report[20:45], report[45:]} {
-				_, _ = w.Write([]byte(c))
-				w.(http.Flusher).Flush()
+		// The client often reads flushed chunks in one go, so the filter is
+		// driven directly. The body is split at every byte, and both writes
+		// reuse one buffer as io.Copy does.
+		body := "1\n" + exceptionReport(tag, message)
+		buf := make([]byte, len(body))
+		for cut := 1; cut < len(body); cut++ {
+			var out strings.Builder
+			filter := newExceptionFilter(&out, tag)
+			for _, part := range []string{body[:cut], body[cut:]} {
+				n := copy(buf, part)
+				_, err := filter.Write(buf[:n])
+				require.NoError(t, err)
 			}
-		})
-		out, _, err := runFake(t, fs, nil, "SELECT 1")
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "FUNCTION_THROW_IF_VALUE_IS_NON_ZERO")
-		assert.Equal(t, "1\n", out)
+			msg, failed, err := filter.finish()
+			require.NoError(t, err)
+			require.True(t, failed, "cut at %d", cut)
+			require.Equal(t, strings.TrimSpace(message), msg, "cut at %d", cut)
+			require.Equal(t, "1\n", out.String(), "cut at %d", cut)
+		}
 	})
 
 	t.Run("AbortedStream", func(t *testing.T) {
