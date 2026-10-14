@@ -233,17 +233,14 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
     | LogWithPagination
     | null
     | undefined;
-  const latestDataRef = useRef(latestData);
-  latestDataRef.current = latestData;
   const canFollow = viewMode === 'tail' && isLiveMode;
   const range = `${viewMode}:${pageSize}:${currentPage}`;
 
   const pauseFollowing = useCallback(() => {
     if (!following || !canFollow) return;
     setFollowing(false);
-    const held = latestDataRef.current;
-    setPausedData(held ? { range, data: held } : null);
-  }, [canFollow, following, range]);
+    setPausedData(latestData ? { range, data: latestData } : null);
+  }, [canFollow, following, latestData, range]);
 
   const resumeFollowing = useCallback(() => {
     setPausedData(null);
