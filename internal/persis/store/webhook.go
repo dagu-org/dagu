@@ -169,13 +169,24 @@ func (s *WebhookStore) Create(ctx context.Context, webhook *auth.Webhook) error 
 	// Another process may be creating this DAG's webhook too; the claim
 	// decides, and the loser removes its record.
 	if err := s.claim(ctx, webhook.DAGName, webhook.ID); err != nil {
-		if delErr := s.col.Delete(ctx, webhook.ID); delErr != nil {
+		undoCtx, cancel := undoContext(ctx)
+		defer cancel()
+		if delErr := s.col.Delete(undoCtx, webhook.ID); delErr != nil {
 			return errors.Join(err, delErr)
 		}
 		return err
 	}
 	s.byDAGName[webhook.DAGName] = webhook.ID
 	return nil
+}
+
+// webhookUndoTimeout bounds undoing half of a create or rename.
+const webhookUndoTimeout = 10 * time.Second
+
+// undoContext is for undoing half of a create or rename. It outlives ctx,
+// since a write the caller gave up on must still be undone.
+func undoContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.WithoutCancel(ctx), webhookUndoTimeout)
 }
 
 // webhookClaim is a DAG name's claim record: the webhook holding the name.
@@ -422,7 +433,9 @@ func (s *WebhookStore) RenameDAG(ctx context.Context, oldName, newName string) e
 	// Another process may be creating the new name's webhook; if it claims
 	// the name first, the webhook moves back.
 	if err := s.claim(ctx, newName, id); err != nil {
-		return errors.Join(err, s.moveBack(ctx, id, oldName))
+		undoCtx, cancel := undoContext(ctx)
+		defer cancel()
+		return errors.Join(err, s.moveBack(undoCtx, id, oldName))
 	}
 	s.release(ctx, oldName, id)
 	delete(s.byDAGName, oldName)

@@ -813,3 +813,39 @@ func TestWebhookRenameRollbackKeepsOneWebhookPerDAG(t *testing.T) {
 	require.Len(t, d2, 1)
 	assert.Equal(t, "wh-d2", d2[0].ID)
 }
+
+// swappingCollection, once armed, runs during after the next swap, as a
+// caller that gives up while a write is half done.
+type swappingCollection struct {
+	persis.Collection
+	armed  atomic.Bool
+	during func()
+}
+
+func (c *swappingCollection) CompareAndSwap(ctx context.Context, id string, expected, next []byte) error {
+	err := c.Collection.CompareAndSwap(ctx, id, expected, next)
+	if c.armed.CompareAndSwap(true, false) {
+		c.during()
+	}
+	return err
+}
+
+// A rename the caller gives up on after its webhook moved still moves the
+// webhook back.
+func TestWebhookRenameUndoesAfterCancel(t *testing.T) {
+	col := testutil.NewMemoryBackend().Collection("webhooks")
+	swapping := &swappingCollection{Collection: col}
+	s, err := store.NewWebhookStore(swapping, claimsOf(col), nil)
+	require.NoError(t, err)
+	require.NoError(t, s.Create(context.Background(), newWebhook("d1")))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	swapping.during = cancel
+	swapping.armed.Store(true)
+	require.ErrorIs(t, s.RenameDAG(ctx, "d1", "d2"), context.Canceled)
+
+	got, err := s.GetByDAGName(context.Background(), "d1")
+	require.NoError(t, err)
+	assert.Equal(t, "wh-d1", got.ID)
+	assert.Empty(t, webhooksFor(t, s, "d2"))
+}
