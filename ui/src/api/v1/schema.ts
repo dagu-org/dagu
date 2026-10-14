@@ -2101,7 +2101,9 @@ export interface paths {
          *     bearer token only, bearer token plus HMAC, or HMAC only.
          *
          *     The request body is passed to the DAG as the WEBHOOK_PAYLOAD environment
-         *     variable. If the DAG configures `webhook.forward_headers`, selected
+         *     variable, and as a file named by WEBHOOK_PAYLOAD_FILE. A body too large
+         *     for one environment variable is passed only as the file. If the DAG
+         *     configures `webhook.forward_headers`, selected
          *     request headers are passed as the WEBHOOK_HEADERS environment variable.
          *     For safety, the `Authorization` header is never forwarded.
          *     The DAG run is enqueued and the endpoint returns immediately with the
@@ -2675,6 +2677,110 @@ export interface paths {
          */
         post: operations["disableDAGWebhookHMAC"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dags/{fileName}/webhook/public": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the webhook's public URL
+         * @description Returns the webhook's public URL through Dagu Cloud, the state of the
+         *     relay connection that holds it, and its latest deliveries.
+         *     Developer, manager, or admin only.
+         *
+         */
+        get: operations["getDAGWebhookPublic"];
+        put?: never;
+        /**
+         * Turn on the webhook's public URL
+         * @description Gives the webhook a public URL through Dagu Cloud. A webhook that has
+         *     one keeps it. The server must be connected to Dagu Cloud, and the plan
+         *     must allow another public URL. Admin only.
+         *
+         */
+        post: operations["enableDAGWebhookPublic"];
+        /**
+         * Turn off the webhook's public URL
+         * @description Removes the webhook's public URL and its delivery log. Dagu Cloud drops
+         *     the URL and any deliveries waiting for it. Admin only.
+         *
+         */
+        delete: operations["disableDAGWebhookPublic"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dags/{fileName}/webhook/public/regenerate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Replace the webhook's public URL
+         * @description Gives the webhook a new public URL. The old URL stops working, and
+         *     deliveries waiting for it are dropped. Admin only.
+         *
+         */
+        post: operations["regenerateDAGWebhookPublicURL"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dags/{fileName}/webhook/public/sender": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set who may send to the webhook's public URL
+         * @description Sets the sender whose signature requests to the public URL must
+         *     carry, its signing secret, and the events that start runs. For
+         *     GitHub, Dagu makes the secret when none is entered, and returns it
+         *     only this once. Admin only.
+         *
+         */
+        put: operations["configureDAGWebhookPublicSender"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dags/{fileName}/webhook/public/missed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Dismiss the webhook's missed deliveries
+         * @description Clears the counts of deliveries Dagu Cloud dropped for the public URL.
+         *     Admin only.
+         *
+         */
+        delete: operations["dismissDAGWebhookPublicMissed"];
         options?: never;
         head?: never;
         patch?: never;
@@ -4453,6 +4559,103 @@ export interface components {
              * @description When the webhook was last triggered
              */
             lastUsedAt?: string;
+            public?: components["schemas"]["WebhookPublicSettings"];
+        };
+        /**
+         * @description A service whose signed requests a public URL accepts
+         * @enum {string}
+         */
+        WebhookPublicSender: WebhookPublicSender;
+        /** @description What the webhook's public URL accepts */
+        WebhookPublicSettings: {
+            sender?: components["schemas"]["WebhookPublicSender"];
+            /** @description Whether the sender's signing secret is stored */
+            secretConfigured: boolean;
+            /** @description Events that start runs; empty takes every event */
+            events: string[];
+            /**
+             * Format: date-time
+             * @description When the public URL was turned on
+             */
+            createdAt: string;
+        };
+        /**
+         * @description Whether Dagu Cloud holds the public URL: `active` once it does,
+         *     `connecting` before then, `overLimit` when the plan allows fewer
+         *     public URLs than exist and this one is left out, and `error` when the
+         *     server cannot connect.
+         *
+         * @enum {string}
+         */
+        WebhookPublicState: WebhookPublicState;
+        /** @description The webhook's public URL, its state, and its latest deliveries */
+        WebhookPublicDetails: {
+            /** @description The public URL; absent until Dagu Cloud has given this server its address */
+            url?: string;
+            state: components["schemas"]["WebhookPublicState"];
+            /** @description Why the server cannot connect */
+            error?: string;
+            /** @description The most public URLs the plan allows, once known */
+            maxHooks?: number;
+            /** @description The latest deliveries, newest first */
+            deliveries: components["schemas"]["WebhookPublicDelivery"][];
+            missed: components["schemas"]["WebhookPublicMissed"];
+        };
+        /** @description One request Dagu Cloud handed over for the public URL */
+        WebhookPublicDelivery: {
+            /** @description The delivery's ID, which names the run it starts */
+            id: string;
+            /**
+             * Format: date-time
+             * @description When Dagu Cloud received the request
+             */
+            receivedAt: string;
+            /** @description The body's size in bytes */
+            size: number;
+            /** @description What the request is about, as its sender labels it */
+            event?: string;
+            /**
+             * @description What became of the delivery: `started` a run, `waiting` at Dagu
+             *     Cloud to be sent again, `rejected` by the sender's signature
+             *     check, `skipped` as an event that starts no run, `ignored` while
+             *     the webhook was disabled, or `failed`.
+             *
+             * @enum {string}
+             */
+            outcome: WebhookPublicDeliveryOutcome;
+            /** @description The run a started delivery started */
+            dagRunId?: string;
+            /** @description Why the delivery was rejected, skipped, waiting, or failed */
+            error?: string;
+        };
+        /** @description Deliveries Dagu Cloud dropped since they were last dismissed: those
+         *     that waited more than 7 days, and those refused while 1,000 waited.
+         *      */
+        WebhookPublicMissed: {
+            expired: number;
+            refused: number;
+            /**
+             * Format: date-time
+             * @description When the first of them was counted
+             */
+            since?: string;
+        };
+        /** @description Who may send to a public URL, and which events start runs */
+        WebhookPublicSenderRequest: {
+            sender?: components["schemas"]["WebhookPublicSender"];
+            /** @description The sender's signing secret. Empty keeps the stored secret of the
+             *     same sender, or, for GitHub, makes one.
+             *      */
+            secret?: string;
+            /** @description Make a new GitHub signing secret */
+            generateSecret?: boolean;
+            /** @description Events that start runs; empty takes every event */
+            events?: string[];
+        };
+        WebhookPublicSenderResponse: {
+            webhook: components["schemas"]["WebhookDetails"];
+            /** @description The signing secret Dagu made, shown only this once */
+            secret?: string;
         };
         /** @description Response when creating or regenerating a webhook (includes full token) */
         WebhookCreateResponse: {
@@ -15897,6 +16100,299 @@ export interface operations {
             };
         };
     };
+    getDAGWebhookPublic: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The public URL and its deliveries */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookPublicDetails"];
+                };
+            };
+            /** @description No webhook, or no public URL, for this DAG */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    enableDAGWebhookPublic: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The webhook with its public URL turned on */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookDetails"];
+                };
+            };
+            /** @description The server is not connected to Dagu Cloud, or the plan allows no more public URLs */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No webhook configured for this DAG */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Public URLs need encrypted storage, which is not available on this node */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    disableDAGWebhookPublic: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The webhook with its public URL turned off */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookDetails"];
+                };
+            };
+            /** @description No webhook configured for this DAG */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    regenerateDAGWebhookPublicURL: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The webhook with its new public URL */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookDetails"];
+                };
+            };
+            /** @description No webhook, or no public URL, for this DAG */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    configureDAGWebhookPublicSender: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WebhookPublicSenderRequest"];
+            };
+        };
+        responses: {
+            /** @description The webhook with its new sender settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookPublicSenderResponse"];
+                };
+            };
+            /** @description Invalid sender, secret, or events */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No webhook, or no public URL, for this DAG */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    dismissDAGWebhookPublicMissed: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Missed deliveries dismissed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No webhook, or no public URL, for this DAG */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     getDAGSettings: {
         parameters: {
             query?: {
@@ -21303,6 +21799,26 @@ export enum WebhookAuthMode {
 export enum WebhookHMACEnforcementMode {
     strict = "strict",
     observe = "observe"
+}
+export enum WebhookPublicSender {
+    github = "github",
+    stripe = "stripe",
+    slack = "slack",
+    standard = "standard"
+}
+export enum WebhookPublicState {
+    active = "active",
+    connecting = "connecting",
+    overLimit = "overLimit",
+    error = "error"
+}
+export enum WebhookPublicDeliveryOutcome {
+    started = "started",
+    waiting = "waiting",
+    rejected = "rejected",
+    skipped = "skipped",
+    ignored = "ignored",
+    failed = "failed"
 }
 export enum WebhookHMACConfigureRequestAuthMode {
     token_and_hmac = "token_and_hmac",
