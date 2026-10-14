@@ -2020,11 +2020,13 @@ paths:
     get:
       summary: "Summarize DAG-run activity"
       description: |
-        Aggregates the DAG-runs created in a time window: exact counts per
-        status, per-DAG time buckets, the runs worth showing one by one, runs
-        that are still active (including ones created before the window), and
-        the next scheduled runs. Without fromDate, the window is the last
-        `hours` hours, aligned to bucket boundaries.
+        Lists the DAG-runs created in a time window, newest first, one page at
+        a time. The first page also lists the DAGs whose latest run did not
+        succeed, runs still in progress (including ones created before the
+        window), and the next scheduled runs. Without fromDate, the window is
+        the last `hours` hours, aligned to a 96th of its length. To load older
+        runs, pass the first page's from and to as fromDate and toDate, with
+        nextCursor as cursor.
       operationId: "getDAGRunActivity"
       tags:
         - "dag-runs"
@@ -2047,7 +2049,8 @@ paths:
           required: false
           schema:
             type: "string"
-          description: "Only count runs of DAGs that have ALL these comma-separated labels"
+          description: "Only include runs of DAGs that have ALL these comma-separated labels"
+        - $ref: "#/components/parameters/DAGRunListCursor"
       responses:
         "200":
           description: "A successful response"
@@ -2056,7 +2059,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/DAGRunActivity"
         "400":
-          description: "The window or filters are invalid"
+          description: "The window, filters, or cursor are invalid"
           content:
             application/json:
               schema:
@@ -11752,7 +11755,7 @@ components:
 
     DAGRunActivity:
       type: object
-      description: "Aggregated DAG-run activity for one time window"
+      description: "One page of DAG-run activity for a time window"
       properties:
         from:
           type: integer
@@ -11762,89 +11765,36 @@ components:
           type: integer
           format: int64
           description: "Window end as Unix seconds"
-        bucketSeconds:
-          type: integer
-          description: "Length of each bucket in seconds"
-        truncated:
-          type: boolean
-          description: "True when runs were left out of the per-DAG run lists; counts and buckets stay exact"
-        counts:
+        runs:
           type: array
-          description: "Number of runs per status in the window"
+          description: "Up to 100 runs created in the window, newest first"
           items:
-            $ref: "#/components/schemas/DAGRunActivityCount"
-        workflows:
+            $ref: "#/components/schemas/DAGRunActivityRun"
+        nextCursor:
+          type: string
+          description: "Opaque cursor for loading the next page of older runs"
+        attention:
           type: array
-          description: "DAGs with runs in the window, ordered by name"
+          description: "First page only: the latest run of each DAG whose latest run was created in the window and did not succeed, newest first, at most 20"
           items:
-            $ref: "#/components/schemas/DAGRunActivityWorkflow"
+            $ref: "#/components/schemas/DAGRunActivityRun"
         active:
           type: array
-          description: "Runs still running, waiting, or queued, including up to 50 live runs created before the window"
+          description: "First page only: runs still running, waiting, or queued, oldest first, at most 100, including up to 50 live runs created before the window"
           items:
             $ref: "#/components/schemas/DAGRunActivityRun"
         upcoming:
           type: array
-          description: "Next scheduled runs, soonest first"
+          description: "First page only: next scheduled runs, soonest first"
           items:
             $ref: "#/components/schemas/DAGRunActivityUpcoming"
       required:
         - from
         - to
-        - bucketSeconds
-        - truncated
-        - counts
-        - workflows
+        - runs
+        - attention
         - active
         - upcoming
-
-    DAGRunActivityCount:
-      type: object
-      properties:
-        status:
-          $ref: "#/components/schemas/Status"
-        count:
-          type: integer
-      required:
-        - status
-        - count
-
-    DAGRunActivityWorkflow:
-      type: object
-      description: "Activity of one DAG in the window"
-      properties:
-        name:
-          type: string
-        runCount:
-          type: integer
-          description: "Number of runs in the window"
-        failedCount:
-          type: integer
-          description: "Number of failed and rejected runs in the window"
-        strip:
-          type: string
-          description: |
-            One character per bucket from the window start, naming the most
-            severe run in the bucket: "f" failed or rejected, "a" aborted,
-            "p" partially succeeded, "r" running, waiting, or queued,
-            "s" succeeded, "." no run.
-        runs:
-          type: array
-          description: "Every run when there are few, otherwise the unsuccessful and active ones plus the latest; newest first"
-          items:
-            $ref: "#/components/schemas/DAGRunActivityRun"
-        latest:
-          $ref: "#/components/schemas/DAGRunActivityRun"
-        medianSuccessSeconds:
-          type: integer
-          description: "Median duration of successful runs, when at least three succeeded"
-      required:
-        - name
-        - runCount
-        - failedCount
-        - strip
-        - runs
-        - latest
 
     DAGRunActivityRun:
       type: object
@@ -11852,7 +11802,7 @@ components:
       properties:
         name:
           type: string
-          description: "DAG name; set on active runs"
+          description: "DAG name"
         dagRunId:
           type: string
         status:
@@ -11867,11 +11817,12 @@ components:
           description: "Finish as Unix seconds"
         failedStep:
           type: string
-          description: "First failed step; set on the latest run when it failed"
+          description: "First failed step; set on attention runs"
         error:
           type: string
-          description: "Error of the failed step, shortened; set with failedStep"
+          description: "Error of the failed step or the run, shortened; set on attention runs"
       required:
+        - name
         - dagRunId
         - status
 

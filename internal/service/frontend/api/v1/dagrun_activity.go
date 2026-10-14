@@ -24,28 +24,28 @@ import (
 )
 
 const (
-	// activityBucketCount is how many equal buckets split an activity window.
-	activityBucketCount  = 96
+	// activityWindowSteps is how many equal steps a live window is aligned to.
+	activityWindowSteps  = 96
 	activityDefaultHours = 24
 	// activityMaxLiveHours bounds a window that ends now, which live
 	// updates recompute on every run status change.
 	activityMaxLiveHours = 48
 	// activityMaxRange bounds a fixed window read on request.
 	activityMaxRange = 7 * 24 * time.Hour
-	// activityFewRuns is the run count up to which a DAG lists every run.
-	activityFewRuns = 24
-	// activityRunCap bounds the runs listed across all DAGs.
-	activityRunCap = 300
-	// activityFailureDetails bounds the status files read for failure details.
-	activityFailureDetails = 20
+	// activityPageSize is the number of runs on one page.
+	activityPageSize = 100
+	// activityAttentionLimit bounds the DAGs listed as needing attention.
+	activityAttentionLimit = 20
 	// activityLiveRunReads bounds the status files read for live runs that
 	// started before the window.
-	activityLiveRunReads  = 50
+	activityLiveRunReads = 50
+	// activityActiveLimit bounds the runs listed as in progress.
+	activityActiveLimit   = 100
 	activityUpcomingLimit = 5
 	activityErrorMaxBytes = 200
 )
 
-// GetDAGRunActivity summarizes the DAG-runs of a time window.
+// GetDAGRunActivity returns one page of the DAG-runs of a time window.
 func (a *API) GetDAGRunActivity(ctx context.Context, request api.GetDAGRunActivityRequestObject) (api.GetDAGRunActivityResponseObject, error) {
 	params := request.Params
 	query, err := a.newActivityQuery(ctx, activityParams{
@@ -54,6 +54,7 @@ func (a *API) GetDAGRunActivity(ctx context.Context, request api.GetDAGRunActivi
 		toDate:    params.ToDate,
 		labels:    params.Labels,
 		workspace: params.Workspace,
+		cursor:    params.Cursor,
 	}, time.Now())
 	if err != nil {
 		return nil, err
@@ -65,8 +66,9 @@ func (a *API) GetDAGRunActivity(ctx context.Context, request api.GetDAGRunActivi
 	return api.GetDAGRunActivity200JSONResponse(activity), nil
 }
 
-// GetDAGRunActivityData returns the activity of a window that ends now for
-// SSE. The identifier is the REST query string without fromDate and toDate.
+// GetDAGRunActivityData returns the first page of a window that ends now for
+// SSE. The identifier is the REST query string without fromDate, toDate and
+// cursor.
 func (a *API) GetDAGRunActivityData(ctx context.Context, queryString string) (any, error) {
 	query, err := a.activityQueryFromString(ctx, queryString)
 	if err != nil {
@@ -87,8 +89,8 @@ func (a *API) activityQueryFromString(ctx context.Context, queryString string) (
 	if err != nil {
 		return activityQuery{}, activityBadRequest(fmt.Sprintf("invalid query parameters: %s", err))
 	}
-	if values.Has("fromDate") || values.Has("toDate") {
-		return activityQuery{}, activityBadRequest("live activity takes hours, not fromDate or toDate")
+	if values.Has("fromDate") || values.Has("toDate") || values.Has("cursor") {
+		return activityQuery{}, activityBadRequest("live activity takes hours, not fromDate, toDate or cursor")
 	}
 	var params activityParams
 	if raw := values.Get("hours"); raw != "" {
@@ -111,15 +113,17 @@ type activityParams struct {
 	toDate    *int64
 	labels    *string
 	workspace *api.Workspace
+	cursor    *string
 }
 
-// activityQuery is a validated activity window and its filters.
+// activityQuery is a validated activity window, its filters, and the page
+// to read.
 type activityQuery struct {
 	from            time.Time
 	to              time.Time
-	bucket          time.Duration
 	labels          []string
 	workspaceFilter *workspace.WorkspaceFilter
+	cursor          string
 }
 
 func (a *API) newActivityQuery(ctx context.Context, params activityParams, now time.Time) (activityQuery, error) {
@@ -134,7 +138,6 @@ func (a *API) newActivityQuery(ctx context.Context, params activityParams, now t
 		if span <= 0 || span > activityMaxRange {
 			return activityQuery{}, activityBadRequest("the window must end after it starts and span at most 7 days")
 		}
-		query.bucket = max(time.Second, (span+activityBucketCount*time.Second-1)/activityBucketCount).Truncate(time.Second)
 	} else {
 		hours := activityDefaultHours
 		if params.hours != nil {
@@ -143,13 +146,17 @@ func (a *API) newActivityQuery(ctx context.Context, params activityParams, now t
 		if hours < 1 || hours > activityMaxLiveHours {
 			return activityQuery{}, activityBadRequest(fmt.Sprintf("hours must be between 1 and %d", activityMaxLiveHours))
 		}
-		// Aligning to bucket boundaries keeps the window, and so the payload,
-		// unchanged until the next boundary.
-		query.bucket = time.Duration(hours) * time.Hour / activityBucketCount
-		query.to = now.Truncate(query.bucket).Add(query.bucket)
-		query.from = query.to.Add(-activityBucketCount * query.bucket)
+		// Aligning to a step keeps the window, and so the payload, unchanged
+		// until the next step.
+		window := time.Duration(hours) * time.Hour
+		step := window / activityWindowSteps
+		query.to = now.Truncate(step).Add(step)
+		query.from = query.to.Add(-window)
 	}
 	query.labels = parseCommaSeparatedLabels(params.labels)
+	if params.cursor != nil {
+		query.cursor = *params.cursor
+	}
 	filter, err := a.workspaceFilterForParams(ctx, params.workspace)
 	if err != nil {
 		return activityQuery{}, err
@@ -166,44 +173,6 @@ func activityBadRequest(message string) *Error {
 	}
 }
 
-// activityRun is one run seen in the window.
-type activityRun struct {
-	id       string
-	status   ir.Status
-	at       time.Time
-	started  int64
-	finished int64
-}
-
-// activityWorkflow accumulates the runs of one DAG.
-type activityWorkflow struct {
-	name             string
-	runs             []activityRun
-	failedCount      int
-	strip            []byte
-	successDurations []int64
-}
-
-// Strip characters name the most severe run in a bucket.
-const (
-	stripEmpty     = '.'
-	stripSucceeded = 's'
-	stripActive    = 'r'
-	stripPartial   = 'p'
-	stripAborted   = 'a'
-	stripFailed    = 'f'
-)
-
-// stripSeverity orders strip characters; a bucket shows its most severe run.
-var stripSeverity = map[byte]int{
-	stripEmpty:     0,
-	stripSucceeded: 1,
-	stripActive:    2,
-	stripPartial:   3,
-	stripAborted:   4,
-	stripFailed:    5,
-}
-
 func (a *API) dagRunActivity(ctx context.Context, query activityQuery) (api.DAGRunActivity, error) {
 	return withDAGRunReadTimeout(ctx, dagRunReadRequestInfo{
 		endpoint: "/dag-run-activity",
@@ -213,219 +182,82 @@ func (a *API) dagRunActivity(ctx context.Context, query activityQuery) (api.DAGR
 }
 
 func (a *API) readDAGRunActivity(ctx context.Context, query activityQuery) (api.DAGRunActivity, error) {
-	counts := make(map[ir.Status]int)
-	workflows := make(map[string]*activityWorkflow)
-	err := a.dagRunRepository.VisitStatuses(ctx, persis.DAGRunListOptions{
+	page, err := a.dagRunRepository.ListStatusesPage(ctx, persis.DAGRunListOptions{
 		From:            persis.NewUTC(query.from),
 		To:              persis.NewUTC(query.to),
 		Labels:          query.labels,
 		WorkspaceFilter: query.workspaceFilter,
-	}, func(status *ir.DAGRunStatus) error {
-		counts[status.Status]++
-		workflow := workflows[status.Name]
-		if workflow == nil {
-			workflow = &activityWorkflow{
-				name:  status.Name,
-				strip: []byte(strings.Repeat(string(stripEmpty), activityBucketCount)),
-			}
-			workflows[status.Name] = workflow
-		}
-		run := newActivityRun(status)
-		workflow.runs = append(workflow.runs, run)
-		workflow.addToStrip(query, run)
-		if status.Status == ir.Failed || status.Status == ir.Rejected {
-			workflow.failedCount++
-		}
-		if status.Status == ir.Succeeded && run.started > 0 && run.finished >= run.started {
-			workflow.successDurations = append(workflow.successDurations, run.finished-run.started)
-		}
-		return nil
+		Limit:           activityPageSize,
+		Cursor:          query.cursor,
 	})
 	if err != nil {
+		if badRequest := dagRunListBadRequest(err); badRequest != nil {
+			return api.DAGRunActivity{}, badRequest
+		}
 		return api.DAGRunActivity{}, fmt.Errorf("error reading dag-run activity: %w", err)
 	}
 
 	result := api.DAGRunActivity{
-		From:          query.from.Unix(),
-		To:            query.to.Unix(),
-		BucketSeconds: int(query.bucket / time.Second),
-		Counts:        activityCounts(counts),
-		Workflows:     make([]api.DAGRunActivityWorkflow, 0, len(workflows)),
+		From:      query.from.Unix(),
+		To:        query.to.Unix(),
+		Runs:      make([]api.DAGRunActivityRun, 0, len(page.Items)),
+		Attention: []api.DAGRunActivityRun{},
+		Active:    []api.DAGRunActivityRun{},
+		Upcoming:  []api.DAGRunActivityUpcoming{},
+	}
+	if page.NextCursor != "" {
+		result.NextCursor = &page.NextCursor
+	}
+	for _, status := range page.Items {
+		result.Runs = append(result.Runs, toActivityRun(status))
+	}
+	if query.cursor != "" {
+		return result, nil
 	}
 
-	names := make([]string, 0, len(workflows))
-	for name := range workflows {
-		names = append(names, name)
+	latest, err := a.dagRunRepository.LatestStatuses(ctx, persis.DAGRunLatestStatusesQuery{
+		NotBefore:       persis.NewUTC(query.from),
+		Labels:          query.labels,
+		WorkspaceFilter: query.workspaceFilter,
+	})
+	if err != nil {
+		return api.DAGRunActivity{}, fmt.Errorf("error reading latest dag-runs: %w", err)
 	}
-	slices.Sort(names)
-	listed := selectActivityRuns(workflows)
-	result.Truncated = len(listed) > activityRunCap
-	if result.Truncated {
-		listed = listed[:activityRunCap]
-	}
-	runsByWorkflow := make(map[string][]activityRun, len(workflows))
-	for _, entry := range listed {
-		runsByWorkflow[entry.workflow] = append(runsByWorkflow[entry.workflow], entry.run)
-	}
-
-	for _, name := range names {
-		workflow := workflows[name]
-		runs := runsByWorkflow[name]
-		slices.SortFunc(runs, compareActivityRunsNewestFirst)
-		item := api.DAGRunActivityWorkflow{
-			Name:        name,
-			RunCount:    len(workflow.runs),
-			FailedCount: workflow.failedCount,
-			Strip:       string(workflow.strip),
-			Runs:        make([]api.DAGRunActivityRun, 0, len(runs)),
-			Latest:      toActivityRun(workflow.runs[0], ""),
-		}
-		for _, run := range runs {
-			item.Runs = append(item.Runs, toActivityRun(run, ""))
-		}
-		if median, ok := medianSeconds(workflow.successDurations); ok {
-			item.MedianSuccessSeconds = &median
-		}
-		result.Workflows = append(result.Workflows, item)
-	}
-	a.addFailureDetails(ctx, result.Workflows)
-	result.Active = a.activeRuns(ctx, query, workflows)
+	result.Attention = attentionRuns(latest)
+	result.Active = a.activeRuns(ctx, query, page.Items, latest)
 	result.Upcoming = a.upcomingRuns(ctx, query)
 	return result, nil
 }
 
-func newActivityRun(status *ir.DAGRunStatus) activityRun {
-	run := activityRun{id: status.DAGRunID, status: status.Status}
+// toActivityRun summarizes a run. A run that has not started reports its
+// queue time, or its creation time, as startedAt.
+func toActivityRun(status *ir.DAGRunStatus) api.DAGRunActivityRun {
+	result := api.DAGRunActivityRun{
+		Name:     status.Name,
+		DagRunId: status.DAGRunID,
+		Status:   api.Status(status.Status),
+	}
 	if started, err := stringutil.ParseTime(status.StartedAt); err == nil && !started.IsZero() {
-		run.started = started.Unix()
-		run.at = started
+		result.StartedAt = new(started.Unix())
+	} else if queued, err := stringutil.ParseTime(status.QueuedAt); err == nil && !queued.IsZero() {
+		result.StartedAt = new(queued.Unix())
+	} else if status.CreatedAt > 0 {
+		result.StartedAt = new(time.UnixMilli(status.CreatedAt).Unix())
 	}
 	if finished, err := stringutil.ParseTime(status.FinishedAt); err == nil && !finished.IsZero() {
-		run.finished = finished.Unix()
+		result.FinishedAt = new(finished.Unix())
 	}
-	if run.at.IsZero() {
-		if queued, err := stringutil.ParseTime(status.QueuedAt); err == nil && !queued.IsZero() {
-			run.at = queued
-		} else if status.CreatedAt > 0 {
-			run.at = time.UnixMilli(status.CreatedAt)
-		}
-	}
-	return run
-}
-
-func (w *activityWorkflow) addToStrip(query activityQuery, run activityRun) {
-	index := 0
-	if !run.at.IsZero() {
-		index = int(run.at.Sub(query.from) / query.bucket)
-	}
-	index = min(max(index, 0), activityBucketCount-1)
-	if mark := stripMark(run.status); stripSeverity[mark] > stripSeverity[w.strip[index]] {
-		w.strip[index] = mark
-	}
-}
-
-func stripMark(status ir.Status) byte {
-	switch status {
-	case ir.Succeeded:
-		return stripSucceeded
-	case ir.PartiallySucceeded:
-		return stripPartial
-	case ir.Failed, ir.Rejected:
-		return stripFailed
-	case ir.Aborted:
-		return stripAborted
-	case ir.NotStarted, ir.Running, ir.Queued, ir.Waiting:
-		return stripActive
-	}
-	return stripEmpty
-}
-
-func activityCounts(counts map[ir.Status]int) []api.DAGRunActivityCount {
-	result := make([]api.DAGRunActivityCount, 0, len(counts))
-	for status, count := range counts {
-		result = append(result, api.DAGRunActivityCount{Status: api.Status(status), Count: count})
-	}
-	slices.SortFunc(result, func(left, right api.DAGRunActivityCount) int {
-		return cmp.Compare(left.Status, right.Status)
-	})
 	return result
 }
 
-// isNotableRun reports whether a run is listed even for a busy DAG.
-func isNotableRun(status ir.Status) bool {
-	return status != ir.Succeeded
-}
-
-type listedActivityRun struct {
-	workflow string
-	run      activityRun
-	notable  bool
-}
-
-// selectActivityRuns sorts each DAG's runs newest first and returns the runs
-// to list, most important first: every run of a DAG with few runs, otherwise
-// its notable runs and its latest run.
-func selectActivityRuns(workflows map[string]*activityWorkflow) []listedActivityRun {
-	var listed []listedActivityRun
-	for name, workflow := range workflows {
-		slices.SortFunc(workflow.runs, compareActivityRunsNewestFirst)
-		for i, run := range workflow.runs {
-			notable := isNotableRun(run.status)
-			if len(workflow.runs) > activityFewRuns && !notable && i > 0 {
-				continue
-			}
-			listed = append(listed, listedActivityRun{workflow: name, run: run, notable: notable})
-		}
-	}
-	slices.SortFunc(listed, func(left, right listedActivityRun) int {
-		if left.notable != right.notable {
-			if left.notable {
-				return -1
-			}
-			return 1
-		}
-		if c := compareActivityRunsNewestFirst(left.run, right.run); c != 0 {
-			return c
-		}
-		return cmp.Compare(left.workflow, right.workflow)
-	})
-	return listed
-}
-
-func compareActivityRunsNewestFirst(left, right activityRun) int {
-	if c := right.at.Compare(left.at); c != 0 {
+func compareActivityRunsNewestFirst(left, right api.DAGRunActivityRun) int {
+	if c := cmp.Compare(valueOf(right.StartedAt), valueOf(left.StartedAt)); c != 0 {
 		return c
 	}
-	return cmp.Compare(right.id, left.id)
-}
-
-func toActivityRun(run activityRun, name string) api.DAGRunActivityRun {
-	result := api.DAGRunActivityRun{
-		DagRunId: run.id,
-		Status:   api.Status(run.status),
+	if c := cmp.Compare(left.Name, right.Name); c != 0 {
+		return c
 	}
-	if name != "" {
-		result.Name = &name
-	}
-	if run.started > 0 {
-		result.StartedAt = &run.started
-	} else if !run.at.IsZero() {
-		at := run.at.Unix()
-		result.StartedAt = &at
-	}
-	if run.finished > 0 {
-		result.FinishedAt = &run.finished
-	}
-	return result
-}
-
-func medianSeconds(durations []int64) (int, bool) {
-	if len(durations) < 3 {
-		return 0, false
-	}
-	sorted := slices.Clone(durations)
-	slices.Sort(sorted)
-	return int(sorted[len(sorted)/2]), true
+	return cmp.Compare(left.DagRunId, right.DagRunId)
 }
 
 func isUnsuccessfulStatus(status ir.Status) bool {
@@ -438,33 +270,26 @@ func isUnsuccessfulStatus(status ir.Status) bool {
 	return false
 }
 
-// addFailureDetails names the failed step and its error on the latest run of
-// the most recently failing DAGs. Index entries carry no step data, so each
-// detail costs one cached status read.
-func (a *API) addFailureDetails(ctx context.Context, workflows []api.DAGRunActivityWorkflow) {
-	failing := make([]int, 0)
-	for i, workflow := range workflows {
-		if isUnsuccessfulStatus(ir.Status(workflow.Latest.Status)) {
-			failing = append(failing, i)
-		}
-	}
-	slices.SortFunc(failing, func(left, right int) int {
-		return cmp.Compare(valueOf(workflows[right].Latest.StartedAt), valueOf(workflows[left].Latest.StartedAt))
-	})
-	for _, i := range failing[:min(len(failing), activityFailureDetails)] {
-		latest := &workflows[i].Latest
-		status, err := a.dagRunMgr.GetSavedStatus(ctx, ir.NewDAGRunRef(workflows[i].Name, latest.DagRunId))
-		if err != nil {
+// attentionRuns returns the latest runs that did not succeed, newest first,
+// with the step that failed.
+func attentionRuns(latest []*ir.DAGRunStatus) []api.DAGRunActivityRun {
+	runs := make([]api.DAGRunActivityRun, 0)
+	for _, status := range latest {
+		if !isUnsuccessfulStatus(status.Status) {
 			continue
 		}
+		run := toActivityRun(status)
 		step, message := firstFailure(status)
 		if step != "" {
-			latest.FailedStep = &step
+			run.FailedStep = &step
 		}
 		if message != "" {
-			latest.Error = &message
+			run.Error = &message
 		}
+		runs = append(runs, run)
 	}
+	slices.SortFunc(runs, compareActivityRunsNewestFirst)
+	return runs[:min(len(runs), activityAttentionLimit)]
 }
 
 // firstFailure returns the first failed step in run order and its error, or
@@ -486,18 +311,26 @@ func shortError(message string) string {
 	return stringutil.TruncUTF8Bytes(message, activityErrorMaxBytes)
 }
 
-// activeRuns lists runs that are still in progress: those in the window and
-// live processes of runs created before it. Oldest first.
-func (a *API) activeRuns(ctx context.Context, query activityQuery, workflows map[string]*activityWorkflow) []api.DAGRunActivityRun {
+// activeRuns lists runs that are still in progress, oldest first: those on
+// the first page, the latest run of each DAG, and live processes of runs
+// created before the window. Waiting runs have no process, so the latest runs
+// are what keep them listed.
+func (a *API) activeRuns(ctx context.Context, query activityQuery, pageRuns, latest []*ir.DAGRunStatus) []api.DAGRunActivityRun {
 	active := make([]api.DAGRunActivityRun, 0)
 	seen := make(map[ir.DAGRunRef]struct{})
-	for name, workflow := range workflows {
-		for _, run := range workflow.runs {
-			if isActiveRunStatus(run.status) {
-				active = append(active, toActivityRun(run, name))
-				seen[ir.NewDAGRunRef(name, run.id)] = struct{}{}
-			}
+	add := func(status *ir.DAGRunStatus) {
+		ref := ir.NewDAGRunRef(status.Name, status.DAGRunID)
+		if _, ok := seen[ref]; ok || !isActiveRunStatus(status.Status) {
+			return
 		}
+		seen[ref] = struct{}{}
+		active = append(active, toActivityRun(status))
+	}
+	for _, status := range pageRuns {
+		add(status)
+	}
+	for _, status := range latest {
+		add(status)
 	}
 
 	if a.procRepository != nil {
@@ -515,28 +348,24 @@ func (a *API) activeRuns(ctx context.Context, query activityQuery, workflows map
 						break groups
 					}
 					reads++
-					seen[ref] = struct{}{}
 					status, err := a.readLiveRunStatus(ctx, ref)
-					if err != nil || !isActiveRunStatus(status.Status) {
+					if err != nil {
 						continue
 					}
 					labels := ir.NewLabels(status.Labels)
 					if !query.workspaceFilter.MatchesLabels(labels) || !labels.MatchesFilters(labelFilters) {
 						continue
 					}
-					active = append(active, toActivityRun(newActivityRun(status), status.Name))
+					add(status)
 				}
 			}
 		}
 	}
 
 	slices.SortFunc(active, func(left, right api.DAGRunActivityRun) int {
-		if c := cmp.Compare(valueOf(left.StartedAt), valueOf(right.StartedAt)); c != 0 {
-			return c
-		}
-		return cmp.Compare(left.DagRunId, right.DagRunId)
+		return compareActivityRunsNewestFirst(right, left)
 	})
-	return active
+	return active[:min(len(active), activityActiveLimit)]
 }
 
 // readLiveRunStatus reads the saved status of a run whose process heartbeat
