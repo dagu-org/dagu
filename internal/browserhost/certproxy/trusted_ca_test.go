@@ -20,8 +20,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func trustEntry(ca *testCA, hosts ...string) Entry {
-	return Entry{Label: ca.cert.Subject.CommonName, Hosts: hosts, CAPEM: ca.pem()}
+func trustedCA(ca *testCA, hosts ...string) TrustedCA {
+	return TrustedCA{Label: ca.cert.Subject.CommonName, Hosts: hosts, CAPEM: ca.pem()}
 }
 
 func TestScopedTrust(t *testing.T) {
@@ -33,7 +33,7 @@ func TestScopedTrust(t *testing.T) {
 			site := newSiteAuth(t, ca, ca, tls.NoClientCert, 0)
 			upstream := newTunnelProxy(t, siteAddr(site), http.StatusOK)
 			cfg := testConfig(t, `function FindProxyForURL() { return "PROXY `+upstream.addr+`"; }`)
-			cfg.TrustedCAs = []Entry{trustEntry(ca, siteHost)}
+			cfg.TrustedCAs = []TrustedCA{trustedCA(ca, siteHost)}
 			cfg.Guard = guard
 			ready := serveProxy(t, cfg)
 
@@ -64,7 +64,7 @@ func TestScopedTrustCombinesWithIdentity(t *testing.T) {
 	ca, other := newTestCA(t, "server CA"), newTestCA(t, "other CA")
 	site := newSite(t, ca, other, 0)
 	cfg := testConfig(t, "", other.clientEntry(t, testLabel, "127.0.0.1"))
-	cfg.TrustedCAs = []Entry{trustEntry(other, "*"), trustEntry(ca, "127.0.0.1")}
+	cfg.TrustedCAs = []TrustedCA{trustedCA(other, "*"), trustedCA(ca, "127.0.0.1")}
 	ready := serveProxy(t, cfg)
 	body, err := get(t, browserClient(ready, "http/1.1"), site.URL)
 	require.NoError(t, err)
@@ -84,7 +84,7 @@ func TestScopedTrustKeepsGuardTrust(t *testing.T) {
 			identity := corp.clientEntry(t, testLabel, "other.test")
 			identity.CAPEM = corp.pem()
 			cfg := testConfig(t, `function FindProxyForURL() { return "PROXY `+upstream.addr+`"; }`, identity)
-			cfg.TrustedCAs = []Entry{trustEntry(unrelated, siteHost)}
+			cfg.TrustedCAs = []TrustedCA{trustedCA(unrelated, siteHost)}
 			cfg.Guard = guard
 			ready := serveProxy(t, cfg)
 
@@ -122,7 +122,7 @@ func TestScopedTrustRejectsInvalidServer(t *testing.T) {
 			site.StartTLS()
 			t.Cleanup(site.Close)
 			cfg := testConfig(t, "")
-			cfg.TrustedCAs = []Entry{trustEntry(ca, "127.0.0.1")}
+			cfg.TrustedCAs = []TrustedCA{trustedCA(ca, "127.0.0.1")}
 			ready := serveProxy(t, cfg)
 			_, err := get(t, browserClient(ready, "http/1.1"), site.URL)
 			require.Error(t, err)
@@ -137,7 +137,7 @@ func TestScopedTrustKeepsMandatoryRoute(t *testing.T) {
 	site := newSiteAuth(t, ca, ca, tls.NoClientCert, 0)
 	upstream := newTunnelProxy(t, siteAddr(site), http.StatusProxyAuthRequired)
 	cfg := testConfig(t, `function FindProxyForURL() { return "PROXY `+upstream.addr+`"; }`)
-	cfg.TrustedCAs = []Entry{trustEntry(ca, siteHost)}
+	cfg.TrustedCAs = []TrustedCA{trustedCA(ca, siteHost)}
 	cfg.Guard = true
 	ready := serveProxy(t, cfg)
 	_, err := get(t, browserClient(ready, "http/1.1"), "https://"+siteHost+"/")
@@ -154,12 +154,12 @@ func TestScopedTrustUsesProxyHostname(t *testing.T) {
 	site := newSiteAuth(t, serverCA, serverCA, tls.NoClientCert, 0)
 	proxy := newHTTPSTunnelProxy(t, proxyCA, siteAddr(site))
 	cfg := testConfig(t, `function FindProxyForURL() { return "HTTPS `+proxy+`"; }`, proxyCA.clientEntry(t, testLabel, "127.0.0.1"))
-	cfg.TrustedCAs = []Entry{trustEntry(serverCA, siteHost)}
+	cfg.TrustedCAs = []TrustedCA{trustedCA(serverCA, siteHost)}
 	ready := serveProxy(t, cfg)
 	_, err := get(t, browserClient(ready, "http/1.1"), "https://"+siteHost+"/")
 	require.Error(t, err, "destination trust must not authenticate the HTTPS proxy")
 
-	cfg.TrustedCAs = append(cfg.TrustedCAs, trustEntry(proxyCA, "127.0.0.1"))
+	cfg.TrustedCAs = append(cfg.TrustedCAs, trustedCA(proxyCA, "127.0.0.1"))
 	ready = serveProxy(t, cfg)
 	body, err := get(t, browserClient(ready, "http/1.1"), "https://"+siteHost+"/")
 	require.NoError(t, err)

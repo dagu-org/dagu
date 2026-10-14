@@ -81,8 +81,10 @@ func loadClientCertificates(ctx context.Context, step []cmnconfig.BrowserClientC
 	return entries, warnings, nil
 }
 
-func loadTrustedCAs(ctx context.Context) ([]certproxy.Entry, []string, error) {
-	var entries []certproxy.Entry
+// loadTrustedCAs loads the host's trusted authorities. Warnings report
+// hosts whose sites Chrome never routes through the certificate proxy.
+func loadTrustedCAs(ctx context.Context) ([]certproxy.TrustedCA, []string, error) {
+	var entries []certproxy.TrustedCA
 	var warnings []string
 	for i, authority := range cmnconfig.GetConfig(ctx).Browser.TrustedCAs {
 		entry, err := certproxy.LoadTrustedCA(fmt.Sprintf("browser.trusted_cas[%d]", i), authority)

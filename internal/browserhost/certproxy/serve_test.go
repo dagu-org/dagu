@@ -255,7 +255,7 @@ func TestServeControlPaths(t *testing.T) {
 		assert.Equal(t, pacContentType, response.Header.Get("Content-Type"))
 		script, err := io.ReadAll(response.Body)
 		require.NoError(t, err)
-		assert.Equal(t, composePAC(ready.Port, 0, cfg.Entries, system), string(script))
+		assert.Equal(t, composePAC(ready.Port, 0, cfg.routedHosts(), system), string(script))
 		assert.Equal(t, http.StatusNotFound, status(base+"/other-token/proxy.pac"))
 	})
 }

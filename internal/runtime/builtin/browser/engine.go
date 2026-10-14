@@ -115,7 +115,9 @@ type launchOptions struct {
 	// ClientCertificates are presented, through a proxy, to the hosts they
 	// name.
 	ClientCertificates []certproxy.Entry
-	TrustedCAs         []certproxy.Entry
+	// TrustedCAs add server trust, through the same proxy, to the hosts
+	// they name.
+	TrustedCAs []certproxy.TrustedCA
 	// Guard sends the browser's other https: requests through the proxy
 	// too.
 	Guard bool

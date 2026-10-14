@@ -78,19 +78,19 @@ func Load(label string, c cmnconfig.BrowserClientCertificate, baseDir string, no
 }
 
 // LoadTrustedCA reads a scoped server authority without a client identity.
-func LoadTrustedCA(label string, c cmnconfig.BrowserTrustedCA) (Entry, error) {
+func LoadTrustedCA(label string, c cmnconfig.BrowserTrustedCA) (TrustedCA, error) {
 	if err := c.Validate(); err != nil {
-		return Entry{}, fmt.Errorf("%s: %w", label, err)
+		return TrustedCA{}, fmt.Errorf("%s: %w", label, err)
 	}
 	data, err := os.ReadFile(c.CAFile) //nolint:gosec // the authority file is the configured input
 	if err != nil {
-		return Entry{}, fmt.Errorf("%s: %w", label, err)
+		return TrustedCA{}, fmt.Errorf("%s: %w", label, err)
 	}
 	certs, err := trustedCertificates(data)
 	if err != nil {
-		return Entry{}, fmt.Errorf("%s: %w", label, err)
+		return TrustedCA{}, fmt.Errorf("%s: %w", label, err)
 	}
-	return Entry{Label: label, Hosts: slices.Clone(c.Hosts), CAPEM: encodeCertificates(certs)}, nil
+	return TrustedCA{Label: label, Hosts: slices.Clone(c.Hosts), CAPEM: encodeCertificates(certs)}, nil
 }
 
 func trustedCertificates(data []byte) ([]*x509.Certificate, error) {

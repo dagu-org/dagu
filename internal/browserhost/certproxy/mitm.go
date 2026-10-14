@@ -77,7 +77,7 @@ type server struct {
 	ctx        context.Context
 	token      string
 	entries    []*upstreamEntry
-	trustedCAs []Entry
+	trustedCAs []scopedAuthority
 	pac        *pacEvaluator
 	issuer     *leafIssuer
 	events     *eventLog
@@ -92,6 +92,12 @@ type server struct {
 	// guard accepts the browser's other https: connections; nil without a
 	// guard, or once it stopped.
 	guard net.Listener
+}
+
+// scopedAuthority is a TrustedCA ready to verify servers.
+type scopedAuthority struct {
+	hosts []string
+	certs []*x509.Certificate
 }
 
 // upstreamEntry is an Entry ready to present.
@@ -337,7 +343,7 @@ func (s *server) scopedEntry(host string) *upstreamEntry {
 	entry := s.entryFor(host)
 	var selected *upstreamEntry
 	for _, authority := range s.trustedCAs {
-		if !hostpattern.MatchAny(host, authority.Hosts) {
+		if !hostpattern.MatchAny(host, authority.hosts) {
 			continue
 		}
 		if selected == nil {
@@ -348,7 +354,9 @@ func (s *server) scopedEntry(host string) *upstreamEntry {
 			scoped.roots = entry.roots.Clone()
 			selected = &scoped
 		}
-		selected.roots.AppendCertsFromPEM([]byte(authority.CAPEM))
+		for _, cert := range authority.certs {
+			selected.roots.AddCert(cert)
+		}
 	}
 	if selected != nil {
 		return selected

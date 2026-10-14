@@ -38,6 +38,17 @@ type Entry struct {
 	CAPEM string `json:"ca_pem,omitempty"`
 }
 
+// TrustedCA is a server certificate authority trusted only for the hosts it
+// names.
+type TrustedCA struct {
+	// Label names the authority in messages, such as browser.trusted_cas[0].
+	Label string `json:"label"`
+	// Hosts are host patterns, as the hostpattern package matches them.
+	Hosts []string `json:"hosts"`
+	// CAPEM holds the authority's certificates.
+	CAPEM string `json:"ca_pem"`
+}
+
 // Config is what the proxy serves, and for which browser.
 type Config struct {
 	// Token is a random value that prefixes the proxy's control paths.
@@ -51,9 +62,9 @@ type Config struct {
 	// Entries are the certificates; the first whose hosts match a host is
 	// presented to it.
 	Entries []Entry `json:"entries"`
-	// TrustedCAs contain only Hosts, Label, and CAPEM. All matching
-	// authorities add server trust without presenting a client identity.
-	TrustedCAs []Entry `json:"trusted_cas,omitempty"`
+	// TrustedCAs add server trust to the hosts each names. Every matching
+	// authority applies, beside the entry presented there, if any.
+	TrustedCAs []TrustedCA `json:"trusted_cas,omitempty"`
 	// GraceSeconds is how long the proxy waits for the browser to answer
 	// for the first time; zero means five minutes.
 	GraceSeconds int `json:"grace_seconds,omitempty"`
