@@ -728,7 +728,7 @@ func TestEntryReaderRefreshEmitsNothingWhenUnchanged(t *testing.T) {
 			dir := t.TempDir()
 			writeDAGFile(t, dir, "existing.yaml", "existing")
 			store := newRepository(dir, WithSkipExamples(true), WithRecursiveDiscovery(recursive))
-			er := NewFileEntryReader(dir, store, recursive, "", "")
+			er := NewFileEntryReader(dir, store, recursive, "", "", withWatcherFactory(newSilentWatcher))
 			events := make(chan persis.DAGChangeEvent, 64)
 			er.events = events
 			ctx := context.Background()
@@ -748,4 +748,82 @@ func TestEntryReaderRefreshEmitsNothingWhenUnchanged(t *testing.T) {
 			expectNoEvent(t, events, 100*time.Millisecond)
 		})
 	}
+}
+
+// silentWatcher models a watcher that never delivers events, like inotify on a
+// network file system when another host writes the files.
+type silentWatcher struct {
+	events chan fsnotify.Event
+	errors chan error
+}
+
+func newSilentWatcher() filenotify.FileWatcher {
+	return &silentWatcher{events: make(chan fsnotify.Event), errors: make(chan error)}
+}
+
+func (w *silentWatcher) Events() <-chan fsnotify.Event { return w.events }
+func (w *silentWatcher) Errors() <-chan error          { return w.errors }
+func (w *silentWatcher) Add(string) error              { return nil }
+func (w *silentWatcher) Remove(string) error           { return nil }
+func (w *silentWatcher) Close() error                  { return nil }
+
+// startSilentEntryReader starts a reader whose watcher never fires and returns
+// its event channel.
+func startSilentEntryReader(t *testing.T, dir string, recursive bool, opts ...EntryReaderOption) (*entryReaderImpl, chan persis.DAGChangeEvent) {
+	t.Helper()
+
+	store := newRepository(dir, WithSkipExamples(true), WithRecursiveDiscovery(recursive))
+	opts = append([]EntryReaderOption{withWatcherFactory(newSilentWatcher)}, opts...)
+	er := NewFileEntryReader(dir, store, recursive, "", "", opts...)
+	events := make(chan persis.DAGChangeEvent, 64)
+	er.events = events
+
+	ctx, cancel := context.WithCancel(context.Background())
+	require.NoError(t, er.Init(ctx))
+	go er.Start(ctx)
+	t.Cleanup(func() {
+		cancel()
+		er.Stop()
+	})
+	return er, events
+}
+
+// TestEntryReaderResyncSeesChangesWithoutWatcherEvents covers DAG files that
+// another host creates, edits, renames and deletes on a shared volume: the
+// watcher stays silent, so only the periodic resync can report them.
+func TestEntryReaderResyncSeesChangesWithoutWatcherEvents(t *testing.T) {
+	for _, recursive := range []bool{false, true} {
+		name := "NonRecursive"
+		if recursive {
+			name = "Recursive"
+		}
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeDAGFile(t, dir, "existing.yaml", "existing")
+			_, events := startSilentEntryReader(t, dir, recursive, WithResyncInterval(100*time.Millisecond))
+
+			writeDAGFile(t, dir, "remote.yaml", "remote")
+			expectEvent(t, events, persis.DAGChangeAdded, "remote")
+
+			writeDAGFile(t, dir, "remote.yaml", "remote-edited-by-another-host")
+			expectEvent(t, events, persis.DAGChangeDeleted, "remote")
+			expectEvent(t, events, persis.DAGChangeAdded, "remote-edited-by-another-host")
+
+			require.NoError(t, os.Rename(filepath.Join(dir, "remote.yaml"), filepath.Join(dir, "moved.yaml")))
+			expectEvent(t, events, persis.DAGChangeDeleted, "remote-edited-by-another-host")
+			expectEvent(t, events, persis.DAGChangeAdded, "remote-edited-by-another-host")
+
+			require.NoError(t, os.Remove(filepath.Join(dir, "existing.yaml")))
+			expectEvent(t, events, persis.DAGChangeDeleted, "existing")
+		})
+	}
+}
+
+// TestEntryReaderResyncDisabled keeps the resync opt-out working.
+func TestEntryReaderResyncDisabled(t *testing.T) {
+	dir := t.TempDir()
+	_, events := startSilentEntryReader(t, dir, false, WithResyncInterval(0))
+
+	writeDAGFile(t, dir, "remote.yaml", "remote")
+	expectNoEvent(t, events, 300*time.Millisecond)
 }

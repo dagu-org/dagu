@@ -46,7 +46,33 @@ type entryReaderImpl struct {
 	quit                   chan struct{}
 	closeOnce              sync.Once
 	events                 chan persis.DAGChangeEvent
+	newWatcher             func() filenotify.FileWatcher
+	resyncInterval         time.Duration
 }
+
+// EntryReaderOption customizes a filesystem DAG entry reader.
+type EntryReaderOption func(*entryReaderImpl)
+
+// WithResyncInterval sets how often the reader re-reads the whole DAG
+// directory regardless of watcher events. A non-positive value disables the
+// periodic resync.
+func WithResyncInterval(interval time.Duration) EntryReaderOption {
+	return func(er *entryReaderImpl) {
+		er.resyncInterval = interval
+	}
+}
+
+// withWatcherFactory replaces the file watcher implementation.
+func withWatcherFactory(factory func() filenotify.FileWatcher) EntryReaderOption {
+	return func(er *entryReaderImpl) {
+		er.newWatcher = factory
+	}
+}
+
+// defaultResyncInterval bounds how long a change made through another host can
+// stay unseen. Native file watches do not fire for writes made over a network
+// file system by another machine.
+const defaultResyncInterval = 5 * time.Minute
 
 type dagFileStamp struct {
 	size    int64
@@ -60,8 +86,8 @@ type registryState struct {
 }
 
 // NewFileEntryReader creates a filesystem DAG entry reader.
-func NewFileEntryReader(dir string, dagRepository *persis.DAGRepository, recursive bool, baseConfigPath, workspaceBaseConfigDir string) *entryReaderImpl {
-	return &entryReaderImpl{
+func NewFileEntryReader(dir string, dagRepository *persis.DAGRepository, recursive bool, baseConfigPath, workspaceBaseConfigDir string, opts ...EntryReaderOption) *entryReaderImpl {
+	er := &entryReaderImpl{
 		targetDir:              dir,
 		baseConfigPath:         baseConfigPath,
 		workspaceBaseConfigDir: workspaceBaseConfigDir,
@@ -73,7 +99,13 @@ func NewFileEntryReader(dir string, dagRepository *persis.DAGRepository, recursi
 		recursive:              recursive,
 		quit:                   make(chan struct{}),
 		events:                 make(chan persis.DAGChangeEvent, 64),
+		newWatcher:             func() filenotify.FileWatcher { return filenotify.New(time.Minute) },
+		resyncInterval:         defaultResyncInterval,
 	}
+	for _, opt := range opts {
+		opt(er)
+	}
+	return er
 }
 
 // Init loads the initial DAG registry and starts watching the target directory.
@@ -94,7 +126,7 @@ func (er *entryReaderImpl) Init(ctx context.Context) error {
 
 	er.lock.Lock()
 	defer er.lock.Unlock()
-	er.watcher = filenotify.New(time.Minute)
+	er.watcher = er.newWatcher()
 	if err := er.addInitialWatches([]string{er.targetDir}); err != nil {
 		_ = er.watcher.Close()
 		return err
@@ -142,12 +174,23 @@ func (er *entryReaderImpl) watch(ctx context.Context) {
 		}
 	}()
 
+	// Watches only see writes made on this host; on a network file system the
+	// rest is picked up by re-reading the directory on a timer.
+	var resync <-chan time.Time
+	if er.resyncInterval > 0 {
+		resyncTicker := time.NewTicker(er.resyncInterval)
+		defer resyncTicker.Stop()
+		resync = resyncTicker.C
+	}
+
 	for {
 		select {
 		case <-er.quit:
 			return
 		case <-ctx.Done():
 			return
+		case <-resync:
+			scheduleRefresh()
 		case event, ok := <-er.watcher.Events():
 			if !ok {
 				return
@@ -356,7 +399,7 @@ func definitionIDForFile(fileName string) string {
 }
 
 func (er *entryReaderImpl) initRecursive(ctx context.Context) error {
-	er.watcher = filenotify.New(time.Minute)
+	er.watcher = er.newWatcher()
 
 	scan, err := Discover(er.targetDir, DiscoveryOptions{Recursive: true})
 	if err != nil {
