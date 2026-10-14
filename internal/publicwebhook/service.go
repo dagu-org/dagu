@@ -33,8 +33,6 @@ const (
 	// relay when the queue is full, or when queueing it failed.
 	queueFullRetry = time.Minute
 	storageRetry   = 30 * time.Second
-	// hookSuffix ends every hook ID: auth.WebhookHookID.
-	hookSuffix = "/webhook"
 	// requestTimeout bounds a ticket request and the relay handshake.
 	requestTimeout = 30 * time.Second
 )
@@ -52,7 +50,7 @@ type Webhooks interface {
 	// ListComplete returns every webhook, or an error when any cannot be
 	// read.
 	ListComplete(ctx context.Context) ([]*auth.Webhook, error)
-	GetByDAGName(ctx context.Context, dagName string) (*auth.Webhook, error)
+	GetByID(ctx context.Context, id string) (*auth.Webhook, error)
 }
 
 // Runs starts the runs deliveries ask for.
@@ -284,7 +282,7 @@ func hookSet(webhooks []*auth.Webhook, maxHooks int) ([]cloudrelay.Hook, []strin
 			leftOut = append(leftOut, wh.DAGName)
 			continue
 		}
-		hook := cloudrelay.Hook{ID: auth.WebhookHookID(wh.DAGName), Token: wh.Public.Token}
+		hook := cloudrelay.Hook{ID: auth.WebhookHookID(wh.ID), Token: wh.Public.Token}
 		if wh.Public.Sender == string(webhooksig.Slack) {
 			hook.Handshake = cloudrelay.HandshakeSlack
 		}
@@ -328,19 +326,19 @@ func (s *Service) hooked(ctx context.Context, h cloudrelay.Hooked) {
 func (s *Service) missed(ctx context.Context, missed []cloudrelay.Missed) {
 	now := time.Now().UTC()
 	for _, m := range missed {
-		dagName, ok := strings.CutSuffix(m.Hook, hookSuffix)
+		id, ok := strings.CutPrefix(m.Hook, auth.WebhookHookIDPrefix)
 		if !ok {
 			continue
 		}
-		wh, err := s.cfg.Webhooks.GetByDAGName(ctx, dagName)
+		wh, err := s.cfg.Webhooks.GetByID(ctx, id)
 		if err != nil || !isPublic(wh) {
 			if err != nil && !errors.Is(err, auth.ErrWebhookNotFound) {
-				logger.Warn(ctx, "Public webhooks: missed deliveries could not be counted", tag.DAG(dagName), tag.Error(err))
+				logger.Warn(ctx, "Public webhooks: missed deliveries could not be counted", tag.Key("hook"), tag.Value(m.Hook), tag.Error(err))
 			}
 			continue
 		}
 		if err := s.cfg.Store.AddMissed(ctx, wh.ID, m.Expired, m.Refused, now); err != nil {
-			logger.Warn(ctx, "Public webhooks: missed deliveries could not be counted", tag.DAG(dagName), tag.Error(err))
+			logger.Warn(ctx, "Public webhooks: missed deliveries could not be counted", tag.DAG(wh.DAGName), tag.Error(err))
 		}
 	}
 }
@@ -348,20 +346,21 @@ func (s *Service) missed(ctx context.Context, missed []cloudrelay.Missed) {
 // deliver starts a run for a delivery the webhook takes, and logs what
 // became of it.
 func (s *Service) deliver(ctx context.Context, d cloudrelay.Delivery) cloudrelay.Outcome {
-	dagName, ok := strings.CutSuffix(d.Hook, hookSuffix)
+	id, ok := strings.CutPrefix(d.Hook, auth.WebhookHookIDPrefix)
 	if !ok {
 		return cloudrelay.OutcomeIgnored
 	}
-	wh, err := s.cfg.Webhooks.GetByDAGName(ctx, dagName)
+	wh, err := s.cfg.Webhooks.GetByID(ctx, id)
 	switch {
 	case errors.Is(err, auth.ErrWebhookNotFound):
 		return cloudrelay.OutcomeIgnored
 	case err != nil:
-		logger.Warn(ctx, "Public webhooks: a webhook could not be read", tag.DAG(dagName), tag.Error(err))
+		logger.Warn(ctx, "Public webhooks: a webhook could not be read", tag.Key("hook"), tag.Value(d.Hook), tag.Error(err))
 		return cloudrelay.OutcomeRetry(storageRetry)
 	case !isPublic(wh):
 		return cloudrelay.OutcomeIgnored
 	}
+	dagName := wh.DAGName
 
 	event := webhooksig.Event(d.Header, d.Body)
 	logged := Delivery{ID: d.ID, Received: d.Received.UTC(), Size: len(d.Body), Event: event}

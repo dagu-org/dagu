@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"slices"
+	"time"
 
 	"github.com/dagucloud/dagu/v2/api/v1"
 	"github.com/dagucloud/dagu/v2/internal/audit"
@@ -238,6 +239,9 @@ func (a *API) checkPublicWebhookLimit(ctx context.Context, dagName string) error
 	}
 }
 
+// webhookRestoreTimeout bounds moving a webhook back after a failed rename.
+const webhookRestoreTimeout = 10 * time.Second
+
 // moveWebhookForRename moves a DAG's webhook to the DAG's new name before
 // the DAG itself moves, so a rename never succeeds with the webhook left
 // behind, where its local endpoint and public URL could no longer start the
@@ -264,8 +268,11 @@ func (a *API) moveWebhookForRename(ctx context.Context, oldName, newName string)
 }
 
 // restoreWebhookAfterFailedRename moves a webhook back to its DAG's old name
-// when the DAG itself could not move.
+// when the DAG itself could not move. It runs even if the request was
+// cancelled, since the webhook would otherwise stay under the new name.
 func (a *API) restoreWebhookAfterFailedRename(ctx context.Context, oldName, newName string) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), webhookRestoreTimeout)
+	defer cancel()
 	if err := a.authService.RenameWebhook(ctx, newName, oldName); err != nil {
 		logger.Error(ctx, "Failed to move webhook back after a failed rename",
 			tag.Error(err),

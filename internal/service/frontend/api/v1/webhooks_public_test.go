@@ -276,4 +276,10 @@ func TestWebhooksRenameKeepsWebhookWithTheDAG(t *testing.T) {
 	}).WithBearerToken(f.token).ExpectStatus(http.StatusConflict).Send(t)
 	f.server.Client().Get("/api/v1/dags/rename_source/webhook").
 		WithBearerToken(f.token).ExpectStatus(http.StatusOK).Send(t)
+
+	// A DAG without a webhook does not take over the one left behind.
+	createTestDAG(t, f.server, f.token, "rename_plain")
+	f.server.Client().Post("/api/v1/dags/rename_plain/rename", api.RenameDAGJSONRequestBody{
+		NewFileName: "rename_orphan",
+	}).WithBearerToken(f.token).ExpectStatus(http.StatusConflict).Send(t)
 }

@@ -563,6 +563,7 @@ func TestWebhookRenameDAG(t *testing.T) {
 
 	require.ErrorIs(t, s.RenameDAG(ctx, "d1", "d2"), auth.ErrWebhookAlreadyExists)
 	require.ErrorIs(t, s.RenameDAG(ctx, "missing", "d3"), auth.ErrWebhookNotFound)
+	require.ErrorIs(t, s.RenameDAG(ctx, "missing", "d2"), auth.ErrWebhookAlreadyExists, "a webhook at the new name is refused first")
 	require.NoError(t, s.RenameDAG(ctx, "d1", "d3"))
 
 	_, err := s.GetByDAGName(ctx, "d1")

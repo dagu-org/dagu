@@ -230,8 +230,8 @@ type WebhookStore interface {
 
 	// RenameDAG moves a DAG's webhook to the DAG's new name, keeping its
 	// tokens and settings.
-	// Returns ErrWebhookNotFound if no webhook exists for oldName, and
-	// ErrWebhookAlreadyExists if one exists for newName.
+	// Returns ErrWebhookAlreadyExists if a webhook exists for newName,
+	// checked first, and ErrWebhookNotFound if none exists for oldName.
 	RenameDAG(ctx context.Context, oldName, newName string) error
 
 	// UpdateLastUsed records recent use of a webhook and, when profileTokenID

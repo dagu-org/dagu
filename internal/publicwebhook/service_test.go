@@ -305,6 +305,11 @@ func (h *harness) delivery(t *testing.T, webhookID string) publicwebhook.Deliver
 	return log.Deliveries[0]
 }
 
+// hookOf is the hook ID the relay knows a webhook's public URL by.
+func hookOf(wh *auth.Webhook) string {
+	return auth.WebhookHookID(wh.ID)
+}
+
 func deliveryFrame(id, hook string, header map[string]string, body string) map[string]any {
 	return map[string]any{
 		"t": "delivery", "id": id, "hook": hook, "received": time.Now().UTC().Format(time.RFC3339Nano),
@@ -322,14 +327,14 @@ func TestServiceStartsRuns(t *testing.T) {
 	ws := h.cloud.relay(t)
 
 	hooks := ws.next(t, "hooks")
-	assert.Equal(t, []any{map[string]any{"hook": "nightly/webhook", "digest": digestOf("token-1")}}, hooks["hooks"])
+	assert.Equal(t, []any{map[string]any{"hook": hookOf(wh), "digest": digestOf("token-1")}}, hooks["hooks"])
 	ws.write(t, map[string]any{"t": "hooked", "id": hooks["id"], "url": "https://hooks.example/obj"})
 	require.Eventually(t, func() bool { return h.status(t).URL == "https://hooks.example/obj" }, 5*time.Second, 10*time.Millisecond)
 	status := h.status(t)
 	assert.True(t, status.Connected)
 	assert.Equal(t, 1000, status.MaxHooks)
 
-	ws.write(t, deliveryFrame("d-1", "nightly/webhook", map[string]string{"X-Github-Event": "push", "Authorization": "x"}, `{"ref":"main"}`))
+	ws.write(t, deliveryFrame("d-1", hookOf(wh), map[string]string{"X-Github-Event": "push", "Authorization": "x"}, `{"ref":"main"}`))
 	assert.Equal(t, map[string]any{"t": "delivered", "id": "d-1", "outcome": "started"}, ws.next(t, "delivered"))
 
 	h.runs.mu.Lock()
@@ -346,7 +351,7 @@ func TestServiceStartsRuns(t *testing.T) {
 	assert.Equal(t, "push", logged.Event)
 	assert.Equal(t, len(`{"ref":"main"}`), logged.Size)
 
-	ws.write(t, map[string]any{"t": "missed", "hooks": []map[string]any{{"hook": "nightly/webhook", "expired": 2, "refused": 1}}})
+	ws.write(t, map[string]any{"t": "missed", "hooks": []map[string]any{{"hook": hookOf(wh), "expired": 2, "refused": 1}}})
 	require.Eventually(t, func() bool {
 		log, err := h.log.Log(context.Background(), wh.ID)
 		return err == nil && log.Missed.Expired == 2 && log.Missed.Refused == 1
@@ -365,8 +370,8 @@ func TestServiceCountsMissedOutsideTheSet(t *testing.T) {
 	assert.Len(t, ws.next(t, "hooks")["hooks"], 1)
 
 	ws.write(t, map[string]any{"t": "missed", "hooks": []map[string]any{
-		{"hook": "second/webhook", "expired": 3, "refused": 0},
-		{"hook": "gone/webhook", "expired": 1, "refused": 0},
+		{"hook": hookOf(second), "expired": 3, "refused": 0},
+		{"hook": auth.WebhookHookID("gone"), "expired": 1, "refused": 0},
 	}})
 	require.Eventually(t, func() bool {
 		log, err := h.log.Log(context.Background(), second.ID)
@@ -407,14 +412,14 @@ func TestServiceDeliveryOutcomes(t *testing.T) {
 		after   any
 		logged  string
 	}{
-		{"a bad signature", 0, nil, github, "github/webhook", unsigned, "ignored", nil, publicwebhook.OutcomeRejected},
-		{"GitHub's ping", 0, nil, github, "github/webhook", map[string]string{"X-Github-Event": "ping", "X-Hub-Signature-256": signed.Get("X-Hub-Signature-256")}, "ignored", nil, publicwebhook.OutcomeSkipped},
-		{"an event not taken", 0, nil, issues, "issues/webhook", unsigned, "ignored", nil, publicwebhook.OutcomeSkipped},
-		{"a full queue", 100, nil, plain, "plain/webhook", unsigned, "retry", float64(60), publicwebhook.OutcomeWaiting},
-		{"a run that cannot start", 0, fmt.Errorf("%w: bad params", publicwebhook.ErrInvalidRun), plain, "plain/webhook", unsigned, "failed", nil, publicwebhook.OutcomeFailed},
-		{"a storage failure", 0, errors.New("disk full"), plain, "plain/webhook", unsigned, "retry", float64(30), publicwebhook.OutcomeWaiting},
-		{"a DAG that does not load", 0, nil, missing, "missing/webhook", unsigned, "failed", nil, publicwebhook.OutcomeFailed},
-		{"a webhook turned off", 0, nil, off, "off/webhook", unsigned, "ignored", nil, publicwebhook.OutcomeIgnored},
+		{"a bad signature", 0, nil, github, hookOf(github), unsigned, "ignored", nil, publicwebhook.OutcomeRejected},
+		{"GitHub's ping", 0, nil, github, hookOf(github), map[string]string{"X-Github-Event": "ping", "X-Hub-Signature-256": signed.Get("X-Hub-Signature-256")}, "ignored", nil, publicwebhook.OutcomeSkipped},
+		{"an event not taken", 0, nil, issues, hookOf(issues), unsigned, "ignored", nil, publicwebhook.OutcomeSkipped},
+		{"a full queue", 100, nil, plain, hookOf(plain), unsigned, "retry", float64(60), publicwebhook.OutcomeWaiting},
+		{"a run that cannot start", 0, fmt.Errorf("%w: bad params", publicwebhook.ErrInvalidRun), plain, hookOf(plain), unsigned, "failed", nil, publicwebhook.OutcomeFailed},
+		{"a storage failure", 0, errors.New("disk full"), plain, hookOf(plain), unsigned, "retry", float64(30), publicwebhook.OutcomeWaiting},
+		{"a DAG that does not load", 0, nil, missing, hookOf(missing), unsigned, "failed", nil, publicwebhook.OutcomeFailed},
+		{"a webhook turned off", 0, nil, off, hookOf(off), unsigned, "ignored", nil, publicwebhook.OutcomeIgnored},
 	} {
 		h.runs.set(tc.queued, tc.err)
 		id := "d-" + strings.ReplaceAll(tc.name, " ", "-")
@@ -433,11 +438,11 @@ func TestServiceDeliveryOutcomes(t *testing.T) {
 	}
 
 	h.runs.set(0, nil)
-	ws.write(t, deliveryFrame("d-large", "plain/webhook", unsigned, strings.Repeat("a", testMaxPayloadSize+1)))
+	ws.write(t, deliveryFrame("d-large", hookOf(plain), unsigned, strings.Repeat("a", testMaxPayloadSize+1)))
 	assert.Equal(t, map[string]any{"t": "delivered", "id": "d-large", "outcome": "failed"}, ws.next(t, "delivered"),
 		"a body over webhooks.max_payload_size starts no run")
 
-	ws.write(t, deliveryFrame("d-unknown", "nobody/webhook", unsigned, "{}"))
+	ws.write(t, deliveryFrame("d-unknown", auth.WebhookHookID("nobody"), unsigned, "{}"))
 	assert.Equal(t, map[string]any{"t": "delivered", "id": "d-unknown", "outcome": "ignored"}, ws.next(t, "delivered"))
 }
 
@@ -446,12 +451,12 @@ func TestServiceKeepsToThePlan(t *testing.T) {
 	h := newHarness(t, 1)
 	now := time.Now()
 	h.addWebhook(t, "newer", &auth.WebhookPublic{Token: "t-newer", CreatedAt: now.Add(time.Minute)})
-	h.addWebhook(t, "older", &auth.WebhookPublic{Token: "t-older", CreatedAt: now})
+	older := h.addWebhook(t, "older", &auth.WebhookPublic{Token: "t-older", CreatedAt: now})
 	h.run(t)
 	ws := h.cloud.relay(t)
 
 	hooks := ws.next(t, "hooks")
-	assert.Equal(t, []any{map[string]any{"hook": "older/webhook", "digest": digestOf("t-older")}}, hooks["hooks"])
+	assert.Equal(t, []any{map[string]any{"hook": hookOf(older), "digest": digestOf("t-older")}}, hooks["hooks"])
 	require.Eventually(t, func() bool {
 		left := h.status(t).LeftOut
 		return len(left) == 1 && left[0] == "newer"
@@ -462,7 +467,7 @@ func TestServiceKeepsToThePlan(t *testing.T) {
 // set; turning every URL off empties the set and lets the connection go.
 func TestServiceSendsOnlyCompleteSets(t *testing.T) {
 	h := newHarness(t, 1000)
-	h.addWebhook(t, "nightly", &auth.WebhookPublic{Token: "token-1", CreatedAt: time.Now()})
+	wh := h.addWebhook(t, "nightly", &auth.WebhookPublic{Token: "token-1", CreatedAt: time.Now()})
 	h.run(t)
 	ws := h.cloud.relay(t)
 	ws.next(t, "hooks")
@@ -480,7 +485,7 @@ func TestServiceSendsOnlyCompleteSets(t *testing.T) {
 	ws.none(t, "hooks", 200*time.Millisecond)
 
 	require.NoError(t, h.col.Delete(context.Background(), "broken"))
-	assert.Equal(t, []any{map[string]any{"hook": "nightly/webhook", "digest": digestOf("token-2")}}, ws.next(t, "hooks")["hooks"])
+	assert.Equal(t, []any{map[string]any{"hook": hookOf(wh), "digest": digestOf("token-2")}}, ws.next(t, "hooks")["hooks"])
 
 	_, err = h.webhooks.UpdateByDAGName(context.Background(), "nightly", func(wh *auth.Webhook) error {
 		wh.Public = nil
@@ -542,4 +547,24 @@ func TestServiceDropsURLsTurnedOffWhileAway(t *testing.T) {
 	require.Eventually(t, func() bool { return !h.status(t).Holding }, 5*time.Second, 10*time.Millisecond)
 	time.Sleep(200 * time.Millisecond)
 	assert.Equal(t, int32(1), h.cloud.tickets.Load(), "with nothing left to drop, the server stays away")
+}
+
+// The relay knows a URL by its webhook, not its DAG's name, so renaming the
+// DAG changes nothing at the relay, and a delivery starts the renamed DAG.
+func TestServiceKeepsURLsAcrossRenames(t *testing.T) {
+	h := newHarness(t, 1000)
+	wh := h.addWebhook(t, "nightly", &auth.WebhookPublic{Token: "token-1", CreatedAt: time.Now()})
+	h.run(t)
+	ws := h.cloud.relay(t)
+	ws.next(t, "hooks")
+
+	require.NoError(t, h.webhooks.RenameDAG(context.Background(), "nightly", "renamed"))
+	ws.none(t, "hooks", 200*time.Millisecond)
+	ws.write(t, deliveryFrame("d-1", hookOf(wh), map[string]string{"X-Github-Event": "push"}, `{}`))
+	assert.Equal(t, "started", ws.next(t, "delivered")["outcome"])
+
+	h.runs.mu.Lock()
+	defer h.runs.mu.Unlock()
+	require.Len(t, h.runs.enqueued, 1)
+	assert.Equal(t, "renamed", h.runs.enqueued[0].dagName)
 }

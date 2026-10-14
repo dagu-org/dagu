@@ -297,8 +297,9 @@ func (s *WebhookStore) UpdateByDAGName(
 }
 
 // RenameDAG moves a DAG's webhook to the DAG's new name, keeping its tokens
-// and settings. Returns [auth.ErrWebhookNotFound] if no webhook exists for
-// oldName, and [auth.ErrWebhookAlreadyExists] if one exists for newName.
+// and settings. Returns [auth.ErrWebhookAlreadyExists] if a webhook exists
+// for newName, checked first, and [auth.ErrWebhookNotFound] if none exists
+// for oldName.
 func (s *WebhookStore) RenameDAG(ctx context.Context, oldName, newName string) error {
 	if oldName == "" || newName == "" {
 		return auth.ErrInvalidWebhookDAGName
@@ -311,12 +312,14 @@ func (s *WebhookStore) RenameDAG(ctx context.Context, oldName, newName string) e
 	if err := s.loadIndexLocked(ctx); err != nil {
 		return fmt.Errorf("webhook store: rebuild index: %w", err)
 	}
+	// The new name is checked first: a webhook left there must not pass to
+	// the DAG, whether or not the DAG has its own.
+	if _, exists := s.byDAGName[newName]; exists {
+		return auth.ErrWebhookAlreadyExists
+	}
 	id, ok := s.byDAGName[oldName]
 	if !ok {
 		return auth.ErrWebhookNotFound
-	}
-	if _, exists := s.byDAGName[newName]; exists {
-		return auth.ErrWebhookAlreadyExists
 	}
 	err := retryConflict(ctx, func(ctx context.Context) error {
 		rec, err := s.col.Get(ctx, id)

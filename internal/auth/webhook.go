@@ -98,10 +98,15 @@ type WebhookPublic struct {
 	CreatedAt time.Time
 }
 
-// WebhookHookID is the ID Dagu Cloud knows a DAG's public webhook URL by.
-func WebhookHookID(dagName string) string {
-	return dagName + "/webhook"
+// WebhookHookID is the ID Dagu Cloud knows a webhook's public URL by. It is
+// built from the webhook's own ID, so it stays the same when the DAG is
+// renamed and requests waiting for the URL survive the rename.
+func WebhookHookID(webhookID string) string {
+	return WebhookHookIDPrefix + webhookID
 }
+
+// WebhookHookIDPrefix starts every hook ID.
+const WebhookHookIDPrefix = "webhook/"
 
 // WebhookProfileToken is a webhook token bound to one runtime profile.
 // The token is stored as a bcrypt hash.

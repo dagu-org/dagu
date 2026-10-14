@@ -159,8 +159,9 @@ Relay ─── delivery frame over the server's outbound WebSocket ──▶ Da
   With remote access off, the server answers every proxied request with `403`
   and handles only delivery frames.
 - **Frames:** `hooks`, `hooked`, `delivery`, and `delivered`, unchanged from
-  the relay's existing webhook contract. `hooks` replaces the whole set; the
-  hook ID is `<dag>/<trigger>`.
+  the relay's existing webhook contract. `hooks` replaces the whole set. A
+  hook ID names the trigger by an ID that survives renaming the DAG; the
+  built-in webhook trigger keeps `webhook/<webhook ID>`.
 - **The token is made by the server** (32 random bytes). The relay keeps only
   its SHA-256.
 - **Raw bytes and headers pass through unchanged,** so the server verifies
@@ -283,10 +284,10 @@ public URLs are used.
   only its SHA-256. **New URL** replaces it; requests Dagu Cloud already
   took through the old URL are still delivered. Turning the URL off drops
   them.
-- The hook ID is `<dag>/webhook`, the name this RFC gives the built-in
-  webhook trigger, so URLs survive the move to triggers. Renaming a DAG
-  moves its webhook, so the URL keeps working, but the hook ID changes:
-  anything waiting for it under the old name is dropped.
+- The hook ID is `webhook/<webhook ID>`, so it stays the same when the DAG
+  is renamed: the webhook moves with the DAG, and its URL and anything
+  waiting for it survive the rename. The built-in webhook trigger keeps
+  this ID when triggers arrive, so URLs survive that move too.
 - The local endpoint keeps its token and `X-Dagu-Signature` checks.
 
 ### Sender and events
