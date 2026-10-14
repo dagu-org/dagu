@@ -15,7 +15,6 @@ import { useQuery } from '@/hooks/api';
 import { useDAGSSE } from '@/hooks/useDAGSSE';
 import { whenEnabled } from '@/hooks/queryUtils';
 import { sseFallbackOptions, useSSECacheSync } from '@/hooks/useSSECacheSync';
-import dayjs from '@/lib/dayjs';
 import { shouldIgnoreKeyboardShortcuts } from '@/lib/keyboard-shortcuts';
 import { cn } from '@/lib/utils';
 import LoadingIndicator from '@/components/ui/loading-indicator';
@@ -56,25 +55,6 @@ type Props = {
 };
 
 const CLOSE_ANIMATION_MS = 200;
-
-function formatDuration(startDate: string, endDate: string): string {
-  if (!startDate || !endDate) {
-    return '--';
-  }
-
-  const duration = dayjs.duration(dayjs(endDate).diff(dayjs(startDate)));
-  const hours = Math.floor(duration.asHours());
-  const minutes = duration.minutes();
-  const seconds = duration.seconds();
-
-  if (hours > 0) {
-    return `${hours}h ${minutes}m ${seconds}s`;
-  }
-  if (minutes > 0) {
-    return `${minutes}m ${seconds}s`;
-  }
-  return `${seconds}s`;
-}
 
 function getLoadState(
   data: DAGDetailsResponse | undefined,
@@ -380,7 +360,6 @@ function DAGDetailsSidePanel({
                       dagRunId="latest"
                       stepName={null}
                       refreshFn={refreshFn}
-                      formatDuration={formatDuration}
                       activeTab={activeTab}
                       onTabChange={setActiveTab}
                       isModal={true}

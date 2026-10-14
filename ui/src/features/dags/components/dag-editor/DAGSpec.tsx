@@ -61,6 +61,7 @@ import SpecViewSwitcher from './SpecViewSwitcher';
 import { I18nText } from '@/i18n/I18nText';
 import { I18nProps } from '@/i18n/I18nProps';
 import { useI18n } from '@/i18n/I18nProvider';
+import { useScrollFade } from '@/hooks/useScrollFade';
 
 /** Narrowest spec tab, in pixels, that shows the graph beside the editor. */
 const SPLIT_VIEW_MIN_WIDTH = 1024;
@@ -84,6 +85,7 @@ type Props = {
  * including visualization, attributes, steps, and YAML definition
  */
 function DAGSpec({ fileName, localDags, editorHints }: Props) {
+  const [localTabRowRef, localTabRowFade] = useScrollFade<HTMLDivElement>('x');
   const { ts } = useI18n();
   const remoteNode = useRemoteNode();
   const client = useClient();
@@ -585,7 +587,11 @@ function DAGSpec({ fileName, localDags, editorHints }: Props) {
 
   const localDagTabs = hasLocalDags ? (
     <div className="flex-shrink-0">
-      <div className="overflow-x-auto -mx-2 px-2 scrollbar-thin scrollbar-thumb-gray-300">
+      <div
+        ref={localTabRowRef}
+        style={localTabRowFade}
+        className="overflow-x-auto -mx-2 px-2 scrollbar-thin scrollbar-thumb-gray-300"
+      >
         <Tabs className="w-max min-w-full">
           <Tab
             isActive={activeTab === 'parent'}

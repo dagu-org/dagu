@@ -102,6 +102,7 @@ type Multiplexer struct {
 	fetchers            map[TopicType]FetchFunc
 	refreshModes        map[TopicType]TopicRefreshMode
 	publishOnWake       map[TopicType]bool
+	minIntervals        map[TopicType]time.Duration
 	authorizers         map[TopicType]TopicAuthorizer
 	validators          map[TopicType]TopicValidator
 	maxClients          int
@@ -144,6 +145,7 @@ func NewMultiplexer(cfg StreamConfig, metrics *Metrics) *Multiplexer {
 		fetchers:            make(map[TopicType]FetchFunc),
 		refreshModes:        make(map[TopicType]TopicRefreshMode),
 		publishOnWake:       make(map[TopicType]bool),
+		minIntervals:        make(map[TopicType]time.Duration),
 		authorizers:         make(map[TopicType]TopicAuthorizer),
 		validators:          make(map[TopicType]TopicValidator),
 		maxClients:          cfg.MaxClients,
@@ -188,6 +190,19 @@ func (m *Multiplexer) SetPublishOnWake(topicType TopicType, enabled bool) {
 		return
 	}
 	m.publishOnWake[topicType] = true
+}
+
+// SetMinInterval sets the shortest time between two refetches of a topic of
+// this type. Wakes that arrive sooner are merged into one deferred refetch, so
+// bursts of run events cost one read per interval. Zero removes the limit.
+func (m *Multiplexer) SetMinInterval(topicType TopicType, interval time.Duration) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if interval <= 0 {
+		delete(m.minIntervals, topicType)
+		return
+	}
+	m.minIntervals[topicType] = interval
 }
 
 // RegisterAuthorizer registers an optional topic-specific authorizer.
@@ -627,6 +642,7 @@ func (m *Multiplexer) getOrCreateTopicForMutation(parsed ParsedTopic) (*multiple
 		m.refreshModeFor(parsed.Type),
 		m.shouldPublishOnWake(parsed.Type),
 	)
+	topic.minInterval = m.minIntervals[parsed.Type]
 	m.topics[parsed.Key] = topic
 	return topic, true, nil
 }
@@ -1215,6 +1231,8 @@ type multiplexTopic struct {
 	errorBackoff             backoff.Retrier
 	backoffUntil             time.Time
 	currentInterval          time.Duration
+	minInterval              time.Duration
+	lastPollAt               time.Time
 }
 
 func newMultiplexTopic(
@@ -1320,6 +1338,9 @@ func (t *multiplexTopic) start() {
 		if t.refreshMode == TopicRefreshModePolling {
 			t.resetTimer(timer, &timerCh, 0)
 		}
+		// deferredWake marks a timer that stands in for a wake held back by
+		// the minimum interval.
+		deferredWake := false
 
 		for {
 			select {
@@ -1329,28 +1350,53 @@ func (t *multiplexTopic) start() {
 				return
 			case <-timerCh:
 				timerCh = nil
-				t.poll(false, nil)
+				t.poll(deferredWake && t.publishOnWake, nil)
+				deferredWake = false
 				if delay, shouldRetry := t.nextRetryDelay(); shouldRetry {
 					t.resetTimer(timer, &timerCh, delay)
 					continue
 				}
 				if t.refreshMode == TopicRefreshModePolling {
-					t.resetTimer(timer, &timerCh, t.currentInterval)
+					t.resetTimer(timer, &timerCh, t.pollInterval())
 				}
 			case <-t.notifyCh:
-				t.poll(t.publishOnWake, t.takePendingBatch())
+				batch := t.takePendingBatch()
+				if wait := t.wakeDelay(); wait > 0 {
+					// A pending timer refetches soon enough; otherwise defer
+					// this wake to the end of the interval.
+					if timerCh == nil {
+						t.resetTimer(timer, &timerCh, wait)
+						deferredWake = true
+					}
+					continue
+				}
+				t.poll(t.publishOnWake, batch)
 				if delay, shouldRetry := t.nextRetryDelay(); shouldRetry {
 					t.resetTimer(timer, &timerCh, delay)
 					continue
 				}
 				if t.refreshMode == TopicRefreshModePolling {
-					t.resetTimer(timer, &timerCh, t.currentInterval)
+					t.resetTimer(timer, &timerCh, t.pollInterval())
 					continue
 				}
 				t.stopTimer(timer, &timerCh)
 			}
 		}
 	})
+}
+
+// pollInterval is the polling period, never shorter than the minimum interval.
+func (t *multiplexTopic) pollInterval() time.Duration {
+	return max(t.currentInterval, t.minInterval)
+}
+
+// wakeDelay is how long a wake must wait to respect the minimum interval,
+// which stretches to the adaptive interval when fetches are slow.
+func (t *multiplexTopic) wakeDelay() time.Duration {
+	if t.minInterval <= 0 || t.lastPollAt.IsZero() {
+		return 0
+	}
+	return max(t.minInterval, t.currentInterval) - time.Since(t.lastPollAt)
 }
 
 func (t *multiplexTopic) stop() {
@@ -1411,6 +1457,7 @@ func (t *multiplexTopic) poll(forcePublish bool, batch *persis.DAGRunListReadBat
 	if time.Now().Before(t.backoffUntil) {
 		return
 	}
+	t.lastPollAt = time.Now()
 
 	t.clientsMu.RLock()
 	sessions := make([]*streamSession, 0, len(t.sessions))

@@ -116,7 +116,8 @@ function renderMenu(
   initialEntry = '/cockpit',
   configOverride: Partial<Config> = {},
   appBarOverride: Partial<React.ContextType<typeof AppBarContext>> = {},
-  isOpen = true
+  isOpen = true,
+  hideHeader = false
 ): void {
   render(
     <UserPreferencesProvider>
@@ -140,7 +141,7 @@ function renderMenu(
                 ...appBarOverride,
               }}
             >
-              <MainListItems isOpen={isOpen} />
+              <MainListItems isOpen={isOpen} hideHeader={hideHeader} />
             </AppBarContext.Provider>
           </ConfigContext.Provider>
         </MemoryRouter>
@@ -168,6 +169,16 @@ beforeEach(() => {
 });
 
 describe('sidebar menu', () => {
+  // The mobile drawer has its own title and close button.
+  it('leaves the title and collapse toggle to a container that has its own', () => {
+    renderMenu('/cockpit', {}, {}, true, true);
+
+    expect(
+      screen.queryByRole('button', { name: 'Collapse sidebar' })
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Primary' })).toBeVisible();
+  });
+
   it('localizes shell controls without English wrappers', () => {
     localStorage.setItem(
       'user_preferences',

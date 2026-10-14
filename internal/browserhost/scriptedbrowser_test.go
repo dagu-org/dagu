@@ -4,6 +4,7 @@
 package browserhost_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -34,6 +35,7 @@ type cdpEvent struct {
 type scriptedBrowser struct {
 	server   *httptest.Server
 	script   func(cdpCommand) []cdpEvent
+	refuse   func(cdpCommand) string
 	mu       sync.Mutex
 	commands []cdpCommand
 	conns    []*websocket.Conn
@@ -41,7 +43,14 @@ type scriptedBrowser struct {
 
 func newScriptedBrowser(t *testing.T, script func(cdpCommand) []cdpEvent) *scriptedBrowser {
 	t.Helper()
-	fake := &scriptedBrowser{script: script}
+	return newRefusingBrowser(t, script, nil)
+}
+
+// newRefusingBrowser is a scripted browser that answers the commands refuse
+// returns a message for with that error.
+func newRefusingBrowser(t *testing.T, script func(cdpCommand) []cdpEvent, refuse func(cdpCommand) string) *scriptedBrowser {
+	t.Helper()
+	fake := &scriptedBrowser{script: script, refuse: refuse}
 	fake.server = httptest.NewServer(http.HandlerFunc(fake.serve))
 	t.Cleanup(fake.server.Close)
 	return fake
@@ -81,10 +90,37 @@ func (f *scriptedBrowser) serve(w http.ResponseWriter, r *http.Request) {
 		f.mu.Lock()
 		f.commands = append(f.commands, command.cdpCommand)
 		f.mu.Unlock()
-		send(map[string]any{"id": command.ID, "sessionId": command.SessionID, "result": map[string]any{}})
-		for _, event := range f.script(command.cdpCommand) {
+		reply := map[string]any{"id": command.ID, "sessionId": command.SessionID, "result": map[string]any{}}
+		if f.refuse != nil {
+			if message := f.refuse(command.cdpCommand); message != "" {
+				reply = map[string]any{"id": command.ID, "sessionId": command.SessionID, "error": map[string]any{"code": -32000, "message": message}}
+			}
+		}
+		events := f.script(command.cdpCommand)
+		// Chrome reports the targets an auto-attach request attaches to
+		// before it answers the request.
+		if command.Method == "Target.setAutoAttach" {
+			for _, event := range events {
+				send(event)
+			}
+			send(reply)
+			continue
+		}
+		send(reply)
+		for _, event := range events {
 			send(event)
 		}
+	}
+}
+
+// emit sends event on every DevTools connection, as a browser reports what
+// no command caused, such as a page opening a file picker.
+func (f *scriptedBrowser) emit(event cdpEvent) {
+	data, _ := json.Marshal(event)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, conn := range f.conns {
+		_ = conn.Write(context.Background(), websocket.MessageText, data)
 	}
 }
 

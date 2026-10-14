@@ -24,6 +24,9 @@ type DAGRunStore interface {
 	CreateAttempt(ctx context.Context, req DAGRunCreateAttemptRequest) (dagrun.Attempt, error)
 	RecentStatuses(ctx context.Context, name string, limit int) ([]ir.DAGRunStatus, error)
 	LatestAttempt(ctx context.Context, query DAGRunLatestAttemptQuery) (dagrun.Attempt, error)
+	// LatestStatuses returns the status of each DAG's newest run when that
+	// run was created at or after NotBefore and matches the query's filters.
+	LatestStatuses(ctx context.Context, query DAGRunLatestStatusesQuery) ([]*ir.DAGRunStatus, error)
 	QueryStatuses(ctx context.Context, query DAGRunStatusQuery) (DAGRunStatusPage, error)
 	CompareAndSwapLatestAttemptStatus(ctx context.Context, req DAGRunCompareAndSwapStatusRequest) (*ir.DAGRunStatus, bool, error)
 	FindAttempt(ctx context.Context, ref ir.DAGRunRef) (dagrun.Attempt, error)
@@ -71,6 +74,13 @@ type DAGRunCreateAttemptRequest struct {
 type DAGRunLatestAttemptQuery struct {
 	Name      string
 	NotBefore TimeInUTC
+}
+
+// DAGRunLatestStatusesQuery selects the newest run of every DAG.
+type DAGRunLatestStatusesQuery struct {
+	NotBefore       TimeInUTC
+	Labels          []string
+	WorkspaceFilter *workspace.WorkspaceFilter
 }
 
 // DAGRunCompareAndSwapStatusRequest describes an atomic latest-attempt status update.

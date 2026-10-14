@@ -51,22 +51,7 @@ import { CreateDAGModal, DAGPagination } from '../common';
 import DAGActions from '../common/DAGActions';
 import LiveSwitch from '../common/LiveSwitch';
 import PinToggle from '../common/PinToggle';
-
-// Helper to format milliseconds into d/h/m/s
-function formatMs(ms: number): string {
-  const seconds = Math.floor(ms / 1000);
-  const days = Math.floor(seconds / 86400);
-  const hours = Math.floor((seconds % 86400) / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = seconds % 60;
-  const parts: string[] = [];
-  if (days > 0) parts.push(`${days}d`);
-  if (hours > 0) parts.push(`${hours}h`);
-  if (minutes > 0) parts.push(`${minutes}m`);
-  // Only show seconds if no larger units or if seconds > 0
-  if (secs > 0 || parts.length === 0) parts.push(`${secs}s`);
-  return parts.join(' ');
-}
+import { formatDurationMs } from '@/lib/formatDuration';
 
 // Import shadcn/ui components
 import { PanelWidthContext } from '../../../../components/SplitLayout';
@@ -303,7 +288,7 @@ function DAGCard({
                 }
                 return (
                   <span>
-                    <I18nText text={'Run in'} /> {formatMs(ms)}
+                    <I18nText text={'Run in'} /> {formatDurationMs(ms)}
                   </span>
                 );
               }}
@@ -867,7 +852,7 @@ const defaultColumns = [
           if (durationMs > 0) {
             durationContent = (
               <div className="text-xs text-muted-foreground">
-                {formatMs(durationMs)}
+                {formatDurationMs(durationMs)}
               </div>
             );
           }
@@ -957,7 +942,7 @@ const defaultColumns = [
                   }
                   return (
                     <span>
-                      <I18nText text={'Run in'} /> {formatMs(ms)}
+                      <I18nText text={'Run in'} /> {formatDurationMs(ms)}
                     </span>
                   );
                 }}

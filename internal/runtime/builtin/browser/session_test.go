@@ -517,3 +517,73 @@ func TestSessionModelReadsItsKeyFromTheEnvironment(t *testing.T) {
 	defer mu.Unlock()
 	assert.Equal(t, "Bearer sk-session-1234", authorization)
 }
+
+// An upload into an element the outline names runs without the model and
+// is kept as the upload a step writes, into the element in words, with its
+// action as the recording. An upload into words asks the model.
+func TestSessionUploads(t *testing.T) {
+	t.Parallel()
+
+	files := writeFiles(t, t.TempDir(), "invoice.pdf")
+	ts := newTestSessions(t, pageModel(nil))
+	ts.engine.snapshot = uploadPage("Upload receipt")
+	opened := ts.open(SessionOptions{URL: "https://books.example.com/receipts", LLM: testModel})
+
+	input, err := json.Marshal(map[string]any{"upload": map[string]any{"into": "[0-5]", "files": files[0]}, "timeout": "30s"})
+	require.NoError(t, err)
+	result, err := ts.do(opened.ID, string(input))
+	require.NoError(t, err)
+	assert.Equal(t, opUpload, result.Kind)
+	assert.Equal(t, `the "Upload receipt" button`, result.Into)
+	assert.True(t, result.Recorded)
+	assert.Equal(t, []SessionAction{{Selector: "xpath=/html/body/button", Description: `button "Upload receipt"`, Method: uploadMethod}}, result.Actions)
+	assert.Contains(t, result.Detail, "invoice.pdf into xpath=/html/body/button")
+	assert.Zero(t, ts.provider.callCount(), "an element upload asks no model")
+	op, err := json.Marshal(map[string]any{"upload": map[string]any{"files": files[0], "into": `the "Upload receipt" button`}, "timeout": "30s"})
+	require.NoError(t, err)
+	assert.JSONEq(t, string(op), string(ts.state(opened.ID).Ops[0].Op))
+
+	input, err = json.Marshal(map[string]any{"upload": map[string]any{"into": "the receipt box", "files": files}})
+	require.NoError(t, err)
+	result, err = ts.do(opened.ID, string(input))
+	require.NoError(t, err)
+	assert.Empty(t, result.Into)
+	assert.True(t, result.Recorded)
+	assert.Equal(t, 1, ts.provider.callCount())
+	assert.Equal(t, []fakeUpload{
+		{selector: "xpath=/html/body/button", paths: files},
+		{selector: "xpath=/html/body/button", paths: files},
+	}, ts.engine.uploaded())
+
+	_, err = ts.do(opened.ID, `{"upload": {"into": "0-5", "files": "invoice.pdf", "cache": false}}`)
+	assert.Equal(t, CodeInvalidInput, sessionCode(err))
+	assert.ErrorContains(t, err, "an upload into an element by its ID replays that element, so it takes no cache")
+
+	_, err = ts.do(opened.ID, `{"upload": {"into": "0-6", "files": "invoice.pdf"}}`)
+	require.Error(t, err)
+	assert.Equal(t, CodeInvalidInput, sessionCode(err))
+	assert.ErrorContains(t, err, "element 0-6 has no name a step could find it by again; describe it in into, or leave into out when it is the page's only file input")
+}
+
+// A session without a model uploads into the page's only file input and
+// into elements by ID, and refuses an upload into words.
+func TestSessionUploadsWithoutModel(t *testing.T) {
+	t.Parallel()
+
+	files := writeFiles(t, t.TempDir(), "invoice.pdf")
+	ts := newTestSessions(t, pageModel(nil))
+	ts.engine.snapshot = uploadPage("Upload receipt")
+	opened := ts.open(SessionOptions{URL: "https://books.example.com/receipts"})
+
+	for _, upload := range []map[string]any{{"files": files}, {"files": files, "into": "0-5"}} {
+		input, err := json.Marshal(map[string]any{"upload": upload})
+		require.NoError(t, err)
+		_, err = ts.do(opened.ID, string(input))
+		require.NoError(t, err)
+	}
+	input, err := json.Marshal(map[string]any{"upload": map[string]any{"files": files, "into": "the receipt box"}})
+	require.NoError(t, err)
+	_, err = ts.do(opened.ID, string(input))
+	assert.Equal(t, CodeModelRequired, sessionCode(err))
+	assert.Len(t, ts.engine.uploaded(), 2)
+}

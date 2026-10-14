@@ -513,6 +513,131 @@ describe('DAGStatus', () => {
     ).not.toBeInTheDocument();
   });
 
+  describe('URL state', () => {
+    function urlStateView(
+      selectedRun: components['schemas']['DAGRunDetails'],
+      props: Partial<React.ComponentProps<typeof DAGStatus>>
+    ) {
+      return (
+        <MemoryRouter>
+          <AppBarContext.Provider value={appBarValue}>
+            <DAGContext.Provider
+              value={{
+                refresh: vi.fn(),
+                name: selectedRun.name,
+                fileName: 'example.yaml',
+              }}
+            >
+              <DAGStatus
+                dagRun={selectedRun}
+                fileName="example.yaml"
+                {...props}
+              />
+            </DAGContext.Provider>
+          </AppBarContext.Provider>
+        </MemoryRouter>
+      );
+    }
+
+    function renderWithURLState(
+      selectedRun: components['schemas']['DAGRunDetails'],
+      props: Partial<React.ComponentProps<typeof DAGStatus>>
+    ) {
+      vi.mocked(useClient).mockReturnValue({
+        PATCH: patchMock,
+      } as unknown as ReturnType<typeof useClient>);
+      return render(urlStateView(selectedRun, props));
+    }
+
+    // Writing an automatic switch into the URL would pin it there, so a
+    // later visit could not surface a newer action.
+    it('reports tabs the user picks but not automatic switches', () => {
+      const onTabSelect = vi.fn();
+      renderWithURLState(waitingHumanTaskRun('run-1'), { onTabSelect });
+
+      expect(screen.getByText('Human task panel')).toBeVisible();
+      expect(onTabSelect).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Outputs' }));
+      expect(onTabSelect).toHaveBeenCalledWith('outputs');
+    });
+
+    it('opens the details of a step named on load and reports closing them', async () => {
+      const onStepSelect = vi.fn();
+      renderWithURLState(dagRun, { initialStepName: 'step', onStepSelect });
+
+      const drawer = await screen.findByRole('dialog', { name: 'step' });
+      expect(drawer).toBeVisible();
+
+      fireEvent.keyDown(drawer, { key: 'Escape' });
+      expect(onStepSelect).toHaveBeenLastCalledWith(undefined);
+    });
+
+    // A link to a step outranks the switch to a waiting action.
+    it('keeps a step named on load open on a run that waits for action', async () => {
+      renderWithURLState(waitingHumanTaskRun('run-1'), {
+        initialStepName: 'step',
+      });
+
+      expect(await screen.findByRole('dialog', { name: 'step' })).toBeVisible();
+      expect(screen.queryByText('Human task panel')).not.toBeInTheDocument();
+    });
+
+    it('follows the tab and step when the URL changes', async () => {
+      const { rerender } = renderWithURLState(dagRun, {
+        initialTab: 'outputs',
+      });
+      expect(screen.getByText('Outputs panel')).toBeVisible();
+
+      rerender(urlStateView(dagRun, { initialStepName: 'step' }));
+      expect(await screen.findByRole('dialog', { name: 'step' })).toBeVisible();
+
+      rerender(urlStateView(dagRun, {}));
+      await waitFor(() =>
+        expect(
+          screen.queryByRole('dialog', { name: 'step' })
+        ).not.toBeInTheDocument()
+      );
+    });
+
+    // The page stays mounted when the URL moves to another run, so a step
+    // closed on one run must open again on the next run that names it.
+    it('opens the named step again on another run', async () => {
+      const { rerender } = renderWithURLState(dagRun, {
+        initialStepName: 'step',
+      });
+      fireEvent.keyDown(await screen.findByRole('dialog', { name: 'step' }), {
+        key: 'Escape',
+      });
+      await waitFor(() =>
+        expect(
+          screen.queryByRole('dialog', { name: 'step' })
+        ).not.toBeInTheDocument()
+      );
+
+      rerender(
+        urlStateView(
+          { ...dagRun, dagRunId: 'run-2' },
+          { initialStepName: 'step' }
+        )
+      );
+
+      expect(await screen.findByRole('dialog', { name: 'step' })).toBeVisible();
+    });
+
+    it('reports a step opened from the graph', async () => {
+      const onStepSelect = vi.fn();
+      renderWithURLState(dagRun, { onStepSelect });
+
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Open step details' })
+      );
+
+      expect(await screen.findByRole('dialog', { name: 'step' })).toBeVisible();
+      expect(onStepSelect).toHaveBeenCalledWith('step');
+    });
+  });
+
   it('shows the failure and opens stderr from the step drawer', async () => {
     const failedRun = {
       ...dagRun,
@@ -719,6 +844,51 @@ describe('DAGStatus', () => {
       screen.getByText(`Graph status: ${NodeStatus.Success}`)
     ).toBeInTheDocument();
     expect(refresh).not.toHaveBeenCalled();
+  });
+
+  describe('summary', () => {
+    function renderSummary(
+      selectedRun: components['schemas']['DAGRunDetails']
+    ) {
+      return render(
+        <MemoryRouter>
+          <AppBarContext.Provider value={appBarValue}>
+            <DAGContext.Provider
+              value={{
+                refresh: vi.fn(),
+                name: selectedRun.name,
+                fileName: 'example.yaml',
+              }}
+            >
+              <DAGStatus dagRun={selectedRun} fileName="example.yaml" summary />
+            </DAGContext.Provider>
+          </AppBarContext.Provider>
+        </MemoryRouter>
+      );
+    }
+
+    it('shows the run status without run tabs and links to the run page', () => {
+      renderSummary(dagRun);
+
+      expect(
+        screen.queryByRole('button', { name: 'Outputs' })
+      ).not.toBeInTheDocument();
+      expect(screen.getByText('Node status table')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /Open run/ })).toHaveAttribute(
+        'href',
+        `/dag-runs/${dagRun.name}/${dagRun.dagRunId}?remoteNode=local`
+      );
+    });
+
+    // Answering a human task must not require leaving the workflow page.
+    it('keeps a waiting human task on the page instead of switching tabs', () => {
+      renderSummary(waitingHumanTaskRun('run-1'));
+
+      expect(
+        screen.getByRole('region', { name: 'Action required' })
+      ).toHaveTextContent('Human task panel');
+      expect(screen.getByText('Node status table')).toBeInTheDocument();
+    });
   });
 
   it('passes the DAG run name to the approval tab when fileName differs', () => {

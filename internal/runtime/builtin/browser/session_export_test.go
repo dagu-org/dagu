@@ -230,3 +230,33 @@ func TestExportedStepAsYAML(t *testing.T) {
         text: Orders
 `, string(text))
 }
+
+// An exported upload replays the element the session uploaded into, and the
+// export says the files are the ones the session was given.
+func TestExportedStepReplaysUploads(t *testing.T) {
+	t.Parallel()
+
+	files := writeFiles(t, t.TempDir(), "invoice.pdf")
+	ts := newTestSessions(t, pageModel(nil))
+	ts.engine.snapshot = uploadPage("Upload receipt")
+	opened := ts.open(SessionOptions{URL: "https://books.example.com/receipts", LLM: testModel})
+	input, err := json.Marshal(map[string]any{"upload": map[string]any{"into": "0-5", "files": files[0]}})
+	require.NoError(t, err)
+	_, err = ts.do(opened.ID, string(input))
+	require.NoError(t, err)
+
+	exported, err := ts.sessions.Export(ts.context(), ExportRequest{ID: opened.ID, DAG: "orders", Step: "shop"})
+	require.NoError(t, err)
+	assert.Equal(t, []ExportedOperation{{SessionIndex: 0, Index: 0, Kind: opUpload, Recorded: true}}, exported.Ops)
+	assert.Equal(t, 1, exported.Recordings)
+	assert.Equal(t, []string{"operation 0 uploads " + files[0] + ", the files the session was given; give the step the files each run uploads, such as an earlier step's output"}, exported.Warnings)
+
+	require.NoError(t, ts.sessions.Close(ts.context(), CloseRequest{ID: opened.ID}))
+	run := newTestRun(t, pageModel(nil))
+	run.dataDir = ts.dataDir
+	run.engine.snapshot = uploadPage("Upload receipt")
+	execution := run.execute(string(mustJSON(t, exported.Step.With)), nil)
+	require.NoError(t, execution.err, execution.stderr.String())
+	assert.Zero(t, run.provider.callCount(), "the upload replays the session's recording")
+	assert.Equal(t, []string{"goto:completed", "upload:cache-hit"}, eventNames(execution.exec.GetAgentSession()))
+}

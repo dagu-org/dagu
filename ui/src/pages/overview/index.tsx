@@ -6,8 +6,9 @@ import { useCanWrite, useCanWriteForWorkspace } from '@/contexts/AuthContext';
 import { ViewEditorDialog } from '@/features/views/ViewEditorDialog';
 import { ViewPanel } from '@/features/views/ViewPanel';
 import { View, useViews } from '@/hooks/useViews';
-import { Clock3, Gauge, LayoutGrid, Pencil, Plus } from 'lucide-react';
+import { Activity, Gauge, LayoutGrid, Pencil, Plus } from 'lucide-react';
 import React from 'react';
+import { useScrollFade } from '@/hooks/useScrollFade';
 import Dashboard from '..';
 import CockpitPage from '../cockpit';
 import { I18nProps } from '@/i18n/I18nProps';
@@ -70,6 +71,7 @@ export default function OverviewPage({
   );
   const [editorOpen, setEditorOpen] = React.useState(false);
   const [editingView, setEditingView] = React.useState<View | null>(null);
+  const [tabRowRef, tabRowFade] = useScrollFade<HTMLDivElement>('x');
 
   React.useEffect(() => {
     if (initialTab) {
@@ -142,7 +144,11 @@ export default function OverviewPage({
       <h1 className="sr-only">
         <I18nText text={'Overview'} />
       </h1>
-      <div className="mb-3 flex shrink-0 items-center overflow-x-auto border-b border-border">
+      <div
+        ref={tabRowRef}
+        style={tabRowFade}
+        className="mb-3 flex shrink-0 items-center overflow-x-auto border-b border-border"
+      >
       <I18nProps><Tabs
         role="tablist"
         aria-label="Overview views"
@@ -157,8 +163,8 @@ export default function OverviewPage({
           onClick={() => setActiveTab('timeline')}
           className="cursor-pointer gap-2"
         >
-          <Clock3 className="h-4 w-4" />
-          <I18nText text={"Timeline"} />
+          <Activity className="h-4 w-4" />
+          <I18nText text={"Activity"} />
         </Tab>
         <Tab
           id={tabElementId('cockpit')}

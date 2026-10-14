@@ -24,6 +24,7 @@ const executorType = ir.ExecutorTypeBrowser
 const (
 	opGoto       = "goto"
 	opAct        = "act"
+	opUpload     = "upload"
 	opExtract    = "extract"
 	opExpect     = "expect"
 	opWait       = "wait"
@@ -84,6 +85,7 @@ type viewport struct {
 type operation struct {
 	Goto       string       `json:"goto,omitempty"`
 	Act        *actSpec     `json:"act,omitempty"`
+	Upload     *uploadSpec  `json:"upload,omitempty"`
 	Extract    *extractSpec `json:"extract,omitempty"`
 	Expect     *condition   `json:"expect,omitempty"`
 	Wait       *waitSpec    `json:"wait,omitempty"`
@@ -96,6 +98,43 @@ type operation struct {
 type actSpec struct {
 	Instruction string `json:"instruction"`
 	Cache       *bool  `json:"cache,omitempty"`
+}
+
+// uploadSpec gives files to a file input of the page.
+type uploadSpec struct {
+	Files uploadFiles `json:"files"`
+	// Into describes the file input, or the button or area that opens the
+	// file picker; empty means the page's only file input.
+	Into  string `json:"into,omitempty"`
+	Cache *bool  `json:"cache,omitempty"`
+}
+
+// uploadFiles are the entries of upload.files, each naming one file or
+// several.
+type uploadFiles []string
+
+// UnmarshalJSON accepts one entry or a list of them.
+func (f *uploadFiles) UnmarshalJSON(data []byte) error {
+	var entry string
+	if err := json.Unmarshal(data, &entry); err == nil {
+		*f = uploadFiles{entry}
+		return nil
+	}
+	var entries []string
+	if err := json.Unmarshal(data, &entries); err != nil {
+		return err
+	}
+	*f = entries
+	return nil
+}
+
+// MarshalJSON writes a single entry as a string, the form it is usually
+// written in.
+func (f uploadFiles) MarshalJSON() ([]byte, error) {
+	if len(f) == 1 {
+		return json.Marshal(f[0])
+	}
+	return json.Marshal([]string(f))
 }
 
 type extractSpec struct {
@@ -142,6 +181,8 @@ func (o operation) kind() string {
 		return opGoto
 	case o.Act != nil:
 		return opAct
+	case o.Upload != nil:
+		return opUpload
 	case o.Extract != nil:
 		return opExtract
 	case o.Expect != nil:
@@ -175,6 +216,8 @@ func (o operation) promptTexts() []string {
 	switch {
 	case o.Act != nil:
 		texts = append(texts, o.Act.Instruction)
+	case o.Upload != nil && o.Upload.Into != "":
+		texts = append(texts, o.Upload.Into)
 	case o.Extract != nil:
 		texts = append(texts, o.Extract.Instruction)
 	case o.Expect != nil && o.Expect.judged():
@@ -321,7 +364,7 @@ func (c config) validate() error {
 
 func (o operation) validate() error {
 	if o.kind() == "" {
-		return errors.New("operation must set one of goto, act, extract, expect, wait, screenshot, or ask")
+		return errors.New("operation must set one of goto, act, upload, extract, expect, wait, screenshot, or ask")
 	}
 	if err := agentstep.ValidateDuration("timeout", o.Timeout); err != nil {
 		return err
@@ -339,6 +382,18 @@ func (o operation) validate() error {
 	case o.Act != nil:
 		if strings.TrimSpace(o.Act.Instruction) == "" {
 			return errors.New("act instruction must not be empty")
+		}
+	case o.Upload != nil:
+		if len(o.Upload.Files) == 0 {
+			return errors.New("upload must name at least one file")
+		}
+		for _, entry := range o.Upload.Files {
+			if strings.TrimSpace(entry) == "" {
+				return errors.New("upload files must not be empty")
+			}
+		}
+		if o.Upload.Into != "" && strings.TrimSpace(o.Upload.Into) == "" {
+			return errors.New("upload into must not be blank")
 		}
 	case o.Extract != nil:
 		if strings.TrimSpace(o.Extract.Instruction) == "" {
@@ -410,6 +465,19 @@ var operationSchema = &jsonschema.Schema{
 				"cache":       {Type: "boolean"},
 			},
 		},
+		opUpload: {
+			Type:                 "object",
+			AdditionalProperties: agentstep.NoExtraProperties(),
+			Required:             []string{"files"},
+			Properties: map[string]*jsonschema.Schema{
+				"files": {AnyOf: []*jsonschema.Schema{
+					agentstep.NonEmptyString(),
+					{Type: "array", MinItems: new(1), Items: agentstep.NonEmptyString()},
+				}},
+				"into":  agentstep.NonEmptyString(),
+				"cache": {Type: "boolean"},
+			},
+		},
 		opExtract: {
 			Type:                 "object",
 			AdditionalProperties: agentstep.NoExtraProperties(),
@@ -445,6 +513,7 @@ var operationSchema = &jsonschema.Schema{
 	OneOf: []*jsonschema.Schema{
 		{Required: []string{opGoto}},
 		{Required: []string{opAct}},
+		{Required: []string{opUpload}},
 		{Required: []string{opExtract}},
 		{Required: []string{opExpect}},
 		{Required: []string{opWait}},

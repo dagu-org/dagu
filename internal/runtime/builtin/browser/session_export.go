@@ -43,7 +43,7 @@ type ExportResult struct {
 	Step ExportedStep `json:"step"`
 	// CacheFile is where the recordings were written; empty on a dry run.
 	CacheFile string `json:"cache_file,omitempty"`
-	// Recordings counts the acts a first run replays.
+	// Recordings counts the acts and uploads a first run replays.
 	Recordings int `json:"recordings"`
 	// Ops maps each operation of the step to the session's history.
 	Ops []ExportedOperation `json:"ops"`
@@ -84,7 +84,7 @@ type ExportedOperation struct {
 	SessionIndex int    `json:"session_index"`
 	Index        int    `json:"index"`
 	Kind         string `json:"kind"`
-	// Recorded reports that the step's first run replays the act.
+	// Recorded reports that the step's first run replays the act or upload.
 	Recorded bool `json:"recorded"`
 }
 
@@ -215,6 +215,9 @@ func exportStep(state sessionState, req ExportRequest) (*exportedSession, error)
 		exported.step.With.Do = append(exported.step.With.Do, entry.Op)
 		exported.sessionIndex = append(exported.sessionIndex, sessionIndex)
 		item := ExportedOperation{SessionIndex: sessionIndex, Index: index, Kind: entry.Kind}
+		// key is where the step's replay cache keeps what the operation did,
+		// and what names it in a warning.
+		key, what := "", ""
 		if op.Act != nil {
 			for _, name := range entry.Variables {
 				used[name] = true
@@ -222,18 +225,26 @@ func exportStep(state sessionState, req ExportRequest) (*exportedSession, error)
 			if strings.Contains(op.Act.Instruction, "$") {
 				exported.warnf("operation %d's instruction holds $, which a step may fill in from its parameters before acting, so the first run may ask the model for it", sessionIndex)
 			}
-			switch {
-			case entry.Status != OperationDone:
-				// A skipped act has nothing to replay.
-			case !entry.Recordable:
-				exported.warnf("operation %d (act %q) has no recording, so every run asks the model for it", sessionIndex, op.Act.Instruction)
-			default:
-				exported.recordings[replayKey(index, op.Act.Instruction, entry.URLBefore)] = entry.Actions
-				item.Recorded = true
-				if previous != "" && pagePath(previous) != pagePath(entry.URLBefore) {
-					exported.warnf("the page changed from %s to %s before operation %d outside the exported operations, so the first run may ask the model for it; an expect: {url: ...} before it makes the step wait for that page",
-						previous, entry.URLBefore, sessionIndex)
-				}
+			key, what = replayKey(index, op.Act.Instruction, entry.URLBefore), fmt.Sprintf("act %q", op.Act.Instruction)
+		}
+		if op.Upload != nil {
+			exported.warnf("operation %d uploads %s, the files the session was given; give the step the files each run uploads, such as an earlier step's output",
+				sessionIndex, strings.Join(op.Upload.Files, ", "))
+			if op.Upload.Into != "" {
+				key, what = uploadReplayKey(index, op.Upload.Into, entry.URLBefore), fmt.Sprintf("upload into %q", op.Upload.Into)
+			}
+		}
+		switch {
+		case key == "", entry.Status != OperationDone:
+			// A skipped operation has nothing to replay.
+		case !entry.Recordable:
+			exported.warnf("operation %d (%s) has no recording, so every run asks the model for it", sessionIndex, what)
+		default:
+			exported.recordings[key] = entry.Actions
+			item.Recorded = true
+			if previous != "" && pagePath(previous) != pagePath(entry.URLBefore) {
+				exported.warnf("the page changed from %s to %s before operation %d outside the exported operations, so the first run may ask the model for it; an expect: {url: ...} before it makes the step wait for that page",
+					previous, entry.URLBefore, sessionIndex)
 			}
 		}
 		if entry.URLAfter != "" {
