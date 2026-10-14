@@ -726,6 +726,12 @@ func (a *Agent) Run(ctx context.Context) (runErr error) {
 		return err
 	}
 
+	stepParams, payloadFileEnv, cleanupPayload, err := webhookPayload(a.dag.Params)
+	if err != nil {
+		return err
+	}
+	defer cleanupPayload()
+
 	contextOpts := []runtime.ContextOption{
 		runtime.WithDAGLoader(dagLoader),
 		runtime.WithRunStateStore(a.runStateStore),
@@ -738,7 +744,7 @@ func (a *Agent) Run(ctx context.Context) (runErr error) {
 		runtime.WithTriggerType(a.triggerType),
 		runtime.WithTriggerActor(a.triggerActor),
 		runtime.WithRunStartedAt(contextTimeString(a.plan.StartAt())),
-		runtime.WithParams(a.dag.Params),
+		runtime.WithParams(stepParams),
 		runtime.WithRuntimeProfileValues(
 			profileValues.defaultEnvs,
 			profileValues.defaultSecrets,
@@ -754,6 +760,9 @@ func (a *Agent) Run(ctx context.Context) (runErr error) {
 	}
 	if len(a.extraEnvs) > 0 {
 		contextOpts = append(contextOpts, runtime.WithEnvVars(a.extraEnvs...))
+	}
+	if payloadFileEnv != "" {
+		contextOpts = append(contextOpts, runtime.WithEnvVars(payloadFileEnv))
 	}
 	if len(a.inheritedEnvs) > 0 {
 		contextOpts = append(contextOpts, runtime.WithInheritedEnvs(a.inheritedEnvs))
