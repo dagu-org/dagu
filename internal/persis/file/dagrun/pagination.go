@@ -201,6 +201,8 @@ type lazyDay struct {
 	// pos is the end of the entries not read yet.
 	pos  int
 	runs int
+	// index lists finished runs without reading their statuses.
+	index *dagrunindex.DayIndex
 	// before is the creation time of the last group handled. Falling back to
 	// a whole-day read takes only the runs created before it.
 	before   time.Time
@@ -309,7 +311,13 @@ func (it *dagRunStatusIterator) Next(ctx context.Context) (*dagRunListItem, erro
 		}
 
 		if runs := countDAGRunDirs(entries); it.readsLazily(runs) {
-			it.day = &lazyDay{path: dayPath, entries: entries, pos: len(entries), runs: runs}
+			it.day = &lazyDay{
+				path:    dayPath,
+				entries: entries,
+				pos:     len(entries),
+				runs:    runs,
+				index:   dagrunindex.NewDayIndex(dayPath, runs/it.store.listTuning.resolveShare),
+			}
 			continue
 		}
 		items, err := it.loadDay(ctx, dayPath, entries, time.Time{})
@@ -394,6 +402,9 @@ func (it *dagRunStatusIterator) nextLazyGroup(ctx context.Context) ([]dagRunList
 
 		items := make([]dagRunListItem, 0, len(runs))
 		for _, run := range runs {
+			if entry, ok := day.index.Lookup(filepath.Base(run.baseDir), run.timestamp); ok {
+				run.summary = summaryFromIndexEntry(entry)
+			}
 			if item, ok := it.toListItem(ctx, run); ok {
 				items = append(items, item)
 			}

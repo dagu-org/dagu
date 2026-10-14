@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagucloud/dagu/v2/internal/cmn/fileutil"
 	"github.com/dagucloud/dagu/v2/internal/ir"
 	"github.com/dagucloud/dagu/v2/internal/persis"
 	"github.com/dagucloud/dagu/v2/internal/workspace"
@@ -251,6 +252,40 @@ func TestQueryStatusesMatchesOracle(t *testing.T) {
 			}
 		}
 	}
+}
+
+// A lazy read lists finished runs from the day's index, so a page of them
+// reads no status from disk.
+func TestQueryStatusesLazyReadUsesIndex(t *testing.T) {
+	th := setupTestRepository(t)
+	base := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
+	dag := &ir.DAG{Name: "indexed"}
+	for i := range 40 {
+		attempt, err := th.Backend.CreateAttempt(th.Context, persis.DAGRunCreateAttemptRequest{
+			DAG:       dag,
+			Timestamp: base.Add(time.Duration(i) * time.Minute),
+			DAGRunID:  fmt.Sprintf("run-%02d", i),
+		})
+		require.NoError(t, err)
+		require.NoError(t, attempt.Open(th.Context))
+		status := ir.InitialStatus(dag)
+		status.DAGRunID = fmt.Sprintf("run-%02d", i)
+		status.AttemptID = attempt.ID()
+		status.Status = ir.Succeeded
+		require.NoError(t, attempt.Write(th.Context, status))
+		require.NoError(t, attempt.Close(th.Context))
+	}
+	// Reading the day whole writes its index.
+	listAll(t, th.Backend, persis.DAGRunStatusQuery{})
+
+	cache := fileutil.NewCache[*ir.DAGRunStatus]("test", 100, time.Hour)
+	store := NewStore(th.TmpDir, WithHistoryFileCache(cache))
+	store.listTuning = statusListTuning{minDayRuns: 1, resolveShare: 1, rejectFloor: math.MaxInt, rejectRatio: 1}
+	page, err := store.QueryStatuses(th.Context, persis.DAGRunStatusQuery{Limit: 10})
+	require.NoError(t, err)
+	require.Len(t, page.Items, 10)
+	require.Equal(t, "run-39", page.Items[0].DAGRunID)
+	require.Zero(t, cache.Size())
 }
 
 type fakeDirEntry struct {
