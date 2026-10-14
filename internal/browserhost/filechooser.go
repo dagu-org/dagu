@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -17,6 +19,10 @@ import (
 
 // fileChooserSingle is the mode of a file picker that takes one file.
 const fileChooserSingle = "selectSingle"
+
+// closedTargetMarkers are the texts by which the browser refuses a command
+// sent to a target that closed, which then opens no picker.
+var closedTargetMarkers = []string{"Session with given id not found", "No target with given id", "Target closed"}
 
 // ErrNoFileChooser reports that no file picker opened.
 var ErrNoFileChooser = errors.New("no file picker opened")
@@ -138,10 +144,13 @@ func (c *chooserConn) command(ctx context.Context, sessionID, method string, par
 // read handles the connection's replies and events until it closes. The
 // browser reports the targets an auto-attach request attaches to before it
 // answers the request, so once that answer and those of the commands arming
-// each target are in, every page and frame open then intercepts its pickers.
+// each target are in, every page and frame open then intercepts its pickers,
+// or ready says why one does not.
 func (c *chooserConn) read(ctx context.Context) {
-	// arming holds the unanswered commands that arm attached targets.
-	arming := map[int64]bool{}
+	// arming holds the method of each unanswered command that arms an
+	// attached target, and armErr what kept a target from being armed.
+	arming := map[int64]string{}
+	var armErr error
 	rootAnswered, readySent := false, false
 	signal := func(err error) {
 		if !readySent {
@@ -178,9 +187,12 @@ func (c *chooserConn) read(ctx context.Context) {
 					signal(fmt.Errorf("Target.setAutoAttach: %w", replyErr))
 				}
 				rootAnswered = true
-			case arming[message.ID]:
-				// A target that closed meanwhile cannot be armed and opens
-				// no picker.
+			case arming[message.ID] != "":
+				// A target that closed meanwhile cannot be armed, and opens
+				// no picker either.
+				if replyErr != nil && !targetClosed(replyErr) {
+					armErr = errors.Join(armErr, fmt.Errorf("%s: %w", arming[message.ID], replyErr))
+				}
 				delete(arming, message.ID)
 			default:
 				c.mu.Lock()
@@ -215,7 +227,7 @@ func (c *chooserConn) read(ctx context.Context) {
 				{"Target.setAutoAttach", autoAttachParams()},
 			} {
 				id := c.lastID.Add(1)
-				arming[id] = true
+				arming[id] = command.method
 				_ = writeCommand(ctx, c.conn, id, event.SessionID, command.method, command.params)
 			}
 		case message.Method == "Page.fileChooserOpened":
@@ -232,7 +244,13 @@ func (c *chooserConn) read(ctx context.Context) {
 			}
 		}
 		if rootAnswered && len(arming) == 0 {
-			signal(nil)
+			signal(armErr)
 		}
 	}
+}
+
+// targetClosed reports whether err refuses a command because its target
+// closed.
+func targetClosed(err error) bool {
+	return slices.ContainsFunc(closedTargetMarkers, func(marker string) bool { return strings.Contains(err.Error(), marker) })
 }

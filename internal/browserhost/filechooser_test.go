@@ -81,6 +81,41 @@ func TestChooseFilesRefusesSeveralFilesForASingleFilePicker(t *testing.T) {
 	assert.Empty(t, fake.received("DOM.setFileInputFiles"), "no file is given")
 }
 
+// A target that cannot be armed fails before the click, unless it closed
+// meanwhile, since a closed target opens no picker.
+func TestChooseFilesReportsATargetThatCannotIntercept(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name, refusal string
+		opens         bool
+	}{
+		{name: "refused", refusal: "Not allowed"},
+		{name: "closed", refusal: "Session with given id not found", opens: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			fake := newRefusingBrowser(t, chooserScript, func(command cdpCommand) string {
+				if command.Method == "Page.setInterceptFileChooserDialog" && command.SessionID == "frame-1" {
+					return tc.refusal
+				}
+				return ""
+			})
+			opened := false
+			err := browserhost.ChooseFiles(context.Background(), fake.server.URL, []string{"/a.pdf"}, 50*time.Millisecond, func(context.Context) error {
+				opened = true
+				return nil
+			})
+			assert.Equal(t, tc.opens, opened)
+			if tc.opens {
+				require.ErrorIs(t, err, browserhost.ErrNoFileChooser)
+				return
+			}
+			require.ErrorContains(t, err, "intercept file pickers: Page.setInterceptFileChooserDialog: Not allowed")
+		})
+	}
+}
+
 func TestChooseFilesReportsNoPicker(t *testing.T) {
 	t.Parallel()
 

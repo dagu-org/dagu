@@ -35,6 +35,7 @@ type cdpEvent struct {
 type scriptedBrowser struct {
 	server   *httptest.Server
 	script   func(cdpCommand) []cdpEvent
+	refuse   func(cdpCommand) string
 	mu       sync.Mutex
 	commands []cdpCommand
 	conns    []*websocket.Conn
@@ -42,7 +43,14 @@ type scriptedBrowser struct {
 
 func newScriptedBrowser(t *testing.T, script func(cdpCommand) []cdpEvent) *scriptedBrowser {
 	t.Helper()
-	fake := &scriptedBrowser{script: script}
+	return newRefusingBrowser(t, script, nil)
+}
+
+// newRefusingBrowser is a scripted browser that answers the commands refuse
+// returns a message for with that error.
+func newRefusingBrowser(t *testing.T, script func(cdpCommand) []cdpEvent, refuse func(cdpCommand) string) *scriptedBrowser {
+	t.Helper()
+	fake := &scriptedBrowser{script: script, refuse: refuse}
 	fake.server = httptest.NewServer(http.HandlerFunc(fake.serve))
 	t.Cleanup(fake.server.Close)
 	return fake
@@ -83,6 +91,11 @@ func (f *scriptedBrowser) serve(w http.ResponseWriter, r *http.Request) {
 		f.commands = append(f.commands, command.cdpCommand)
 		f.mu.Unlock()
 		reply := map[string]any{"id": command.ID, "sessionId": command.SessionID, "result": map[string]any{}}
+		if f.refuse != nil {
+			if message := f.refuse(command.cdpCommand); message != "" {
+				reply = map[string]any{"id": command.ID, "sessionId": command.SessionID, "error": map[string]any{"code": -32000, "message": message}}
+			}
+		}
 		events := f.script(command.cdpCommand)
 		// Chrome reports the targets an auto-attach request attaches to
 		// before it answers the request.

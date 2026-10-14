@@ -685,7 +685,7 @@ func (s *Sessions) Do(ctx context.Context, req DoRequest) (DoResult, error) {
 				entry.Recordable = done.PageURL != "" && len(done.Actions) > 0
 				if entry.Recordable && holdsValue(done.Actions, values.all) {
 					entry.Recordable = false
-					warnings = append(warnings, "the act's actions hold a variable's value, so an exported step asks the model for this act on every run")
+					warnings = append(warnings, "the operation's actions hold a variable's value, so an exported step asks the model for this operation on every run")
 				}
 				// Only actions an export replays are kept, and those hold no
 				// variable's value.
