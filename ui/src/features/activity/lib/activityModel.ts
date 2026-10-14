@@ -161,8 +161,10 @@ export function isQueueStalled(
   nowSeconds: number
 ): boolean {
   if (queue.nextQueuedAt === undefined) return false;
+  // A running count that is a lower bound cannot show room.
   const hasRoom =
-    queue.maxConcurrency === undefined || queue.running < queue.maxConcurrency;
+    queue.maxConcurrency === undefined ||
+    (!queue.runningCapped && queue.running < queue.maxConcurrency);
   return hasRoom && nowSeconds - queue.nextQueuedAt > STALLED_WAIT_SECONDS;
 }
 

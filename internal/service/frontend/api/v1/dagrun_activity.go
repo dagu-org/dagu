@@ -49,10 +49,11 @@ const (
 	activityQueueLimit = 20
 )
 
-// activityQueueScan bounds the queued entries read to count backlogs: a few
-// per queue, so the budget reaches many queues, and deeper backlogs are
-// reported as lower bounds. Declared as a var so tests can lower it.
-var activityQueueScan = queueScan{total: 200, perQueue: 5}
+// activityQueueScan bounds the runs read to describe queues: a few queued
+// entries per queue, so the budget reaches many queues, and a fixed number of
+// running runs. Deeper backlogs and busier queues are reported as lower
+// bounds. Declared as a var so tests can lower it.
+var activityQueueScan = queueScan{total: 200, perQueue: 5, running: 200}
 
 // GetDAGRunActivity returns one page of the DAG-runs of a time window.
 func (a *API) GetDAGRunActivity(ctx context.Context, request api.GetDAGRunActivityRequestObject) (api.GetDAGRunActivityResponseObject, error) {
@@ -272,6 +273,9 @@ func (a *API) activityQueues(ctx context.Context, query activityQuery) []api.DAG
 		}
 		if info.queuedCountCapped {
 			item.QueuedCapped = new(true)
+		}
+		if info.runningCapped {
+			item.RunningCapped = new(true)
 		}
 		if !info.nextQueuedAt.IsZero() {
 			item.NextQueuedAt = new(info.nextQueuedAt.Unix())

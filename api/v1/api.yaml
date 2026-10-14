@@ -11810,7 +11810,10 @@ components:
           type: string
         running:
           type: integer
-          description: "Number of runs running"
+          description: "Number of runs running; a lower bound when runningCapped is set"
+        runningCapped:
+          type: boolean
+          description: "True when reading running runs stopped early, so running is a lower bound"
         maxConcurrency:
           type: integer
           description: "Maximum number of runs the queue runs at once"

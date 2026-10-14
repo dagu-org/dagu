@@ -377,6 +377,36 @@ func TestDAGRunActivityLeavesOutQueuesItCouldNotRead(t *testing.T) {
 	assert.True(t, valueOf(busy.QueuedCapped))
 }
 
+// Queue lines read a bounded number of running runs, local and distributed.
+// Past the bound, a queue's running count is a lower bound.
+func TestDAGRunActivityBoundsRunningReads(t *testing.T) {
+	// Not parallel: this test lowers the package-level scan bounds.
+	original := activityQueueScan
+	activityQueueScan = queueScan{total: 200, perQueue: 5, running: 3}
+	t.Cleanup(func() { activityQueueScan = original })
+
+	f := newActivityFixture(t)
+	day := time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC)
+	var refs []ir.DAGRunRef
+	for i := range 2 {
+		id := fmt.Sprintf("train-%d", i)
+		f.addRun("train", id, ir.Running, day.Add(-time.Hour), 0)
+		refs = append(refs, ir.NewDAGRunRef("train", id))
+	}
+	f.api.procRepository = aliveProcs{refs: refs}
+	leaseStore := newTestDAGRunLeaseStore(t.TempDir())
+	f.api.dagRunLeaseStore = leaseStore
+	for i := range 2 {
+		createDistributedQueueRun(t, t.Context(), f.repository, leaseStore, "train", fmt.Sprintf("remote-%d", i), "default", time.Now())
+	}
+
+	activity := f.activity(day, day.Add(24*time.Hour))
+
+	require.Len(t, activity.Queues, 1)
+	assert.Equal(t, 3, activity.Queues[0].Running)
+	assert.True(t, valueOf(activity.Queues[0].RunningCapped))
+}
+
 // countingQueueStore counts the queued records its cursor pages load.
 type countingQueueStore struct {
 	queue.QueueStore

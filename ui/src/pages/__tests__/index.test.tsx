@@ -382,6 +382,28 @@ describe('DashboardPage', () => {
     expect(screen.queryByRole('link', { name: 'etl' })).not.toBeInTheDocument();
   });
 
+  it('marks a running count that is a lower bound', () => {
+    mockActivity({
+      activity: makeActivity({
+        runs: reportRuns,
+        queues: [
+          {
+            name: 'default',
+            running: 200,
+            runningCapped: true,
+            maxConcurrency: 500,
+            queued: 0,
+          },
+        ],
+      }),
+    });
+
+    renderPage();
+
+    const queues = screen.getByRole('list', { name: 'Queues' });
+    expect(queues).toHaveTextContent('200+ of 500 running');
+  });
+
   // A shared queue is named after neither workflow in it.
   it('keeps a shared queue holding a filtered workflow', () => {
     mockActivity({

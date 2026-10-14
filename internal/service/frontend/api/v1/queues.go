@@ -4,10 +4,13 @@
 package api
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
+	"slices"
 	"sort"
 	"time"
 
@@ -210,6 +213,9 @@ type queueInfo struct {
 	// queuedCountCapped reports that queuedCount hit queuedCountScanCap and is
 	// therefore a lower bound rather than an exact total.
 	queuedCountCapped bool
+	// runningCapped reports that running runs were left unread, so running
+	// is a lower bound.
+	runningCapped bool
 	// nextQueuedAt is when the next run in line was queued.
 	nextQueuedAt time.Time
 }
@@ -263,6 +269,9 @@ type queueScan struct {
 	// bounds them for one queue; past either, counts are lower bounds.
 	total    int
 	perQueue int
+	// running, when set, bounds the running runs read across all queues;
+	// past it, running counts are lower bounds.
+	running int
 	// matches, when set, counts only the runs it accepts.
 	matches func(api.DAGRunSummary) bool
 }
@@ -274,6 +283,15 @@ func queuesPageScan() queueScan {
 
 func (s queueScan) accepts(summary api.DAGRunSummary) bool {
 	return s.matches == nil || s.matches(summary)
+}
+
+// runningBudget returns the budget for reading running runs, or nil when
+// every running run is read.
+func (s queueScan) runningBudget() *scanBudget {
+	if s.running == 0 {
+		return nil
+	}
+	return newScanBudget(s.running)
 }
 
 // collectQueues gathers running runs and queued counts per queue.
@@ -308,13 +326,22 @@ func (a *API) collectQueues(ctx context.Context, onlyQueue string, scan queueSca
 		}
 	}
 
+	runningReads := scan.runningBudget()
 	localRunningIDs := make(map[string]struct{})
-	for groupName, dagRuns := range runningByGroup {
+	for _, groupName := range slices.Sorted(maps.Keys(runningByGroup)) {
 		if onlyQueue != "" && groupName != onlyQueue {
 			continue
 		}
 		var queue *queueInfo
-		for _, dagRun := range dagRuns {
+		for _, dagRun := range runningByGroup[groupName] {
+			if runningReads.exhausted() {
+				// Left unread, the run still counts as local, so no lease
+				// counts it again.
+				localRunningIDs[dagRun.ID] = struct{}{}
+				getOrCreateQueue(queueMap, groupName, a.config).runningCapped = true
+				continue
+			}
+			runningReads.consume()
 			attempt, err := a.dagRunRepository.FindAttempt(ctx, dagRun)
 			if err != nil {
 				continue
@@ -338,7 +365,11 @@ func (a *API) collectQueues(ctx context.Context, onlyQueue string, scan queueSca
 		}
 	}
 
-	for queueName, summaries := range a.activeDistributedRunningSummaries(ctx, onlyQueue, localRunningIDs) {
+	distributed, unread := a.activeDistributedRunningSummaries(ctx, onlyQueue, localRunningIDs, runningReads)
+	for queueName := range unread {
+		getOrCreateQueue(queueMap, queueName, a.config).runningCapped = true
+	}
+	for queueName, summaries := range distributed {
 		var accepted []api.DAGRunSummary
 		for _, summary := range summaries {
 			if scan.accepts(summary) {
@@ -594,16 +625,20 @@ func (a *API) effectiveLeaseStaleThreshold() time.Duration {
 	return dagrun.DefaultStaleLeaseThreshold
 }
 
-func (a *API) activeDistributedRunningSummaries(ctx context.Context, queueName string, excludeRunIDs map[string]struct{}) map[string][]api.DAGRunSummary {
+// activeDistributedRunningSummaries returns the runs held by fresh leases, by
+// queue. Once reads is exhausted, leases are left unread, and the queues they
+// belong to are returned as unread.
+func (a *API) activeDistributedRunningSummaries(ctx context.Context, queueName string, excludeRunIDs map[string]struct{}, reads *scanBudget) (map[string][]api.DAGRunSummary, map[string]struct{}) {
 	result := make(map[string][]api.DAGRunSummary)
+	unread := make(map[string]struct{})
 	if a.dagRunLeaseStore == nil {
-		return result
+		return result, unread
 	}
 
 	leases, err := a.dagRunLeaseStore.ListAll(ctx)
 	if err != nil {
 		logger.Warn(ctx, "Failed to list distributed running leases", tag.Error(err))
-		return result
+		return result, unread
 	}
 
 	now := time.Now().UTC()
@@ -614,6 +649,11 @@ func (a *API) activeDistributedRunningSummaries(ctx context.Context, queueName s
 		if _, ok := excludeRunIDs[lease.DAGRun.ID]; ok {
 			continue
 		}
+		if reads.exhausted() {
+			unread[cmp.Or(lease.QueueName, lease.DAGRun.Name)] = struct{}{}
+			continue
+		}
+		reads.consume()
 		summary, ok := a.runningSummaryFromLease(ctx, lease)
 		if !ok {
 			continue
@@ -628,7 +668,7 @@ func (a *API) activeDistributedRunningSummaries(ctx context.Context, queueName s
 		result[groupName] = append(result[groupName], summary)
 	}
 
-	return result
+	return result, unread
 }
 
 func (a *API) runningSummaryFromLease(ctx context.Context, lease dispatch.DAGRunLease) (api.DAGRunSummary, bool) {

@@ -149,6 +149,11 @@ describe('isQueueStalled', () => {
       false
     );
   });
+
+  // A running count that is only a lower bound cannot show room.
+  it('accepts a long wait when the running count is a lower bound', () => {
+    expect(isQueueStalled({ ...queue, runningCapped: true }, now)).toBe(false);
+  });
 });
 
 describe('isSchedulerHoldingWork', () => {

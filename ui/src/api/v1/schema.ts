@@ -4217,8 +4217,10 @@ export interface components {
         /** @description A queue with runs running or waiting */
         DAGRunActivityQueue: {
             name: string;
-            /** @description Number of runs running */
+            /** @description Number of runs running; a lower bound when runningCapped is set */
             running: number;
+            /** @description True when reading running runs stopped early, so running is a lower bound */
+            runningCapped?: boolean;
             /** @description Maximum number of runs the queue runs at once */
             maxConcurrency?: number;
             /** @description Number of runs waiting; a lower bound when queuedCapped is set */

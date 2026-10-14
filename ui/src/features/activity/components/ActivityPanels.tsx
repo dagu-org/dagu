@@ -330,9 +330,9 @@ export function InProgress({
               </Link>
               <span className="text-xs text-muted-foreground tabular-nums">
                 {queue.maxConcurrency === undefined
-                  ? ts('{running} running', { running: queue.running })
+                  ? ts('{running} running', { running: runningCount(queue) })
                   : ts('{running} of {max} running', {
-                      running: queue.running,
+                      running: runningCount(queue),
                       max: queue.maxConcurrency,
                     })}
                 {queue.queued > 0 || queue.queuedCapped ? (
@@ -374,6 +374,11 @@ export function InProgress({
       )}
     </section>
   );
+}
+
+/** A queue's running count, marked when it is a lower bound. */
+function runningCount(queue: ActivityQueue): string | number {
+  return queue.runningCapped ? `${queue.running}+` : queue.running;
 }
 
 /** The next scheduled runs with a countdown to each. */
