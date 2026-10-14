@@ -152,6 +152,25 @@ func (l *ConfigLoader) resolvePath(fieldName, pathValue string) (string, error) 
 	return resolved, nil
 }
 
+// loadBrowserTrustedCAs resolves the file of each trusted authority and
+// rejects a malformed one.
+func (l *ConfigLoader) loadBrowserTrustedCAs(defs []BrowserTrustedCADef) ([]BrowserTrustedCA, error) {
+	var authorities []BrowserTrustedCA
+	for i, def := range defs {
+		field := fmt.Sprintf("browser.trusted_cas[%d]", i)
+		caFile, err := l.resolvePath(field+".ca_file", def.CAFile)
+		if err != nil {
+			return nil, err
+		}
+		authority := BrowserTrustedCA{Hosts: def.Hosts, CAFile: caFile}
+		if err := authority.Validate(); err != nil {
+			return nil, fmt.Errorf("%s: %w", field, err)
+		}
+		authorities = append(authorities, authority)
+	}
+	return authorities, nil
+}
+
 // loadBrowserClientCertificates resolves the files of each client
 // certificate and rejects a malformed one.
 func (l *ConfigLoader) loadBrowserClientCertificates(defs []BrowserClientCertificateDef) ([]BrowserClientCertificate, error) {
@@ -411,6 +430,11 @@ func (l *ConfigLoader) loadCoreConfig(cfg *Config, def Definition) error {
 			return err
 		}
 		cfg.Browser.ClientCertificates = certificates
+		authorities, err := l.loadBrowserTrustedCAs(def.Browser.TrustedCAs)
+		if err != nil {
+			return err
+		}
+		cfg.Browser.TrustedCAs = authorities
 	}
 	cfg.DAGDiscovery = DAGDiscoveryConfig{
 		Recursive: l.v.GetBool("dag_discovery.recursive"),

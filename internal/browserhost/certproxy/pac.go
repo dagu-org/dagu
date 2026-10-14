@@ -72,15 +72,12 @@ FindProxyForURL = function (url, host) {
 `
 
 // composePAC returns the PAC script the browser uses: the https: URLs of
-// the entries' hosts go to the proxy on proxyPort, other https: URLs to the
-// guard on guardPort, if not zero, and everything else follows the system
-// script.
-func composePAC(proxyPort, guardPort int, entries []Entry, system string) string {
+// hosts go to the proxy on proxyPort, other https: URLs to the guard on
+// guardPort, if not zero, and everything else follows the system script.
+func composePAC(proxyPort, guardPort int, hosts []string, system string) string {
 	patterns := []string{}
-	for _, entry := range entries {
-		for _, host := range entry.Hosts {
-			patterns = append(patterns, pacPattern(host))
-		}
+	for _, host := range hosts {
+		patterns = append(patterns, pacPattern(host))
 	}
 	proxy, _ := json.Marshal(proxyResult(proxyPort))
 	guard, _ := json.Marshal("")

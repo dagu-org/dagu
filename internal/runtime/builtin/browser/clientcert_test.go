@@ -9,11 +9,13 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/pem"
 	"fmt"
 	"math/big"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -47,6 +49,36 @@ func writeClientCertificate(t *testing.T, commonName, passphrase string) string 
 	path := filepath.Join(t.TempDir(), commonName+".p12")
 	require.NoError(t, os.WriteFile(path, data, 0o600))
 	return path
+}
+
+func TestTrustedCAsReachBrowser(t *testing.T) {
+	t.Parallel()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	ca := &x509.Certificate{
+		SerialNumber: big.NewInt(1), NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().Add(time.Hour),
+		IsCA: true, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign,
+	}
+	der, err := x509.CreateCertificate(rand.Reader, ca, ca, key.Public(), key)
+	require.NoError(t, err)
+	path := filepath.Join(t.TempDir(), "ca.pem")
+	require.NoError(t, os.WriteFile(path, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}), 0o600))
+	for host, warning := range map[string]bool{"portal.example.com": false, "10.0.0.1": false, "localhost": true, "127.0.0.1": true, "::1": true, "169.254.1.1": true} {
+		t.Run(host, func(t *testing.T) {
+			run := newTestRun(t, pageModel(nil))
+			run.hostTrustedCAs = []cmnconfig.BrowserTrustedCA{{Hosts: []string{host}, CAFile: path}}
+			result := run.execute(`{"do":[{"goto":"https://portal.example.com/"}]}`, nil)
+			require.NoError(t, result.err)
+			require.Len(t, run.launcher.launches, 1)
+			require.Len(t, run.launcher.launches[0].TrustedCAs, 1)
+			assert.Equal(t, []string{host}, run.launcher.launches[0].TrustedCAs[0].Hosts)
+			assert.Equal(t, warning, strings.Contains(result.stderr.String(), "Chrome bypasses certificate routing"))
+		})
+	}
+	run := newTestRun(t, pageModel(nil))
+	run.hostTrustedCAs = []cmnconfig.BrowserTrustedCA{{Hosts: []string{"portal.example.com"}, CAFile: filepath.Join(t.TempDir(), "missing.pem")}}
+	require.ErrorContains(t, run.execute(`{"do":[{"goto":"https://portal.example.com/"}]}`, nil).err, "browser.trusted_cas[0]")
+	assert.Empty(t, run.launcher.launches)
 }
 
 // The step's certificates come before the host's, so the step's entry wins

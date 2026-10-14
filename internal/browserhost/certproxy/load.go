@@ -4,6 +4,7 @@
 package certproxy
 
 import (
+	"bytes"
 	"crypto"
 	"crypto/tls"
 	"crypto/x509"
@@ -27,6 +28,11 @@ const (
 	pemEncryptedPrivateKey  = "ENCRYPTED PRIVATE KEY"
 	pemProcTypeHeader       = "Proc-Type"
 	pemProcTypeEncryptedTag = "ENCRYPTED"
+	// pemCertificateBegin starts a PEM certificate block.
+	pemCertificateBegin = "-----BEGIN CERTIFICATE-----"
+	// pemPrivateKeyMarker ends the BEGIN and END lines of every kind of PEM
+	// private key.
+	pemPrivateKeyMarker = "PRIVATE KEY-----"
 	// validityDateLayout formats the dates of validity warnings.
 	validityDateLayout = "2006-01-02"
 )
@@ -74,6 +80,68 @@ func Load(label string, c cmnconfig.BrowserClientCertificate, baseDir string, no
 		entry.CAPEM = encodeCertificates(roots)
 	}
 	return entry, validityWarnings(label, chain[0], now), nil
+}
+
+// LoadTrustedCA reads a scoped server authority without a client identity.
+func LoadTrustedCA(label string, c cmnconfig.BrowserTrustedCA) (TrustedCA, error) {
+	if err := c.Validate(); err != nil {
+		return TrustedCA{}, fmt.Errorf("%s: %w", label, err)
+	}
+	data, err := os.ReadFile(c.CAFile) //nolint:gosec // the authority file is the configured input
+	if err != nil {
+		return TrustedCA{}, fmt.Errorf("%s: %w", label, err)
+	}
+	certs, err := trustedCertificates(data)
+	if err != nil {
+		return TrustedCA{}, fmt.Errorf("%s: %w", label, err)
+	}
+	return TrustedCA{Label: label, Hosts: slices.Clone(c.Hosts), CAPEM: encodeCertificates(certs)}, nil
+}
+
+// trustedCertificates returns the trust anchors of a ca_file: certificate
+// authorities and self-signed certificates. Text around the PEM blocks, as
+// openssl writes it, is ignored.
+func trustedCertificates(data []byte) ([]*x509.Certificate, error) {
+	if bytes.Contains(data, []byte(pemPrivateKeyMarker)) {
+		return nil, errors.New("ca_file holds a private key; it needs only the authority's certificate")
+	}
+	var certs []*x509.Certificate
+	for rest := data; ; {
+		var block *pem.Block
+		if block, rest = pem.Decode(rest); block == nil {
+			break
+		}
+		if block.Type != pemCertificate {
+			continue
+		}
+		cert, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("ca_file: %w", err)
+		}
+		if !trustAnchor(cert) {
+			return nil, fmt.Errorf("ca_file holds %s, which is neither a certificate authority nor self-signed; name the authority that issued it", cert.Subject)
+		}
+		certs = append(certs, cert)
+	}
+	// pem.Decode skips a block it cannot decode, which would drop a
+	// damaged certificate silently.
+	if len(certs) < bytes.Count(data, []byte(pemCertificateBegin)) {
+		return nil, errors.New("ca_file holds a malformed PEM certificate")
+	}
+	if len(certs) == 0 {
+		return nil, errors.New("ca_file holds no PEM certificate")
+	}
+	return certs, nil
+}
+
+// trustAnchor reports whether cert can anchor server trust: a certificate
+// authority, or a self-signed certificate such as an appliance's.
+func trustAnchor(cert *x509.Certificate) bool {
+	if cert.BasicConstraintsValid && cert.IsCA && (cert.KeyUsage == 0 || cert.KeyUsage&x509.KeyUsageCertSign != 0) {
+		return true
+	}
+	return bytes.Equal(cert.RawIssuer, cert.RawSubject) &&
+		cert.CheckSignature(cert.SignatureAlgorithm, cert.RawTBSCertificate, cert.Signature) == nil
 }
 
 // loadPFX reads a PKCS#12 file and returns its chain, leaf first, and key.

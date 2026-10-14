@@ -2016,6 +2016,61 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /dag-run-activity:
+    get:
+      summary: "Summarize DAG-run activity"
+      description: |
+        Lists the DAG-runs created in a time window, newest first, one page at
+        a time. The first page also lists the DAGs whose latest run did not
+        succeed, runs still in progress (including ones created before the
+        window), queues with work, and the next scheduled runs. Without fromDate, the window is
+        the last `hours` hours, aligned to a 96th of its length. To load older
+        runs, pass the first page's from and to as fromDate and toDate, with
+        nextCursor as cursor.
+      operationId: "getDAGRunActivity"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Workspace"
+        - $ref: "#/components/parameters/DateTimeFrom"
+        - $ref: "#/components/parameters/DateTimeTo"
+        - name: "hours"
+          in: "query"
+          required: false
+          schema:
+            type: "integer"
+            minimum: 1
+            maximum: 48
+            default: 24
+          description: "Length of a window that ends now. Ignored when fromDate is set."
+        - name: "labels"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+          description: "Only include runs of DAGs that have ALL these comma-separated labels"
+        - $ref: "#/components/parameters/DAGRunListCursor"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DAGRunActivity"
+        "400":
+          description: "The window, filters, or cursor are invalid"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /dag-runs:
     get:
       summary: "List all DAG-runs"
@@ -5198,7 +5253,9 @@ paths:
         bearer token only, bearer token plus HMAC, or HMAC only.
 
         The request body is passed to the DAG as the WEBHOOK_PAYLOAD environment
-        variable. If the DAG configures `webhook.forward_headers`, selected
+        variable, and as a file named by WEBHOOK_PAYLOAD_FILE. A body too large
+        for one environment variable is passed only as the file. If the DAG
+        configures `webhook.forward_headers`, selected
         request headers are passed as the WEBHOOK_HEADERS environment variable.
         For safety, the `Authorization` header is never forwarded.
         The DAG run is enqueued and the endpoint returns immediately with the
@@ -6748,6 +6805,221 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /dags/{fileName}/webhook/public:
+    get:
+      summary: "Get the webhook's public URL"
+      description: |
+        Returns the webhook's public URL through Dagu Cloud, the state of the
+        relay connection that holds it, and its latest deliveries.
+        Developer, manager, or admin only.
+      operationId: "getDAGWebhookPublic"
+      tags:
+        - "webhooks"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      responses:
+        "200":
+          description: "The public URL and its deliveries"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookPublicDetails"
+        "404":
+          description: "No webhook, or no public URL, for this DAG"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      summary: "Turn on the webhook's public URL"
+      description: |
+        Gives the webhook a public URL through Dagu Cloud. A webhook that has
+        one keeps it. The server must be connected to Dagu Cloud, and the plan
+        must allow another public URL. Admin only.
+      operationId: "enableDAGWebhookPublic"
+      tags:
+        - "webhooks"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      responses:
+        "200":
+          description: "The webhook with its public URL turned on"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookDetails"
+        "400":
+          description: "The server is not connected to Dagu Cloud, or the plan allows no more public URLs"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "No webhook configured for this DAG"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "501":
+          description: "Public URLs need encrypted storage, which is not available on this node"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      summary: "Turn off the webhook's public URL"
+      description: |
+        Removes the webhook's public URL and its delivery log. Dagu Cloud drops
+        the URL and any deliveries waiting for it. Admin only.
+      operationId: "disableDAGWebhookPublic"
+      tags:
+        - "webhooks"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      responses:
+        "200":
+          description: "The webhook with its public URL turned off"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookDetails"
+        "404":
+          description: "No webhook configured for this DAG"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{fileName}/webhook/public/regenerate:
+    post:
+      summary: "Replace the webhook's public URL"
+      description: |
+        Gives the webhook a new public URL. The old URL stops working.
+        Requests Dagu Cloud already took through it are still delivered;
+        turning the URL off drops them. Admin only.
+      operationId: "regenerateDAGWebhookPublicURL"
+      tags:
+        - "webhooks"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      responses:
+        "200":
+          description: "The webhook with its new public URL"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookDetails"
+        "404":
+          description: "No webhook, or no public URL, for this DAG"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{fileName}/webhook/public/sender:
+    put:
+      summary: "Set who may send to the webhook's public URL"
+      description: |
+        Sets the sender whose signature requests to the public URL must
+        carry, its signing secret, and the events that start runs. For
+        GitHub, Dagu makes the secret when none is entered, and returns it
+        only this once. Admin only.
+      operationId: "configureDAGWebhookPublicSender"
+      tags:
+        - "webhooks"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookPublicSenderRequest"
+      responses:
+        "200":
+          description: "The webhook with its new sender settings"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookPublicSenderResponse"
+        "400":
+          description: "Invalid sender, secret, or events"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "No webhook, or no public URL, for this DAG"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{fileName}/webhook/public/missed:
+    delete:
+      summary: "Dismiss the webhook's missed deliveries"
+      description: |
+        Clears the counts of deliveries Dagu Cloud dropped for the public URL.
+        Admin only.
+      operationId: "dismissDAGWebhookPublicMissed"
+      tags:
+        - "webhooks"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      responses:
+        "204":
+          description: "Missed deliveries dismissed"
+        "404":
+          description: "No webhook, or no public URL, for this DAG"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /dags/{fileName}/settings:
     get:
       summary: "Get DAG settings"
@@ -7315,7 +7587,7 @@ paths:
             type: string
         - name: type
           in: query
-          description: "Filter by event type (e.g., dag.run.failed, llm.usage.recorded)"
+          description: "Filter by event type (e.g., dag.run.failed, llm.usage.recorded). Without it, dag.run.updated entries are omitted."
           required: false
           schema:
             type: string
@@ -11436,7 +11708,7 @@ components:
     DateTimeFrom:
       name: fromDate
       in: query
-      description: start datetime for filtering DAG-runs in ISO 8601 format with timezone
+      description: start of the time range for filtering DAG-runs, as a Unix timestamp in seconds
       required: false
       schema:
         $ref: "#/components/schemas/UnixTimestamp"
@@ -11444,7 +11716,7 @@ components:
     DateTimeTo:
       name: toDate
       in: query
-      description: end datetime for filtering DAG-runs in ISO 8601 format with timezone
+      description: end of the time range for filtering DAG-runs, as a Unix timestamp in seconds
       required: false
       schema:
         $ref: "#/components/schemas/UnixTimestamp"
@@ -11697,6 +11969,147 @@ components:
           description: "Opaque cursor for loading the next page of older DAG-runs"
       required:
         - dagRuns
+
+    DAGRunActivity:
+      type: object
+      description: "One page of DAG-run activity for a time window"
+      properties:
+        from:
+          type: integer
+          format: int64
+          description: "Window start as Unix seconds"
+        to:
+          type: integer
+          format: int64
+          description: "Window end as Unix seconds"
+        runs:
+          type: array
+          description: "Up to 100 runs created in the window, newest first"
+          items:
+            $ref: "#/components/schemas/DAGRunActivityRun"
+        nextCursor:
+          type: string
+          description: "Opaque cursor for loading the next page of older runs"
+        attention:
+          type: array
+          description: "First page only: the latest run of each DAG whose latest run was created in the window and did not succeed, newest first, at most 20"
+          items:
+            $ref: "#/components/schemas/DAGRunActivityRun"
+        active:
+          type: array
+          description: "First page only: runs still running, waiting, or queued, oldest first, at most 100, including up to 50 live runs created before the window"
+          items:
+            $ref: "#/components/schemas/DAGRunActivityRun"
+        upcoming:
+          type: array
+          description: "First page only: next scheduled runs, soonest first"
+          items:
+            $ref: "#/components/schemas/DAGRunActivityUpcoming"
+        queues:
+          type: array
+          description: "First page only: queues with runs running or waiting, the longest wait first, at most 20"
+          items:
+            $ref: "#/components/schemas/DAGRunActivityQueue"
+        diskUsedPercent:
+          type: integer
+          description: "First page only: how full the data directory's disk is, in percent; set only when it is at least 90 and the caller may view system status"
+      required:
+        - from
+        - to
+        - runs
+        - attention
+        - active
+        - upcoming
+        - queues
+
+    DAGRunActivityQueue:
+      type: object
+      description: "A queue with runs running or waiting"
+      properties:
+        name:
+          type: string
+        running:
+          type: integer
+          description: "Number of runs running; a lower bound when runningCapped is set"
+        runningCapped:
+          type: boolean
+          description: "True when reading running runs stopped early, so running is a lower bound"
+        maxConcurrency:
+          type: integer
+          description: "Maximum number of runs the queue runs at once"
+        queued:
+          type: integer
+          description: "Number of runs waiting; a lower bound when queuedCapped is set"
+        queuedCapped:
+          type: boolean
+          description: "True when counting stopped early, so queued is a lower bound"
+        nextQueuedAt:
+          type: integer
+          format: int64
+          description: "When the next run in line was queued, as Unix seconds"
+        blockedReason:
+          $ref: "#/components/schemas/DAGRunActivityQueueBlockedReason"
+      required:
+        - name
+        - running
+        - queued
+
+    DAGRunActivityQueueBlockedReason:
+      type: string
+      description: "Why queued runs cannot start: no healthy worker matches their selector, no healthy worker exists, or runs cannot be handed to workers"
+      enum:
+        - "noMatchingWorker"
+        - "noAvailableWorker"
+        - "workerDispatchUnavailable"
+
+    DAGRunActivityRun:
+      type: object
+      description: "One DAG-run in an activity summary"
+      properties:
+        name:
+          type: string
+          description: "DAG name"
+        dagRunId:
+          type: string
+        status:
+          $ref: "#/components/schemas/Status"
+        startedAt:
+          type: integer
+          format: int64
+          description: "Start as Unix seconds, or the queue time when the run has not started"
+        finishedAt:
+          type: integer
+          format: int64
+          description: "Finish as Unix seconds"
+        failedStep:
+          type: string
+          description: "First failed step; set on attention runs"
+        error:
+          type: string
+          description: "Error of the failed step or the run, shortened; set on attention runs"
+        queue:
+          type: string
+          description: "Queue the run runs or waits in; set on active runs"
+      required:
+        - name
+        - dagRunId
+        - status
+
+    DAGRunActivityUpcoming:
+      type: object
+      properties:
+        name:
+          type: string
+        fileName:
+          type: string
+        nextRun:
+          type: integer
+          format: int64
+          description: "Next scheduled run as Unix seconds"
+      required:
+        - name
+        - fileName
+        - nextRun
 
     ApproveStepRequest:
       type: object
@@ -12265,6 +12678,172 @@ components:
           type: string
           format: date-time
           description: "When the webhook was last triggered"
+        public:
+          $ref: "#/components/schemas/WebhookPublicSettings"
+
+    WebhookPublicSender:
+      type: string
+      description: "A service whose signed requests a public URL accepts"
+      enum:
+        - "github"
+        - "stripe"
+        - "slack"
+        - "standard"
+
+    WebhookPublicSettings:
+      type: object
+      description: "What the webhook's public URL accepts"
+      required:
+        - secretConfigured
+        - events
+        - createdAt
+      properties:
+        sender:
+          $ref: "#/components/schemas/WebhookPublicSender"
+        secretConfigured:
+          type: boolean
+          description: "Whether the sender's signing secret is stored"
+        events:
+          type: array
+          description: "Events that start runs; empty takes every event"
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+          description: "When the public URL was turned on"
+
+    WebhookPublicState:
+      type: string
+      description: |
+        Whether Dagu Cloud holds the public URL: `active` once it does,
+        `connecting` before then, `overLimit` when the plan allows fewer
+        public URLs than exist and this one is left out, and `error` when the
+        server cannot connect.
+      enum:
+        - "active"
+        - "connecting"
+        - "overLimit"
+        - "error"
+
+    WebhookPublicDetails:
+      type: object
+      description: "The webhook's public URL, its state, and its latest deliveries"
+      required:
+        - state
+        - deliveries
+        - missed
+      properties:
+        url:
+          type: string
+          description: "The public URL; absent until Dagu Cloud has given this server its address"
+        state:
+          $ref: "#/components/schemas/WebhookPublicState"
+        error:
+          type: string
+          description: "Why the server cannot connect"
+        maxHooks:
+          type: integer
+          description: "The most public URLs the plan allows, once known"
+        deliveries:
+          type: array
+          description: "The latest deliveries, newest first"
+          items:
+            $ref: "#/components/schemas/WebhookPublicDelivery"
+        missed:
+          $ref: "#/components/schemas/WebhookPublicMissed"
+
+    WebhookPublicDelivery:
+      type: object
+      description: "One request Dagu Cloud handed over for the public URL"
+      required:
+        - id
+        - receivedAt
+        - size
+        - outcome
+      properties:
+        id:
+          type: string
+          description: "The delivery's ID, which names the run it starts"
+        receivedAt:
+          type: string
+          format: date-time
+          description: "When Dagu Cloud received the request"
+        size:
+          type: integer
+          description: "The body's size in bytes"
+        event:
+          type: string
+          description: "What the request is about, as its sender labels it"
+        outcome:
+          type: string
+          description: |
+            What became of the delivery: `started` a run, `waiting` at Dagu
+            Cloud to be sent again, `rejected` by the sender's signature
+            check, `skipped` as an event that starts no run, `ignored` while
+            the webhook was disabled, or `failed`.
+          enum:
+            - "started"
+            - "waiting"
+            - "rejected"
+            - "skipped"
+            - "ignored"
+            - "failed"
+        dagRunId:
+          type: string
+          description: "The run a started delivery started"
+        error:
+          type: string
+          description: "Why the delivery was rejected, skipped, waiting, or failed"
+
+    WebhookPublicMissed:
+      type: object
+      description: |
+        Deliveries Dagu Cloud dropped since they were last dismissed: those
+        that waited more than 7 days, and those refused while 1,000 waited.
+      required:
+        - expired
+        - refused
+      properties:
+        expired:
+          type: integer
+        refused:
+          type: integer
+        since:
+          type: string
+          format: date-time
+          description: "When the first of them was counted"
+
+    WebhookPublicSenderRequest:
+      type: object
+      description: "Who may send to a public URL, and which events start runs"
+      properties:
+        sender:
+          $ref: "#/components/schemas/WebhookPublicSender"
+        secret:
+          type: string
+          description: |
+            The sender's signing secret. Empty keeps the stored secret of the
+            same sender, or, for GitHub, makes one.
+        generateSecret:
+          type: boolean
+          description: "Make a new GitHub signing secret"
+        events:
+          type: array
+          description: "Events that start runs; empty takes every event"
+          items:
+            type: string
+
+    WebhookPublicSenderResponse:
+      type: object
+      required:
+        - webhook
+      properties:
+        webhook:
+          $ref: "#/components/schemas/WebhookDetails"
+        secret:
+          type: string
+          description: "The signing secret Dagu made, shown only this once"
 
     WebhookCreateResponse:
       type: object
@@ -13961,6 +14540,9 @@ components:
         reason:
           type: string
           description: "Operator-facing explanation shown while paused"
+        schedulerRunning:
+          type: boolean
+          description: "Whether a scheduler instance is running. Omitted when the server cannot tell."
       required:
         - paused
 

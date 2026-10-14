@@ -69,6 +69,53 @@ func TestSessionPresentsHostClientCertificate(t *testing.T) {
 	assert.GreaterOrEqual(t, strings.Count(strings.Join(proxy.connects(), " "), mtlsHost), 1)
 }
 
+func TestSessionScopedAuthorities(t *testing.T) {
+	t.Parallel()
+	s := newSessionEnv(t)
+	ca := newTestCA(t, "Scoped server CA")
+	cert, key := ca.issue(t, mtlsHost, x509.ExtKeyUsageServerAuth, mtlsHost, "outside.test")
+	site := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/redirect" {
+			http.Redirect(w, r, "https://outside.test/", http.StatusFound)
+			return
+		}
+		_, _ = io.WriteString(w, "<html><head><title>Scoped authority</title></head><body>Secure portal</body></html>")
+	}))
+	site.TLS = &tls.Config{Certificates: []tls.Certificate{{Certificate: [][]byte{cert.Raw}, PrivateKey: key}}}
+	site.StartTLS()
+	t.Cleanup(site.Close)
+	_, proxyURL := startUpstreamProxy(t, site.Listener.Addr().String())
+	s.dagu.WriteFile("ca.pem", ca.pem())
+	var home string
+	for _, entry := range s.env {
+		if value, ok := strings.CutPrefix(entry, "DAGU_HOME="); ok {
+			home = value
+		}
+	}
+	writeConfig := func(authorities bool) {
+		text := "browser:\n  guard_client_certificates: true\n"
+		if authorities {
+			text += "  trusted_cas:\n    - hosts: [" + mtlsHost + "]\n      ca_file: " + s.dagu.ProjectPath("ca.pem") + "\n"
+		}
+		require.NoError(t, os.WriteFile(filepath.Join(home, "config.yaml"), []byte(text), 0o600))
+	}
+	writeConfig(true)
+	opened := s.session("", "open", "https://"+mtlsHost+"/", "--proxy", proxyURL)
+	opened.ExpectExitCode(0)
+	result := printed(t, opened)
+	assert.Equal(t, true, result["tls_verified"])
+	assert.Equal(t, "Scoped authority", result["title"])
+	id, _ := result["id"].(string)
+	require.NotEmpty(t, id)
+	t.Cleanup(func() { s.session("", "close", id, "--force") })
+
+	// A redirect signed by the same authority gets no trust outside its scope.
+	s.session("", "open", "https://"+mtlsHost+"/redirect", "--proxy", proxyURL).ExpectExitCode(1)
+	writeConfig(false)
+	s.session(`{"goto":"https://`+mtlsHost+`/again"}`, "do", id).ExpectExitCode(0)
+	s.session("", "open", "https://"+mtlsHost+"/", "--proxy", proxyURL).ExpectExitCode(1)
+}
+
 // mtlsHost names the site that requires a client certificate. Chrome never
 // resolves it: requests reach it through the upstream proxy, which maps it
 // to the local server. Loopback addresses would bypass every proxy.

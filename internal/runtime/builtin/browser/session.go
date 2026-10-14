@@ -152,6 +152,9 @@ type SessionPageView struct {
 // OpenResult reports an opened session.
 type OpenResult struct {
 	ID string `json:"id"`
+	// TLSVerified confirms the proxy verified the final HTTPS page's host.
+	// False means no such evidence was available, not a certificate failure.
+	TLSVerified bool `json:"tls_verified"`
 	// CDPURL is the browser's DevTools address, where an application can
 	// show the page and let a person act on it.
 	CDPURL       string    `json:"cdp_url"`
@@ -203,8 +206,10 @@ type DoResult struct {
 	Actions []SessionAction `json:"actions"`
 	// Act is the act a step writes for an element operation.
 	Act string `json:"act,omitempty"`
+	// Into is the into a step writes for an element upload.
+	Into string `json:"into,omitempty"`
 	// Recorded reports that a step exported from the session replays the
-	// act's actions.
+	// act's or the upload's actions.
 	Recorded bool           `json:"recorded"`
 	Outputs  map[string]any `json:"outputs,omitempty"`
 	// Screenshot is the file a screenshot operation saved.
@@ -301,6 +306,11 @@ func (s *Sessions) Open(ctx context.Context, opts SessionOptions) (OpenResult, e
 	if err != nil {
 		return OpenResult{}, &SessionError{Code: CodeLaunchFailed, Message: err.Error()}
 	}
+	authorities, trustWarnings, err := loadTrustedCAs(ctx)
+	if err != nil {
+		return OpenResult{}, &SessionError{Code: CodeLaunchFailed, Message: err.Error()}
+	}
+	warnings = append(warnings, trustWarnings...)
 
 	id, workDir, err := reserveSession(store)
 	if err != nil {
@@ -343,6 +353,7 @@ func (s *Sessions) Open(ctx context.Context, opts SessionOptions) (OpenResult, e
 		Generate:       generate,
 
 		ClientCertificates: certificates,
+		TrustedCAs:         authorities,
 		Guard:              guardsCertificates(ctx, certificates),
 		Warn:               func(message string) { warnings = append(warnings, message) },
 	}
@@ -413,6 +424,7 @@ func (s *Sessions) Open(ctx context.Context, opts SessionOptions) (OpenResult, e
 	}
 	return OpenResult{
 		ID:              id,
+		TLSVerified:     op.tlsVerified(ctx, pageURL),
 		CDPURL:          record.CDPURL,
 		Headless:        opts.Headless,
 		Profile:         opts.Profile,
@@ -524,7 +536,7 @@ func (s *Sessions) operator(eng engine, bridge *modelBridge, state sessionState,
 		certificateProxy: eng.Handle().CertProxy != nil,
 		certificateEvent: func(_ int, event certproxy.Event) {
 			if event.Kind != certproxy.EventConnect {
-				*warnings = append(*warnings, "client certificate: "+describeCertificateEvent(event))
+				*warnings = append(*warnings, "browser TLS: "+describeCertificateEvent(event))
 			}
 		},
 	}
@@ -606,8 +618,8 @@ func (s *Sessions) Do(ctx context.Context, req DoRequest) (DoResult, error) {
 	if err != nil {
 		return DoResult{}, err
 	}
-	// An element operation is the act it stands for, with its action as the
-	// act's recording.
+	// An element operation is the act or upload it stands for, with its
+	// action as its recording.
 	var preset []recordedAction
 	if isElement {
 		snap, err := eng.Snapshot(ctx)
@@ -640,8 +652,11 @@ func (s *Sessions) Do(ctx context.Context, req DoRequest) (DoResult, error) {
 		warnings = append(warnings, extractWarnings(*op.Extract)...)
 	}
 	result := DoResult{ID: req.ID, Index: index, Kind: op.kind(), Status: OperationDone}
-	if isElement {
+	switch {
+	case isElement && op.Act != nil:
 		result.Act = op.Act.Instruction
+	case isElement && op.Upload != nil:
+		result.Into = op.Upload.Into
 	}
 	canonical, err := json.Marshal(op)
 	if err != nil {
@@ -676,11 +691,11 @@ func (s *Sessions) Do(ctx context.Context, req DoRequest) (DoResult, error) {
 				entry.URLBefore = done.PageURL
 			}
 			result.Actions = sessionActions(done.Actions, masker)
-			if op.Act != nil {
+			if op.Act != nil || op.Upload != nil {
 				entry.Recordable = done.PageURL != "" && len(done.Actions) > 0
 				if entry.Recordable && holdsValue(done.Actions, values.all) {
 					entry.Recordable = false
-					warnings = append(warnings, "the act's actions hold a variable's value, so an exported step asks the model for this act on every run")
+					warnings = append(warnings, "the operation's actions hold a variable's value, so an exported step asks the model for this operation on every run")
 				}
 				// Only actions an export replays are kept, and those hold no
 				// variable's value.

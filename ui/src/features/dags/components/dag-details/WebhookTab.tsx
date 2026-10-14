@@ -51,6 +51,7 @@ import ConfirmModal from '@/components/ui/confirm-dialog';
 import { EmptyState } from '@/components/PageStates';
 import WebhookProfileSelectionCard from './WebhookProfileSelectionCard';
 import WebhookProfileTokensCard from './WebhookProfileTokensCard';
+import WebhookPublicURLCard from './WebhookPublicURLCard';
 import {
   buildWebhookExamples,
   findActiveAllowedProfile,
@@ -69,6 +70,8 @@ type WebhookHMACEnforcementMode =
 
 interface WebhookTabProps {
   fileName: string;
+  // dagName names the DAG's runs, which may differ from its file name.
+  dagName?: string;
 }
 
 interface CopyButtonProps {
@@ -115,7 +118,7 @@ function toHMACAuthMode(mode: WebhookAuthMode): WebhookHMACAuthMode {
   }
 }
 
-function WebhookTab({ fileName }: WebhookTabProps) {
+function WebhookTab({ fileName, dagName = fileName }: WebhookTabProps) {
   const { ts } = useI18n();
   const config = useConfig();
   const remoteNode = useRemoteNode();
@@ -125,7 +128,7 @@ function WebhookTab({ fileName }: WebhookTabProps) {
   // State
   const [webhook, setWebhook] = useState<WebhookDetails | null>(null);
   const [secretReveal, setSecretReveal] = useState<{
-    kind: 'token' | 'hmac';
+    kind: 'token' | 'hmac' | 'sender';
     value: string;
   } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -553,23 +556,29 @@ function WebhookTab({ fileName }: WebhookTabProps) {
   // Token reveal after create/regenerate
   if (secretReveal) {
     const secretLabel =
-      secretReveal.kind === 'token' ? 'Webhook Token' : 'Webhook HMAC Secret';
+      secretReveal.kind === 'token'
+        ? 'Webhook Token'
+        : secretReveal.kind === 'hmac'
+          ? 'Webhook HMAC Secret'
+          : 'Signing Secret';
     const secretWarning =
       secretReveal.kind === 'token'
         ? "Copy this token now. You won't be able to see it again!"
-        : "Copy this HMAC secret now. You won't be able to see it again!";
+        : secretReveal.kind === 'hmac'
+          ? "Copy this HMAC secret now. You won't be able to see it again!"
+          : "Copy this secret into GitHub's webhook settings now. You won't be able to see it again!";
 
     return (
       <Card className="max-w-xl gap-0 py-0">
         <CardHeader className="pb-2 px-4 pt-3">
           <div className="flex items-center gap-2">
             <Webhook className="h-4 w-4 text-muted-foreground" />
-            <CardTitle className="text-sm">{secretLabel}</CardTitle>
+            <CardTitle className="text-sm">{ts(secretLabel)}</CardTitle>
           </div>
         </CardHeader>
         <CardContent className="px-4 pb-3 pt-3 space-y-3">
           <div className="p-3 bg-warning/10 border border-warning/20 rounded-md">
-            <p className="text-sm text-foreground">{secretWarning}</p>
+            <p className="text-sm text-foreground">{ts(secretWarning)}</p>
           </div>
           <div className="flex items-center gap-2">
             <code className="flex-1 p-2 text-xs bg-muted rounded-md break-all font-mono">
@@ -754,6 +763,18 @@ function WebhookTab({ fileName }: WebhookTabProps) {
           </div>
         </CardContent>
       </Card>
+
+      <WebhookPublicURLCard
+        fileName={fileName}
+        dagName={dagName}
+        isAdmin={isAdmin}
+        remoteNode={getRemoteNodeParam()}
+        webhook={webhook}
+        onWebhookChange={setWebhook}
+        onSecretCreated={(secret) =>
+          setSecretReveal({ kind: 'sender', value: secret })
+        }
+      />
 
       {/* Authentication Card */}
       <Card className="gap-0 py-0">
@@ -1054,7 +1075,7 @@ function WebhookTab({ fileName }: WebhookTabProps) {
           <ul className="mt-2 text-xs text-muted-foreground space-y-1">
             <li>
               <I18nTemplate
-                text="{payload} is available as the {variable} environment variable."
+                text="{payload} is in the file named by {file}, and in the {variable} environment variable when it fits in one."
                 values={{
                   payload: (
                     <code className="bg-accent px-1 rounded-md border">
@@ -1064,6 +1085,11 @@ function WebhookTab({ fileName }: WebhookTabProps) {
                   variable: (
                     <code className="bg-accent px-1 rounded-md border">
                       WEBHOOK_PAYLOAD
+                    </code>
+                  ),
+                  file: (
+                    <code className="bg-accent px-1 rounded-md border">
+                      WEBHOOK_PAYLOAD_FILE
                     </code>
                   ),
                 }}

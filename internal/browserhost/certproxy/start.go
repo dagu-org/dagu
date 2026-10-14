@@ -26,7 +26,7 @@ import (
 
 // configVersion versions the configuration a starting process hands the
 // proxy, which may run an executable replaced in the meantime.
-const configVersion = 1
+const configVersion = 2
 
 const (
 	// startAttempts bounds the starts of a proxy that took the browser's
@@ -211,6 +211,18 @@ func PendingConnections(ctx context.Context, handleURL string) ([]Pending, error
 		return nil, fmt.Errorf("read certificate proxy connections: %w", err)
 	}
 	return pending, nil
+}
+
+// Verified reports whether the proxy at handleURL verified the server
+// certificate of host on a route it still carries. An error means the proxy
+// no longer answers.
+func Verified(ctx context.Context, handleURL, host string) (bool, error) {
+	query := url.Values{hostParam: {host}}
+	var verified bool
+	if err := getControl(ctx, handleURL+"/"+verifiedPath+"?"+query.Encode(), &verified); err != nil {
+		return false, fmt.Errorf("read certificate proxy verification: %w", err)
+	}
+	return verified, nil
 }
 
 // getControl reads the JSON a control path of the proxy answers into v.

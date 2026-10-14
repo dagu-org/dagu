@@ -222,11 +222,14 @@ func (a *API) DeleteDAG(ctx context.Context, request api.DeleteDAGRequestObject)
 	}
 
 	if a.authService != nil && a.authService.HasWebhookStore() {
+		webhook, _ := a.authService.GetWebhookByDAGName(ctx, request.FileName)
 		if err := a.authService.DeleteWebhook(ctx, request.FileName); err != nil && !errors.Is(err, auth.ErrWebhookNotFound) {
 			logger.Warn(ctx, "Failed to delete webhook for deleted DAG",
 				tag.Name(request.FileName),
 				tag.Error(err),
 			)
+		} else {
+			a.deletePublicWebhookLog(ctx, webhook)
 		}
 	}
 
@@ -412,7 +415,14 @@ func (a *API) RenameDAG(ctx context.Context, request api.RenameDAGRequestObject)
 		}
 	}
 
+	webhookMoved, err := a.moveWebhookForRename(ctx, request.FileName, request.Body.NewFileName)
+	if err != nil {
+		return nil, err
+	}
 	if err := a.dagRepository.Rename(ctx, request.FileName, request.Body.NewFileName); err != nil {
+		if webhookMoved {
+			a.restoreWebhookAfterFailedRename(ctx, request.FileName, request.Body.NewFileName)
+		}
 		return nil, fmt.Errorf("failed to move DAG: %w", err)
 	}
 	a.migrateDAGSettingsAfterRename(ctx, request.FileName, request.Body.NewFileName)

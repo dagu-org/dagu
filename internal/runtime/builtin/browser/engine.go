@@ -50,6 +50,16 @@ type engine interface {
 	// whenever the page loads a new document.
 	DocumentID(ctx context.Context) (string, error)
 	Extract(ctx context.Context, instruction string, schema json.RawMessage, timeout time.Duration) (json.RawMessage, error)
+	// Observe returns the elements the model finds for an instruction, the
+	// best match first, without acting on them.
+	Observe(ctx context.Context, instruction string, timeout time.Duration) ([]recordedAction, error)
+	// Upload gives files to a file input and reports how they reached it,
+	// as uploadDirect, uploadPicker, or uploadNearby. With an empty
+	// selector, the page's only file input gets them. Otherwise the element
+	// at selector gets them when it is a file input or holds exactly one;
+	// else a click on it opens a file picker that gets them; else the one
+	// file input nearest it does.
+	Upload(ctx context.Context, selector string, files []uploadFile, timeout time.Duration) (string, error)
 	WaitForSelector(ctx context.Context, selector string, timeout time.Duration) error
 	Screenshot(ctx context.Context) ([]byte, error)
 	CurrentURL(ctx context.Context) (string, error)
@@ -83,6 +93,10 @@ type engine interface {
 	// PendingConnections returns the connections the certificate proxy has
 	// not yet heard a site answer on, or nothing without a proxy.
 	PendingConnections(ctx context.Context) ([]certproxy.Pending, error)
+	// CertificateVerified reports whether the certificate proxy verified the
+	// server certificate of host on a route it still carries; false without
+	// a proxy.
+	CertificateVerified(ctx context.Context, host string) (bool, error)
 	Handle() browserHandle
 	// Detach releases the session while the browser keeps running.
 	Detach(ctx context.Context) error
@@ -105,6 +119,9 @@ type launchOptions struct {
 	// ClientCertificates are presented, through a proxy, to the hosts they
 	// name.
 	ClientCertificates []certproxy.Entry
+	// TrustedCAs add server trust, through the same proxy, to the hosts
+	// they name.
+	TrustedCAs []certproxy.TrustedCA
 	// Guard sends the browser's other https: requests through the proxy
 	// too.
 	Guard bool

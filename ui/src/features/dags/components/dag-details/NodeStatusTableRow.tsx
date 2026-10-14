@@ -111,6 +111,10 @@ type Props = {
   hideActions?: boolean;
   /** Whether the inline log starts expanded */
   defaultLogExpanded?: boolean;
+  /** Whether this step's details are open */
+  selected?: boolean;
+  /** Opens this step's details; without it a row click toggles the log */
+  onInspect?: (stepName: string) => void;
 };
 
 type BuildExecution = components['schemas']['BuildExecution'];
@@ -305,6 +309,8 @@ function NodeStatusTableRow({
   view = 'desktop',
   hideActions = false,
   defaultLogExpanded = false,
+  selected = false,
+  onInspect,
 }: Props) {
   const { ts } = useI18n();
   const { dagRunId, name: dagName } = dagRun;
@@ -498,76 +504,19 @@ function NodeStatusTableRow({
         return;
       }
 
-      // Check if we're in a dagRun context or a DAG context
-      // More reliable detection by checking the current URL path or the dagRun object
-      const currentPath = window.location.pathname;
-      const isModal = document.querySelector('.dagRun-modal-content') !== null;
-      const isDAGRunContext =
-        dagRun && (currentPath.startsWith('/dag-runs/') || isModal);
-
-      if (isDAGRunContext) {
-        // For dagRuns, navigate to /dag-runs/{root-dag-name}/{root-dag-run-id}?subDAGRunId=...
-        const searchParams = new URLSearchParams();
-        searchParams.set('remoteNode', remoteNode);
-        searchParams.set('subDAGRunId', subDAGRunId);
-
-        // Determine root DAG information
-        let rootDAGRunId: string;
-        let rootDAGName: string;
-
-        if (dagRun && dagRun.rootDAGRunId) {
-          // If this is already a sub dagRun, use its root information
-          rootDAGRunId = dagRun.rootDAGRunId;
-          rootDAGName = dagRun.rootDAGRunName;
-          searchParams.set('dagRunId', dagRun.rootDAGRunId);
-          searchParams.set('dagRunName', dagRun.rootDAGRunName);
-        } else {
-          // Otherwise, use the current dagRun as the root
-          rootDAGRunId = dagRunId || '';
-          rootDAGName = dagRun?.name || name;
-          searchParams.set('dagRunId', dagRunId || '');
-          searchParams.set('dagRunName', dagRun?.name || name);
-        }
-
-        searchParams.set('step', node.step.name);
-        const url = `/dag-runs/${rootDAGName}/${rootDAGRunId}?${searchParams.toString()}`;
-
-        // If Cmd/Ctrl key is pressed, open in new tab
-        if (e && (e.metaKey || e.ctrlKey)) {
-          window.open(url, '_blank');
-        } else {
-          navigate(url);
-        }
+      // Child runs open on the run page under their root run.
+      const url = buildDAGRunPageURL({
+        rootDAGRunName: dagRun?.rootDAGRunId
+          ? dagRun.rootDAGRunName
+          : dagRun?.name || name,
+        rootDAGRunId: dagRun?.rootDAGRunId || dagRunId || '',
+        subDAGRunId,
+        remoteNode,
+      });
+      if (modifierClick) {
+        window.open(url, '_blank');
       } else {
-        // For DAGs, use the existing approach with query parameters
-        const searchParams = new URLSearchParams();
-        searchParams.set('remoteNode', remoteNode);
-        searchParams.set('subDAGRunId', subDAGRunId);
-
-        // Use root dagRun information from the dagRun prop if available
-        if (dagRun && dagRun.rootDAGRunId) {
-          // If this is already a sub dagRun, use its root information
-          searchParams.set('dagRunId', dagRun.rootDAGRunId);
-        } else {
-          // Otherwise, use the current dagRun as the root
-          searchParams.set('dagRunId', dagRunId || '');
-        }
-
-        // Add dagRunName parameter to avoid waiting for DAG details
-        // Use the root dagRun name or current dagRun name
-        if (dagRun) {
-          searchParams.set('dagRunName', dagRun.rootDAGRunName);
-        }
-
-        searchParams.set('step', node.step.name);
-        const url = `/dags/${name}?${searchParams.toString()}`;
-
-        // If Cmd/Ctrl key is pressed, open in new tab
-        if (e && (e.metaKey || e.ctrlKey)) {
-          window.open(url, '_blank');
-        } else {
-          navigate(url);
-        }
+        navigate(url);
       }
     }
   };
@@ -842,13 +791,38 @@ function NodeStatusTableRow({
       </DropdownMenu>
     ) : null;
 
+  // A button, so keyboard and touch users reach the details a row click
+  // opens. It stops the click so the row does not handle it again.
+  const stepName = onInspect ? (
+    <button
+      type="button"
+      onClick={(event) => {
+        event.stopPropagation();
+        onInspect(node.step.name);
+      }}
+      className="rounded-sm text-left hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+    >
+      {node.step.name}
+    </button>
+  ) : (
+    node.step.name
+  );
+
   // Render desktop view (table row)
   if (view === 'desktop') {
     return (
       <>
         <StyledTableRow
-          className="hover:bg-muted/50 transition-colors duration-200 h-auto cursor-pointer"
+          className={cn(
+            'hover:bg-muted/50 transition-colors duration-200 h-auto cursor-pointer',
+            selected && 'bg-primary/5 hover:bg-primary/10'
+          )}
+          data-selected={selected || undefined}
           onClick={() => {
+            if (onInspect) {
+              onInspect(node.step.name);
+              return;
+            }
             if (hasLogs) {
               setIsLogExpanded(!isLogExpanded);
               // Set default tab based on what's available
@@ -891,7 +865,7 @@ function NodeStatusTableRow({
           <TableCell>
             <div className="space-y-0.5">
               <div className="text-sm font-semibold text-foreground text-wrap break-all flex items-center gap-1.5">
-                {node.step.name}
+                {stepName}
                 {hasSubDAGRun && (
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -1280,7 +1254,7 @@ function NodeStatusTableRow({
             {rownum}
           </span>
           <p className="font-semibold text-foreground">
-            {node.step.name}
+            {stepName}
             {hasSubDAGRun && (
               <span className="inline-flex items-center text-primary ml-1.5">
                 <GitBranch className="h-4 w-4" />

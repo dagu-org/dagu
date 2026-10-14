@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"maps"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"regexp"
 	"slices"
@@ -25,7 +26,7 @@ import (
 )
 
 const (
-	// kindClientCertificate labels what the client certificate proxy reports.
+	// kindClientCertificate labels what the certificate proxy reports.
 	kindClientCertificate = "client_certificate"
 	// statusAsked marks a site that asked for a client certificate no entry
 	// names.
@@ -78,6 +79,36 @@ func loadClientCertificates(ctx context.Context, step []cmnconfig.BrowserClientC
 		}
 	}
 	return entries, warnings, nil
+}
+
+// loadTrustedCAs loads the host's trusted authorities. Warnings report
+// hosts whose sites Chrome never routes through the certificate proxy.
+func loadTrustedCAs(ctx context.Context) ([]certproxy.TrustedCA, []string, error) {
+	var entries []certproxy.TrustedCA
+	var warnings []string
+	for i, authority := range cmnconfig.GetConfig(ctx).Browser.TrustedCAs {
+		entry, err := certproxy.LoadTrustedCA(fmt.Sprintf("browser.trusted_cas[%d]", i), authority)
+		if err != nil {
+			return nil, nil, err
+		}
+		entries = append(entries, entry)
+		for _, host := range authority.Hosts {
+			if bypassesCertificateProxy(host) {
+				warnings = append(warnings, fmt.Sprintf("%s: Chrome bypasses certificate routing for %s; this authority can verify an HTTPS proxy there, but a website must use a non-loopback, non-link-local hostname or address", entry.Label, host))
+			}
+		}
+	}
+	return entries, warnings, nil
+}
+
+// Chrome's implicit bypass applies to PAC routing, even for named hosts.
+func bypassesCertificateProxy(host string) bool {
+	host = hostpattern.Canonical(host)
+	if host == "localhost" || host == "loopback" || strings.HasSuffix(host, ".localhost") {
+		return true
+	}
+	address, err := netip.ParseAddr(host)
+	return err == nil && (address.Unmap().IsLoopback() || address.IsLinkLocalUnicast())
 }
 
 // guardsCertificates reports whether a browser presenting certificates

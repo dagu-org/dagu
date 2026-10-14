@@ -37,6 +37,7 @@ import (
 	"github.com/dagucloud/dagu/v2/internal/pagination"
 	"github.com/dagucloud/dagu/v2/internal/persis"
 	profilepkg "github.com/dagucloud/dagu/v2/internal/profile"
+	"github.com/dagucloud/dagu/v2/internal/publicwebhook"
 	"github.com/dagucloud/dagu/v2/internal/queue"
 	"github.com/dagucloud/dagu/v2/internal/remotenode"
 	"github.com/dagucloud/dagu/v2/internal/runtime"
@@ -83,7 +84,7 @@ type API struct {
 	coordinatorCli       coordinator.Client
 	serviceRegistry      serviceregistry.ServiceRegistry
 	subCmdBuilder        *launcher.SubCmdBuilder
-	resourceService      *resource.Service
+	resourceService      resourceMonitor
 	authService          AuthService
 	auditService         *audit.Service
 	eventService         *eventstore.Service
@@ -102,6 +103,7 @@ type API struct {
 	profileStore         profilepkg.Store
 	viewStore            view.Store
 	licenseManager       *license.Manager
+	publicWebhookStore   publicwebhook.Store
 	cloudReport          CloudReportService
 	apiKeyCreateMu       sync.Mutex
 	workspaceStore       workspace.Store
@@ -120,6 +122,12 @@ type processRepository interface {
 	CountAliveByDAGName(ctx context.Context, groupName, dagName string) (int, error)
 	IsAttemptAlive(ctx context.Context, groupName string, dagRun ir.DAGRunRef, attemptID string) (bool, error)
 	ListAllAlive(ctx context.Context) (map[string][]ir.DAGRunRef, error)
+}
+
+// resourceMonitor serves the system resource samples the server collects.
+type resourceMonitor interface {
+	GetHistory(duration time.Duration) *resource.ResourceHistory
+	DiskUsedPercent() (float64, bool)
 }
 
 type NotificationService interface {
@@ -197,6 +205,11 @@ type AuthService interface {
 	ToggleWebhook(ctx context.Context, dagName string, enabled bool) (*auth.Webhook, error)
 	ValidateWebhookToken(ctx context.Context, dagName, token string) (*auth.Webhook, error)
 	HasWebhookStore() bool
+	EnablePublicWebhook(ctx context.Context, dagName string) (*auth.Webhook, error)
+	DisablePublicWebhook(ctx context.Context, dagName string) (*auth.Webhook, error)
+	RenameWebhook(ctx context.Context, oldName, newName string) error
+	RegeneratePublicWebhookToken(ctx context.Context, dagName string) (*auth.Webhook, error)
+	ConfigurePublicWebhookSender(ctx context.Context, dagName string, input authservice.PublicWebhookSenderInput) (*authservice.PublicWebhookSenderResult, error)
 	// Setup
 	CountUsers(ctx context.Context) (int64, error)
 }
@@ -304,6 +317,14 @@ func WithDAGPinStore(store dagpin.Store) APIOption {
 func WithWikiStore(store wiki.PageStore) APIOption {
 	return func(a *API) {
 		a.wikiStore = store
+	}
+}
+
+// WithPublicWebhookStore returns an APIOption that sets the store of public
+// webhook URL status and deliveries.
+func WithPublicWebhookStore(store publicwebhook.Store) APIOption {
+	return func(a *API) {
+		a.publicWebhookStore = store
 	}
 }
 
@@ -446,9 +467,12 @@ func New(
 		coordinatorCli:      cc,
 		serviceRegistry:     sr,
 		metricsRegistry:     mr,
-		resourceService:     rs,
 		defaultExecMode:     cfg.DefaultExecMode,
 		leaseStaleThreshold: dagrun.DefaultStaleLeaseThreshold,
+	}
+	// A nil service must leave the field nil, not a typed nil.
+	if rs != nil {
+		a.resourceService = rs
 	}
 
 	for _, opt := range opts {

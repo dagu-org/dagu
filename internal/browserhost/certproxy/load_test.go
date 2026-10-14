@@ -261,6 +261,49 @@ func TestLoadCAFile(t *testing.T) {
 	assert.Contains(t, err.Error(), "holds no PEM certificate")
 }
 
+// A ca_file holds trust anchors: authorities, or self-signed certificates
+// such as an appliance's. Text around the certificates, as openssl writes
+// it, is ignored; a private key or a damaged certificate is an error.
+func TestLoadTrustedCA(t *testing.T) {
+	t.Parallel()
+	ca := newTestCA(t, "server CA")
+	leaf, key := ca.issue(t, certOptions{name: siteHost})
+	appliance, _ := newSelfSigned(t, siteHost)
+	for name, tt := range map[string]struct {
+		data    string
+		want    []*x509.Certificate
+		wantErr string
+	}{
+		"Authority":            {data: ca.pem(), want: []*x509.Certificate{ca.cert}},
+		"SelfSigned":           {data: certPEM(appliance), want: []*x509.Certificate{appliance}},
+		"Bundle":               {data: ca.pem() + certPEM(appliance), want: []*x509.Certificate{ca.cert, appliance}},
+		"OpenSSLText":          {data: "subject=CN = server CA\nissuer=CN = server CA\n" + ca.pem() + "\n# end of bundle\n", want: []*x509.Certificate{ca.cert}},
+		"IssuedLeaf":           {data: ca.pem() + certPEM(leaf), wantErr: "neither a certificate authority nor self-signed"},
+		"PrivateKey":           {data: ca.pem() + keyPEM(t, key), wantErr: "private key"},
+		"MalformedPrivateKey":  {data: "-----BEGIN PRIVATE KEY-----\ninvalid\n" + ca.pem(), wantErr: "private key"},
+		"MalformedCertificate": {data: "-----BEGIN CERTIFICATE-----\ninvalid\n" + ca.pem(), wantErr: "malformed"},
+		"NoCertificate":        {data: "not a certificate", wantErr: "holds no PEM certificate"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			dir := t.TempDir()
+			writeFile(t, dir, "ca.pem", tt.data)
+			entry, err := LoadTrustedCA(testLabel, cmnconfig.BrowserTrustedCA{Hosts: []string{siteHost}, CAFile: filepath.Join(dir, "ca.pem")})
+			if tt.wantErr != "" {
+				require.ErrorContains(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, []string{siteHost}, entry.Hosts)
+			got := parseChain(t, entry.CAPEM)
+			require.Len(t, got, len(tt.want))
+			for i, cert := range tt.want {
+				assert.True(t, got[i].Equal(cert))
+			}
+		})
+	}
+}
+
 func TestLoadRejectsInvalidConfig(t *testing.T) {
 	t.Parallel()
 

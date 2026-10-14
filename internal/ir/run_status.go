@@ -68,6 +68,15 @@ func InitialStatus(dag *DAG) DAGRunStatus {
 	}
 }
 
+// The condition type that tells whether a queued DAG-run can start, and the
+// reasons it records when no worker can take the run.
+const (
+	DAGRunConditionRunnable               = "Runnable"
+	DAGRunReasonNoMatchingWorker          = "NoMatchingWorker"
+	DAGRunReasonNoAvailableWorker         = "NoAvailableWorker"
+	DAGRunReasonWorkerDispatchUnavailable = "WorkerDispatchUnavailable"
+)
+
 // DAGRunCondition describes an observed runtime condition for a DAG-run.
 type DAGRunCondition struct {
 	Type      string `json:"type"`

@@ -38,6 +38,17 @@ type Entry struct {
 	CAPEM string `json:"ca_pem,omitempty"`
 }
 
+// TrustedCA is a server certificate authority trusted only for the hosts it
+// names.
+type TrustedCA struct {
+	// Label names the authority in messages, such as browser.trusted_cas[0].
+	Label string `json:"label"`
+	// Hosts are host patterns, as the hostpattern package matches them.
+	Hosts []string `json:"hosts"`
+	// CAPEM holds the authority's certificates.
+	CAPEM string `json:"ca_pem"`
+}
+
 // Config is what the proxy serves, and for which browser.
 type Config struct {
 	// Token is a random value that prefixes the proxy's control paths.
@@ -51,6 +62,9 @@ type Config struct {
 	// Entries are the certificates; the first whose hosts match a host is
 	// presented to it.
 	Entries []Entry `json:"entries"`
+	// TrustedCAs add server trust to the hosts each names. Every matching
+	// authority applies, beside the entry presented there, if any.
+	TrustedCAs []TrustedCA `json:"trusted_cas,omitempty"`
 	// GraceSeconds is how long the proxy waits for the browser to answer
 	// for the first time; zero means five minutes.
 	GraceSeconds int `json:"grace_seconds,omitempty"`
@@ -76,7 +90,8 @@ type Ready struct {
 
 // Kinds of Event.
 const (
-	// EventConnect reports the first connection to a host with an entry.
+	// EventConnect reports the first connection to a host an entry or an
+	// authority names, once its server certificate was verified.
 	EventConnect = "connect"
 	// EventClientCertificateRejected reports a server that refused the
 	// client certificate.
@@ -199,6 +214,53 @@ func (l *eventLog) connect(host, entry string, presented bool, message string) {
 	if !seen {
 		l.record(Event{Kind: EventConnect, Host: host, Entry: entry, Message: message, Presented: presented})
 	}
+}
+
+// verifiedHosts holds the hosts whose server certificate the proxy
+// verified, each mapped to whether the guard carried the connection. The
+// latest verification of a host decides.
+type verifiedHosts struct {
+	mu    sync.Mutex
+	hosts map[string]bool
+	// guardOff is set once the guard stopped.
+	guardOff bool
+}
+
+func newVerifiedHosts() *verifiedHosts {
+	return &verifiedHosts{hosts: map[string]bool{}}
+}
+
+// add records a verified host, unless the guard carried it after it
+// stopped: the browser reaches that host directly from then on.
+func (v *verifiedHosts) add(host string, guarded bool) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	if guarded && v.guardOff {
+		return
+	}
+	v.hosts[host] = guarded
+}
+
+func (v *verifiedHosts) remove(host string) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	delete(v.hosts, host)
+}
+
+// dropGuarded forgets the hosts the guard carried, which the browser
+// reaches itself once the guard stops.
+func (v *verifiedHosts) dropGuarded() {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	v.guardOff = true
+	maps.DeleteFunc(v.hosts, func(_ string, guarded bool) bool { return guarded })
+}
+
+func (v *verifiedHosts) has(host string) bool {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	_, ok := v.hosts[host]
+	return ok
 }
 
 // after returns the events recorded after seq.

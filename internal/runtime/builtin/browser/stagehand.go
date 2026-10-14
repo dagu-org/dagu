@@ -193,7 +193,7 @@ func (l stagehandLauncher) Launch(ctx context.Context, opts launchOptions) (engi
 	}
 	cdpURL := fmt.Sprintf("http://127.0.0.1:%d", port)
 	var proxy *certproxy.Handle
-	if len(opts.ClientCertificates) > 0 || opts.Guard {
+	if len(opts.ClientCertificates) > 0 || len(opts.TrustedCAs) > 0 || opts.Guard {
 		if proxy, err = l.startCertProxy(ctx, cdpURL, opts); err != nil {
 			return nil, err
 		}
@@ -273,14 +273,15 @@ func (l stagehandLauncher) startCertProxy(ctx context.Context, cdpURL string, op
 		start = certproxy.Start
 	}
 	proxy, err := start(ctx, cmnconfig.GetConfig(ctx).Paths.Executable, certproxy.Config{
-		Token:     rand.Text(),
-		CDPURL:    cdpURL,
-		SystemPAC: pac,
-		Entries:   opts.ClientCertificates,
-		Guard:     opts.Guard,
+		Token:      rand.Text(),
+		CDPURL:     cdpURL,
+		SystemPAC:  pac,
+		Entries:    opts.ClientCertificates,
+		TrustedCAs: opts.TrustedCAs,
+		Guard:      opts.Guard,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("start the client certificate proxy: %w", err)
+		return nil, fmt.Errorf("start the certificate proxy: %w", err)
 	}
 	return proxy, nil
 }
@@ -659,6 +660,24 @@ func (e *stagehandEngine) Extract(ctx context.Context, instruction string, schem
 	})
 }
 
+func (e *stagehandEngine) Observe(ctx context.Context, instruction string, timeout time.Duration) ([]recordedAction, error) {
+	result, err := boundCall(ctx, timeout+callTimeoutSlack, func(ctx context.Context) (stagehand.ObserveResult, error) {
+		return e.client.Observe(ctx, &instruction, &stagehand.StagehandClientObserveOptions{Timeout: new(float64(timeout.Milliseconds()))})
+	})
+	if err != nil {
+		return nil, err
+	}
+	found := make([]recordedAction, 0, len(result.Data))
+	for _, action := range result.Data {
+		element := recordedAction{Selector: action.Selector, Description: action.Description, Arguments: action.Arguments}
+		if action.Method != nil {
+			element.Method = *action.Method
+		}
+		found = append(found, element)
+	}
+	return found, nil
+}
+
 func (e *stagehandEngine) WaitForSelector(ctx context.Context, selector string, timeout time.Duration) error {
 	matched, err := boundCall(ctx, timeout+callTimeoutSlack, func(ctx context.Context) (bool, error) {
 		page, err := e.page(ctx)
@@ -818,6 +837,15 @@ func (e *stagehandEngine) PendingConnections(ctx context.Context) ([]certproxy.P
 	}
 	return boundCall(ctx, e.pageCallTimeout, func(ctx context.Context) ([]certproxy.Pending, error) {
 		return certproxy.PendingConnections(ctx, e.handle.CertProxy.URL)
+	})
+}
+
+func (e *stagehandEngine) CertificateVerified(ctx context.Context, host string) (bool, error) {
+	if e.handle.CertProxy == nil {
+		return false, nil
+	}
+	return boundCall(ctx, e.pageCallTimeout, func(ctx context.Context) (bool, error) {
+		return certproxy.Verified(ctx, e.handle.CertProxy.URL, host)
 	})
 }
 

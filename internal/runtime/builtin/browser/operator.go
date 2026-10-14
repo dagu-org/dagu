@@ -33,6 +33,9 @@ type operator struct {
 	recorder actRecorder
 	// shots stores the screenshots screenshot operations take.
 	shots *agentstep.ArtifactStore
+	// workDir resolves the relative paths of the files uploads give; empty
+	// means the current directory.
+	workDir string
 	// warn reports a problem that did not stop the operation at index.
 	warn func(index int, message string)
 	// certificateProxy is set when the browser's https: requests go through
@@ -50,7 +53,8 @@ type operator struct {
 	presented map[string]string
 }
 
-// actRecorder keeps the actions acts performed, keyed by replayKey.
+// actRecorder keeps the actions acts and uploads performed, keyed by
+// replayKey and uploadReplayKey.
 type actRecorder interface {
 	// lookup returns the actions recorded under key, if any.
 	lookup(key string) ([]recordedAction, bool)
@@ -61,9 +65,10 @@ type actRecorder interface {
 // opResult is what one operation did.
 type opResult struct {
 	agentstep.Report
-	// Actions are the actions an act performed or replayed.
+	// Actions are the actions an act or an upload performed or replayed.
 	Actions []recordedAction
-	// PageURL is the page an act started on, when the act was recorded.
+	// PageURL is the page an act or an upload started on, when it was
+	// recorded.
 	PageURL string
 	// Values are the values an extract read, limited to the properties its
 	// schema lists.
@@ -77,6 +82,9 @@ func (o *operator) runOperation(ctx context.Context, index int, op operation) (o
 		return o.gotoURL(ctx, index, op.Goto, timeout)
 	case op.Act != nil:
 		result, err := o.act(ctx, index, *op.Act, timeout)
+		return result, o.explainWait(ctx, err)
+	case op.Upload != nil:
+		result, err := o.upload(ctx, index, *op.Upload, timeout)
 		return result, o.explainWait(ctx, err)
 	case op.Extract != nil:
 		return o.extract(ctx, index, *op.Extract, timeout)
@@ -175,7 +183,7 @@ func (o *operator) takeCertificateEvents(ctx context.Context, index int) []certp
 	if err != nil && !o.certificateProxyLost {
 		o.certificateProxyLost = true
 		if o.warn != nil {
-			o.warn(index, "the client certificate proxy stopped answering: "+err.Error())
+			o.warn(index, "the certificate proxy stopped answering: "+err.Error())
 		}
 	}
 	var failures []certproxy.Event
@@ -197,6 +205,17 @@ func (o *operator) takeCertificateEvents(ctx context.Context, index int) []certp
 		}
 	}
 	return failures
+}
+
+// tlsVerified reports whether the certificate proxy verified the server
+// certificate of the host of the https: page at address. Without an answer
+// from the proxy, it reports false.
+func (o *operator) tlsVerified(ctx context.Context, address string) bool {
+	if !o.certificateProxy || o.certificateProxyLost || !strings.HasPrefix(strings.ToLower(address), "https://") {
+		return false
+	}
+	verified, err := o.eng.CertificateVerified(ctx, urlHost(address))
+	return err == nil && verified
 }
 
 func (o *operator) act(ctx context.Context, index int, spec actSpec, timeout time.Duration) (opResult, error) {

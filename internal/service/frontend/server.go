@@ -76,6 +76,13 @@ const (
 	serverShutdownTimeout = 10 * time.Second
 	httpShutdownBudget    = 5 * time.Second
 	httpWriteTimeout      = 60 * time.Second
+	// dagRunActivityMinInterval is the shortest gap between two refetches
+	// of one live activity topic.
+	dagRunActivityMinInterval = 5 * time.Second
+	// dagRunActivityMaxInterval bounds how stale a live activity topic gets
+	// when no run event wakes it, such as when a queued run records why it
+	// cannot start or the data disk fills.
+	dagRunActivityMaxInterval = 30 * time.Second
 )
 
 var wikiSSETopicTypes = [...]sse.TopicType{
@@ -354,6 +361,9 @@ func NewServer(setup ServerConfig, opts ...ServerOption) (*Server, error) {
 	)
 	if stores.WorkspaceBaseConfig != nil {
 		apiOpts = append(apiOpts, apiv1.WithWorkspaceBaseConfigProvider(stores.WorkspaceBaseConfig))
+	}
+	if stores.PublicWebhooks != nil {
+		apiOpts = append(apiOpts, apiv1.WithPublicWebhookStore(stores.PublicWebhooks))
 	}
 
 	var auditSvc *audit.Service
@@ -1393,6 +1403,12 @@ func (srv *Server) registerDedicatedSSEFetchers(registrar *sse.Multiplexer) {
 	registrar.RegisterFetcher(sse.TopicTypeStepLog, srv.apiV1.GetStepLogData)
 	registrar.RegisterFetcher(sse.TopicTypeDAGRuns, srv.apiV1.GetDAGRunsListData)
 	registrar.RegisterValidator(sse.TopicTypeDAGRuns, srv.apiV1.ValidateDAGRunsListQuery)
+	registrar.RegisterFetcher(sse.TopicTypeDAGRunActivity, srv.apiV1.GetDAGRunActivityData)
+	registrar.RegisterValidator(sse.TopicTypeDAGRunActivity, srv.apiV1.ValidateDAGRunActivityQuery)
+	// Each activity refetch scans the whole window, so bursts of run events
+	// are merged into at most one refetch per interval.
+	registrar.SetMinInterval(sse.TopicTypeDAGRunActivity, dagRunActivityMinInterval)
+	registrar.SetMaxInterval(sse.TopicTypeDAGRunActivity, dagRunActivityMaxInterval)
 	registrar.RegisterFetcher(sse.TopicTypeQueues, srv.apiV1.GetQueuesListData)
 	registrar.RegisterFetcher(sse.TopicTypeDAGsList, srv.apiV1.GetDAGsListData)
 	for _, topicType := range []sse.TopicType{sse.TopicTypeWikiPage, sse.TopicTypeLegacyDoc} {
@@ -1420,6 +1436,7 @@ func (srv *Server) registerDedicatedSSEFetchers(registrar *sse.Multiplexer) {
 			sse.TopicTypeSubDAGRun,
 			sse.TopicTypeDAGHistory,
 			sse.TopicTypeDAGRuns,
+			sse.TopicTypeDAGRunActivity,
 			sse.TopicTypeQueues,
 		} {
 			registrar.SetRefreshMode(topicType, sse.TopicRefreshModeOnDemand)

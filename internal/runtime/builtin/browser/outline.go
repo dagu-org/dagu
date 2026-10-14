@@ -149,6 +149,9 @@ var pressableRoles = []string{"button", "tab", "menuitem", "treeitem", "option"}
 
 var choiceRoles = []string{"select", "combobox", "listbox"}
 
+// fileInputRole is the role the tree gives a file input.
+const fileInputRole = "input, file"
+
 var cellRoles = []string{"cell", "gridcell", "columnheader", "rowheader"}
 
 // droppedRoles carry nothing a reader of the outline needs.
@@ -170,6 +173,8 @@ func (b outlineBuilder) build(n *outlineNode) []*outlineEntry {
 	case slices.Contains(fieldRoles, n.role), n.role == "combobox":
 		// A field's text is what was typed into it, which may be a secret.
 		return []*outlineEntry{{line: withRef(n, withName(n.role, n.name)), shape: n.role}}
+	case n.role == fileInputRole:
+		return []*outlineEntry{{line: withRef(n, withName(roleWord(n.role), n.name)), shape: n.role}}
 	case slices.Contains(toggleRoles, n.role), slices.Contains(pressableRoles, n.role):
 		return []*outlineEntry{{line: withRef(n, withFlags(withName(n.role, n.name), n.flags)), shape: n.role}}
 	case n.role == "heading":

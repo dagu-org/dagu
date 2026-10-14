@@ -52,7 +52,7 @@ func TestBrowserSessionCommands(t *testing.T) {
 		th := test.SetupCommand(t)
 		out, err := runSessionCommand(th, "", "list")
 		require.NoError(t, err)
-		assert.JSONEq(t, `{"sessions": []}`, out)
+		assert.JSONEq(t, `{"sessions": [], "capabilities": ["trusted_cas"]}`, out)
 	})
 
 	// A command on a session that does not exist prints its error as JSON

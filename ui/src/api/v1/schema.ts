@@ -714,6 +714,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dag-run-activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Summarize DAG-run activity
+         * @description Lists the DAG-runs created in a time window, newest first, one page at
+         *     a time. The first page also lists the DAGs whose latest run did not
+         *     succeed, runs still in progress (including ones created before the
+         *     window), queues with work, and the next scheduled runs. Without fromDate, the window is
+         *     the last `hours` hours, aligned to a 96th of its length. To load older
+         *     runs, pass the first page's from and to as fromDate and toDate, with
+         *     nextCursor as cursor.
+         *
+         */
+        get: operations["getDAGRunActivity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dag-runs": {
         parameters: {
             query?: never;
@@ -2101,7 +2128,9 @@ export interface paths {
          *     bearer token only, bearer token plus HMAC, or HMAC only.
          *
          *     The request body is passed to the DAG as the WEBHOOK_PAYLOAD environment
-         *     variable. If the DAG configures `webhook.forward_headers`, selected
+         *     variable, and as a file named by WEBHOOK_PAYLOAD_FILE. A body too large
+         *     for one environment variable is passed only as the file. If the DAG
+         *     configures `webhook.forward_headers`, selected
          *     request headers are passed as the WEBHOOK_HEADERS environment variable.
          *     For safety, the `Authorization` header is never forwarded.
          *     The DAG run is enqueued and the endpoint returns immediately with the
@@ -2675,6 +2704,111 @@ export interface paths {
          */
         post: operations["disableDAGWebhookHMAC"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dags/{fileName}/webhook/public": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the webhook's public URL
+         * @description Returns the webhook's public URL through Dagu Cloud, the state of the
+         *     relay connection that holds it, and its latest deliveries.
+         *     Developer, manager, or admin only.
+         *
+         */
+        get: operations["getDAGWebhookPublic"];
+        put?: never;
+        /**
+         * Turn on the webhook's public URL
+         * @description Gives the webhook a public URL through Dagu Cloud. A webhook that has
+         *     one keeps it. The server must be connected to Dagu Cloud, and the plan
+         *     must allow another public URL. Admin only.
+         *
+         */
+        post: operations["enableDAGWebhookPublic"];
+        /**
+         * Turn off the webhook's public URL
+         * @description Removes the webhook's public URL and its delivery log. Dagu Cloud drops
+         *     the URL and any deliveries waiting for it. Admin only.
+         *
+         */
+        delete: operations["disableDAGWebhookPublic"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dags/{fileName}/webhook/public/regenerate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Replace the webhook's public URL
+         * @description Gives the webhook a new public URL. The old URL stops working.
+         *     Requests Dagu Cloud already took through it are still delivered;
+         *     turning the URL off drops them. Admin only.
+         *
+         */
+        post: operations["regenerateDAGWebhookPublicURL"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dags/{fileName}/webhook/public/sender": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set who may send to the webhook's public URL
+         * @description Sets the sender whose signature requests to the public URL must
+         *     carry, its signing secret, and the events that start runs. For
+         *     GitHub, Dagu makes the secret when none is entered, and returns it
+         *     only this once. Admin only.
+         *
+         */
+        put: operations["configureDAGWebhookPublicSender"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dags/{fileName}/webhook/public/missed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Dismiss the webhook's missed deliveries
+         * @description Clears the counts of deliveries Dagu Cloud dropped for the public URL.
+         *     Admin only.
+         *
+         */
+        delete: operations["dismissDAGWebhookPublicMissed"];
         options?: never;
         head?: never;
         patch?: never;
@@ -4162,6 +4296,90 @@ export interface components {
             /** @description Opaque cursor for loading the next page of older DAG-runs */
             nextCursor?: string;
         };
+        /** @description One page of DAG-run activity for a time window */
+        DAGRunActivity: {
+            /**
+             * Format: int64
+             * @description Window start as Unix seconds
+             */
+            from: number;
+            /**
+             * Format: int64
+             * @description Window end as Unix seconds
+             */
+            to: number;
+            /** @description Up to 100 runs created in the window, newest first */
+            runs: components["schemas"]["DAGRunActivityRun"][];
+            /** @description Opaque cursor for loading the next page of older runs */
+            nextCursor?: string;
+            /** @description First page only: the latest run of each DAG whose latest run was created in the window and did not succeed, newest first, at most 20 */
+            attention: components["schemas"]["DAGRunActivityRun"][];
+            /** @description First page only: runs still running, waiting, or queued, oldest first, at most 100, including up to 50 live runs created before the window */
+            active: components["schemas"]["DAGRunActivityRun"][];
+            /** @description First page only: next scheduled runs, soonest first */
+            upcoming: components["schemas"]["DAGRunActivityUpcoming"][];
+            /** @description First page only: queues with runs running or waiting, the longest wait first, at most 20 */
+            queues: components["schemas"]["DAGRunActivityQueue"][];
+            /** @description First page only: how full the data directory's disk is, in percent; set only when it is at least 90 and the caller may view system status */
+            diskUsedPercent?: number;
+        };
+        /** @description A queue with runs running or waiting */
+        DAGRunActivityQueue: {
+            name: string;
+            /** @description Number of runs running; a lower bound when runningCapped is set */
+            running: number;
+            /** @description True when reading running runs stopped early, so running is a lower bound */
+            runningCapped?: boolean;
+            /** @description Maximum number of runs the queue runs at once */
+            maxConcurrency?: number;
+            /** @description Number of runs waiting; a lower bound when queuedCapped is set */
+            queued: number;
+            /** @description True when counting stopped early, so queued is a lower bound */
+            queuedCapped?: boolean;
+            /**
+             * Format: int64
+             * @description When the next run in line was queued, as Unix seconds
+             */
+            nextQueuedAt?: number;
+            blockedReason?: components["schemas"]["DAGRunActivityQueueBlockedReason"];
+        };
+        /**
+         * @description Why queued runs cannot start: no healthy worker matches their selector, no healthy worker exists, or runs cannot be handed to workers
+         * @enum {string}
+         */
+        DAGRunActivityQueueBlockedReason: DAGRunActivityQueueBlockedReason;
+        /** @description One DAG-run in an activity summary */
+        DAGRunActivityRun: {
+            /** @description DAG name */
+            name: string;
+            dagRunId: string;
+            status: components["schemas"]["Status"];
+            /**
+             * Format: int64
+             * @description Start as Unix seconds, or the queue time when the run has not started
+             */
+            startedAt?: number;
+            /**
+             * Format: int64
+             * @description Finish as Unix seconds
+             */
+            finishedAt?: number;
+            /** @description First failed step; set on attention runs */
+            failedStep?: string;
+            /** @description Error of the failed step or the run, shortened; set on attention runs */
+            error?: string;
+            /** @description Queue the run runs or waits in; set on active runs */
+            queue?: string;
+        };
+        DAGRunActivityUpcoming: {
+            name: string;
+            fileName: string;
+            /**
+             * Format: int64
+             * @description Next scheduled run as Unix seconds
+             */
+            nextRun: number;
+        };
         /** @description Request body for approving a waiting step */
         ApproveStepRequest: {
             /** @description Key-value parameters to provide. These will be available as environment variables in subsequent steps. */
@@ -4453,6 +4671,103 @@ export interface components {
              * @description When the webhook was last triggered
              */
             lastUsedAt?: string;
+            public?: components["schemas"]["WebhookPublicSettings"];
+        };
+        /**
+         * @description A service whose signed requests a public URL accepts
+         * @enum {string}
+         */
+        WebhookPublicSender: WebhookPublicSender;
+        /** @description What the webhook's public URL accepts */
+        WebhookPublicSettings: {
+            sender?: components["schemas"]["WebhookPublicSender"];
+            /** @description Whether the sender's signing secret is stored */
+            secretConfigured: boolean;
+            /** @description Events that start runs; empty takes every event */
+            events: string[];
+            /**
+             * Format: date-time
+             * @description When the public URL was turned on
+             */
+            createdAt: string;
+        };
+        /**
+         * @description Whether Dagu Cloud holds the public URL: `active` once it does,
+         *     `connecting` before then, `overLimit` when the plan allows fewer
+         *     public URLs than exist and this one is left out, and `error` when the
+         *     server cannot connect.
+         *
+         * @enum {string}
+         */
+        WebhookPublicState: WebhookPublicState;
+        /** @description The webhook's public URL, its state, and its latest deliveries */
+        WebhookPublicDetails: {
+            /** @description The public URL; absent until Dagu Cloud has given this server its address */
+            url?: string;
+            state: components["schemas"]["WebhookPublicState"];
+            /** @description Why the server cannot connect */
+            error?: string;
+            /** @description The most public URLs the plan allows, once known */
+            maxHooks?: number;
+            /** @description The latest deliveries, newest first */
+            deliveries: components["schemas"]["WebhookPublicDelivery"][];
+            missed: components["schemas"]["WebhookPublicMissed"];
+        };
+        /** @description One request Dagu Cloud handed over for the public URL */
+        WebhookPublicDelivery: {
+            /** @description The delivery's ID, which names the run it starts */
+            id: string;
+            /**
+             * Format: date-time
+             * @description When Dagu Cloud received the request
+             */
+            receivedAt: string;
+            /** @description The body's size in bytes */
+            size: number;
+            /** @description What the request is about, as its sender labels it */
+            event?: string;
+            /**
+             * @description What became of the delivery: `started` a run, `waiting` at Dagu
+             *     Cloud to be sent again, `rejected` by the sender's signature
+             *     check, `skipped` as an event that starts no run, `ignored` while
+             *     the webhook was disabled, or `failed`.
+             *
+             * @enum {string}
+             */
+            outcome: WebhookPublicDeliveryOutcome;
+            /** @description The run a started delivery started */
+            dagRunId?: string;
+            /** @description Why the delivery was rejected, skipped, waiting, or failed */
+            error?: string;
+        };
+        /** @description Deliveries Dagu Cloud dropped since they were last dismissed: those
+         *     that waited more than 7 days, and those refused while 1,000 waited.
+         *      */
+        WebhookPublicMissed: {
+            expired: number;
+            refused: number;
+            /**
+             * Format: date-time
+             * @description When the first of them was counted
+             */
+            since?: string;
+        };
+        /** @description Who may send to a public URL, and which events start runs */
+        WebhookPublicSenderRequest: {
+            sender?: components["schemas"]["WebhookPublicSender"];
+            /** @description The sender's signing secret. Empty keeps the stored secret of the
+             *     same sender, or, for GitHub, makes one.
+             *      */
+            secret?: string;
+            /** @description Make a new GitHub signing secret */
+            generateSecret?: boolean;
+            /** @description Events that start runs; empty takes every event */
+            events?: string[];
+        };
+        WebhookPublicSenderResponse: {
+            webhook: components["schemas"]["WebhookDetails"];
+            /** @description The signing secret Dagu made, shown only this once */
+            secret?: string;
         };
         /** @description Response when creating or regenerating a webhook (includes full token) */
         WebhookCreateResponse: {
@@ -5353,6 +5668,8 @@ export interface components {
             pausedBy?: string;
             /** @description Operator-facing explanation shown while paused */
             reason?: string;
+            /** @description Whether a scheduler instance is running. Omitted when the server cannot tell. */
+            schedulerRunning?: boolean;
         };
         /** @description Response containing status of all coordinator instances */
         CoordinatorStatusResponse: {
@@ -7612,9 +7929,9 @@ export interface components {
         DAGRunName: string;
         /** @description status of the DAG-run. Repeat the parameter to match multiple statuses. */
         StatusList: components["schemas"]["Status"][];
-        /** @description start datetime for filtering DAG-runs in ISO 8601 format with timezone */
+        /** @description start of the time range for filtering DAG-runs, as a Unix timestamp in seconds */
         DateTimeFrom: components["schemas"]["UnixTimestamp"];
-        /** @description end datetime for filtering DAG-runs in ISO 8601 format with timezone */
+        /** @description end of the time range for filtering DAG-runs, as a Unix timestamp in seconds */
         DateTimeTo: components["schemas"]["UnixTimestamp"];
         /** @description Number of lines to return from the end of the file */
         Tail: number;
@@ -9829,9 +10146,9 @@ export interface operations {
                 remoteNode?: components["parameters"]["RemoteNode"];
                 /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. */
                 workspace?: components["parameters"]["Workspace"];
-                /** @description start datetime for filtering DAG-runs in ISO 8601 format with timezone */
+                /** @description start of the time range for filtering DAG-runs, as a Unix timestamp in seconds */
                 fromDate?: components["parameters"]["DateTimeFrom"];
-                /** @description end datetime for filtering DAG-runs in ISO 8601 format with timezone */
+                /** @description end of the time range for filtering DAG-runs, as a Unix timestamp in seconds */
                 toDate?: components["parameters"]["DateTimeTo"];
                 /** @description Filter by DAG names containing this value */
                 name?: components["parameters"]["ArtifactDAGName"];
@@ -9945,14 +10262,67 @@ export interface operations {
             };
         };
     };
+    getDAGRunActivity: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. */
+                workspace?: components["parameters"]["Workspace"];
+                /** @description start of the time range for filtering DAG-runs, as a Unix timestamp in seconds */
+                fromDate?: components["parameters"]["DateTimeFrom"];
+                /** @description end of the time range for filtering DAG-runs, as a Unix timestamp in seconds */
+                toDate?: components["parameters"]["DateTimeTo"];
+                /** @description Length of a window that ends now. Ignored when fromDate is set. */
+                hours?: number;
+                /** @description Only include runs of DAGs that have ALL these comma-separated labels */
+                labels?: string;
+                /** @description Opaque cursor for loading the next page of older DAG-runs */
+                cursor?: components["parameters"]["DAGRunListCursor"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DAGRunActivity"];
+                };
+            };
+            /** @description The window, filters, or cursor are invalid */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     listDAGRuns: {
         parameters: {
             query?: {
                 /** @description status of the DAG-run. Repeat the parameter to match multiple statuses. */
                 status?: components["parameters"]["StatusList"];
-                /** @description start datetime for filtering DAG-runs in ISO 8601 format with timezone */
+                /** @description start of the time range for filtering DAG-runs, as a Unix timestamp in seconds */
                 fromDate?: components["parameters"]["DateTimeFrom"];
-                /** @description end datetime for filtering DAG-runs in ISO 8601 format with timezone */
+                /** @description end of the time range for filtering DAG-runs, as a Unix timestamp in seconds */
                 toDate?: components["parameters"]["DateTimeTo"];
                 /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
                 dagRunId?: components["parameters"]["DAGRunIdSearch"];
@@ -10191,9 +10561,9 @@ export interface operations {
             query?: {
                 /** @description status of the DAG-run. Repeat the parameter to match multiple statuses. */
                 status?: components["parameters"]["StatusList"];
-                /** @description start datetime for filtering DAG-runs in ISO 8601 format with timezone */
+                /** @description start of the time range for filtering DAG-runs, as a Unix timestamp in seconds */
                 fromDate?: components["parameters"]["DateTimeFrom"];
-                /** @description end datetime for filtering DAG-runs in ISO 8601 format with timezone */
+                /** @description end of the time range for filtering DAG-runs, as a Unix timestamp in seconds */
                 toDate?: components["parameters"]["DateTimeTo"];
                 /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
                 dagRunId?: components["parameters"]["DAGRunIdSearch"];
@@ -15909,6 +16279,299 @@ export interface operations {
             };
         };
     };
+    getDAGWebhookPublic: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The public URL and its deliveries */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookPublicDetails"];
+                };
+            };
+            /** @description No webhook, or no public URL, for this DAG */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    enableDAGWebhookPublic: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The webhook with its public URL turned on */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookDetails"];
+                };
+            };
+            /** @description The server is not connected to Dagu Cloud, or the plan allows no more public URLs */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No webhook configured for this DAG */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Public URLs need encrypted storage, which is not available on this node */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    disableDAGWebhookPublic: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The webhook with its public URL turned off */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookDetails"];
+                };
+            };
+            /** @description No webhook configured for this DAG */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    regenerateDAGWebhookPublicURL: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The webhook with its new public URL */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookDetails"];
+                };
+            };
+            /** @description No webhook, or no public URL, for this DAG */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    configureDAGWebhookPublicSender: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WebhookPublicSenderRequest"];
+            };
+        };
+        responses: {
+            /** @description The webhook with its new sender settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookPublicSenderResponse"];
+                };
+            };
+            /** @description Invalid sender, secret, or events */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No webhook, or no public URL, for this DAG */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    dismissDAGWebhookPublicMissed: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Missed deliveries dismissed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No webhook, or no public URL, for this DAG */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     getDAGSettings: {
         parameters: {
             query?: {
@@ -16635,7 +17298,7 @@ export interface operations {
                 remoteNode?: components["parameters"]["RemoteNode"];
                 /** @description Filter by event kind (e.g., dag_run, llm_usage) */
                 kind?: string;
-                /** @description Filter by event type (e.g., dag.run.failed, llm.usage.recorded) */
+                /** @description Filter by event type (e.g., dag.run.failed, llm.usage.recorded). Without it, dag.run.updated entries are omitted. */
                 type?: string;
                 /** @description Filter by DAG name */
                 dagName?: string;
@@ -21276,6 +21939,11 @@ export enum PathsWikiGetParametersQueryOrder {
     asc = "asc",
     desc = "desc"
 }
+export enum DAGRunActivityQueueBlockedReason {
+    noMatchingWorker = "noMatchingWorker",
+    noAvailableWorker = "noAvailableWorker",
+    workerDispatchUnavailable = "workerDispatchUnavailable"
+}
 export enum ChatMessageRole {
     system = "system",
     user = "user",
@@ -21315,6 +21983,26 @@ export enum WebhookAuthMode {
 export enum WebhookHMACEnforcementMode {
     strict = "strict",
     observe = "observe"
+}
+export enum WebhookPublicSender {
+    github = "github",
+    stripe = "stripe",
+    slack = "slack",
+    standard = "standard"
+}
+export enum WebhookPublicState {
+    active = "active",
+    connecting = "connecting",
+    overLimit = "overLimit",
+    error = "error"
+}
+export enum WebhookPublicDeliveryOutcome {
+    started = "started",
+    waiting = "waiting",
+    rejected = "rejected",
+    skipped = "skipped",
+    ignored = "ignored",
+    failed = "failed"
 }
 export enum WebhookHMACConfigureRequestAuthMode {
     token_and_hmac = "token_and_hmac",

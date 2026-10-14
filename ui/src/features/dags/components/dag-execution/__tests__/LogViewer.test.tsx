@@ -8,7 +8,17 @@ import { RemoteNodeProvider } from '@/contexts/RemoteNodeContext';
 import LogViewer from '../LogViewer';
 
 vi.mock('@/hooks/api', () => ({ useClient: vi.fn(), useQuery: vi.fn() }));
-vi.mock('../StepLog', () => ({ default: () => null }));
+vi.mock('../StepLog', () => ({
+  default: ({
+    onStreamShown,
+  }: {
+    onStreamShown?: (stream: string) => void;
+  }) => (
+    <button type="button" onClick={() => onStreamShown?.('stderr')}>
+      Show stderr
+    </button>
+  ),
+}));
 vi.mock('../ExecutionLog', () => ({ default: () => null }));
 vi.mock('../ForeachBodyStepLog', () => ({ default: () => null }));
 
@@ -60,6 +70,15 @@ describe('LogViewer', () => {
       step: 'build',
       stream: 'stderr',
     });
+  });
+
+  it('opens the stream the step log switched to', () => {
+    vi.spyOn(window, 'open').mockReturnValue(null);
+    renderViewer({});
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show stderr' }));
+
+    expect(openedURL().searchParams.get('stream')).toBe('stderr');
   });
 
   it('addresses a sub-run log through its root run', () => {

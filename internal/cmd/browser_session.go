@@ -334,7 +334,8 @@ func browserSessionDoCommand() *cobra.Command {
 		Short: "Run one operation in a browser session",
 		Long: `Read one operation from stdin, in JSON or YAML, and run it in the session.
 The operation is written as an item of a browser step's with.do: goto, act,
-extract, expect, wait, or screenshot, with when and timeout. Give the values
+upload, extract, expect, wait, or screenshot, with when and timeout. Relative
+paths an upload names are under the current directory. Give the values
 of the variables an act uses under variables; they are never read from the
 command line:
 
@@ -351,9 +352,11 @@ without the model:
   {"click": "0-131"}
   {"type": {"into": "0-229", "text": "%user%"}}
   {"select": {"in": "0-106", "option": "未出荷"}}
+  {"upload": {"into": "0-57", "files": "/path/to/invoice.pdf"}}
 
-The session keeps each as the act a step writes, reported as act, with the
-action it took as the act's recording.
+The session keeps each as the act a step writes, reported as act, or the
+upload into the element in words, reported as into, with the action it took
+as its recording.
 
 The result reports what the operation did, the actions an act performed,
 what an extract read, and the page the browser is on next. An operation that
@@ -414,9 +417,9 @@ func browserSessionDescribeCommand() *cobra.Command {
 		Use:   "describe [flags] <session ID>",
 		Short: "Describe the page of a browser session",
 		Long: `Report what the session's page shows, without asking a model: an outline of
-its headings, fields with their labels, selects with their options, buttons,
-links with their addresses, messages, and tables and lists, with long runs of
-alike rows collapsed. Text typed into fields is never shown.
+its headings, fields with their labels, selects with their options, file
+inputs, buttons, links with their addresses, messages, and tables and lists,
+with long runs of alike rows collapsed. Text typed into fields is never shown.
 
 Examples:
   dagu browser session describe ab2cd3ef4g
@@ -588,7 +591,7 @@ func runBrowserSessionList(ctx *Context, _ []string) error {
 	if err != nil {
 		return writeSessionError(ctx, err)
 	}
-	return writeIndentedJSON(ctx.Command.OutOrStdout(), map[string]any{"sessions": sessions})
+	return writeIndentedJSON(ctx.Command.OutOrStdout(), map[string]any{"sessions": sessions, "capabilities": []string{"trusted_cas"}})
 }
 
 func sessionCharsFlag(ctx *Context, name string) (int, error) {

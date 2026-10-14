@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import {
   loadStack,
   loginViaAPI,
@@ -13,7 +13,15 @@ import {
   writeLocalDAG,
 } from './helpers/e2e';
 
-for (const view of ['grouped', 'timeline'] as const) {
+// The Activity lanes select a lane's newest run on the first arrow key.
+async function openNewestRunFromLane(page: Page, dagName: string) {
+  const lane = page.getByRole('group', { name: new RegExp(`^${dagName}:`) });
+  await lane.focus();
+  await lane.press('ArrowRight');
+  await lane.press('Enter');
+}
+
+for (const view of ['grouped', 'activity'] as const) {
   test(`preserves the selected tab during ${view} history navigation`, async ({
     page,
     request,
@@ -52,13 +60,8 @@ steps:
       await page.getByText(newerRun, { exact: true }).click();
     } else {
       await page.goto('/dashboard');
-      await page.getByRole('combobox').filter({ hasText: 'All workflows' }).click();
-      await page.getByRole('option', { name: dagName, exact: true }).click();
-      await page
-        .locator('.vis-item-content')
-        .filter({ hasText: dagName })
-        .first()
-        .click();
+      await page.getByLabel('Filter workflows').fill(dagName);
+      await openNewestRunFromLane(page, dagName);
     }
 
     const modal = page.locator('.dagRun-modal-content');
@@ -110,11 +113,7 @@ steps:
       await page.getByText(dagName, { exact: true }).click();
       await page.getByText(newerRun, { exact: true }).click();
     } else {
-      await page
-        .locator('.vis-item-content')
-        .filter({ hasText: dagName })
-        .first()
-        .click();
+      await openNewestRunFromLane(page, dagName);
     }
     await expect(
       modal.getByRole('columnheader', { name: 'Step Name' })

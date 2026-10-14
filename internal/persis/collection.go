@@ -29,6 +29,7 @@ const (
 	CollectionLicense               = "license"
 	CollectionNotifications         = "notifications"
 	CollectionProfiles              = "profiles"
+	CollectionPublicWebhooks        = "public_webhooks"
 	CollectionQueue                 = "queue"
 	CollectionRemoteNodes           = "remote_nodes"
 	CollectionSchedulerState        = "scheduler_state"
@@ -37,6 +38,7 @@ const (
 	CollectionUsers                 = "users"
 	CollectionViews                 = "views"
 	CollectionWebhooks              = "webhooks"
+	CollectionWebhookDAGClaims      = "webhook_dag_claims"
 	CollectionWorkerHeartbeats      = "worker_heartbeats"
 	CollectionWorkspaces            = "workspaces"
 )
