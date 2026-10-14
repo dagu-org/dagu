@@ -1,7 +1,11 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { Status, type components } from '@/api/v1/schema';
+import {
+  type DAGRunActivityQueueBlockedReason,
+  Status,
+  type components,
+} from '@/api/v1/schema';
 
 export type DAGRunActivity = components['schemas']['DAGRunActivity'];
 export type ActivityRun = components['schemas']['DAGRunActivityRun'];
@@ -42,6 +46,12 @@ export type AttentionItem =
   | { kind: 'failing'; name: string; run: ActivityRun }
   | { kind: 'waiting'; name: string; run: ActivityRun }
   | { kind: 'slow'; name: string; run: ActivityRun; usualSeconds: number };
+
+/** A problem of the system, not of one run, that keeps work from running. */
+export type SystemAlert =
+  | { kind: 'scheduler' }
+  | { kind: 'queue'; queue: string; reason: DAGRunActivityQueueBlockedReason }
+  | { kind: 'disk'; usedPercent: number };
 
 function newestFirst(left: ActivityRun, right: ActivityRun): number {
   return (right.startedAt ?? 0) - (left.startedAt ?? 0);
@@ -183,6 +193,34 @@ export function isSchedulerHoldingWork(
     activity.active.some((run) => run.status === Status.Queued) ||
     activity.queues.some((queue) => queue.queued > 0 || !!queue.queuedCapped)
   );
+}
+
+/**
+ * Lists the system problems that keep work from running: a stopped scheduler
+ * holding work back, queues whose runs no worker can take, and a nearly full
+ * data disk.
+ */
+export function systemAlerts(
+  activity: DAGRunActivity,
+  schedulerRunning: boolean | undefined
+): SystemAlert[] {
+  const alerts: SystemAlert[] = [];
+  if (isSchedulerHoldingWork(activity, schedulerRunning)) {
+    alerts.push({ kind: 'scheduler' });
+  }
+  for (const queue of activity.queues) {
+    if (queue.blockedReason) {
+      alerts.push({
+        kind: 'queue',
+        queue: queue.name,
+        reason: queue.blockedReason,
+      });
+    }
+  }
+  if (activity.diskUsedPercent !== undefined) {
+    alerts.push({ kind: 'disk', usedPercent: activity.diskUsedPercent });
+  }
+  return alerts;
 }
 
 function laneRank(lane: ActivityLane, activeNames: Set<string>): number {

@@ -4320,6 +4320,8 @@ export interface components {
             upcoming: components["schemas"]["DAGRunActivityUpcoming"][];
             /** @description First page only: queues with runs running or waiting, the longest wait first, at most 20 */
             queues: components["schemas"]["DAGRunActivityQueue"][];
+            /** @description First page only: how full the data directory's disk is, in percent; set only when it is at least 90 and the caller may view system status */
+            diskUsedPercent?: number;
         };
         /** @description A queue with runs running or waiting */
         DAGRunActivityQueue: {
@@ -4339,7 +4341,13 @@ export interface components {
              * @description When the next run in line was queued, as Unix seconds
              */
             nextQueuedAt?: number;
+            blockedReason?: components["schemas"]["DAGRunActivityQueueBlockedReason"];
         };
+        /**
+         * @description Why queued runs cannot start: no healthy worker matches their selector, no healthy worker exists, or runs cannot be handed to workers
+         * @enum {string}
+         */
+        DAGRunActivityQueueBlockedReason: DAGRunActivityQueueBlockedReason;
         /** @description One DAG-run in an activity summary */
         DAGRunActivityRun: {
             /** @description DAG name */
@@ -21918,6 +21926,11 @@ export enum PathsWikiGetParametersQuerySort {
 export enum PathsWikiGetParametersQueryOrder {
     asc = "asc",
     desc = "desc"
+}
+export enum DAGRunActivityQueueBlockedReason {
+    noMatchingWorker = "noMatchingWorker",
+    noAvailableWorker = "noAvailableWorker",
+    workerDispatchUnavailable = "workerDispatchUnavailable"
 }
 export enum ChatMessageRole {
     system = "system",

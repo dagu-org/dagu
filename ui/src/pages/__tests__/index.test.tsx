@@ -5,7 +5,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import * as React from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Status } from '@/api/v1/schema';
+import { DAGRunActivityQueueBlockedReason, Status } from '@/api/v1/schema';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { ConfigContext, type Config } from '@/contexts/ConfigContext';
 import { WorkspaceKind } from '@/lib/workspace';
@@ -16,6 +16,7 @@ import {
 import type { DAGRunActivity } from '../../features/activity/lib/activityModel';
 import { useQuery } from '../../hooks/api';
 import { useSchedulerPause } from '../../hooks/useSchedulerPause';
+import { useCanAccessSystemStatus } from '@/contexts/AuthContext';
 import DashboardPage from '../index';
 
 vi.mock('../../features/activity/hooks/useDAGRunActivity', () => ({
@@ -44,6 +45,10 @@ vi.mock('../../hooks/api', () => ({
 
 vi.mock('../../hooks/useSchedulerPause', () => ({
   useSchedulerPause: vi.fn(),
+}));
+
+vi.mock('@/contexts/AuthContext', () => ({
+  useCanAccessSystemStatus: vi.fn(),
 }));
 
 const useActivityMock = vi.mocked(useDAGRunActivity);
@@ -212,6 +217,7 @@ describe('DashboardPage', () => {
   beforeEach(() => {
     mockDAGList([]);
     mockScheduler(true);
+    vi.mocked(useCanAccessSystemStatus).mockReturnValue(true);
   });
 
   afterEach(() => {
@@ -327,6 +333,73 @@ describe('DashboardPage', () => {
         /The scheduler is not running/.test(region.textContent ?? '')
       )
     ).toBe(true);
+  });
+
+  it('says why the runs of a queue cannot start', () => {
+    mockActivity({
+      activity: makeActivity({
+        runs: reportRuns,
+        queues: [
+          {
+            name: 'gpu',
+            running: 0,
+            maxConcurrency: 2,
+            queued: 3,
+            nextQueuedAt: NOW - 600,
+            blockedReason: DAGRunActivityQueueBlockedReason.noMatchingWorker,
+          },
+        ],
+      }),
+    });
+
+    renderPage();
+
+    const attention = screen.getByRole('region', { name: /Needs attention/ });
+    expect(
+      within(attention).getByText(
+        'Queued runs in gpu cannot start: no healthy worker matches their selector.'
+      )
+    ).toBeVisible();
+    expect(
+      within(attention).getByRole('link', { name: /Open/ })
+    ).toHaveAttribute('href', '/queues/gpu');
+    expect(screen.getByRole('list', { name: 'Queues' })).toHaveTextContent(
+      'no matching worker'
+    );
+  });
+
+  // Nothing may have run yet because the disk is full, so the warning must
+  // not give way to the empty state.
+  it('warns of a nearly full data disk', () => {
+    mockActivity({ activity: makeActivity({ diskUsedPercent: 93 }) });
+
+    renderPage();
+
+    const attention = screen.getByRole('region', { name: /Needs attention/ });
+    expect(
+      within(attention).getByText(
+        'The data disk is 93% full. Runs fail once it fills up.'
+      )
+    ).toBeVisible();
+    expect(
+      within(attention).getByRole('link', { name: /System Status/ })
+    ).toHaveAttribute('href', '/system-status');
+  });
+
+  it('links to System Status only for those who may open it', () => {
+    vi.mocked(useCanAccessSystemStatus).mockReturnValue(false);
+    mockScheduler(false);
+    mockActivity({ activity: busyActivity });
+
+    renderPage();
+
+    const attention = screen.getByRole('region', { name: /Needs attention/ });
+    expect(
+      within(attention).getByText(/The scheduler is not running/)
+    ).toBeVisible();
+    expect(
+      within(attention).queryByRole('link', { name: /System Status/ })
+    ).not.toBeInTheDocument();
   });
 
   it('summarizes each queue instead of listing its queued runs', () => {
