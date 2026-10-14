@@ -405,6 +405,88 @@ describe('ExecutionLog follow', () => {
     expect(region.scrollTop).toBe(1000);
   });
 
+  // The log stays mounted when the page moves to another run.
+  it('drops the held lines when another run is shown', () => {
+    logs.data = {
+      content: 'first run line',
+      totalLines: 1,
+      lineCount: 1,
+      hasMore: false,
+    };
+    const { rerender } = render(
+      <ExecutionLog name="example" dagRunId="run" dagRun={runningRun} />,
+      { wrapper: UserPreferencesProvider }
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Raw' }));
+    fireEvent.wheel(screen.getByRole('region', { name: 'Run log' }), {
+      deltaY: -120,
+    });
+
+    logs.data = {
+      content: 'second run line',
+      totalLines: 1,
+      lineCount: 1,
+      hasMore: false,
+    };
+    rerender(
+      <ExecutionLog
+        name="example"
+        dagRunId="run-2"
+        dagRun={{ ...(runningRun as object), dagRunId: 'run-2' } as never}
+      />
+    );
+
+    expect(screen.getByText('second run line')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Back to live' })
+    ).not.toBeInTheDocument();
+  });
+
+  // A tail of repeated lines can look the same after a line is added.
+  it('announces new lines when the held tail reads the same', () => {
+    logs.data = {
+      content: 'tick\ntick',
+      totalLines: 2,
+      lineCount: 2,
+      hasMore: true,
+    };
+    const { rerender } = render(
+      <ExecutionLog name="example" dagRunId="run" dagRun={runningRun} />,
+      { wrapper: UserPreferencesProvider }
+    );
+    fireEvent.wheel(screen.getByRole('region', { name: 'Run log' }), {
+      deltaY: -120,
+    });
+
+    logs.data = { ...logs.data, totalLines: 3 };
+    rerender(
+      <ExecutionLog name="example" dagRunId="run" dagRun={runningRun} />
+    );
+
+    expect(screen.getByText('New output available')).toBeInTheDocument();
+  });
+
+  it('keeps a finished log where its reader is when the display changes', () => {
+    render(
+      <ExecutionLog
+        name="example"
+        dagRunId="run"
+        dagRun={{ ...(runningRun as object), status: Status.Success } as never}
+      />,
+      { wrapper: UserPreferencesProvider }
+    );
+    const region = screen.getByRole('region', { name: 'Run log' });
+    Object.defineProperty(region, 'scrollHeight', {
+      configurable: true,
+      value: 1000,
+    });
+    region.scrollTop = 200;
+
+    fireEvent.click(screen.getByRole('button', { name: 'Raw' }));
+
+    expect(region.scrollTop).toBe(200);
+  });
+
   it('shows another range instead of the held lines', () => {
     logs.data = {
       content: 'line 9\nline 10',

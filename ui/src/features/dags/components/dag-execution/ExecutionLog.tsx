@@ -108,6 +108,17 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
     data: LogWithPagination;
   } | null>(null);
 
+  // The log stays mounted when the page moves to another run, which starts
+  // again from its newest lines.
+  const runKey = JSON.stringify([name, dagRunId, dagRun?.dagRunId]);
+  const [shownRunKey, setShownRunKey] = useState(runKey);
+  if (shownRunKey !== runKey) {
+    setShownRunKey(runKey);
+    setFollowing(true);
+    setPausedData(null);
+    setIsLiveMode(isRunning);
+  }
+
   // Keep track of previous data to prevent flashing
   const [cachedData, setCachedData] = useState<LogWithPagination | null>(null);
   const [isNavigating, setIsNavigating] = useState(false);
@@ -241,11 +252,20 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
     setFollowing(true);
   }, []);
 
+  // Switching how lines render keeps a live reader on the newest line but
+  // leaves a finished log where its reader is.
+  const followedDisplayMode = canFollow ? displayMode : undefined;
   useLayoutEffect(() => {
     if (following && viewMode === 'tail') {
       scrollToBottom();
     }
-  }, [latestData?.content, displayMode, following, viewMode, scrollToBottom]);
+  }, [
+    latestData?.content,
+    followedDisplayMode,
+    following,
+    viewMode,
+    scrollToBottom,
+  ]);
 
   // Handle data loading and navigation state
   useEffect(() => {
@@ -394,7 +414,12 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
   // Prioritize lines held for the shown range, then SSE, REST, and cached data
   const heldData = pausedData?.range === range ? pausedData.data : null;
   const logData = (heldData || latestData) as LogWithPagination;
-  const hasNewOutput = !!heldData && latestData?.content !== heldData.content;
+  // A tail of repeated lines can read the same after a line is added, so the
+  // line count is compared too.
+  const hasNewOutput =
+    !!heldData &&
+    (latestData?.content !== heldData.content ||
+      latestData?.totalLines !== heldData.totalLines);
 
   // Handle error state (but not 404 - that just means no log file exists yet)
   if (error && !logData) {
