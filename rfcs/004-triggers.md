@@ -331,6 +331,7 @@ public URLs are used.
 | Hook unknown, webhook removed, disabled, or not public | `ignored` | `ignored` |
 | Sender chosen and signature missing or invalid | `ignored` | `rejected`, with the reason |
 | GitHub's `ping`, or an event the list leaves out | `ignored` | `skipped` |
+| Body larger than `webhooks.max_payload_size` | `failed` | `failed` |
 | 100 runs already queued on the DAG's queue | `retry` after 60 seconds | `waiting` |
 | DAG fails to load or validate | `failed` | `failed`, with the error |
 | Storage error while enqueueing | `retry` after 30 seconds | `waiting` |

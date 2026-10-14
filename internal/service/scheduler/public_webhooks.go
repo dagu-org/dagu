@@ -38,7 +38,8 @@ func newPublicWebhooks(cfg *config.Config, deps Dependencies, s *Scheduler) *pub
 			dagExecutor:            s.dagExecutor,
 			workspaceBaseConfigDir: workspace.BaseConfigDir(cfg.Paths.DAGsDir),
 		},
-		Hello: cloudrelay.Hello{Name: serverName(cfg), Version: config.Version},
+		Hello:          cloudrelay.Hello{Name: serverName(cfg), Version: config.Version},
+		MaxPayloadSize: cfg.Webhooks.MaxPayloadSize,
 	})
 }
 

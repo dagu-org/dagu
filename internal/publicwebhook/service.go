@@ -7,6 +7,7 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"fmt"
 	"math/rand/v2"
 	"net/http"
 	"slices"
@@ -80,6 +81,9 @@ type Config struct {
 	// timeout.
 	HTTPClient *http.Client
 	Hello      cloudrelay.Hello
+	// MaxPayloadSize bounds a body that starts a run, as for local webhook
+	// requests; zero leaves it to the relay.
+	MaxPayloadSize int
 }
 
 // timing is how the service paces itself; tests shorten it.
@@ -368,6 +372,10 @@ func (s *Service) deliver(ctx context.Context, d cloudrelay.Delivery) cloudrelay
 		return cloudrelay.OutcomeIgnored
 	}
 
+	if limit := s.cfg.MaxPayloadSize; limit > 0 && len(d.Body) > limit {
+		record(OutcomeFailed, "", fmt.Sprintf("The body is larger than the %d bytes webhooks.max_payload_size allows.", limit))
+		return cloudrelay.OutcomeFailed
+	}
 	dag, err := s.cfg.Runs.DAG(ctx, dagName)
 	if err != nil {
 		record(OutcomeFailed, "", err.Error())

@@ -228,6 +228,10 @@ type harness struct {
 	svc      *publicwebhook.Service
 }
 
+// testMaxPayloadSize is the largest body the harness's service starts a run
+// for.
+const testMaxPayloadSize = 1024
+
 func newHarness(t *testing.T, maxHooks int) *harness {
 	t.Helper()
 	enc, err := crypto.NewEncryptor("test-key")
@@ -246,11 +250,12 @@ func newHarness(t *testing.T, maxHooks int) *harness {
 		Credentials: func() (license.CloudCredentials, bool) {
 			return license.CloudCredentials{CloudURL: h.cloud.srv.URL, LicenseID: "lic", ServerID: "srv", HeartbeatSecret: "s"}, true
 		},
-		Webhooks:   webhooks,
-		Store:      h.log,
-		Runs:       h.runs,
-		HTTPClient: h.cloud.srv.Client(),
-		Hello:      cloudrelay.Hello{Name: "etl-prod-1", Version: "2.20.0"},
+		Webhooks:       webhooks,
+		Store:          h.log,
+		Runs:           h.runs,
+		HTTPClient:     h.cloud.srv.Client(),
+		Hello:          cloudrelay.Hello{Name: "etl-prod-1", Version: "2.20.0"},
+		MaxPayloadSize: testMaxPayloadSize,
 	})
 	h.svc.SetTimingForTest(20*time.Millisecond, 10*time.Millisecond, time.Hour)
 	return h
@@ -424,6 +429,11 @@ func TestServiceDeliveryOutcomes(t *testing.T) {
 		}, 5*time.Second, 10*time.Millisecond, tc.name)
 		assert.Equal(t, tc.logged, h.delivery(t, tc.webhook.ID).Outcome, tc.name)
 	}
+
+	h.runs.set(0, nil)
+	ws.write(t, deliveryFrame("d-large", "plain/webhook", unsigned, strings.Repeat("a", testMaxPayloadSize+1)))
+	assert.Equal(t, map[string]any{"t": "delivered", "id": "d-large", "outcome": "failed"}, ws.next(t, "delivered"),
+		"a body over webhooks.max_payload_size starts no run")
 
 	ws.write(t, deliveryFrame("d-unknown", "nobody/webhook", unsigned, "{}"))
 	assert.Equal(t, map[string]any{"t": "delivered", "id": "d-unknown", "outcome": "ignored"}, ws.next(t, "delivered"))
