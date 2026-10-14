@@ -1165,7 +1165,7 @@
               "ca_file": {
                 "type": "string",
                 "minLength": 1,
-                "description": "PEM file containing only certificate authorities, without private keys."
+                "description": "PEM file of certificate authorities or self-signed server certificates, without private keys. Text around the certificates is ignored."
               }
             }
           }

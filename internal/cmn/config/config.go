@@ -75,8 +75,8 @@ type BrowserConfig struct {
 
 // BrowserTrustedCA adds server certificate authorities for specific hosts.
 type BrowserTrustedCA struct {
-	Hosts  []string `json:"hosts" mapstructure:"hosts"`
-	CAFile string   `json:"ca_file" mapstructure:"ca_file"`
+	Hosts  []string `json:"hosts"`
+	CAFile string   `json:"ca_file"`
 }
 
 // Validate rejects an authority without a file or valid host patterns.

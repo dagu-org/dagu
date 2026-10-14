@@ -50,8 +50,7 @@ type operator struct {
 	certificateProxyLost bool
 	// presented maps the hosts the proxy presented a certificate to, to the
 	// certificate's label.
-	presented     map[string]string
-	verifiedHosts map[string]bool
+	presented map[string]string
 }
 
 // actRecorder keeps the actions acts and uploads performed, keyed by
@@ -184,21 +183,11 @@ func (o *operator) takeCertificateEvents(ctx context.Context, index int) []certp
 	if err != nil && !o.certificateProxyLost {
 		o.certificateProxyLost = true
 		if o.warn != nil {
-			o.warn(index, "the client certificate proxy stopped answering: "+err.Error())
+			o.warn(index, "the certificate proxy stopped answering: "+err.Error())
 		}
 	}
 	var failures []certproxy.Event
 	for _, event := range events {
-		if event.Kind == certproxy.EventGuardOff {
-			o.verifiedHosts = nil
-		} else if event.TLSVerified {
-			if o.verifiedHosts == nil {
-				o.verifiedHosts = map[string]bool{}
-			}
-			o.verifiedHosts[hostpattern.Canonical(event.Host)] = true
-		} else if event.Kind == certproxy.EventServerCertificate {
-			delete(o.verifiedHosts, hostpattern.Canonical(event.Host))
-		}
 		if o.certificateEvent != nil {
 			o.certificateEvent(index, event)
 		}
@@ -216,6 +205,17 @@ func (o *operator) takeCertificateEvents(ctx context.Context, index int) []certp
 		}
 	}
 	return failures
+}
+
+// tlsVerified reports whether the certificate proxy verified the server
+// certificate of the host of the https: page at address. Without an answer
+// from the proxy, it reports false.
+func (o *operator) tlsVerified(ctx context.Context, address string) bool {
+	if !o.certificateProxy || o.certificateProxyLost || !strings.HasPrefix(strings.ToLower(address), "https://") {
+		return false
+	}
+	verified, err := o.eng.CertificateVerified(ctx, urlHost(address))
+	return err == nil && verified
 }
 
 func (o *operator) act(ctx context.Context, index int, spec actSpec, timeout time.Duration) (opResult, error) {

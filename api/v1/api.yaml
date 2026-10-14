@@ -7587,7 +7587,7 @@ paths:
             type: string
         - name: type
           in: query
-          description: "Filter by event type (e.g., dag.run.failed, llm.usage.recorded)"
+          description: "Filter by event type (e.g., dag.run.failed, llm.usage.recorded). Without it, dag.run.updated entries are omitted."
           required: false
           schema:
             type: string
@@ -12010,6 +12010,9 @@ components:
           description: "First page only: queues with runs running or waiting, the longest wait first, at most 20"
           items:
             $ref: "#/components/schemas/DAGRunActivityQueue"
+        diskUsedPercent:
+          type: integer
+          description: "First page only: how full the data directory's disk is, in percent; set only when it is at least 90 and the caller may view system status"
       required:
         - from
         - to
@@ -12044,10 +12047,20 @@ components:
           type: integer
           format: int64
           description: "When the next run in line was queued, as Unix seconds"
+        blockedReason:
+          $ref: "#/components/schemas/DAGRunActivityQueueBlockedReason"
       required:
         - name
         - running
         - queued
+
+    DAGRunActivityQueueBlockedReason:
+      type: string
+      description: "Why queued runs cannot start: no healthy worker matches their selector, no healthy worker exists, or runs cannot be handed to workers"
+      enum:
+        - "noMatchingWorker"
+        - "noAvailableWorker"
+        - "workerDispatchUnavailable"
 
     DAGRunActivityRun:
       type: object

@@ -133,7 +133,11 @@ func NewPublicWebhookStores(cfg *config.Config, backend persis.Backend) (*store.
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create encryptor: %w", err)
 	}
-	webhooks, err := store.NewWebhookStore(backend.Collection(persis.CollectionWebhooks), encryptor)
+	webhooks, err := store.NewWebhookStore(
+		backend.Collection(persis.CollectionWebhooks),
+		backend.Collection(persis.CollectionWebhookDAGClaims),
+		encryptor,
+	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create webhook store: %w", err)
 	}

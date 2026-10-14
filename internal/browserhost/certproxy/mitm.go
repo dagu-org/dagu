@@ -48,6 +48,9 @@ const (
 	maxCommonNameLength = 64
 	// relayBufferBytes sizes each read relayed from a server.
 	relayBufferBytes = 32 << 10
+	// drainTimeout bounds how long the proxy reads from a server once the
+	// browser's side of a tunnel ended.
+	drainTimeout = 5 * time.Second
 	// defaultTLSPort is the port of a CONNECT authority that names none.
 	defaultTLSPort = "443"
 	// remoteErrorOp marks the error of an alert a TLS peer sent.
@@ -59,10 +62,12 @@ const (
 
 // Control paths, under the token.
 const (
-	eventsPath  = "events"
-	pendingPath = "pending"
-	pacPath     = "proxy.pac"
-	afterParam  = "after"
+	eventsPath   = "events"
+	pendingPath  = "pending"
+	verifiedPath = "verified"
+	pacPath      = "proxy.pac"
+	afterParam   = "after"
+	hostParam    = "host"
 )
 
 // rejectionAlerts are the TLS alerts by which a server refuses a client
@@ -77,11 +82,11 @@ type server struct {
 	ctx        context.Context
 	token      string
 	entries    []*upstreamEntry
-	trustedCAs []Entry
-	plainEntry *upstreamEntry
+	trustedCAs []scopedAuthority
 	pac        *pacEvaluator
 	issuer     *leafIssuer
 	events     *eventLog
+	verified   *verifiedHosts
 	pacScript  string // served when too large for a data: URL
 	pending    *pendingLog
 	// guardEntry presents no certificate, to the hosts the guard carries.
@@ -93,6 +98,12 @@ type server struct {
 	// guard accepts the browser's other https: connections; nil without a
 	// guard, or once it stopped.
 	guard net.Listener
+}
+
+// scopedAuthority is a TrustedCA ready to verify servers.
+type scopedAuthority struct {
+	hosts []string
+	certs []*x509.Certificate
 }
 
 // upstreamEntry is an Entry ready to present.
@@ -171,6 +182,9 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case s.controlPath(pendingPath):
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(s.pending.list())
+	case s.controlPath(verifiedPath):
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(s.verified.has(hostpattern.Canonical(r.URL.Query().Get(hostParam))))
 	case s.controlPath(pacPath):
 		if s.pacScript == "" {
 			http.NotFound(w, r)
@@ -223,7 +237,6 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request, guard boo
 		return
 	}
 	entry := s.scopedEntry(host)
-	configured := entry != nil
 	if entry == nil {
 		if !guard {
 			s.events.add(EventRefused, host, "", fmt.Sprintf("the certificate proxy refused a connection to %s, which no certificate setting names", host))
@@ -238,7 +251,7 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request, guard boo
 	cancel()
 	if err != nil {
 		s.pending.end(pending)
-		if guard && !configured && errors.Is(err, errProxyAuth) {
+		if guard && errors.Is(err, errProxyAuth) {
 			// A reset connection makes the browser try the route after the
 			// guard; a closed guard keeps it on that route.
 			s.stopGuard(host)
@@ -290,6 +303,7 @@ func (s *server) stopGuard(host string) {
 		return
 	}
 	_ = guard.Close()
+	s.verified.dropGuarded()
 	s.events.add(EventGuardOff, host, "", fmt.Sprintf(
 		"the device's proxy asks %s for credentials the certificate proxy cannot give, so sites without a client certificate "+
 			"now go through the browser's own route; one of them that asks for a client certificate can make the system prompt for it", host))
@@ -333,28 +347,39 @@ func (s *server) entryFor(host string) *upstreamEntry {
 }
 
 // scopedEntry combines a host's client identity with every authority that
-// names that host. Authorities never change which identity is presented.
+// names that host. Authorities never change which identity is presented,
+// and a host without an identity keeps the guard's trust.
 func (s *server) scopedEntry(host string) *upstreamEntry {
 	entry := s.entryFor(host)
 	var selected *upstreamEntry
 	for _, authority := range s.trustedCAs {
-		if !hostpattern.MatchAny(host, authority.Hosts) {
+		if !hostpattern.MatchAny(host, authority.hosts) {
 			continue
 		}
 		if selected == nil {
 			if entry == nil {
-				entry = s.plainEntry
+				entry = s.guardEntry
 			}
+			// A named host gets a copy, so it never counts as carried by
+			// the guard: it keeps the certificate port when the guard stops.
 			scoped := *entry
 			scoped.roots = entry.roots.Clone()
 			selected = &scoped
 		}
-		selected.roots.AppendCertsFromPEM([]byte(authority.CAPEM))
+		for _, cert := range authority.certs {
+			selected.roots.AddCert(cert)
+		}
 	}
 	if selected != nil {
 		return selected
 	}
 	return entry
+}
+
+// carriedByGuard reports whether entry is the guard's own, which only the
+// hosts no entry or authority names use.
+func (s *server) carriedByGuard(entry *upstreamEntry) bool {
+	return entry == s.guardEntry
 }
 
 // tunnel relays the browser's connection to the server reached over raw.
@@ -450,18 +475,24 @@ func (s *server) handshake(ctx context.Context, raw net.Conn, via route, host st
 		s.reportHandshakeFailure(host, entry, requested.Load(), err)
 		return nil, err
 	}
+	// Recorded as the server is verified, as a failure is, so overlapping
+	// connections to a host leave the latest verification's outcome.
+	s.verified.add(host, s.carriedByGuard(entry))
 	return &upstreamConn{Conn: conn, via: via, requested: requested}, nil
 }
 
-// reportConnected records the first connection an entry makes to host, or,
-// for the guard, a server that asked for a certificate it does not have.
+// reportConnected records the first connection to a host an entry or an
+// authority names, or, for the guard, a server that asked for a
+// certificate it does not have.
 func (s *server) reportConnected(host string, entry *upstreamEntry, upstream *upstreamConn) {
 	switch {
 	case !entry.presents():
 		if upstream.requested.Load() {
 			s.reportMissing(host)
 		}
-		s.events.connect(host, entry.label, false, fmt.Sprintf("verified the server certificate of %s through %s", host, upstream.via))
+		if !s.carriedByGuard(entry) {
+			s.events.connect(host, entry.label, false, fmt.Sprintf("verified the server certificate of %s through %s", host, upstream.via))
+		}
 	case upstream.requested.Load():
 		s.events.connect(host, entry.label, true, fmt.Sprintf("presented the client certificate %s to %s through %s", entry.label, host, upstream.via))
 	default:
@@ -476,6 +507,7 @@ func (s *server) reportHandshakeFailure(host string, entry *upstreamEntry, reque
 		return
 	}
 	if verifyErr, ok := errors.AsType[*tls.CertificateVerificationError](err); ok {
+		s.verified.remove(host)
 		message := fmt.Sprintf("%s presented a server certificate that is not trusted (%v)", host, verifyErr.Err)
 		if entry.presents() {
 			message += fmt.Sprintf("; if a private CA issued it, name that CA in ca_file of %s", entry.label)
@@ -516,20 +548,17 @@ func rejectionAlert(err error) (string, bool) {
 }
 
 // relay copies between the browser and the server until either side ends.
+// Once the browser's side ends, what the server already sent, such as an
+// alert refusing the client certificate, is still read for up to
+// drainTimeout before both close.
 func (s *server) relay(client *tls.Conn, upstream *upstreamConn, host string, entry *upstreamEntry, pending int64) {
-	var once sync.Once
-	closeBoth := func() {
-		once.Do(func() {
-			_ = client.Close()
-			_ = upstream.Close()
-		})
-	}
 	go func() {
 		_, _ = io.Copy(upstream, client)
-		closeBoth()
+		_ = upstream.SetReadDeadline(time.Now().Add(drainTimeout))
 	}()
 	s.copyFromServer(client, upstream, host, entry, pending)
-	closeBoth()
+	_ = client.Close()
+	_ = upstream.Close()
 }
 
 // copyFromServer copies what the server sends to the browser. Under TLS

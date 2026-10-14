@@ -66,6 +66,7 @@ func NewBackend(paths config.PathsConfig) *Backend {
 			persis.CollectionUsers:            {dir: paths.UsersDir, indented: true},
 			persis.CollectionViews:            {dir: paths.ViewsDir, indented: true},
 			persis.CollectionWebhooks:         {dir: paths.WebhooksDir, indented: true},
+			persis.CollectionWebhookDAGClaims: {dir: filepath.Join(filepath.Dir(paths.WebhooksDir), "webhook-dag-claims"), indented: true},
 			persis.CollectionWorkerHeartbeats: {dir: filepath.Join(distributedDir, "workers")},
 			persis.CollectionWorkspaces:       {dir: paths.WorkspacesDir, indented: true},
 		},

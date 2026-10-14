@@ -60,7 +60,7 @@ func TestDialRoutes(t *testing.T) {
 	t.Parallel()
 
 	target := echoServer(t)
-	refusing := strings.TrimPrefix(closedURL(t), "http://")
+	refusing := strings.TrimPrefix(closedURL, "http://")
 
 	t.Run("FailsOverInOrder", func(t *testing.T) {
 		t.Parallel()

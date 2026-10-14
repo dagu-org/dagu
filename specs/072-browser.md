@@ -236,16 +236,24 @@ page, such as nginx's 400 or IIS's 403.7, rather than refusing the
 connection. A site that asks for a certificate and opens without one is not a
 failure. An operation that times out names the connections the proxy still
 waits on and how far each got. The step's log records each host the proxy
-presented a certificate to, each site that asked for one, and each failure.
+presented a certificate to or verified with a configured authority, each
+site that asked for one, and each failure. A site the guard carries appears
+only when it asks for a certificate or fails.
 
 ### Trusted server authorities
 
 The host configuration `browser.trusted_cas` lists entries with `hosts` and
-`ca_file`, a PEM file containing certificate authorities without private keys.
+`ca_file`, a PEM file of certificate authorities or self-signed server
+certificates, without private keys. Text around the certificates, as openssl
+writes it, is ignored; a private key, a damaged certificate, or a certificate
+that is neither an authority nor self-signed is an error.
 It applies to workflow browsers and browser sessions, without requiring a
 client certificate. Host patterns have the same syntax as client certificates.
 All authorities matching the destination host add to its existing trust;
-they do not affect which client certificate is presented. Redirects,
+they do not affect which client certificate is presented. A named host
+without a client certificate keeps what the guard trusts, the system's CA
+certificates and every client certificate's `ca_file`, whether or not the
+guard is on, so adding an entry never removes trust. Redirects,
 subresources, and secure WebSockets use their own destination's trust.
 
 These entries never add trust to unrelated hosts through the guard. A named

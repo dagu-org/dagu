@@ -77,6 +77,27 @@ func newTestCA(t *testing.T, name string) *testCA {
 	return &testCA{cert: cert, key: key}
 }
 
+// newSelfSigned returns a self-signed server certificate for host that is
+// not a CA, as an appliance presents, and its key.
+func newSelfSigned(t *testing.T, host string) (*x509.Certificate, crypto.Signer) {
+	t.Helper()
+	key := newKey(t, ecdsaKey)
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: host},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+		KeyUsage:     x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		DNSNames:     []string{host},
+	}
+	der, err := x509.CreateCertificate(rand.Reader, template, template, key.Public(), key)
+	require.NoError(t, err)
+	cert, err := x509.ParseCertificate(der)
+	require.NoError(t, err)
+	return cert, key
+}
+
 func newKey(t *testing.T, kind keyKind) crypto.Signer {
 	t.Helper()
 	if kind == rsaKey {
@@ -188,8 +209,14 @@ func serveProxy(t *testing.T, cfg Config) Ready {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	ready := make(chan Ready, 1)
-	done := make(chan error, 1)
-	go func() { done <- Serve(ctx, cfg, func(r Ready) { ready <- r }) }()
+	// done is closed, not sent on, so both the wait below and the cleanup
+	// see Serve return.
+	done := make(chan struct{})
+	var serveErr error
+	go func() {
+		defer close(done)
+		serveErr = Serve(ctx, cfg, func(r Ready) { ready <- r })
+	}()
 	t.Cleanup(func() {
 		cancel()
 		<-done
@@ -197,8 +224,8 @@ func serveProxy(t *testing.T, cfg Config) Ready {
 	select {
 	case r := <-ready:
 		return r
-	case err := <-done:
-		t.Fatalf("Serve returned before it was ready: %v", err)
+	case <-done:
+		t.Fatalf("Serve returned before it was ready: %v", serveErr)
 	case <-time.After(10 * time.Second):
 		t.Fatal("Serve was not ready in time")
 	}

@@ -56,8 +56,15 @@ type resourceWatcher struct {
 }
 
 // NewHTTPHandler returns a Streamable HTTP MCP handler backed by the Dagu API.
+// Open event streams carry periodic SSE comments so proxies keep them open.
 func NewHTTPHandler(api *frontendapi.API) http.Handler {
 	server := NewServer(api)
+	return withSSEHeartbeat(newStreamableHandler(server), sseHeartbeatInterval)
+}
+
+// newStreamableHandler serves server over Streamable HTTP. Replies to POST are
+// plain JSON, so server-initiated messages use the standalone event stream.
+func newStreamableHandler(server *mcpsdk.Server) http.Handler {
 	return mcpsdk.NewStreamableHTTPHandler(
 		func(*http.Request) *mcpsdk.Server { return server },
 		&mcpsdk.StreamableHTTPOptions{JSONResponse: true},

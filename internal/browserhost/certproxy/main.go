@@ -82,6 +82,14 @@ func Serve(ctx context.Context, cfg Config, ready func(Ready)) error {
 		}
 		entries = append(entries, upstream)
 	}
+	authorities := make([]scopedAuthority, 0, len(cfg.TrustedCAs))
+	for _, authority := range cfg.TrustedCAs {
+		certs, err := trustedCertificates([]byte(authority.CAPEM))
+		if err != nil {
+			return fmt.Errorf("%s: %w", authority.Label, err)
+		}
+		authorities = append(authorities, scopedAuthority{hosts: authority.Hosts, certs: certs})
+	}
 	issuer, err := newLeafIssuer()
 	if err != nil {
 		return fmt.Errorf("create the certificate proxy key: %w", err)
@@ -115,18 +123,17 @@ func Serve(ctx context.Context, cfg Config, ready func(Ready)) error {
 		ctx:        ctx,
 		token:      cfg.Token,
 		entries:    entries,
-		trustedCAs: cfg.TrustedCAs,
-		plainEntry: newGuardEntry(nil),
+		trustedCAs: authorities,
 		pac:        evaluator,
 		issuer:     issuer,
 		events:     newEventLog(),
+		verified:   newVerifiedHosts(),
 		pending:    newPendingLog(),
 		guardEntry: newGuardEntry(cfg.Entries),
 		tunnels:    map[net.Conn]struct{}{},
 		guard:      guard,
 	}
-	routes := append(append([]Entry{}, cfg.Entries...), cfg.TrustedCAs...)
-	script := composePAC(port, guardPort, routes, system)
+	script := composePAC(port, guardPort, cfg.routedHosts(), system)
 	pacURL, served := pacLocation(script, controlURL(port, cfg.Token)+"/"+pacPath)
 	if served {
 		s.pacScript = script
@@ -167,6 +174,19 @@ func Serve(ctx context.Context, cfg Config, ready func(Ready)) error {
 	return failure
 }
 
+// routedHosts returns the host patterns the browser sends to the proxy's
+// certificate port: those of every entry and every trusted authority.
+func (c Config) routedHosts() []string {
+	var hosts []string
+	for _, entry := range c.Entries {
+		hosts = append(hosts, entry.Hosts...)
+	}
+	for _, authority := range c.TrustedCAs {
+		hosts = append(hosts, authority.Hosts...)
+	}
+	return hosts
+}
+
 func (c Config) validate() error {
 	switch {
 	case c.Token == "":
@@ -184,9 +204,6 @@ func (c Config) validate() error {
 			if err := hostpattern.Validate(host); err != nil {
 				return fmt.Errorf("%s: %w", authority.Label, err)
 			}
-		}
-		if authority.ChainPEM != "" || authority.KeyPEM != "" {
-			return fmt.Errorf("%s: trusted authorities cannot contain a client identity", authority.Label)
 		}
 		if _, err := trustedCertificates([]byte(authority.CAPEM)); err != nil {
 			return fmt.Errorf("%s: %w", authority.Label, err)

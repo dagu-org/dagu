@@ -281,7 +281,7 @@ func (l stagehandLauncher) startCertProxy(ctx context.Context, cdpURL string, op
 		Guard:      opts.Guard,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("start the client certificate proxy: %w", err)
+		return nil, fmt.Errorf("start the certificate proxy: %w", err)
 	}
 	return proxy, nil
 }
@@ -837,6 +837,15 @@ func (e *stagehandEngine) PendingConnections(ctx context.Context) ([]certproxy.P
 	}
 	return boundCall(ctx, e.pageCallTimeout, func(ctx context.Context) ([]certproxy.Pending, error) {
 		return certproxy.PendingConnections(ctx, e.handle.CertProxy.URL)
+	})
+}
+
+func (e *stagehandEngine) CertificateVerified(ctx context.Context, host string) (bool, error) {
+	if e.handle.CertProxy == nil {
+		return false, nil
+	}
+	return boundCall(ctx, e.pageCallTimeout, func(ctx context.Context) (bool, error) {
+		return certproxy.Verified(ctx, e.handle.CertProxy.URL, host)
 	})
 }
 

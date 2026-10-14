@@ -47,6 +47,8 @@ type DAGRunReader interface {
 }
 
 type DAGRunNodeSnapshot struct {
+	Stdout            string                `json:"stdout,omitempty"`
+	Stderr            string                `json:"stderr,omitempty"`
 	StepID            string                `json:"step_id,omitempty"`
 	StepName          string                `json:"step_name,omitempty"`
 	StartedAt         string                `json:"started_at,omitempty"`
@@ -63,6 +65,8 @@ func newDAGRunNodeSnapshot(node *ir.Node) *DAGRunNodeSnapshot {
 		return nil
 	}
 	return &DAGRunNodeSnapshot{
+		Stdout:            node.Stdout,
+		Stderr:            node.Stderr,
 		StepID:            node.Step.ID,
 		StepName:          node.Step.Name,
 		StartedAt:         node.StartedAt,
@@ -80,6 +84,8 @@ func (s *DAGRunNodeSnapshot) Node() *ir.Node {
 		return nil
 	}
 	return &ir.Node{
+		Stdout:            s.Stdout,
+		Stderr:            s.Stderr,
 		Step:              ir.Step{ID: s.StepID, Name: s.StepName},
 		StartedAt:         s.StartedAt,
 		Status:            s.Status,

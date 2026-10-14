@@ -218,6 +218,9 @@ type queueInfo struct {
 	runningCapped bool
 	// nextQueuedAt is when the next run in line was queued.
 	nextQueuedAt time.Time
+	// workerBlockReason is why a counted queued run cannot start for want
+	// of a worker, or empty when none it read says so.
+	workerBlockReason string
 }
 
 // getOrCreateQueue returns an existing queue from the map or creates a new one.
@@ -519,12 +522,16 @@ type visibleQueued struct {
 	// nextQueuedAt is when the first visible entry with a queue time, which
 	// is normally the next to run, was queued.
 	nextQueuedAt time.Time
+	// workerBlockReason is the first worker reason a visible entry records
+	// for not starting.
+	workerBlockReason string
 }
 
 func (v visibleQueued) applyTo(queue *queueInfo) {
 	queue.queuedCount = v.count
 	queue.queuedCountCapped = v.capped
 	queue.nextQueuedAt = v.nextQueuedAt
+	queue.workerBlockReason = v.workerBlockReason
 }
 
 // countVisibleQueuedItems counts queued items that are not already running.
@@ -571,6 +578,9 @@ func (a *API) countVisibleQueuedItems(ctx context.Context, queueName string, bud
 					if result.nextQueuedAt.IsZero() {
 						result.nextQueuedAt = parseQueuedAt(summary.QueuedAt)
 					}
+					if result.workerBlockReason == "" {
+						result.workerBlockReason = workerBlockReason(summary)
+					}
 					result.count++
 				}
 			}
@@ -591,6 +601,23 @@ func (a *API) countVisibleQueuedItems(ctx context.Context, queueName string, bud
 		}
 		cursor = page.NextCursor
 	}
+}
+
+// workerBlockReason returns the reason a queued run records for not starting
+// when no worker can take it, or empty when it records none.
+func workerBlockReason(summary api.DAGRunSummary) string {
+	for _, condition := range valueOf(summary.Conditions) {
+		if condition.Type != ir.DAGRunConditionRunnable || condition.Status == api.DAGRunConditionStatusTrue {
+			continue
+		}
+		switch condition.Reason {
+		case ir.DAGRunReasonNoMatchingWorker,
+			ir.DAGRunReasonNoAvailableWorker,
+			ir.DAGRunReasonWorkerDispatchUnavailable:
+			return condition.Reason
+		}
+	}
+	return ""
 }
 
 func parseQueuedAt(value *string) time.Time {
