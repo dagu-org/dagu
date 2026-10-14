@@ -141,6 +141,7 @@ type contextOptions struct {
 	Context
 
 	params             []string
+	paramsJSON         *string
 	defaultEnvs        []string
 	envs               []string
 	inheritedEnvs      []cmnvalue.EnvEntry
@@ -240,6 +241,14 @@ func WithScheduleTime(scheduleTime string) ContextOption {
 func WithParams(params []string) ContextOption {
 	return func(o *contextOptions) {
 		o.params = params
+	}
+}
+
+// WithParamsJSON replaces the DAG's params JSON in the environment steps
+// see.
+func WithParamsJSON(paramsJSON string) ContextOption {
+	return func(o *contextOptions) {
+		o.paramsJSON = &paramsJSON
 	}
 }
 

@@ -4,6 +4,7 @@
 package agent
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -17,31 +18,66 @@ const (
 	webhookPayloadFile  = "WEBHOOK_PAYLOAD_FILE"
 )
 
+// stepPayload is what a webhook run's steps see of the request body.
+type stepPayload struct {
+	// params are the params the steps see.
+	params []string
+	// paramsJSON, when set, replaces DAG_PARAMS_JSON, which then leaves the
+	// body out too.
+	paramsJSON *string
+	// fileEnv is the WEBHOOK_PAYLOAD_FILE entry, empty for a run without a
+	// webhook body.
+	fileEnv string
+	// cleanup removes the payload file.
+	cleanup func()
+}
+
 // webhookPayload gives a webhook run's steps the body as a file, since one
-// environment variable holds only so much. It returns the params the steps
-// see, leaving WEBHOOK_PAYLOAD out when it would not fit in a variable, the
-// WEBHOOK_PAYLOAD_FILE entry, and a cleanup that removes the file. A run
-// without a webhook body gets params as they are and no entry.
-func webhookPayload(params []string) (stepParams []string, env string, cleanup func(), err error) {
+// environment variable holds only so much. When the body would not fit in a
+// variable, the steps' params and params JSON leave it out, since starting a
+// step with it would fail. A run without a webhook body gets its params as
+// they are.
+func webhookPayload(params []string, paramsJSON string) (stepPayload, error) {
 	i := slices.IndexFunc(params, func(p string) bool { return strings.HasPrefix(p, webhookPayloadParam+"=") })
 	if i < 0 {
-		return params, "", func() {}, nil
+		return stepPayload{params: params, cleanup: func() {}}, nil
 	}
 	dir, err := os.MkdirTemp("", "dagu-webhook-")
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("failed to create webhook payload directory: %w", err)
+		return stepPayload{}, fmt.Errorf("failed to create webhook payload directory: %w", err)
 	}
-	cleanup = func() { _ = os.RemoveAll(dir) }
+	cleanup := func() { _ = os.RemoveAll(dir) }
 	path := filepath.Join(dir, "payload")
 	payload := strings.TrimPrefix(params[i], webhookPayloadParam+"=")
 	if err := os.WriteFile(path, []byte(payload), 0o600); err != nil {
 		cleanup()
-		return nil, "", nil, fmt.Errorf("failed to write webhook payload file: %w", err)
+		return stepPayload{}, fmt.Errorf("failed to write webhook payload file: %w", err)
 	}
+	result := stepPayload{params: params, fileEnv: webhookPayloadFile + "=" + path, cleanup: cleanup}
 	if len(params[i]) >= maxEnvEntry() {
-		params = slices.Delete(slices.Clone(params), i, i+1)
+		result.params = slices.Delete(slices.Clone(params), i, i+1)
+		result.paramsJSON = withoutParam(paramsJSON, webhookPayloadParam)
 	}
-	return params, webhookPayloadFile + "=" + path, cleanup, nil
+	return result, nil
+}
+
+// withoutParam returns params JSON without name, or nil when it is not an
+// object holding name.
+func withoutParam(paramsJSON, name string) *string {
+	var params map[string]json.RawMessage
+	if json.Unmarshal([]byte(paramsJSON), &params) != nil {
+		return nil
+	}
+	if _, ok := params[name]; !ok {
+		return nil
+	}
+	delete(params, name)
+	data, err := json.Marshal(params)
+	if err != nil {
+		return nil
+	}
+	trimmed := string(data)
+	return &trimmed
 }
 
 // maxEnvEntry bounds one NAME=VALUE environment entry: Linux refuses to start

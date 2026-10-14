@@ -726,11 +726,11 @@ func (a *Agent) Run(ctx context.Context) (runErr error) {
 		return err
 	}
 
-	stepParams, payloadFileEnv, cleanupPayload, err := webhookPayload(a.dag.Params)
+	payload, err := webhookPayload(a.dag.Params, a.dag.ParamsJSON)
 	if err != nil {
 		return err
 	}
-	defer cleanupPayload()
+	defer payload.cleanup()
 
 	contextOpts := []runtime.ContextOption{
 		runtime.WithDAGLoader(dagLoader),
@@ -744,7 +744,7 @@ func (a *Agent) Run(ctx context.Context) (runErr error) {
 		runtime.WithTriggerType(a.triggerType),
 		runtime.WithTriggerActor(a.triggerActor),
 		runtime.WithRunStartedAt(contextTimeString(a.plan.StartAt())),
-		runtime.WithParams(stepParams),
+		runtime.WithParams(payload.params),
 		runtime.WithRuntimeProfileValues(
 			profileValues.defaultEnvs,
 			profileValues.defaultSecrets,
@@ -761,8 +761,11 @@ func (a *Agent) Run(ctx context.Context) (runErr error) {
 	if len(a.extraEnvs) > 0 {
 		contextOpts = append(contextOpts, runtime.WithEnvVars(a.extraEnvs...))
 	}
-	if payloadFileEnv != "" {
-		contextOpts = append(contextOpts, runtime.WithEnvVars(payloadFileEnv))
+	if payload.fileEnv != "" {
+		contextOpts = append(contextOpts, runtime.WithEnvVars(payload.fileEnv))
+	}
+	if payload.paramsJSON != nil {
+		contextOpts = append(contextOpts, runtime.WithParamsJSON(*payload.paramsJSON))
 	}
 	if len(a.inheritedEnvs) > 0 {
 		contextOpts = append(contextOpts, runtime.WithInheritedEnvs(a.inheritedEnvs))

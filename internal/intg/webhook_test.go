@@ -139,10 +139,24 @@ steps:
     with:
       shell: bash
     output: PAYLOAD_SIZES
+  - name: params-json
+    run: echo "$DAG_PARAMS_JSON"
+    with:
+      shell: bash
+    output: PARAMS_JSON
+  - name: longest-env-entry
+    run: |
+      env | awk '{ if (length($0) > max) max = length($0) } END { print (max < 131072 ? "fits" : "too long") }'
+    with:
+      shell: bash
+    output: ENV_ENTRIES
 `, strings.Repeat("a", 200_000)))
 		dag.Agent().RunSuccess(t)
 		dag.AssertOutputs(t, map[string]any{
 			"PAYLOAD_SIZES": "0 200000",
+			"PARAMS_JSON":   "{}",
+			// Linux refuses to start a step with an entry this long.
+			"ENV_ENTRIES": "fits",
 		})
 
 		status, err := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
