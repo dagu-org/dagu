@@ -80,6 +80,8 @@ type Props = {
   followTail?: boolean;
   onFollowTailChange?: (following: boolean) => void;
   onSettled?: (stepName: string) => void;
+  /** Reports the stream shown after the reader switches it in place. */
+  onStreamShown?: (stream: Stream) => void;
 };
 
 type ContentProps = Props & {
@@ -99,6 +101,14 @@ function StepLog(props: Props) {
   useEffect(() => {
     setStream(props.stream ?? Stream.stdout);
   }, [props.stream]);
+  const { onStreamShown } = props;
+  const showStream = useCallback(
+    (next: Stream) => {
+      setStream(next);
+      onStreamShown?.(next);
+    },
+    [onStreamShown]
+  );
   // A log identity owns its search, cache and scroll position.
   const identity = JSON.stringify([
     remoteNode,
@@ -116,7 +126,7 @@ function StepLog(props: Props) {
       key={identity}
       {...props}
       stream={stream}
-      onStreamChange={props.followTail === undefined ? setStream : undefined}
+      onStreamChange={props.followTail === undefined ? showStream : undefined}
     />
   );
 }
