@@ -56,7 +56,12 @@ func NewWebhookStore(col persis.Collection, enc *crypto.Encryptor) (*WebhookStor
 	return s, nil
 }
 
+// rebuildIndex replaces the index with one read from the collection. It holds
+// mu throughout, so a write from this process lands either before the read or
+// after the replacement, never lost in between.
 func (s *WebhookStore) rebuildIndex(ctx context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	recs, err := listAll(ctx, s.col, persis.ListQuery{})
 	if err != nil {
 		return err
@@ -69,8 +74,6 @@ func (s *WebhookStore) rebuildIndex(ctx context.Context) error {
 		}
 		index[stored.DAGName] = stored.ID
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.byDAGName = index
 	return nil
 }
@@ -228,6 +231,9 @@ func (s *WebhookStore) List(ctx context.Context) ([]*auth.Webhook, error) {
 // cannot be read, for a caller that must not act on part of the set. It also
 // refreshes the DAG-name index, so each webhook it returns can be looked up.
 func (s *WebhookStore) ListComplete(ctx context.Context) ([]*auth.Webhook, error) {
+	// Held throughout, as in rebuildIndex.
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	recs, err := listAllStrict(ctx, s.col, persis.ListQuery{})
 	if err != nil {
 		return nil, err
@@ -242,9 +248,7 @@ func (s *WebhookStore) ListComplete(ctx context.Context) ([]*auth.Webhook, error
 		out = append(out, wh)
 		index[wh.DAGName] = wh.ID
 	}
-	s.mu.Lock()
 	s.byDAGName = index
-	s.mu.Unlock()
 	return out, nil
 }
 

@@ -471,6 +471,56 @@ func TestWebhookListCompleteReportsCorruptFiles(t *testing.T) {
 	assert.Len(t, some, 1)
 }
 
+// listingCollection runs during once, in its own goroutine, while the first
+// listing is under way, and waits briefly for it to finish.
+type listingCollection struct {
+	persis.Collection
+	once   sync.Once
+	during func()
+}
+
+func (c *listingCollection) List(ctx context.Context, q persis.ListQuery) (*persis.Page, error) {
+	page, err := c.Collection.List(ctx, q)
+	if c.during == nil {
+		return page, err
+	}
+	c.once.Do(func() {
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			c.during()
+		}()
+		select {
+		case <-done:
+		case <-time.After(100 * time.Millisecond):
+		}
+	})
+	return page, err
+}
+
+// A webhook created while a listing is under way is not lost from the
+// lookups, so the DAG cannot get a second one.
+func TestWebhookListCompleteKeepsConcurrentCreates(t *testing.T) {
+	ctx := context.Background()
+	col := &listingCollection{Collection: testutil.NewMemoryBackend().Collection("webhooks")}
+	s, err := store.NewWebhookStore(col, nil)
+	require.NoError(t, err)
+	require.NoError(t, s.Create(ctx, newWebhook("d0")))
+	created := make(chan error, 1)
+	col.during = func() { created <- s.Create(ctx, newWebhook("d1")) }
+	// A recent miss keeps the next one from rereading the collection.
+	_, err = s.GetByDAGName(ctx, "unknown")
+	require.ErrorIs(t, err, auth.ErrWebhookNotFound)
+
+	_, err = s.ListComplete(ctx)
+	require.NoError(t, err)
+	require.NoError(t, <-created)
+
+	second := newWebhook("d1")
+	second.ID = "wh-d1-second"
+	assert.ErrorIs(t, s.Create(ctx, second), auth.ErrWebhookAlreadyExists)
+}
+
 func newEncryptedWebhookStore(t *testing.T, col persis.Collection) *store.WebhookStore {
 	t.Helper()
 	enc, err := crypto.NewEncryptor("test-key")
