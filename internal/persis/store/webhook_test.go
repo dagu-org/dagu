@@ -735,3 +735,81 @@ func TestWebhookClaimLeftOverIsTakenOver(t *testing.T) {
 	require.NoError(t, fresh.Create(ctx, replacement))
 	assert.Len(t, webhooksFor(t, fresh, "d1"), 1)
 }
+
+// pausingCollection, once armed, pauses the next listing until resumed, as a
+// process that has read the collection and not yet written.
+type pausingCollection struct {
+	persis.Collection
+	armed   atomic.Bool
+	paused  chan struct{}
+	resumed chan struct{}
+}
+
+func (c *pausingCollection) List(ctx context.Context, q persis.ListQuery) (*persis.Page, error) {
+	page, err := c.Collection.List(ctx, q)
+	if c.armed.CompareAndSwap(true, false) {
+		close(c.paused)
+		<-c.resumed
+	}
+	return page, err
+}
+
+// claimingCollection, once armed, runs during before the next claim is
+// written, as other processes acting between a store's steps.
+type claimingCollection struct {
+	persis.Collection
+	armed  atomic.Bool
+	during func()
+}
+
+func (c *claimingCollection) Create(ctx context.Context, rec *persis.Record) error {
+	if c.armed.CompareAndSwap(true, false) {
+		c.during()
+	}
+	return c.Collection.Create(ctx, rec)
+}
+
+// A rename that loses the new name moves back, and gives way when another
+// process gave the old name a webhook meanwhile, so no DAG gets two.
+func TestWebhookRenameRollbackKeepsOneWebhookPerDAG(t *testing.T) {
+	ctx := context.Background()
+	col := testutil.NewMemoryBackend().Collection("webhooks")
+	claims := claimsOf(col)
+	renaming := &claimingCollection{Collection: claims}
+	a, err := store.NewWebhookStore(col, renaming, nil)
+	require.NoError(t, err)
+	b, err := store.NewWebhookStore(col, claims, nil)
+	require.NoError(t, err)
+	reading := &pausingCollection{Collection: col, paused: make(chan struct{}), resumed: make(chan struct{})}
+	z, err := store.NewWebhookStore(reading, claims, nil)
+	require.NoError(t, err)
+	require.NoError(t, a.Create(ctx, newWebhook("d1")))
+
+	// z reads that d2 is free before the rename starts.
+	reading.armed.Store(true)
+	zDone := make(chan error, 1)
+	go func() { zDone <- z.Create(ctx, newWebhook("d2")) }()
+	<-reading.paused
+
+	// While a's webhook names d2 and before a claims it, z claims d2 and b
+	// gives d1, whose claim now looks left over, a webhook.
+	other := newWebhook("d1")
+	other.ID = "wh-d1-other"
+	var zErr, bErr error
+	renaming.during = func() {
+		close(reading.resumed)
+		zErr = <-zDone
+		bErr = b.Create(ctx, other)
+	}
+	renaming.armed.Store(true)
+
+	require.ErrorIs(t, a.RenameDAG(ctx, "d1", "d2"), auth.ErrWebhookAlreadyExists)
+	require.NoError(t, zErr)
+	require.NoError(t, bErr)
+	d1 := webhooksFor(t, b, "d1")
+	require.Len(t, d1, 1)
+	assert.Equal(t, "wh-d1-other", d1[0].ID)
+	d2 := webhooksFor(t, b, "d2")
+	require.Len(t, d2, 1)
+	assert.Equal(t, "wh-d2", d2[0].ID)
+}

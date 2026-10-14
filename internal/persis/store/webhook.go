@@ -422,15 +422,30 @@ func (s *WebhookStore) RenameDAG(ctx context.Context, oldName, newName string) e
 	// Another process may be creating the new name's webhook; if it claims
 	// the name first, the webhook moves back.
 	if err := s.claim(ctx, newName, id); err != nil {
-		if revertErr := s.setDAGName(ctx, id, oldName); revertErr != nil {
-			return errors.Join(err, revertErr)
-		}
-		return err
+		return errors.Join(err, s.moveBack(ctx, id, oldName))
 	}
 	s.release(ctx, oldName, id)
 	delete(s.byDAGName, oldName)
 	s.byDAGName[newName] = id
 	return nil
+}
+
+// moveBack returns webhook id to dagName after a rename lost the new name.
+// While the record named the new name, the old name's claim looked left over,
+// so another process may have created a webhook for the DAG meanwhile; then
+// this one gives way and is removed, leaving the DAG one webhook.
+func (s *WebhookStore) moveBack(ctx context.Context, id, dagName string) error {
+	if err := s.setDAGName(ctx, id, dagName); err != nil {
+		return err
+	}
+	err := s.claim(ctx, dagName, id)
+	if !errors.Is(err, auth.ErrWebhookAlreadyExists) {
+		return err
+	}
+	if err := s.col.Delete(ctx, id); err != nil {
+		return err
+	}
+	return s.loadIndexLocked(ctx)
 }
 
 // setDAGName moves webhook id's record to dagName. The stored form is moved
