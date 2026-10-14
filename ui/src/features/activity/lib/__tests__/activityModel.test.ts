@@ -164,6 +164,16 @@ describe('isSchedulerHoldingWork', () => {
     expect(isSchedulerHoldingWork(queued, false)).toBe(true);
   });
 
+  // A queued run counts even when no queue line lists it, such as after a
+  // failed queue read.
+  it('flags a stopped scheduler with a queued run no queue lists', () => {
+    const waiting = activity({
+      active: [{ name: 'etl', dagRunId: 'etl-1', status: Status.Queued }],
+    });
+
+    expect(isSchedulerHoldingWork(waiting, false)).toBe(true);
+  });
+
   // A node without schedules may run no scheduler on purpose, and an older
   // node does not report one at all.
   it('stays quiet without waiting work or a known stopped scheduler', () => {

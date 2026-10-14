@@ -178,6 +178,7 @@ export function isSchedulerHoldingWork(
   if (schedulerRunning !== false) return false;
   return (
     activity.upcoming.length > 0 ||
+    activity.active.some((run) => run.status === Status.Queued) ||
     activity.queues.some((queue) => queue.queued > 0 || !!queue.queuedCapped)
   );
 }
