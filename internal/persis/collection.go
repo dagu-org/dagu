@@ -29,6 +29,7 @@ const (
 	CollectionLicense               = "license"
 	CollectionNotifications         = "notifications"
 	CollectionProfiles              = "profiles"
+	CollectionPublicWebhooks        = "public_webhooks"
 	CollectionQueue                 = "queue"
 	CollectionRemoteNodes           = "remote_nodes"
 	CollectionSchedulerState        = "scheduler_state"

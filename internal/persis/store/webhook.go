@@ -22,8 +22,10 @@ var _ auth.WebhookStore = (*WebhookStore)(nil)
 const webhookLastUsedWriteInterval = time.Minute
 
 // WebhookStore implements [auth.WebhookStore].
-// DAG-name lookups use an in-memory index (byDAGName) rebuilt from the
-// collection on startup; all writes keep it in sync under mu.
+// DAG-name lookups use an in-memory index (byDAGName) built from the
+// collection on startup and rebuilt when a lookup misses, since another
+// process sharing the collection may have written since; this process's
+// writes keep it in sync under mu.
 type WebhookStore struct {
 	col       persis.Collection
 	encryptor *crypto.Encryptor // nil = HMAC encryption disabled
@@ -50,16 +52,36 @@ func (s *WebhookStore) rebuildIndex(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	index := make(map[string]string, len(recs))
 	for _, rec := range recs {
 		var stored auth.WebhookForStorage
 		if err := persis.Decode(rec, &stored); err != nil {
 			continue // skip corrupt records
 		}
-		s.byDAGName[stored.DAGName] = stored.ID
+		index[stored.DAGName] = stored.ID
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.byDAGName = index
 	return nil
+}
+
+// idOf returns the ID of dagName's webhook, rebuilding the index when it has
+// none, since another process sharing the collection may have created one.
+func (s *WebhookStore) idOf(ctx context.Context, dagName string) (string, bool, error) {
+	s.mu.RLock()
+	id, ok := s.byDAGName[dagName]
+	s.mu.RUnlock()
+	if ok {
+		return id, true, nil
+	}
+	if err := s.rebuildIndex(ctx); err != nil {
+		return "", false, fmt.Errorf("webhook store: rebuild index: %w", err)
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	id, ok = s.byDAGName[dagName]
+	return id, ok, nil
 }
 
 // Create stores a new webhook.
@@ -83,6 +105,13 @@ func (s *WebhookStore) Create(ctx context.Context, webhook *auth.Webhook) error 
 	if err != nil {
 		return err
 	}
+	exists, err := s.exists(ctx, webhook.DAGName)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return auth.ErrWebhookAlreadyExists
+	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -100,6 +129,26 @@ func (s *WebhookStore) Create(ctx context.Context, webhook *auth.Webhook) error 
 	}
 	s.byDAGName[webhook.DAGName] = webhook.ID
 	return nil
+}
+
+// exists reports whether dagName has a webhook, checking the collection so
+// that one another process created or deleted counts as it is now.
+func (s *WebhookStore) exists(ctx context.Context, dagName string) (bool, error) {
+	id, ok, err := s.idOf(ctx, dagName)
+	if err != nil || !ok {
+		return false, err
+	}
+	_, err = s.col.Get(ctx, id)
+	if errors.Is(err, persis.ErrNotFound) {
+		if err := s.rebuildIndex(ctx); err != nil {
+			return false, fmt.Errorf("webhook store: rebuild index: %w", err)
+		}
+		s.mu.RLock()
+		defer s.mu.RUnlock()
+		_, ok := s.byDAGName[dagName]
+		return ok, nil
+	}
+	return err == nil, err
 }
 
 // GetByID retrieves a webhook by its unique ID.
@@ -124,9 +173,10 @@ func (s *WebhookStore) GetByDAGName(ctx context.Context, dagName string) (*auth.
 	if dagName == "" {
 		return nil, auth.ErrInvalidWebhookDAGName
 	}
-	s.mu.RLock()
-	id, ok := s.byDAGName[dagName]
-	s.mu.RUnlock()
+	id, ok, err := s.idOf(ctx, dagName)
+	if err != nil {
+		return nil, err
+	}
 	if !ok {
 		return nil, auth.ErrWebhookNotFound
 	}
@@ -150,6 +200,24 @@ func (s *WebhookStore) List(ctx context.Context) ([]*auth.Webhook, error) {
 	return out, nil
 }
 
+// ListComplete returns all webhooks in the store, or an error when any record
+// cannot be read, for a caller that must not act on part of the set.
+func (s *WebhookStore) ListComplete(ctx context.Context) ([]*auth.Webhook, error) {
+	recs, err := listAll(ctx, s.col, persis.ListQuery{})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*auth.Webhook, 0, len(recs))
+	for _, rec := range recs {
+		wh, err := s.fromRecord(rec)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, wh)
+	}
+	return out, nil
+}
+
 // UpdateByDAGName applies mutate to the current webhook for dagName and stores
 // the result. Concurrent updates, including those from other processes sharing
 // the collection, never overwrite each other. mutate may run more than once.
@@ -164,15 +232,16 @@ func (s *WebhookStore) UpdateByDAGName(
 		return nil, auth.ErrInvalidWebhookDAGName
 	}
 
-	s.mu.RLock()
-	id, ok := s.byDAGName[dagName]
-	s.mu.RUnlock()
+	id, ok, err := s.idOf(ctx, dagName)
+	if err != nil {
+		return nil, err
+	}
 	if !ok {
 		return nil, auth.ErrWebhookNotFound
 	}
 
 	var updated *auth.Webhook
-	err := retryConflict(ctx, func(ctx context.Context) error {
+	err = retryConflict(ctx, func(ctx context.Context) error {
 		rec, err := s.col.Get(ctx, id)
 		if err != nil {
 			return err
@@ -245,9 +314,10 @@ func (s *WebhookStore) DeleteByDAGName(ctx context.Context, dagName string) erro
 	if dagName == "" {
 		return auth.ErrInvalidWebhookDAGName
 	}
-	s.mu.RLock()
-	id, ok := s.byDAGName[dagName]
-	s.mu.RUnlock()
+	id, ok, err := s.idOf(ctx, dagName)
+	if err != nil {
+		return err
+	}
 	if !ok {
 		return auth.ErrWebhookNotFound
 	}
@@ -316,6 +386,23 @@ func (s *WebhookStore) toStorage(wh *auth.Webhook) (*auth.WebhookForStorage, err
 		}
 		stored.HMACSecretEnc = enc
 	}
+	if wh.Public != nil {
+		if s.encryptor == nil {
+			return nil, auth.ErrWebhookPublicEncryptorRequired
+		}
+		enc, err := s.encryptor.Encrypt(wh.Public.Token)
+		if err != nil {
+			return nil, fmt.Errorf("webhook store: encrypt public URL token: %w", err)
+		}
+		stored.Public.TokenEnc = enc
+		if wh.Public.SenderSecret != "" {
+			enc, err := s.encryptor.Encrypt(wh.Public.SenderSecret)
+			if err != nil {
+				return nil, fmt.Errorf("webhook store: encrypt sender secret: %w", err)
+			}
+			stored.Public.SenderSecretEnc = enc
+		}
+	}
 	return stored, nil
 }
 
@@ -334,6 +421,23 @@ func (s *WebhookStore) fromRecord(rec *persis.Record) (*auth.Webhook, error) {
 			return nil, fmt.Errorf("%w: %w", auth.ErrWebhookHMACDecryptFailed, err)
 		}
 		wh.HMACSecret = secret
+	}
+	if stored.Public != nil {
+		if s.encryptor == nil {
+			return nil, auth.ErrWebhookPublicEncryptorRequired
+		}
+		token, err := s.encryptor.Decrypt(stored.Public.TokenEnc)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", auth.ErrWebhookPublicDecryptFailed, err)
+		}
+		wh.Public.Token = token
+		if stored.Public.SenderSecretEnc != "" {
+			secret, err := s.encryptor.Decrypt(stored.Public.SenderSecretEnc)
+			if err != nil {
+				return nil, fmt.Errorf("%w: %w", auth.ErrWebhookPublicDecryptFailed, err)
+			}
+			wh.Public.SenderSecret = secret
+		}
 	}
 	return wh, nil
 }

@@ -77,6 +77,12 @@ var (
 	// ErrWebhookHMACDecryptFailed is returned when an encrypted HMAC secret
 	// cannot be decrypted from storage.
 	ErrWebhookHMACDecryptFailed = errors.New("failed to decrypt webhook HMAC secret")
+	// ErrWebhookPublicEncryptorRequired is returned when a public webhook URL
+	// is stored or read without an encryptor for its token and sender secret.
+	ErrWebhookPublicEncryptorRequired = errors.New("webhook public URL requires encryptor")
+	// ErrWebhookPublicDecryptFailed is returned when a public webhook URL's
+	// token or sender secret cannot be decrypted.
+	ErrWebhookPublicDecryptFailed = errors.New("failed to decrypt webhook public URL secrets")
 )
 
 // UserStore defines the interface for user persistence operations.

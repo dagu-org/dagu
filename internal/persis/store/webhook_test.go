@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dagucloud/dagu/v2/internal/auth"
+	"github.com/dagucloud/dagu/v2/internal/cmn/crypto"
 	"github.com/dagucloud/dagu/v2/internal/persis"
 	"github.com/dagucloud/dagu/v2/internal/persis/store"
 	"github.com/dagucloud/dagu/v2/internal/persis/testutil"
@@ -371,4 +372,95 @@ func TestWebhookIndexRebuiltOnStartup(t *testing.T) {
 	got, err = s2.GetByDAGName(ctx, "d2")
 	require.NoError(t, err)
 	assert.Equal(t, "wh-d2", got.ID)
+}
+
+// A store sees the webhooks another process sharing its collection creates
+// and deletes after the store started.
+func TestWebhookSeesOtherProcesses(t *testing.T) {
+	ctx := context.Background()
+	col := testutil.NewMemoryBackend().Collection("webhooks")
+	s1, err := store.NewWebhookStore(col, nil)
+	require.NoError(t, err)
+	s2, err := store.NewWebhookStore(col, nil)
+	require.NoError(t, err)
+
+	require.NoError(t, s1.Create(ctx, newWebhook("d1")))
+	got, err := s2.GetByDAGName(ctx, "d1")
+	require.NoError(t, err)
+	assert.Equal(t, "wh-d1", got.ID)
+	_, err = s2.UpdateByDAGName(ctx, "d1", func(wh *auth.Webhook) error {
+		wh.Enabled = false
+		return nil
+	})
+	require.NoError(t, err)
+	assert.ErrorIs(t, s2.Create(ctx, newWebhook("d1")), auth.ErrWebhookAlreadyExists)
+
+	require.NoError(t, s2.DeleteByDAGName(ctx, "d1"))
+	assert.NoError(t, s1.Create(ctx, newWebhook("d1")), "a webhook deleted elsewhere can be created again")
+}
+
+func newEncryptedWebhookStore(t *testing.T, col persis.Collection) *store.WebhookStore {
+	t.Helper()
+	enc, err := crypto.NewEncryptor("test-key")
+	require.NoError(t, err)
+	s, err := store.NewWebhookStore(col, enc)
+	require.NoError(t, err)
+	return s
+}
+
+// A public URL's token and sender secret are stored encrypted and read back
+// as they were.
+func TestWebhookPublicURL(t *testing.T) {
+	ctx := context.Background()
+	col := testutil.NewMemoryBackend().Collection("webhooks")
+	s := newEncryptedWebhookStore(t, col)
+	wh := newWebhook("d1")
+	created := time.Now().UTC().Truncate(time.Second)
+	wh.Public = &auth.WebhookPublic{
+		Token:        "public-token",
+		Sender:       "github",
+		SenderSecret: "sender-secret",
+		Events:       []string{"issues"},
+		CreatedAt:    created,
+	}
+	require.NoError(t, s.Create(ctx, wh))
+
+	rec, err := col.Get(ctx, wh.ID)
+	require.NoError(t, err)
+	assert.NotContains(t, string(rec.Data), "public-token")
+	assert.NotContains(t, string(rec.Data), "sender-secret")
+
+	got, err := s.GetByDAGName(ctx, "d1")
+	require.NoError(t, err)
+	assert.Equal(t, wh.Public, got.Public)
+
+	unencrypted, err := store.NewWebhookStore(col, nil)
+	require.NoError(t, err)
+	_, err = unencrypted.GetByDAGName(ctx, "d1")
+	assert.ErrorIs(t, err, auth.ErrWebhookPublicEncryptorRequired)
+	assert.ErrorIs(t, unencrypted.Create(ctx, wh), auth.ErrWebhookPublicEncryptorRequired)
+}
+
+// ListComplete fails rather than leave out a webhook it cannot read, which
+// List skips.
+func TestWebhookListComplete(t *testing.T) {
+	ctx := context.Background()
+	col := testutil.NewMemoryBackend().Collection("webhooks")
+	s := newEncryptedWebhookStore(t, col)
+	require.NoError(t, s.Create(ctx, newWebhook("d1")))
+	public := newWebhook("d2")
+	public.Public = &auth.WebhookPublic{Token: "public-token"}
+	require.NoError(t, s.Create(ctx, public))
+
+	all, err := s.ListComplete(ctx)
+	require.NoError(t, err)
+	assert.Len(t, all, 2)
+
+	unencrypted, err := store.NewWebhookStore(col, nil)
+	require.NoError(t, err)
+	_, err = unencrypted.ListComplete(ctx)
+	require.ErrorIs(t, err, auth.ErrWebhookPublicEncryptorRequired)
+	some, err := unencrypted.List(ctx)
+	require.NoError(t, err)
+	assert.Len(t, some, 1)
 }
