@@ -37,8 +37,8 @@ Dagu turns existing scripts and runbooks into production workflows with scheduli
 For a quick look at how workflows are defined, see the examples.
 
 <div align="center">
-  <a href="./assets/images/dagu-demo.mp4?raw=1">
-    <img src="./assets/images/cockpit-demo-poster.jpg" width="720" alt="Dagu Cockpit showing queued, running, completed, and failed workflow runs">
+  <a href="https://dagu.sh/dagu-film.mp4">
+    <img src="./assets/images/dagu-film-poster.jpg" width="720" alt="Watch the Dagu film: your code is the engine, Dagu is the cockpit">
   </a>
 </div>
 
