@@ -24,6 +24,7 @@ vi.mock('../../../../../hooks/api', () => ({
 
 vi.mock('../WebhookProfileSelectionCard', () => ({ default: () => null }));
 vi.mock('../WebhookProfileTokensCard', () => ({ default: () => null }));
+vi.mock('../WebhookPublicURLCard', () => ({ default: () => null }));
 
 const webhook = {
   id: '00000000-0000-0000-0000-000000000001',

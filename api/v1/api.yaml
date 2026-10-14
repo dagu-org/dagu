@@ -5253,7 +5253,9 @@ paths:
         bearer token only, bearer token plus HMAC, or HMAC only.
 
         The request body is passed to the DAG as the WEBHOOK_PAYLOAD environment
-        variable. If the DAG configures `webhook.forward_headers`, selected
+        variable, and as a file named by WEBHOOK_PAYLOAD_FILE. A body too large
+        for one environment variable is passed only as the file. If the DAG
+        configures `webhook.forward_headers`, selected
         request headers are passed as the WEBHOOK_HEADERS environment variable.
         For safety, the `Authorization` header is never forwarded.
         The DAG run is enqueued and the endpoint returns immediately with the
@@ -6792,6 +6794,221 @@ paths:
                 $ref: "#/components/schemas/Error"
         "404":
           description: "No webhook configured for this DAG"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{fileName}/webhook/public:
+    get:
+      summary: "Get the webhook's public URL"
+      description: |
+        Returns the webhook's public URL through Dagu Cloud, the state of the
+        relay connection that holds it, and its latest deliveries.
+        Developer, manager, or admin only.
+      operationId: "getDAGWebhookPublic"
+      tags:
+        - "webhooks"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      responses:
+        "200":
+          description: "The public URL and its deliveries"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookPublicDetails"
+        "404":
+          description: "No webhook, or no public URL, for this DAG"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      summary: "Turn on the webhook's public URL"
+      description: |
+        Gives the webhook a public URL through Dagu Cloud. A webhook that has
+        one keeps it. The server must be connected to Dagu Cloud, and the plan
+        must allow another public URL. Admin only.
+      operationId: "enableDAGWebhookPublic"
+      tags:
+        - "webhooks"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      responses:
+        "200":
+          description: "The webhook with its public URL turned on"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookDetails"
+        "400":
+          description: "The server is not connected to Dagu Cloud, or the plan allows no more public URLs"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "No webhook configured for this DAG"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "501":
+          description: "Public URLs need encrypted storage, which is not available on this node"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      summary: "Turn off the webhook's public URL"
+      description: |
+        Removes the webhook's public URL and its delivery log. Dagu Cloud drops
+        the URL and any deliveries waiting for it. Admin only.
+      operationId: "disableDAGWebhookPublic"
+      tags:
+        - "webhooks"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      responses:
+        "200":
+          description: "The webhook with its public URL turned off"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookDetails"
+        "404":
+          description: "No webhook configured for this DAG"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{fileName}/webhook/public/regenerate:
+    post:
+      summary: "Replace the webhook's public URL"
+      description: |
+        Gives the webhook a new public URL. The old URL stops working.
+        Requests Dagu Cloud already took through it are still delivered;
+        turning the URL off drops them. Admin only.
+      operationId: "regenerateDAGWebhookPublicURL"
+      tags:
+        - "webhooks"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      responses:
+        "200":
+          description: "The webhook with its new public URL"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookDetails"
+        "404":
+          description: "No webhook, or no public URL, for this DAG"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{fileName}/webhook/public/sender:
+    put:
+      summary: "Set who may send to the webhook's public URL"
+      description: |
+        Sets the sender whose signature requests to the public URL must
+        carry, its signing secret, and the events that start runs. For
+        GitHub, Dagu makes the secret when none is entered, and returns it
+        only this once. Admin only.
+      operationId: "configureDAGWebhookPublicSender"
+      tags:
+        - "webhooks"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookPublicSenderRequest"
+      responses:
+        "200":
+          description: "The webhook with its new sender settings"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookPublicSenderResponse"
+        "400":
+          description: "Invalid sender, secret, or events"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "No webhook, or no public URL, for this DAG"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{fileName}/webhook/public/missed:
+    delete:
+      summary: "Dismiss the webhook's missed deliveries"
+      description: |
+        Clears the counts of deliveries Dagu Cloud dropped for the public URL.
+        Admin only.
+      operationId: "dismissDAGWebhookPublicMissed"
+      tags:
+        - "webhooks"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      responses:
+        "204":
+          description: "Missed deliveries dismissed"
+        "404":
+          description: "No webhook, or no public URL, for this DAG"
           content:
             application/json:
               schema:
@@ -12448,6 +12665,172 @@ components:
           type: string
           format: date-time
           description: "When the webhook was last triggered"
+        public:
+          $ref: "#/components/schemas/WebhookPublicSettings"
+
+    WebhookPublicSender:
+      type: string
+      description: "A service whose signed requests a public URL accepts"
+      enum:
+        - "github"
+        - "stripe"
+        - "slack"
+        - "standard"
+
+    WebhookPublicSettings:
+      type: object
+      description: "What the webhook's public URL accepts"
+      required:
+        - secretConfigured
+        - events
+        - createdAt
+      properties:
+        sender:
+          $ref: "#/components/schemas/WebhookPublicSender"
+        secretConfigured:
+          type: boolean
+          description: "Whether the sender's signing secret is stored"
+        events:
+          type: array
+          description: "Events that start runs; empty takes every event"
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+          description: "When the public URL was turned on"
+
+    WebhookPublicState:
+      type: string
+      description: |
+        Whether Dagu Cloud holds the public URL: `active` once it does,
+        `connecting` before then, `overLimit` when the plan allows fewer
+        public URLs than exist and this one is left out, and `error` when the
+        server cannot connect.
+      enum:
+        - "active"
+        - "connecting"
+        - "overLimit"
+        - "error"
+
+    WebhookPublicDetails:
+      type: object
+      description: "The webhook's public URL, its state, and its latest deliveries"
+      required:
+        - state
+        - deliveries
+        - missed
+      properties:
+        url:
+          type: string
+          description: "The public URL; absent until Dagu Cloud has given this server its address"
+        state:
+          $ref: "#/components/schemas/WebhookPublicState"
+        error:
+          type: string
+          description: "Why the server cannot connect"
+        maxHooks:
+          type: integer
+          description: "The most public URLs the plan allows, once known"
+        deliveries:
+          type: array
+          description: "The latest deliveries, newest first"
+          items:
+            $ref: "#/components/schemas/WebhookPublicDelivery"
+        missed:
+          $ref: "#/components/schemas/WebhookPublicMissed"
+
+    WebhookPublicDelivery:
+      type: object
+      description: "One request Dagu Cloud handed over for the public URL"
+      required:
+        - id
+        - receivedAt
+        - size
+        - outcome
+      properties:
+        id:
+          type: string
+          description: "The delivery's ID, which names the run it starts"
+        receivedAt:
+          type: string
+          format: date-time
+          description: "When Dagu Cloud received the request"
+        size:
+          type: integer
+          description: "The body's size in bytes"
+        event:
+          type: string
+          description: "What the request is about, as its sender labels it"
+        outcome:
+          type: string
+          description: |
+            What became of the delivery: `started` a run, `waiting` at Dagu
+            Cloud to be sent again, `rejected` by the sender's signature
+            check, `skipped` as an event that starts no run, `ignored` while
+            the webhook was disabled, or `failed`.
+          enum:
+            - "started"
+            - "waiting"
+            - "rejected"
+            - "skipped"
+            - "ignored"
+            - "failed"
+        dagRunId:
+          type: string
+          description: "The run a started delivery started"
+        error:
+          type: string
+          description: "Why the delivery was rejected, skipped, waiting, or failed"
+
+    WebhookPublicMissed:
+      type: object
+      description: |
+        Deliveries Dagu Cloud dropped since they were last dismissed: those
+        that waited more than 7 days, and those refused while 1,000 waited.
+      required:
+        - expired
+        - refused
+      properties:
+        expired:
+          type: integer
+        refused:
+          type: integer
+        since:
+          type: string
+          format: date-time
+          description: "When the first of them was counted"
+
+    WebhookPublicSenderRequest:
+      type: object
+      description: "Who may send to a public URL, and which events start runs"
+      properties:
+        sender:
+          $ref: "#/components/schemas/WebhookPublicSender"
+        secret:
+          type: string
+          description: |
+            The sender's signing secret. Empty keeps the stored secret of the
+            same sender, or, for GitHub, makes one.
+        generateSecret:
+          type: boolean
+          description: "Make a new GitHub signing secret"
+        events:
+          type: array
+          description: "Events that start runs; empty takes every event"
+          items:
+            type: string
+
+    WebhookPublicSenderResponse:
+      type: object
+      required:
+        - webhook
+      properties:
+        webhook:
+          $ref: "#/components/schemas/WebhookDetails"
+        secret:
+          type: string
+          description: "The signing secret Dagu made, shown only this once"
 
     WebhookCreateResponse:
       type: object
