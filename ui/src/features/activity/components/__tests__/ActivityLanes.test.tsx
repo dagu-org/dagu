@@ -5,8 +5,8 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { Status } from '@/api/v1/schema';
-import type { DAGRunActivity } from '../../lib/activityModel';
-import { ActivityLanes, stripGradient } from '../ActivityLanes';
+import type { ActivityRun } from '../../lib/activityModel';
+import { ActivityLanes } from '../ActivityLanes';
 
 vi.mock('@/features/dag-runs/components/dag-run-details', () => ({
   DAGRunDetailsModal: ({
@@ -29,50 +29,39 @@ vi.mock('@/features/dag-runs/components/dag-run-details', () => ({
 const FROM = 1_790_000_000 - (1_790_000_000 % 900);
 const TO = FROM + 96 * 900;
 
-const activity: DAGRunActivity = {
-  from: FROM,
-  to: TO,
-  bucketSeconds: 900,
-  truncated: false,
-  counts: [],
-  active: [],
-  upcoming: [],
-  workflows: [
-    {
-      name: 'report',
-      runCount: 2,
-      failedCount: 0,
-      strip: 'ss'.padEnd(96, '.'),
-      runs: [
-        { dagRunId: 'report-1', status: Status.Success, startedAt: FROM },
-        { dagRunId: 'report-2', status: Status.Success, startedAt: FROM + 900 },
-      ],
-      latest: {
-        dagRunId: 'report-2',
-        status: Status.Success,
-        startedAt: FROM + 900,
-      },
-    },
-    {
-      name: 'billing',
-      runCount: 3,
-      failedCount: 2,
-      strip: '.ff'.padEnd(96, '.'),
-      runs: [
-        {
-          dagRunId: 'billing-3',
-          status: Status.Failed,
-          startedAt: FROM + 1800,
-        },
-      ],
-      latest: {
-        dagRunId: 'billing-3',
-        status: Status.Failed,
-        startedAt: FROM + 1800,
-      },
-    },
-  ],
-};
+// Loaded runs, newest first, as the API lists them.
+const runs: ActivityRun[] = [
+  {
+    name: 'billing',
+    dagRunId: 'billing-3',
+    status: Status.Failed,
+    startedAt: FROM + 1800,
+  },
+  {
+    name: 'billing',
+    dagRunId: 'billing-2',
+    status: Status.Failed,
+    startedAt: FROM + 1500,
+  },
+  {
+    name: 'report',
+    dagRunId: 'report-2',
+    status: Status.Success,
+    startedAt: FROM + 900,
+  },
+  {
+    name: 'billing',
+    dagRunId: 'billing-1',
+    status: Status.Success,
+    startedAt: FROM + 600,
+  },
+  {
+    name: 'report',
+    dagRunId: 'report-1',
+    status: Status.Success,
+    startedAt: FROM,
+  },
+];
 
 function LocationProbe() {
   const location = useLocation();
@@ -87,7 +76,10 @@ function renderLanes() {
           path="/"
           element={
             <ActivityLanes
-              activity={activity}
+              runs={runs}
+              active={[]}
+              window={{ from: FROM, to: TO }}
+              hasMore={false}
               range={{ from: FROM, to: TO }}
               nowSeconds={TO - 60}
               remoteNode="local"
@@ -100,25 +92,6 @@ function renderLanes() {
     </MemoryRouter>
   );
 }
-
-describe('stripGradient', () => {
-  it('merges neighboring buckets of the same kind into one band', () => {
-    const gradient = stripGradient('ss..f'.padEnd(96, '.'), activity, {
-      from: FROM,
-      to: TO,
-    });
-
-    expect(gradient?.match(/var\(--status-success\)/g)).toHaveLength(2);
-    expect(gradient).toContain('transparent 0.000%');
-    expect(gradient).toContain('2.083%');
-  });
-
-  it('paints nothing for an empty strip', () => {
-    expect(
-      stripGradient('.'.repeat(96), activity, { from: FROM, to: TO })
-    ).toBeUndefined();
-  });
-});
 
 describe('ActivityLanes', () => {
   it('lists failing workflows first with their failure share', () => {

@@ -4,10 +4,11 @@
 import { describe, expect, it } from 'vitest';
 import { Status } from '@/api/v1/schema';
 import {
-  type ActivityWorkflow,
+  type ActivityRun,
   attentionItems,
   type DAGRunActivity,
   fitRange,
+  groupLanes,
   inProgressRuns,
   sortLanes,
   timeTicks,
@@ -15,70 +16,83 @@ import {
 
 const HOUR = 3600;
 const FROM = 1_790_000_000 - (1_790_000_000 % 900);
+const WINDOW = { from: FROM, to: FROM + 24 * HOUR };
 
-function workflow(
+function run(
   name: string,
+  dagRunId: string,
   status: Status,
   startedAt: number,
-  extra: Partial<ActivityWorkflow> = {}
-): ActivityWorkflow {
-  return {
-    name,
-    runCount: 1,
-    failedCount: status === Status.Failed ? 1 : 0,
-    strip: '.'.repeat(96),
-    runs: [],
-    latest: { dagRunId: `${name}-latest`, status, startedAt },
-    ...extra,
-  };
+  finishedAt?: number
+): ActivityRun {
+  return { name, dagRunId, status, startedAt, finishedAt };
 }
 
 function activity(overrides: Partial<DAGRunActivity> = {}): DAGRunActivity {
   return {
-    from: FROM,
-    to: FROM + 24 * HOUR,
-    bucketSeconds: 900,
-    truncated: false,
-    counts: [],
-    workflows: [],
+    ...WINDOW,
+    runs: [],
+    attention: [],
     active: [],
     upcoming: [],
     ...overrides,
   };
 }
 
+describe('groupLanes', () => {
+  it("keeps each workflow's runs newest first with the newest as latest", () => {
+    const lanes = groupLanes([
+      run('etl', 'etl-3', Status.Failed, FROM + 3 * HOUR),
+      run('ping', 'ping-1', Status.Success, FROM + 2 * HOUR),
+      run('etl', 'etl-2', Status.Success, FROM + HOUR),
+      run('etl', 'etl-1', Status.Rejected, FROM),
+    ]);
+
+    expect(lanes).toEqual([
+      expect.objectContaining({
+        name: 'etl',
+        latest: expect.objectContaining({ dagRunId: 'etl-3' }),
+        failedCount: 2,
+      }),
+      expect.objectContaining({ name: 'ping', failedCount: 0 }),
+    ]);
+    expect(lanes[0]!.runs.map((item) => item.dagRunId)).toEqual([
+      'etl-3',
+      'etl-2',
+      'etl-1',
+    ]);
+  });
+});
+
 describe('attentionItems', () => {
-  it('lists failing workflows newest first, then waiting and slow runs', () => {
+  it('lists failing workflows, then waiting runs, then slow runs', () => {
     const now = FROM + 10 * HOUR;
+    // train usually takes 10 minutes; quick has too few runs to judge.
+    const loaded = [
+      run('train', 't-a', Status.Success, FROM, FROM + 600),
+      run('train', 't-b', Status.Success, FROM + HOUR, FROM + HOUR + 500),
+      run(
+        'train',
+        't-c',
+        Status.Success,
+        FROM + 2 * HOUR,
+        FROM + 2 * HOUR + 700
+      ),
+      run('quick', 'q-a', Status.Success, FROM, FROM + 10),
+    ];
     const items = attentionItems(
       activity({
-        workflows: [
-          workflow('older-failure', Status.Failed, FROM + HOUR),
-          workflow('healthy', Status.Success, FROM + 2 * HOUR),
-          workflow('newer-failure', Status.Failed, FROM + 3 * HOUR),
-          workflow('train', Status.Running, FROM + 9 * HOUR, {
-            medianSuccessSeconds: 600,
-          }),
-          workflow('quick', Status.Running, now - 60, {
-            medianSuccessSeconds: 600,
-          }),
+        attention: [
+          run('newer-failure', 'n-1', Status.Failed, FROM + 3 * HOUR),
+          run('older-failure', 'o-1', Status.Failed, FROM + HOUR),
         ],
         active: [
           { name: 'approve', dagRunId: 'a-1', status: Status.Waiting },
-          {
-            name: 'train',
-            dagRunId: 't-1',
-            status: Status.Running,
-            startedAt: FROM + 9 * HOUR,
-          },
-          {
-            name: 'quick',
-            dagRunId: 'q-1',
-            status: Status.Running,
-            startedAt: now - 60,
-          },
+          run('train', 't-1', Status.Running, FROM + 9 * HOUR),
+          run('quick', 'q-1', Status.Running, FROM + 9 * HOUR),
         ],
       }),
+      loaded,
       now
     );
 
@@ -88,6 +102,7 @@ describe('attentionItems', () => {
       'waiting:approve',
       'slow:train',
     ]);
+    expect(items[3]).toMatchObject({ usualSeconds: 600 });
   });
 });
 
@@ -103,20 +118,21 @@ describe('inProgressRuns', () => {
       })
     );
 
-    expect(runs.map((run) => run.dagRunId)).toEqual(['1', '3']);
+    expect(runs.map((item) => item.dagRunId)).toEqual(['1', '3']);
   });
 });
 
 describe('sortLanes', () => {
   it('puts failing workflows first, then running ones, then recent activity', () => {
-    const lanes = sortLanes([
-      workflow('quiet', Status.Success, FROM + HOUR),
-      workflow('busy', Status.Success, FROM + 5 * HOUR, {
-        strip: 'r'.padEnd(96, '.'),
-      }),
-      workflow('broken', Status.Failed, FROM),
-      workflow('recent', Status.Success, FROM + 6 * HOUR),
-    ]);
+    const lanes = sortLanes(
+      groupLanes([
+        run('recent', 'r-1', Status.Success, FROM + 6 * HOUR),
+        run('busy', 'b-1', Status.Success, FROM + 5 * HOUR),
+        run('quiet', 'q-1', Status.Success, FROM + HOUR),
+        run('broken', 'x-1', Status.Failed, FROM),
+      ]),
+      [run('busy', 'b-0', Status.Running, FROM - HOUR)]
+    );
 
     expect(lanes.map((lane) => lane.name)).toEqual([
       'broken',
@@ -128,20 +144,19 @@ describe('sortLanes', () => {
 });
 
 describe('fitRange', () => {
-  it('starts one bucket before the first run', () => {
-    const strip = '.'.repeat(40) + 's' + '.'.repeat(55);
-    const range = fitRange(
-      activity({ workflows: [workflow('a', Status.Success, 0, { strip })] })
-    );
+  it('starts a quarter hour before the oldest run', () => {
+    const range = fitRange(WINDOW, [
+      run('a', '2', Status.Success, FROM + 10 * HOUR),
+      run('a', '1', Status.Success, FROM + 6 * HOUR),
+    ]);
 
-    expect(range).toEqual({ from: FROM + 39 * 900, to: FROM + 24 * HOUR });
+    expect(range).toEqual({ from: FROM + 6 * HOUR - 900, to: WINDOW.to });
   });
 
   it('keeps at least an hour in view', () => {
-    const strip = '.'.repeat(95) + 's';
-    const range = fitRange(
-      activity({ workflows: [workflow('a', Status.Success, 0, { strip })] })
-    );
+    const range = fitRange(WINDOW, [
+      run('a', '1', Status.Success, WINDOW.to - 60),
+    ]);
 
     expect(range.to - range.from).toBe(HOUR);
   });

@@ -4,11 +4,19 @@
 import { Status, type components } from '@/api/v1/schema';
 
 export type DAGRunActivity = components['schemas']['DAGRunActivity'];
-export type ActivityWorkflow = components['schemas']['DAGRunActivityWorkflow'];
 export type ActivityRun = components['schemas']['DAGRunActivityRun'];
 
 /** A time range in Unix seconds. */
 export type TimeRange = { from: number; to: number };
+
+/** One workflow's loaded runs, newest first. */
+export type ActivityLane = {
+  name: string;
+  runs: ActivityRun[];
+  latest: ActivityRun;
+  /** Failed or rejected runs among the loaded ones. */
+  failedCount: number;
+};
 
 /** Statuses that leave a workflow needing a look when its latest run ends so. */
 const UNSUCCESSFUL = new Set<Status>([
@@ -18,11 +26,19 @@ const UNSUCCESSFUL = new Set<Status>([
   Status.Aborted,
 ]);
 
+const IN_PROGRESS = new Set<Status>([
+  Status.Running,
+  Status.Queued,
+  Status.Waiting,
+]);
+
 /** A running run is flagged once it takes this many times its usual time. */
 export const SLOW_RUN_FACTOR = 2;
+/** Successful runs needed before a workflow's usual time is trusted. */
+const MIN_USUAL_SAMPLES = 3;
 
 export type AttentionItem =
-  | { kind: 'failing'; name: string; run: ActivityRun; failedCount: number }
+  | { kind: 'failing'; name: string; run: ActivityRun }
   | { kind: 'waiting'; name: string; run: ActivityRun }
   | { kind: 'slow'; name: string; run: ActivityRun; usualSeconds: number };
 
@@ -30,50 +46,88 @@ function newestFirst(left: ActivityRun, right: ActivityRun): number {
   return (right.startedAt ?? 0) - (left.startedAt ?? 0);
 }
 
+/** Groups runs, listed newest first, into one lane per workflow. */
+export function groupLanes(runs: ActivityRun[]): ActivityLane[] {
+  const lanes = new Map<string, ActivityLane>();
+  for (const run of runs) {
+    const lane = lanes.get(run.name);
+    if (lane) {
+      lane.runs.push(run);
+    } else {
+      lanes.set(run.name, {
+        name: run.name,
+        runs: [run],
+        latest: run,
+        failedCount: 0,
+      });
+    }
+  }
+  for (const lane of lanes.values()) {
+    lane.failedCount = lane.runs.filter(
+      (run) => run.status === Status.Failed || run.status === Status.Rejected
+    ).length;
+  }
+  return [...lanes.values()];
+}
+
+/** Median duration of each workflow's successful runs, in seconds. */
+function usualSeconds(runs: ActivityRun[]): Map<string, number> {
+  const durations = new Map<string, number[]>();
+  for (const run of runs) {
+    if (
+      run.status !== Status.Success ||
+      run.startedAt === undefined ||
+      run.finishedAt === undefined ||
+      run.finishedAt < run.startedAt
+    ) {
+      continue;
+    }
+    const list = durations.get(run.name) ?? [];
+    list.push(run.finishedAt - run.startedAt);
+    durations.set(run.name, list);
+  }
+  const usual = new Map<string, number>();
+  for (const [name, list] of durations) {
+    if (list.length < MIN_USUAL_SAMPLES) continue;
+    list.sort((left, right) => left - right);
+    usual.set(name, list[Math.floor(list.length / 2)]!);
+  }
+  return usual;
+}
+
 /**
  * Lists what needs a person: workflows whose latest run did not succeed,
- * runs waiting for input, and runs taking much longer than usual.
+ * runs waiting for input, and runs taking much longer than the loaded runs
+ * of their workflow usually take.
  */
 export function attentionItems(
   activity: DAGRunActivity,
+  runs: ActivityRun[],
   nowSeconds: number
 ): AttentionItem[] {
-  const failing = activity.workflows
-    .filter((workflow) => UNSUCCESSFUL.has(workflow.latest.status))
-    .sort((left, right) => newestFirst(left.latest, right.latest))
-    .map<AttentionItem>((workflow) => ({
-      kind: 'failing',
-      name: workflow.name,
-      run: workflow.latest,
-      failedCount: workflow.failedCount,
-    }));
+  const failing = activity.attention.map<AttentionItem>((run) => ({
+    kind: 'failing',
+    name: run.name,
+    run,
+  }));
 
   const waiting = activity.active
     .filter((run) => run.status === Status.Waiting)
-    .map<AttentionItem>((run) => ({
-      kind: 'waiting',
-      name: run.name ?? '',
-      run,
-    }));
+    .map<AttentionItem>((run) => ({ kind: 'waiting', name: run.name, run }));
 
-  const usual = new Map(
-    activity.workflows.map((workflow) => [
-      workflow.name,
-      workflow.medianSuccessSeconds,
-    ])
-  );
+  const usual = usualSeconds(runs);
   const slow: AttentionItem[] = [];
   for (const run of activity.active) {
-    const usualSeconds = usual.get(run.name ?? '');
+    const seconds = usual.get(run.name);
     if (
       run.status !== Status.Running ||
-      !usualSeconds ||
+      !seconds ||
       run.startedAt === undefined
     ) {
       continue;
     }
-    if (nowSeconds - run.startedAt > usualSeconds * SLOW_RUN_FACTOR) {
-      slow.push({ kind: 'slow', name: run.name ?? '', run, usualSeconds });
+    if (nowSeconds - run.startedAt > seconds * SLOW_RUN_FACTOR) {
+      slow.push({ kind: 'slow', name: run.name, run, usualSeconds: seconds });
     }
   }
 
@@ -85,9 +139,14 @@ export function inProgressRuns(activity: DAGRunActivity): ActivityRun[] {
   return activity.active.filter((run) => run.status !== Status.Waiting);
 }
 
-function laneRank(workflow: ActivityWorkflow): number {
-  if (UNSUCCESSFUL.has(workflow.latest.status)) return 0;
-  if (workflow.strip.includes('r')) return 1;
+function laneRank(lane: ActivityLane, activeNames: Set<string>): number {
+  if (UNSUCCESSFUL.has(lane.latest.status)) return 0;
+  if (
+    activeNames.has(lane.name) ||
+    lane.runs.some((run) => IN_PROGRESS.has(run.status))
+  ) {
+    return 1;
+  }
   return 2;
 }
 
@@ -95,10 +154,14 @@ function laneRank(workflow: ActivityWorkflow): number {
  * Orders lanes so unresolved failures come first, then workflows with runs
  * in progress, then the most recently active.
  */
-export function sortLanes(workflows: ActivityWorkflow[]): ActivityWorkflow[] {
-  return [...workflows].sort(
+export function sortLanes(
+  lanes: ActivityLane[],
+  active: ActivityRun[]
+): ActivityLane[] {
+  const activeNames = new Set(active.map((run) => run.name));
+  return [...lanes].sort(
     (left, right) =>
-      laneRank(left) - laneRank(right) ||
+      laneRank(left, activeNames) - laneRank(right, activeNames) ||
       newestFirst(left.latest, right.latest) ||
       left.name.localeCompare(right.name)
   );
@@ -106,25 +169,34 @@ export function sortLanes(workflows: ActivityWorkflow[]): ActivityWorkflow[] {
 
 /** Shortest range the lanes zoom out to when activity is sparse. */
 const MIN_FIT_SECONDS = 60 * 60;
+/** Empty time kept before the first run when fitting the range. */
+const FIT_LEAD_SECONDS = 15 * 60;
 
-/**
- * Narrows the window to the part that has runs, keeping one empty bucket of
- * context before the first run and at least an hour of span.
- */
-export function fitRange(activity: DAGRunActivity): TimeRange {
-  const bucket = activity.bucketSeconds;
-  let first = activity.to;
-  for (const workflow of activity.workflows) {
-    const index = workflow.strip.search(/[^.]/);
-    if (index >= 0) {
-      first = Math.min(first, activity.from + index * bucket);
+/** Start time of the oldest run, or undefined when none has one. */
+export function oldestStart(runs: ActivityRun[]): number | undefined {
+  let oldest: number | undefined;
+  for (const run of runs) {
+    if (
+      run.startedAt !== undefined &&
+      (oldest === undefined || run.startedAt < oldest)
+    ) {
+      oldest = run.startedAt;
     }
   }
+  return oldest;
+}
+
+/**
+ * Narrows the window to the part that has runs, keeping some empty time
+ * before the first run and at least an hour of span.
+ */
+export function fitRange(window: TimeRange, runs: ActivityRun[]): TimeRange {
+  const first = Math.max(window.from, oldestStart(runs) ?? window.to);
   const from = Math.max(
-    activity.from,
-    Math.min(first - bucket, activity.to - MIN_FIT_SECONDS)
+    window.from,
+    Math.min(first - FIT_LEAD_SECONDS, window.to - MIN_FIT_SECONDS)
   );
-  return { from, to: activity.to };
+  return { from, to: window.to };
 }
 
 const TICK_STEPS = [

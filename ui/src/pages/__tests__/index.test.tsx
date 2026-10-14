@@ -131,10 +131,8 @@ function makeActivity(overrides: Partial<DAGRunActivity> = {}): DAGRunActivity {
   return {
     from: FROM,
     to: NOW + 600,
-    bucketSeconds: 900,
-    truncated: false,
-    counts: [],
-    workflows: [],
+    runs: [],
+    attention: [],
     active: [],
     upcoming: [],
     ...overrides,
@@ -143,9 +141,16 @@ function makeActivity(overrides: Partial<DAGRunActivity> = {}): DAGRunActivity {
 
 function mockActivity(state: Partial<DAGRunActivityState>) {
   useActivityMock.mockReturnValue({
+    runs: state.activity?.runs ?? [],
     isLoading: false,
     unavailable: false,
     refresh: vi.fn().mockResolvedValue(undefined),
+    hasMore: false,
+    loadMore: vi.fn().mockResolvedValue(undefined),
+    isLoadingMore: false,
+    loadMoreError: null,
+    paused: false,
+    resume: vi.fn(),
     ...state,
   });
 }
@@ -163,39 +168,25 @@ function mockDAGList(names: string[]) {
   );
 }
 
+const billingFailure = {
+  name: 'billing',
+  dagRunId: 'billing-9',
+  status: Status.Failed,
+  startedAt: NOW - 600,
+  failedStep: 'reconcile',
+  error: 'exit status 3',
+};
+
+const reportRuns = [1, 2, 3].map((index) => ({
+  name: 'report',
+  dagRunId: `report-${index}`,
+  status: Status.Success,
+  startedAt: NOW - 60 * index,
+}));
+
 const busyActivity = makeActivity({
-  counts: [
-    { status: Status.Success, count: 40 },
-    { status: Status.Failed, count: 3 },
-  ],
-  workflows: [
-    {
-      name: 'billing',
-      runCount: 12,
-      failedCount: 3,
-      strip: 'f'.padStart(96, '.'),
-      runs: [],
-      latest: {
-        dagRunId: 'billing-9',
-        status: Status.Failed,
-        startedAt: NOW - 600,
-        failedStep: 'reconcile',
-        error: 'exit status 3',
-      },
-    },
-    {
-      name: 'report',
-      runCount: 31,
-      failedCount: 0,
-      strip: 's'.padStart(96, '.'),
-      runs: [],
-      latest: {
-        dagRunId: 'report-1',
-        status: Status.Success,
-        startedAt: NOW - 60,
-      },
-    },
-  ],
+  runs: [...reportRuns, billingFailure],
+  attention: [billingFailure],
   active: [{ name: 'approve', dagRunId: 'a-1', status: Status.Waiting }],
   upcoming: [{ name: 'nightly', fileName: 'nightly', nextRun: NOW + 3600 }],
 });
@@ -225,12 +216,12 @@ describe('DashboardPage', () => {
     ).toHaveAttribute('href', '/dag-runs/approve/a-1?remoteNode=local');
   });
 
-  it('links each exact count to the matching runs', () => {
+  it('counts the runs and links each status to the window’s runs', () => {
     mockActivity({ activity: busyActivity });
 
     renderPage();
 
-    const failed = screen.getByRole('link', { name: /^3\s*failed$/ });
+    const failed = screen.getByRole('link', { name: /^1\s*failed$/ });
     const url = new URL(failed.getAttribute('href')!, 'http://localhost');
     expect(url.pathname).toBe('/dag-runs');
     expect(Object.fromEntries(url.searchParams)).toEqual({
@@ -239,16 +230,35 @@ describe('DashboardPage', () => {
       fromDate: String(FROM),
       toDate: String(NOW + 600),
     });
-    expect(screen.getByRole('link', { name: /^43\s*runs$/ })).toBeVisible();
+    expect(screen.getByRole('link', { name: /^4\s*runs$/ })).toBeVisible();
+  });
+
+  // With older runs left to load, the counts cover only the loaded ones.
+  it('labels the counts as the latest runs and loads older ones', () => {
+    const loadMore = vi.fn().mockResolvedValue(undefined);
+    mockActivity({ activity: busyActivity, hasMore: true, loadMore });
+
+    renderPage();
+
+    expect(
+      screen.getByRole('link', { name: /^4\s*latest runs$/ })
+    ).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Load more' }));
+    expect(loadMore).toHaveBeenCalled();
+  });
+
+  it('returns to live from loaded older runs', () => {
+    const resume = vi.fn();
+    mockActivity({ activity: busyActivity, paused: true, resume });
+
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Back to live' }));
+
+    expect(resume).toHaveBeenCalled();
   });
 
   it('says all is clear when nothing needs attention', () => {
-    mockActivity({
-      activity: makeActivity({
-        workflows: [busyActivity.workflows[1]!],
-        counts: [{ status: Status.Success, count: 31 }],
-      }),
-    });
+    mockActivity({ activity: makeActivity({ runs: reportRuns }) });
 
     renderPage();
 

@@ -198,33 +198,44 @@ function Dashboard(): React.ReactElement {
     appBarContext.setTitle('Activity');
   }, [appBarContext]);
 
-  const { activity, isLoading, unavailable, refresh } = useDAGRunActivity(
-    activityWindow,
-    workspaceQuery,
-    remoteNode
-  );
+  const {
+    activity,
+    runs,
+    isLoading,
+    unavailable,
+    refresh,
+    hasMore,
+    loadMore,
+    isLoadingMore,
+    loadMoreError,
+    paused,
+    resume,
+  } = useDAGRunActivity(activityWindow, workspaceQuery, remoteNode);
 
-  const filteredActivity = React.useMemo(() => {
+  const { filteredActivity, filteredRuns } = React.useMemo(() => {
     const query = filter.trim().toLowerCase();
-    if (!activity || !query) return activity;
-    const matches = (name?: string) =>
-      (name ?? '').toLowerCase().includes(query);
+    if (!activity || !query) {
+      return { filteredActivity: activity, filteredRuns: runs };
+    }
+    const matches = (name: string) => name.toLowerCase().includes(query);
     return {
-      ...activity,
-      workflows: activity.workflows.filter((workflow) =>
-        matches(workflow.name)
-      ),
-      active: activity.active.filter((run) => matches(run.name)),
-      upcoming: activity.upcoming.filter((item) => matches(item.name)),
+      filteredActivity: {
+        ...activity,
+        attention: activity.attention.filter((run) => matches(run.name)),
+        active: activity.active.filter((run) => matches(run.name)),
+        upcoming: activity.upcoming.filter((item) => matches(item.name)),
+      },
+      filteredRuns: runs.filter((run) => matches(run.name)),
     };
-  }, [activity, filter]);
+  }, [activity, runs, filter]);
 
   // Telling "no workflows" from "no runs" costs one small request, sent only
   // when the window is empty. A few names are enough to spot the examples.
   const isEmpty =
     !!activity &&
-    activity.workflows.length === 0 &&
-    activity.active.length === 0;
+    activity.runs.length === 0 &&
+    activity.active.length === 0 &&
+    activity.attention.length === 0;
   const { data: dagList } = useQuery(
     '/dags',
     isEmpty
@@ -245,12 +256,14 @@ function Dashboard(): React.ReactElement {
     dag.dag.name.startsWith('example-')
   );
 
+  let windowRange: TimeRange | null = null;
   let range: TimeRange | null = null;
   if (filteredActivity) {
+    windowRange = { from: filteredActivity.from, to: filteredActivity.to };
     range =
       scale === 'fit' && live
-        ? fitRange(filteredActivity)
-        : { from: filteredActivity.from, to: filteredActivity.to };
+        ? fitRange(windowRange, filteredRuns)
+        : windowRange;
   }
 
   const selectDay = (value: string) => {
@@ -276,7 +289,7 @@ function Dashboard(): React.ReactElement {
   let body: React.ReactNode;
   if (unavailable) {
     body = <UnavailableNotice onRetry={() => void refresh()} />;
-  } else if (isLoading || !filteredActivity || !range) {
+  } else if (isLoading || !filteredActivity || !windowRange || !range) {
     body = (
       <div
         role="status"
@@ -291,7 +304,11 @@ function Dashboard(): React.ReactElement {
   } else {
     body = (
       <>
-        <ActivityCounts activity={filteredActivity} />
+        <ActivityCounts
+          runs={filteredRuns}
+          window={windowRange}
+          hasMore={hasMore}
+        />
         <div
           className={cn(
             'grid min-w-0 gap-6',
@@ -301,7 +318,11 @@ function Dashboard(): React.ReactElement {
           <div className="flex min-w-0 flex-col gap-6">
             {live && (
               <NeedsAttention
-                items={attentionItems(filteredActivity, nowSeconds)}
+                items={attentionItems(
+                  filteredActivity,
+                  filteredRuns,
+                  nowSeconds
+                )}
                 remoteNode={remoteNode}
                 onChanged={() => void refresh()}
               />
@@ -332,14 +353,17 @@ function Dashboard(): React.ReactElement {
                   </ToggleGroup>
                 )}
               </div>
-              {filteredActivity.workflows.length === 0 ? (
+              {filteredRuns.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   <I18nText text={'No workflows match the filter.'} />
                 </p>
               ) : (
                 <div className="rounded-lg border border-border bg-card px-3">
                   <ActivityLanes
-                    activity={filteredActivity}
+                    runs={filteredRuns}
+                    active={filteredActivity.active}
+                    window={windowRange}
+                    hasMore={hasMore}
                     range={range}
                     nowSeconds={nowSeconds}
                     remoteNode={remoteNode}
@@ -350,21 +374,45 @@ function Dashboard(): React.ReactElement {
                   />
                 </div>
               )}
-              <p className="text-xs text-muted-foreground">
-                {filteredActivity.truncated ? (
-                  <I18nText
-                    text={
-                      'Some routine runs are not marked one by one; the bars still count every run.'
-                    }
-                  />
-                ) : (
-                  <I18nText
-                    text={
-                      'Drag across a lane to zoom in. Click a bar for its runs or a mark for one run.'
-                    }
-                  />
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                <span>
+                  {hasMore ? (
+                    <I18nText
+                      text={
+                        'Showing the latest {count} runs. Drag across a lane to zoom in, or click a mark for one run.'
+                      }
+                      values={{ count: runs.length }}
+                    />
+                  ) : (
+                    <I18nText
+                      text={
+                        'Drag across a lane to zoom in, or click a mark for one run.'
+                      }
+                    />
+                  )}
+                </span>
+                {hasMore && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void loadMore()}
+                    disabled={isLoadingMore}
+                  >
+                    {isLoadingMore ? (
+                      <I18nText text={'Loading more runs...'} />
+                    ) : loadMoreError ? (
+                      <I18nText text={'Retry loading more'} />
+                    ) : (
+                      <I18nText text={'Load more'} />
+                    )}
+                  </Button>
                 )}
-              </p>
+                {loadMoreError && !isLoadingMore && (
+                  <span role="alert" className="text-error">
+                    {loadMoreError}
+                  </span>
+                )}
+              </div>
             </section>
           </div>
           {live && (
@@ -408,7 +456,7 @@ function Dashboard(): React.ReactElement {
           onChange={(event) => selectDay(event.target.value)}
           className="h-9 w-[150px]"
         />
-        {live ? (
+        {live && !paused ? (
           <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
             <Activity className="h-3.5 w-3.5 text-success" aria-hidden="true" />
             <I18nText text={'Live, last 24 hours'} />
@@ -416,7 +464,10 @@ function Dashboard(): React.ReactElement {
         ) : (
           <Button
             variant="outline"
-            onClick={() => setActivityWindow({ kind: 'live' })}
+            onClick={() => {
+              resume();
+              setActivityWindow({ kind: 'live' });
+            }}
           >
             <I18nText text={'Back to live'} />
           </Button>

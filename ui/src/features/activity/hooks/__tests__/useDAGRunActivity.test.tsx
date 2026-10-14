@@ -3,11 +3,13 @@
 
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useQuery } from '@/hooks/api';
+import { Status } from '@/api/v1/schema';
+import { useClient, useQuery } from '@/hooks/api';
 import { useDAGRunActivitySSE } from '@/hooks/useDAGRunActivitySSE';
-import { useDAGRunActivity } from '../useDAGRunActivity';
+import type { ActivityRun, DAGRunActivity } from '../../lib/activityModel';
+import { type ActivityWindow, useDAGRunActivity } from '../useDAGRunActivity';
 
-vi.mock('@/hooks/api', () => ({ useQuery: vi.fn() }));
+vi.mock('@/hooks/api', () => ({ useQuery: vi.fn(), useClient: vi.fn() }));
 vi.mock('@/hooks/useDAGRunActivitySSE', () => ({
   useDAGRunActivitySSE: vi.fn(),
 }));
@@ -20,6 +22,28 @@ const useQueryMock = vi.mocked(
   ) => unknown
 );
 const useSSEMock = vi.mocked(useDAGRunActivitySSE);
+const getMock = vi.fn();
+vi.mocked(useClient).mockReturnValue({ GET: getMock } as never);
+
+function run(dagRunId: string): ActivityRun {
+  return { name: 'etl', dagRunId, status: Status.Success, startedAt: 1 };
+}
+
+function page(runs: ActivityRun[], nextCursor?: string): DAGRunActivity {
+  return {
+    from: 100,
+    to: 200,
+    runs,
+    nextCursor,
+    attention: [],
+    active: [],
+    upcoming: [],
+  };
+}
+
+function runIDs(runs: ActivityRun[]): string[] {
+  return runs.map((item) => item.dagRunId);
+}
 
 type QueryResult = { data?: unknown; error?: unknown };
 let queryResult: QueryResult = {};
@@ -96,7 +120,7 @@ describe('useDAGRunActivity', () => {
     expect(lastSSEEnabled()).toBe(false);
     expect(lastQueryConfig()).toMatchObject({ refreshInterval: 0 });
 
-    queryResult = { data: { workflows: [] } };
+    queryResult = { data: page([]) };
     act(() => {
       void result.current.refresh();
     });
@@ -112,5 +136,69 @@ describe('useDAGRunActivity', () => {
 
     expect(result.current.unavailable).toBe(false);
     expect(lastSSEEnabled()).toBe(true);
+  });
+
+  it('loads older runs with the first page’s window and cursor', async () => {
+    queryResult = { data: page([run('new')], 'cursor-1') };
+    getMock.mockResolvedValue({ data: page([run('old')], 'cursor-2') });
+    const { result } = renderHook(() =>
+      useDAGRunActivity({ kind: 'fixed', from: 100, to: 200 }, {}, 'local')
+    );
+
+    await act(() => result.current.loadMore());
+
+    expect(getMock).toHaveBeenCalledWith('/dag-run-activity', {
+      params: {
+        query: {
+          fromDate: 100,
+          toDate: 200,
+          cursor: 'cursor-1',
+          remoteNode: 'local',
+        },
+      },
+      signal: expect.any(AbortSignal),
+    });
+    expect(runIDs(result.current.runs)).toEqual(['new', 'old']);
+    expect(result.current.hasMore).toBe(true);
+    expect(result.current.paused).toBe(false);
+  });
+
+  // Merging a moving first page into older pages would leave gaps, so a live
+  // window holds its runs until resumed.
+  it('holds a live window’s runs while older ones are shown', async () => {
+    queryResult = { data: page([run('b')], 'cursor-1') };
+    getMock.mockResolvedValue({ data: page([run('a')]) });
+    const { result, rerender } = renderHook(() =>
+      useDAGRunActivity({ kind: 'live' }, {}, 'local')
+    );
+    await act(() => result.current.loadMore());
+
+    queryResult = { data: page([run('c'), run('b')], 'cursor-2') };
+    rerender();
+
+    expect(runIDs(result.current.runs)).toEqual(['b', 'a']);
+    expect(result.current.paused).toBe(true);
+    expect(result.current.hasMore).toBe(false);
+
+    act(() => result.current.resume());
+
+    expect(runIDs(result.current.runs)).toEqual(['c', 'b']);
+    expect(result.current.paused).toBe(false);
+  });
+
+  it('starts from the first page again when the window changes', async () => {
+    queryResult = { data: page([run('b')], 'cursor-1') };
+    getMock.mockResolvedValue({ data: page([run('a')]) });
+    const { result, rerender } = renderHook(
+      ({ window }: { window: ActivityWindow }) =>
+        useDAGRunActivity(window, {}, 'local'),
+      { initialProps: { window: { kind: 'live' } as ActivityWindow } }
+    );
+    await act(() => result.current.loadMore());
+
+    rerender({ window: { kind: 'fixed', from: 100, to: 200 } });
+
+    expect(runIDs(result.current.runs)).toEqual(['b']);
+    expect(result.current.hasMore).toBe(true);
   });
 });

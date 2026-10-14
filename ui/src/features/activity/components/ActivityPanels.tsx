@@ -22,7 +22,7 @@ import { executionsURL } from '../lib/activityLinks';
 import type {
   ActivityRun,
   AttentionItem,
-  DAGRunActivity,
+  TimeRange,
 } from '../lib/activityModel';
 
 type DAGRunSummary = components['schemas']['DAGRunSummary'];
@@ -174,11 +174,6 @@ export function NeedsAttention({
                   </Ticker>
                 )}
               </span>
-              {item.kind === 'failing' && item.failedCount > 1 && (
-                <span className="text-xs text-error tabular-nums">
-                  {ts('{count} failed', { count: item.failedCount })}
-                </span>
-              )}
               <RelativeTime
                 timestamp={isoTime(item.run.startedAt)}
                 compact
@@ -236,7 +231,7 @@ export function InProgress({
                 {runStatusText(run.status)}
               </StatusChip>
               <RunLink
-                name={run.name ?? ''}
+                name={run.name}
                 run={run}
                 remoteNode={remoteNode}
                 className="min-w-0 flex-1 truncate text-foreground hover:underline"
@@ -331,18 +326,25 @@ const COUNT_ORDER = [
   Status.NotStarted,
 ];
 
-/** Exact run counts for the window, each linking to the matching runs. */
+/**
+ * Counts of the loaded runs by status, each linking to the matching runs of
+ * the window. They cover every run in the window only when none is left to
+ * load, so the total says "latest runs" otherwise.
+ */
 export function ActivityCounts({
-  activity,
+  runs,
+  window: range,
+  hasMore,
 }: {
-  activity: DAGRunActivity;
+  runs: ActivityRun[];
+  window: TimeRange;
+  hasMore: boolean;
 }): React.ReactElement {
   const { ts } = useI18n();
-  const counts = new Map(
-    activity.counts.map((count) => [count.status, count.count])
-  );
-  const total = activity.counts.reduce((sum, count) => sum + count.count, 0);
-  const range = { from: activity.from, to: activity.to };
+  const counts = new Map<Status, number>();
+  for (const run of runs) {
+    counts.set(run.status, (counts.get(run.status) ?? 0) + 1);
+  }
   return (
     <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
       <Link
@@ -350,10 +352,14 @@ export function ActivityCounts({
         className="group flex items-baseline gap-1.5"
       >
         <span className="text-xl font-semibold text-foreground tabular-nums group-hover:underline">
-          {total.toLocaleString()}
+          {runs.length.toLocaleString()}
         </span>
         <span className="text-xs text-muted-foreground">
-          <I18nText text={'runs'} />
+          {hasMore ? (
+            <I18nText text={'latest runs'} />
+          ) : (
+            <I18nText text={'runs'} />
+          )}
         </span>
       </Link>
       {COUNT_ORDER.filter(

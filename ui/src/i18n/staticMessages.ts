@@ -2468,7 +2468,7 @@ const english = {
   "Nothing is running.": "Nothing is running.",
   "Runs by workflow": "Runs by workflow",
   "{failed} of {count} failed": "{failed} of {count} failed",
-  "{name}: {count} runs. Use the arrow keys to move between notable runs.": "{name}: {count} runs. Use the arrow keys to move between notable runs.",
+  "{name}: {count} runs. Use the arrow keys to move between runs.": "{name}: {count} runs. Use the arrow keys to move between runs.",
   "All clear. No failing workflows or runs waiting for input.": "All clear. No failing workflows or runs waiting for input.",
   "Running {elapsed}, usually {usual}": "Running {elapsed}, usually {usual}",
   "No runs in the last 24 hours": "No runs in the last 24 hours",
@@ -2476,8 +2476,9 @@ const english = {
   "Activity is not available from this node": "Activity is not available from this node",
   "The node may run an older Dagu version. Its runs are still listed on the Executions page.": "The node may run an older Dagu version. Its runs are still listed on the Executions page.",
   "No workflows match the filter.": "No workflows match the filter.",
-  "Some routine runs are not marked one by one; the bars still count every run.": "Some routine runs are not marked one by one; the bars still count every run.",
-  "Drag across a lane to zoom in. Click a bar for its runs or a mark for one run.": "Drag across a lane to zoom in. Click a bar for its runs or a mark for one run.",
+  "Showing the latest {count} runs. Drag across a lane to zoom in, or click a mark for one run.": "Showing the latest {count} runs. Drag across a lane to zoom in, or click a mark for one run.",
+  "Drag across a lane to zoom in, or click a mark for one run.": "Drag across a lane to zoom in, or click a mark for one run.",
+  "latest runs": "latest runs",
   "Live, last 24 hours": "Live, last 24 hours",
 } as const;
 
@@ -4893,7 +4894,7 @@ const chinese = {
   "Nothing is running.": "当前没有运行。",
   "Runs by workflow": "按工作流显示运行",
   "{failed} of {count} failed": "{count} 次中 {failed} 次失败",
-  "{name}: {count} runs. Use the arrow keys to move between notable runs.": "{name}：{count} 次运行。使用方向键在重要运行之间移动。",
+  "{name}: {count} runs. Use the arrow keys to move between runs.": "{name}：{count} 次运行。使用方向键在运行之间移动。",
   "All clear. No failing workflows or runs waiting for input.": "一切正常。没有失败的工作流，也没有等待输入的运行。",
   "Running {elapsed}, usually {usual}": "已运行 {elapsed}，通常 {usual}",
   "No runs in the last 24 hours": "过去 24 小时内没有运行",
@@ -4901,8 +4902,9 @@ const chinese = {
   "Activity is not available from this node": "无法从此节点获取活动",
   "The node may run an older Dagu version. Its runs are still listed on the Executions page.": "该节点可能运行较旧版本的 Dagu。其运行仍会显示在执行记录页面上。",
   "No workflows match the filter.": "没有匹配筛选条件的工作流。",
-  "Some routine runs are not marked one by one; the bars still count every run.": "部分常规运行未逐一标记；条形图仍统计所有运行。",
-  "Drag across a lane to zoom in. Click a bar for its runs or a mark for one run.": "在泳道上拖动以放大。点击条形查看其运行，点击标记打开单次运行。",
+  "Showing the latest {count} runs. Drag across a lane to zoom in, or click a mark for one run.": "显示最近 {count} 次运行。在泳道上拖动以放大，或点击标记打开单次运行。",
+  "Drag across a lane to zoom in, or click a mark for one run.": "在泳道上拖动以放大，或点击标记打开单次运行。",
+  "latest runs": "次最近运行",
   "Live, last 24 hours": "实时，过去 24 小时",
 } as const satisfies Record<StaticMessage, string>;
 
@@ -7394,7 +7396,7 @@ const japanese = {
   "Nothing is running.": "実行中のものはありません。",
   "Runs by workflow": "ワークフロー別の実行",
   "{failed} of {count} failed": "{count} 件中 {failed} 件失敗",
-  "{name}: {count} runs. Use the arrow keys to move between notable runs.": "{name}：{count} 件の実行。矢印キーで注目すべき実行の間を移動できます。",
+  "{name}: {count} runs. Use the arrow keys to move between runs.": "{name}：{count} 件の実行。矢印キーで実行の間を移動できます。",
   "All clear. No failing workflows or runs waiting for input.": "問題はありません。失敗しているワークフローも入力待ちの実行もありません。",
   "Running {elapsed}, usually {usual}": "{elapsed} 実行中（通常は {usual}）",
   "No runs in the last 24 hours": "過去 24 時間に実行はありません",
@@ -7402,8 +7404,9 @@ const japanese = {
   "Activity is not available from this node": "このノードからアクティビティを取得できません",
   "The node may run an older Dagu version. Its runs are still listed on the Executions page.": "このノードは古いバージョンの Dagu を実行している可能性があります。実行は引き続き実行一覧ページに表示されます。",
   "No workflows match the filter.": "条件に一致するワークフローはありません。",
-  "Some routine runs are not marked one by one; the bars still count every run.": "一部の通常の実行は個別に表示していません。バーにはすべての実行が含まれます。",
-  "Drag across a lane to zoom in. Click a bar for its runs or a mark for one run.": "レーン上をドラッグすると拡大します。バーをクリックするとその実行一覧、マークをクリックすると個別の実行を開きます。",
+  "Showing the latest {count} runs. Drag across a lane to zoom in, or click a mark for one run.": "最新の {count} 件の実行を表示しています。レーン上をドラッグすると拡大し、マークをクリックすると個別の実行を開きます。",
+  "Drag across a lane to zoom in, or click a mark for one run.": "レーン上をドラッグすると拡大し、マークをクリックすると個別の実行を開きます。",
+  "latest runs": "件の最新の実行",
   "Live, last 24 hours": "ライブ・過去 24 時間",
 } as const satisfies Record<StaticMessage, string>;
 
