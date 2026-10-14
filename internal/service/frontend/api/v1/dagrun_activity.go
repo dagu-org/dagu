@@ -47,10 +47,12 @@ const (
 	activityErrorMaxBytes = 200
 	// activityQueueLimit bounds the queues listed with work.
 	activityQueueLimit = 20
-	// activityQueueScanCap bounds the queued entries read to count backlogs,
-	// across all queues; larger backlogs are reported as lower bounds.
-	activityQueueScanCap = 200
 )
+
+// activityQueueScan bounds the queued entries read to count backlogs: a few
+// per queue, so the budget reaches many queues, and deeper backlogs are
+// reported as lower bounds. Declared as a var so tests can lower it.
+var activityQueueScan = queueScan{total: 200, perQueue: 5}
 
 // GetDAGRunActivity returns one page of the DAG-runs of a time window.
 func (a *API) GetDAGRunActivity(ctx context.Context, request api.GetDAGRunActivityRequestObject) (api.GetDAGRunActivityResponseObject, error) {
@@ -234,22 +236,30 @@ func (a *API) readDAGRunActivity(ctx context.Context, query activityQuery) (api.
 	result.Attention = attentionRuns(latest)
 	result.Active = a.activeRuns(ctx, query, page.Items, latest)
 	result.Upcoming = a.upcomingRuns(ctx, query)
-	result.Queues = a.activityQueues(ctx)
+	result.Queues = a.activityQueues(ctx, query)
 	return result, nil
 }
 
-// activityQueues lists the queues with runs running or waiting, the longest
-// wait first. A queue read failure leaves the list empty rather than failing
-// the whole summary.
-func (a *API) activityQueues(ctx context.Context) []api.DAGRunActivityQueue {
+// activityQueues lists the queues with runs running or waiting that match the
+// query's filters, the longest wait first. A queue read failure leaves the
+// list empty rather than failing the whole summary.
+func (a *API) activityQueues(ctx context.Context, query activityQuery) []api.DAGRunActivityQueue {
 	queues := []api.DAGRunActivityQueue{}
-	queueMap, err := a.collectQueues(ctx, "", activityQueueScanCap)
+	scan := activityQueueScan
+	labelFilters := parseLabelFilters(query.labels)
+	scan.matches = func(summary api.DAGRunSummary) bool {
+		labels := ir.NewLabels(valueOf(summary.Labels))
+		return query.workspaceFilter.MatchesLabels(labels) && labels.MatchesFilters(labelFilters)
+	}
+	queueMap, err := a.collectQueues(ctx, "", scan)
 	if err != nil {
 		logger.Warn(ctx, "Failed to read queues for activity", tag.Error(err))
 		return queues
 	}
 	for _, info := range queueMap {
-		if len(info.running) == 0 && info.queuedCount == 0 && !info.queuedCountCapped {
+		// Only measured work earns a line. A queue the budget did not reach,
+		// or whose runs the filters left out, has none.
+		if len(info.running) == 0 && info.queuedCount == 0 {
 			continue
 		}
 		item := api.DAGRunActivityQueue{

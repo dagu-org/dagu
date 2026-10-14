@@ -257,7 +257,7 @@ func TestDAGRunActivityStreamTakesOnlyLiveWindows(t *testing.T) {
 
 // queueRun saves a queued run of name and puts it in the DAG's own queue. A
 // zero queuedAt saves the run without a queue time.
-func (f *activityFixture) queueRun(queueStore queue.QueueStore, name, id string, queuedAt time.Time) {
+func (f *activityFixture) queueRun(queueStore queue.QueueStore, name, id string, queuedAt time.Time, labels ...string) {
 	f.t.Helper()
 	ctx := f.t.Context()
 	dag := &ir.DAG{Name: name}
@@ -273,6 +273,7 @@ func (f *activityFixture) queueRun(queueStore queue.QueueStore, name, id string,
 	runStatus.AttemptID = attempt.ID()
 	runStatus.Status = ir.Queued
 	runStatus.ProcGroup = name
+	runStatus.Labels = labels
 	if !queuedAt.IsZero() {
 		runStatus.QueuedAt = queuedAt.UTC().Format(time.RFC3339)
 	}
@@ -326,4 +327,51 @@ func TestDAGRunActivityQueueWaitSkipsRunsWithoutQueueTime(t *testing.T) {
 	require.Len(t, activity.Queues, 1)
 	assert.Equal(t, 2, activity.Queues[0].Queued)
 	assert.Equal(t, now.Add(-5*time.Minute).Unix(), valueOf(activity.Queues[0].NextQueuedAt))
+}
+
+// Queue lines count only the runs the Overview's filters select.
+func TestDAGRunActivityQueuesFollowTheFilters(t *testing.T) {
+	f := newActivityFixture(t)
+	queueStore := store.NewQueueStore(file.NewCollection(filepath.Join(t.TempDir(), "queue")))
+	f.api.queueStore = queueStore
+	now := time.Now().Truncate(time.Second)
+	f.queueRun(queueStore, "etl", "etl-1", now.Add(-time.Minute), "team=ops")
+	f.queueRun(queueStore, "report", "report-1", now.Add(-time.Minute))
+
+	from, to := now.Add(-time.Hour).Unix(), now.Add(time.Hour).Unix()
+	resp, err := f.api.GetDAGRunActivity(t.Context(), openapiv1.GetDAGRunActivityRequestObject{
+		Params: openapiv1.GetDAGRunActivityParams{FromDate: &from, ToDate: &to, Labels: new("team=ops")},
+	})
+	require.NoError(t, err)
+	activity, ok := resp.(openapiv1.GetDAGRunActivity200JSONResponse)
+	require.True(t, ok)
+
+	require.Len(t, activity.Queues, 1)
+	assert.Equal(t, "etl", activity.Queues[0].Name)
+}
+
+// Once the scan budget runs out, later queues are not listed as if they
+// held no work.
+func TestDAGRunActivityLeavesOutQueuesItCouldNotRead(t *testing.T) {
+	// Not parallel: this test lowers the package-level scan bounds.
+	original := activityQueueScan
+	activityQueueScan = queueScan{total: 3, perQueue: 3}
+	t.Cleanup(func() { activityQueueScan = original })
+
+	f := newActivityFixture(t)
+	queueStore := store.NewQueueStore(file.NewCollection(filepath.Join(t.TempDir(), "queue")))
+	f.api.queueStore = queueStore
+	now := time.Now().Truncate(time.Second)
+	for i := range 4 {
+		f.queueRun(queueStore, "a-busy", fmt.Sprintf("busy-%d", i), now.Add(-time.Duration(10-i)*time.Minute))
+	}
+	f.queueRun(queueStore, "b-unread", "unread-1", now.Add(-time.Minute))
+
+	activity := f.activity(now.Add(-time.Hour), now.Add(time.Hour))
+
+	require.Len(t, activity.Queues, 1)
+	busy := activity.Queues[0]
+	assert.Equal(t, "a-busy", busy.Name)
+	assert.Equal(t, 3, busy.Queued)
+	assert.True(t, valueOf(busy.QueuedCapped))
 }
