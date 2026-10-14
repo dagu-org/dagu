@@ -244,16 +244,18 @@ function Dashboard(): React.ReactElement {
 
   // Telling "no workflows" from "no runs" costs one small request, sent only
   // when the window is empty. A few names are enough to spot the examples.
-  // Scheduled runs and a full disk keep the page, which can then show what
-  // holds work back.
+  // A live window also keeps the page for what its side panels list, such as
+  // scheduled runs or a full disk, which can explain why nothing ran. A fixed
+  // window shows only runs.
   const isEmpty =
     !!activity &&
     activity.runs.length === 0 &&
-    activity.active.length === 0 &&
-    activity.attention.length === 0 &&
-    activity.queues.length === 0 &&
-    activity.upcoming.length === 0 &&
-    activity.diskUsedPercent === undefined;
+    (!live ||
+      (activity.active.length === 0 &&
+        activity.attention.length === 0 &&
+        activity.queues.length === 0 &&
+        activity.upcoming.length === 0 &&
+        activity.diskUsedPercent === undefined));
   const { data: dagList } = useQuery(
     '/dags',
     isEmpty

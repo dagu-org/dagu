@@ -386,6 +386,30 @@ describe('DashboardPage', () => {
     ).toHaveAttribute('href', '/system-status');
   });
 
+  // A fixed window shows only lanes, so what the live panels list must not
+  // keep it out of its empty state.
+  it('says a picked day has no runs despite live-only data', () => {
+    mockDAGList(['report']);
+    mockActivity({
+      activity: makeActivity({
+        upcoming: [
+          { name: 'nightly', fileName: 'nightly', nextRun: NOW + 3600 },
+        ],
+        queues: [{ name: 'default', running: 0, queued: 2 }],
+        diskUsedPercent: 93,
+      }),
+    });
+
+    renderPage();
+    fireEvent.change(screen.getByLabelText('Date'), {
+      target: { value: '2026-03-01' },
+    });
+
+    expect(
+      screen.getByRole('heading', { name: 'No runs in this range' })
+    ).toBeVisible();
+  });
+
   it('links to System Status only for those who may open it', () => {
     vi.mocked(useCanAccessSystemStatus).mockReturnValue(false);
     mockScheduler(false);
