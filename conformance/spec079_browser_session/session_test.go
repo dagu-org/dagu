@@ -483,7 +483,10 @@ func TestSessionUploadAndExport(t *testing.T) {
 		Recordings int            `json:"recordings"`
 		Warnings   []string       `json:"warnings"`
 	}
-	replaced := strings.NewReplacer(s.portal, "${SHOP_URL}", statement, "${STATEMENT}").Replace(exported.Stdout())
+	// The export is JSON, which escapes the separators of a Windows path.
+	quoted, err := json.Marshal(statement)
+	require.NoError(t, err)
+	replaced := strings.NewReplacer(s.portal, "${SHOP_URL}", strings.Trim(string(quoted), `"`), "${STATEMENT}").Replace(exported.Stdout())
 	require.NoError(t, json.Unmarshal([]byte(replaced), &export))
 	assert.Equal(t, 1, export.Recordings)
 	assert.Equal(t, fixtureStep(t, "statements.yaml", "attach"), export.Step)
