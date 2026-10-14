@@ -382,6 +382,25 @@ func TestWebhookIndexRebuiltOnStartup(t *testing.T) {
 
 // A store sees the webhooks another process sharing its collection creates
 // and deletes after the store started.
+// A recent miss does not let a create overlook a webhook another process
+// created since.
+func TestWebhookCreateSeesOtherProcessesAfterAMiss(t *testing.T) {
+	ctx := context.Background()
+	col := testutil.NewMemoryBackend().Collection("webhooks")
+	s1, err := store.NewWebhookStore(col, nil)
+	require.NoError(t, err)
+	s2, err := store.NewWebhookStore(col, nil)
+	require.NoError(t, err)
+
+	_, err = s2.GetByDAGName(ctx, "d1")
+	require.ErrorIs(t, err, auth.ErrWebhookNotFound)
+	require.NoError(t, s1.Create(ctx, newWebhook("d1")))
+
+	second := newWebhook("d1")
+	second.ID = "wh-d1-second"
+	assert.ErrorIs(t, s2.Create(ctx, second), auth.ErrWebhookAlreadyExists)
+}
+
 func TestWebhookSeesOtherProcesses(t *testing.T) {
 	ctx := context.Background()
 	col := testutil.NewMemoryBackend().Collection("webhooks")
@@ -471,54 +490,54 @@ func TestWebhookListCompleteReportsCorruptFiles(t *testing.T) {
 	assert.Len(t, some, 1)
 }
 
-// listingCollection runs during once, in its own goroutine, while the first
-// listing is under way, and waits briefly for it to finish.
+// listingCollection, once armed, runs during in its own goroutine while the
+// next listing is under way, and waits briefly for it to finish. Listings
+// during makes pass straight through.
 type listingCollection struct {
 	persis.Collection
-	once   sync.Once
+	armed  atomic.Bool
 	during func()
 }
 
 func (c *listingCollection) List(ctx context.Context, q persis.ListQuery) (*persis.Page, error) {
 	page, err := c.Collection.List(ctx, q)
-	if c.during == nil {
+	if !c.armed.CompareAndSwap(true, false) {
 		return page, err
 	}
-	c.once.Do(func() {
-		done := make(chan struct{})
-		go func() {
-			defer close(done)
-			c.during()
-		}()
-		select {
-		case <-done:
-		case <-time.After(100 * time.Millisecond):
-		}
-	})
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		c.during()
+	}()
+	select {
+	case <-done:
+	case <-time.After(100 * time.Millisecond):
+	}
 	return page, err
 }
 
 // A webhook created while a listing is under way is not lost from the
-// lookups, so the DAG cannot get a second one.
+// lookups.
 func TestWebhookListCompleteKeepsConcurrentCreates(t *testing.T) {
 	ctx := context.Background()
 	col := &listingCollection{Collection: testutil.NewMemoryBackend().Collection("webhooks")}
 	s, err := store.NewWebhookStore(col, nil)
 	require.NoError(t, err)
 	require.NoError(t, s.Create(ctx, newWebhook("d0")))
-	created := make(chan error, 1)
-	col.during = func() { created <- s.Create(ctx, newWebhook("d1")) }
 	// A recent miss keeps the next one from rereading the collection.
 	_, err = s.GetByDAGName(ctx, "unknown")
 	require.ErrorIs(t, err, auth.ErrWebhookNotFound)
+	created := make(chan error, 1)
+	col.during = func() { created <- s.Create(ctx, newWebhook("d1")) }
+	col.armed.Store(true)
 
 	_, err = s.ListComplete(ctx)
 	require.NoError(t, err)
 	require.NoError(t, <-created)
 
-	second := newWebhook("d1")
-	second.ID = "wh-d1-second"
-	assert.ErrorIs(t, s.Create(ctx, second), auth.ErrWebhookAlreadyExists)
+	got, err := s.GetByDAGName(ctx, "d1")
+	require.NoError(t, err)
+	assert.Equal(t, "wh-d1", got.ID)
 }
 
 func newEncryptedWebhookStore(t *testing.T, col persis.Collection) *store.WebhookStore {

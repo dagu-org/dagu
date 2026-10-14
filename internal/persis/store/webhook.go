@@ -28,10 +28,10 @@ const webhookMissRebuildInterval = time.Second
 
 // WebhookStore implements [auth.WebhookStore].
 // DAG-name lookups use an in-memory index (byDAGName) built from the
-// collection on startup, refreshed by every complete listing, and rebuilt
-// when a lookup misses, at most once per webhookMissRebuildInterval, since
-// another process sharing the collection may have written since; this
-// process's writes keep it in sync under mu.
+// collection on startup, refreshed by every complete listing and every
+// create, and rebuilt when a lookup misses, at most once per
+// webhookMissRebuildInterval, since another process sharing the collection
+// may have written since; this process's writes keep it in sync under mu.
 type WebhookStore struct {
 	col       persis.Collection
 	encryptor *crypto.Encryptor // nil = HMAC encryption disabled
@@ -62,6 +62,12 @@ func NewWebhookStore(col persis.Collection, enc *crypto.Encryptor) (*WebhookStor
 func (s *WebhookStore) rebuildIndex(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.loadIndexLocked(ctx)
+}
+
+// loadIndexLocked replaces the index with one read from the collection. The
+// caller holds mu.
+func (s *WebhookStore) loadIndexLocked(ctx context.Context) error {
 	recs, err := listAll(ctx, s.col, persis.ListQuery{})
 	if err != nil {
 		return err
@@ -132,17 +138,14 @@ func (s *WebhookStore) Create(ctx context.Context, webhook *auth.Webhook) error 
 	if err != nil {
 		return err
 	}
-	exists, err := s.exists(ctx, webhook.DAGName)
-	if err != nil {
-		return err
-	}
-	if exists {
-		return auth.ErrWebhookAlreadyExists
-	}
-
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	// The collection is read afresh, however lookups have been throttled,
+	// since another process may have just created this DAG's webhook.
+	if err := s.loadIndexLocked(ctx); err != nil {
+		return fmt.Errorf("webhook store: rebuild index: %w", err)
+	}
 	if _, exists := s.byDAGName[webhook.DAGName]; exists {
 		return auth.ErrWebhookAlreadyExists
 	}
@@ -156,26 +159,6 @@ func (s *WebhookStore) Create(ctx context.Context, webhook *auth.Webhook) error 
 	}
 	s.byDAGName[webhook.DAGName] = webhook.ID
 	return nil
-}
-
-// exists reports whether dagName has a webhook, checking the collection so
-// that one another process created or deleted counts as it is now.
-func (s *WebhookStore) exists(ctx context.Context, dagName string) (bool, error) {
-	id, ok, err := s.idOf(ctx, dagName)
-	if err != nil || !ok {
-		return false, err
-	}
-	_, err = s.col.Get(ctx, id)
-	if errors.Is(err, persis.ErrNotFound) {
-		if err := s.rebuildIndex(ctx); err != nil {
-			return false, fmt.Errorf("webhook store: rebuild index: %w", err)
-		}
-		s.mu.RLock()
-		defer s.mu.RUnlock()
-		_, ok := s.byDAGName[dagName]
-		return ok, nil
-	}
-	return err == nil, err
 }
 
 // GetByID retrieves a webhook by its unique ID.
