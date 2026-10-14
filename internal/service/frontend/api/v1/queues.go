@@ -68,6 +68,14 @@ func (b *scanBudget) consume() {
 	}
 }
 
+// limit caps n at the entries left in the budget.
+func (b *scanBudget) limit(n int) int {
+	if b == nil {
+		return n
+	}
+	return min(n, b.remaining)
+}
+
 // ListQueues implements api.StrictServerInterface.
 func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (api.ListQueuesResponseObject, error) {
 	queueMap, err := a.collectQueues(ctx, "", queuesPageScan())
@@ -510,16 +518,13 @@ func (a *API) countVisibleQueuedItems(ctx context.Context, queueName string, bud
 	scanned := 0
 	cursor := ""
 	for {
-		page, err := a.queueStore.ListCursor(ctx, queueName, cursor, queueCursorScanBatch)
+		// Load only the entries this queue and the request may still scan.
+		limit := budget.limit(min(queueCursorScanBatch, scan.perQueue-scanned))
+		page, err := a.queueStore.ListCursor(ctx, queueName, cursor, limit)
 		if err != nil {
 			return visibleQueued{}, err
 		}
-		for i, queuedItem := range page.Items {
-			if budget.exhausted() {
-				// This entry and everything after it stays unscanned.
-				result.capped = true
-				return result, nil
-			}
+		for _, queuedItem := range page.Items {
 			budget.consume()
 
 			// Every entry costs a status read, whether or not it ends up visible,
@@ -541,11 +546,16 @@ func (a *API) countVisibleQueuedItems(ctx context.Context, queueName string, bud
 
 			if scanned >= scan.perQueue {
 				// Only a lower bound if entries actually remain unscanned.
-				result.capped = i+1 < len(page.Items) || page.HasMore
+				result.capped = page.HasMore
 				return result, nil
 			}
 		}
 		if !page.HasMore {
+			return result, nil
+		}
+		if budget.exhausted() {
+			// The entries left stay unscanned.
+			result.capped = true
 			return result, nil
 		}
 		cursor = page.NextCursor

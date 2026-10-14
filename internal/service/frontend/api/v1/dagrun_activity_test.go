@@ -14,6 +14,7 @@ import (
 	openapiv1 "github.com/dagucloud/dagu/v2/api/v1"
 	"github.com/dagucloud/dagu/v2/internal/cmn/config"
 	"github.com/dagucloud/dagu/v2/internal/ir"
+	"github.com/dagucloud/dagu/v2/internal/pagination"
 	"github.com/dagucloud/dagu/v2/internal/persis"
 	"github.com/dagucloud/dagu/v2/internal/persis/file"
 	"github.com/dagucloud/dagu/v2/internal/persis/store"
@@ -374,4 +375,41 @@ func TestDAGRunActivityLeavesOutQueuesItCouldNotRead(t *testing.T) {
 	assert.Equal(t, "a-busy", busy.Name)
 	assert.Equal(t, 3, busy.Queued)
 	assert.True(t, valueOf(busy.QueuedCapped))
+}
+
+// countingQueueStore counts the queued records its cursor pages load.
+type countingQueueStore struct {
+	queue.QueueStore
+	loaded int
+}
+
+func (s *countingQueueStore) ListCursor(ctx context.Context, name, cursor string, limit int) (pagination.CursorResult[queue.QueuedItemData], error) {
+	page, err := s.QueueStore.ListCursor(ctx, name, cursor, limit)
+	s.loaded += len(page.Items)
+	return page, err
+}
+
+// Counting backlogs loads only the queued records the scan may count.
+func TestDAGRunActivityLoadsOnlyTheQueuedRecordsItCounts(t *testing.T) {
+	// Not parallel: this test lowers the package-level scan bounds.
+	original := activityQueueScan
+	activityQueueScan = queueScan{total: 7, perQueue: 5}
+	t.Cleanup(func() { activityQueueScan = original })
+
+	f := newActivityFixture(t)
+	queueStore := &countingQueueStore{QueueStore: store.NewQueueStore(file.NewCollection(filepath.Join(t.TempDir(), "queue")))}
+	f.api.queueStore = queueStore
+	now := time.Now().Truncate(time.Second)
+	for i := range 10 {
+		f.queueRun(queueStore, "a", fmt.Sprintf("a-%d", i), now.Add(-time.Duration(20-i)*time.Minute))
+		f.queueRun(queueStore, "b", fmt.Sprintf("b-%d", i), now.Add(-time.Duration(20-i)*time.Minute))
+	}
+	queueStore.loaded = 0
+
+	activity := f.activity(now.Add(-time.Hour), now.Add(time.Hour))
+
+	assert.Equal(t, 7, queueStore.loaded)
+	require.Len(t, activity.Queues, 2)
+	assert.Equal(t, 5, activity.Queues[0].Queued)
+	assert.Equal(t, 2, activity.Queues[1].Queued)
 }
