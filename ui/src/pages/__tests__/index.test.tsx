@@ -15,6 +15,7 @@ import {
 } from '../../features/activity/hooks/useDAGRunActivity';
 import type { DAGRunActivity } from '../../features/activity/lib/activityModel';
 import { useQuery } from '../../hooks/api';
+import { useSchedulerPause } from '../../hooks/useSchedulerPause';
 import DashboardPage from '../index';
 
 vi.mock('../../features/activity/hooks/useDAGRunActivity', () => ({
@@ -41,7 +42,18 @@ vi.mock('../../hooks/api', () => ({
   useQuery: vi.fn(),
 }));
 
+vi.mock('../../hooks/useSchedulerPause', () => ({
+  useSchedulerPause: vi.fn(),
+}));
+
 const useActivityMock = vi.mocked(useDAGRunActivity);
+const useSchedulerPauseMock = vi.mocked(useSchedulerPause);
+
+function mockScheduler(schedulerRunning: boolean | undefined) {
+  useSchedulerPauseMock.mockReturnValue({
+    schedulerRunning,
+  } as ReturnType<typeof useSchedulerPause>);
+}
 const useQueryMock = vi.mocked(
   useQuery as unknown as (path: string, init: unknown) => unknown
 );
@@ -103,8 +115,8 @@ function makeConfig(overrides: Partial<Config> = {}): Config {
   };
 }
 
-function renderPage() {
-  return render(
+function pageTree() {
+  return (
     <MemoryRouter initialEntries={['/']}>
       <ConfigContext.Provider value={makeConfig()}>
         <AppBarContext.Provider
@@ -127,6 +139,10 @@ function renderPage() {
   );
 }
 
+function renderPage() {
+  return render(pageTree());
+}
+
 function makeActivity(overrides: Partial<DAGRunActivity> = {}): DAGRunActivity {
   return {
     from: FROM,
@@ -135,6 +151,7 @@ function makeActivity(overrides: Partial<DAGRunActivity> = {}): DAGRunActivity {
     attention: [],
     active: [],
     upcoming: [],
+    queues: [],
     ...overrides,
   };
 }
@@ -194,6 +211,7 @@ const busyActivity = makeActivity({
 describe('DashboardPage', () => {
   beforeEach(() => {
     mockDAGList([]);
+    mockScheduler(true);
   });
 
   afterEach(() => {
@@ -255,6 +273,167 @@ describe('DashboardPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Back to live' }));
 
     expect(resume).toHaveBeenCalled();
+  });
+
+  it('warns when a stopped scheduler holds back scheduled runs', () => {
+    mockScheduler(false);
+    mockActivity({ activity: busyActivity });
+
+    renderPage();
+
+    const attention = screen.getByRole('region', { name: /Needs attention/ });
+    expect(
+      within(attention).getByText(/The scheduler is not running/)
+    ).toBeVisible();
+    expect(
+      within(attention).getByRole('link', { name: /System Status/ })
+    ).toHaveAttribute('href', '/system-status');
+  });
+
+  // Nothing has run yet precisely because the scheduler is down, so the
+  // warning must not give way to the empty state.
+  it('warns about a stopped scheduler before any run exists', () => {
+    mockScheduler(false);
+    mockActivity({
+      activity: makeActivity({
+        upcoming: [
+          { name: 'nightly', fileName: 'nightly', nextRun: NOW + 3600 },
+        ],
+      }),
+    });
+
+    renderPage();
+
+    const attention = screen.getByRole('region', { name: /Needs attention/ });
+    expect(
+      within(attention).getByText(/The scheduler is not running/)
+    ).toBeVisible();
+    expect(screen.getByText('No runs in the last 24 hours')).toBeVisible();
+    expect(screen.getByRole('link', { name: 'nightly' })).toBeVisible();
+  });
+
+  // A status region mounted before the warning appears is what makes a
+  // screen reader announce it.
+  it('announces the stopped-scheduler warning when it appears', () => {
+    mockActivity({ activity: busyActivity });
+    const { rerender } = renderPage();
+    const regions = screen.getAllByRole('status');
+
+    mockScheduler(false);
+    rerender(pageTree());
+
+    expect(
+      regions.some((region) =>
+        /The scheduler is not running/.test(region.textContent ?? '')
+      )
+    ).toBe(true);
+  });
+
+  it('summarizes each queue instead of listing its queued runs', () => {
+    // Running status text animates and reads the reduced-motion preference.
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: false,
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    });
+    mockActivity({
+      activity: makeActivity({
+        runs: reportRuns,
+        active: [
+          {
+            name: 'etl',
+            dagRunId: 'etl-1',
+            status: Status.Queued,
+            queue: 'default',
+          },
+          {
+            name: 'train',
+            dagRunId: 'train-1',
+            status: Status.Running,
+            startedAt: NOW - 60,
+          },
+        ],
+        queues: [
+          {
+            name: 'default',
+            running: 1,
+            maxConcurrency: 1,
+            queued: 20,
+            nextQueuedAt: NOW - 600,
+          },
+        ],
+      }),
+    });
+
+    renderPage();
+
+    const queues = screen.getByRole('list', { name: 'Queues' });
+    expect(queues).toHaveTextContent('1 of 1 running');
+    expect(queues).toHaveTextContent('20 queued');
+    expect(queues).toHaveTextContent(/next waiting 10m/);
+    expect(
+      within(queues).getByRole('link', { name: 'default' })
+    ).toHaveAttribute('href', '/queues/default');
+    expect(screen.getByRole('link', { name: 'train' })).toBeVisible();
+    expect(screen.queryByRole('link', { name: 'etl' })).not.toBeInTheDocument();
+  });
+
+  it('marks a running count that is a lower bound', () => {
+    mockActivity({
+      activity: makeActivity({
+        runs: reportRuns,
+        queues: [
+          {
+            name: 'default',
+            running: 200,
+            runningCapped: true,
+            maxConcurrency: 500,
+            queued: 0,
+          },
+        ],
+      }),
+    });
+
+    renderPage();
+
+    const queues = screen.getByRole('list', { name: 'Queues' });
+    expect(queues).toHaveTextContent('200+ of 500 running');
+  });
+
+  // A shared queue is named after neither workflow in it.
+  it('keeps a shared queue holding a filtered workflow', () => {
+    mockActivity({
+      activity: makeActivity({
+        runs: reportRuns,
+        active: [
+          {
+            name: 'etl',
+            dagRunId: 'etl-1',
+            status: Status.Queued,
+            queue: 'default',
+          },
+        ],
+        queues: [
+          { name: 'default', running: 1, maxConcurrency: 1, queued: 3 },
+          { name: 'report', running: 1, maxConcurrency: 1, queued: 0 },
+        ],
+      }),
+    });
+
+    renderPage();
+    fireEvent.change(screen.getByLabelText('Filter workflows'), {
+      target: { value: 'etl' },
+    });
+
+    const queues = screen.getByRole('list', { name: 'Queues' });
+    expect(within(queues).getByRole('link', { name: 'default' })).toBeVisible();
+    expect(
+      within(queues).queryByRole('link', { name: 'report' })
+    ).not.toBeInTheDocument();
   });
 
   it('says all is clear when nothing needs attention', () => {

@@ -10,6 +10,8 @@ import {
   fitRange,
   groupLanes,
   inProgressRuns,
+  isQueueStalled,
+  isSchedulerHoldingWork,
   sortLanes,
   timeTicks,
 } from '../activityModel';
@@ -35,6 +37,7 @@ function activity(overrides: Partial<DAGRunActivity> = {}): DAGRunActivity {
     attention: [],
     active: [],
     upcoming: [],
+    queues: [],
     ...overrides,
   };
 }
@@ -107,18 +110,81 @@ describe('attentionItems', () => {
 });
 
 describe('inProgressRuns', () => {
-  it('leaves waiting runs to the attention list', () => {
+  // Waiting runs need attention, and a queue line covers its queued runs.
+  it('lists running runs and queued runs no queue line covers', () => {
     const runs = inProgressRuns(
       activity({
         active: [
-          { name: 'a', dagRunId: '1', status: Status.Running },
+          { name: 'a', dagRunId: '1', status: Status.Running, queue: 'a' },
           { name: 'b', dagRunId: '2', status: Status.Waiting },
-          { name: 'c', dagRunId: '3', status: Status.Queued },
+          { name: 'c', dagRunId: '3', status: Status.Queued, queue: 'c' },
+          { name: 'd', dagRunId: '4', status: Status.Queued, queue: 'd' },
+          { name: 'e', dagRunId: '5', status: Status.Queued },
         ],
+        queues: [{ name: 'c', running: 0, queued: 1 }],
       })
     );
 
-    expect(runs.map((item) => item.dagRunId)).toEqual(['1', '3']);
+    expect(runs.map((item) => item.dagRunId)).toEqual(['1', '4', '5']);
+  });
+});
+
+describe('isQueueStalled', () => {
+  const now = FROM + HOUR;
+  const queue = {
+    name: 'default',
+    running: 0,
+    maxConcurrency: 2,
+    queued: 3,
+    nextQueuedAt: now - 10 * 60,
+  };
+
+  it('flags a queue whose next run waits while it has room', () => {
+    expect(isQueueStalled(queue, now)).toBe(true);
+  });
+
+  it('accepts a long wait in a full queue or a short one', () => {
+    expect(isQueueStalled({ ...queue, running: 2 }, now)).toBe(false);
+    expect(isQueueStalled({ ...queue, nextQueuedAt: now - 60 }, now)).toBe(
+      false
+    );
+  });
+
+  // A running count that is only a lower bound cannot show room.
+  it('accepts a long wait when the running count is a lower bound', () => {
+    expect(isQueueStalled({ ...queue, runningCapped: true }, now)).toBe(false);
+  });
+});
+
+describe('isSchedulerHoldingWork', () => {
+  const scheduled = activity({
+    upcoming: [{ name: 'nightly', fileName: 'nightly', nextRun: FROM + HOUR }],
+  });
+  const queued = activity({
+    queues: [{ name: 'default', running: 0, queued: 1 }],
+  });
+
+  it('flags a stopped scheduler while runs are scheduled or queued', () => {
+    expect(isSchedulerHoldingWork(scheduled, false)).toBe(true);
+    expect(isSchedulerHoldingWork(queued, false)).toBe(true);
+  });
+
+  // A queued run counts even when no queue line lists it, such as after a
+  // failed queue read.
+  it('flags a stopped scheduler with a queued run no queue lists', () => {
+    const waiting = activity({
+      active: [{ name: 'etl', dagRunId: 'etl-1', status: Status.Queued }],
+    });
+
+    expect(isSchedulerHoldingWork(waiting, false)).toBe(true);
+  });
+
+  // A node without schedules may run no scheduler on purpose, and an older
+  // node does not report one at all.
+  it('stays quiet without waiting work or a known stopped scheduler', () => {
+    expect(isSchedulerHoldingWork(activity(), false)).toBe(false);
+    expect(isSchedulerHoldingWork(scheduled, true)).toBe(false);
+    expect(isSchedulerHoldingWork(scheduled, undefined)).toBe(false);
   });
 });
 

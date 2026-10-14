@@ -7,13 +7,18 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"testing"
 	"time"
 
 	openapiv1 "github.com/dagucloud/dagu/v2/api/v1"
 	"github.com/dagucloud/dagu/v2/internal/cmn/config"
 	"github.com/dagucloud/dagu/v2/internal/ir"
+	"github.com/dagucloud/dagu/v2/internal/pagination"
 	"github.com/dagucloud/dagu/v2/internal/persis"
+	"github.com/dagucloud/dagu/v2/internal/persis/file"
+	"github.com/dagucloud/dagu/v2/internal/persis/store"
+	"github.com/dagucloud/dagu/v2/internal/queue"
 	runtimepkg "github.com/dagucloud/dagu/v2/internal/runtime"
 	"github.com/dagucloud/dagu/v2/internal/testutil"
 	"github.com/stretchr/testify/assert"
@@ -96,9 +101,13 @@ func runIDs(runs []openapiv1.DAGRunActivityRun) []string {
 	return ids
 }
 
+// Older pages list only runs; the summaries come with the first page.
 func TestDAGRunActivityPagesRunsNewestFirst(t *testing.T) {
 	f := newActivityFixture(t)
 	day := time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC)
+	queueStore := store.NewQueueStore(file.NewCollection(filepath.Join(t.TempDir(), "queue")))
+	f.api.queueStore = queueStore
+	f.queueRun(queueStore, "nightly", "nightly-1", day.Add(-2*time.Hour))
 	f.addRuns("ping", activityPageSize+2, day.Add(time.Hour))
 	f.addRun("ping", "outside", ir.Succeeded, day.Add(-time.Hour), time.Second)
 	f.addRun("train", "train-1", ir.Running, day.Add(-time.Minute), 0)
@@ -111,11 +120,13 @@ func TestDAGRunActivityPagesRunsNewestFirst(t *testing.T) {
 	assert.Equal(t, day.Add(time.Hour+101*time.Minute).Unix(), valueOf(first.Runs[0].StartedAt))
 	assert.Equal(t, "ping-002", first.Runs[activityPageSize-1].DagRunId)
 	require.NotNil(t, first.NextCursor)
+	require.Len(t, first.Queues, 1)
 
 	older := f.page(day, day.Add(24*time.Hour), first.NextCursor)
 
 	assert.Equal(t, []string{"ping-001", "ping-000"}, runIDs(older.Runs))
 	assert.Nil(t, older.NextCursor)
+	assert.Empty(t, older.Queues)
 	assert.Equal(t, first.From, older.From)
 	assert.Equal(t, first.To, older.To)
 }
@@ -243,4 +254,192 @@ func TestDAGRunActivityStreamTakesOnlyLiveWindows(t *testing.T) {
 		require.ErrorAs(t, err, &apiErr, query)
 		assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus, query)
 	}
+}
+
+// queueRun saves a queued run of name and puts it in the DAG's own queue. A
+// zero queuedAt saves the run without a queue time.
+func (f *activityFixture) queueRun(queueStore queue.QueueStore, name, id string, queuedAt time.Time, labels ...string) {
+	f.t.Helper()
+	ctx := f.t.Context()
+	dag := &ir.DAG{Name: name}
+	createdAt := queuedAt
+	if createdAt.IsZero() {
+		createdAt = time.Now()
+	}
+	attempt, err := f.repository.CreateAttempt(ctx, dag, createdAt, id, persis.DAGRunCreateAttemptOptions{})
+	require.NoError(f.t, err)
+	require.NoError(f.t, attempt.Open(ctx))
+	runStatus := ir.InitialStatus(dag)
+	runStatus.DAGRunID = id
+	runStatus.AttemptID = attempt.ID()
+	runStatus.Status = ir.Queued
+	runStatus.ProcGroup = name
+	runStatus.Labels = labels
+	if !queuedAt.IsZero() {
+		runStatus.QueuedAt = queuedAt.UTC().Format(time.RFC3339)
+	}
+	require.NoError(f.t, attempt.Write(ctx, runStatus))
+	require.NoError(f.t, attempt.Close(ctx))
+	require.NoError(f.t, queueStore.Enqueue(ctx, name, queue.QueuePriorityLow, ir.NewDAGRunRef(name, id)))
+}
+
+// Queues with work are listed on the first page, the one whose next run has
+// waited longest first.
+func TestDAGRunActivityListsQueuesLongestWaitFirst(t *testing.T) {
+	f := newActivityFixture(t)
+	queueStore := store.NewQueueStore(file.NewCollection(filepath.Join(t.TempDir(), "queue")))
+	f.api.queueStore = queueStore
+	now := time.Now().Truncate(time.Second)
+	f.queueRun(queueStore, "report", "report-1", now.Add(-2*time.Minute))
+	f.queueRun(queueStore, "etl", "etl-1", now.Add(-10*time.Minute))
+	f.queueRun(queueStore, "etl", "etl-2", now.Add(-time.Minute))
+
+	first := f.activity(now.Add(-time.Hour), now.Add(time.Hour))
+
+	require.Len(t, first.Queues, 2)
+	etl := first.Queues[0]
+	assert.Equal(t, "etl", etl.Name)
+	assert.Equal(t, 2, etl.Queued)
+	assert.Equal(t, 0, etl.Running)
+	assert.Equal(t, 1, valueOf(etl.MaxConcurrency))
+	assert.Equal(t, now.Add(-10*time.Minute).Unix(), valueOf(etl.NextQueuedAt))
+	assert.Equal(t, "report", first.Queues[1].Name)
+
+	// Runs in progress name their queue, so a client can tell which ones a
+	// queue line already covers.
+	require.NotEmpty(t, first.Active)
+	for _, run := range first.Active {
+		assert.Equal(t, run.Name, valueOf(run.Queue))
+	}
+}
+
+// A run in line without a queue time does not hide the wait of the runs
+// behind it.
+func TestDAGRunActivityQueueWaitSkipsRunsWithoutQueueTime(t *testing.T) {
+	f := newActivityFixture(t)
+	queueStore := store.NewQueueStore(file.NewCollection(filepath.Join(t.TempDir(), "queue")))
+	f.api.queueStore = queueStore
+	now := time.Now().Truncate(time.Second)
+	f.queueRun(queueStore, "etl", "etl-1", time.Time{})
+	f.queueRun(queueStore, "etl", "etl-2", now.Add(-5*time.Minute))
+
+	activity := f.activity(now.Add(-time.Hour), now.Add(time.Hour))
+
+	require.Len(t, activity.Queues, 1)
+	assert.Equal(t, 2, activity.Queues[0].Queued)
+	assert.Equal(t, now.Add(-5*time.Minute).Unix(), valueOf(activity.Queues[0].NextQueuedAt))
+}
+
+// Queue lines count only the runs the Overview's filters select.
+func TestDAGRunActivityQueuesFollowTheFilters(t *testing.T) {
+	f := newActivityFixture(t)
+	queueStore := store.NewQueueStore(file.NewCollection(filepath.Join(t.TempDir(), "queue")))
+	f.api.queueStore = queueStore
+	now := time.Now().Truncate(time.Second)
+	f.queueRun(queueStore, "etl", "etl-1", now.Add(-time.Minute), "team=ops")
+	f.queueRun(queueStore, "report", "report-1", now.Add(-time.Minute))
+
+	from, to := now.Add(-time.Hour).Unix(), now.Add(time.Hour).Unix()
+	resp, err := f.api.GetDAGRunActivity(t.Context(), openapiv1.GetDAGRunActivityRequestObject{
+		Params: openapiv1.GetDAGRunActivityParams{FromDate: &from, ToDate: &to, Labels: new("team=ops")},
+	})
+	require.NoError(t, err)
+	activity, ok := resp.(openapiv1.GetDAGRunActivity200JSONResponse)
+	require.True(t, ok)
+
+	require.Len(t, activity.Queues, 1)
+	assert.Equal(t, "etl", activity.Queues[0].Name)
+}
+
+// Once the scan budget runs out, later queues are not listed as if they
+// held no work.
+func TestDAGRunActivityLeavesOutQueuesItCouldNotRead(t *testing.T) {
+	// Not parallel: this test lowers the package-level scan bounds.
+	original := activityQueueScan
+	activityQueueScan = queueScan{total: 3, perQueue: 3}
+	t.Cleanup(func() { activityQueueScan = original })
+
+	f := newActivityFixture(t)
+	queueStore := store.NewQueueStore(file.NewCollection(filepath.Join(t.TempDir(), "queue")))
+	f.api.queueStore = queueStore
+	now := time.Now().Truncate(time.Second)
+	for i := range 4 {
+		f.queueRun(queueStore, "a-busy", fmt.Sprintf("busy-%d", i), now.Add(-time.Duration(10-i)*time.Minute))
+	}
+	f.queueRun(queueStore, "b-unread", "unread-1", now.Add(-time.Minute))
+
+	activity := f.activity(now.Add(-time.Hour), now.Add(time.Hour))
+
+	require.Len(t, activity.Queues, 1)
+	busy := activity.Queues[0]
+	assert.Equal(t, "a-busy", busy.Name)
+	assert.Equal(t, 3, busy.Queued)
+	assert.True(t, valueOf(busy.QueuedCapped))
+}
+
+// Queue lines read a bounded number of running runs, local and distributed.
+// Past the bound, a queue's running count is a lower bound.
+func TestDAGRunActivityBoundsRunningReads(t *testing.T) {
+	// Not parallel: this test lowers the package-level scan bounds.
+	original := activityQueueScan
+	activityQueueScan = queueScan{total: 200, perQueue: 5, running: 3}
+	t.Cleanup(func() { activityQueueScan = original })
+
+	f := newActivityFixture(t)
+	day := time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC)
+	var refs []ir.DAGRunRef
+	for i := range 2 {
+		id := fmt.Sprintf("train-%d", i)
+		f.addRun("train", id, ir.Running, day.Add(-time.Hour), 0)
+		refs = append(refs, ir.NewDAGRunRef("train", id))
+	}
+	f.api.procRepository = aliveProcs{refs: refs}
+	leaseStore := newTestDAGRunLeaseStore(t.TempDir())
+	f.api.dagRunLeaseStore = leaseStore
+	for i := range 2 {
+		createDistributedQueueRun(t, t.Context(), f.repository, leaseStore, "train", fmt.Sprintf("remote-%d", i), "default", time.Now())
+	}
+
+	activity := f.activity(day, day.Add(24*time.Hour))
+
+	require.Len(t, activity.Queues, 1)
+	assert.Equal(t, 3, activity.Queues[0].Running)
+	assert.True(t, valueOf(activity.Queues[0].RunningCapped))
+}
+
+// countingQueueStore counts the queued records its cursor pages load.
+type countingQueueStore struct {
+	queue.QueueStore
+	loaded int
+}
+
+func (s *countingQueueStore) ListCursor(ctx context.Context, name, cursor string, limit int) (pagination.CursorResult[queue.QueuedItemData], error) {
+	page, err := s.QueueStore.ListCursor(ctx, name, cursor, limit)
+	s.loaded += len(page.Items)
+	return page, err
+}
+
+// Counting backlogs loads only the queued records the scan may count.
+func TestDAGRunActivityLoadsOnlyTheQueuedRecordsItCounts(t *testing.T) {
+	// Not parallel: this test lowers the package-level scan bounds.
+	original := activityQueueScan
+	activityQueueScan = queueScan{total: 7, perQueue: 5}
+	t.Cleanup(func() { activityQueueScan = original })
+
+	f := newActivityFixture(t)
+	queueStore := &countingQueueStore{QueueStore: store.NewQueueStore(file.NewCollection(filepath.Join(t.TempDir(), "queue")))}
+	f.api.queueStore = queueStore
+	now := time.Now().Truncate(time.Second)
+	for i := range 10 {
+		f.queueRun(queueStore, "a", fmt.Sprintf("a-%d", i), now.Add(-time.Duration(20-i)*time.Minute))
+		f.queueRun(queueStore, "b", fmt.Sprintf("b-%d", i), now.Add(-time.Duration(20-i)*time.Minute))
+	}
+	queueStore.loaded = 0
+
+	activity := f.activity(now.Add(-time.Hour), now.Add(time.Hour))
+
+	assert.Equal(t, 7, queueStore.loaded)
+	require.Len(t, activity.Queues, 2)
+	assert.Equal(t, 5, activity.Queues[0].Queued)
+	assert.Equal(t, 2, activity.Queues[1].Queued)
 }

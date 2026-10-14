@@ -38,6 +38,7 @@ function page(runs: ActivityRun[], nextCursor?: string): DAGRunActivity {
     attention: [],
     active: [],
     upcoming: [],
+    queues: [],
   };
 }
 

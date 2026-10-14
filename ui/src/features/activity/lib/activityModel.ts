@@ -5,6 +5,7 @@ import { Status, type components } from '@/api/v1/schema';
 
 export type DAGRunActivity = components['schemas']['DAGRunActivity'];
 export type ActivityRun = components['schemas']['DAGRunActivityRun'];
+export type ActivityQueue = components['schemas']['DAGRunActivityQueue'];
 
 /** A time range in Unix seconds. */
 export type TimeRange = { from: number; to: number };
@@ -134,9 +135,54 @@ export function attentionItems(
   return [...failing, ...waiting, ...slow];
 }
 
-/** Runs that are running or queued; waiting runs are listed as attention. */
+/**
+ * Runs that are running, and queued runs no queue line covers, such as runs
+ * of a queue past the listed ones. Waiting runs are listed as attention.
+ */
 export function inProgressRuns(activity: DAGRunActivity): ActivityRun[] {
-  return activity.active.filter((run) => run.status !== Status.Waiting);
+  const summarized = new Set(activity.queues.map((queue) => queue.name));
+  return activity.active.filter(
+    (run) =>
+      run.status === Status.Running ||
+      (run.status === Status.Queued &&
+        !(run.queue !== undefined && summarized.has(run.queue)))
+  );
+}
+
+/** A queue's next run counts as stuck once it has waited this long. */
+export const STALLED_WAIT_SECONDS = 5 * 60;
+
+/**
+ * Reports whether a queue looks stuck: its next run has waited long while
+ * the queue has room to run it.
+ */
+export function isQueueStalled(
+  queue: ActivityQueue,
+  nowSeconds: number
+): boolean {
+  if (queue.nextQueuedAt === undefined) return false;
+  // A running count that is a lower bound cannot show room.
+  const hasRoom =
+    queue.maxConcurrency === undefined ||
+    (!queue.runningCapped && queue.running < queue.maxConcurrency);
+  return hasRoom && nowSeconds - queue.nextQueuedAt > STALLED_WAIT_SECONDS;
+}
+
+/**
+ * Reports whether a stopped scheduler is holding work back: scheduled or
+ * queued runs exist, and no scheduler is running to start them. A node that
+ * runs without schedules or queues is not flagged.
+ */
+export function isSchedulerHoldingWork(
+  activity: DAGRunActivity,
+  schedulerRunning: boolean | undefined
+): boolean {
+  if (schedulerRunning !== false) return false;
+  return (
+    activity.upcoming.length > 0 ||
+    activity.active.some((run) => run.status === Status.Queued) ||
+    activity.queues.some((queue) => queue.queued > 0 || !!queue.queuedCapped)
+  );
 }
 
 function laneRank(lane: ActivityLane, activeNames: Set<string>): number {
