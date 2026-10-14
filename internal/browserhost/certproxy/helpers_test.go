@@ -188,8 +188,14 @@ func serveProxy(t *testing.T, cfg Config) Ready {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	ready := make(chan Ready, 1)
-	done := make(chan error, 1)
-	go func() { done <- Serve(ctx, cfg, func(r Ready) { ready <- r }) }()
+	// done is closed, not sent on, so both the wait below and the cleanup
+	// see Serve return.
+	done := make(chan struct{})
+	var serveErr error
+	go func() {
+		defer close(done)
+		serveErr = Serve(ctx, cfg, func(r Ready) { ready <- r })
+	}()
 	t.Cleanup(func() {
 		cancel()
 		<-done
@@ -197,8 +203,8 @@ func serveProxy(t *testing.T, cfg Config) Ready {
 	select {
 	case r := <-ready:
 		return r
-	case err := <-done:
-		t.Fatalf("Serve returned before it was ready: %v", err)
+	case <-done:
+		t.Fatalf("Serve returned before it was ready: %v", serveErr)
 	case <-time.After(10 * time.Second):
 		t.Fatal("Serve was not ready in time")
 	}
