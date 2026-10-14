@@ -76,6 +76,10 @@ func (e *changeToolError) Error() string {
 	return e.Message
 }
 
+// changeToolInputSchema is deliberately flat: no root-level oneOf/anyOf/allOf. Some MCP clients
+// (ChatGPT's connector) collapse a root-level oneOf into a generic object and then drop every
+// argument not declared inside the chosen branch, so only "type" reached the server. The per-type
+// required/allowed fields are enforced by validateChangeInput and documented in the descriptions.
 func changeToolInputSchema() json.RawMessage {
 	return json.RawMessage(`{
 		"type": "object",
@@ -88,75 +92,41 @@ func changeToolInputSchema() json.RawMessage {
 			"type": {
 				"type": "string",
 				"enum": ["upsert_dag", "rename_dag", "delete_dag", "set_dag_profile", "clear_dag_profile", "upsert_wiki_page", "rename_wiki_page", "delete_wiki_page"],
-				"description": "Change type. Defaults to upsert_dag."
+				"description": "Change type. Defaults to upsert_dag. Required fields per type: upsert_dag: name, spec. rename_dag: type, name, newName. delete_dag: type, name. set_dag_profile: type, name, profile. clear_dag_profile: type, name. upsert_wiki_page: type, workspace, path, content. rename_wiki_page: type, workspace, path, newPath. delete_wiki_page: type, workspace, path. Fields not listed for a type are rejected."
 			},
 			"name": {
 				"type": "string",
-				"description": "Target DAG name."
+				"description": "Target DAG name. Required for upsert_dag, rename_dag, delete_dag, set_dag_profile and clear_dag_profile."
 			},
 			"spec": {
 				"type": "string",
-				"description": "DAG YAML document to validate and optionally store."
+				"description": "DAG YAML document to validate and optionally store. Required for upsert_dag."
 			},
 			"newName": {
 				"type": "string",
-				"description": "Destination DAG name for rename_dag."
+				"description": "Destination DAG name. Required for rename_dag."
 			},
 			"profile": {
 				"type": "string",
-				"description": "Runtime profile name for set_dag_profile."
+				"description": "Runtime profile name. Required for set_dag_profile."
 			},
 			"workspace": {
 				"type": "string",
-				"description": "Wiki workspace: default or a named workspace. Required for Wiki changes."
+				"description": "Wiki workspace: default or a named workspace. Required for upsert_wiki_page, rename_wiki_page and delete_wiki_page."
 			},
 			"path": {
 				"type": "string",
-				"description": "Wiki page or directory path without .md. Required for Wiki changes."
+				"description": "Wiki page or directory path without .md. Required for upsert_wiki_page, rename_wiki_page and delete_wiki_page."
 			},
 			"content": {
 				"type": "string",
-				"description": "Full Markdown content for upsert_wiki_page. Empty content is allowed."
+				"description": "Full Markdown content. Required for upsert_wiki_page; empty content is allowed."
 			},
 			"newPath": {
 				"type": "string",
-				"description": "Destination Wiki page or directory path for rename_wiki_page."
+				"description": "Destination Wiki page or directory path. Required for rename_wiki_page."
 			}
 		},
-		"oneOf": [
-			{
-				"properties": {"type": {"enum": ["upsert_dag"]}},
-				"required": ["name", "spec"]
-			},
-			{
-				"properties": {"type": {"enum": ["rename_dag"]}},
-				"required": ["type", "name", "newName"]
-			},
-			{
-				"properties": {"type": {"enum": ["delete_dag"]}},
-				"required": ["type", "name"]
-			},
-			{
-				"properties": {"type": {"enum": ["set_dag_profile"]}},
-				"required": ["type", "name", "profile"]
-			},
-			{
-				"properties": {"type": {"enum": ["clear_dag_profile"]}},
-				"required": ["type", "name"]
-			},
-			{
-				"properties": {"type": {"enum": ["upsert_wiki_page"]}},
-				"required": ["type", "workspace", "path", "content"]
-			},
-			{
-				"properties": {"type": {"enum": ["rename_wiki_page"]}},
-				"required": ["type", "workspace", "path", "newPath"]
-			},
-			{
-				"properties": {"type": {"enum": ["delete_wiki_page"]}},
-				"required": ["type", "workspace", "path"]
-			}
-		],
 		"additionalProperties": false
 	}`)
 }

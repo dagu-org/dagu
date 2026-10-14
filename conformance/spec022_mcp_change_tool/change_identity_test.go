@@ -5,6 +5,7 @@ package spec022_mcp_change_tool_test
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/dagucloud/dagu/v2/conformance/mcptest"
@@ -84,23 +85,27 @@ func TestChangeToolIdentityAndInputSchema(t *testing.T) {
 			required: []any{"type", "workspace", "path"},
 		},
 	}
-	for _, rawBranch := range requireArray(t, schema, "oneOf") {
-		branch, ok := rawBranch.(map[string]any)
-		require.True(t, ok)
-		branchProperties, ok := branch["properties"].(map[string]any)
-		require.True(t, ok)
-		typeSchema, ok := branchProperties["type"].(map[string]any)
-		require.True(t, ok)
-		typeValues := requireArray(t, typeSchema, "enum")
-		changeType, ok := typeValues[0].(string)
-		require.True(t, ok)
-		contract, ok := expectedBranches[changeType]
-		require.True(t, ok, "unexpected change type %q", changeType)
-		require.Equal(t, contract.types, typeValues)
-		require.ElementsMatch(t, contract.required, requireArray(t, branch, "required"))
-		delete(expectedBranches, changeType)
+	// The schema is flat (no root-level combinators) so clients that cannot handle a root oneOf
+	// still send every argument; each per-type contract is documented in the descriptions and
+	// enforced server-side (see change_errors_test.go).
+	for _, combinator := range []string{"oneOf", "anyOf", "allOf"} {
+		require.NotContains(t, schema, combinator)
 	}
-	require.Empty(t, expectedBranches)
+	typeSchema, ok := properties["type"].(map[string]any)
+	require.True(t, ok)
+	typeDescription, ok := typeSchema["description"].(string)
+	require.True(t, ok)
+	for changeType, contract := range expectedBranches {
+		require.Contains(t, requireArray(t, typeSchema, "enum"), changeType)
+		fields := make([]string, 0, len(contract.required))
+		for _, field := range contract.required {
+			name, ok := field.(string)
+			require.True(t, ok)
+			require.Contains(t, properties, name)
+			fields = append(fields, name)
+		}
+		require.Contains(t, typeDescription, changeType+": "+strings.Join(fields, ", ")+".")
+	}
 }
 
 func toolInputSchema(t *testing.T, tool *mcpsdk.Tool) map[string]any {
