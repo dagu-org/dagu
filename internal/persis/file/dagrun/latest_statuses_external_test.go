@@ -5,6 +5,7 @@ package dagrun_test
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"slices"
@@ -50,6 +51,28 @@ func TestLatestStatusesReturnsNewestRunPerDAG(t *testing.T) {
 	// A lost pointer is rebuilt from the run directories.
 	require.NoError(t, os.Remove(filepath.Join(baseDir, "recovered", "dag-runs", ".dagrun.latest")))
 	require.Equal(t, []string{"broken/boom/failed", "recovered/fixed/succeeded"}, latest(persis.DAGRunLatestStatusesQuery{}))
+}
+
+// A pointer update can lose a lock race, leaving the pointer on an older run.
+// A run created after the cutoff must still be found.
+func TestLatestStatusesFindsRunsAPointerMissed(t *testing.T) {
+	ctx := context.Background()
+	baseDir := t.TempDir()
+	repository := newFileRepository(baseDir, persis.DAGRunRepositoryOptions{})
+	cutoff := time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC)
+	writeLatestStatusRun(t, repository, "lagging", "before", cutoff.Add(-24*time.Hour), ir.Succeeded)
+
+	// Written straight to disk, so the pointer still names the older run.
+	statusFile := createStatuslessRunDir(t, baseDir, "lagging", cutoff.Add(time.Hour), "after")
+	data, err := json.Marshal(ir.DAGRunStatus{Name: "lagging", DAGRunID: "after", Status: ir.Failed})
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(statusFile, append(data, '\n'), 0o600))
+
+	statuses, err := repository.LatestStatuses(ctx, persis.DAGRunLatestStatusesQuery{NotBefore: persis.NewUTC(cutoff)})
+	require.NoError(t, err)
+	require.Len(t, statuses, 1)
+	require.Equal(t, "after", statuses[0].DAGRunID)
+	require.Equal(t, ir.Failed, statuses[0].Status)
 }
 
 func writeLatestStatusRun(

@@ -58,12 +58,26 @@ func (store *Store) LatestStatuses(ctx context.Context, query persis.DAGRunLates
 }
 
 // newestAttemptSince returns the newest visible attempt of root when its run
-// was created at or after cutoff. Only a missing or unusable pointer makes it
-// list the root's runs.
+// was created at or after cutoff.
+//
+// A pointer update that loses a lock race leaves the pointer on an older run,
+// so a pointer older than cutoff is trusted only while no day directory is
+// dated on or after cutoff; a run created since cutoff would live in one.
+// Otherwise, as for a missing pointer, the root's runs are listed and the
+// pointer is repaired.
 func (store *Store) newestAttemptSince(ctx context.Context, root DataRoot, cutoff persis.TimeInUTC) (*Attempt, error) {
 	attempt, err := root.latestAttemptFromPointer(ctx, store.cache, cutoff)
-	if err == nil || errors.Is(err, errLatestAttemptBeforeCutoff) || ctx.Err() != nil {
+	if err == nil || ctx.Err() != nil {
 		return attempt, err
+	}
+	if errors.Is(err, errLatestAttemptBeforeCutoff) {
+		days, err := listDayPathsInRange(root, cutoff, persis.TimeInUTC{})
+		if err != nil {
+			return nil, err
+		}
+		if len(days) == 0 {
+			return nil, errLatestAttemptBeforeCutoff
+		}
 	}
 	return store.latestAttemptAfter(ctx, root, cutoff)
 }

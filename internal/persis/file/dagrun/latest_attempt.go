@@ -22,8 +22,7 @@ const latestAttemptFileName = ".dagrun.latest"
 var (
 	errLatestAttemptPointerInvalid = errors.New("latest attempt pointer invalid")
 	// errLatestAttemptBeforeCutoff reports a valid pointer to a run created
-	// before the cutoff. The pointer tracks the newest run, so no run of the
-	// root is newer.
+	// before the cutoff.
 	errLatestAttemptBeforeCutoff = errors.New("latest attempt is before the cutoff")
 )
 
