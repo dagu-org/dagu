@@ -98,6 +98,8 @@ type fakeEngine struct {
 	outcome pageOutcome
 	// pending are the connections the certificate proxy waits on.
 	pending []certproxy.Pending
+	// verifiedHosts are the hosts the certificate proxy vouches for.
+	verifiedHosts []string
 	// pageText and visible describe the page that fixed checks read.
 	pageText string
 	visible  []string
@@ -183,6 +185,12 @@ func (e *fakeEngine) PendingConnections(context.Context) ([]certproxy.Pending, e
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	return e.pending, nil
+}
+
+func (e *fakeEngine) CertificateVerified(_ context.Context, host string) (bool, error) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return slices.Contains(e.verifiedHosts, host), nil
 }
 
 func (e *fakeEngine) Goto(_ context.Context, url string, _ time.Duration) error {

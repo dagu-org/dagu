@@ -213,6 +213,18 @@ func PendingConnections(ctx context.Context, handleURL string) ([]Pending, error
 	return pending, nil
 }
 
+// Verified reports whether the proxy at handleURL verified the server
+// certificate of host on a route it still carries. An error means the proxy
+// no longer answers.
+func Verified(ctx context.Context, handleURL, host string) (bool, error) {
+	query := url.Values{hostParam: {host}}
+	var verified bool
+	if err := getControl(ctx, handleURL+"/"+verifiedPath+"?"+query.Encode(), &verified); err != nil {
+		return false, fmt.Errorf("read certificate proxy verification: %w", err)
+	}
+	return verified, nil
+}
+
 // getControl reads the JSON a control path of the proxy answers into v.
 func getControl(ctx context.Context, address string, v any) error {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, address, nil)

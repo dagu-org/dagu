@@ -85,16 +85,25 @@ func (ts *testSessions) state(id string) sessionState {
 
 var testModel = &ir.LLMConfig{Provider: "openai", Model: "test-model"}
 
+// tls_verified reports whether the certificate proxy vouches for the final
+// page's host.
 func TestSessionTLSVerification(t *testing.T) {
 	t.Parallel()
-	for _, verifiedHost := range []string{"portal.example.com", "redirect.example.com", ""} {
-		t.Run(verifiedHost, func(t *testing.T) {
+	for name, tt := range map[string]struct {
+		verified []string
+		want     bool
+	}{
+		"PageHost":   {verified: []string{"portal.example.com"}, want: true},
+		"OtherHost":  {verified: []string{"redirect.example.com"}},
+		"NoEvidence": {},
+	} {
+		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			ts := newTestSessions(t, pageModel(nil))
 			ts.engine.handle.CertProxy = &certproxy.Handle{URL: "http://127.0.0.1:1/token"}
-			ts.engine.certificateEvents = []certproxy.Event{{Seq: 1, Kind: certproxy.EventConnect, Host: verifiedHost, TLSVerified: true}}
+			ts.engine.verifiedHosts = tt.verified
 			opened := ts.open(SessionOptions{URL: "https://portal.example.com/", Headless: true})
-			assert.Equal(t, verifiedHost == "portal.example.com", opened.TLSVerified)
+			assert.Equal(t, tt.want, opened.TLSVerified)
 		})
 	}
 }

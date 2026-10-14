@@ -113,7 +113,7 @@ type OpenCodeDef struct {
 type BrowserDef struct {
 	Sandbox                 *bool                         `mapstructure:"sandbox"`
 	ClientCertificates      []BrowserClientCertificateDef `mapstructure:"client_certificates"`
-	TrustedCAs              []BrowserTrustedCA            `mapstructure:"trusted_cas"`
+	TrustedCAs              []BrowserTrustedCADef         `mapstructure:"trusted_cas"`
 	GuardClientCertificates *bool                         `mapstructure:"guard_client_certificates"`
 }
 
@@ -127,6 +127,13 @@ type BrowserClientCertificateDef struct {
 	CAFile         string   `mapstructure:"ca_file"`
 	Passphrase     string   `mapstructure:"passphrase"`
 	PassphraseFile string   `mapstructure:"passphrase_file"`
+}
+
+// BrowserTrustedCADef is a server certificate authority that browsers on
+// this host trust for the hosts it names.
+type BrowserTrustedCADef struct {
+	Hosts  []string `mapstructure:"hosts"`
+	CAFile string   `mapstructure:"ca_file"`
 }
 
 // DAGDiscoveryDef configures DAG definition discovery.

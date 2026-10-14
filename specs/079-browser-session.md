@@ -45,8 +45,10 @@ page and let a person act on it.
 
 `open` also returns `tls_verified`: true confirms that the certificate proxy
 verified the final HTTPS page's host. False means no such evidence was
-available; it does not by itself mean the certificate failed. This confirms
-transport trust, not login or whether a configured authority was needed.
+available; it does not by itself mean the certificate failed. A host the
+guard carried counts only while the guard runs, since the browser reaches it
+directly once the guard stops. This confirms transport trust, not login or
+whether a configured authority was needed.
 `list` includes `capabilities: ["trusted_cas"]` so applications can detect
 support without assuming an engine version.
 

@@ -68,8 +68,8 @@ func TestServeGuardCarriesOptionalCertificateSite(t *testing.T) {
 	waitForEvent(t, ready, cfg.Token, EventClientCertificateMissing)
 }
 
-// A site that asks for no client certificate opens through the guard and
-// reports its verified TLS connection.
+// A site that asks for no client certificate opens through the guard, with
+// nothing to report.
 func TestServeGuardCarriesOrdinarySite(t *testing.T) {
 	t.Parallel()
 
@@ -83,9 +83,60 @@ func TestServeGuardCarriesOrdinarySite(t *testing.T) {
 	assert.Equal(t, "HTTP/1.1 anonymous", body)
 	events, err := Events(context.Background(), controlURL(ready.Port, cfg.Token), 0)
 	require.NoError(t, err)
-	require.Len(t, events, 1)
-	assert.Equal(t, EventConnect, events[0].Kind)
-	assert.True(t, events[0].TLSVerified)
+	assert.Empty(t, events)
+}
+
+// The proxy vouches for the hosts whose server certificate it verified on a
+// route it still carries: once the guard stops, the browser reaches the
+// guard's hosts itself, while a named host keeps the certificate port.
+func TestServeVerifiedHostsFollowRoutes(t *testing.T) {
+	t.Parallel()
+
+	ca := newTestCA(t, "corp CA")
+	site := newSiteAuth(t, ca, ca, tls.NoClientCert, 0)
+	upstream := newTunnelProxy(t, siteAddr(site), http.StatusOK)
+	authProxy := newTunnelProxy(t, siteAddr(site), http.StatusProxyAuthRequired)
+	cfg := guardConfig(t, ca, fmt.Sprintf(`function FindProxyForURL(url, host) { return host == "auth.test" ? "PROXY %s" : "PROXY %s"; }`, authProxy.addr, upstream.addr))
+	cfg.TrustedCAs = []TrustedCA{trustedCA(ca, siteHost)}
+	ready := serveProxy(t, cfg)
+	handle := controlURL(ready.Port, cfg.Token)
+	verified := func(host string) bool {
+		t.Helper()
+		ok, err := Verified(context.Background(), handle, host)
+		require.NoError(t, err)
+		return ok
+	}
+
+	_, err := get(t, browserClient(ready, "http/1.1"), "https://"+siteHost+"/")
+	require.NoError(t, err)
+	_, err = get(t, browserClientAt(ready.GuardPort, ready, "http/1.1"), site.URL)
+	require.NoError(t, err)
+	assert.True(t, verified(strings.ToUpper(siteHost)))
+	assert.True(t, verified("127.0.0.1"))
+	assert.False(t, verified("other.test"))
+
+	conn, _, err := connectThrough(fmt.Sprintf("127.0.0.1:%d", ready.GuardPort), "auth.test:443")
+	if err == nil {
+		_ = conn.Close()
+	}
+	waitForEvent(t, ready, cfg.Token, EventGuardOff)
+	assert.True(t, verified(siteHost))
+	assert.False(t, verified("127.0.0.1"))
+}
+
+// A guard connection that completes after the guard stopped does not vouch
+// for its host, which the browser reaches directly from then on.
+func TestVerifiedHostsIgnoreGuardAfterStop(t *testing.T) {
+	t.Parallel()
+
+	verified := newVerifiedHosts()
+	verified.add("named.test", false)
+	verified.dropGuarded()
+	verified.add("late.test", true)
+	verified.add("late-named.test", false)
+	assert.True(t, verified.has("named.test"))
+	assert.False(t, verified.has("late.test"))
+	assert.True(t, verified.has("late-named.test"))
 }
 
 // When the device's proxy asks for credentials, the guard resets the
