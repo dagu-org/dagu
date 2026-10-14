@@ -518,6 +518,41 @@ describe('ExecutionLog follow', () => {
     expect(region.scrollTop).toBe(200);
   });
 
+  // A finished log opens on its newest lines, but a reader who moves keeps
+  // their place when the lines are fetched again.
+  it('follows a finished log until its reader moves', () => {
+    const finishedRun = {
+      ...(runningRun as object),
+      status: Status.Success,
+    } as never;
+    const { rerender } = render(
+      <ExecutionLog name="example" dagRunId="run" dagRun={finishedRun} />,
+      { wrapper: UserPreferencesProvider }
+    );
+    const region = screen.getByRole('region', { name: 'Run log' });
+    Object.defineProperty(region, 'scrollHeight', {
+      configurable: true,
+      value: 1000,
+    });
+    logs.data = { ...logs.data, content: 'first output\nlast output' };
+    rerender(
+      <ExecutionLog name="example" dagRunId="run" dagRun={finishedRun} />
+    );
+    expect(region.scrollTop).toBe(1000);
+
+    region.scrollTop = 200;
+    fireEvent.wheel(region, { deltaY: -120 });
+    logs.data = { ...logs.data, content: 'first output\nlast output\nfooter' };
+    rerender(
+      <ExecutionLog name="example" dagRunId="run" dagRun={finishedRun} />
+    );
+
+    expect(region.scrollTop).toBe(200);
+    expect(
+      screen.queryByRole('button', { name: 'Back to live' })
+    ).not.toBeInTheDocument();
+  });
+
   it('shows another range instead of the held lines', () => {
     logs.data = {
       content: 'line 9\nline 10',

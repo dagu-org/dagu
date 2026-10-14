@@ -107,6 +107,9 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
     range: string;
     data: LogWithPagination;
   } | null>(null);
+  // The range a reader moved through while the log was not live. There is
+  // nothing to hold or resume, but their place is kept when lines change.
+  const [readerAwayRange, setReaderAwayRange] = useState<string | null>(null);
 
   // The log stays mounted when the page moves to another run, which starts
   // again from its newest lines.
@@ -116,6 +119,7 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
     setShownRunKey(runKey);
     setFollowing(true);
     setPausedData(null);
+    setReaderAwayRange(null);
     setIsLiveMode(isRunning);
   }
 
@@ -237,7 +241,11 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
   const range = `${viewMode}:${pageSize}:${currentPage}`;
 
   const pauseFollowing = useCallback(() => {
-    if (!following || !canFollow) return;
+    if (!canFollow) {
+      setReaderAwayRange(range);
+      return;
+    }
+    if (!following) return;
     setFollowing(false);
     setPausedData(latestData ? { range, data: latestData } : null);
   }, [canFollow, following, latestData, range]);
@@ -250,16 +258,19 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
   }, []);
 
   // Switching how lines render keeps a live reader on the newest line but
-  // leaves a finished log where its reader is.
+  // leaves a finished log where its reader is. A finished log opens on its
+  // newest lines and keeps following them until its reader moves.
   const followedDisplayMode = canFollow ? displayMode : undefined;
+  const keepsReaderPlace = !isLiveMode && readerAwayRange === range;
   useLayoutEffect(() => {
-    if (following && viewMode === 'tail') {
+    if (following && viewMode === 'tail' && !keepsReaderPlace) {
       scrollToBottom();
     }
   }, [
     latestData?.content,
     followedDisplayMode,
     following,
+    keepsReaderPlace,
     viewMode,
     scrollToBottom,
   ]);
