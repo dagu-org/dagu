@@ -28,10 +28,6 @@ type DAGRunStore interface {
 	// run was created at or after NotBefore and matches the query's filters.
 	LatestStatuses(ctx context.Context, query DAGRunLatestStatusesQuery) ([]*ir.DAGRunStatus, error)
 	QueryStatuses(ctx context.Context, query DAGRunStatusQuery) (DAGRunStatusPage, error)
-	// VisitStatuses calls visit for each status matching query, in no
-	// particular order, ignoring Limit and Cursor. An error from visit stops
-	// the scan and is returned.
-	VisitStatuses(ctx context.Context, query DAGRunStatusQuery, visit func(*ir.DAGRunStatus) error) error
 	CompareAndSwapLatestAttemptStatus(ctx context.Context, req DAGRunCompareAndSwapStatusRequest) (*ir.DAGRunStatus, bool, error)
 	FindAttempt(ctx context.Context, ref ir.DAGRunRef) (dagrun.Attempt, error)
 	FindSubAttempt(ctx context.Context, root ir.DAGRunRef, childRunID string) (dagrun.Attempt, error)
