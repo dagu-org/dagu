@@ -238,8 +238,9 @@ func newHarness(t *testing.T, maxHooks int) *harness {
 	t.Helper()
 	enc, err := crypto.NewEncryptor("test-key")
 	require.NoError(t, err)
-	col := testutil.NewMemoryBackend().Collection("webhooks")
-	webhooks, err := store.NewWebhookStore(col, enc)
+	backend := testutil.NewMemoryBackend()
+	col := backend.Collection("webhooks")
+	webhooks, err := store.NewWebhookStore(col, backend.Collection("webhook_dag_claims"), enc)
 	require.NoError(t, err)
 	h := &harness{
 		cloud:    newFakeCloud(t, maxHooks),

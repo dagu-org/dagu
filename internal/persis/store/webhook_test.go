@@ -26,10 +26,20 @@ import (
 	"github.com/dagucloud/dagu/v2/internal/persis/testutil"
 )
 
+// webhookClaims holds the DAG name claims kept beside each test collection.
+var webhookClaims sync.Map
+
+// claimsOf returns the DAG name claims kept beside col. Stores over the same
+// collection share them, as processes sharing a data directory do.
+func claimsOf(col persis.Collection) persis.Collection {
+	claims, _ := webhookClaims.LoadOrStore(col, testutil.NewMemoryBackend().Collection("webhook_dag_claims"))
+	return claims.(persis.Collection)
+}
+
 func newWebhookStore(t *testing.T) *store.WebhookStore {
 	t.Helper()
 	col := testutil.NewMemoryBackend().Collection("webhooks")
-	s, err := store.NewWebhookStore(col, nil)
+	s, err := store.NewWebhookStore(col, claimsOf(col), nil)
 	require.NoError(t, err)
 	return s
 }
@@ -58,14 +68,14 @@ func newConflictingWebhookStores(
 ) (s, other *store.WebhookStore) {
 	t.Helper()
 	col := testutil.NewMemoryBackend().Collection("webhooks")
-	other, err := store.NewWebhookStore(col, nil)
+	other, err := store.NewWebhookStore(col, claimsOf(col), nil)
 	require.NoError(t, err)
 	require.NoError(t, other.Create(context.Background(), wh))
 
 	s, err = store.NewWebhookStore(&conflictingCollection{
 		Collection: col,
 		write:      func() { otherWrite(other) },
-	}, nil)
+	}, claimsOf(col), nil)
 	require.NoError(t, err)
 	return s, other
 }
@@ -362,13 +372,13 @@ func TestWebhookIndexRebuiltOnStartup(t *testing.T) {
 	// to verify the index is rebuilt correctly from persisted data.
 	col := testutil.NewMemoryBackend().Collection("webhooks")
 
-	s1, err := store.NewWebhookStore(col, nil)
+	s1, err := store.NewWebhookStore(col, claimsOf(col), nil)
 	require.NoError(t, err)
 	require.NoError(t, s1.Create(ctx, newWebhook("d1")))
 	require.NoError(t, s1.Create(ctx, newWebhook("d2")))
 
 	// Create a second store over the same collection (simulates restart).
-	s2, err := store.NewWebhookStore(col, nil)
+	s2, err := store.NewWebhookStore(col, claimsOf(col), nil)
 	require.NoError(t, err)
 
 	got, err := s2.GetByDAGName(ctx, "d1")
@@ -387,9 +397,9 @@ func TestWebhookIndexRebuiltOnStartup(t *testing.T) {
 func TestWebhookCreateSeesOtherProcessesAfterAMiss(t *testing.T) {
 	ctx := context.Background()
 	col := testutil.NewMemoryBackend().Collection("webhooks")
-	s1, err := store.NewWebhookStore(col, nil)
+	s1, err := store.NewWebhookStore(col, claimsOf(col), nil)
 	require.NoError(t, err)
-	s2, err := store.NewWebhookStore(col, nil)
+	s2, err := store.NewWebhookStore(col, claimsOf(col), nil)
 	require.NoError(t, err)
 
 	_, err = s2.GetByDAGName(ctx, "d1")
@@ -404,9 +414,9 @@ func TestWebhookCreateSeesOtherProcessesAfterAMiss(t *testing.T) {
 func TestWebhookSeesOtherProcesses(t *testing.T) {
 	ctx := context.Background()
 	col := testutil.NewMemoryBackend().Collection("webhooks")
-	s1, err := store.NewWebhookStore(col, nil)
+	s1, err := store.NewWebhookStore(col, claimsOf(col), nil)
 	require.NoError(t, err)
-	s2, err := store.NewWebhookStore(col, nil)
+	s2, err := store.NewWebhookStore(col, claimsOf(col), nil)
 	require.NoError(t, err)
 
 	require.NoError(t, s1.Create(ctx, newWebhook("d1")))
@@ -440,7 +450,7 @@ func (c *listCountingCollection) List(ctx context.Context, q persis.ListQuery) (
 func TestWebhookMissesShareARereading(t *testing.T) {
 	ctx := context.Background()
 	col := &listCountingCollection{Collection: testutil.NewMemoryBackend().Collection("webhooks")}
-	s, err := store.NewWebhookStore(col, nil)
+	s, err := store.NewWebhookStore(col, claimsOf(col), nil)
 	require.NoError(t, err)
 	col.lists.Store(0)
 
@@ -456,9 +466,9 @@ func TestWebhookMissesShareARereading(t *testing.T) {
 func TestWebhookListCompleteRefreshesLookups(t *testing.T) {
 	ctx := context.Background()
 	col := testutil.NewMemoryBackend().Collection("webhooks")
-	s1, err := store.NewWebhookStore(col, nil)
+	s1, err := store.NewWebhookStore(col, claimsOf(col), nil)
 	require.NoError(t, err)
-	s2, err := store.NewWebhookStore(col, nil)
+	s2, err := store.NewWebhookStore(col, claimsOf(col), nil)
 	require.NoError(t, err)
 
 	_, err = s1.GetByDAGName(ctx, "d1")
@@ -478,7 +488,7 @@ func TestWebhookListCompleteReportsCorruptFiles(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
 	backend := file.NewBackend(config.PathsConfig{DataDir: dir, WebhooksDir: filepath.Join(dir, "webhooks")})
-	s, err := store.NewWebhookStore(backend.Collection(persis.CollectionWebhooks), nil)
+	s, err := store.NewWebhookStore(backend.Collection(persis.CollectionWebhooks), backend.Collection(persis.CollectionWebhookDAGClaims), nil)
 	require.NoError(t, err)
 	require.NoError(t, s.Create(ctx, newWebhook("d1")))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "webhooks", "broken.json"), []byte("{not json"), 0o600))
@@ -521,7 +531,7 @@ func (c *listingCollection) List(ctx context.Context, q persis.ListQuery) (*pers
 func TestWebhookListCompleteKeepsConcurrentCreates(t *testing.T) {
 	ctx := context.Background()
 	col := &listingCollection{Collection: testutil.NewMemoryBackend().Collection("webhooks")}
-	s, err := store.NewWebhookStore(col, nil)
+	s, err := store.NewWebhookStore(col, claimsOf(col), nil)
 	require.NoError(t, err)
 	require.NoError(t, s.Create(ctx, newWebhook("d0")))
 	// A recent miss keeps the next one from rereading the collection.
@@ -544,7 +554,7 @@ func newEncryptedWebhookStore(t *testing.T, col persis.Collection) *store.Webhoo
 	t.Helper()
 	enc, err := crypto.NewEncryptor("test-key")
 	require.NoError(t, err)
-	s, err := store.NewWebhookStore(col, enc)
+	s, err := store.NewWebhookStore(col, claimsOf(col), enc)
 	require.NoError(t, err)
 	return s
 }
@@ -604,7 +614,7 @@ func TestWebhookPublicURL(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, wh.Public, got.Public)
 
-	unencrypted, err := store.NewWebhookStore(col, nil)
+	unencrypted, err := store.NewWebhookStore(col, claimsOf(col), nil)
 	require.NoError(t, err)
 	_, err = unencrypted.GetByDAGName(ctx, "d1")
 	assert.ErrorIs(t, err, auth.ErrWebhookPublicEncryptorRequired)
@@ -626,11 +636,102 @@ func TestWebhookListComplete(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, all, 2)
 
-	unencrypted, err := store.NewWebhookStore(col, nil)
+	unencrypted, err := store.NewWebhookStore(col, claimsOf(col), nil)
 	require.NoError(t, err)
 	_, err = unencrypted.ListComplete(ctx)
 	require.ErrorIs(t, err, auth.ErrWebhookPublicEncryptorRequired)
 	some, err := unencrypted.List(ctx)
 	require.NoError(t, err)
 	assert.Len(t, some, 1)
+}
+
+// webhooksFor returns the webhooks a listing finds for dagName.
+func webhooksFor(t *testing.T, s *store.WebhookStore, dagName string) []*auth.Webhook {
+	t.Helper()
+	all, err := s.ListComplete(context.Background())
+	require.NoError(t, err)
+	var found []*auth.Webhook
+	for _, wh := range all {
+		if wh.DAGName == dagName {
+			found = append(found, wh)
+		}
+	}
+	return found
+}
+
+// Two processes creating a DAG's webhook at once, each having read that it
+// has none, leave the DAG one webhook: the other create is refused.
+func TestWebhookCreateIsUniqueAcrossProcesses(t *testing.T) {
+	ctx := context.Background()
+	col := testutil.NewMemoryBackend().Collection("webhooks")
+	listing := &listingCollection{Collection: col}
+	s1, err := store.NewWebhookStore(listing, claimsOf(col), nil)
+	require.NoError(t, err)
+	s2, err := store.NewWebhookStore(col, claimsOf(col), nil)
+	require.NoError(t, err)
+
+	other := newWebhook("d1")
+	other.ID = "wh-d1-other"
+	created := make(chan error, 1)
+	// s2 creates while s1 has read the collection and not yet written.
+	listing.during = func() { created <- s2.Create(ctx, other) }
+	listing.armed.Store(true)
+	err1 := s1.Create(ctx, newWebhook("d1"))
+	err2 := <-created
+
+	succeeded := 0
+	for _, err := range []error{err1, err2} {
+		if err == nil {
+			succeeded++
+		} else {
+			require.ErrorIs(t, err, auth.ErrWebhookAlreadyExists)
+		}
+	}
+	assert.Equal(t, 1, succeeded, "exactly one create wins")
+	assert.Len(t, webhooksFor(t, s2, "d1"), 1)
+}
+
+// A rename onto a name another process claims first is refused, and the
+// webhook stays with its DAG.
+func TestWebhookRenameYieldsToAConcurrentCreate(t *testing.T) {
+	ctx := context.Background()
+	col := testutil.NewMemoryBackend().Collection("webhooks")
+	listing := &listingCollection{Collection: col}
+	s1, err := store.NewWebhookStore(listing, claimsOf(col), nil)
+	require.NoError(t, err)
+	s2, err := store.NewWebhookStore(col, claimsOf(col), nil)
+	require.NoError(t, err)
+	require.NoError(t, s1.Create(ctx, newWebhook("d1")))
+
+	created := make(chan error, 1)
+	listing.during = func() { created <- s2.Create(ctx, newWebhook("d2")) }
+	listing.armed.Store(true)
+	require.ErrorIs(t, s1.RenameDAG(ctx, "d1", "d2"), auth.ErrWebhookAlreadyExists)
+	require.NoError(t, <-created)
+
+	stayed := webhooksFor(t, s2, "d1")
+	require.Len(t, stayed, 1)
+	assert.Equal(t, "wh-d1", stayed[0].ID)
+	taken := webhooksFor(t, s2, "d2")
+	require.Len(t, taken, 1)
+	assert.Equal(t, "wh-d2", taken[0].ID)
+}
+
+// A claim left over by a crash, whose webhook is gone or now belongs to
+// another DAG, does not keep the DAG from getting a webhook.
+func TestWebhookClaimLeftOverIsTakenOver(t *testing.T) {
+	ctx := context.Background()
+	col := testutil.NewMemoryBackend().Collection("webhooks")
+	s, err := store.NewWebhookStore(col, claimsOf(col), nil)
+	require.NoError(t, err)
+	require.NoError(t, s.Create(ctx, newWebhook("d1")))
+	// The record went away without its claim, as a crash mid-delete leaves.
+	require.NoError(t, col.Delete(ctx, "wh-d1"))
+	fresh, err := store.NewWebhookStore(col, claimsOf(col), nil)
+	require.NoError(t, err)
+
+	replacement := newWebhook("d1")
+	replacement.ID = "wh-d1-new"
+	require.NoError(t, fresh.Create(ctx, replacement))
+	assert.Len(t, webhooksFor(t, fresh, "d1"), 1)
 }
