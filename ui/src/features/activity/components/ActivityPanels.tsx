@@ -296,7 +296,10 @@ export function InProgress({
       {queues.length > 0 && (
         <ul
           aria-label={ts('Queues')}
-          className="flex flex-col gap-1 border-t border-border pt-2"
+          className={cn(
+            'flex flex-col gap-1',
+            runs.length > 0 && 'border-t border-border pt-2'
+          )}
         >
           {queues.map((queue) => (
             <li key={queue.name} className="flex flex-col text-sm">
