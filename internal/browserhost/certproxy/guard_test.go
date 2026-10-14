@@ -124,6 +124,21 @@ func TestServeVerifiedHostsFollowRoutes(t *testing.T) {
 	assert.False(t, verified("127.0.0.1"))
 }
 
+// A guard connection that completes after the guard stopped does not vouch
+// for its host, which the browser reaches directly from then on.
+func TestVerifiedHostsIgnoreGuardAfterStop(t *testing.T) {
+	t.Parallel()
+
+	verified := newVerifiedHosts()
+	verified.add("named.test", false)
+	verified.dropGuarded()
+	verified.add("late.test", true)
+	verified.add("late-named.test", false)
+	assert.True(t, verified.has("named.test"))
+	assert.False(t, verified.has("late.test"))
+	assert.True(t, verified.has("late-named.test"))
+}
+
 // When the device's proxy asks for credentials, the guard resets the
 // connection and stops, so the browser falls back to its own route, which
 // can sign in to that proxy.

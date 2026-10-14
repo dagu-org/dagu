@@ -217,19 +217,27 @@ func (l *eventLog) connect(host, entry string, presented bool, message string) {
 }
 
 // verifiedHosts holds the hosts whose server certificate the proxy
-// verified, each mapped to whether the guard carried the connection.
+// verified, each mapped to whether the guard carried the connection. The
+// latest verification of a host decides.
 type verifiedHosts struct {
 	mu    sync.Mutex
 	hosts map[string]bool
+	// guardOff is set once the guard stopped.
+	guardOff bool
 }
 
 func newVerifiedHosts() *verifiedHosts {
 	return &verifiedHosts{hosts: map[string]bool{}}
 }
 
+// add records a verified host, unless the guard carried it after it
+// stopped: the browser reaches that host directly from then on.
 func (v *verifiedHosts) add(host string, guarded bool) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
+	if guarded && v.guardOff {
+		return
+	}
 	v.hosts[host] = guarded
 }
 
@@ -244,6 +252,7 @@ func (v *verifiedHosts) remove(host string) {
 func (v *verifiedHosts) dropGuarded() {
 	v.mu.Lock()
 	defer v.mu.Unlock()
+	v.guardOff = true
 	maps.DeleteFunc(v.hosts, func(_ string, guarded bool) bool { return guarded })
 }
 

@@ -464,21 +464,22 @@ func (s *server) handshake(ctx context.Context, raw net.Conn, via route, host st
 		s.reportHandshakeFailure(host, entry, requested.Load(), err)
 		return nil, err
 	}
+	// Recorded as the server is verified, as a failure is, so overlapping
+	// connections to a host leave the latest verification's outcome.
+	s.verified.add(host, entry == s.guardEntry)
 	return &upstreamConn{Conn: conn, via: via, requested: requested}, nil
 }
 
-// reportConnected records a verified connection to host, and reports the
-// first one to a host an entry or an authority names, or, for the guard, a
-// server that asked for a certificate it does not have.
+// reportConnected records the first connection to a host an entry or an
+// authority names, or, for the guard, a server that asked for a
+// certificate it does not have.
 func (s *server) reportConnected(host string, entry *upstreamEntry, upstream *upstreamConn) {
-	guarded := entry == s.guardEntry
-	s.verified.add(host, guarded)
 	switch {
 	case !entry.presents():
 		if upstream.requested.Load() {
 			s.reportMissing(host)
 		}
-		if !guarded {
+		if entry != s.guardEntry {
 			s.events.connect(host, entry.label, false, fmt.Sprintf("verified the server certificate of %s through %s", host, upstream.via))
 		}
 	case upstream.requested.Load():
