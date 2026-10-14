@@ -103,6 +103,7 @@ type Multiplexer struct {
 	refreshModes        map[TopicType]TopicRefreshMode
 	publishOnWake       map[TopicType]bool
 	minIntervals        map[TopicType]time.Duration
+	maxIntervals        map[TopicType]time.Duration
 	authorizers         map[TopicType]TopicAuthorizer
 	validators          map[TopicType]TopicValidator
 	maxClients          int
@@ -146,6 +147,7 @@ func NewMultiplexer(cfg StreamConfig, metrics *Metrics) *Multiplexer {
 		refreshModes:        make(map[TopicType]TopicRefreshMode),
 		publishOnWake:       make(map[TopicType]bool),
 		minIntervals:        make(map[TopicType]time.Duration),
+		maxIntervals:        make(map[TopicType]time.Duration),
 		authorizers:         make(map[TopicType]TopicAuthorizer),
 		validators:          make(map[TopicType]TopicValidator),
 		maxClients:          cfg.MaxClients,
@@ -203,6 +205,19 @@ func (m *Multiplexer) SetMinInterval(topicType TopicType, interval time.Duration
 		return
 	}
 	m.minIntervals[topicType] = interval
+}
+
+// SetMaxInterval sets the longest time an on-demand topic of this type goes
+// without a refetch, for state that changes without a wake. Zero removes the
+// limit.
+func (m *Multiplexer) SetMaxInterval(topicType TopicType, interval time.Duration) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if interval <= 0 {
+		delete(m.maxIntervals, topicType)
+		return
+	}
+	m.maxIntervals[topicType] = interval
 }
 
 // RegisterAuthorizer registers an optional topic-specific authorizer.
@@ -643,6 +658,7 @@ func (m *Multiplexer) getOrCreateTopicForMutation(parsed ParsedTopic) (*multiple
 		m.shouldPublishOnWake(parsed.Type),
 	)
 	topic.minInterval = m.minIntervals[parsed.Type]
+	topic.maxInterval = m.maxIntervals[parsed.Type]
 	m.topics[parsed.Key] = topic
 	return topic, true, nil
 }
@@ -1232,6 +1248,7 @@ type multiplexTopic struct {
 	backoffUntil             time.Time
 	currentInterval          time.Duration
 	minInterval              time.Duration
+	maxInterval              time.Duration
 	lastPollAt               time.Time
 }
 
@@ -1335,12 +1352,27 @@ func (t *multiplexTopic) start() {
 		defer timer.Stop()
 
 		var timerCh <-chan time.Time
+		// deferredWake marks a timer that stands in for a wake held back by
+		// the minimum interval; idle marks one set only by the maximum
+		// interval, which a wake may bring forward.
+		deferredWake, idle := false, false
+		// scheduleNext arms the timer for the next refetch no wake asks for.
+		scheduleNext := func() {
+			switch {
+			case t.refreshMode == TopicRefreshModePolling:
+				t.resetTimer(timer, &timerCh, t.pollInterval())
+			case t.maxInterval > 0:
+				t.resetTimer(timer, &timerCh, t.maxInterval)
+				idle = true
+			default:
+				t.stopTimer(timer, &timerCh)
+			}
+		}
 		if t.refreshMode == TopicRefreshModePolling {
 			t.resetTimer(timer, &timerCh, 0)
+		} else {
+			scheduleNext()
 		}
-		// deferredWake marks a timer that stands in for a wake held back by
-		// the minimum interval.
-		deferredWake := false
 
 		for {
 			select {
@@ -1350,36 +1382,32 @@ func (t *multiplexTopic) start() {
 				return
 			case <-timerCh:
 				timerCh = nil
+				idle = false
 				t.poll(deferredWake && t.publishOnWake, nil)
 				deferredWake = false
 				if delay, shouldRetry := t.nextRetryDelay(); shouldRetry {
 					t.resetTimer(timer, &timerCh, delay)
 					continue
 				}
-				if t.refreshMode == TopicRefreshModePolling {
-					t.resetTimer(timer, &timerCh, t.pollInterval())
-				}
+				scheduleNext()
 			case <-t.notifyCh:
 				batch := t.takePendingBatch()
 				if wait := t.wakeDelay(); wait > 0 {
 					// A pending timer refetches soon enough; otherwise defer
 					// this wake to the end of the interval.
-					if timerCh == nil {
+					if timerCh == nil || idle {
 						t.resetTimer(timer, &timerCh, wait)
-						deferredWake = true
+						deferredWake, idle = true, false
 					}
 					continue
 				}
+				idle = false
 				t.poll(t.publishOnWake, batch)
 				if delay, shouldRetry := t.nextRetryDelay(); shouldRetry {
 					t.resetTimer(timer, &timerCh, delay)
 					continue
 				}
-				if t.refreshMode == TopicRefreshModePolling {
-					t.resetTimer(timer, &timerCh, t.pollInterval())
-					continue
-				}
-				t.stopTimer(timer, &timerCh)
+				scheduleNext()
 			}
 		}
 	})

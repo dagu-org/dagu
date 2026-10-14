@@ -79,6 +79,10 @@ const (
 	// dagRunActivityMinInterval is the shortest gap between two refetches
 	// of one live activity topic.
 	dagRunActivityMinInterval = 5 * time.Second
+	// dagRunActivityMaxInterval bounds how stale a live activity topic gets
+	// when no run event wakes it, such as when a queued run records why it
+	// cannot start or the data disk fills.
+	dagRunActivityMaxInterval = 30 * time.Second
 )
 
 var wikiSSETopicTypes = [...]sse.TopicType{
@@ -1404,6 +1408,7 @@ func (srv *Server) registerDedicatedSSEFetchers(registrar *sse.Multiplexer) {
 	// Each activity refetch scans the whole window, so bursts of run events
 	// are merged into at most one refetch per interval.
 	registrar.SetMinInterval(sse.TopicTypeDAGRunActivity, dagRunActivityMinInterval)
+	registrar.SetMaxInterval(sse.TopicTypeDAGRunActivity, dagRunActivityMaxInterval)
 	registrar.RegisterFetcher(sse.TopicTypeQueues, srv.apiV1.GetQueuesListData)
 	registrar.RegisterFetcher(sse.TopicTypeDAGsList, srv.apiV1.GetDAGsListData)
 	for _, topicType := range []sse.TopicType{sse.TopicTypeWikiPage, sse.TopicTypeLegacyDoc} {
