@@ -138,6 +138,30 @@ func TestValidateStep(t *testing.T) {
 			with: `{"browser":{"screenshots":"sometimes"},"do":[{"act":"a"}]}`,
 			want: "invalid browser config",
 		},
+		{
+			name: "upload",
+			with: `{"do":[{"upload":{"files":"invoice.pdf"}},{"upload":{"files":["a.pdf","${FILES}"],"into":"Receipt","cache":false}}]}`,
+		},
+		{
+			name: "upload without files",
+			with: `{"do":[{"upload":{"into":"Receipt"}}]}`,
+			want: "invalid browser config",
+		},
+		{
+			name: "upload with no file listed",
+			with: `{"do":[{"upload":{"files":[]}}]}`,
+			want: "invalid browser config",
+		},
+		{
+			name: "upload with a blank file",
+			with: `{"do":[{"upload":{"files":["a.pdf"," "]}}]}`,
+			want: "upload files must not be empty",
+		},
+		{
+			name: "upload into nothing",
+			with: `{"do":[{"upload":{"files":"a.pdf","into":"  "}}]}`,
+			want: "upload into must not be blank",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -174,6 +198,8 @@ func TestOperationsWriteBackAsWritten(t *testing.T) {
 		`{"extract":{"instruction":"The order numbers","schema":{"type":"object","properties":{"numbers":{"type":"array"}}}}}`,
 		`{"when":"A cookie banner is shown","act":"Accept the cookies"}`,
 		`{"wait":{"duration":"2s"}}`,
+		`{"upload":{"files":"invoice.pdf"}}`,
+		`{"upload":{"files":["a.pdf","b.pdf"],"into":"The receipt drop area","cache":false}}`,
 	} {
 		var op operation
 		require.NoError(t, json.Unmarshal([]byte(written), &op), written)

@@ -129,6 +129,7 @@ func newRun(ctx context.Context, e *browserExecutor) (*run, error) {
 			variables:      variables,
 			allowedDomains: e.cfg.Browser.AllowedDomains,
 			shots:          artifacts,
+			workDir:        env.WorkingDir,
 		},
 		exec:      e,
 		cfg:       e.cfg,

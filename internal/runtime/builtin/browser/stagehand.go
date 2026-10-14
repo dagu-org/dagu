@@ -659,6 +659,24 @@ func (e *stagehandEngine) Extract(ctx context.Context, instruction string, schem
 	})
 }
 
+func (e *stagehandEngine) Observe(ctx context.Context, instruction string, timeout time.Duration) ([]recordedAction, error) {
+	result, err := boundCall(ctx, timeout+callTimeoutSlack, func(ctx context.Context) (stagehand.ObserveResult, error) {
+		return e.client.Observe(ctx, &instruction, &stagehand.StagehandClientObserveOptions{Timeout: new(float64(timeout.Milliseconds()))})
+	})
+	if err != nil {
+		return nil, err
+	}
+	found := make([]recordedAction, 0, len(result.Data))
+	for _, action := range result.Data {
+		element := recordedAction{Selector: action.Selector, Description: action.Description, Arguments: action.Arguments}
+		if action.Method != nil {
+			element.Method = *action.Method
+		}
+		found = append(found, element)
+	}
+	return found, nil
+}
+
 func (e *stagehandEngine) WaitForSelector(ctx context.Context, selector string, timeout time.Duration) error {
 	matched, err := boundCall(ctx, timeout+callTimeoutSlack, func(ctx context.Context) (bool, error) {
 		page, err := e.page(ctx)
