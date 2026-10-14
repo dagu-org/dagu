@@ -209,8 +209,8 @@ func (l *eventLog) record(event Event) {
 	}
 }
 
-// connect records the first connection entry makes to host, and whether
-// it presented its certificate there.
+// connect records event when it is the first connection its entry makes to
+// its host.
 func (l *eventLog) connect(event Event) {
 	key := connectKey{entry: event.Entry, host: event.Host}
 	l.mu.Lock()
