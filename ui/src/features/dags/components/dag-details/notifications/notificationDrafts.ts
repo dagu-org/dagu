@@ -12,6 +12,7 @@ import {
   components,
   NotificationEventType,
   NotificationProviderType,
+  NotificationTargetProviderType,
 } from '../../../../../api/v1/schema';
 import { TOKEN_KEY } from '../../../../../contexts/AuthContext';
 
@@ -386,7 +387,9 @@ function applyCommandDraft(
 }
 
 function draftTargetFromAPI(target: NotificationTarget): DraftTarget {
-  const draft = blankTarget(target.type);
+  const draft = blankTarget(
+    target.type as unknown as NotificationProviderType
+  );
   draft.id = target.id;
   draft.name = target.name || '';
   draft.enabled = target.enabled;
@@ -519,8 +522,9 @@ export function targetInput(target: DraftTarget): NotificationTargetInput {
   return {
     id: target.id,
     ...deliveryInput(target),
+    type: target.type as unknown as NotificationTargetProviderType,
     events: target.events.length > 0 ? target.events : undefined,
-  } as NotificationTargetInput;
+  } as unknown as NotificationTargetInput;
 }
 
 export function subscriptionInput(

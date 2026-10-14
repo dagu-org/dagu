@@ -47,6 +47,7 @@ type Service struct {
 	reusableChannelsEnabled    func() bool
 	publicURL                  func() string
 	notificationCommandTimeout time.Duration
+	notificationLogLimit       int
 }
 
 type TestResult struct {

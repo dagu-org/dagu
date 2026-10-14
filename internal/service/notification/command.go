@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dagucloud/dagu/v2/internal/cmn/cmdutil"
 	"github.com/dagucloud/dagu/v2/internal/ir"
 	notificationmodel "github.com/dagucloud/dagu/v2/internal/notification"
 	"github.com/dagucloud/dagu/v2/internal/service/chatbridge"
@@ -24,7 +25,9 @@ import (
 
 const (
 	defaultNotificationCommandTimeout = 30 * time.Second
+	defaultExecutionLogLimit          = 1 << 20
 	commandStderrLimit                = 4 << 10
+	executionLogTruncatedNote         = "\n# log truncated\n"
 )
 
 type commandEnvField struct {
@@ -77,16 +80,10 @@ func (s *Service) runNotificationCommand(
 	event chatbridge.NotificationEvent,
 	publicURL string,
 ) error {
-	rendered := renderNotificationTemplate(command, event, publicURL)
+	values := notificationTemplateValues(event, publicURL)
+	rendered := renderTemplateTokens(command, values, quoteNotificationValue)
 	if strings.TrimSpace(rendered) == "" {
 		return errors.New("command is empty")
-	}
-	logPath, err := writeExecutionLog(event.Status)
-	if err != nil {
-		return err
-	}
-	if logPath != "" {
-		defer os.Remove(logPath)
 	}
 
 	timeout := s.notificationCommandTimeout
@@ -96,45 +93,164 @@ func (s *Service) runNotificationCommand(
 	cmdCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	shell, prefix := notificationShell()
-	args := append(append([]string{}, prefix...), rendered)
-	cmd := exec.CommandContext(cmdCtx, shell, args...)
-	configureNotificationCommand(cmd)
-	cmd.Env = commandEnvironment(os.Environ(), notificationTemplateValues(event, publicURL), logPath)
-	cmd.Stdout = io.Discard
-	stderr := &limitedBuffer{remaining: commandStderrLimit}
-	cmd.Stderr = stderr
+	logPath, err := writeExecutionLog(cmdCtx, event.Status, s.executionLogLimit())
+	if err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if errors.Is(err, context.DeadlineExceeded) {
+			return fmt.Errorf("command timed out after %s", timeout)
+		}
+		return err
+	}
+	if logPath != "" {
+		defer func() { _ = os.Remove(logPath) }()
+	}
 
-	err = cmd.Run()
-	if err == nil {
-		return nil
+	prepared, err := prepareNotificationCommand(rendered)
+	if err != nil {
+		return err
 	}
-	if ctx.Err() != nil {
-		return ctx.Err()
+	defer prepared.cleanup()
+
+	stderr := &limitedBuffer{remaining: commandStderrLimit}
+	proc, err := startNotificationProcess(prepared.shell, prepared.args, commandEnvironment(os.Environ(), values, logPath), stderr)
+	if err != nil {
+		return fmt.Errorf("run notification command: %w", err)
 	}
-	if errors.Is(cmdCtx.Err(), context.DeadlineExceeded) {
+	defer func() { _ = proc.Release() }()
+
+	waitDone := make(chan error, 1)
+	go func() { waitDone <- proc.Wait() }()
+
+	var runErr error
+	select {
+	case runErr = <-waitDone:
+	case <-cmdCtx.Done():
+		_, _ = proc.Stop(cmdutil.StopRequest{
+			Intent: cmdutil.ForceTermination(),
+			Reason: cmdutil.StopReasonTimeout,
+		})
+		<-waitDone
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		return fmt.Errorf("command timed out after %s", timeout)
 	}
+	if runErr == nil {
+		return nil
+	}
 	var exitErr *exec.ExitError
-	if errors.As(err, &exitErr) {
+	if errors.As(runErr, &exitErr) {
 		detail := stderr.String()
 		if detail != "" {
 			return fmt.Errorf("command exited with status %d: %s", exitErr.ExitCode(), detail)
 		}
 		return fmt.Errorf("command exited with status %d", exitErr.ExitCode())
 	}
-	return fmt.Errorf("run notification command: %w", err)
+	return fmt.Errorf("run notification command: %w", runErr)
 }
 
-func notificationShell() (string, []string) {
-	if runtime.GOOS == "windows" {
-		shell := os.Getenv("ComSpec")
-		if shell == "" {
-			shell = `C:\Windows\System32\cmd.exe`
-		}
-		return shell, []string{"/c"}
+func (s *Service) executionLogLimit() int {
+	if s != nil && s.notificationLogLimit > 0 {
+		return s.notificationLogLimit
 	}
-	return "/bin/sh", []string{"-c"}
+	return defaultExecutionLogLimit
+}
+
+type preparedNotificationCommand struct {
+	shell   string
+	args    []string
+	cleanup func()
+}
+
+func prepareNotificationCommand(rendered string) (preparedNotificationCommand, error) {
+	if runtime.GOOS != "windows" {
+		return preparedNotificationCommand{
+			shell:   "/bin/sh",
+			args:    []string{"-c", rendered},
+			cleanup: func() {},
+		}, nil
+	}
+	path, err := writeNotificationScript(rendered)
+	if err != nil {
+		return preparedNotificationCommand{}, err
+	}
+	shell := os.Getenv("ComSpec")
+	if shell == "" {
+		shell = `C:\Windows\System32\cmd.exe`
+	}
+	return preparedNotificationCommand{
+		shell:   shell,
+		args:    []string{"/c", path},
+		cleanup: func() { _ = os.Remove(path) },
+	}, nil
+}
+
+func writeNotificationScript(command string) (string, error) {
+	file, err := os.CreateTemp("", "dagu-notification-cmd-*.cmd")
+	if err != nil {
+		return "", fmt.Errorf("create notification command script: %w", err)
+	}
+	path := file.Name()
+	// A BOM lets cmd.exe read a Unicode command as UTF-8.
+	if _, err := file.Write([]byte{0xEF, 0xBB, 0xBF}); err != nil {
+		_ = file.Close()
+		_ = os.Remove(path)
+		return "", err
+	}
+	if _, err := io.WriteString(file, command+"\r\n"); err != nil {
+		_ = file.Close()
+		_ = os.Remove(path)
+		return "", err
+	}
+	if err := file.Close(); err != nil {
+		_ = os.Remove(path)
+		return "", err
+	}
+	return path, nil
+}
+
+func startNotificationProcess(shell string, args []string, env []string, stderr io.Writer) (*cmdutil.ManagedProcess, error) {
+	cmd := exec.Command(shell, args...) // #nosec G204 -- shell is the platform command shell; args are the configured notification script.
+	cmd.WaitDelay = time.Second
+	cmd.Env = env
+	cmd.Stdout = io.Discard
+	cmd.Stderr = stderr
+	return cmdutil.StartManagedProcess(cmd)
+}
+
+// quoteNotificationValue inserts a template value as one shell word.
+func quoteNotificationValue(value string) string {
+	if runtime.GOOS == "windows" {
+		return quoteCmdNotificationValue(value)
+	}
+	return quotePOSIXNotificationValue(value)
+}
+
+func quotePOSIXNotificationValue(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", `'\''`) + "'"
+}
+
+// quoteCmdNotificationValue quotes value for a cmd.exe script. A quote is
+// closed, emitted with a caret, and reopened so it cannot end the string.
+func quoteCmdNotificationValue(value string) string {
+	var b strings.Builder
+	b.WriteByte('"')
+	for _, r := range value {
+		switch r {
+		case '"':
+			b.WriteString(`"^""`)
+		case '%':
+			b.WriteString("%%")
+		case '\r', '\n':
+			b.WriteByte(' ')
+		default:
+			b.WriteRune(r)
+		}
+	}
+	b.WriteByte('"')
+	return b.String()
 }
 
 func commandEnvironment(base []string, values map[string]string, logPath string) []string {
@@ -197,7 +313,7 @@ func executionLogSections(status *ir.DAGRunStatus) []commandLogSection {
 		sections = append(sections, commandLogSection{label: label, path: path})
 	}
 	add("DAG log", status.Log)
-	for _, node := range status.Nodes {
+	for _, node := range status.NodesInRunOrder() {
 		if node == nil {
 			continue
 		}
@@ -211,10 +327,13 @@ func executionLogSections(status *ir.DAGRunStatus) []commandLogSection {
 	return sections
 }
 
-func writeExecutionLog(status *ir.DAGRunStatus) (string, error) {
+func writeExecutionLog(ctx context.Context, status *ir.DAGRunStatus, limit int) (string, error) {
 	sections := executionLogSections(status)
 	if len(sections) == 0 {
 		return "", nil
+	}
+	if limit <= 0 {
+		limit = defaultExecutionLogLimit
 	}
 	file, err := os.CreateTemp("", "dagu-notification-log-*")
 	if err != nil {
@@ -225,30 +344,59 @@ func writeExecutionLog(status *ir.DAGRunStatus) (string, error) {
 		_ = file.Close()
 		_ = os.Remove(path)
 	}
+	remaining := limit
+	if len(executionLogTruncatedNote) < remaining {
+		remaining -= len(executionLogTruncatedNote)
+	}
 	wrote := false
+	truncated := false
 	for _, section := range sections {
-		src, err := os.Open(section.path)
+		if err := ctx.Err(); err != nil {
+			cleanup()
+			return "", err
+		}
+		if remaining <= 0 {
+			truncated = true
+			break
+		}
+		src, err := os.Open(section.path) // #nosec G304 -- path is a log file recorded for this run.
 		if err != nil {
 			continue
 		}
+		header := ""
 		if wrote {
-			if _, err := io.WriteString(file, "\n"); err != nil {
-				src.Close()
-				cleanup()
-				return "", err
-			}
+			header = "\n"
 		}
-		if _, err := fmt.Fprintf(file, "# %s\n", section.label); err != nil {
-			src.Close()
+		header += "# " + section.label + "\n"
+		if len(header) > remaining {
+			truncated = true
+			_ = src.Close()
+			break
+		}
+		if _, err := io.WriteString(file, header); err != nil {
+			_ = src.Close()
 			cleanup()
 			return "", err
 		}
-		if _, err := io.Copy(file, src); err != nil {
-			src.Close()
+		remaining -= len(header)
+		copied, more, err := copyLimited(ctx, file, src, remaining)
+		_ = src.Close()
+		if err != nil {
 			cleanup()
 			return "", err
 		}
-		src.Close()
+		remaining -= copied
+		wrote = true
+		if more {
+			truncated = true
+			break
+		}
+	}
+	if truncated {
+		if _, err := io.WriteString(file, executionLogTruncatedNote); err != nil {
+			cleanup()
+			return "", err
+		}
 		wrote = true
 	}
 	if err := file.Close(); err != nil {
@@ -260,6 +408,43 @@ func writeExecutionLog(status *ir.DAGRunStatus) (string, error) {
 		return "", nil
 	}
 	return path, nil
+}
+
+func copyLimited(ctx context.Context, dst io.Writer, src io.Reader, remaining int) (int, bool, error) {
+	buf := make([]byte, 32*1024)
+	written := 0
+	for remaining > 0 {
+		if err := ctx.Err(); err != nil {
+			return written, false, err
+		}
+		chunk := buf
+		if remaining < len(chunk) {
+			chunk = chunk[:remaining]
+		}
+		n, err := src.Read(chunk)
+		if n > 0 {
+			if _, werr := dst.Write(chunk[:n]); werr != nil {
+				return written, false, werr
+			}
+			written += n
+			remaining -= n
+		}
+		if err == io.EOF {
+			return written, false, nil
+		}
+		if err != nil {
+			return written, false, err
+		}
+	}
+	var extra [1]byte
+	n, err := src.Read(extra[:])
+	if n > 0 {
+		return written, true, nil
+	}
+	if err != nil && !errors.Is(err, io.EOF) {
+		return written, false, err
+	}
+	return written, false, nil
 }
 
 type limitedBuffer struct {

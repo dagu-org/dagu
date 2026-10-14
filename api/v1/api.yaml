@@ -12417,6 +12417,16 @@ components:
         - teams
         - command
 
+    NotificationTargetProviderType:
+      type: string
+      description: "Provider for a DAG-local notification target. Local commands are reusable channels, not inline targets."
+      enum:
+        - email
+        - webhook
+        - slack
+        - telegram
+        - teams
+
     NotificationEventType:
       type: string
       description: "DAG run event that can trigger server-side notifications. Rules configured for dag.run.succeeded also match dag.run.partially_succeeded; rules configured only for dag.run.partially_succeeded do not match clean successes."
@@ -12889,7 +12899,7 @@ components:
       properties:
         command:
           type: string
-          description: "Shell command. Notification tokens such as {{dag.name}} are rendered before the shell runs. The same fields are exported as environment variables, including DAG_NAME and STATUS. EXECUTION_LOG is the path of a temporary file containing the run log; Dagu removes that file after the command exits. Unix shells expand $DAG_NAME. Windows cmd.exe expands %DAG_NAME%."
+          description: "Shell command. Tokens such as {{dag.name}} are inserted as one quoted shell word, so the value is not interpreted as shell syntax. The same fields are exported as environment variables, including DAG_NAME, STATUS, and ERROR. EXECUTION_LOG is the path of a temporary file containing up to 1 MiB of the run log; Dagu removes that file after the command exits. Unix shells expand $DAG_NAME. Windows cmd.exe expands %DAG_NAME%."
 
     NotificationTargetInput:
       type: object
@@ -12905,7 +12915,7 @@ components:
           type: string
           description: "Human-readable target name"
         type:
-          $ref: "#/components/schemas/NotificationProviderType"
+          $ref: "#/components/schemas/NotificationTargetProviderType"
         enabled:
           type: boolean
           description: "Whether this target receives notifications"
@@ -12940,7 +12950,7 @@ components:
           type: string
           description: "Human-readable target name"
         type:
-          $ref: "#/components/schemas/NotificationProviderType"
+          $ref: "#/components/schemas/NotificationTargetProviderType"
         enabled:
           type: boolean
           description: "Whether this target receives notifications"

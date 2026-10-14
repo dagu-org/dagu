@@ -907,7 +907,7 @@ func toAPINotificationTarget(target notificationmodel.PublicTarget) api.Notifica
 	result := api.NotificationTarget{
 		Id:      target.ID,
 		Name:    ptrOf(target.Name),
-		Type:    api.NotificationProviderType(target.Type),
+		Type:    api.NotificationTargetProviderType(target.Type),
 		Enabled: target.Enabled,
 	}
 	if len(target.Events) > 0 {

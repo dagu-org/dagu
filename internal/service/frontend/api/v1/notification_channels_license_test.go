@@ -56,13 +56,13 @@ func TestDAGNotifications_RejectCommandTarget(t *testing.T) {
 
 	server := test.SetupServer(t)
 	createTestDAG(t, server, "", "daily-report")
-	server.Client().Put("/api/v1/dags/daily-report/notifications", api.UpdateDAGNotificationsRequest{
-		Enabled: true,
-		Events:  []api.NotificationEventType{api.NotificationEventTypeDagRunFailed},
-		Targets: []api.NotificationTargetInput{{
-			Name:    new("Desktop"),
-			Type:    api.NotificationProviderTypeCommand,
-			Enabled: true,
+	server.Client().Put("/api/v1/dags/daily-report/notifications", map[string]any{
+		"enabled": true,
+		"events":  []string{"dag.run.failed"},
+		"targets": []map[string]any{{
+			"name":    "Desktop",
+			"type":    "command",
+			"enabled": true,
 		}},
 	}).ExpectStatus(http.StatusBadRequest).Send(t)
 }
