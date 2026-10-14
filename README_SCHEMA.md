@@ -104,7 +104,7 @@ Common step fields:
 | `retry_policy` | Retry behavior for this step. |
 | `repeat_policy` | Repeat or polling behavior. |
 | `continue_on` | Continue after selected failure, skip, exit-code, or output conditions. |
-| `preconditions` | Conditions that must pass before the step starts. |
+| `preconditions` | Conditions that must pass before the step starts. An unmet condition skips the step without failing the run; see [Failing on Unmet Conditions](https://docs.dagu.sh/writing-workflows/control-flow#failing-on-unmet-conditions). |
 | `worker_selector` | Required worker labels. Keys and values support variable substitution (e.g. `${VAR}`); parallel sub-DAG steps can reference `${ITEM}`. |
 | `stdin` | File path piped to the step command's standard input. |
 | `stdout`, `stderr`, `log_output` | Step log output configuration. `stdout` can also publish DAG/action outputs. |
