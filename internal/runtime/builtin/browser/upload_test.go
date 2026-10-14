@@ -174,6 +174,8 @@ func TestResolveUploadFiles(t *testing.T) {
 		{"name": "receipt.png", "content_type": "image/png", "path": receipt},
 	})
 	require.NoError(t, err)
+	attachment, err := json.Marshal(map[string]any{"name": "b.pdf", "path": b})
+	require.NoError(t, err)
 	emails, err := json.Marshal([]map[string]any{
 		{"subject": "Invoice", "attachments": []map[string]any{{"name": "b.pdf", "path": b}}},
 		{"subject": "Thanks", "attachments": nil},
@@ -192,7 +194,7 @@ func TestResolveUploadFiles(t *testing.T) {
 		{name: "one per line", entries: []string{receipt + "\n\n" + notes + "\n"}, want: []string{receipt, notes}},
 		{name: "JSON list of paths", entries: []string{`["receipt.png","invoices/b.pdf"]`}, want: []string{receipt, b}},
 		{name: "JSON list of attachments", entries: []string{string(attachments)}, want: []string{a, receipt}},
-		{name: "JSON attachment", entries: []string{`{"name":"b.pdf","path":"` + b + `"}`}, want: []string{b}},
+		{name: "JSON attachment", entries: []string{string(attachment)}, want: []string{b}},
 		{name: "emails with saved attachments", entries: []string{string(emails)}, want: []string{b, receipt}},
 		{name: "each file once", entries: []string{"invoices/*.pdf", a}, want: []string{a, b}},
 	} {
