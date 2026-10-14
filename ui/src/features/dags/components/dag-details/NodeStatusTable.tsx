@@ -124,6 +124,7 @@ function NodeStatusTable({
             onNodeStatusUpdated={onNodeStatusUpdated}
             dagRun={status}
             view="mobile"
+            onInspect={onInspectStep}
             hideActions={hideActions}
             defaultLogExpanded={n.step.name === firstFailedStepName}
           />

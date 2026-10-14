@@ -791,6 +791,23 @@ function NodeStatusTableRow({
       </DropdownMenu>
     ) : null;
 
+  // A button, so keyboard and touch users reach the details a row click
+  // opens. It stops the click so the row does not handle it again.
+  const stepName = onInspect ? (
+    <button
+      type="button"
+      onClick={(event) => {
+        event.stopPropagation();
+        onInspect(node.step.name);
+      }}
+      className="rounded-sm text-left hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+    >
+      {node.step.name}
+    </button>
+  ) : (
+    node.step.name
+  );
+
   // Render desktop view (table row)
   if (view === 'desktop') {
     return (
@@ -848,7 +865,7 @@ function NodeStatusTableRow({
           <TableCell>
             <div className="space-y-0.5">
               <div className="text-sm font-semibold text-foreground text-wrap break-all flex items-center gap-1.5">
-                {node.step.name}
+                {stepName}
                 {hasSubDAGRun && (
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -1237,7 +1254,7 @@ function NodeStatusTableRow({
             {rownum}
           </span>
           <p className="font-semibold text-foreground">
-            {node.step.name}
+            {stepName}
             {hasSubDAGRun && (
               <span className="inline-flex items-center text-primary ml-1.5">
                 <GitBranch className="h-4 w-4" />

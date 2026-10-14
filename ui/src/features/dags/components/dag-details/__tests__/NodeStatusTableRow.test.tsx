@@ -101,7 +101,8 @@ function freezeNow() {
 
 function renderRow(
   node: components['schemas']['Node'],
-  view: 'desktop' | 'mobile'
+  view: 'desktop' | 'mobile',
+  props: Partial<React.ComponentProps<typeof NodeStatusTableRow>> = {}
 ) {
   const row = (
     <NodeStatusTableRow
@@ -110,6 +111,7 @@ function renderRow(
       name="example.yaml"
       dagRun={dagRun}
       view={view}
+      {...props}
     />
   );
   return render(
@@ -433,6 +435,21 @@ describe('NodeStatusTableRow', () => {
     );
     expect(onInspect).toHaveBeenCalledTimes(1);
   });
+
+  // The step name is a button, so keyboard and touch users reach the same
+  // details a row click opens.
+  it.each(['desktop', 'mobile'] as const)(
+    'opens step details from the step name in the %s view',
+    (view) => {
+      const onInspect = vi.fn();
+      renderRow(timedNode, view, { onInspect });
+
+      fireEvent.click(screen.getByRole('button', { name: 'build' }));
+
+      expect(onInspect).toHaveBeenCalledTimes(1);
+      expect(onInspect).toHaveBeenCalledWith('build');
+    }
+  );
 
   it('falls back to the configured log message when stdout cannot be loaded', () => {
     mockedUseQuery.mockImplementation((path, init) => ({
