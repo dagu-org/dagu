@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	// kindClientCertificate labels what the client certificate proxy reports.
+	// kindClientCertificate labels what the certificate proxy reports.
 	kindClientCertificate = "client_certificate"
 	// statusAsked marks a site that asked for a client certificate no entry
 	// names.

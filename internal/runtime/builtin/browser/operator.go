@@ -187,7 +187,7 @@ func (o *operator) takeCertificateEvents(ctx context.Context, index int) []certp
 	if err != nil && !o.certificateProxyLost {
 		o.certificateProxyLost = true
 		if o.warn != nil {
-			o.warn(index, "the client certificate proxy stopped answering: "+err.Error())
+			o.warn(index, "the certificate proxy stopped answering: "+err.Error())
 		}
 	}
 	var failures []certproxy.Event

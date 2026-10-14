@@ -281,7 +281,7 @@ func (l stagehandLauncher) startCertProxy(ctx context.Context, cdpURL string, op
 		Guard:      opts.Guard,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("start the client certificate proxy: %w", err)
+		return nil, fmt.Errorf("start the certificate proxy: %w", err)
 	}
 	return proxy, nil
 }
