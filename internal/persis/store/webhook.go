@@ -21,17 +21,26 @@ var _ auth.WebhookStore = (*WebhookStore)(nil)
 // record just to record use.
 const webhookLastUsedWriteInterval = time.Minute
 
+// webhookMissRebuildInterval bounds how often lookups of DAGs without a
+// webhook reread the whole collection, so a burst of requests for unknown
+// names costs one reread, not one each.
+const webhookMissRebuildInterval = time.Second
+
 // WebhookStore implements [auth.WebhookStore].
 // DAG-name lookups use an in-memory index (byDAGName) built from the
-// collection on startup and rebuilt when a lookup misses, since another
-// process sharing the collection may have written since; this process's
-// writes keep it in sync under mu.
+// collection on startup, refreshed by every complete listing, and rebuilt
+// when a lookup misses, at most once per webhookMissRebuildInterval, since
+// another process sharing the collection may have written since; this
+// process's writes keep it in sync under mu.
 type WebhookStore struct {
 	col       persis.Collection
 	encryptor *crypto.Encryptor // nil = HMAC encryption disabled
 
 	mu        sync.RWMutex
 	byDAGName map[string]string // dagName → webhookID
+
+	missMu        sync.Mutex
+	missRebuiltAt time.Time // guarded by missMu
 }
 
 // NewWebhookStore creates a WebhookStore backed by col. enc may be nil when HMAC secrets are unused.
@@ -75,13 +84,28 @@ func (s *WebhookStore) idOf(ctx context.Context, dagName string) (string, bool, 
 	if ok {
 		return id, true, nil
 	}
-	if err := s.rebuildIndex(ctx); err != nil {
+	if err := s.rebuildAfterMiss(ctx); err != nil {
 		return "", false, fmt.Errorf("webhook store: rebuild index: %w", err)
 	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	id, ok = s.byDAGName[dagName]
 	return id, ok, nil
+}
+
+// rebuildAfterMiss rebuilds the index unless a miss rebuilt it within
+// webhookMissRebuildInterval. Concurrent misses share one rebuild.
+func (s *WebhookStore) rebuildAfterMiss(ctx context.Context) error {
+	s.missMu.Lock()
+	defer s.missMu.Unlock()
+	if time.Since(s.missRebuiltAt) < webhookMissRebuildInterval {
+		return nil
+	}
+	if err := s.rebuildIndex(ctx); err != nil {
+		return err
+	}
+	s.missRebuiltAt = time.Now()
+	return nil
 }
 
 // Create stores a new webhook.
@@ -201,20 +225,26 @@ func (s *WebhookStore) List(ctx context.Context) ([]*auth.Webhook, error) {
 }
 
 // ListComplete returns all webhooks in the store, or an error when any record
-// cannot be read, for a caller that must not act on part of the set.
+// cannot be read, for a caller that must not act on part of the set. It also
+// refreshes the DAG-name index, so each webhook it returns can be looked up.
 func (s *WebhookStore) ListComplete(ctx context.Context) ([]*auth.Webhook, error) {
-	recs, err := listAll(ctx, s.col, persis.ListQuery{})
+	recs, err := listAllStrict(ctx, s.col, persis.ListQuery{})
 	if err != nil {
 		return nil, err
 	}
 	out := make([]*auth.Webhook, 0, len(recs))
+	index := make(map[string]string, len(recs))
 	for _, rec := range recs {
 		wh, err := s.fromRecord(rec)
 		if err != nil {
 			return nil, err
 		}
 		out = append(out, wh)
+		index[wh.DAGName] = wh.ID
 	}
+	s.mu.Lock()
+	s.byDAGName = index
+	s.mu.Unlock()
 	return out, nil
 }
 

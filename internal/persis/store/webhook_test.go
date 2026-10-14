@@ -6,7 +6,11 @@ package store_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -14,8 +18,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dagucloud/dagu/v2/internal/auth"
+	"github.com/dagucloud/dagu/v2/internal/cmn/config"
 	"github.com/dagucloud/dagu/v2/internal/cmn/crypto"
 	"github.com/dagucloud/dagu/v2/internal/persis"
+	"github.com/dagucloud/dagu/v2/internal/persis/file"
 	"github.com/dagucloud/dagu/v2/internal/persis/store"
 	"github.com/dagucloud/dagu/v2/internal/persis/testutil"
 )
@@ -397,6 +403,72 @@ func TestWebhookSeesOtherProcesses(t *testing.T) {
 
 	require.NoError(t, s2.DeleteByDAGName(ctx, "d1"))
 	assert.NoError(t, s1.Create(ctx, newWebhook("d1")), "a webhook deleted elsewhere can be created again")
+}
+
+// listCountingCollection counts how often the whole collection is read.
+type listCountingCollection struct {
+	persis.Collection
+	lists atomic.Int32
+}
+
+func (c *listCountingCollection) List(ctx context.Context, q persis.ListQuery) (*persis.Page, error) {
+	c.lists.Add(1)
+	return c.Collection.List(ctx, q)
+}
+
+// Requests for DAGs without a webhook, such as unauthenticated triggers with
+// made-up names, cannot make each lookup reread the whole collection.
+func TestWebhookMissesShareARereading(t *testing.T) {
+	ctx := context.Background()
+	col := &listCountingCollection{Collection: testutil.NewMemoryBackend().Collection("webhooks")}
+	s, err := store.NewWebhookStore(col, nil)
+	require.NoError(t, err)
+	col.lists.Store(0)
+
+	for i := range 50 {
+		_, err := s.GetByDAGName(ctx, fmt.Sprintf("unknown-%d", i))
+		require.ErrorIs(t, err, auth.ErrWebhookNotFound)
+	}
+	assert.Equal(t, int32(1), col.lists.Load())
+}
+
+// A complete listing refreshes the lookups, so a webhook another process
+// created is found as soon as it is listed.
+func TestWebhookListCompleteRefreshesLookups(t *testing.T) {
+	ctx := context.Background()
+	col := testutil.NewMemoryBackend().Collection("webhooks")
+	s1, err := store.NewWebhookStore(col, nil)
+	require.NoError(t, err)
+	s2, err := store.NewWebhookStore(col, nil)
+	require.NoError(t, err)
+
+	_, err = s1.GetByDAGName(ctx, "d1")
+	require.ErrorIs(t, err, auth.ErrWebhookNotFound)
+	require.NoError(t, s2.Create(ctx, newWebhook("d1")))
+	_, err = s1.ListComplete(ctx)
+	require.NoError(t, err)
+
+	got, err := s1.GetByDAGName(ctx, "d1")
+	require.NoError(t, err)
+	assert.Equal(t, "wh-d1", got.ID)
+}
+
+// A record the file backend cannot parse makes a complete listing fail
+// instead of leaving the webhook out.
+func TestWebhookListCompleteReportsCorruptFiles(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	backend := file.NewBackend(config.PathsConfig{DataDir: dir, WebhooksDir: filepath.Join(dir, "webhooks")})
+	s, err := store.NewWebhookStore(backend.Collection(persis.CollectionWebhooks), nil)
+	require.NoError(t, err)
+	require.NoError(t, s.Create(ctx, newWebhook("d1")))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "webhooks", "broken.json"), []byte("{not json"), 0o600))
+
+	_, err = s.ListComplete(ctx)
+	require.Error(t, err)
+	some, err := s.List(ctx)
+	require.NoError(t, err)
+	assert.Len(t, some, 1)
 }
 
 func newEncryptedWebhookStore(t *testing.T, col persis.Collection) *store.WebhookStore {
