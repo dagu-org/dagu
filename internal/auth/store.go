@@ -228,6 +228,12 @@ type WebhookStore interface {
 	// Returns ErrWebhookNotFound if no webhook exists for the DAG.
 	DeleteByDAGName(ctx context.Context, dagName string) error
 
+	// RenameDAG moves a DAG's webhook to the DAG's new name, keeping its
+	// tokens and settings.
+	// Returns ErrWebhookNotFound if no webhook exists for oldName, and
+	// ErrWebhookAlreadyExists if one exists for newName.
+	RenameDAG(ctx context.Context, oldName, newName string) error
+
 	// UpdateLastUsed records recent use of a webhook and, when profileTokenID
 	// is not empty, of that profile token, persisting each timestamp at most
 	// once per minute. This is called when the webhook is triggered.

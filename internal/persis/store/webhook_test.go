@@ -549,6 +549,34 @@ func newEncryptedWebhookStore(t *testing.T, col persis.Collection) *store.Webhoo
 	return s
 }
 
+// A webhook follows its DAG to a new name with its tokens and public URL,
+// and other processes see it there.
+func TestWebhookRenameDAG(t *testing.T) {
+	ctx := context.Background()
+	col := testutil.NewMemoryBackend().Collection("webhooks")
+	s := newEncryptedWebhookStore(t, col)
+	other := newEncryptedWebhookStore(t, col)
+	wh := newWebhook("d1")
+	wh.Public = &auth.WebhookPublic{Token: "public-token", CreatedAt: time.Now().UTC().Truncate(time.Second)}
+	require.NoError(t, s.Create(ctx, wh))
+	require.NoError(t, s.Create(ctx, newWebhook("d2")))
+
+	require.ErrorIs(t, s.RenameDAG(ctx, "d1", "d2"), auth.ErrWebhookAlreadyExists)
+	require.ErrorIs(t, s.RenameDAG(ctx, "missing", "d3"), auth.ErrWebhookNotFound)
+	require.NoError(t, s.RenameDAG(ctx, "d1", "d3"))
+
+	_, err := s.GetByDAGName(ctx, "d1")
+	require.ErrorIs(t, err, auth.ErrWebhookNotFound)
+	for _, st := range []*store.WebhookStore{s, other} {
+		got, err := st.GetByDAGName(ctx, "d3")
+		require.NoError(t, err)
+		assert.Equal(t, wh.ID, got.ID)
+		assert.Equal(t, "d3", got.DAGName)
+		assert.Equal(t, wh.TokenHash, got.TokenHash)
+		assert.Equal(t, wh.Public, got.Public)
+	}
+}
+
 // A public URL's token and sender secret are stored encrypted and read back
 // as they were.
 func TestWebhookPublicURL(t *testing.T) {

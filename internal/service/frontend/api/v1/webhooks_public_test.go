@@ -217,3 +217,35 @@ func TestWebhooksPublicURLAdminOnly(t *testing.T) {
 	f.server.Client().Post(base+"/regenerate", nil).WithBearerToken(login.Token).ExpectStatus(http.StatusForbidden).Send(t)
 	f.server.Client().Delete(base).WithBearerToken(login.Token).ExpectStatus(http.StatusForbidden).Send(t)
 }
+
+// Renaming a DAG keeps its webhook's public URL and deliveries; deleting the
+// DAG removes them.
+func TestWebhooksPublicURLFollowsTheDAG(t *testing.T) {
+	webhookParallel(t)
+	f := setupPublicWebhooks(t)
+	ctx := context.Background()
+	f.webhook(t, "public_rename_old")
+	f.enable(t, "public_rename_old", http.StatusOK)
+	require.NoError(t, f.relay.SetStatus(ctx, publicwebhook.Status{Connected: true, URL: relayURL}))
+	webhookID := f.webhookID(t, "public_rename_old")
+	require.NoError(t, f.relay.AddDelivery(ctx, webhookID, publicwebhook.Delivery{
+		ID: "delivery-1", Received: time.Now().UTC(), Outcome: publicwebhook.OutcomeStarted,
+	}))
+	before := f.public(t, "public_rename_old")
+
+	f.server.Client().Post("/api/v1/dags/public_rename_old/rename", api.RenameDAGJSONRequestBody{
+		NewFileName: "public_rename_new",
+	}).WithBearerToken(f.token).ExpectStatus(http.StatusOK).Send(t)
+
+	after := f.public(t, "public_rename_new")
+	assert.Equal(t, before.Url, after.Url, "the URL keeps its token")
+	assert.Len(t, after.Deliveries, 1)
+	f.server.Client().Get("/api/v1/dags/public_rename_old/webhook").
+		WithBearerToken(f.token).ExpectStatus(http.StatusNotFound).Send(t)
+
+	f.server.Client().Delete("/api/v1/dags/public_rename_new").
+		WithBearerToken(f.token).ExpectStatus(http.StatusNoContent).Send(t)
+	log, err := f.relay.Log(ctx, webhookID)
+	require.NoError(t, err)
+	assert.Empty(t, log.Deliveries, "deleting the DAG removes its deliveries")
+}

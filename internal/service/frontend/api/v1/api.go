@@ -201,6 +201,7 @@ type AuthService interface {
 	HasWebhookStore() bool
 	EnablePublicWebhook(ctx context.Context, dagName string) (*auth.Webhook, error)
 	DisablePublicWebhook(ctx context.Context, dagName string) (*auth.Webhook, error)
+	RenameWebhook(ctx context.Context, oldName, newName string) error
 	RegeneratePublicWebhookToken(ctx context.Context, dagName string) (*auth.Webhook, error)
 	ConfigurePublicWebhookSender(ctx context.Context, dagName string, input authservice.PublicWebhookSenderInput) (*authservice.PublicWebhookSenderResult, error)
 	// Setup

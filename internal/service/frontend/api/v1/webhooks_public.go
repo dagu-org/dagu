@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"slices"
 
@@ -234,6 +235,22 @@ func (a *API) checkPublicWebhookLimit(ctx context.Context, dagName string) error
 		HTTPStatus: http.StatusBadRequest,
 		Code:       api.ErrorCodeBadRequest,
 		Message:    fmt.Sprintf("the plan allows %d public webhook URLs; turn one off first", status.MaxHooks),
+	}
+}
+
+// migrateWebhookAfterRename moves a renamed DAG's webhook to its new name, so
+// its local endpoint and public URL keep starting the DAG.
+func (a *API) migrateWebhookAfterRename(ctx context.Context, oldName, newName string) {
+	if a.authService == nil || !a.authService.HasWebhookStore() {
+		return
+	}
+	err := a.authService.RenameWebhook(ctx, oldName, newName)
+	if err != nil && !errors.Is(err, auth.ErrWebhookNotFound) {
+		logger.Warn(ctx, "Failed to move webhook after rename",
+			tag.Error(err),
+			slog.String("old_name", oldName),
+			slog.String("new_name", newName),
+		)
 	}
 }
 

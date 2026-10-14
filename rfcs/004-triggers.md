@@ -285,7 +285,8 @@ public URLs are used.
   them.
 - The hook ID is `<dag>/webhook`, the name this RFC gives the built-in
   webhook trigger, so URLs survive the move to triggers. Renaming a DAG
-  changes its hook ID: its URL and anything waiting for it are dropped.
+  moves its webhook, so the URL keeps working, but the hook ID changes:
+  anything waiting for it under the old name is dropped.
 - The local endpoint keeps its token and `X-Dagu-Signature` checks.
 
 ### Sender and events

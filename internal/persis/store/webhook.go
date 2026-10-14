@@ -296,6 +296,58 @@ func (s *WebhookStore) UpdateByDAGName(
 	return updated, nil
 }
 
+// RenameDAG moves a DAG's webhook to the DAG's new name, keeping its tokens
+// and settings. Returns [auth.ErrWebhookNotFound] if no webhook exists for
+// oldName, and [auth.ErrWebhookAlreadyExists] if one exists for newName.
+func (s *WebhookStore) RenameDAG(ctx context.Context, oldName, newName string) error {
+	if oldName == "" || newName == "" {
+		return auth.ErrInvalidWebhookDAGName
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Read afresh, as for a create, since the new name must be free.
+	if err := s.loadIndexLocked(ctx); err != nil {
+		return fmt.Errorf("webhook store: rebuild index: %w", err)
+	}
+	id, ok := s.byDAGName[oldName]
+	if !ok {
+		return auth.ErrWebhookNotFound
+	}
+	if _, exists := s.byDAGName[newName]; exists {
+		return auth.ErrWebhookAlreadyExists
+	}
+	err := retryConflict(ctx, func(ctx context.Context) error {
+		rec, err := s.col.Get(ctx, id)
+		if err != nil {
+			return err
+		}
+		// The stored form is moved as it is, so the encrypted secrets need
+		// no encryptor.
+		var stored auth.WebhookForStorage
+		if err := persis.Decode(rec, &stored); err != nil {
+			return err
+		}
+		stored.DAGName = newName
+		stored.UpdatedAt = time.Now().UTC()
+		data, err := persis.Encode(stored)
+		if err != nil {
+			return err
+		}
+		return s.col.CompareAndSwap(ctx, id, rec.Data, data)
+	})
+	if errors.Is(err, persis.ErrNotFound) {
+		return auth.ErrWebhookNotFound
+	}
+	if err != nil {
+		return err
+	}
+	delete(s.byDAGName, oldName)
+	s.byDAGName[newName] = id
+	return nil
+}
+
 // Delete removes a webhook by its ID.
 // Returns [auth.ErrWebhookNotFound] if the webhook does not exist.
 func (s *WebhookStore) Delete(ctx context.Context, id string) error {
