@@ -357,6 +357,8 @@ func (s *server) scopedEntry(host string) *upstreamEntry {
 			if entry == nil {
 				entry = s.guardEntry
 			}
+			// A named host gets a copy, so it never counts as carried by
+			// the guard: it keeps the certificate port when the guard stops.
 			scoped := *entry
 			scoped.roots = entry.roots.Clone()
 			selected = &scoped
@@ -369,6 +371,12 @@ func (s *server) scopedEntry(host string) *upstreamEntry {
 		return selected
 	}
 	return entry
+}
+
+// carriedByGuard reports whether entry is the guard's own, which only the
+// hosts no entry or authority names use.
+func (s *server) carriedByGuard(entry *upstreamEntry) bool {
+	return entry == s.guardEntry
 }
 
 // tunnel relays the browser's connection to the server reached over raw.
@@ -466,7 +474,7 @@ func (s *server) handshake(ctx context.Context, raw net.Conn, via route, host st
 	}
 	// Recorded as the server is verified, as a failure is, so overlapping
 	// connections to a host leave the latest verification's outcome.
-	s.verified.add(host, entry == s.guardEntry)
+	s.verified.add(host, s.carriedByGuard(entry))
 	return &upstreamConn{Conn: conn, via: via, requested: requested}, nil
 }
 
@@ -479,7 +487,7 @@ func (s *server) reportConnected(host string, entry *upstreamEntry, upstream *up
 		if upstream.requested.Load() {
 			s.reportMissing(host)
 		}
-		if entry != s.guardEntry {
+		if !s.carriedByGuard(entry) {
 			s.events.connect(host, entry.label, false, fmt.Sprintf("verified the server certificate of %s through %s", host, upstream.via))
 		}
 	case upstream.requested.Load():
