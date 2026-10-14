@@ -346,6 +346,27 @@ func TestServiceStartsRuns(t *testing.T) {
 	}, 5*time.Second, 10*time.Millisecond)
 }
 
+// The relay reports what it dropped as soon as the server says hello, so a
+// count is kept for any public webhook, not only those in the set it holds.
+func TestServiceCountsMissedOutsideTheSet(t *testing.T) {
+	h := newHarness(t, 1)
+	now := time.Now()
+	h.addWebhook(t, "first", &auth.WebhookPublic{Token: "token-1", CreatedAt: now})
+	second := h.addWebhook(t, "second", &auth.WebhookPublic{Token: "token-2", CreatedAt: now.Add(time.Second)})
+	h.run(t)
+	ws := h.cloud.relay(t)
+	assert.Len(t, ws.next(t, "hooks")["hooks"], 1)
+
+	ws.write(t, map[string]any{"t": "missed", "hooks": []map[string]any{
+		{"hook": "second/webhook", "expired": 3, "refused": 0},
+		{"hook": "gone/webhook", "expired": 1, "refused": 0},
+	}})
+	require.Eventually(t, func() bool {
+		log, err := h.log.Log(context.Background(), second.ID)
+		return err == nil && log.Missed.Expired == 3
+	}, 5*time.Second, 10*time.Millisecond)
+}
+
 // Each delivery a webhook does not take, or cannot start yet, is answered
 // and logged as the design table says.
 func TestServiceDeliveryOutcomes(t *testing.T) {

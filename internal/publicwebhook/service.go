@@ -116,8 +116,6 @@ type Service struct {
 	mu sync.Mutex
 	// status is the relay's status as last stored.
 	status Status
-	// hooks maps the hook IDs of the set the relay holds to webhook IDs.
-	hooks map[string]string
 }
 
 // New creates a Service.
@@ -218,15 +216,12 @@ func (s *Service) connect(ctx context.Context, creds license.CloudCredentials) e
 		case err != nil:
 			logger.Warn(ctx, "Public webhooks: the webhooks could not be read; the relay keeps its set", tag.Error(err))
 		default:
-			hooks, ids, leftOut := hookSet(webhooks, ticket.MaxHooks)
+			hooks, leftOut := hookSet(webhooks, ticket.MaxHooks)
 			if signature := setSignature(hooks); signature != sent {
 				if err := conn.SetHooks(ctx, hooks); err != nil {
 					break
 				}
 				sent = signature
-				s.mu.Lock()
-				s.hooks = ids
-				s.mu.Unlock()
 				s.updateStatus(ctx, func(st *Status) { st.LeftOut = leftOut })
 			}
 			if len(hooks) == 0 {
@@ -249,15 +244,13 @@ func isPublic(wh *auth.Webhook) bool {
 }
 
 // hookSet is the set of public URLs the relay holds: at most maxHooks, the
-// oldest first. It also returns the webhook ID of each hook, and the DAGs
-// left out.
-func hookSet(webhooks []*auth.Webhook, maxHooks int) ([]cloudrelay.Hook, map[string]string, []string) {
+// oldest first. It also returns the DAGs left out.
+func hookSet(webhooks []*auth.Webhook, maxHooks int) ([]cloudrelay.Hook, []string) {
 	public := slices.DeleteFunc(slices.Clone(webhooks), func(wh *auth.Webhook) bool { return !isPublic(wh) })
 	slices.SortFunc(public, func(a, b *auth.Webhook) int {
 		return cmp.Or(a.Public.CreatedAt.Compare(b.Public.CreatedAt), strings.Compare(a.DAGName, b.DAGName))
 	})
 	hooks := make([]cloudrelay.Hook, 0, len(public))
-	ids := make(map[string]string, len(public))
 	var leftOut []string
 	for _, wh := range public {
 		if len(hooks) >= maxHooks {
@@ -269,9 +262,8 @@ func hookSet(webhooks []*auth.Webhook, maxHooks int) ([]cloudrelay.Hook, map[str
 			hook.Handshake = cloudrelay.HandshakeSlack
 		}
 		hooks = append(hooks, hook)
-		ids[hook.ID] = wh.ID
 	}
-	return hooks, ids, leftOut
+	return hooks, leftOut
 }
 
 // setSignature tells sets of hooks apart without keeping their tokens.
@@ -303,18 +295,25 @@ func (s *Service) hooked(ctx context.Context, h cloudrelay.Hooked) {
 	})
 }
 
+// missed counts what the relay dropped for each public webhook. The relay
+// reports counts as soon as the server says hello, before it hears the set,
+// so each hook is looked up in the store rather than in the set.
 func (s *Service) missed(ctx context.Context, missed []cloudrelay.Missed) {
-	s.mu.Lock()
-	ids := s.hooks
-	s.mu.Unlock()
 	now := time.Now().UTC()
 	for _, m := range missed {
-		id, ok := ids[m.Hook]
+		dagName, ok := strings.CutSuffix(m.Hook, hookSuffix)
 		if !ok {
 			continue
 		}
-		if err := s.cfg.Store.AddMissed(ctx, id, m.Expired, m.Refused, now); err != nil {
-			logger.Warn(ctx, "Public webhooks: missed deliveries could not be counted", tag.Error(err))
+		wh, err := s.cfg.Webhooks.GetByDAGName(ctx, dagName)
+		if err != nil || !isPublic(wh) {
+			if err != nil && !errors.Is(err, auth.ErrWebhookNotFound) {
+				logger.Warn(ctx, "Public webhooks: missed deliveries could not be counted", tag.DAG(dagName), tag.Error(err))
+			}
+			continue
+		}
+		if err := s.cfg.Store.AddMissed(ctx, wh.ID, m.Expired, m.Refused, now); err != nil {
+			logger.Warn(ctx, "Public webhooks: missed deliveries could not be counted", tag.DAG(dagName), tag.Error(err))
 		}
 	}
 }
