@@ -1,41 +1,53 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import * as React from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Status } from '@/api/v1/schema';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { ConfigContext, type Config } from '@/contexts/ConfigContext';
-import { SearchStateProvider } from '@/contexts/SearchStateContext';
 import { WorkspaceKind } from '@/lib/workspace';
-import { usePaginatedDAGRuns } from '../../features/dag-runs/hooks/dagRunPagination';
-import { useClient } from '../../hooks/api';
+import {
+  type DAGRunActivityState,
+  useDAGRunActivity,
+} from '../../features/activity/hooks/useDAGRunActivity';
+import type { DAGRunActivity } from '../../features/activity/lib/activityModel';
+import { useQuery } from '../../hooks/api';
 import DashboardPage from '../index';
 
-vi.mock('../../features/dashboard/components/DashboardTimechart', () => ({
-  default: () => <div data-testid="dashboard-timechart" />,
-}));
-
-vi.mock('../../features/dag-runs/components/dag-run-details', () => ({
-  DAGRunDetailsModal: () => null,
+vi.mock('../../features/activity/hooks/useDAGRunActivity', () => ({
+  useDAGRunActivity: vi.fn(),
 }));
 
 vi.mock('../../features/dags/components/common', () => ({
   CreateDAGModal: () => <button type="button">New workflow</button>,
 }));
 
-vi.mock('../../features/dag-runs/hooks/dagRunPagination', () => ({
-  usePaginatedDAGRuns: vi.fn(),
+vi.mock('@/features/dag-runs/components/dag-run-details', () => ({
+  DAGRunDetailsModal: () => null,
+}));
+
+vi.mock('@/features/dag-runs/components/common', () => ({
+  DAGRunActions: () => <button type="button">Retry</button>,
+}));
+
+vi.mock('../../features/system-status/components/PathsCard', () => ({
+  default: () => null,
 }));
 
 vi.mock('../../hooks/api', () => ({
-  useClient: vi.fn(),
+  useQuery: vi.fn(),
 }));
 
-const useClientMock = vi.mocked(useClient);
-const usePaginatedDAGRunsMock = vi.mocked(usePaginatedDAGRuns);
+const useActivityMock = vi.mocked(useDAGRunActivity);
+const useQueryMock = vi.mocked(
+  useQuery as unknown as (path: string, init: unknown) => unknown
+);
+
+const NOW = Math.floor(Date.now() / 1000);
+const FROM = NOW - 24 * 3600;
 
 function makeConfig(overrides: Partial<Config> = {}): Config {
   return {
@@ -91,255 +103,224 @@ function makeConfig(overrides: Partial<Config> = {}): Config {
   };
 }
 
-function renderPage({
-  selectedWorkspace = '',
-}: { selectedWorkspace?: string } = {}) {
+function renderPage() {
   return render(
-    <MemoryRouter initialEntries={['/dashboard']}>
+    <MemoryRouter initialEntries={['/']}>
       <ConfigContext.Provider value={makeConfig()}>
-        <SearchStateProvider>
-          <AppBarContext.Provider
-            value={{
-              title: '',
-              setTitle: () => undefined,
-              remoteNodes: ['local', 'remote-a'],
-              setRemoteNodes: () => undefined,
-              selectedRemoteNode: 'remote-a',
-              selectRemoteNode: () => undefined,
-              workspaces: selectedWorkspace
-                ? [{ id: 'workspace-1', name: selectedWorkspace }]
-                : [],
-              workspaceSelection: selectedWorkspace
-                ? {
-                    kind: WorkspaceKind.workspace,
-                    workspace: selectedWorkspace,
-                  }
-                : { kind: WorkspaceKind.all },
-              selectWorkspace: () => undefined,
-            }}
-          >
-            <DashboardPage />
-          </AppBarContext.Provider>
-        </SearchStateProvider>
+        <AppBarContext.Provider
+          value={{
+            title: '',
+            setTitle: () => undefined,
+            remoteNodes: ['local'],
+            setRemoteNodes: () => undefined,
+            selectedRemoteNode: 'local',
+            selectRemoteNode: () => undefined,
+            workspaces: [],
+            workspaceSelection: { kind: WorkspaceKind.all },
+            selectWorkspace: () => undefined,
+          }}
+        >
+          <DashboardPage />
+        </AppBarContext.Provider>
       </ConfigContext.Provider>
     </MemoryRouter>
   );
 }
 
-describe('DashboardPage', () => {
-  const clientGetMock = vi.fn();
+function makeActivity(overrides: Partial<DAGRunActivity> = {}): DAGRunActivity {
+  return {
+    from: FROM,
+    to: NOW + 600,
+    runs: [],
+    attention: [],
+    active: [],
+    upcoming: [],
+    ...overrides,
+  };
+}
 
-  beforeEach(() => {
-    localStorage.clear();
-    sessionStorage.clear();
-    clientGetMock.mockReset();
-    useClientMock.mockReturnValue({
-      GET: clientGetMock.mockResolvedValue({
-        data: {
-          dags: [],
-          pagination: {
-            totalPages: 1,
-            totalRecords: 0,
+function mockActivity(state: Partial<DAGRunActivityState>) {
+  useActivityMock.mockReturnValue({
+    runs: state.activity?.runs ?? [],
+    isLoading: false,
+    unavailable: false,
+    refresh: vi.fn().mockResolvedValue(undefined),
+    hasMore: false,
+    loadMore: vi.fn().mockResolvedValue(undefined),
+    isLoadingMore: false,
+    loadMoreError: null,
+    paused: false,
+    resume: vi.fn(),
+    ...state,
+  });
+}
+
+function mockDAGList(names: string[]) {
+  useQueryMock.mockImplementation((path, init) =>
+    path === '/dags' && init
+      ? {
+          data: {
+            dags: names.map((name) => ({ dag: { name } })),
+            pagination: { totalRecords: names.length },
           },
-        },
-      }),
-    } as never);
-    usePaginatedDAGRunsMock.mockReturnValue({
-      dagRuns: [],
-      headPage: undefined,
-      error: null,
-      isInitialLoading: false,
-      isLoadingMore: false,
-      loadMoreError: null,
-      hasMore: false,
-      refresh: vi.fn(),
-      loadMore: vi.fn(),
-    });
+        }
+      : { data: undefined }
+  );
+}
+
+const billingFailure = {
+  name: 'billing',
+  dagRunId: 'billing-9',
+  status: Status.Failed,
+  startedAt: NOW - 600,
+  failedStep: 'reconcile',
+  error: 'exit status 3',
+};
+
+const reportRuns = [1, 2, 3].map((index) => ({
+  name: 'report',
+  dagRunId: `report-${index}`,
+  status: Status.Success,
+  startedAt: NOW - 60 * index,
+}));
+
+const busyActivity = makeActivity({
+  runs: [...reportRuns, billingFailure],
+  attention: [billingFailure],
+  active: [{ name: 'approve', dagRunId: 'a-1', status: Status.Waiting }],
+  upcoming: [{ name: 'nightly', fileName: 'nightly', nextRun: NOW + 3600 }],
+});
+
+describe('DashboardPage', () => {
+  beforeEach(() => {
+    mockDAGList([]);
   });
 
   afterEach(() => {
     vi.clearAllMocks();
   });
 
-  it('requests dashboard DAG runs without queued status', async () => {
+  it('shows what needs attention with the failing step', () => {
+    mockActivity({ activity: busyActivity });
+
     renderPage();
 
-    await waitFor(() => {
-      expect(usePaginatedDAGRunsMock).toHaveBeenCalled();
-    });
-
-    const latestCall =
-      usePaginatedDAGRunsMock.mock.calls[
-        usePaginatedDAGRunsMock.mock.calls.length - 1
-      ]?.[0];
-    expect(latestCall).toBeDefined();
-    if (!latestCall) {
-      throw new Error('Expected dashboard to request paginated DAG runs');
-    }
-
-    const latestQuery = latestCall.query;
-    expect(latestQuery).toBeDefined();
-    if (!latestQuery) {
-      throw new Error('Expected dashboard DAG run query to be defined');
-    }
-
-    expect(latestQuery).toEqual(
-      expect.objectContaining({
-        remoteNode: 'remote-a',
-        status: [
-          Status.Success,
-          Status.Failed,
-          Status.Running,
-          Status.Aborted,
-          Status.NotStarted,
-          Status.PartialSuccess,
-          Status.Waiting,
-          Status.Rejected,
-        ],
-      })
-    );
-    expect(latestQuery.status).not.toContain(Status.Queued);
+    const attention = screen.getByRole('region', { name: /Needs attention/ });
+    const items = within(attention).getAllByRole('listitem');
+    expect(items[0]).toHaveTextContent('billing');
+    expect(items[0]).toHaveTextContent('reconcile: exit status 3');
+    expect(items[1]).toHaveTextContent('approve');
+    expect(items[1]).toHaveTextContent('Waiting for input');
+    expect(
+      within(items[1]!).getByRole('link', { name: /Review/ })
+    ).toHaveAttribute('href', '/dag-runs/approve/a-1?remoteNode=local');
   });
 
-  it('scopes dashboard DAG and DAG-run requests by selected workspace', async () => {
-    renderPage({ selectedWorkspace: 'ops' });
+  it('counts the runs and links each status to the window’s runs', () => {
+    mockActivity({ activity: busyActivity });
 
-    await waitFor(() => {
-      expect(usePaginatedDAGRunsMock).toHaveBeenCalled();
-      expect(clientGetMock).toHaveBeenCalled();
+    renderPage();
+
+    const failed = screen.getByRole('link', { name: /^1\s*failed$/ });
+    const url = new URL(failed.getAttribute('href')!, 'http://localhost');
+    expect(url.pathname).toBe('/dag-runs');
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      status: String(Status.Failed),
+      dateMode: 'custom',
+      fromDate: String(FROM),
+      toDate: String(NOW + 600),
     });
-
-    const latestCall =
-      usePaginatedDAGRunsMock.mock.calls[
-        usePaginatedDAGRunsMock.mock.calls.length - 1
-      ]?.[0];
-    expect(latestCall?.query).toEqual(
-      expect.objectContaining({
-        remoteNode: 'remote-a',
-        workspace: 'ops',
-      })
-    );
-
-    expect(clientGetMock).toHaveBeenCalledWith(
-      '/dags',
-      expect.objectContaining({
-        params: {
-          query: expect.objectContaining({
-            remoteNode: 'remote-a',
-            workspace: 'ops',
-          }),
-        },
-      })
-    );
+    expect(screen.getByRole('link', { name: /^4\s*runs$/ })).toBeVisible();
   });
 
-  function mockDAGInventory(names: string[], totalRecords: number) {
-    clientGetMock.mockResolvedValue({
-      data: {
-        dags: names.map((name) => ({ fileName: `${name}.yaml`, dag: { name } })),
-        pagination: {
-          totalPages: 1,
-          totalRecords,
-        },
-      },
-    });
-  }
+  // With older runs left to load, the counts cover only the loaded ones.
+  it('labels the counts as the latest runs and loads older ones', () => {
+    const loadMore = vi.fn().mockResolvedValue(undefined);
+    mockActivity({ activity: busyActivity, hasMore: true, loadMore });
 
-  it('invites creating the first workflow when no workflows exist', async () => {
     renderPage();
 
     expect(
-      await screen.findByText('Create your first workflow')
+      screen.getByRole('link', { name: /^4\s*latest runs$/ })
     ).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Load more' }));
+    expect(loadMore).toHaveBeenCalled();
+  });
+
+  it('returns to live from loaded older runs', () => {
+    const resume = vi.fn();
+    mockActivity({ activity: busyActivity, paused: true, resume });
+
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Back to live' }));
+
+    expect(resume).toHaveBeenCalled();
+  });
+
+  it('says all is clear when nothing needs attention', () => {
+    mockActivity({ activity: makeActivity({ runs: reportRuns }) });
+
+    renderPage();
+
+    expect(screen.getByText(/All clear/)).toBeVisible();
+  });
+
+  it('filters workflows by name', () => {
+    mockActivity({ activity: busyActivity });
+
+    renderPage();
+    fireEvent.change(screen.getByLabelText('Filter workflows'), {
+      target: { value: 'rep' },
+    });
+
+    const lanes = within(
+      screen.getByRole('list', { name: 'Runs by workflow' })
+    );
+    expect(lanes.getAllByRole('listitem')).toHaveLength(1);
+    expect(lanes.getByText('report')).toBeVisible();
+  });
+
+  it('invites creating the first workflow when no workflows exist', () => {
+    mockActivity({ activity: makeActivity() });
+
+    renderPage();
+
+    expect(screen.getByText('Create your first workflow')).toBeVisible();
     expect(screen.getByText('New workflow')).toBeVisible();
-    expect(screen.queryByTestId('dashboard-timechart')).not.toBeInTheDocument();
   });
 
-  it('points at the Workflows page when workflows exist but nothing ran', async () => {
-    mockDAGInventory(['etl', 'backup'], 2);
+  it('points at the Workflows page when workflows exist but nothing ran', () => {
+    mockDAGList(['etl', 'backup']);
+    mockActivity({ activity: makeActivity() });
 
     renderPage();
 
-    expect(await screen.findByText(/No runs on /)).toBeVisible();
+    expect(screen.getByText('No runs in the last 24 hours')).toBeVisible();
     expect(screen.getByText(/Start a workflow from the/)).toBeVisible();
-    expect(screen.queryByTestId('dashboard-timechart')).not.toBeInTheDocument();
     expect(
       screen.queryByText('Create your first workflow')
     ).not.toBeInTheDocument();
   });
 
-  it('suggests the example workflows when only seeded examples exist', async () => {
-    mockDAGInventory(['example-01-basic-sequential'], 1);
+  it('suggests the example workflows when only seeded examples exist', () => {
+    mockDAGList(['example-01-basic-sequential']);
+    mockActivity({ activity: makeActivity() });
+
+    renderPage();
+
+    expect(screen.getByText(/Run one of the example workflows/)).toBeVisible();
+  });
+
+  it('explains when the node cannot serve activity', () => {
+    const refresh = vi.fn().mockResolvedValue(undefined);
+    mockActivity({ unavailable: true, refresh });
 
     renderPage();
 
     expect(
-      await screen.findByText(/Run one of the example workflows/)
+      screen.getByText('Activity is not available from this node')
     ).toBeVisible();
-  });
-
-  it('keeps the timechart when runs exist', async () => {
-    mockDAGInventory(['etl'], 1);
-    usePaginatedDAGRunsMock.mockReturnValue({
-      dagRuns: [{ name: 'etl', status: Status.Success } as never],
-      headPage: undefined,
-      error: null,
-      isInitialLoading: false,
-      isLoadingMore: false,
-      loadMoreError: null,
-      hasMore: false,
-      refresh: vi.fn(),
-      loadMore: vi.fn(),
-    });
-
-    renderPage();
-
-    expect(await screen.findByTestId('dashboard-timechart')).toBeVisible();
-    expect(screen.queryByText(/No runs on /)).not.toBeInTheDocument();
-  });
-
-  it('offers a retry instead of first-run guidance when the inventory request fails', async () => {
-    clientGetMock.mockResolvedValue({});
-
-    renderPage();
-
-    expect(
-      await screen.findByText('Failed to load the workflow list.')
-    ).toBeVisible();
-    expect(
-      screen.queryByText('Create your first workflow')
-    ).not.toBeInTheDocument();
-    expect(screen.queryByText(/No runs on /)).not.toBeInTheDocument();
-
-    const callsBeforeRetry = clientGetMock.mock.calls.length;
-    mockDAGInventory(['etl'], 1);
-    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
-
-    await waitFor(() => {
-      expect(clientGetMock.mock.calls.length).toBeGreaterThan(callsBeforeRetry);
-    });
-    expect(await screen.findByText(/No runs on /)).toBeVisible();
-  });
-
-  it('shows placeholders instead of zeros while runs load', async () => {
-    mockDAGInventory(['etl'], 1);
-    usePaginatedDAGRunsMock.mockReturnValue({
-      dagRuns: [],
-      headPage: undefined,
-      error: null,
-      isInitialLoading: true,
-      isLoadingMore: false,
-      loadMoreError: null,
-      hasMore: false,
-      refresh: vi.fn(),
-      loadMore: vi.fn(),
-    });
-
-    renderPage();
-
-    await waitFor(() => {
-      expect(screen.getAllByText('-').length).toBeGreaterThanOrEqual(4);
-    });
-    expect(screen.queryByText(/No runs on /)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(refresh).toHaveBeenCalled();
   });
 });

@@ -2016,6 +2016,61 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /dag-run-activity:
+    get:
+      summary: "Summarize DAG-run activity"
+      description: |
+        Lists the DAG-runs created in a time window, newest first, one page at
+        a time. The first page also lists the DAGs whose latest run did not
+        succeed, runs still in progress (including ones created before the
+        window), and the next scheduled runs. Without fromDate, the window is
+        the last `hours` hours, aligned to a 96th of its length. To load older
+        runs, pass the first page's from and to as fromDate and toDate, with
+        nextCursor as cursor.
+      operationId: "getDAGRunActivity"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Workspace"
+        - $ref: "#/components/parameters/DateTimeFrom"
+        - $ref: "#/components/parameters/DateTimeTo"
+        - name: "hours"
+          in: "query"
+          required: false
+          schema:
+            type: "integer"
+            minimum: 1
+            maximum: 48
+            default: 24
+          description: "Length of a window that ends now. Ignored when fromDate is set."
+        - name: "labels"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+          description: "Only include runs of DAGs that have ALL these comma-separated labels"
+        - $ref: "#/components/parameters/DAGRunListCursor"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DAGRunActivity"
+        "400":
+          description: "The window, filters, or cursor are invalid"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /dag-runs:
     get:
       summary: "List all DAG-runs"
@@ -11436,7 +11491,7 @@ components:
     DateTimeFrom:
       name: fromDate
       in: query
-      description: start datetime for filtering DAG-runs in ISO 8601 format with timezone
+      description: start of the time range for filtering DAG-runs, as a Unix timestamp in seconds
       required: false
       schema:
         $ref: "#/components/schemas/UnixTimestamp"
@@ -11444,7 +11499,7 @@ components:
     DateTimeTo:
       name: toDate
       in: query
-      description: end datetime for filtering DAG-runs in ISO 8601 format with timezone
+      description: end of the time range for filtering DAG-runs, as a Unix timestamp in seconds
       required: false
       schema:
         $ref: "#/components/schemas/UnixTimestamp"
@@ -11697,6 +11752,95 @@ components:
           description: "Opaque cursor for loading the next page of older DAG-runs"
       required:
         - dagRuns
+
+    DAGRunActivity:
+      type: object
+      description: "One page of DAG-run activity for a time window"
+      properties:
+        from:
+          type: integer
+          format: int64
+          description: "Window start as Unix seconds"
+        to:
+          type: integer
+          format: int64
+          description: "Window end as Unix seconds"
+        runs:
+          type: array
+          description: "Up to 100 runs created in the window, newest first"
+          items:
+            $ref: "#/components/schemas/DAGRunActivityRun"
+        nextCursor:
+          type: string
+          description: "Opaque cursor for loading the next page of older runs"
+        attention:
+          type: array
+          description: "First page only: the latest run of each DAG whose latest run was created in the window and did not succeed, newest first, at most 20"
+          items:
+            $ref: "#/components/schemas/DAGRunActivityRun"
+        active:
+          type: array
+          description: "First page only: runs still running, waiting, or queued, oldest first, at most 100, including up to 50 live runs created before the window"
+          items:
+            $ref: "#/components/schemas/DAGRunActivityRun"
+        upcoming:
+          type: array
+          description: "First page only: next scheduled runs, soonest first"
+          items:
+            $ref: "#/components/schemas/DAGRunActivityUpcoming"
+      required:
+        - from
+        - to
+        - runs
+        - attention
+        - active
+        - upcoming
+
+    DAGRunActivityRun:
+      type: object
+      description: "One DAG-run in an activity summary"
+      properties:
+        name:
+          type: string
+          description: "DAG name"
+        dagRunId:
+          type: string
+        status:
+          $ref: "#/components/schemas/Status"
+        startedAt:
+          type: integer
+          format: int64
+          description: "Start as Unix seconds, or the queue time when the run has not started"
+        finishedAt:
+          type: integer
+          format: int64
+          description: "Finish as Unix seconds"
+        failedStep:
+          type: string
+          description: "First failed step; set on attention runs"
+        error:
+          type: string
+          description: "Error of the failed step or the run, shortened; set on attention runs"
+      required:
+        - name
+        - dagRunId
+        - status
+
+    DAGRunActivityUpcoming:
+      type: object
+      properties:
+        name:
+          type: string
+        fileName:
+          type: string
+        nextRun:
+          type: integer
+          format: int64
+          description: "Next scheduled run as Unix seconds"
+      required:
+        - name
+        - fileName
+        - nextRun
 
     ApproveStepRequest:
       type: object

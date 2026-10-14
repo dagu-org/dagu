@@ -1,0 +1,246 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package api
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"testing"
+	"time"
+
+	openapiv1 "github.com/dagucloud/dagu/v2/api/v1"
+	"github.com/dagucloud/dagu/v2/internal/cmn/config"
+	"github.com/dagucloud/dagu/v2/internal/ir"
+	"github.com/dagucloud/dagu/v2/internal/persis"
+	runtimepkg "github.com/dagucloud/dagu/v2/internal/runtime"
+	"github.com/dagucloud/dagu/v2/internal/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+type activityFixture struct {
+	t          *testing.T
+	api        *API
+	repository *persis.DAGRunRepository
+}
+
+func newActivityFixture(t *testing.T) *activityFixture {
+	t.Helper()
+	repository := testutil.NewFileDAGRunRepository(t.TempDir(), persis.DAGRunRepositoryOptions{})
+	cfg := &config.Config{}
+	return &activityFixture{
+		t:          t,
+		repository: repository,
+		api: &API{
+			dagRunRepository: repository,
+			dagRunMgr:        runtimepkg.NewManager(repository, nil, cfg),
+			config:           cfg,
+		},
+	}
+}
+
+// addRun saves a run that started at start and ran for duration.
+func (f *activityFixture) addRun(name, id string, status ir.Status, start time.Time, duration time.Duration, nodes ...*ir.Node) {
+	f.t.Helper()
+	ctx := f.t.Context()
+	dag := &ir.DAG{Name: name}
+	attempt, err := f.repository.CreateAttempt(ctx, dag, start, id, persis.DAGRunCreateAttemptOptions{})
+	require.NoError(f.t, err)
+	require.NoError(f.t, attempt.Open(ctx))
+	runStatus := ir.InitialStatus(dag)
+	runStatus.DAGRunID = id
+	runStatus.AttemptID = attempt.ID()
+	runStatus.Status = status
+	runStatus.StartedAt = start.Format(time.RFC3339)
+	if duration > 0 {
+		runStatus.FinishedAt = start.Add(duration).Format(time.RFC3339)
+	}
+	runStatus.Nodes = nodes
+	require.NoError(f.t, attempt.Write(ctx, runStatus))
+	require.NoError(f.t, attempt.Close(ctx))
+}
+
+func (f *activityFixture) activity(from, to time.Time) openapiv1.DAGRunActivity {
+	f.t.Helper()
+	return f.page(from, to, nil)
+}
+
+// page reads one page of a fixed window; a nil cursor reads the first page.
+func (f *activityFixture) page(from, to time.Time, cursor *string) openapiv1.DAGRunActivity {
+	f.t.Helper()
+	fromUnix, toUnix := from.Unix(), to.Unix()
+	resp, err := f.api.GetDAGRunActivity(f.t.Context(), openapiv1.GetDAGRunActivityRequestObject{
+		Params: openapiv1.GetDAGRunActivityParams{FromDate: &fromUnix, ToDate: &toUnix, Cursor: cursor},
+	})
+	require.NoError(f.t, err)
+	activity, ok := resp.(openapiv1.GetDAGRunActivity200JSONResponse)
+	require.True(f.t, ok)
+	return openapiv1.DAGRunActivity(activity)
+}
+
+// addRuns saves count succeeded runs of name, one a minute from start.
+func (f *activityFixture) addRuns(name string, count int, start time.Time) {
+	f.t.Helper()
+	for i := range count {
+		f.addRun(name, fmt.Sprintf("%s-%03d", name, i), ir.Succeeded, start.Add(time.Duration(i)*time.Minute), time.Second)
+	}
+}
+
+func runIDs(runs []openapiv1.DAGRunActivityRun) []string {
+	ids := make([]string, 0, len(runs))
+	for _, run := range runs {
+		ids = append(ids, run.DagRunId)
+	}
+	return ids
+}
+
+func TestDAGRunActivityPagesRunsNewestFirst(t *testing.T) {
+	f := newActivityFixture(t)
+	day := time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC)
+	f.addRuns("ping", activityPageSize+2, day.Add(time.Hour))
+	f.addRun("ping", "outside", ir.Succeeded, day.Add(-time.Hour), time.Second)
+	f.addRun("train", "train-1", ir.Running, day.Add(-time.Minute), 0)
+
+	first := f.activity(day, day.Add(24*time.Hour))
+
+	require.Len(t, first.Runs, activityPageSize)
+	assert.Equal(t, "ping-101", first.Runs[0].DagRunId)
+	assert.Equal(t, "ping", first.Runs[0].Name)
+	assert.Equal(t, day.Add(time.Hour+101*time.Minute).Unix(), valueOf(first.Runs[0].StartedAt))
+	assert.Equal(t, "ping-002", first.Runs[activityPageSize-1].DagRunId)
+	require.NotNil(t, first.NextCursor)
+
+	older := f.page(day, day.Add(24*time.Hour), first.NextCursor)
+
+	assert.Equal(t, []string{"ping-001", "ping-000"}, runIDs(older.Runs))
+	assert.Nil(t, older.NextCursor)
+	assert.Equal(t, first.From, older.From)
+	assert.Equal(t, first.To, older.To)
+}
+
+// A DAG whose latest run failed needs attention even when newer runs of other
+// DAGs push that run off the first page. A DAG that recovered does not.
+func TestDAGRunActivityListsFailingLatestRuns(t *testing.T) {
+	f := newActivityFixture(t)
+	day := time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC)
+	f.addRun("stale", "stale-1", ir.Failed, day.Add(-time.Hour), time.Second)
+	f.addRun("report", "report-1", ir.Failed, day.Add(time.Hour), time.Second)
+	f.addRun("report", "report-2", ir.Succeeded, day.Add(2*time.Hour), time.Second)
+	f.addRun("etl", "etl-1", ir.Failed, day.Add(3*time.Hour), 5*time.Second,
+		&ir.Node{Step: ir.Step{Name: "extract"}, Status: ir.NodeSucceeded},
+		&ir.Node{Step: ir.Step{Name: "load"}, Status: ir.NodeFailed, Error: "\x1b[31mconnection refused\x1b[0m\nretry later"},
+	)
+	f.addRun("ping", "ping-1", ir.Aborted, day.Add(4*time.Hour), time.Second)
+	f.addRuns("tick", activityPageSize, day.Add(5*time.Hour))
+
+	activity := f.activity(day, day.Add(24*time.Hour))
+
+	assert.NotContains(t, runIDs(activity.Runs), "etl-1")
+	assert.Equal(t, []string{"ping-1", "etl-1"}, runIDs(activity.Attention))
+	etl := activity.Attention[1]
+	assert.Equal(t, "etl", etl.Name)
+	assert.Equal(t, "load", valueOf(etl.FailedStep))
+	assert.Equal(t, "connection refused", valueOf(etl.Error))
+}
+
+// Runs in progress come from the first page and from each DAG's latest run, so
+// a waiting run, which has no process, stays listed after newer runs.
+func TestDAGRunActivityListsActiveRuns(t *testing.T) {
+	f := newActivityFixture(t)
+	day := time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC)
+	f.addRun("approve", "approve-1", ir.Waiting, day.Add(time.Hour), 0)
+	f.addRuns("tick", activityPageSize, day.Add(2*time.Hour))
+	f.addRun("train", "train-1", ir.Running, day.Add(20*time.Hour), 0)
+
+	activity := f.activity(day, day.Add(24*time.Hour))
+
+	assert.Equal(t, []string{"approve-1", "train-1"}, runIDs(activity.Active))
+	assert.Equal(t, "approve", activity.Active[0].Name)
+}
+
+// aliveProcs reports the given runs as having live processes.
+type aliveProcs struct {
+	processRepository
+	refs []ir.DAGRunRef
+}
+
+func (p aliveProcs) ListAllAlive(context.Context) (map[string][]ir.DAGRunRef, error) {
+	return map[string][]ir.DAGRunRef{"default": p.refs}, nil
+}
+
+// Runs that started before the window appear while their process lives, up
+// to a bound on the status files read for them.
+func TestDAGRunActivityListsLiveRunsFromBeforeWindow(t *testing.T) {
+	f := newActivityFixture(t)
+	day := time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC)
+	var refs []ir.DAGRunRef
+	for i := range activityLiveRunReads + 1 {
+		id := fmt.Sprintf("train-%02d", i)
+		f.addRun("train", id, ir.Running, day.Add(-time.Hour).Add(time.Duration(i)*time.Second), 0)
+		refs = append(refs, ir.NewDAGRunRef("train", id))
+	}
+	f.api.procRepository = aliveProcs{refs: refs}
+
+	activity := f.activity(day, day.Add(24*time.Hour))
+
+	require.Len(t, activity.Active, activityLiveRunReads)
+	assert.Equal(t, "train-00", activity.Active[0].DagRunId)
+	assert.Equal(t, "train", activity.Active[0].Name)
+	assert.Empty(t, activity.Runs)
+}
+
+func TestDAGRunActivityRejectsInvalidWindows(t *testing.T) {
+	f := newActivityFixture(t)
+	now := time.Now()
+	tests := []struct {
+		name   string
+		params openapiv1.GetDAGRunActivityParams
+	}{
+		{name: "EndsBeforeStart", params: openapiv1.GetDAGRunActivityParams{
+			FromDate: new(now.Unix()), ToDate: new(now.Add(-time.Hour).Unix()),
+		}},
+		{name: "LongerThanAWeek", params: openapiv1.GetDAGRunActivityParams{
+			FromDate: new(now.Add(-8 * 24 * time.Hour).Unix()), ToDate: new(now.Unix()),
+		}},
+		{name: "TooManyHours", params: openapiv1.GetDAGRunActivityParams{Hours: new(49)}},
+		{name: "NoHours", params: openapiv1.GetDAGRunActivityParams{Hours: new(0)}},
+		{name: "UnknownCursor", params: openapiv1.GetDAGRunActivityParams{Cursor: new("bogus")}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := f.api.GetDAGRunActivity(t.Context(), openapiv1.GetDAGRunActivityRequestObject{Params: tt.params})
+
+			var apiErr *Error
+			require.ErrorAs(t, err, &apiErr)
+			assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
+		})
+	}
+}
+
+// A live window ends at the next 96th of its length, so it stays the same,
+// and so does its payload, until that step passes.
+func TestDAGRunActivityAlignsLiveWindow(t *testing.T) {
+	f := newActivityFixture(t)
+	now := time.Date(2026, 3, 2, 10, 7, 30, 0, time.UTC)
+
+	query, err := f.api.newActivityQuery(t.Context(), activityParams{}, now)
+
+	require.NoError(t, err)
+	assert.Equal(t, time.Date(2026, 3, 2, 10, 15, 0, 0, time.UTC), query.to.UTC())
+	assert.Equal(t, query.to.Add(-24*time.Hour), query.from)
+}
+
+func TestDAGRunActivityStreamTakesOnlyLiveWindows(t *testing.T) {
+	f := newActivityFixture(t)
+
+	require.NoError(t, f.api.ValidateDAGRunActivityQuery(t.Context(), "hours=6"))
+
+	for _, query := range []string{"fromDate=1", "cursor=abc"} {
+		err := f.api.ValidateDAGRunActivityQuery(t.Context(), query)
+		var apiErr *Error
+		require.ErrorAs(t, err, &apiErr, query)
+		assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus, query)
+	}
+}

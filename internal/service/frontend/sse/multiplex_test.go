@@ -35,6 +35,16 @@ func TestParseTopicCanonicalizesQuery(t *testing.T) {
 	assert.Equal(t, "dagslist:page=1&perPage=100", parsed.Key)
 }
 
+// Browsers that share a workspace and window share one activity topic, so
+// per-connection parameters are dropped from its key.
+func TestParseTopicSharesActivityAcrossConnections(t *testing.T) {
+	parsed, err := ParseTopic("dagrunactivity:workspace=ops&hours=24&token=secret&remoteNode=edge")
+	require.NoError(t, err)
+
+	assert.Equal(t, TopicTypeDAGRunActivity, parsed.Type)
+	assert.Equal(t, "dagrunactivity:hours=24&workspace=ops", parsed.Key)
+}
+
 func TestParseTopicRejectsMalformedQuery(t *testing.T) {
 	_, err := ParseTopic("dagruns:%ZZ")
 	require.Error(t, err)
@@ -1188,4 +1198,40 @@ func parseControlEvent(t *testing.T, body string) StreamControlEvent {
 
 	t.Fatalf("control event not found in stream body: %q", body)
 	return StreamControlEvent{}
+}
+
+// A burst of wakes inside the minimum interval costs one immediate refetch and
+// one deferred refetch, not one refetch per wake.
+func TestMultiplexTopicMinIntervalMergesWakes(t *testing.T) {
+	// Above the 1s adaptive floor, so the minimum interval decides the delay.
+	const interval = 1200 * time.Millisecond
+
+	mux := NewMultiplexer(StreamConfig{}, nil)
+	t.Cleanup(mux.Shutdown)
+
+	var fetches atomic.Int32
+	mux.RegisterFetcher(TopicTypeDAGRuns, func(context.Context, string) (any, error) {
+		return map[string]int32{"revision": fetches.Add(1)}, nil
+	})
+	mux.SetRefreshMode(TopicTypeDAGRuns, TopicRefreshModeOnDemand)
+	mux.SetMinInterval(TopicTypeDAGRuns, interval)
+
+	result, err := mux.createSession(context.Background(), httptest.NewRecorder(), []string{"dagruns:status=1"}, 0)
+	require.NoError(t, err)
+	defer mux.removeSession(result.session)
+	result.session.bootstrapTopics(t.Context(), 0, result.topics)
+	require.Equal(t, int32(1), fetches.Load())
+
+	mux.WakeTopic(TopicTypeDAGRuns, "status=1")
+	require.Eventually(t, func() bool { return fetches.Load() == 2 }, time.Second, 5*time.Millisecond)
+
+	for range 5 {
+		mux.WakeTopic(TopicTypeDAGRuns, "status=1")
+		time.Sleep(10 * time.Millisecond)
+	}
+	assert.Equal(t, int32(2), fetches.Load(), "wakes inside the interval wait")
+
+	require.Eventually(t, func() bool { return fetches.Load() == 3 }, 2*interval, 5*time.Millisecond)
+	time.Sleep(interval)
+	assert.Equal(t, int32(3), fetches.Load(), "the burst becomes one deferred refetch")
 }
