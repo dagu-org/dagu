@@ -54,4 +54,11 @@ func TestSchedulerPauseStateReportsWhetherASchedulerRuns(t *testing.T) {
 	assert.False(t, *stopped.SchedulerRunning)
 
 	assert.Nil(t, pauseState(t, nil).SchedulerRunning, "unknown without a registry")
+
+	// A member whose state the registry cannot tell may still be scheduling.
+	unknown := pauseState(t, schedulerMembers{members: []serviceregistry.HostInfo{
+		{ID: "standby", Status: serviceregistry.ServiceStatusInactive},
+		{ID: "unreadable", Status: serviceregistry.ServiceStatusUnknown},
+	}})
+	assert.Nil(t, unknown.SchedulerRunning, "unknown while a member's state is unknown")
 }
