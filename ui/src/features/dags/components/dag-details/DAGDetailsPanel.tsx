@@ -18,7 +18,6 @@ import {
   sseFallbackOptions,
   useSSECacheSync,
 } from '../../../../hooks/useSSECacheSync';
-import dayjs from '../../../../lib/dayjs';
 import { shouldIgnoreKeyboardShortcuts } from '../../../../lib/keyboard-shortcuts';
 import LoadingIndicator from '@/components/ui/loading-indicator';
 import { DAGContext } from '../../contexts/DAGContext';
@@ -26,25 +25,6 @@ import { RootDAGRunContext } from '../../contexts/RootDAGRunContext';
 import DAGDetailsContent from './DAGDetailsContent';
 import { I18nText } from '@/i18n/I18nText';
 import { I18nProps } from '@/i18n/I18nProps';
-
-function formatDuration(startDate: string, endDate: string): string {
-  if (!startDate || !endDate) {
-    return '--';
-  }
-
-  const duration = dayjs.duration(dayjs(endDate).diff(dayjs(startDate)));
-  const hours = Math.floor(duration.asHours());
-  const minutes = duration.minutes();
-  const seconds = duration.seconds();
-
-  if (hours > 0) {
-    return `${hours}h ${minutes}m ${seconds}s`;
-  }
-  if (minutes > 0) {
-    return `${minutes}m ${seconds}s`;
-  }
-  return `${seconds}s`;
-}
 
 type Props = {
   fileName: string;
@@ -240,7 +220,6 @@ function DAGDetailsPanel({
                   dag={data.dag}
                   currentDAGRun={displayDAGRun}
                   refreshFn={refreshFn}
-                  formatDuration={formatDuration}
                   activeTab={activeTab}
                   onTabChange={setActiveTab}
                   dagRunId="latest"

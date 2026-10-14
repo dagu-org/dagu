@@ -85,6 +85,8 @@ type Props = {
   name?: string;
   /** Content shown at the start of the toolbar, such as an interactions hint. */
   toolbarStart?: React.ReactNode;
+  /** Step drawn as selected, such as the one whose details are open. */
+  selectedStepName?: string;
 };
 
 const GRAPH_STATUS_STROKES = {
@@ -122,6 +124,30 @@ function mixHexColors(color: string, base: string, amount: number): string {
       .padStart(2, '0')
   );
   return `#${mixed.join('')}`;
+}
+
+/** Ring drawn around the selected node; SVG has no outline. */
+const GRAPH_SELECTED_FILTER =
+  'drop-shadow(0 0 1.5px var(--ring)) drop-shadow(0 0 4px var(--ring))';
+
+/**
+ * Marks the rendered node of nodeId as selected and clears the others.
+ * Mermaid wraps the id in its own element id; node ids contain only id
+ * characters, so any other character delimits them.
+ */
+function markSelectedNode(container: HTMLElement, nodeId?: string): void {
+  const pattern = nodeId
+    ? new RegExp(`(^|[^A-Za-z0-9_])${nodeId}($|[^A-Za-z0-9_])`)
+    : null;
+  container.querySelectorAll<SVGGElement>('g.node').forEach((nodeElement) => {
+    const selected = !!pattern && pattern.test(nodeElement.id);
+    nodeElement.style.filter = selected ? GRAPH_SELECTED_FILTER : '';
+    if (selected) {
+      nodeElement.setAttribute('data-selected', 'true');
+    } else {
+      nodeElement.removeAttribute('data-selected');
+    }
+  });
 }
 
 function applyRenderedGraphStyles(container: HTMLDivElement): void {
@@ -173,12 +199,26 @@ function Graph({
   height,
   name,
   toolbarStart,
+  selectedStepName,
 }: Props): React.JSX.Element {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const viewportRef = React.useRef<HTMLDivElement>(null);
   const isDarkMode = useResolvedTheme() === 'dark';
-  const applyGraphStyles = React.useCallback(applyRenderedGraphStyles, []);
+  const selectedNodeId = selectedStepName
+    ? toMermaidNodeId(selectedStepName)
+    : undefined;
+  const selectedNodeIdRef = React.useRef(selectedNodeId);
+  selectedNodeIdRef.current = selectedNodeId;
+  const applyGraphStyles = React.useCallback((container: HTMLDivElement) => {
+    applyRenderedGraphStyles(container);
+    markSelectedNode(container, selectedNodeIdRef.current);
+  }, []);
+  React.useEffect(() => {
+    if (containerRef.current) {
+      markSelectedNode(containerRef.current, selectedNodeId);
+    }
+  }, [selectedNodeId]);
   const graphControlButtonClass = 'h-7 w-7 shrink-0 px-0 font-medium';
   const selectedLayoutClass =
     'bg-muted text-foreground shadow-none dark:border-0 dark:bg-muted dark:text-foreground';

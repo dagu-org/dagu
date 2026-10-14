@@ -101,7 +101,8 @@ function freezeNow() {
 
 function renderRow(
   node: components['schemas']['Node'],
-  view: 'desktop' | 'mobile'
+  view: 'desktop' | 'mobile',
+  props: Partial<React.ComponentProps<typeof NodeStatusTableRow>> = {}
 ) {
   const row = (
     <NodeStatusTableRow
@@ -110,6 +111,7 @@ function renderRow(
       name="example.yaml"
       dagRun={dagRun}
       view={view}
+      {...props}
     />
   );
   return render(
@@ -390,6 +392,62 @@ describe('NodeStatusTableRow', () => {
       for (const call of inlineLogCalls) {
         expect(call[2]).toMatchObject({ refreshInterval: interval });
       }
+    }
+  );
+
+  // A row and its graph node open the same step details; the chevron keeps
+  // the quick inline log.
+  it('opens step details from a row click and keeps the log toggle', () => {
+    const onInspect = vi.fn();
+    const node = {
+      ...timedNode,
+      stdout: '/tmp/build.out',
+    } as components['schemas']['Node'];
+    render(
+      <MemoryRouter>
+        <AppBarContext.Provider value={appBarValue}>
+          <table>
+            <tbody>
+              <NodeStatusTableRow
+                rownum={1}
+                node={node}
+                name="example.yaml"
+                dagRun={dagRun}
+                view="desktop"
+                selected
+                onInspect={onInspect}
+              />
+            </tbody>
+          </table>
+        </AppBarContext.Provider>
+      </MemoryRouter>
+    );
+
+    const row = screen.getByText('build').closest('tr')!;
+    expect(row).toHaveAttribute('data-selected', 'true');
+    fireEvent.click(row);
+    expect(onInspect).toHaveBeenCalledWith('build');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show logs' }));
+    expect(screen.getByRole('button', { name: 'Hide logs' })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
+    expect(onInspect).toHaveBeenCalledTimes(1);
+  });
+
+  // The step name is a button, so keyboard and touch users reach the same
+  // details a row click opens.
+  it.each(['desktop', 'mobile'] as const)(
+    'opens step details from the step name in the %s view',
+    (view) => {
+      const onInspect = vi.fn();
+      renderRow(timedNode, view, { onInspect });
+
+      fireEvent.click(screen.getByRole('button', { name: 'build' }));
+
+      expect(onInspect).toHaveBeenCalledTimes(1);
+      expect(onInspect).toHaveBeenCalledWith('build');
     }
   );
 

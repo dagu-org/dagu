@@ -22,7 +22,6 @@ import {
   useSSECacheSync,
 } from '../../../hooks/useSSECacheSync';
 import { useSubDAGRunSSE } from '../../../hooks/useSubDAGRunSSE';
-import dayjs from '../../../lib/dayjs';
 import {
   hasWorkspaceLabel,
   sanitizeWorkspaceName,
@@ -39,6 +38,7 @@ import {
   PageLoading,
 } from '@/components/PageStates';
 import { isNotFoundQueryError } from '@/lib/queryErrors';
+import { buildDAGRunPageURL } from '@/features/dag-runs/lib/dagRunUrls';
 
 type Params = {
   fileName: string;
@@ -91,23 +91,6 @@ function DAGDetails() {
 
   // Determine active tab
   const tab = params.tab === 'docs' ? 'wiki' : params.tab || 'status';
-
-  // Format duration utility function
-  const formatDuration = useCallback(
-    (startDate: string, endDate: string): string => {
-      if (!startDate || !endDate) return '--';
-
-      const duration = dayjs.duration(dayjs(endDate).diff(dayjs(startDate)));
-      const hours = Math.floor(duration.asHours());
-      const minutes = duration.minutes();
-      const seconds = duration.seconds();
-
-      if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
-      if (minutes > 0) return `${minutes}m ${seconds}s`;
-      return `${seconds}s`;
-    },
-    []
-  );
 
   // Build URL with remote node parameter if needed
   const buildUrl = useCallback(
@@ -165,6 +148,23 @@ function DAGDetails() {
   useEffect(() => {
     setTitle(dagTitle);
   }, [dagTitle, setTitle]);
+
+  // A run is selected on the run page. Links that name a run on the
+  // workflow's Overview, from older versions or bookmarks, redirect there.
+  const runRootName = queriedDAGRunName || dagData?.dag?.name;
+  useEffect(() => {
+    if (tab !== 'status' || !dagRunId || !runRootName) return;
+    navigate(
+      buildDAGRunPageURL({
+        rootDAGRunName: runRootName,
+        rootDAGRunId: dagRunId,
+        subDAGRunId: subDAGRunId ?? undefined,
+        remoteNode,
+        step: stepName ?? undefined,
+      }),
+      { replace: true }
+    );
+  }, [dagRunId, navigate, remoteNode, runRootName, stepName, subDAGRunId, tab]);
 
   const dagLabels = [
     ...(dagData?.dag?.labels ?? []),
@@ -253,14 +253,17 @@ function DAGDetails() {
     DAGRunDetails | undefined
   >(undefined);
 
-  // Refresh all relevant data based on current view
-  const refreshData = useCallback(() => {
-    mutateDag();
-    if (subDAGRunId) {
-      mutateSubDagRun();
-    } else if (effectiveDAGRunId) {
-      mutateDagRun();
-    }
+  // Refresh all relevant data based on current view. The returned promise
+  // settles when the reads finish, so a refresh button can show progress.
+  const refreshData = useCallback(async () => {
+    await Promise.all([
+      mutateDag(),
+      subDAGRunId
+        ? mutateSubDagRun()
+        : effectiveDAGRunId
+          ? mutateDagRun()
+          : undefined,
+    ]);
   }, [
     mutateDag,
     mutateDagRun,
@@ -327,7 +330,6 @@ function DAGDetails() {
                     currentDAGRun={displayDAGRun}
                     fileName={fileName}
                     refreshFn={refreshData}
-                    formatDuration={formatDuration}
                     buildScopedUrl={buildUrl}
                     pinned={dagData.pinned}
                   />
@@ -337,7 +339,6 @@ function DAGDetails() {
                       dag={dagData.dag}
                       currentDAGRun={displayDAGRun}
                       refreshFn={refreshData}
-                      formatDuration={formatDuration}
                       activeTab={tab}
                       onTabChange={handleTabChange}
                       dagRunId={displayDAGRunId}

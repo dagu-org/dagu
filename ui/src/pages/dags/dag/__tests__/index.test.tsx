@@ -86,6 +86,7 @@ function renderPage(initialEntry = '/dags/release-notes') {
         <Routes>
           <Route path="/dags/:fileName" element={<DAGDetails />} />
           <Route path="/dags/:fileName/:tab" element={<DAGDetails />} />
+          <Route path="*" element={null} />
         </Routes>
       </AppBarContext.Provider>
     </MemoryRouter>
@@ -120,7 +121,9 @@ describe('DAGDetails page', () => {
   });
 
   it('falls back to the latest run when a pinned run is missing', () => {
-    renderPage('/dags/release-notes?dagRunId=missing&dagRunName=release-notes');
+    renderPage(
+      '/dags/release-notes/log?dagRunId=missing&dagRunName=release-notes&step=build'
+    );
 
     expect(screen.getByText('Output for run-1')).toBeVisible();
   });
@@ -166,6 +169,20 @@ describe('DAGDetails page', () => {
     expect(screen.getByText('disk is full')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(mutate).toHaveBeenCalled();
+  });
+
+  // Runs are selected on the run page; older links that name a run on the
+  // workflow page land there instead.
+  it('sends a run named on the workflow page to the run page', async () => {
+    renderPage(
+      '/dags/release-notes?dagRunId=run-7&subDAGRunId=child-2&dagRunName=release-notes&step=deploy'
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location')).toHaveTextContent(
+        '/dag-runs/release-notes/run-7?remoteNode=local&subDAGRunId=child-2&dagRunId=run-7&dagRunName=release-notes&step=deploy'
+      );
+    });
   });
 
   it('redirects the legacy docs tab to the Wiki tab', async () => {
