@@ -4,6 +4,7 @@
 package browserhost_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -81,10 +82,32 @@ func (f *scriptedBrowser) serve(w http.ResponseWriter, r *http.Request) {
 		f.mu.Lock()
 		f.commands = append(f.commands, command.cdpCommand)
 		f.mu.Unlock()
-		send(map[string]any{"id": command.ID, "sessionId": command.SessionID, "result": map[string]any{}})
-		for _, event := range f.script(command.cdpCommand) {
+		reply := map[string]any{"id": command.ID, "sessionId": command.SessionID, "result": map[string]any{}}
+		events := f.script(command.cdpCommand)
+		// Chrome reports the targets an auto-attach request attaches to
+		// before it answers the request.
+		if command.Method == "Target.setAutoAttach" {
+			for _, event := range events {
+				send(event)
+			}
+			send(reply)
+			continue
+		}
+		send(reply)
+		for _, event := range events {
 			send(event)
 		}
+	}
+}
+
+// emit sends event on every DevTools connection, as a browser reports what
+// no command caused, such as a page opening a file picker.
+func (f *scriptedBrowser) emit(event cdpEvent) {
+	data, _ := json.Marshal(event)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, conn := range f.conns {
+		_ = conn.Write(context.Background(), websocket.MessageText, data)
 	}
 }
 
