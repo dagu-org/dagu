@@ -29,6 +29,7 @@ type Store struct {
 	artifactDir     string
 	cache           *fileutil.Cache[*ir.DAGRunStatus]
 	retryCandidates retryCandidateCache
+	listTuning      statusListTuning
 }
 
 // StoreOption configures filesystem DAG-run storage.
@@ -82,6 +83,7 @@ func NewStore(baseDir string, opts ...StoreOption) *Store {
 		artifactDir:     cfg.artifactDir,
 		cache:           cfg.fileCache,
 		retryCandidates: retryCandidateCache{limit: cfg.retryCandidateCacheLimit},
+		listTuning:      defaultStatusListTuning,
 	}
 }
 
