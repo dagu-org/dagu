@@ -36,6 +36,7 @@ import { WorkspaceSelector } from './components/workspace/WorkspaceSelector';
 import { LanguageSelector } from './components/LanguageSelector';
 import { useI18n } from './i18n/I18nProvider';
 import { useNavigationSections } from './hooks/useNavigationSections';
+import { useScrollFade } from './hooks/useScrollFade';
 import {
   commandPaletteShortcut,
   useCommandPalette,
@@ -58,6 +59,8 @@ type MainListItemsProps = {
   onNavItemClick?: () => void;
   onToggle?: () => void;
   customColor?: boolean;
+  /** Leaves the title and collapse toggle to a container that has its own. */
+  hideHeader?: boolean;
 };
 
 const DEFAULT_TITLE = 'Dagu';
@@ -407,7 +410,13 @@ export const mainListItems = React.forwardRef<
   HTMLDivElement,
   MainListItemsProps
 >(function MainListItems(
-  { isOpen = false, onNavItemClick, onToggle, customColor = false },
+  {
+    isOpen = false,
+    onNavItemClick,
+    onToggle,
+    customColor = false,
+    hideHeader = false,
+  },
   ref
 ) {
   const config = useConfig();
@@ -458,69 +467,75 @@ export const mainListItems = React.forwardRef<
 
   const title = config.title || DEFAULT_TITLE;
   const titleInitial = getTitleInitial(title);
+  // The nav scrolls on short screens; the fade shows sections below.
+  const [navRef, navFade] = useScrollFade<HTMLElement>('y');
 
   return (
     <div ref={ref} className="flex flex-col h-full">
       {/* Developer-tool Header - Clean & Minimal */}
-      <div className="h-14 relative mb-4 flex items-center border-b border-sidebar-border px-1">
-        <button
-          onClick={onToggle}
-          className={cn(
-            'h-9 px-2 rounded-md flex-shrink-0 flex items-center justify-center',
-            'text-sidebar-foreground',
-            sidebarItemClassName
-          )}
-          aria-label={
-            isOpen
-              ? t('navigation.collapseSidebar')
-              : t('navigation.expandSidebar')
-          }
-        >
-          {/* Expand icon (character) - visible when collapsed */}
-          <div
-            className="w-7 h-7 rounded-md flex items-center justify-center border border-sidebar-foreground absolute"
-            style={{
-              transition:
-                'opacity 200ms cubic-bezier(0.4, 0, 0.2, 1), transform 200ms cubic-bezier(0.4, 0, 0.2, 1)',
-              opacity: isOpen ? 0 : 1,
-              transform: isOpen ? 'scale(0.8)' : 'scale(1)',
-              pointerEvents: isOpen ? 'none' : 'auto',
-            }}
+      {!hideHeader && (
+        <div className="h-14 relative mb-4 flex items-center border-b border-sidebar-border px-1">
+          <button
+            onClick={onToggle}
+            className={cn(
+              'h-9 px-2 rounded-md flex-shrink-0 flex items-center justify-center',
+              'text-sidebar-foreground',
+              sidebarItemClassName
+            )}
+            aria-label={
+              isOpen
+                ? t('navigation.collapseSidebar')
+                : t('navigation.expandSidebar')
+            }
           >
-            <span className="font-medium text-xs text-sidebar-foreground">
-              {titleInitial}
-            </span>
-          </div>
-          {/* Collapse icon (PanelLeft) - visible when expanded */}
-          <div
+            {/* Expand icon (character) - visible when collapsed */}
+            <div
+              className="w-7 h-7 rounded-md flex items-center justify-center border border-sidebar-foreground absolute"
+              style={{
+                transition:
+                  'opacity 200ms cubic-bezier(0.4, 0, 0.2, 1), transform 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+                opacity: isOpen ? 0 : 1,
+                transform: isOpen ? 'scale(0.8)' : 'scale(1)',
+                pointerEvents: isOpen ? 'none' : 'auto',
+              }}
+            >
+              <span className="font-medium text-xs text-sidebar-foreground">
+                {titleInitial}
+              </span>
+            </div>
+            {/* Collapse icon (PanelLeft) - visible when expanded */}
+            <div
+              style={{
+                transition:
+                  'opacity 200ms cubic-bezier(0.4, 0, 0.2, 1), transform 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+                opacity: isOpen ? 1 : 0,
+                transform: isOpen ? 'scale(1)' : 'scale(0.8)',
+              }}
+            >
+              <PanelLeft size={18} />
+            </div>
+          </button>
+          <span
+            className={cn(
+              'font-semibold tracking-tight text-sidebar-accent-foreground select-none whitespace-nowrap leading-tight ml-1 overflow-hidden',
+              getResponsiveTitleClass(title, 'sidebar-expanded')
+            )}
             style={{
               transition:
-                'opacity 200ms cubic-bezier(0.4, 0, 0.2, 1), transform 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+                'opacity 200ms cubic-bezier(0.4, 0, 0.2, 1), transform 200ms cubic-bezier(0.4, 0, 0.2, 1), max-width 280ms cubic-bezier(0.4, 0, 0.2, 1)',
               opacity: isOpen ? 1 : 0,
-              transform: isOpen ? 'scale(1)' : 'scale(0.8)',
+              maxWidth: isOpen ? '180px' : '0px',
+              transform: isOpen ? 'translateX(0)' : 'translateX(-8px)',
             }}
           >
-            <PanelLeft size={18} />
-          </div>
-        </button>
-        <span
-          className={cn(
-            'font-semibold tracking-tight text-sidebar-accent-foreground select-none whitespace-nowrap leading-tight ml-1 overflow-hidden',
-            getResponsiveTitleClass(title, 'sidebar-expanded')
-          )}
-          style={{
-            transition:
-              'opacity 200ms cubic-bezier(0.4, 0, 0.2, 1), transform 200ms cubic-bezier(0.4, 0, 0.2, 1), max-width 280ms cubic-bezier(0.4, 0, 0.2, 1)',
-            opacity: isOpen ? 1 : 0,
-            maxWidth: isOpen ? '180px' : '0px',
-            transform: isOpen ? 'translateX(0)' : 'translateX(-8px)',
-          }}
-        >
-          {title}
-        </span>
-      </div>
+            {title}
+          </span>
+        </div>
+      )}
       {/* Developer-tool Navigation - Compact Spacing */}
       <nav
+        ref={navRef}
+        style={navFade}
         aria-label={t('navigation.primary')}
         className="flex-1 min-h-0 overflow-y-auto pr-1 flex flex-col gap-4"
       >

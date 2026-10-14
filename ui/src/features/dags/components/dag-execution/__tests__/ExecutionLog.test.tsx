@@ -9,7 +9,7 @@ import StepLog from '../StepLog';
 import ExecutionLog from '../ExecutionLog';
 import LogPageSizeSelect from '../LogPageSizeSelect';
 import { downloadFromUrl, downloadFromForm } from '@/lib/download';
-import { NodeStatus, Stream } from '@/api/v1/schema';
+import { NodeStatus, Status, Stream } from '@/api/v1/schema';
 import type { StepLogSSEResponse } from '@/hooks/useStepLogSSE';
 import { UserPreferencesProvider } from '@/contexts/UserPreference';
 
@@ -166,6 +166,63 @@ describe('StepLog', () => {
     expect(filename).toBe('example-run-each-2.inner.0-body-stderr.log');
   });
 
+  it('switches between stdout and stderr in place', () => {
+    render(
+      <StepLog
+        dagName="example"
+        dagRunId="run"
+        stepName="build"
+        node={{ status: NodeStatus.Success } as never}
+      />,
+      { wrapper: UserPreferencesProvider }
+    );
+    expect(screen.getByRole('button', { name: 'stdout' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'stderr' }));
+
+    expect(logs.queries[logs.queries.length - 1]).toMatchObject({
+      stream: Stream.stderr,
+    });
+    expect(screen.getByRole('button', { name: 'stderr' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+  });
+
+  // A caller that follows the tail owns the stream, so a switch must not
+  // render the previous stream first.
+  it('reads a caller-owned stream switch without the previous stream', () => {
+    const { rerender } = render(
+      <StepLog
+        dagName="example"
+        dagRunId="run"
+        stepName="build"
+        followTail
+        stream={Stream.stdout}
+      />,
+      { wrapper: UserPreferencesProvider }
+    );
+    logs.queries = [];
+
+    rerender(
+      <StepLog
+        dagName="example"
+        dagRunId="run"
+        stepName="build"
+        followTail
+        stream={Stream.stderr}
+      />
+    );
+
+    expect(logs.queries.length).toBeGreaterThan(0);
+    expect(logs.queries).toEqual(
+      logs.queries.map((query) => ({ ...query, stream: Stream.stderr }))
+    );
+  });
+
   it('shows the beginning of an active log when requested', async () => {
     const props = {
       dagName: 'example',
@@ -320,6 +377,203 @@ describe('StepLog', () => {
       await vi.waitFor(() => expect(onSettled).toHaveBeenCalledWith('build'));
     }
   );
+});
+
+// New lines push the oldest ones out of a tail, so the view must hold still
+// while someone reads it.
+describe('ExecutionLog follow', () => {
+  const runningRun = {
+    name: 'example',
+    dagRunId: 'run',
+    status: Status.Running,
+  } as never;
+
+  it('holds the lines in place while reading and resumes on request', () => {
+    logs.data = {
+      content: 'scheduler started',
+      totalLines: 1,
+      lineCount: 1,
+      hasMore: false,
+    };
+    const { rerender } = render(
+      <ExecutionLog name="example" dagRunId="run" dagRun={runningRun} />,
+      { wrapper: UserPreferencesProvider }
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Raw' }));
+    const region = screen.getByRole('region', { name: 'Run log' });
+
+    fireEvent.wheel(region, { deltaY: -120 });
+    logs.data = {
+      content: 'scheduler started\nstep done',
+      totalLines: 2,
+      lineCount: 2,
+      hasMore: false,
+    };
+    rerender(
+      <ExecutionLog name="example" dagRunId="run" dagRun={runningRun} />
+    );
+
+    expect(screen.queryByText('step done')).not.toBeInTheDocument();
+    expect(screen.getByText('New output available')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back to live' }));
+    expect(screen.getByText('step done')).toBeInTheDocument();
+  });
+
+  it('keeps the newest lines in view when the display changes', () => {
+    render(<ExecutionLog name="example" dagRunId="run" dagRun={runningRun} />, {
+      wrapper: UserPreferencesProvider,
+    });
+    const region = screen.getByRole('region', { name: 'Run log' });
+    Object.defineProperty(region, 'scrollHeight', {
+      configurable: true,
+      value: 1000,
+    });
+    region.scrollTop = 0;
+
+    fireEvent.click(screen.getByRole('button', { name: 'Raw' }));
+
+    expect(region.scrollTop).toBe(1000);
+  });
+
+  // The log stays mounted when the page moves to another run.
+  it('drops the held lines when another run is shown', () => {
+    logs.data = {
+      content: 'first run line',
+      totalLines: 1,
+      lineCount: 1,
+      hasMore: false,
+    };
+    const { rerender } = render(
+      <ExecutionLog name="example" dagRunId="run" dagRun={runningRun} />,
+      { wrapper: UserPreferencesProvider }
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Raw' }));
+    fireEvent.wheel(screen.getByRole('region', { name: 'Run log' }), {
+      deltaY: -120,
+    });
+
+    logs.data = {
+      content: 'second run line',
+      totalLines: 1,
+      lineCount: 1,
+      hasMore: false,
+    };
+    rerender(
+      <ExecutionLog
+        name="example"
+        dagRunId="run-2"
+        dagRun={{ ...(runningRun as object), dagRunId: 'run-2' } as never}
+      />
+    );
+
+    expect(screen.getByText('second run line')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Back to live' })
+    ).not.toBeInTheDocument();
+  });
+
+  // A tail of repeated lines can look the same after a line is added.
+  it('announces new lines when the held tail reads the same', () => {
+    logs.data = {
+      content: 'tick\ntick',
+      totalLines: 2,
+      lineCount: 2,
+      hasMore: true,
+    };
+    const { rerender } = render(
+      <ExecutionLog name="example" dagRunId="run" dagRun={runningRun} />,
+      { wrapper: UserPreferencesProvider }
+    );
+    fireEvent.wheel(screen.getByRole('region', { name: 'Run log' }), {
+      deltaY: -120,
+    });
+
+    logs.data = { ...logs.data, totalLines: 3 };
+    rerender(
+      <ExecutionLog name="example" dagRunId="run" dagRun={runningRun} />
+    );
+
+    expect(screen.getByText('New output available')).toBeInTheDocument();
+  });
+
+  it('keeps a finished log where its reader is when the display changes', () => {
+    render(
+      <ExecutionLog
+        name="example"
+        dagRunId="run"
+        dagRun={{ ...(runningRun as object), status: Status.Success } as never}
+      />,
+      { wrapper: UserPreferencesProvider }
+    );
+    const region = screen.getByRole('region', { name: 'Run log' });
+    Object.defineProperty(region, 'scrollHeight', {
+      configurable: true,
+      value: 1000,
+    });
+    region.scrollTop = 200;
+
+    fireEvent.click(screen.getByRole('button', { name: 'Raw' }));
+
+    expect(region.scrollTop).toBe(200);
+  });
+
+  // A finished log opens on its newest lines, but a reader who moves keeps
+  // their place when the lines are fetched again.
+  it('follows a finished log until its reader moves', () => {
+    const finishedRun = {
+      ...(runningRun as object),
+      status: Status.Success,
+    } as never;
+    const { rerender } = render(
+      <ExecutionLog name="example" dagRunId="run" dagRun={finishedRun} />,
+      { wrapper: UserPreferencesProvider }
+    );
+    const region = screen.getByRole('region', { name: 'Run log' });
+    Object.defineProperty(region, 'scrollHeight', {
+      configurable: true,
+      value: 1000,
+    });
+    logs.data = { ...logs.data, content: 'first output\nlast output' };
+    rerender(
+      <ExecutionLog name="example" dagRunId="run" dagRun={finishedRun} />
+    );
+    expect(region.scrollTop).toBe(1000);
+
+    region.scrollTop = 200;
+    fireEvent.wheel(region, { deltaY: -120 });
+    logs.data = { ...logs.data, content: 'first output\nlast output\nfooter' };
+    rerender(
+      <ExecutionLog name="example" dagRunId="run" dagRun={finishedRun} />
+    );
+
+    expect(region.scrollTop).toBe(200);
+    expect(
+      screen.queryByRole('button', { name: 'Back to live' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows another range instead of the held lines', () => {
+    logs.data = {
+      content: 'line 9\nline 10',
+      totalLines: 10,
+      lineCount: 2,
+      hasMore: true,
+    };
+    logs.head = { content: 'line 1\nline 2' };
+    render(<ExecutionLog name="example" dagRunId="run" dagRun={runningRun} />, {
+      wrapper: UserPreferencesProvider,
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Raw' }));
+    fireEvent.wheel(screen.getByRole('region', { name: 'Run log' }), {
+      deltaY: -120,
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show beginning' }));
+
+    expect(screen.getByText('line 1')).toBeInTheDocument();
+    expect(screen.queryByText('line 10')).not.toBeInTheDocument();
+  });
 });
 
 describe('ExecutionLog ZIP download', () => {

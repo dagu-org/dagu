@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ReloadButton } from '@/components/ui/reload-button';
 import { Switch } from '@/components/ui/switch';
+import { ToggleButton, ToggleGroup } from '@/components/ui/toggle-group';
 import { downloadFromUrl } from '@/lib/download';
 import { useConfig } from '../../../../contexts/ConfigContext';
 import { useRemoteNode } from '../../../../contexts/RemoteNodeContext';
@@ -37,6 +38,8 @@ import LogPageSizeSelect from './LogPageSizeSelect';
 import { I18nText } from '@/i18n/I18nText';
 import { I18nProps } from '@/i18n/I18nProps';
 import { useI18n } from '@/i18n/I18nProvider';
+import { LogChunks } from './LogChunks';
+import { LogViewModeSwitch } from './LogViewModeSwitch';
 
 const TAIL_THRESHOLD_PX = 4;
 const SSE_TAIL_LINES = 1000;
@@ -77,6 +80,13 @@ type Props = {
   followTail?: boolean;
   onFollowTailChange?: (following: boolean) => void;
   onSettled?: (stepName: string) => void;
+  /** Reports the stream shown after the reader switches it in place. */
+  onStreamShown?: (stream: Stream) => void;
+};
+
+type ContentProps = Props & {
+  /** Switches the shown stream; absent when the caller owns the stream. */
+  onStreamChange?: (stream: Stream) => void;
 };
 
 /**
@@ -85,19 +95,48 @@ type Props = {
  */
 function StepLog(props: Props) {
   const remoteNode = useRemoteNode();
+  // The viewer switches streams itself unless a caller that follows the tail,
+  // such as Run progress, owns the stream. A new stream from the caller
+  // replaces the viewer's choice in the same render, so the previous stream
+  // is never read.
+  const ownsStream = props.followTail !== undefined;
+  const [selectedStream, setSelectedStream] = useState(
+    props.stream ?? Stream.stdout
+  );
+  const [streamProp, setStreamProp] = useState(props.stream);
+  if (streamProp !== props.stream) {
+    setStreamProp(props.stream);
+    setSelectedStream(props.stream ?? Stream.stdout);
+  }
+  const stream = ownsStream ? (props.stream ?? Stream.stdout) : selectedStream;
+  const { onStreamShown } = props;
+  const showStream = useCallback(
+    (next: Stream) => {
+      setSelectedStream(next);
+      onStreamShown?.(next);
+    },
+    [onStreamShown]
+  );
   // A log identity owns its search, cache and scroll position.
   const identity = JSON.stringify([
     remoteNode,
     props.dagName,
     props.dagRunId,
     props.stepName,
-    props.stream,
+    stream,
     props.dagRun?.rootDAGRunName,
     props.dagRun?.rootDAGRunId,
     props.foreach?.stepName,
     props.foreach?.item,
   ]);
-  return <StepLogContent key={identity} {...props} />;
+  return (
+    <StepLogContent
+      key={identity}
+      {...props}
+      stream={stream}
+      onStreamChange={ownsStream ? undefined : showStream}
+    />
+  );
 }
 
 function StepLogContent({
@@ -112,7 +151,8 @@ function StepLogContent({
   followTail,
   onFollowTailChange,
   onSettled,
-}: Props) {
+  onStreamChange,
+}: ContentProps) {
   const { ts } = useI18n();
   const remoteNode = useRemoteNode();
   const config = useConfig();
@@ -528,34 +568,27 @@ function StepLogContent({
       {/* Controls for log navigation */}
       <div className="mb-2 flex shrink-0 flex-col gap-2 rounded bg-muted p-2">
         <div className="flex flex-wrap items-center gap-2">
-          {/* Responsive button container */}
+          {onStreamChange && (
+            <ToggleGroup aria-label={ts('Stream')} className="p-0.5">
+              {[Stream.stdout, Stream.stderr].map((option) => (
+                <ToggleButton
+                  key={option}
+                  value={option}
+                  groupValue={stream}
+                  onClick={() => onStreamChange(option)}
+                  className="h-7 px-2.5 font-mono"
+                >
+                  {option}
+                </ToggleButton>
+              ))}
+            </ToggleGroup>
+          )}
           {showNavigation && (
-            <div className="flex flex-wrap gap-1">
-              <Button
-                size="sm"
-                variant={viewMode === 'tail' ? 'primary' : 'default'}
-                onClick={() => handleViewModeChange('tail')}
-                disabled={isNavigating}
-              >
-                <I18nText text={'Show end'} />
-              </Button>
-              <Button
-                size="sm"
-                variant={viewMode === 'head' ? 'primary' : 'default'}
-                onClick={() => handleViewModeChange('head')}
-                disabled={isNavigating}
-              >
-                <I18nText text={'Show beginning'} />
-              </Button>
-              <Button
-                size="sm"
-                variant={viewMode === 'page' ? 'primary' : 'default'}
-                onClick={() => handleViewModeChange('page')}
-                disabled={isNavigating}
-              >
-                <I18nText text={'Page View'} />
-              </Button>
-            </div>
+            <LogViewModeSwitch
+              value={viewMode}
+              onChange={handleViewModeChange}
+              disabled={isNavigating}
+            />
           )}
 
           {showNavigation && (
@@ -902,32 +935,38 @@ function StepLogContent({
         <pre
           className={`font-mono text-sm text-foreground log-content ${preferences.logWrap ? '' : 'min-w-max'}`}
         >
-          {lines.map((line, index) => (
-            <div
-              key={index}
-              className="flex pr-2 py-0.5"
-              data-log-index={index}
-            >
-              <span
-                className="text-muted-foreground mr-4 select-none w-14 text-right flex-shrink-0 self-start sticky left-0 bg-muted pl-4 pr-2 z-10"
-                data-line-number={getLineNumber(index)}
-              >
-                {getLineNumber(index)}
-              </span>
-              <span
-                className={`flex-grow select-text cursor-text ${preferences.logWrap ? 'whitespace-pre-wrap break-all' : 'whitespace-pre'}`}
-              >
-                {line ? (
-                  <AnsiLine
-                    text={line}
-                    highlight={trimmedSearch || undefined}
-                  />
-                ) : (
-                  ' '
-                )}
-              </span>
-            </div>
-          ))}
+          <LogChunks
+            count={lines.length}
+            renderLine={(index) => {
+              const line = lines[index];
+              return (
+                <div
+                  key={index}
+                  className="flex pr-2 py-0.5"
+                  data-log-index={index}
+                >
+                  <span
+                    className="text-muted-foreground mr-4 select-none w-14 text-right flex-shrink-0 self-start sticky left-0 bg-muted pl-4 pr-2 z-10"
+                    data-line-number={getLineNumber(index)}
+                  >
+                    {getLineNumber(index)}
+                  </span>
+                  <span
+                    className={`flex-grow select-text cursor-text ${preferences.logWrap ? 'whitespace-pre-wrap break-all' : 'whitespace-pre'}`}
+                  >
+                    {line ? (
+                      <AnsiLine
+                        text={line}
+                        highlight={trimmedSearch || undefined}
+                      />
+                    ) : (
+                      ' '
+                    )}
+                  </span>
+                </div>
+              );
+            }}
+          />
         </pre>
       </div>
     </div>

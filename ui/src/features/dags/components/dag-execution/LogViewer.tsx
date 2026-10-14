@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRemoteNode } from '@/contexts/RemoteNodeContext';
 import { buildDAGPageURL } from '@/features/dag-runs/lib/dagRunUrls';
 import { components, NodeStatus, Stream } from '../../../../api/v1/schema';
@@ -56,9 +56,14 @@ const LogViewer: React.FC<LogViewerProps> = ({
   const title =
     logType === 'execution'
       ? `Execution Log: ${dagName}`
-      : `Step Log (${stream}): ${stepTitle}`;
+      : `Step log: ${stepTitle}`;
 
   const remoteNode = useRemoteNode();
+  // A step log can switch streams in place; the new-tab link follows it.
+  const [shownStream, setShownStream] = useState(stream);
+  useEffect(() => {
+    setShownStream(stream);
+  }, [stream]);
   const sourceFile = dagRun?.sourceFileName || fileName;
   const subRun = isSubDAGRun(dagRun);
   const isStepLog = logType === 'step';
@@ -73,7 +78,10 @@ const LogViewer: React.FC<LogViewerProps> = ({
           rootDAGRunName: subRun ? dagRun?.rootDAGRunName : undefined,
           subDAGRunId: subRun ? dagRun?.dagRunId : undefined,
           step: isStepLog ? stepName : undefined,
-          stream: isStepLog && stream !== Stream.stdout ? stream : undefined,
+          stream:
+            isStepLog && shownStream !== Stream.stdout
+              ? shownStream
+              : undefined,
         })
       : undefined;
 
@@ -108,6 +116,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
               dagRun={dagRun}
               stream={stream}
               node={node}
+              onStreamShown={setShownStream}
             />
           ))
         )}

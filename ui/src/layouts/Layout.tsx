@@ -285,14 +285,14 @@ function Content({ navbarColor, children }: LayoutProps) {
             aria-modal="true"
             aria-labelledby="mobile-navigation-title"
             className={cn(
-              'h-full w-64 overflow-hidden shadow-lg border-r border-border',
+              'flex h-full w-64 flex-col overflow-hidden shadow-lg border-r border-border',
               !hasCustomColor && 'bg-sidebar text-sidebar-foreground',
               hasCustomColor && 'custom-sidebar-color'
             )}
             style={sidebarStyle}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center p-4 border-b border-sidebar-border">
+            <div className="flex shrink-0 justify-between items-center p-4 border-b border-sidebar-border">
               <span
                 id="mobile-navigation-title"
                 className={cn(
@@ -315,14 +315,14 @@ function Content({ navbarColor, children }: LayoutProps) {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="flex flex-col h-full pt-2">
-              <div className="flex-1 overflow-y-auto min-h-0 px-2">
-                <MainListItems
-                  isOpen={true}
-                  onNavItemClick={closeMobileSidebar}
-                  customColor={hasCustomColor}
-                />
-              </div>
+            {/* The menu scrolls its nav and keeps its footer in view. */}
+            <div className="min-h-0 flex-1 px-2 pt-2">
+              <MainListItems
+                isOpen={true}
+                onNavItemClick={closeMobileSidebar}
+                customColor={hasCustomColor}
+                hideHeader
+              />
             </div>
           </div>
         </div>
