@@ -76,10 +76,10 @@ func (e *changeToolError) Error() string {
 	return e.Message
 }
 
-// changeToolInputSchema is deliberately flat: no root-level oneOf/anyOf/allOf. Some MCP clients
-// (ChatGPT's connector) collapse a root-level oneOf into a generic object and then drop every
-// argument not declared inside the chosen branch, so only "type" reached the server. The per-type
-// required/allowed fields are enforced by validateChangeInput and documented in the descriptions.
+// changeToolInputSchema stays flat, without root-level oneOf/anyOf/allOf,
+// because some MCP clients (such as ChatGPT's connector) drop arguments outside
+// a root combinator branch. validateChangeInput enforces the per-type fields
+// that the descriptions list.
 func changeToolInputSchema() json.RawMessage {
 	return json.RawMessage(`{
 		"type": "object",
