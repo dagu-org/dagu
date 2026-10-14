@@ -173,25 +173,28 @@ Visit http://localhost:8080
 
 ## How You Run Dagu
 
-Dagu runs on one machine, on temporary workers your platform creates for each run, or on workers you keep running. All three are self-hosted, and the same workflow YAML runs on any of them. See the [Deployment Models guide](https://docs.dagu.sh/overview/deployment-models).
+Dagu runs on one machine, on temporary workers your platform creates for each run, or on workers you keep running. All three are self-hosted, and the same workflow YAML runs on any of them. Any of them can report to Dagu Console, which shows your servers together and emails you when a workflow fails or a server goes silent. See the [Deployment Models guide](https://docs.dagu.sh/overview/deployment-models).
 
 <table>
   <tr>
     <td width="50%" align="center" valign="top">
       <strong>Single server</strong><br>
-      <img src="./assets/images/deployment-model-local.gif" width="100%" alt="Single-server deployment model with one Dagu server handling scheduling and execution.">
+      <img src="./assets/images/deployment-model-single-server.svg" width="100%" alt="Single server: one machine runs dagu start-all; the Dagu server runs your steps and writes DAGs, run history, and logs to local files.">
     </td>
     <td width="50%" align="center" valign="top">
       <strong>Temporary workers</strong><br>
-      <img src="./assets/images/deployment-model-shared-volume.gif" width="100%" alt="Deployment model where a launcher provisions a temporary worker per run, the worker writes state to a shared volume and is destroyed, and an always-on Dagu server reads that state.">
+      <img src="./assets/images/deployment-model-temporary-workers.svg" width="100%" alt="Temporary workers: your launcher starts a temporary worker that runs dagu start and writes state to a shared volume; the always-on Dagu server reads the same volume, with no network path between the two.">
     </td>
   </tr>
   <tr>
     <td width="50%" align="center" valign="top">
       <strong>Distributed workers</strong><br>
-      <img src="./assets/images/deployment-model-self-hosted.gif" width="100%" alt="Distributed-worker deployment where the Dagu server dispatches tasks into a coordinator and workers on separate hosts poll it over gRPC, reporting status and logs back, with the server and persistent volume sharing the same data.">
+      <img src="./assets/images/deployment-model-distributed-workers.svg" width="100%" alt="Distributed workers: workers on your hosts poll the coordinator in the Dagu server over outbound gRPC, so they need no inbound port; the server writes status, logs, and artifacts to Dagu data.">
     </td>
-    <td width="50%"></td>
+    <td width="50%" align="center" valign="top">
+      <strong>Monitoring with Dagu Console</strong><br>
+      <img src="./assets/images/deployment-model-console-monitoring.svg" width="100%" alt="Monitoring with Dagu Console: three servers, one per topology, report metadata to Dagu Console over outbound HTTPS; Dagu Console shows them together and emails you when a workflow fails or a server goes silent, while logs, outputs, and secrets stay on each server.">
+    </td>
   </tr>
 </table>
 
