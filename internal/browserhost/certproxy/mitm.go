@@ -48,6 +48,9 @@ const (
 	maxCommonNameLength = 64
 	// relayBufferBytes sizes each read relayed from a server.
 	relayBufferBytes = 32 << 10
+	// drainTimeout bounds how long the proxy reads from a server once the
+	// browser's side of a tunnel ended.
+	drainTimeout = 5 * time.Second
 	// defaultTLSPort is the port of a CONNECT authority that names none.
 	defaultTLSPort = "443"
 	// remoteErrorOp marks the error of an alert a TLS peer sent.
@@ -545,20 +548,17 @@ func rejectionAlert(err error) (string, bool) {
 }
 
 // relay copies between the browser and the server until either side ends.
+// Once the browser's side ends, what the server already sent, such as an
+// alert refusing the client certificate, is still read for up to
+// drainTimeout before both close.
 func (s *server) relay(client *tls.Conn, upstream *upstreamConn, host string, entry *upstreamEntry, pending int64) {
-	var once sync.Once
-	closeBoth := func() {
-		once.Do(func() {
-			_ = client.Close()
-			_ = upstream.Close()
-		})
-	}
 	go func() {
 		_, _ = io.Copy(upstream, client)
-		closeBoth()
+		_ = upstream.SetReadDeadline(time.Now().Add(drainTimeout))
 	}()
 	s.copyFromServer(client, upstream, host, entry, pending)
-	closeBoth()
+	_ = client.Close()
+	_ = upstream.Close()
 }
 
 // copyFromServer copies what the server sends to the browser. Under TLS

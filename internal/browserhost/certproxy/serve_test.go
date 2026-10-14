@@ -5,6 +5,8 @@ package certproxy
 
 import (
 	"crypto/tls"
+	"crypto/x509"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -13,7 +15,9 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -117,6 +121,57 @@ func TestServeReportsRejectedCertificate(t *testing.T) {
 			assert.Contains(t, event.Message, "127.0.0.1 rejected the client certificate "+testLabel+": ")
 		})
 	}
+}
+
+// A server's refusal of the client certificate is reported even when it
+// arrives after the browser closed its side: the proxy reads what the
+// server sends before it closes the connection to it.
+func TestServeReportsRejectionAfterBrowserCloses(t *testing.T) {
+	t.Parallel()
+
+	ca, other := newTestCA(t, "corp CA"), newTestCA(t, "other CA")
+	cert, key := ca.issue(t, certOptions{name: siteHost, ips: []net.IP{net.IPv4(127, 0, 0, 1)}})
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	site := httptest.NewUnstartedServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	site.TLS = &tls.Config{
+		Certificates: []tls.Certificate{{Certificate: [][]byte{cert.Raw}, PrivateKey: key}},
+		// Under TLS 1.3 the client finishes its handshake before the
+		// server judges its certificate; holding the verdict orders it
+		// after the browser closed.
+		ClientAuth: tls.RequireAnyClientCert,
+		VerifyPeerCertificate: func([][]byte, [][]*x509.Certificate) error {
+			<-release
+			return errors.New("the client certificate is not accepted")
+		},
+	}
+	site.Config.ErrorLog = log.New(io.Discard, "", 0)
+	site.StartTLS()
+	t.Cleanup(site.Close)
+	t.Cleanup(func() { releaseOnce.Do(func() { close(release) }) })
+	entry := other.clientEntry(t, testLabel, "127.0.0.1")
+	entry.CAPEM = ca.pem()
+	cfg := testConfig(t, "", entry)
+	ready := serveProxy(t, cfg)
+
+	raw, status, err := connectThrough(fmt.Sprintf("127.0.0.1:%d", ready.Port), siteAddr(site))
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, status)
+	browser := tls.Client(raw, &tls.Config{
+		ServerName:            "127.0.0.1",
+		InsecureSkipVerify:    true, //nolint:gosec // the certificate is checked by its key below
+		VerifyPeerCertificate: pinnedKey(ready.SPKI),
+	})
+	_, err = io.WriteString(browser, "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
+	require.NoError(t, err)
+	require.NoError(t, browser.Close())
+	// Long enough for a proxy that ends the tunnel on the browser's close
+	// to have done so; a proxy that reads on needs no wait at all.
+	time.Sleep(200 * time.Millisecond)
+	releaseOnce.Do(func() { close(release) })
+
+	event := waitForEvent(t, ready, cfg.Token, EventClientCertificateRejected)
+	assert.Equal(t, "127.0.0.1", event.Host)
 }
 
 func TestServeReportsUntrustedServer(t *testing.T) {
