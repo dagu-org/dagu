@@ -47,7 +47,18 @@ const (
 	activityErrorMaxBytes = 200
 	// activityQueueLimit bounds the queues listed with work.
 	activityQueueLimit = 20
+	// activityDiskFullPercent is the data disk usage, in percent, from which
+	// the activity warns that runs may soon fail to persist.
+	activityDiskFullPercent = 90
 )
+
+// activityBlockedReasons maps the worker reasons a queued run records for
+// not starting to the reasons the activity reports.
+var activityBlockedReasons = map[string]api.DAGRunActivityQueueBlockedReason{
+	ir.DAGRunReasonNoMatchingWorker:          api.DAGRunActivityQueueBlockedReasonNoMatchingWorker,
+	ir.DAGRunReasonNoAvailableWorker:         api.DAGRunActivityQueueBlockedReasonNoAvailableWorker,
+	ir.DAGRunReasonWorkerDispatchUnavailable: api.DAGRunActivityQueueBlockedReasonWorkerDispatchUnavailable,
+}
 
 // activityQueueScan bounds the runs read to describe queues: a few queued
 // entries per queue, so the budget reaches many queues, and a fixed number of
@@ -238,6 +249,7 @@ func (a *API) readDAGRunActivity(ctx context.Context, query activityQuery) (api.
 	result.Active = a.activeRuns(ctx, query, page.Items, latest)
 	result.Upcoming = a.upcomingRuns(ctx, query)
 	result.Queues = a.activityQueues(ctx, query)
+	result.DiskUsedPercent = a.activityDiskUsedPercent(ctx)
 	return result, nil
 }
 
@@ -280,6 +292,9 @@ func (a *API) activityQueues(ctx context.Context, query activityQuery) []api.DAG
 		if !info.nextQueuedAt.IsZero() {
 			item.NextQueuedAt = new(info.nextQueuedAt.Unix())
 		}
+		if reason, ok := activityBlockedReasons[info.workerBlockReason]; ok {
+			item.BlockedReason = &reason
+		}
 		queues = append(queues, item)
 	}
 	slices.SortFunc(queues, func(left, right api.DAGRunActivityQueue) int {
@@ -298,6 +313,20 @@ func (a *API) activityQueues(ctx context.Context, query activityQuery) []api.DAG
 		)
 	})
 	return queues[:min(len(queues), activityQueueLimit)]
+}
+
+// activityDiskUsedPercent returns how full the data directory's disk is when
+// it is nearly full and the caller may view system status. Whole percents
+// keep the live payload unchanged while usage creeps.
+func (a *API) activityDiskUsedPercent(ctx context.Context) *int {
+	if a.resourceService == nil || a.requireDeveloperOrAbove(ctx) != nil {
+		return nil
+	}
+	used, ok := a.resourceService.DiskUsedPercent()
+	if !ok || used < activityDiskFullPercent {
+		return nil
+	}
+	return new(int(used))
 }
 
 // toActivityRun summarizes a run. A run that has not started reports its

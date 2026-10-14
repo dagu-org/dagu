@@ -1235,3 +1235,38 @@ func TestMultiplexTopicMinIntervalMergesWakes(t *testing.T) {
 	time.Sleep(interval)
 	assert.Equal(t, int32(3), fetches.Load(), "the burst becomes one deferred refetch")
 }
+
+// An on-demand topic with a maximum interval refetches without wakes, and a
+// wake held back by the minimum interval does not wait for that refetch.
+func TestMultiplexTopicMaxIntervalRefetchesWithoutWakes(t *testing.T) {
+	// Above the 1s adaptive floor, so the minimum interval decides the delay.
+	const minInterval = 1200 * time.Millisecond
+	const maxInterval = 3 * time.Second
+
+	mux := NewMultiplexer(StreamConfig{}, nil)
+	t.Cleanup(mux.Shutdown)
+
+	var fetches atomic.Int32
+	mux.RegisterFetcher(TopicTypeDAGRuns, func(context.Context, string) (any, error) {
+		return map[string]int32{"revision": fetches.Add(1)}, nil
+	})
+	mux.SetRefreshMode(TopicTypeDAGRuns, TopicRefreshModeOnDemand)
+	mux.SetMinInterval(TopicTypeDAGRuns, minInterval)
+	mux.SetMaxInterval(TopicTypeDAGRuns, maxInterval)
+
+	result, err := mux.createSession(context.Background(), httptest.NewRecorder(), []string{"dagruns:status=1"}, 0)
+	require.NoError(t, err)
+	defer mux.removeSession(result.session)
+	result.session.bootstrapTopics(t.Context(), 0, result.topics)
+	require.Equal(t, int32(1), fetches.Load())
+
+	mux.WakeTopic(TopicTypeDAGRuns, "status=1")
+	require.Eventually(t, func() bool { return fetches.Load() == 2 }, time.Second, 5*time.Millisecond)
+
+	mux.WakeTopic(TopicTypeDAGRuns, "status=1")
+	require.Eventually(t, func() bool { return fetches.Load() == 3 }, 2*minInterval, 5*time.Millisecond,
+		"the held-back wake refetches at the minimum interval")
+
+	require.Eventually(t, func() bool { return fetches.Load() == 4 }, 2*maxInterval, 5*time.Millisecond,
+		"the maximum interval refetches without a wake")
+}

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	openapiv1 "github.com/dagucloud/dagu/v2/api/v1"
+	"github.com/dagucloud/dagu/v2/internal/auth"
 	"github.com/dagucloud/dagu/v2/internal/cmn/config"
 	"github.com/dagucloud/dagu/v2/internal/ir"
 	"github.com/dagucloud/dagu/v2/internal/pagination"
@@ -20,6 +21,7 @@ import (
 	"github.com/dagucloud/dagu/v2/internal/persis/store"
 	"github.com/dagucloud/dagu/v2/internal/queue"
 	runtimepkg "github.com/dagucloud/dagu/v2/internal/runtime"
+	"github.com/dagucloud/dagu/v2/internal/service/resource"
 	"github.com/dagucloud/dagu/v2/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -351,6 +353,56 @@ func TestDAGRunActivityQueuesFollowTheFilters(t *testing.T) {
 	assert.Equal(t, "etl", activity.Queues[0].Name)
 }
 
+// setConditions replaces the runtime conditions a saved run records.
+func (f *activityFixture) setConditions(name, id string, conditions ...ir.DAGRunCondition) {
+	f.t.Helper()
+	ctx := f.t.Context()
+	attempt, err := f.repository.FindAttempt(ctx, ir.NewDAGRunRef(name, id))
+	require.NoError(f.t, err)
+	runStatus, err := attempt.ReadStatus(ctx)
+	require.NoError(f.t, err)
+	require.NoError(f.t, attempt.Open(ctx))
+	runStatus.Conditions = conditions
+	require.NoError(f.t, attempt.Write(ctx, *runStatus))
+	require.NoError(f.t, attempt.Close(ctx))
+}
+
+func notRunnable(status openapiv1.DAGRunConditionStatus, reason string) ir.DAGRunCondition {
+	return ir.NewDAGRunCondition(ir.DAGRunConditionRunnable, string(status), reason, "", time.Now())
+}
+
+// A queue says why its runs cannot start when a run in line records that no
+// worker can take it, even behind a run that only waits for room.
+func TestDAGRunActivityReportsQueuesBlockedByWorkers(t *testing.T) {
+	f := newActivityFixture(t)
+	queueStore := store.NewQueueStore(file.NewCollection(filepath.Join(t.TempDir(), "queue")))
+	f.api.queueStore = queueStore
+	now := time.Now().Truncate(time.Second)
+	waitsForRoom := notRunnable(openapiv1.DAGRunConditionStatusFalse, "MaxConcurrencyReached")
+	f.queueRun(queueStore, "etl", "etl-1", now.Add(-3*time.Minute))
+	f.setConditions("etl", "etl-1", waitsForRoom)
+	f.queueRun(queueStore, "etl", "etl-2", now.Add(-2*time.Minute))
+	f.setConditions("etl", "etl-2", notRunnable(openapiv1.DAGRunConditionStatusFalse, ir.DAGRunReasonNoMatchingWorker))
+	f.queueRun(queueStore, "report", "report-1", now.Add(-time.Minute))
+	f.setConditions("report", "report-1", notRunnable(openapiv1.DAGRunConditionStatusUnknown, ir.DAGRunReasonWorkerDispatchUnavailable))
+	f.queueRun(queueStore, "sync", "sync-1", now.Add(-time.Minute))
+	f.setConditions("sync", "sync-1", waitsForRoom)
+
+	activity := f.activity(now.Add(-time.Hour), now.Add(time.Hour))
+
+	require.Len(t, activity.Queues, 3)
+	blocked := map[string]openapiv1.DAGRunActivityQueueBlockedReason{}
+	for _, queue := range activity.Queues {
+		if queue.BlockedReason != nil {
+			blocked[queue.Name] = *queue.BlockedReason
+		}
+	}
+	assert.Equal(t, map[string]openapiv1.DAGRunActivityQueueBlockedReason{
+		"etl":    openapiv1.DAGRunActivityQueueBlockedReasonNoMatchingWorker,
+		"report": openapiv1.DAGRunActivityQueueBlockedReasonWorkerDispatchUnavailable,
+	}, blocked)
+}
+
 // Once the scan budget runs out, later queues are not listed as if they
 // held no work.
 func TestDAGRunActivityLeavesOutQueuesItCouldNotRead(t *testing.T) {
@@ -442,4 +494,43 @@ func TestDAGRunActivityLoadsOnlyTheQueuedRecordsItCounts(t *testing.T) {
 	require.Len(t, activity.Queues, 2)
 	assert.Equal(t, 5, activity.Queues[0].Queued)
 	assert.Equal(t, 2, activity.Queues[1].Queued)
+}
+
+// diskSample reports a fixed disk usage.
+type diskSample float64
+
+func (diskSample) GetHistory(time.Duration) *resource.ResourceHistory {
+	return &resource.ResourceHistory{}
+}
+
+func (d diskSample) DiskUsedPercent() (float64, bool) {
+	return float64(d), true
+}
+
+// The first page warns of a nearly full data disk, and only to callers who
+// may view system status.
+func TestDAGRunActivityWarnsOfANearlyFullDisk(t *testing.T) {
+	now := time.Now().Truncate(time.Second)
+	from, to := now.Add(-time.Hour).Unix(), now.Add(time.Hour).Unix()
+	read := func(f *activityFixture, ctx context.Context) *int {
+		resp, err := f.api.GetDAGRunActivity(ctx, openapiv1.GetDAGRunActivityRequestObject{
+			Params: openapiv1.GetDAGRunActivityParams{FromDate: &from, ToDate: &to},
+		})
+		require.NoError(t, err)
+		activity, ok := resp.(openapiv1.GetDAGRunActivity200JSONResponse)
+		require.True(t, ok)
+		return activity.DiskUsedPercent
+	}
+
+	f := newActivityFixture(t)
+	f.api.resourceService = diskSample(93.7)
+	assert.Equal(t, new(93), read(f, t.Context()))
+
+	f.api.resourceService = diskSample(89.9)
+	assert.Nil(t, read(f, t.Context()), "room left")
+
+	f.api.resourceService = diskSample(93.7)
+	f.api.authService = struct{ AuthService }{}
+	viewer := auth.WithUser(t.Context(), &auth.User{Role: auth.RoleViewer, WorkspaceAccess: auth.AllWorkspaceAccess()})
+	assert.Nil(t, read(f, viewer), "a viewer cannot view system status")
 }

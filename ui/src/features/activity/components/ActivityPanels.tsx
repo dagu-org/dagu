@@ -4,10 +4,16 @@
 import { ArrowRight, CircleAlert, CircleCheck } from 'lucide-react';
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Status, StatusLabel, type components } from '@/api/v1/schema';
+import {
+  DAGRunActivityQueueBlockedReason,
+  Status,
+  StatusLabel,
+  type components,
+} from '@/api/v1/schema';
 import { RelativeTime } from '@/components/ui/relative-time';
 import StatusChip from '@/components/ui/status-chip';
 import Ticker from '@/components/ui/ticker';
+import { useCanAccessSystemStatus } from '@/contexts/AuthContext';
 import { DAGRunActions } from '@/features/dag-runs/components/common';
 import {
   buildDAGPageURL,
@@ -25,11 +31,34 @@ import {
   type ActivityRun,
   type AttentionItem,
   isQueueStalled,
+  type SystemAlert,
   type TimeRange,
 } from '../lib/activityModel';
 
 type DAGRunSummary = components['schemas']['DAGRunSummary'];
 type Upcoming = components['schemas']['DAGRunActivityUpcoming'];
+
+/** Why a queue's runs cannot start, as a sentence and as a short label. */
+const BLOCKED_REASONS: Record<
+  DAGRunActivityQueueBlockedReason,
+  { message: string; label: string }
+> = {
+  [DAGRunActivityQueueBlockedReason.noMatchingWorker]: {
+    message:
+      'Queued runs in {queue} cannot start: no healthy worker matches their selector.',
+    label: 'no matching worker',
+  },
+  [DAGRunActivityQueueBlockedReason.noAvailableWorker]: {
+    message:
+      'Queued runs in {queue} cannot start: no healthy worker is available.',
+    label: 'no worker available',
+  },
+  [DAGRunActivityQueueBlockedReason.workerDispatchUnavailable]: {
+    message:
+      'Queued runs in {queue} cannot start: they cannot be handed to a worker right now.',
+    label: 'worker unreachable',
+  },
+};
 
 /** Labels of the statuses a retry can start from. */
 const RETRYABLE_LABELS: Partial<Record<Status, StatusLabel>> = {
@@ -105,37 +134,90 @@ function RunLink({
   );
 }
 
+/** One system alert: what is wrong, and where to look. */
+function SystemAlertRow({
+  alert,
+  canAccessSystemStatus,
+}: {
+  alert: SystemAlert;
+  canAccessSystemStatus: boolean;
+}): React.ReactElement {
+  const { ts } = useI18n();
+  const linkClass =
+    'inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground';
+  return (
+    <li className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
+      <CircleAlert className="h-4 w-4 shrink-0 text-error" aria-hidden="true" />
+      <span className="min-w-0 flex-1 text-sm text-foreground">
+        {systemAlertText(alert, ts)}
+      </span>
+      {alert.kind === 'queue' ? (
+        <Link
+          to={`/queues/${encodeURIComponent(alert.queue)}`}
+          className={linkClass}
+        >
+          {ts('Open')}
+          <ArrowRight className="h-3 w-3" aria-hidden="true" />
+        </Link>
+      ) : (
+        canAccessSystemStatus && (
+          <Link to="/system-status" className={linkClass}>
+            <I18nText text={'System Status'} />
+            <ArrowRight className="h-3 w-3" aria-hidden="true" />
+          </Link>
+        )
+      )}
+    </li>
+  );
+}
+
+function systemAlertText(
+  alert: SystemAlert,
+  ts: ReturnType<typeof useI18n>['ts']
+): string {
+  switch (alert.kind) {
+    case 'scheduler':
+      return ts(
+        'The scheduler is not running, so scheduled and queued runs will not start.'
+      );
+    case 'queue':
+      return ts(BLOCKED_REASONS[alert.reason].message, { queue: alert.queue });
+    case 'disk':
+      return ts(
+        'The data disk is {percent}% full. Runs fail once it fills up.',
+        { percent: alert.usedPercent }
+      );
+  }
+}
+
 /**
- * What needs a person now; one quiet line when nothing does. A stopped
- * scheduler that holds work back comes first.
+ * What needs a person now; one quiet line when nothing does. System alerts,
+ * which hold back work of many runs, come first.
  */
 export function NeedsAttention({
   items,
-  schedulerStopped,
+  alerts,
   remoteNode,
   onChanged,
 }: {
   items: AttentionItem[];
-  schedulerStopped: boolean;
+  alerts: SystemAlert[];
   remoteNode: string;
   onChanged: () => void;
 }): React.ReactElement {
   const { ts } = useI18n();
-  // Kept mounted across refreshes, so a screen reader announces the
-  // warning when a refresh adds it.
-  const schedulerStatus = (
+  const canAccessSystemStatus = useCanAccessSystemStatus();
+  // Kept mounted across refreshes, so a screen reader announces an alert
+  // when a refresh adds it.
+  const alertStatus = (
     <p role="status" className="sr-only">
-      {schedulerStopped
-        ? ts(
-            'The scheduler is not running, so scheduled and queued runs will not start.'
-          )
-        : ''}
+      {alerts.map((alert) => systemAlertText(alert, ts)).join(' ')}
     </p>
   );
-  if (items.length === 0 && !schedulerStopped) {
+  if (items.length === 0 && alerts.length === 0) {
     return (
       <>
-        {schedulerStatus}
+        {alertStatus}
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
           <CircleCheck className="h-4 w-4 text-success" aria-hidden="true" />
           <I18nText
@@ -147,39 +229,24 @@ export function NeedsAttention({
   }
   return (
     <>
-      {schedulerStatus}
+      {alertStatus}
       <section
         className="flex flex-col gap-2"
         aria-labelledby="needs-attention-title"
       >
         <div id="needs-attention-title">
-          <SectionTitle count={items.length + (schedulerStopped ? 1 : 0)}>
+          <SectionTitle count={items.length + alerts.length}>
             <I18nText text={'Needs attention'} />
           </SectionTitle>
         </div>
         <ul className="divide-y divide-border rounded-lg border border-border bg-card">
-          {schedulerStopped && (
-            <li className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
-              <CircleAlert
-                className="h-4 w-4 shrink-0 text-error"
-                aria-hidden="true"
-              />
-              <span className="min-w-0 flex-1 text-sm text-foreground">
-                <I18nText
-                  text={
-                    'The scheduler is not running, so scheduled and queued runs will not start.'
-                  }
-                />
-              </span>
-              <Link
-                to="/system-status"
-                className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-              >
-                <I18nText text={'System Status'} />
-                <ArrowRight className="h-3 w-3" aria-hidden="true" />
-              </Link>
-            </li>
-          )}
+          {alerts.map((alert) => (
+            <SystemAlertRow
+              key={alert.kind === 'queue' ? `queue:${alert.queue}` : alert.kind}
+              alert={alert}
+              canAccessSystemStatus={canAccessSystemStatus}
+            />
+          ))}
           {items.map((item) => {
             const summary =
               item.kind === 'failing'
@@ -347,7 +414,9 @@ export function InProgress({
                 {queue.nextQueuedAt !== undefined && (
                   <span
                     className={cn(
-                      isQueueStalled(queue, nowSeconds) && 'text-warning'
+                      !queue.blockedReason &&
+                        isQueueStalled(queue, nowSeconds) &&
+                        'text-warning'
                     )}
                   >
                     {' · '}
@@ -368,6 +437,11 @@ export function InProgress({
                   </span>
                 )}
               </span>
+              {queue.blockedReason && (
+                <span className="text-xs text-error">
+                  {ts(BLOCKED_REASONS[queue.blockedReason].label)}
+                </span>
+              )}
             </li>
           ))}
         </ul>

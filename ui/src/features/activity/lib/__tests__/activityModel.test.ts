@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { describe, expect, it } from 'vitest';
-import { Status } from '@/api/v1/schema';
+import { DAGRunActivityQueueBlockedReason, Status } from '@/api/v1/schema';
 import {
   type ActivityRun,
   attentionItems,
@@ -13,6 +13,7 @@ import {
   isQueueStalled,
   isSchedulerHoldingWork,
   sortLanes,
+  systemAlerts,
   timeTicks,
 } from '../activityModel';
 
@@ -185,6 +186,40 @@ describe('isSchedulerHoldingWork', () => {
     expect(isSchedulerHoldingWork(activity(), false)).toBe(false);
     expect(isSchedulerHoldingWork(scheduled, true)).toBe(false);
     expect(isSchedulerHoldingWork(scheduled, undefined)).toBe(false);
+  });
+});
+
+describe('systemAlerts', () => {
+  it('lists a held-back scheduler, then blocked queues, then the disk', () => {
+    const alerts = systemAlerts(
+      activity({
+        queues: [
+          { name: 'default', running: 0, queued: 1 },
+          {
+            name: 'gpu',
+            running: 0,
+            queued: 2,
+            blockedReason: DAGRunActivityQueueBlockedReason.noMatchingWorker,
+          },
+        ],
+        diskUsedPercent: 94,
+      }),
+      false
+    );
+
+    expect(alerts).toEqual([
+      { kind: 'scheduler' },
+      {
+        kind: 'queue',
+        queue: 'gpu',
+        reason: DAGRunActivityQueueBlockedReason.noMatchingWorker,
+      },
+      { kind: 'disk', usedPercent: 94 },
+    ]);
+  });
+
+  it('lists nothing for a healthy system', () => {
+    expect(systemAlerts(activity(), true)).toEqual([]);
   });
 });
 
