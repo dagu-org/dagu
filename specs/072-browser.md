@@ -243,7 +243,10 @@ only when it asks for a certificate or fails.
 ### Trusted server authorities
 
 The host configuration `browser.trusted_cas` lists entries with `hosts` and
-`ca_file`, a PEM file containing certificate authorities without private keys.
+`ca_file`, a PEM file of certificate authorities or self-signed server
+certificates, without private keys. Text around the certificates, as openssl
+writes it, is ignored; a private key, a damaged certificate, or a certificate
+that is neither an authority nor self-signed is an error.
 It applies to workflow browsers and browser sessions, without requiring a
 client certificate. Host patterns have the same syntax as client certificates.
 All authorities matching the destination host add to its existing trust;

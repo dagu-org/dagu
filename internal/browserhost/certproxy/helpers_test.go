@@ -77,6 +77,27 @@ func newTestCA(t *testing.T, name string) *testCA {
 	return &testCA{cert: cert, key: key}
 }
 
+// newSelfSigned returns a self-signed server certificate for host that is
+// not a CA, as an appliance presents, and its key.
+func newSelfSigned(t *testing.T, host string) (*x509.Certificate, crypto.Signer) {
+	t.Helper()
+	key := newKey(t, ecdsaKey)
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: host},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+		KeyUsage:     x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		DNSNames:     []string{host},
+	}
+	der, err := x509.CreateCertificate(rand.Reader, template, template, key.Public(), key)
+	require.NoError(t, err)
+	cert, err := x509.ParseCertificate(der)
+	require.NoError(t, err)
+	return cert, key
+}
+
 func newKey(t *testing.T, kind keyKind) crypto.Signer {
 	t.Helper()
 	if kind == rsaKey {

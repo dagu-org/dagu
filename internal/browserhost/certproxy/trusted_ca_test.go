@@ -71,6 +71,25 @@ func TestScopedTrustCombinesWithIdentity(t *testing.T) {
 	assert.Equal(t, "HTTP/1.1 "+testLabel, body)
 }
 
+// A self-signed server certificate, as an appliance presents, anchors trust
+// in its own name only.
+func TestScopedTrustAcceptsSelfSignedServer(t *testing.T) {
+	t.Parallel()
+	cert, key := newSelfSigned(t, siteHost)
+	site := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, "appliance") }))
+	site.TLS = &tls.Config{Certificates: []tls.Certificate{{Certificate: [][]byte{cert.Raw}, PrivateKey: key}}}
+	site.StartTLS()
+	t.Cleanup(site.Close)
+	upstream := newTunnelProxy(t, siteAddr(site), http.StatusOK)
+	cfg := testConfig(t, `function FindProxyForURL() { return "PROXY `+upstream.addr+`"; }`)
+	cfg.TrustedCAs = []TrustedCA{{Label: "appliance", Hosts: []string{siteHost}, CAPEM: certPEM(cert)}}
+	ready := serveProxy(t, cfg)
+
+	body, err := get(t, browserClient(ready, "http/1.1"), "https://"+siteHost+"/")
+	require.NoError(t, err)
+	assert.Equal(t, "appliance", body)
+}
+
 // An authority adds to the trust a host has without it: the system's CAs
 // and every client certificate's ca_file, with or without the guard.
 func TestScopedTrustKeepsGuardTrust(t *testing.T) {
