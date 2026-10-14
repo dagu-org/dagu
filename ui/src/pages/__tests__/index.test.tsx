@@ -298,6 +298,27 @@ describe('DashboardPage', () => {
 
   // Nothing has run yet precisely because the scheduler is down, so the
   // warning must not give way to the empty state.
+  // Seconds of a run hours away only make the line flicker and grow.
+  it('counts down to a far-off run to the minute', () => {
+    mockActivity({
+      activity: makeActivity({
+        runs: reportRuns,
+        upcoming: [
+          {
+            name: 'nightly',
+            fileName: 'nightly',
+            nextRun: NOW + 6 * 3600 + 53 * 60 + 30,
+          },
+        ],
+      }),
+    });
+
+    renderPage();
+
+    const item = screen.getByRole('link', { name: 'nightly' }).closest('li');
+    expect(item).toHaveTextContent(/6h 5\dm$/);
+  });
+
   it('warns about a stopped scheduler before any run exists', () => {
     mockScheduler(false);
     mockActivity({

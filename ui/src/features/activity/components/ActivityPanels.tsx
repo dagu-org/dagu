@@ -22,7 +22,7 @@ import {
 import { I18nText } from '@/i18n/I18nText';
 import { useI18n } from '@/i18n/I18nProvider';
 import dayjs from '@/lib/dayjs';
-import { formatDurationMs } from '@/lib/formatDuration';
+import { formatDurationMs, formatRoughDurationMs } from '@/lib/formatDuration';
 import { runStatusText } from '@/lib/status-utils';
 import { cn } from '@/lib/utils';
 import { executionsURL } from '../lib/activityLinks';
@@ -414,6 +414,7 @@ export function InProgress({
                 {queue.nextQueuedAt !== undefined && (
                   <span
                     className={cn(
+                      'whitespace-nowrap',
                       !queue.blockedReason &&
                         isQueueStalled(queue, nowSeconds) &&
                         'text-warning'
@@ -424,7 +425,7 @@ export function InProgress({
                       {() => (
                         <span>
                           {ts('next waiting {elapsed}', {
-                            elapsed: formatDurationMs(
+                            elapsed: formatRoughDurationMs(
                               Math.max(
                                 0,
                                 Date.now() - (queue.nextQueuedAt ?? 0) * 1000
@@ -490,11 +491,11 @@ export function UpNext({
                   .utcOffset(tzOffsetSeconds / 60)
                   .format('HH:mm')}
               </span>
-              <span className="w-16 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
+              <span className="min-w-16 shrink-0 whitespace-nowrap text-right text-xs text-muted-foreground tabular-nums">
                 <Ticker intervalMs={1000}>
                   {() => (
                     <span>
-                      {formatDurationMs(
+                      {formatRoughDurationMs(
                         Math.max(0, item.nextRun * 1000 - Date.now())
                       )}
                     </span>
