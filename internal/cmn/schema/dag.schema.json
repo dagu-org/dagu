@@ -7557,7 +7557,7 @@
         "cache": {
           "type": "boolean",
           "default": true,
-          "description": "Record the act operations of a step that succeeds and replay them on later runs without a model call."
+          "description": "Record the act and upload operations of a step that succeeds and replay them on later runs without a model call."
         },
         "llm": {
           "$ref": "#/definitions/standardLLMConfig",
@@ -7724,6 +7724,7 @@
       "oneOf": [
         { "required": ["goto"] },
         { "required": ["act"] },
+        { "required": ["upload"] },
         { "required": ["extract"] },
         { "required": ["expect"] },
         { "required": ["wait"] },
@@ -7753,6 +7754,34 @@
             }
           ],
           "description": "Perform an action described in natural language, such as clicking or typing. Reference variables as %name%."
+        },
+        "upload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["files"],
+          "properties": {
+            "files": {
+              "oneOf": [
+                { "type": "string", "minLength": 1 },
+                {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": { "type": "string", "minLength": 1 }
+                }
+              ],
+              "description": "Files to upload, each up to 50 MB: a path or glob pattern relative to the step's working directory, several one per line, or a value an earlier step published as a JSON list of paths, of objects with a path, or of mail.search emails, whose saved attachments are uploaded."
+            },
+            "into": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The file input, or the button or drop area that opens the file picker, in plain words. The model finds it once and later runs replay it. Leave it out when the page has only one file input."
+            },
+            "cache": {
+              "type": "boolean",
+              "description": "Set false to disable the replay cache for this operation. Has no effect when with.cache is false."
+            }
+          },
+          "description": "Give local files to a file input of the page. The model sees the into text and the page, never the files."
         },
         "extract": {
           "type": "object",
@@ -7825,7 +7854,7 @@
           "description": "Maximum time for this operation, such as 30s. Defaults to 2m."
         }
       },
-      "description": "One browser operation. Set exactly one of goto, act, extract, expect, wait, screenshot, or ask."
+      "description": "One browser operation. Set exactly one of goto, act, upload, extract, expect, wait, screenshot, or ask."
     },
     "computerExtractActionConfig": {
       "type": "object",
