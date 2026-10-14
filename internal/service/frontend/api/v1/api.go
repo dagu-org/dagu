@@ -37,6 +37,7 @@ import (
 	"github.com/dagucloud/dagu/v2/internal/pagination"
 	"github.com/dagucloud/dagu/v2/internal/persis"
 	profilepkg "github.com/dagucloud/dagu/v2/internal/profile"
+	"github.com/dagucloud/dagu/v2/internal/publicwebhook"
 	"github.com/dagucloud/dagu/v2/internal/queue"
 	"github.com/dagucloud/dagu/v2/internal/remotenode"
 	"github.com/dagucloud/dagu/v2/internal/runtime"
@@ -102,6 +103,7 @@ type API struct {
 	profileStore         profilepkg.Store
 	viewStore            view.Store
 	licenseManager       *license.Manager
+	publicWebhookStore   publicwebhook.Store
 	cloudReport          CloudReportService
 	apiKeyCreateMu       sync.Mutex
 	workspaceStore       workspace.Store
@@ -197,6 +199,10 @@ type AuthService interface {
 	ToggleWebhook(ctx context.Context, dagName string, enabled bool) (*auth.Webhook, error)
 	ValidateWebhookToken(ctx context.Context, dagName, token string) (*auth.Webhook, error)
 	HasWebhookStore() bool
+	EnablePublicWebhook(ctx context.Context, dagName string) (*auth.Webhook, error)
+	DisablePublicWebhook(ctx context.Context, dagName string) (*auth.Webhook, error)
+	RegeneratePublicWebhookToken(ctx context.Context, dagName string) (*auth.Webhook, error)
+	ConfigurePublicWebhookSender(ctx context.Context, dagName string, input authservice.PublicWebhookSenderInput) (*authservice.PublicWebhookSenderResult, error)
 	// Setup
 	CountUsers(ctx context.Context) (int64, error)
 }
@@ -304,6 +310,14 @@ func WithDAGPinStore(store dagpin.Store) APIOption {
 func WithWikiStore(store wiki.PageStore) APIOption {
 	return func(a *API) {
 		a.wikiStore = store
+	}
+}
+
+// WithPublicWebhookStore returns an APIOption that sets the store of public
+// webhook URL status and deliveries.
+func WithPublicWebhookStore(store publicwebhook.Store) APIOption {
+	return func(a *API) {
+		a.publicWebhookStore = store
 	}
 }
 

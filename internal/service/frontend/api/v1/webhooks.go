@@ -161,6 +161,7 @@ func (a *API) DeleteDAGWebhook(ctx context.Context, request api.DeleteDAGWebhook
 		}
 	}
 
+	a.deletePublicWebhookLog(ctx, targetWebhook)
 	logger.Info(ctx, "Webhook deleted", tag.Name(request.FileName))
 	auditDetails := map[string]any{"dag_name": request.FileName}
 	if targetWebhook != nil {
@@ -965,6 +966,7 @@ func toWebhookDetails(wh *auth.Webhook) api.WebhookDetails {
 		UpdatedAt:     wh.UpdatedAt,
 		CreatedBy:     ptrOf(wh.CreatedBy),
 		LastUsedAt:    wh.LastUsedAt,
+		Public:        toWebhookPublicSettings(wh.Public),
 	}
 }
 

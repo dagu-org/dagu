@@ -18,6 +18,14 @@ func NewTestManager(features ...string) *Manager {
 	return newTestManager("pro", time.Now().Add(24*time.Hour), nil, features...)
 }
 
+// NewConnectedTestManager creates a Manager like NewTestManager whose server
+// is connected to Dagu Cloud.
+func NewConnectedTestManager(features ...string) *Manager {
+	m := NewTestManager(features...)
+	m.activation = &ActivationData{ServerID: "server-test", HeartbeatSecret: "heartbeat-test"}
+	return m
+}
+
 // NewExpiredTestManager creates a Manager with a loaded license that is expired
 // and outside its grace period.
 func NewExpiredTestManager(features ...string) *Manager {

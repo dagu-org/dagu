@@ -355,6 +355,9 @@ func NewServer(setup ServerConfig, opts ...ServerOption) (*Server, error) {
 	if stores.WorkspaceBaseConfig != nil {
 		apiOpts = append(apiOpts, apiv1.WithWorkspaceBaseConfigProvider(stores.WorkspaceBaseConfig))
 	}
+	if stores.PublicWebhooks != nil {
+		apiOpts = append(apiOpts, apiv1.WithPublicWebhookStore(stores.PublicWebhooks))
+	}
 
 	var auditSvc *audit.Service
 	if stores.Audit != nil {

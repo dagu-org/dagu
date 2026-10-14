@@ -89,6 +89,7 @@ func initStores(ctx context.Context, cfg *config.Config, backend persis.Backend,
 		stores.AuthService = builtinAuth.service
 		stores.UserStore = builtinAuth.userStore
 		stores.AuthSetupRequired = builtinAuth.setupRequired
+		stores.PublicWebhooks = store.NewPublicWebhookStore(backend.Collection(persis.CollectionPublicWebhooks))
 	}
 
 	stores.Secret = persisfile.NewSecretStore(ctx, cfg, backend.Collection(persis.CollectionSecrets))
