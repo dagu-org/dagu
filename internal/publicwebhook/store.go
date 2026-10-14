@@ -69,6 +69,9 @@ type Status struct {
 	// LeftOut names the DAGs whose public URLs exceed MaxHooks and are not
 	// held at the relay.
 	LeftOut []string `json:"leftOut,omitempty"`
+	// Holding is set while the relay holds URLs this server sent, so a URL
+	// turned off while the server was away is dropped when it returns.
+	Holding bool `json:"holding,omitempty"`
 	// Error says why the server is not connected.
 	Error     string    `json:"error,omitempty"`
 	UpdatedAt time.Time `json:"updatedAt"`

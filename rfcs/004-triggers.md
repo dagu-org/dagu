@@ -280,7 +280,9 @@ public URLs are used.
   it. The server must be connected to Dagu Cloud.
 - Turning it on makes a 32-byte token. The webhook store keeps it encrypted,
   like the HMAC secret, so the page can show the URL again. Dagu Cloud gets
-  only its SHA-256. **New URL** replaces it.
+  only its SHA-256. **New URL** replaces it; requests Dagu Cloud already
+  took through the old URL are still delivered. Turning the URL off drops
+  them.
 - The hook ID is `<dag>/webhook`, the name this RFC gives the built-in
   webhook trigger, so URLs survive the move to triggers. Renaming a DAG
   changes its hook ID: its URL and anything waiting for it are dropped.
@@ -304,14 +306,16 @@ public URLs are used.
 
 - The scheduler that holds the scheduler lock holds the connection, so one
   process per server connects. It connects only while the server is
-  connected to Dagu Cloud and some webhook is public.
+  connected to Dagu Cloud and some webhook is public, or Dagu Cloud still
+  holds URLs since turned off, which the server then drops.
 - It asks Dagu Cloud for a five-minute ticket with the license's
   credentials (`POST /api/v1/servers/relay`), which also names the most
   public URLs the plan allows, and connects to `wss://relay.dagu.sh/server`.
   Every connection uses a fresh ticket.
 - Reconnects back off from 1 second to 1 minute. A connection closed with
-  reason `dropped` means Dagu Cloud disconnected the server; a refused ticket
-  waits 10 minutes before the next try.
+  reason `dropped` means Dagu Cloud disconnected the server; a refused ticket,
+  or one that allows none of the public URLs, waits 10 minutes before the
+  next try.
 
 ### Hook set
 

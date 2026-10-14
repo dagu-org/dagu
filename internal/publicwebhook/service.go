@@ -41,9 +41,10 @@ const (
 
 // Status errors the page shows when the server holds no public URLs.
 const (
-	statusNotConnected = "This server is not connected to Dagu Cloud."
-	statusUnreadable   = "The webhooks could not be read."
-	statusTooManyHooks = "Dagu Cloud refused more public URLs than the plan allows."
+	statusNotConnected   = "This server is not connected to Dagu Cloud."
+	statusUnreadable     = "The webhooks could not be read."
+	statusTooManyHooks   = "Dagu Cloud refused more public URLs than the plan allows."
+	statusNoHooksAllowed = "The plan allows no public URLs."
 )
 
 // Webhooks reads the webhooks that may have public URLs.
@@ -68,6 +69,10 @@ type Runs interface {
 
 // ErrInvalidRun marks a run the DAG or the delivery cannot start.
 var ErrInvalidRun = errors.New("the run cannot start")
+
+// errNoHooksAllowed means the ticket allows none of the public URLs, which
+// connecting again soon does not change.
+var errNoHooksAllowed = errors.New("the plan allows no public URLs")
 
 // Config is what the service works with.
 type Config struct {
@@ -131,8 +136,14 @@ func New(cfg Config) *Service {
 }
 
 // Run holds the relay connection while the server is connected to Dagu
-// Cloud and some webhook has a public URL, until ctx is done.
+// Cloud and some webhook has a public URL, or the relay still holds URLs
+// since turned off, until ctx is done.
 func (s *Service) Run(ctx context.Context) {
+	if status, err := s.cfg.Store.Status(ctx); err == nil {
+		s.mu.Lock()
+		s.status = status
+		s.mu.Unlock()
+	}
 	backoff := s.timing.minBackoff
 	for {
 		wait := s.timing.check
@@ -146,7 +157,7 @@ func (s *Service) Run(ctx context.Context) {
 		case err != nil:
 			logger.Warn(ctx, "Public webhooks: the webhooks could not be read", tag.Error(err))
 			s.setError(ctx, statusUnreadable)
-		case !slices.ContainsFunc(webhooks, isPublic):
+		case !slices.ContainsFunc(webhooks, isPublic) && !s.holding():
 			s.setStatus(ctx, Status{})
 		default:
 			started := time.Now()
@@ -164,6 +175,9 @@ func (s *Service) Run(ctx context.Context) {
 			case refused:
 				wait = s.timing.refused
 				s.setError(ctx, err.Error())
+			case errors.Is(err, errNoHooksAllowed):
+				wait = s.timing.refused
+				s.setError(ctx, statusNoHooksAllowed)
 			default:
 				if time.Since(started) >= s.timing.stable {
 					backoff = s.timing.minBackoff
@@ -210,7 +224,10 @@ func (s *Service) connect(ctx context.Context, creds license.CloudCredentials) e
 		})
 	}()
 
+	// The first set goes out whatever it holds, since the relay may still
+	// hold one sent before.
 	var sent string
+	first := true
 	for {
 		// A new set drops what waits for any hook it leaves out, so it is
 		// sent only from a complete read; after a failed one the last set
@@ -221,16 +238,22 @@ func (s *Service) connect(ctx context.Context, creds license.CloudCredentials) e
 			logger.Warn(ctx, "Public webhooks: the webhooks could not be read; the relay keeps its set", tag.Error(err))
 		default:
 			hooks, leftOut := hookSet(webhooks, ticket.MaxHooks)
-			if signature := setSignature(hooks); signature != sent {
+			if signature := setSignature(hooks); first || signature != sent {
 				if err := conn.SetHooks(ctx, hooks); err != nil {
 					break
 				}
-				sent = signature
-				s.updateStatus(ctx, func(st *Status) { st.LeftOut = leftOut })
+				sent, first = signature, false
+				s.updateStatus(ctx, func(st *Status) {
+					st.LeftOut = leftOut
+					st.Holding = len(hooks) > 0
+				})
 			}
 			if len(hooks) == 0 {
 				cancel()
 				<-served
+				if len(leftOut) > 0 {
+					return errNoHooksAllowed
+				}
 				return nil
 			}
 		}
@@ -413,9 +436,19 @@ func (s *Service) deliver(ctx context.Context, d cloudrelay.Delivery) cloudrelay
 }
 
 // setStatus stores status, as the relay connection now is, when it differs
-// from what was last stored.
+// from what was last stored. Whether the relay holds URLs carries over.
 func (s *Service) setStatus(ctx context.Context, status Status) {
-	s.updateStatus(ctx, func(st *Status) { *st = status })
+	s.updateStatus(ctx, func(st *Status) {
+		status.Holding = st.Holding
+		*st = status
+	})
+}
+
+// holding reports whether the relay may still hold URLs this server sent.
+func (s *Service) holding() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.status.Holding
 }
 
 // setError records why the server holds no relay connection, keeping the URL
@@ -448,7 +481,7 @@ func (s *Service) updateStatus(ctx context.Context, change func(*Status)) {
 }
 
 func equalStatus(a, b Status) bool {
-	return a.Connected == b.Connected && a.URL == b.URL && a.MaxHooks == b.MaxHooks &&
+	return a.Connected == b.Connected && a.Holding == b.Holding && a.URL == b.URL && a.MaxHooks == b.MaxHooks &&
 		a.Error == b.Error && slices.Equal(a.LeftOut, b.LeftOut) && a.UpdatedAt.Equal(b.UpdatedAt)
 }
 

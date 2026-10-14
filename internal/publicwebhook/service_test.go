@@ -226,6 +226,8 @@ type harness struct {
 	log      *store.PublicWebhookStore
 	runs     *fakeRuns
 	svc      *publicwebhook.Service
+	// offline makes the server not connected to Dagu Cloud.
+	offline atomic.Bool
 }
 
 // testMaxPayloadSize is the largest body the harness's service starts a run
@@ -248,7 +250,7 @@ func newHarness(t *testing.T, maxHooks int) *harness {
 	}
 	h.svc = publicwebhook.New(publicwebhook.Config{
 		Credentials: func() (license.CloudCredentials, bool) {
-			return license.CloudCredentials{CloudURL: h.cloud.srv.URL, LicenseID: "lic", ServerID: "srv", HeartbeatSecret: "s"}, true
+			return license.CloudCredentials{CloudURL: h.cloud.srv.URL, LicenseID: "lic", ServerID: "srv", HeartbeatSecret: "s"}, !h.offline.Load()
 		},
 		Webhooks:       webhooks,
 		Store:          h.log,
@@ -503,4 +505,41 @@ func TestServiceWaitsAfterARefusal(t *testing.T) {
 	require.Eventually(t, func() bool { return strings.Contains(h.status(t).Error, "refused") }, 5*time.Second, 10*time.Millisecond)
 	time.Sleep(200 * time.Millisecond)
 	assert.Equal(t, int32(1), h.cloud.tickets.Load(), "a refusal is not asked again at once")
+}
+
+// A ticket that allows none of the public URLs is not asked for again at
+// once, which would loop on tickets and connections.
+func TestServiceWaitsWhenThePlanAllowsNoURLs(t *testing.T) {
+	h := newHarness(t, 0)
+	h.addWebhook(t, "nightly", &auth.WebhookPublic{Token: "token-1", CreatedAt: time.Now()})
+	h.run(t)
+	ws := h.cloud.relay(t)
+	assert.Equal(t, []any{}, ws.next(t, "hooks")["hooks"])
+	ws.waitClosed(t)
+
+	require.Eventually(t, func() bool { return h.status(t).Error == "The plan allows no public URLs." }, 5*time.Second, 10*time.Millisecond)
+	assert.Equal(t, []string{"nightly"}, h.status(t).LeftOut)
+	time.Sleep(200 * time.Millisecond)
+	assert.Equal(t, int32(1), h.cloud.tickets.Load(), "the server waits before asking again")
+}
+
+// A URL turned off while the scheduler was away is dropped at the relay when
+// it returns, though no URL is public any longer.
+func TestServiceDropsURLsTurnedOffWhileAway(t *testing.T) {
+	h := newHarness(t, 1000)
+	require.NoError(t, h.log.SetStatus(context.Background(), publicwebhook.Status{Holding: true}))
+	h.addWebhook(t, "nightly", nil)
+	// A server not yet connected to Dagu Cloud when it starts still drops
+	// them once it is.
+	h.offline.Store(true)
+	h.run(t)
+	require.Eventually(t, func() bool { return h.status(t).Error != "" }, 5*time.Second, 10*time.Millisecond)
+	h.offline.Store(false)
+	ws := h.cloud.relay(t)
+
+	assert.Equal(t, []any{}, ws.next(t, "hooks")["hooks"])
+	ws.waitClosed(t)
+	require.Eventually(t, func() bool { return !h.status(t).Holding }, 5*time.Second, 10*time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
+	assert.Equal(t, int32(1), h.cloud.tickets.Load(), "with nothing left to drop, the server stays away")
 }
