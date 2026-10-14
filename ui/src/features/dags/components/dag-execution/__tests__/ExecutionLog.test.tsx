@@ -192,6 +192,37 @@ describe('StepLog', () => {
     );
   });
 
+  // A caller that follows the tail owns the stream, so a switch must not
+  // render the previous stream first.
+  it('reads a caller-owned stream switch without the previous stream', () => {
+    const { rerender } = render(
+      <StepLog
+        dagName="example"
+        dagRunId="run"
+        stepName="build"
+        followTail
+        stream={Stream.stdout}
+      />,
+      { wrapper: UserPreferencesProvider }
+    );
+    logs.queries = [];
+
+    rerender(
+      <StepLog
+        dagName="example"
+        dagRunId="run"
+        stepName="build"
+        followTail
+        stream={Stream.stderr}
+      />
+    );
+
+    expect(logs.queries.length).toBeGreaterThan(0);
+    expect(logs.queries).toEqual(
+      logs.queries.map((query) => ({ ...query, stream: Stream.stderr }))
+    );
+  });
+
   it('shows the beginning of an active log when requested', async () => {
     const props = {
       dagName: 'example',

@@ -96,15 +96,23 @@ type ContentProps = Props & {
 function StepLog(props: Props) {
   const remoteNode = useRemoteNode();
   // The viewer switches streams itself unless a caller that follows the tail,
-  // such as Run progress, owns the stream.
-  const [stream, setStream] = useState(props.stream ?? Stream.stdout);
-  useEffect(() => {
-    setStream(props.stream ?? Stream.stdout);
-  }, [props.stream]);
+  // such as Run progress, owns the stream. A new stream from the caller
+  // replaces the viewer's choice in the same render, so the previous stream
+  // is never read.
+  const ownsStream = props.followTail !== undefined;
+  const [selectedStream, setSelectedStream] = useState(
+    props.stream ?? Stream.stdout
+  );
+  const [streamProp, setStreamProp] = useState(props.stream);
+  if (streamProp !== props.stream) {
+    setStreamProp(props.stream);
+    setSelectedStream(props.stream ?? Stream.stdout);
+  }
+  const stream = ownsStream ? (props.stream ?? Stream.stdout) : selectedStream;
   const { onStreamShown } = props;
   const showStream = useCallback(
     (next: Stream) => {
-      setStream(next);
+      setSelectedStream(next);
       onStreamShown?.(next);
     },
     [onStreamShown]
@@ -126,7 +134,7 @@ function StepLog(props: Props) {
       key={identity}
       {...props}
       stream={stream}
-      onStreamChange={props.followTail === undefined ? showStream : undefined}
+      onStreamChange={ownsStream ? undefined : showStream}
     />
   );
 }
