@@ -203,8 +203,10 @@ type DoResult struct {
 	Actions []SessionAction `json:"actions"`
 	// Act is the act a step writes for an element operation.
 	Act string `json:"act,omitempty"`
+	// Into is the into a step writes for an element upload.
+	Into string `json:"into,omitempty"`
 	// Recorded reports that a step exported from the session replays the
-	// act's actions.
+	// act's or the upload's actions.
 	Recorded bool           `json:"recorded"`
 	Outputs  map[string]any `json:"outputs,omitempty"`
 	// Screenshot is the file a screenshot operation saved.
@@ -606,8 +608,8 @@ func (s *Sessions) Do(ctx context.Context, req DoRequest) (DoResult, error) {
 	if err != nil {
 		return DoResult{}, err
 	}
-	// An element operation is the act it stands for, with its action as the
-	// act's recording.
+	// An element operation is the act or upload it stands for, with its
+	// action as its recording.
 	var preset []recordedAction
 	if isElement {
 		snap, err := eng.Snapshot(ctx)
@@ -640,8 +642,11 @@ func (s *Sessions) Do(ctx context.Context, req DoRequest) (DoResult, error) {
 		warnings = append(warnings, extractWarnings(*op.Extract)...)
 	}
 	result := DoResult{ID: req.ID, Index: index, Kind: op.kind(), Status: OperationDone}
-	if isElement {
+	switch {
+	case isElement && op.Act != nil:
 		result.Act = op.Act.Instruction
+	case isElement && op.Upload != nil:
+		result.Into = op.Upload.Into
 	}
 	canonical, err := json.Marshal(op)
 	if err != nil {
@@ -676,7 +681,7 @@ func (s *Sessions) Do(ctx context.Context, req DoRequest) (DoResult, error) {
 				entry.URLBefore = done.PageURL
 			}
 			result.Actions = sessionActions(done.Actions, masker)
-			if op.Act != nil {
+			if op.Act != nil || op.Upload != nil {
 				entry.Recordable = done.PageURL != "" && len(done.Actions) > 0
 				if entry.Recordable && holdsValue(done.Actions, values.all) {
 					entry.Recordable = false
