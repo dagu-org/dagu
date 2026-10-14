@@ -95,6 +95,10 @@ func TestChangeToolIdentityAndInputSchema(t *testing.T) {
 	require.True(t, ok)
 	typeDescription, ok := typeSchema["description"].(string)
 	require.True(t, ok)
+	// mode is valid for every change type; the description must not suggest otherwise, or a
+	// client could drop mode=apply and silently get a preview.
+	require.Contains(t, typeDescription, "mode and type are accepted for every change type")
+	require.Contains(t, typeDescription, "mode=apply")
 	for changeType, contract := range expectedBranches {
 		require.Contains(t, requireArray(t, typeSchema, "enum"), changeType)
 		fields := make([]string, 0, len(contract.required))

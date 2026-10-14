@@ -92,7 +92,7 @@ func changeToolInputSchema() json.RawMessage {
 			"type": {
 				"type": "string",
 				"enum": ["upsert_dag", "rename_dag", "delete_dag", "set_dag_profile", "clear_dag_profile", "upsert_wiki_page", "rename_wiki_page", "delete_wiki_page"],
-				"description": "Change type. Defaults to upsert_dag. Required fields per type: upsert_dag: name, spec. rename_dag: type, name, newName. delete_dag: type, name. set_dag_profile: type, name, profile. clear_dag_profile: type, name. upsert_wiki_page: type, workspace, path, content. rename_wiki_page: type, workspace, path, newPath. delete_wiki_page: type, workspace, path. Fields not listed for a type are rejected."
+				"description": "Change type. Defaults to upsert_dag. mode and type are accepted for every change type; mode defaults to preview, so send mode=apply to write. Required fields per type: upsert_dag: name, spec. rename_dag: type, name, newName. delete_dag: type, name. set_dag_profile: type, name, profile. clear_dag_profile: type, name. upsert_wiki_page: type, workspace, path, content. rename_wiki_page: type, workspace, path, newPath. delete_wiki_page: type, workspace, path. Any other field is rejected for that change type."
 			},
 			"name": {
 				"type": "string",
