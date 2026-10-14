@@ -424,7 +424,7 @@ func (s *Sessions) Open(ctx context.Context, opts SessionOptions) (OpenResult, e
 	}
 	return OpenResult{
 		ID:              id,
-		TLSVerified:     op.tlsVerified(pageURL),
+		TLSVerified:     op.tlsVerified(ctx, pageURL),
 		CDPURL:          record.CDPURL,
 		Headless:        opts.Headless,
 		Profile:         opts.Profile,

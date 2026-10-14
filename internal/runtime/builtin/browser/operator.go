@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
 	"strings"
 	"time"
 
@@ -52,9 +51,6 @@ type operator struct {
 	// presented maps the hosts the proxy presented a certificate to, to the
 	// certificate's label.
 	presented map[string]string
-	// verifiedHosts maps the hosts the proxy verified a connection to, to
-	// whether the guard carried that connection.
-	verifiedHosts map[string]bool
 }
 
 // actRecorder keeps the actions acts and uploads performed, keyed by
@@ -192,18 +188,6 @@ func (o *operator) takeCertificateEvents(ctx context.Context, index int) []certp
 	}
 	var failures []certproxy.Event
 	for _, event := range events {
-		switch event.Kind {
-		case certproxy.EventConnect:
-			if o.verifiedHosts == nil {
-				o.verifiedHosts = map[string]bool{}
-			}
-			o.verifiedHosts[hostpattern.Canonical(event.Host)] = event.Guarded
-		case certproxy.EventServerCertificate:
-			delete(o.verifiedHosts, hostpattern.Canonical(event.Host))
-		case certproxy.EventGuardOff:
-			// The browser reaches the guard's hosts itself from now on.
-			maps.DeleteFunc(o.verifiedHosts, func(_ string, guarded bool) bool { return guarded })
-		}
 		if o.certificateEvent != nil {
 			o.certificateEvent(index, event)
 		}
@@ -223,14 +207,15 @@ func (o *operator) takeCertificateEvents(ctx context.Context, index int) []certp
 	return failures
 }
 
-// tlsVerified reports whether the proxy verified a TLS connection to the
-// host of the https: page at address.
-func (o *operator) tlsVerified(address string) bool {
-	if o.certificateProxyLost || !strings.HasPrefix(strings.ToLower(address), "https://") {
+// tlsVerified reports whether the certificate proxy verified the server
+// certificate of the host of the https: page at address. Without an answer
+// from the proxy, it reports false.
+func (o *operator) tlsVerified(ctx context.Context, address string) bool {
+	if !o.certificateProxy || o.certificateProxyLost || !strings.HasPrefix(strings.ToLower(address), "https://") {
 		return false
 	}
-	_, verified := o.verifiedHosts[hostpattern.Canonical(urlHost(address))]
-	return verified
+	verified, err := o.eng.CertificateVerified(ctx, urlHost(address))
+	return err == nil && verified
 }
 
 func (o *operator) act(ctx context.Context, index int, spec actSpec, timeout time.Duration) (opResult, error) {

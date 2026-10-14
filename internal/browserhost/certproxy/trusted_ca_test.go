@@ -4,6 +4,7 @@
 package certproxy
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
@@ -13,6 +14,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -41,7 +43,6 @@ func TestScopedTrust(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, "HTTP/2.0 anonymous", body)
 			event := waitForEvent(t, ready, cfg.Token, EventConnect)
-			assert.False(t, event.Guarded)
 			assert.False(t, event.Presented)
 
 			port := ready.Port
@@ -69,6 +70,50 @@ func TestScopedTrustCombinesWithIdentity(t *testing.T) {
 	body, err := get(t, browserClient(ready, "http/1.1"), site.URL)
 	require.NoError(t, err)
 	assert.Equal(t, "HTTP/1.1 "+testLabel, body)
+}
+
+// A host whose server certificate later fails verification loses the
+// proxy's word for it.
+func TestScopedTrustWithdrawsVerification(t *testing.T) {
+	t.Parallel()
+	ca := newTestCA(t, "server CA")
+	good, goodKey := ca.issue(t, certOptions{name: siteHost, dnsNames: []string{siteHost}})
+	bad, badKey := newTestCA(t, "other CA").issue(t, certOptions{name: siteHost, dnsNames: []string{siteHost}})
+	var untrusted atomic.Bool
+	site := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }))
+	site.TLS = &tls.Config{
+		// Each connection shows the current certificate, not a resumed
+		// session's.
+		SessionTicketsDisabled: true,
+		GetCertificate: func(*tls.ClientHelloInfo) (*tls.Certificate, error) {
+			if untrusted.Load() {
+				return &tls.Certificate{Certificate: [][]byte{bad.Raw}, PrivateKey: badKey}, nil
+			}
+			return &tls.Certificate{Certificate: [][]byte{good.Raw}, PrivateKey: goodKey}, nil
+		},
+	}
+	site.Config.ErrorLog = log.New(io.Discard, "", 0)
+	site.StartTLS()
+	t.Cleanup(site.Close)
+	upstream := newTunnelProxy(t, siteAddr(site), http.StatusOK)
+	cfg := testConfig(t, `function FindProxyForURL() { return "PROXY `+upstream.addr+`"; }`)
+	cfg.TrustedCAs = []TrustedCA{trustedCA(ca, siteHost)}
+	ready := serveProxy(t, cfg)
+	handle := controlURL(ready.Port, cfg.Token)
+
+	_, err := get(t, browserClient(ready, "http/1.1"), "https://"+siteHost+"/")
+	require.NoError(t, err)
+	verified, err := Verified(context.Background(), handle, siteHost)
+	require.NoError(t, err)
+	assert.True(t, verified)
+
+	untrusted.Store(true)
+	_, err = get(t, browserClient(ready, "http/1.1"), "https://"+siteHost+"/")
+	require.Error(t, err)
+	waitForEvent(t, ready, cfg.Token, EventServerCertificate)
+	verified, err = Verified(context.Background(), handle, siteHost)
+	require.NoError(t, err)
+	assert.False(t, verified)
 }
 
 // A self-signed server certificate, as an appliance presents, anchors trust

@@ -840,6 +840,15 @@ func (e *stagehandEngine) PendingConnections(ctx context.Context) ([]certproxy.P
 	})
 }
 
+func (e *stagehandEngine) CertificateVerified(ctx context.Context, host string) (bool, error) {
+	if e.handle.CertProxy == nil {
+		return false, nil
+	}
+	return boundCall(ctx, e.pageCallTimeout, func(ctx context.Context) (bool, error) {
+		return certproxy.Verified(ctx, e.handle.CertProxy.URL, host)
+	})
+}
+
 func (e *stagehandEngine) Handle() browserHandle {
 	return e.handle
 }

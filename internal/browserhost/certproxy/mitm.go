@@ -59,10 +59,12 @@ const (
 
 // Control paths, under the token.
 const (
-	eventsPath  = "events"
-	pendingPath = "pending"
-	pacPath     = "proxy.pac"
-	afterParam  = "after"
+	eventsPath   = "events"
+	pendingPath  = "pending"
+	verifiedPath = "verified"
+	pacPath      = "proxy.pac"
+	afterParam   = "after"
+	hostParam    = "host"
 )
 
 // rejectionAlerts are the TLS alerts by which a server refuses a client
@@ -81,6 +83,7 @@ type server struct {
 	pac        *pacEvaluator
 	issuer     *leafIssuer
 	events     *eventLog
+	verified   *verifiedHosts
 	pacScript  string // served when too large for a data: URL
 	pending    *pendingLog
 	// guardEntry presents no certificate, to the hosts the guard carries.
@@ -176,6 +179,9 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case s.controlPath(pendingPath):
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(s.pending.list())
+	case s.controlPath(verifiedPath):
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(s.verified.has(hostpattern.Canonical(r.URL.Query().Get(hostParam))))
 	case s.controlPath(pacPath):
 		if s.pacScript == "" {
 			http.NotFound(w, r)
@@ -294,6 +300,7 @@ func (s *server) stopGuard(host string) {
 		return
 	}
 	_ = guard.Close()
+	s.verified.dropGuarded()
 	s.events.add(EventGuardOff, host, "", fmt.Sprintf(
 		"the device's proxy asks %s for credentials the certificate proxy cannot give, so sites without a client certificate "+
 			"now go through the browser's own route; one of them that asks for a client certificate can make the system prompt for it", host))
@@ -460,22 +467,24 @@ func (s *server) handshake(ctx context.Context, raw net.Conn, via route, host st
 	return &upstreamConn{Conn: conn, via: via, requested: requested}, nil
 }
 
-// reportConnected records the first verified connection to host, and a
-// server that asked for a certificate the entry does not have.
+// reportConnected records a verified connection to host, and reports the
+// first one to a host an entry or an authority names, or, for the guard, a
+// server that asked for a certificate it does not have.
 func (s *server) reportConnected(host string, entry *upstreamEntry, upstream *upstreamConn) {
+	guarded := entry == s.guardEntry
+	s.verified.add(host, guarded)
 	switch {
 	case !entry.presents():
 		if upstream.requested.Load() {
 			s.reportMissing(host)
 		}
-		s.events.connect(Event{
-			Host: host, Entry: entry.label, Guarded: entry == s.guardEntry,
-			Message: fmt.Sprintf("verified the server certificate of %s through %s", host, upstream.via),
-		})
+		if !guarded {
+			s.events.connect(host, entry.label, false, fmt.Sprintf("verified the server certificate of %s through %s", host, upstream.via))
+		}
 	case upstream.requested.Load():
-		s.events.connect(Event{Host: host, Entry: entry.label, Presented: true, Message: fmt.Sprintf("presented the client certificate %s to %s through %s", entry.label, host, upstream.via)})
+		s.events.connect(host, entry.label, true, fmt.Sprintf("presented the client certificate %s to %s through %s", entry.label, host, upstream.via))
 	default:
-		s.events.connect(Event{Host: host, Entry: entry.label, Message: fmt.Sprintf("connected to %s through %s; it did not ask for a client certificate", host, upstream.via)})
+		s.events.connect(host, entry.label, false, fmt.Sprintf("connected to %s through %s; it did not ask for a client certificate", host, upstream.via))
 	}
 }
 
@@ -486,6 +495,7 @@ func (s *server) reportHandshakeFailure(host string, entry *upstreamEntry, reque
 		return
 	}
 	if verifyErr, ok := errors.AsType[*tls.CertificateVerificationError](err); ok {
+		s.verified.remove(host)
 		message := fmt.Sprintf("%s presented a server certificate that is not trusted (%v)", host, verifyErr.Err)
 		if entry.presents() {
 			message += fmt.Sprintf("; if a private CA issued it, name that CA in ca_file of %s", entry.label)

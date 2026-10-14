@@ -127,6 +127,7 @@ func Serve(ctx context.Context, cfg Config, ready func(Ready)) error {
 		pac:        evaluator,
 		issuer:     issuer,
 		events:     newEventLog(),
+		verified:   newVerifiedHosts(),
 		pending:    newPendingLog(),
 		guardEntry: newGuardEntry(cfg.Entries),
 		tunnels:    map[net.Conn]struct{}{},

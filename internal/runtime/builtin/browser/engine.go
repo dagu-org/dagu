@@ -93,6 +93,10 @@ type engine interface {
 	// PendingConnections returns the connections the certificate proxy has
 	// not yet heard a site answer on, or nothing without a proxy.
 	PendingConnections(ctx context.Context) ([]certproxy.Pending, error)
+	// CertificateVerified reports whether the certificate proxy verified the
+	// server certificate of host on a route it still carries; false without
+	// a proxy.
+	CertificateVerified(ctx context.Context, host string) (bool, error)
 	Handle() browserHandle
 	// Detach releases the session while the browser keeps running.
 	Detach(ctx context.Context) error

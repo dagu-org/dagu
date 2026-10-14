@@ -157,11 +157,6 @@ func newRun(ctx context.Context, e *browserExecutor) (*run, error) {
 		_, _ = fmt.Fprintf(r.timeline.Log, "warning: %s %s\n", r.timeline.Position(index), message)
 	}
 	r.certificateEvent = func(index int, event certproxy.Event) {
-		if event.Kind == certproxy.EventConnect && event.Guarded {
-			// No setting names a site the guard carried; logging each
-			// would list every site a page touches.
-			return
-		}
 		logCertificateEvent(r.timeline, index, event)
 		if certificateTrouble(event) {
 			r.certificateFailures[event.Host] = describeCertificateEvent(event)
