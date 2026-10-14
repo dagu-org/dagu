@@ -2479,7 +2479,6 @@ const english = {
   "Replace public URL": "Replace public URL",
   "Replace": "Replace",
   "Dagu Cloud drops this URL and any deliveries waiting for it.": "Dagu Cloud drops this URL and any deliveries waiting for it.",
-  "The current URL stops working, and deliveries waiting for it are dropped. Give every sender the new URL.": "The current URL stops working, and deliveries waiting for it are dropped. Give every sender the new URL.",
   "Your plan allows {count} public URLs, and this one is not among them. Turn another off, or change the plan.": "Your plan allows {count} public URLs, and this one is not among them. Turn another off, or change the plan.",
   "Connecting to Dagu Cloud…": "Connecting to Dagu Cloud…",
   "Recent deliveries": "Recent deliveries",
@@ -2494,7 +2493,10 @@ const english = {
   "Signing Secret": "Signing Secret",
   "Copy this secret into GitHub's webhook settings now. You won't be able to see it again!": "Copy this secret into GitHub's webhook settings now. You won't be able to see it again!",
   "Copy this HMAC secret now. You won't be able to see it again!": "Copy this HMAC secret now. You won't be able to see it again!",
-  "{payload} is available as the {variable} environment variable and in the file named by {file}.": "{payload} is available as the {variable} environment variable and in the file named by {file}.",
+  "The current URL stops working. Requests Dagu Cloud already took through it are still delivered. Give every sender the new URL.": "The current URL stops working. Requests Dagu Cloud already took through it are still delivered. Give every sender the new URL.",
+  "{payload} is in the file named by {file}, and in the {variable} environment variable when it fits in one.": "{payload} is in the file named by {file}, and in the {variable} environment variable when it fits in one.",
+  "The public URL could not be loaded.": "The public URL could not be loaded.",
+  "The plan allows no public URLs.": "The plan allows no public URLs.",
 } as const;
 
 export type StaticMessage = keyof typeof english;
@@ -4920,7 +4922,6 @@ const chinese = {
   "Replace public URL": "替换公共 URL",
   "Replace": "替换",
   "Dagu Cloud drops this URL and any deliveries waiting for it.": "Dagu Cloud 将丢弃此 URL 以及所有等待中的投递。",
-  "The current URL stops working, and deliveries waiting for it are dropped. Give every sender the new URL.": "当前 URL 将失效，等待中的投递将被丢弃。请将新 URL 提供给所有发送方。",
   "Your plan allows {count} public URLs, and this one is not among them. Turn another off, or change the plan.": "您的套餐允许 {count} 个公共 URL，此 URL 不在其中。请关闭其他 URL 或更改套餐。",
   "Connecting to Dagu Cloud…": "正在连接 Dagu Cloud…",
   "Recent deliveries": "最近的投递",
@@ -4935,7 +4936,10 @@ const chinese = {
   "Signing Secret": "签名密钥",
   "Copy this secret into GitHub's webhook settings now. You won't be able to see it again!": "请立即将此密钥复制到 GitHub 的 Webhook 设置中。之后将无法再次查看！",
   "Copy this HMAC secret now. You won't be able to see it again!": "请立即复制此 HMAC 密钥。之后将无法再次查看！",
-  "{payload} is available as the {variable} environment variable and in the file named by {file}.": "{payload} 可通过 {variable} 环境变量以及 {file} 指定的文件获取。",
+  "The current URL stops working. Requests Dagu Cloud already took through it are still delivered. Give every sender the new URL.": "当前 URL 将失效。Dagu Cloud 已通过它接收的请求仍会投递。请将新 URL 提供给所有发送方。",
+  "{payload} is in the file named by {file}, and in the {variable} environment variable when it fits in one.": "{payload} 位于 {file} 指定的文件中；当其大小能放入单个环境变量时，也可通过 {variable} 环境变量获取。",
+  "The public URL could not be loaded.": "无法加载公共 URL。",
+  "The plan allows no public URLs.": "当前套餐不允许公共 URL。",
 } as const satisfies Record<StaticMessage, string>;
 
 const japanese = {
@@ -7438,7 +7442,6 @@ const japanese = {
   "Replace public URL": "公開 URL を置き換える",
   "Replace": "置き換える",
   "Dagu Cloud drops this URL and any deliveries waiting for it.": "Dagu Cloud はこの URL と待機中の配信をすべて破棄します。",
-  "The current URL stops working, and deliveries waiting for it are dropped. Give every sender the new URL.": "現在の URL は使えなくなり、待機中の配信は破棄されます。すべての送信元に新しい URL を設定してください。",
   "Your plan allows {count} public URLs, and this one is not among them. Turn another off, or change the plan.": "ご利用のプランでは公開 URL を {count} 個まで使え、この URL はその中に含まれていません。別の URL をオフにするか、プランを変更してください。",
   "Connecting to Dagu Cloud…": "Dagu Cloud に接続中…",
   "Recent deliveries": "最近の配信",
@@ -7453,7 +7456,10 @@ const japanese = {
   "Signing Secret": "署名シークレット",
   "Copy this secret into GitHub's webhook settings now. You won't be able to see it again!": "このシークレットを今すぐ GitHub の Webhook 設定にコピーしてください。再度表示することはできません。",
   "Copy this HMAC secret now. You won't be able to see it again!": "この HMAC シークレットを今すぐコピーしてください。再度表示することはできません。",
-  "{payload} is available as the {variable} environment variable and in the file named by {file}.": "{payload} は環境変数 {variable} と、{file} が示すファイルで参照できます。",
+  "The current URL stops working. Requests Dagu Cloud already took through it are still delivered. Give every sender the new URL.": "現在の URL は使えなくなります。Dagu Cloud がすでにこの URL で受け付けたリクエストは引き続き配信されます。すべての送信元に新しい URL を設定してください。",
+  "{payload} is in the file named by {file}, and in the {variable} environment variable when it fits in one.": "{payload} は {file} が示すファイルにあり、1 つの環境変数に収まる場合は環境変数 {variable} でも参照できます。",
+  "The public URL could not be loaded.": "公開 URL を読み込めませんでした。",
+  "The plan allows no public URLs.": "ご利用のプランでは公開 URL を使えません。",
 } as const satisfies Record<StaticMessage, string>;
 
 export const staticMessages = {

@@ -1075,7 +1075,7 @@ function WebhookTab({ fileName, dagName = fileName }: WebhookTabProps) {
           <ul className="mt-2 text-xs text-muted-foreground space-y-1">
             <li>
               <I18nTemplate
-                text="{payload} is available as the {variable} environment variable and in the file named by {file}."
+                text="{payload} is in the file named by {file}, and in the {variable} environment variable when it fits in one."
                 values={{
                   payload: (
                     <code className="bg-accent px-1 rounded-md border">

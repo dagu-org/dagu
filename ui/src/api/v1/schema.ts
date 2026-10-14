@@ -2729,8 +2729,9 @@ export interface paths {
         put?: never;
         /**
          * Replace the webhook's public URL
-         * @description Gives the webhook a new public URL. The old URL stops working, and
-         *     deliveries waiting for it are dropped. Admin only.
+         * @description Gives the webhook a new public URL. The old URL stops working.
+         *     Requests Dagu Cloud already took through it are still delivered;
+         *     turning the URL off drops them. Admin only.
          *
          */
         post: operations["regenerateDAGWebhookPublicURL"];

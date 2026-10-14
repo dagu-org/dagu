@@ -6862,8 +6862,9 @@ paths:
     post:
       summary: "Replace the webhook's public URL"
       description: |
-        Gives the webhook a new public URL. The old URL stops working, and
-        deliveries waiting for it are dropped. Admin only.
+        Gives the webhook a new public URL. The old URL stops working.
+        Requests Dagu Cloud already took through it are still delivered;
+        turning the URL off drops them. Admin only.
       operationId: "regenerateDAGWebhookPublicURL"
       tags:
         - "webhooks"

@@ -15,7 +15,6 @@ import (
 	"github.com/dagucloud/dagu/v2/internal/auth"
 	"github.com/dagucloud/dagu/v2/internal/cmn/logger"
 	"github.com/dagucloud/dagu/v2/internal/cmn/logger/tag"
-	"github.com/dagucloud/dagu/v2/internal/persis"
 	"github.com/dagucloud/dagu/v2/internal/publicwebhook"
 	authservice "github.com/dagucloud/dagu/v2/internal/service/auth"
 )
@@ -242,7 +241,7 @@ func (a *API) deletePublicWebhookLog(ctx context.Context, webhook *auth.Webhook)
 	if a.publicWebhookStore == nil || webhook == nil {
 		return
 	}
-	if err := a.publicWebhookStore.DeleteLog(ctx, webhook.ID); err != nil && !errors.Is(err, persis.ErrNotFound) {
+	if err := a.publicWebhookStore.DeleteLog(ctx, webhook.ID); err != nil {
 		logger.Warn(ctx, "Failed to delete public webhook deliveries", tag.Name(webhook.DAGName), tag.Error(err))
 	}
 }

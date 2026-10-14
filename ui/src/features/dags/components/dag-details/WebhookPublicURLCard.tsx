@@ -129,11 +129,13 @@ function WebhookPublicURLCard({
       }),
     [settings, fileName, remoteNode]
   );
-  const { data: details, mutate } = useQuery(
-    '/dags/{fileName}/webhook/public',
-    publicQuery,
-    { refreshInterval: REFRESH_INTERVAL_MS }
-  );
+  const {
+    data: details,
+    error: detailsError,
+    mutate,
+  } = useQuery('/dags/{fileName}/webhook/public', publicQuery, {
+    refreshInterval: REFRESH_INTERVAL_MS,
+  });
 
   const params = { path: { fileName }, query: { remoteNode } };
 
@@ -240,6 +242,7 @@ function WebhookPublicURLCard({
     : sender === WebhookPublicSender.github
       ? 'Leave empty to have Dagu make one'
       : "Paste the sender's signing secret";
+  const loadFailed = !!detailsError && !details;
   const missed = details?.missed;
   const missedCount = (missed?.expired ?? 0) + (missed?.refused ?? 0);
 
@@ -280,46 +283,61 @@ function WebhookPublicURLCard({
 
         {settings && (
           <>
-            <PublicURLState details={details} />
+            {loadFailed ? (
+              <div className="flex flex-wrap items-center gap-2 text-xs text-destructive">
+                <I18nText text={'The public URL could not be loaded.'} />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void mutate()}
+                >
+                  <I18nText text={'Retry'} />
+                </Button>
+              </div>
+            ) : (
+              <PublicURLState details={details} />
+            )}
 
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-muted-foreground">
-                  <I18nText text={'URL'} />
-                </span>
-                {details?.url && (
-                  <I18nProps>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      aria-label={copied ? 'Copied' : 'Copy'}
-                      className="h-6 px-2 text-muted-foreground hover:text-foreground"
-                      onClick={() => handleCopy(details.url!)}
-                    >
-                      {copied ? (
-                        <Check className="h-3 w-3" />
-                      ) : (
-                        <Copy className="h-3 w-3" />
-                      )}
-                    </Button>
-                  </I18nProps>
+            {!loadFailed && (
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs text-muted-foreground">
+                    <I18nText text={'URL'} />
+                  </span>
+                  {details?.url && (
+                    <I18nProps>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label={copied ? 'Copied' : 'Copy'}
+                        className="h-6 px-2 text-muted-foreground hover:text-foreground"
+                        onClick={() => handleCopy(details.url!)}
+                      >
+                        {copied ? (
+                          <Check className="h-3 w-3" />
+                        ) : (
+                          <Copy className="h-3 w-3" />
+                        )}
+                      </Button>
+                    </I18nProps>
+                  )}
+                </div>
+                {details?.url ? (
+                  <div className="px-3 py-2 bg-accent rounded-md text-xs font-mono border overflow-x-auto">
+                    <span className="text-muted-foreground">POST</span>{' '}
+                    <span className="break-all">{details.url}</span>
+                  </div>
+                ) : (
+                  <div className="text-xs text-muted-foreground">
+                    <I18nText
+                      text={
+                        'The URL appears once this server connects to Dagu Cloud.'
+                      }
+                    />
+                  </div>
                 )}
               </div>
-              {details?.url ? (
-                <div className="px-3 py-2 bg-accent rounded-md text-xs font-mono border overflow-x-auto">
-                  <span className="text-muted-foreground">POST</span>{' '}
-                  <span className="break-all">{details.url}</span>
-                </div>
-              ) : (
-                <div className="text-xs text-muted-foreground">
-                  <I18nText
-                    text={
-                      'The URL appears once this server connects to Dagu Cloud.'
-                    }
-                  />
-                </div>
-              )}
-            </div>
+            )}
 
             <div className="space-y-2">
               <span className="text-xs text-muted-foreground">
@@ -470,10 +488,12 @@ function WebhookPublicURLCard({
               </div>
             )}
 
-            <Deliveries
-              dagName={dagName}
-              deliveries={details?.deliveries ?? []}
-            />
+            {!loadFailed && (
+              <Deliveries
+                dagName={dagName}
+                deliveries={details?.deliveries ?? []}
+              />
+            )}
 
             {isAdmin && (
               <Button
@@ -514,7 +534,7 @@ function WebhookPublicURLCard({
             {ts(
               pendingAction === 'disable'
                 ? 'Dagu Cloud drops this URL and any deliveries waiting for it.'
-                : 'The current URL stops working, and deliveries waiting for it are dropped. Give every sender the new URL.'
+                : 'The current URL stops working. Requests Dagu Cloud already took through it are still delivered. Give every sender the new URL.'
             )}
           </p>
         </ConfirmModal>

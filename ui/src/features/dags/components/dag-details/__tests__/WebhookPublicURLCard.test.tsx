@@ -27,9 +27,10 @@ const useQueryMock = useQuery as unknown as {
   mockReturnValue: (value: unknown) => void;
 };
 
-// returnsDetails makes the card's status query answer with details.
-function returnsDetails(details?: WebhookPublicDetails) {
-  useQueryMock.mockReturnValue({ data: details, mutate: mutateMock });
+// returnsDetails makes the card's status query answer with details, or fail
+// with error.
+function returnsDetails(details?: WebhookPublicDetails, error?: unknown) {
+  useQueryMock.mockReturnValue({ data: details, error, mutate: mutateMock });
 }
 
 const postMock = vi.fn();
@@ -225,6 +226,21 @@ describe('WebhookPublicURLCard', () => {
         { params }
       )
     );
+  });
+
+  it('says when the URL cannot be loaded, and loads it again', async () => {
+    returnsDetails(undefined, { message: 'boom' });
+    const user = userEvent.setup();
+    renderCard(publicWebhook);
+
+    expect(
+      screen.getByText('The public URL could not be loaded.')
+    ).toBeVisible();
+    expect(screen.queryByText('Connecting to Dagu Cloud…')).toBeNull();
+    expect(screen.queryByText('No deliveries yet.')).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(mutateMock).toHaveBeenCalled();
   });
 
   it('says when the plan leaves the URL out', () => {
