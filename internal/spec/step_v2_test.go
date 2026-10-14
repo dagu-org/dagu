@@ -724,6 +724,105 @@ steps:
 	}
 }
 
+func TestStepSchemaV2_ActionClickHouseQuery(t *testing.T) {
+	t.Parallel()
+
+	t.Run("InlineQuery", func(t *testing.T) {
+		t.Parallel()
+
+		dag, err := LoadYAML(context.Background(), []byte(`
+steps:
+  - id: rollup
+    action: clickhouse.query
+    with:
+      url: "${CLICKHOUSE_URL}"
+      query: |
+        INSERT INTO daily SELECT * FROM raw WHERE day = {day:Date};
+        SELECT count() FROM daily
+      params:
+        day: "2024-01-02"
+      settings:
+        readonly: 0
+      output_format: csv
+`))
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+
+		// A multi-line query becomes the step script.
+		step := dag.Steps[0]
+		assert.Equal(t, "clickhouse", step.ExecutorConfig.Type)
+		assert.Empty(t, step.Commands)
+		assert.Contains(t, step.Script, "INSERT INTO daily SELECT * FROM raw WHERE day = {day:Date};")
+		assert.Contains(t, step.Script, "SELECT count() FROM daily")
+		assert.Equal(t, "${CLICKHOUSE_URL}", step.ExecutorConfig.Config["url"])
+		assert.Equal(t, "csv", step.ExecutorConfig.Config["output_format"])
+		assert.NotContains(t, step.ExecutorConfig.Config, "query")
+	})
+
+	t.Run("SingleLineQuery", func(t *testing.T) {
+		t.Parallel()
+
+		dag, err := LoadYAML(context.Background(), []byte(`
+steps:
+  - id: one
+    action: clickhouse.query
+    with:
+      url: http://localhost:8123
+      query: "SELECT `+"`a;b`"+`, 'it''s' FROM t WHERE x = {x:String}; SELECT 2"
+`))
+		require.NoError(t, err)
+		step := dag.Steps[0]
+		require.Len(t, step.Commands, 1)
+		assert.Equal(t, "SELECT `a;b`, 'it''s' FROM t WHERE x = {x:String}; SELECT 2", step.Commands[0].CmdWithArgs)
+	})
+
+	t.Run("File", func(t *testing.T) {
+		t.Parallel()
+
+		dag, err := LoadYAML(context.Background(), []byte(`
+steps:
+  - id: load
+    action: clickhouse.query
+    with:
+      url: http://localhost:8123
+      file: sql/load.sql
+`))
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+
+		step := dag.Steps[0]
+		assert.Equal(t, "clickhouse", step.ExecutorConfig.Type)
+		assert.Empty(t, step.Commands)
+		assert.Equal(t, "sql/load.sql", step.ExecutorConfig.Config["file"])
+	})
+
+	for _, tt := range []struct {
+		name    string
+		with    string
+		message string
+	}{
+		{"NeitherQueryNorFile", "url: http://localhost:8123", "with.query or with.file is required"},
+		{"BothQueryAndFile", "url: http://localhost:8123\n      query: SELECT 1\n      file: q.sql", "mutually exclusive"},
+		{"MissingURL", "query: SELECT 1", "url is required"},
+		{"EmbeddedCredentials", "url: http://u:p@localhost:8123\n      query: SELECT 1", "credentials must not be embedded"},
+		{"UnknownOption", "url: http://localhost:8123\n      query: SELECT 1\n      read_only: true", "read_only"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := LoadYAML(context.Background(), []byte(`
+steps:
+  - id: bad
+    action: clickhouse.query
+    with:
+      `+tt.with+`
+`))
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.message)
+		})
+	}
+}
+
 func TestStepSchemaV2_ActionFileOperations(t *testing.T) {
 	t.Parallel()
 
