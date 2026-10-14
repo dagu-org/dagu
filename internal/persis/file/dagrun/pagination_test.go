@@ -255,7 +255,7 @@ func TestQueryStatusesMatchesOracle(t *testing.T) {
 }
 
 // A lazy read lists finished runs from the day's index, so a page of them
-// reads no status from disk.
+// reads no status from disk, including runs created in the same second.
 func TestQueryStatusesLazyReadUsesIndex(t *testing.T) {
 	th := setupTestRepository(t)
 	base := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
@@ -263,7 +263,7 @@ func TestQueryStatusesLazyReadUsesIndex(t *testing.T) {
 	for i := range 40 {
 		attempt, err := th.Backend.CreateAttempt(th.Context, persis.DAGRunCreateAttemptRequest{
 			DAG:       dag,
-			Timestamp: base.Add(time.Duration(i) * time.Minute),
+			Timestamp: base.Add(time.Duration(i/2) * time.Minute),
 			DAGRunID:  fmt.Sprintf("run-%02d", i),
 		})
 		require.NoError(t, err)
@@ -284,7 +284,7 @@ func TestQueryStatusesLazyReadUsesIndex(t *testing.T) {
 	page, err := store.QueryStatuses(th.Context, persis.DAGRunStatusQuery{Limit: 10})
 	require.NoError(t, err)
 	require.Len(t, page.Items, 10)
-	require.Equal(t, "run-39", page.Items[0].DAGRunID)
+	require.Equal(t, "run-38", page.Items[0].DAGRunID)
 	require.Zero(t, cache.Size())
 }
 

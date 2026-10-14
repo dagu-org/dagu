@@ -10,6 +10,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -401,7 +402,8 @@ func (it *dagRunStatusIterator) nextLazyGroup(ctx context.Context) ([]dagRunList
 		}
 
 		items := make([]dagRunListItem, 0, len(runs))
-		for _, run := range runs {
+		// Index lookups go from the newest run directory down.
+		for _, run := range slices.Backward(runs) {
 			if entry, ok := day.index.Lookup(filepath.Base(run.baseDir), run.timestamp); ok {
 				run.summary = summaryFromIndexEntry(entry)
 			}
