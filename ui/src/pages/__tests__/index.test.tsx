@@ -15,6 +15,7 @@ import {
 } from '../../features/activity/hooks/useDAGRunActivity';
 import type { DAGRunActivity } from '../../features/activity/lib/activityModel';
 import { useQuery } from '../../hooks/api';
+import { useSchedulerPause } from '../../hooks/useSchedulerPause';
 import DashboardPage from '../index';
 
 vi.mock('../../features/activity/hooks/useDAGRunActivity', () => ({
@@ -41,7 +42,18 @@ vi.mock('../../hooks/api', () => ({
   useQuery: vi.fn(),
 }));
 
+vi.mock('../../hooks/useSchedulerPause', () => ({
+  useSchedulerPause: vi.fn(),
+}));
+
 const useActivityMock = vi.mocked(useDAGRunActivity);
+const useSchedulerPauseMock = vi.mocked(useSchedulerPause);
+
+function mockScheduler(schedulerRunning: boolean | undefined) {
+  useSchedulerPauseMock.mockReturnValue({
+    schedulerRunning,
+  } as ReturnType<typeof useSchedulerPause>);
+}
 const useQueryMock = vi.mocked(
   useQuery as unknown as (path: string, init: unknown) => unknown
 );
@@ -135,6 +147,7 @@ function makeActivity(overrides: Partial<DAGRunActivity> = {}): DAGRunActivity {
     attention: [],
     active: [],
     upcoming: [],
+    queues: [],
     ...overrides,
   };
 }
@@ -194,6 +207,7 @@ const busyActivity = makeActivity({
 describe('DashboardPage', () => {
   beforeEach(() => {
     mockDAGList([]);
+    mockScheduler(true);
   });
 
   afterEach(() => {
@@ -255,6 +269,69 @@ describe('DashboardPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Back to live' }));
 
     expect(resume).toHaveBeenCalled();
+  });
+
+  it('warns when a stopped scheduler holds back scheduled runs', () => {
+    mockScheduler(false);
+    mockActivity({ activity: busyActivity });
+
+    renderPage();
+
+    const attention = screen.getByRole('region', { name: /Needs attention/ });
+    expect(
+      within(attention).getByText(/The scheduler is not running/)
+    ).toBeVisible();
+    expect(
+      within(attention).getByRole('link', { name: /System Status/ })
+    ).toHaveAttribute('href', '/system-status');
+  });
+
+  it('summarizes each queue instead of listing its queued runs', () => {
+    // Running status text animates and reads the reduced-motion preference.
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: false,
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    });
+    mockActivity({
+      activity: makeActivity({
+        runs: reportRuns,
+        active: [
+          { name: 'etl', dagRunId: 'etl-1', status: Status.Queued },
+          {
+            name: 'train',
+            dagRunId: 'train-1',
+            status: Status.Running,
+            startedAt: NOW - 60,
+          },
+        ],
+        queues: [
+          {
+            name: 'default',
+            running: 1,
+            maxConcurrency: 1,
+            queued: 20,
+            nextQueuedAt: NOW - 600,
+          },
+        ],
+      }),
+    });
+
+    renderPage();
+
+    const queues = screen.getByRole('list', { name: 'Queues' });
+    expect(queues).toHaveTextContent('1 of 1 running');
+    expect(queues).toHaveTextContent('20 queued');
+    expect(queues).toHaveTextContent(/next waiting 10m/);
+    expect(
+      within(queues).getByRole('link', { name: 'default' })
+    ).toHaveAttribute('href', '/queues/default');
+    expect(screen.getByRole('link', { name: 'train' })).toBeVisible();
+    expect(screen.queryByRole('link', { name: 'etl' })).not.toBeInTheDocument();
   });
 
   it('says all is clear when nothing needs attention', () => {

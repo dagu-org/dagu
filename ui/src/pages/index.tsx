@@ -26,11 +26,13 @@ import {
   attentionItems,
   fitRange,
   inProgressRuns,
+  isSchedulerHoldingWork,
   type TimeRange,
 } from '../features/activity/lib/activityModel';
 import { CreateDAGModal } from '../features/dags/components/common';
 import PathsCard from '../features/system-status/components/PathsCard';
 import { useQuery } from '../hooks/api';
+import { useSchedulerPause } from '../hooks/useSchedulerPause';
 import dayjs from '../lib/dayjs';
 import { workspaceSelectionQuery } from '../lib/workspace';
 import { I18nText } from '@/i18n/I18nText';
@@ -211,6 +213,8 @@ function Dashboard(): React.ReactElement {
     paused,
     resume,
   } = useDAGRunActivity(activityWindow, workspaceQuery, remoteNode);
+  // Shares the pause banner's request, so it costs nothing extra.
+  const { schedulerRunning } = useSchedulerPause();
 
   const { filteredActivity, filteredRuns } = React.useMemo(() => {
     const query = filter.trim().toLowerCase();
@@ -224,6 +228,7 @@ function Dashboard(): React.ReactElement {
         attention: activity.attention.filter((run) => matches(run.name)),
         active: activity.active.filter((run) => matches(run.name)),
         upcoming: activity.upcoming.filter((item) => matches(item.name)),
+        queues: activity.queues.filter((queue) => matches(queue.name)),
       },
       filteredRuns: runs.filter((run) => matches(run.name)),
     };
@@ -235,7 +240,8 @@ function Dashboard(): React.ReactElement {
     !!activity &&
     activity.runs.length === 0 &&
     activity.active.length === 0 &&
-    activity.attention.length === 0;
+    activity.attention.length === 0 &&
+    activity.queues.length === 0;
   const { data: dagList } = useQuery(
     '/dags',
     isEmpty
@@ -318,6 +324,10 @@ function Dashboard(): React.ReactElement {
           <div className="flex min-w-0 flex-col gap-6">
             {live && (
               <NeedsAttention
+                schedulerStopped={
+                  !!activity &&
+                  isSchedulerHoldingWork(activity, schedulerRunning)
+                }
                 items={attentionItems(
                   filteredActivity,
                   filteredRuns,
@@ -419,7 +429,9 @@ function Dashboard(): React.ReactElement {
             <div className="flex flex-col gap-6">
               <InProgress
                 runs={inProgressRuns(filteredActivity)}
+                queues={filteredActivity.queues}
                 remoteNode={remoteNode}
+                nowSeconds={nowSeconds}
               />
               <UpNext
                 upcoming={filteredActivity.upcoming}

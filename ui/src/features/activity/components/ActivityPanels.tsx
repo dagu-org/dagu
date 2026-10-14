@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { ArrowRight, CircleCheck } from 'lucide-react';
+import { ArrowRight, CircleAlert, CircleCheck } from 'lucide-react';
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Status, StatusLabel, type components } from '@/api/v1/schema';
@@ -18,11 +18,14 @@ import { useI18n } from '@/i18n/I18nProvider';
 import dayjs from '@/lib/dayjs';
 import { formatDurationMs } from '@/lib/formatDuration';
 import { runStatusText } from '@/lib/status-utils';
+import { cn } from '@/lib/utils';
 import { executionsURL } from '../lib/activityLinks';
-import type {
-  ActivityRun,
-  AttentionItem,
-  TimeRange,
+import {
+  type ActivityQueue,
+  type ActivityRun,
+  type AttentionItem,
+  isQueueStalled,
+  type TimeRange,
 } from '../lib/activityModel';
 
 type DAGRunSummary = components['schemas']['DAGRunSummary'];
@@ -102,18 +105,23 @@ function RunLink({
   );
 }
 
-/** What needs a person now; one quiet line when nothing does. */
+/**
+ * What needs a person now; one quiet line when nothing does. A stopped
+ * scheduler that holds work back comes first.
+ */
 export function NeedsAttention({
   items,
+  schedulerStopped,
   remoteNode,
   onChanged,
 }: {
   items: AttentionItem[];
+  schedulerStopped: boolean;
   remoteNode: string;
   onChanged: () => void;
 }): React.ReactElement {
   const { ts } = useI18n();
-  if (items.length === 0) {
+  if (items.length === 0 && !schedulerStopped) {
     return (
       <p className="flex items-center gap-2 text-sm text-muted-foreground">
         <CircleCheck className="h-4 w-4 text-success" aria-hidden="true" />
@@ -129,11 +137,33 @@ export function NeedsAttention({
       aria-labelledby="needs-attention-title"
     >
       <div id="needs-attention-title">
-        <SectionTitle count={items.length}>
+        <SectionTitle count={items.length + (schedulerStopped ? 1 : 0)}>
           <I18nText text={'Needs attention'} />
         </SectionTitle>
       </div>
       <ul className="divide-y divide-border rounded-lg border border-border bg-card">
+        {schedulerStopped && (
+          <li className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
+            <CircleAlert
+              className="h-4 w-4 shrink-0 text-error"
+              aria-hidden="true"
+            />
+            <span className="min-w-0 flex-1 text-sm text-foreground">
+              <I18nText
+                text={
+                  'The scheduler is not running, so scheduled and queued runs will not start.'
+                }
+              />
+            </span>
+            <Link
+              to="/system-status"
+              className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <I18nText text={'System Status'} />
+              <ArrowRight className="h-3 w-3" aria-hidden="true" />
+            </Link>
+          </li>
+        )}
         {items.map((item) => {
           const summary =
             item.kind === 'failing' ? retrySummary(item.name, item.run) : null;
@@ -206,20 +236,28 @@ export function NeedsAttention({
   );
 }
 
-/** Runs that are running or queued, oldest first, with live elapsed time. */
+/**
+ * Runs that are running, oldest first, with live elapsed time, then one line
+ * per queue with work: how full it is and how long its next run has waited.
+ */
 export function InProgress({
   runs,
+  queues,
   remoteNode,
+  nowSeconds,
 }: {
   runs: ActivityRun[];
+  queues: ActivityQueue[];
   remoteNode: string;
+  nowSeconds: number;
 }): React.ReactElement {
+  const { ts } = useI18n();
   return (
     <section className="flex flex-col gap-2">
       <SectionTitle count={runs.length}>
         <I18nText text={'In progress'} />
       </SectionTitle>
-      {runs.length === 0 ? (
+      {runs.length === 0 && queues.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           <I18nText text={'Nothing is running.'} />
         </p>
@@ -238,7 +276,7 @@ export function InProgress({
               >
                 {run.name}
               </RunLink>
-              {run.status === Status.Running && run.startedAt !== undefined && (
+              {run.startedAt !== undefined && (
                 <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
                   <Ticker intervalMs={1000}>
                     {() => (
@@ -251,6 +289,63 @@ export function InProgress({
                   </Ticker>
                 </span>
               )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {queues.length > 0 && (
+        <ul
+          aria-label={ts('Queues')}
+          className="flex flex-col gap-1 border-t border-border pt-2"
+        >
+          {queues.map((queue) => (
+            <li key={queue.name} className="flex flex-col text-sm">
+              <Link
+                to={`/queues/${encodeURIComponent(queue.name)}`}
+                className="truncate text-foreground hover:underline"
+              >
+                {queue.name}
+              </Link>
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {queue.maxConcurrency === undefined
+                  ? ts('{running} running', { running: queue.running })
+                  : ts('{running} of {max} running', {
+                      running: queue.running,
+                      max: queue.maxConcurrency,
+                    })}
+                {queue.queued > 0 || queue.queuedCapped ? (
+                  <>
+                    {' · '}
+                    {ts(
+                      queue.queuedCapped ? '{count}+ queued' : '{count} queued',
+                      { count: queue.queued }
+                    )}
+                  </>
+                ) : null}
+                {queue.nextQueuedAt !== undefined && (
+                  <span
+                    className={cn(
+                      isQueueStalled(queue, nowSeconds) && 'text-warning'
+                    )}
+                  >
+                    {' · '}
+                    <Ticker intervalMs={1000}>
+                      {() => (
+                        <span>
+                          {ts('next waiting {elapsed}', {
+                            elapsed: formatDurationMs(
+                              Math.max(
+                                0,
+                                Date.now() - (queue.nextQueuedAt ?? 0) * 1000
+                              )
+                            ),
+                          })}
+                        </span>
+                      )}
+                    </Ticker>
+                  </span>
+                )}
+              </span>
             </li>
           ))}
         </ul>

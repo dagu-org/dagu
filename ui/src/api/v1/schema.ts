@@ -726,7 +726,7 @@ export interface paths {
          * @description Lists the DAG-runs created in a time window, newest first, one page at
          *     a time. The first page also lists the DAGs whose latest run did not
          *     succeed, runs still in progress (including ones created before the
-         *     window), and the next scheduled runs. Without fromDate, the window is
+         *     window), queues with work, and the next scheduled runs. Without fromDate, the window is
          *     the last `hours` hours, aligned to a 96th of its length. To load older
          *     runs, pass the first page's from and to as fromDate and toDate, with
          *     nextCursor as cursor.
@@ -4211,6 +4211,25 @@ export interface components {
             active: components["schemas"]["DAGRunActivityRun"][];
             /** @description First page only: next scheduled runs, soonest first */
             upcoming: components["schemas"]["DAGRunActivityUpcoming"][];
+            /** @description First page only: queues with runs running or waiting, the longest wait first, at most 20 */
+            queues: components["schemas"]["DAGRunActivityQueue"][];
+        };
+        /** @description A queue with runs running or waiting */
+        DAGRunActivityQueue: {
+            name: string;
+            /** @description Number of runs running */
+            running: number;
+            /** @description Maximum number of runs the queue runs at once */
+            maxConcurrency?: number;
+            /** @description Number of runs waiting; a lower bound when queuedCapped is set */
+            queued: number;
+            /** @description True when counting stopped early, so queued is a lower bound */
+            queuedCapped?: boolean;
+            /**
+             * Format: int64
+             * @description When the next run in line was queued, as Unix seconds
+             */
+            nextQueuedAt?: number;
         };
         /** @description One DAG-run in an activity summary */
         DAGRunActivityRun: {
@@ -5421,6 +5440,8 @@ export interface components {
             pausedBy?: string;
             /** @description Operator-facing explanation shown while paused */
             reason?: string;
+            /** @description Whether a scheduler instance is running. Omitted when the server cannot tell. */
+            schedulerRunning?: boolean;
         };
         /** @description Response containing status of all coordinator instances */
         CoordinatorStatusResponse: {

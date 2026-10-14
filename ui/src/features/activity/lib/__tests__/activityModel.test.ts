@@ -10,6 +10,8 @@ import {
   fitRange,
   groupLanes,
   inProgressRuns,
+  isQueueStalled,
+  isSchedulerHoldingWork,
   sortLanes,
   timeTicks,
 } from '../activityModel';
@@ -35,6 +37,7 @@ function activity(overrides: Partial<DAGRunActivity> = {}): DAGRunActivity {
     attention: [],
     active: [],
     upcoming: [],
+    queues: [],
     ...overrides,
   };
 }
@@ -107,7 +110,8 @@ describe('attentionItems', () => {
 });
 
 describe('inProgressRuns', () => {
-  it('leaves waiting runs to the attention list', () => {
+  // Queued runs are summarized per queue, and waiting runs need attention.
+  it('lists only running runs', () => {
     const runs = inProgressRuns(
       activity({
         active: [
@@ -118,7 +122,51 @@ describe('inProgressRuns', () => {
       })
     );
 
-    expect(runs.map((item) => item.dagRunId)).toEqual(['1', '3']);
+    expect(runs.map((item) => item.dagRunId)).toEqual(['1']);
+  });
+});
+
+describe('isQueueStalled', () => {
+  const now = FROM + HOUR;
+  const queue = {
+    name: 'default',
+    running: 0,
+    maxConcurrency: 2,
+    queued: 3,
+    nextQueuedAt: now - 10 * 60,
+  };
+
+  it('flags a queue whose next run waits while it has room', () => {
+    expect(isQueueStalled(queue, now)).toBe(true);
+  });
+
+  it('accepts a long wait in a full queue or a short one', () => {
+    expect(isQueueStalled({ ...queue, running: 2 }, now)).toBe(false);
+    expect(isQueueStalled({ ...queue, nextQueuedAt: now - 60 }, now)).toBe(
+      false
+    );
+  });
+});
+
+describe('isSchedulerHoldingWork', () => {
+  const scheduled = activity({
+    upcoming: [{ name: 'nightly', fileName: 'nightly', nextRun: FROM + HOUR }],
+  });
+  const queued = activity({
+    queues: [{ name: 'default', running: 0, queued: 1 }],
+  });
+
+  it('flags a stopped scheduler while runs are scheduled or queued', () => {
+    expect(isSchedulerHoldingWork(scheduled, false)).toBe(true);
+    expect(isSchedulerHoldingWork(queued, false)).toBe(true);
+  });
+
+  // A node without schedules may run no scheduler on purpose, and an older
+  // node does not report one at all.
+  it('stays quiet without waiting work or a known stopped scheduler', () => {
+    expect(isSchedulerHoldingWork(activity(), false)).toBe(false);
+    expect(isSchedulerHoldingWork(scheduled, true)).toBe(false);
+    expect(isSchedulerHoldingWork(scheduled, undefined)).toBe(false);
   });
 });
 
