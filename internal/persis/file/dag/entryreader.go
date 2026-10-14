@@ -48,18 +48,57 @@ type entryReaderImpl struct {
 	events                 chan persis.DAGChangeEvent
 	newWatcher             func() filenotify.FileWatcher
 	resyncInterval         time.Duration
+	marker                 *ChangeMarker
+	markerInterval         time.Duration
+	markerSeen             markerVersions
 }
 
 // EntryReaderOption customizes a filesystem DAG entry reader.
 type EntryReaderOption func(*entryReaderImpl)
 
 // WithResyncInterval sets how often the reader re-reads the whole DAG
-// directory regardless of watcher events. A non-positive value disables the
-// periodic resync.
+// directory regardless of watcher events or the change marker. It is the safety
+// net for changes that do not go through the Dagu store, such as DAG files
+// edited directly or pulled by git sync. A non-positive value disables it.
 func WithResyncInterval(interval time.Duration) EntryReaderOption {
 	return func(er *entryReaderImpl) {
 		er.resyncInterval = interval
 	}
+}
+
+// WithChangeMarker makes the reader poll the change markers of the other hosts
+// every interval and refresh the registry when one changes, which is how it
+// learns about DAG changes that another host made through the Dagu store (the
+// UI and API editors). path is this host's own marker file, as returned by
+// ChangeMarkerPath; it identifies the marker directory and is the one marker
+// the reader ignores, because the file watches already report this host's
+// changes. An empty path disables the marker; a non-positive interval selects
+// the default.
+//
+// Changes that do not go through the store, such as DAG files edited directly
+// on the volume or pulled by git sync, are only picked up by the resync. So are
+// changes from machines that share a host name, or that mount the DAG
+// directory at different paths, since the marker name derives from that path.
+func WithChangeMarker(path string, interval time.Duration) EntryReaderOption {
+	return func(er *entryReaderImpl) {
+		er.marker = nil
+		if path == "" {
+			return
+		}
+		er.marker = NewChangeMarker(path)
+		if interval <= 0 {
+			interval = defaultChangeMarkerInterval
+		}
+		er.markerInterval = interval
+	}
+}
+
+// markerSignalsChange polls the change markers and reports whether the registry
+// should be refreshed, which is when another host's marker is new or changed.
+func (er *entryReaderImpl) markerSignalsChange(ctx context.Context) bool {
+	next, changed := er.marker.poll(ctx, er.markerSeen)
+	er.markerSeen = next
+	return changed
 }
 
 // withWatcherFactory replaces the file watcher implementation.
@@ -69,10 +108,15 @@ func withWatcherFactory(factory func() filenotify.FileWatcher) EntryReaderOption
 	}
 }
 
-// defaultResyncInterval bounds how long a change made through another host can
-// stay unseen. Native file watches do not fire for writes made over a network
-// file system by another machine.
-const defaultResyncInterval = 5 * time.Minute
+const (
+	// defaultChangeMarkerInterval is how often the change marker is checked.
+	defaultChangeMarkerInterval = 5 * time.Second
+	// defaultResyncInterval is the full re-read period. The change marker covers
+	// edits made through Dagu on another host; this covers edits made by other
+	// tools (git, kubectl cp, editors), which native file watches also miss on a
+	// network file system.
+	defaultResyncInterval = 5 * time.Minute
+)
 
 type dagFileStamp struct {
 	size    int64
@@ -120,6 +164,9 @@ func (er *entryReaderImpl) Init(ctx context.Context) error {
 		}
 	}
 	er.baseConfigState = describeBaseConfigStateSet(er.baseConfigPath, er.workspaceBaseConfigDir)
+	// Read the marker before loading so a change made while loading is seen by
+	// the next poll.
+	er.markerSeen, _ = er.marker.poll(ctx, nil)
 	if er.recursive {
 		return er.initRecursive(ctx)
 	}
@@ -183,6 +230,13 @@ func (er *entryReaderImpl) watch(ctx context.Context) {
 		resync = resyncTicker.C
 	}
 
+	var markerPoll <-chan time.Time
+	if er.marker != nil && er.markerInterval > 0 {
+		markerTicker := time.NewTicker(er.markerInterval)
+		defer markerTicker.Stop()
+		markerPoll = markerTicker.C
+	}
+
 	for {
 		select {
 		case <-er.quit:
@@ -191,6 +245,10 @@ func (er *entryReaderImpl) watch(ctx context.Context) {
 			return
 		case <-resync:
 			scheduleRefresh()
+		case <-markerPoll:
+			if er.markerSignalsChange(ctx) {
+				scheduleRefresh()
+			}
 		case event, ok := <-er.watcher.Events():
 			if !ok {
 				return
