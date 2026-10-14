@@ -41,7 +41,7 @@ func TestScopedTrust(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, "HTTP/2.0 anonymous", body)
 			event := waitForEvent(t, ready, cfg.Token, EventConnect)
-			assert.True(t, event.TLSVerified)
+			assert.False(t, event.Guarded)
 			assert.False(t, event.Presented)
 
 			port := ready.Port

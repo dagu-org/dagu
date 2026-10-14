@@ -85,16 +85,32 @@ func (ts *testSessions) state(id string) sessionState {
 
 var testModel = &ir.LLMConfig{Provider: "openai", Model: "test-model"}
 
+// tls_verified reports the proxy's evidence for the final page's host. The
+// guard stopping withdraws only the evidence of the hosts it carried.
 func TestSessionTLSVerification(t *testing.T) {
 	t.Parallel()
-	for _, verifiedHost := range []string{"portal.example.com", "redirect.example.com", ""} {
-		t.Run(verifiedHost, func(t *testing.T) {
+	connect := func(host string, guarded bool) certproxy.Event {
+		return certproxy.Event{Seq: 1, Kind: certproxy.EventConnect, Host: host, Guarded: guarded}
+	}
+	guardOff := certproxy.Event{Seq: 2, Kind: certproxy.EventGuardOff, Host: "cdn.example.net"}
+	for name, tt := range map[string]struct {
+		events []certproxy.Event
+		want   bool
+	}{
+		"NamedHost":           {events: []certproxy.Event{connect("portal.example.com", false)}, want: true},
+		"GuardedHost":         {events: []certproxy.Event{connect("portal.example.com", true)}, want: true},
+		"OtherHost":           {events: []certproxy.Event{connect("redirect.example.com", false)}},
+		"NoEvidence":          {},
+		"GuardOffNamedHost":   {events: []certproxy.Event{connect("portal.example.com", false), guardOff}, want: true},
+		"GuardOffGuardedHost": {events: []certproxy.Event{connect("portal.example.com", true), guardOff}},
+	} {
+		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			ts := newTestSessions(t, pageModel(nil))
 			ts.engine.handle.CertProxy = &certproxy.Handle{URL: "http://127.0.0.1:1/token"}
-			ts.engine.certificateEvents = []certproxy.Event{{Seq: 1, Kind: certproxy.EventConnect, Host: verifiedHost, TLSVerified: true}}
+			ts.engine.certificateEvents = tt.events
 			opened := ts.open(SessionOptions{URL: "https://portal.example.com/", Headless: true})
-			assert.Equal(t, verifiedHost == "portal.example.com", opened.TLSVerified)
+			assert.Equal(t, tt.want, opened.TLSVerified)
 		})
 	}
 }

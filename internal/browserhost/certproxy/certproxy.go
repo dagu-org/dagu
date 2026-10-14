@@ -90,7 +90,8 @@ type Ready struct {
 
 // Kinds of Event.
 const (
-	// EventConnect reports the first connection to a host with an entry.
+	// EventConnect reports the first connection to a host, once the server
+	// certificate was verified.
 	EventConnect = "connect"
 	// EventClientCertificateRejected reports a server that refused the
 	// client certificate.
@@ -139,8 +140,9 @@ type Event struct {
 	// Presented is set on a connection on which the entry's certificate
 	// was presented.
 	Presented bool `json:"presented,omitempty"`
-	// TLSVerified reports a successful, verified upstream TLS connection.
-	TLSVerified bool `json:"tls_verified,omitempty"`
+	// Guarded is set on a connection the guard carried, to a host no entry
+	// or authority names.
+	Guarded bool `json:"guarded,omitempty"`
 }
 
 const (
@@ -200,20 +202,24 @@ func (l *eventLog) record(event Event) {
 	event.Seq, event.Time = l.seq, now
 	l.events = append(l.events, event)
 	if len(l.events) > maxEvents {
-		l.events = append(l.events[:0:0], l.events[len(l.events)-maxEvents:]...)
+		// The guard's connections are evidence only, so they go before
+		// anything a reader must not miss.
+		drop := max(slices.IndexFunc(l.events, func(e Event) bool { return e.Guarded }), 0)
+		l.events = slices.Delete(l.events, drop, drop+1)
 	}
 }
 
 // connect records the first connection entry makes to host, and whether
 // it presented its certificate there.
-func (l *eventLog) connect(host, entry string, presented bool, message string) {
-	key := connectKey{entry: entry, host: host}
+func (l *eventLog) connect(event Event) {
+	key := connectKey{entry: event.Entry, host: event.Host}
 	l.mu.Lock()
 	seen := l.connected[key]
 	l.connected[key] = true
 	l.mu.Unlock()
 	if !seen {
-		l.record(Event{Kind: EventConnect, Host: host, Entry: entry, Message: message, Presented: presented, TLSVerified: true})
+		event.Kind = EventConnect
+		l.record(event)
 	}
 }
 

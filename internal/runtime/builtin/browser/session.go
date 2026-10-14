@@ -23,7 +23,6 @@ import (
 	"github.com/dagucloud/dagu/v2/internal/browserhost/certproxy"
 	cmnconfig "github.com/dagucloud/dagu/v2/internal/cmn/config"
 	"github.com/dagucloud/dagu/v2/internal/cmn/dirlock"
-	"github.com/dagucloud/dagu/v2/internal/cmn/hostpattern"
 	"github.com/dagucloud/dagu/v2/internal/cmn/masking"
 	"github.com/dagucloud/dagu/v2/internal/cmn/procutil"
 	cmnvalue "github.com/dagucloud/dagu/v2/internal/cmn/value"
@@ -425,7 +424,7 @@ func (s *Sessions) Open(ctx context.Context, opts SessionOptions) (OpenResult, e
 	}
 	return OpenResult{
 		ID:              id,
-		TLSVerified:     strings.HasPrefix(strings.ToLower(pageURL), "https://") && !op.certificateProxyLost && op.verifiedHosts[hostpattern.Canonical(urlHost(pageURL))],
+		TLSVerified:     op.tlsVerified(pageURL),
 		CDPURL:          record.CDPURL,
 		Headless:        opts.Headless,
 		Profile:         opts.Profile,

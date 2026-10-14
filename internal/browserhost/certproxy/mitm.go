@@ -460,19 +460,22 @@ func (s *server) handshake(ctx context.Context, raw net.Conn, via route, host st
 	return &upstreamConn{Conn: conn, via: via, requested: requested}, nil
 }
 
-// reportConnected records the first connection an entry makes to host, or,
-// for the guard, a server that asked for a certificate it does not have.
+// reportConnected records the first verified connection to host, and a
+// server that asked for a certificate the entry does not have.
 func (s *server) reportConnected(host string, entry *upstreamEntry, upstream *upstreamConn) {
 	switch {
 	case !entry.presents():
 		if upstream.requested.Load() {
 			s.reportMissing(host)
 		}
-		s.events.connect(host, entry.label, false, fmt.Sprintf("verified the server certificate of %s through %s", host, upstream.via))
+		s.events.connect(Event{
+			Host: host, Entry: entry.label, Guarded: entry == s.guardEntry,
+			Message: fmt.Sprintf("verified the server certificate of %s through %s", host, upstream.via),
+		})
 	case upstream.requested.Load():
-		s.events.connect(host, entry.label, true, fmt.Sprintf("presented the client certificate %s to %s through %s", entry.label, host, upstream.via))
+		s.events.connect(Event{Host: host, Entry: entry.label, Presented: true, Message: fmt.Sprintf("presented the client certificate %s to %s through %s", entry.label, host, upstream.via)})
 	default:
-		s.events.connect(host, entry.label, false, fmt.Sprintf("connected to %s through %s; it did not ask for a client certificate", host, upstream.via))
+		s.events.connect(Event{Host: host, Entry: entry.label, Message: fmt.Sprintf("connected to %s through %s; it did not ask for a client certificate", host, upstream.via)})
 	}
 }
 

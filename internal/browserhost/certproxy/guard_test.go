@@ -68,8 +68,8 @@ func TestServeGuardCarriesOptionalCertificateSite(t *testing.T) {
 	waitForEvent(t, ready, cfg.Token, EventClientCertificateMissing)
 }
 
-// A site that asks for no client certificate opens through the guard and
-// reports its verified TLS connection.
+// A site that asks for no client certificate opens through the guard, which
+// reports the verified connection as one it carried.
 func TestServeGuardCarriesOrdinarySite(t *testing.T) {
 	t.Parallel()
 
@@ -85,7 +85,23 @@ func TestServeGuardCarriesOrdinarySite(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, events, 1)
 	assert.Equal(t, EventConnect, events[0].Kind)
-	assert.True(t, events[0].TLSVerified)
+	assert.True(t, events[0].Guarded)
+}
+
+// The guard's connections are evidence only, so a full log drops them
+// before a failure a reader has yet to take.
+func TestEventLogKeepsFailuresOverGuardEvidence(t *testing.T) {
+	t.Parallel()
+
+	events := newEventLog()
+	events.add(EventServerCertificate, siteHost, "", siteHost+" presented a server certificate that is not trusted")
+	for i := range maxEvents {
+		host := fmt.Sprintf("site%d.test", i)
+		events.connect(Event{Host: host, Guarded: true, Message: "verified the server certificate of " + host})
+	}
+	kept := events.after(0)
+	require.Len(t, kept, maxEvents)
+	assert.Equal(t, EventServerCertificate, kept[0].Kind)
 }
 
 // When the device's proxy asks for credentials, the guard resets the

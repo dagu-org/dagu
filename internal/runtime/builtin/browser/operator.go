@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"strings"
 	"time"
 
@@ -50,7 +51,9 @@ type operator struct {
 	certificateProxyLost bool
 	// presented maps the hosts the proxy presented a certificate to, to the
 	// certificate's label.
-	presented     map[string]string
+	presented map[string]string
+	// verifiedHosts maps the hosts the proxy verified a connection to, to
+	// whether the guard carried that connection.
 	verifiedHosts map[string]bool
 }
 
@@ -189,15 +192,17 @@ func (o *operator) takeCertificateEvents(ctx context.Context, index int) []certp
 	}
 	var failures []certproxy.Event
 	for _, event := range events {
-		if event.Kind == certproxy.EventGuardOff {
-			o.verifiedHosts = nil
-		} else if event.TLSVerified {
+		switch event.Kind {
+		case certproxy.EventConnect:
 			if o.verifiedHosts == nil {
 				o.verifiedHosts = map[string]bool{}
 			}
-			o.verifiedHosts[hostpattern.Canonical(event.Host)] = true
-		} else if event.Kind == certproxy.EventServerCertificate {
+			o.verifiedHosts[hostpattern.Canonical(event.Host)] = event.Guarded
+		case certproxy.EventServerCertificate:
 			delete(o.verifiedHosts, hostpattern.Canonical(event.Host))
+		case certproxy.EventGuardOff:
+			// The browser reaches the guard's hosts itself from now on.
+			maps.DeleteFunc(o.verifiedHosts, func(_ string, guarded bool) bool { return guarded })
 		}
 		if o.certificateEvent != nil {
 			o.certificateEvent(index, event)
@@ -216,6 +221,16 @@ func (o *operator) takeCertificateEvents(ctx context.Context, index int) []certp
 		}
 	}
 	return failures
+}
+
+// tlsVerified reports whether the proxy verified a TLS connection to the
+// host of the https: page at address.
+func (o *operator) tlsVerified(address string) bool {
+	if o.certificateProxyLost || !strings.HasPrefix(strings.ToLower(address), "https://") {
+		return false
+	}
+	_, verified := o.verifiedHosts[hostpattern.Canonical(urlHost(address))]
+	return verified
 }
 
 func (o *operator) act(ctx context.Context, index int, spec actSpec, timeout time.Duration) (opResult, error) {

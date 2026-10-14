@@ -173,6 +173,26 @@ func TestCertificateProxyFailureExplainsErrorPage(t *testing.T) {
 	assert.Contains(t, execution.stderr.String(), "client_certificate completed presented the certificate to portal.example.com")
 }
 
+// The step's log records the connections to the hosts an entry or an
+// authority names, not every site the guard carried.
+func TestCertificateLogSkipsGuardedSites(t *testing.T) {
+	t.Parallel()
+
+	run := newTestRun(t, pageModel(nil))
+	run.hostCertificates = []cmnconfig.BrowserClientCertificate{
+		{Hosts: []string{"portal.example.com"}, PFXFile: writeClientCertificate(t, "device", "")},
+	}
+	run.engine.certificateEvents = []certproxy.Event{
+		{Seq: 1, Kind: certproxy.EventConnect, Host: "intranet.example.com", Message: "verified the server certificate of intranet.example.com through DIRECT"},
+		{Seq: 2, Kind: certproxy.EventConnect, Host: "cdn.example.net", Message: "verified the server certificate of cdn.example.net through DIRECT", Guarded: true},
+	}
+	execution := run.execute(`{"do": [{"goto": "https://portal.example.com"}]}`, nil)
+
+	require.NoError(t, execution.err)
+	assert.Contains(t, execution.stderr.String(), "client_certificate completed verified the server certificate of intranet.example.com")
+	assert.NotContains(t, execution.stderr.String(), "cdn.example.net")
+}
+
 // A failure the proxy reports for another host, such as a page's CDN, does
 // not explain an error page unrelated to it.
 func TestCertificateProxyFailureForAnotherHostIsNotBlamed(t *testing.T) {

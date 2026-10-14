@@ -236,7 +236,9 @@ page, such as nginx's 400 or IIS's 403.7, rather than refusing the
 connection. A site that asks for a certificate and opens without one is not a
 failure. An operation that times out names the connections the proxy still
 waits on and how far each got. The step's log records each host the proxy
-presented a certificate to, each site that asked for one, and each failure.
+presented a certificate to or verified with a configured authority, each
+site that asked for one, and each failure. A site the guard carries appears
+only when it asks for a certificate or fails.
 
 ### Trusted server authorities
 
