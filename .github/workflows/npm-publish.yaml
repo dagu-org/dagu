@@ -249,6 +249,10 @@ jobs:
       # The main package must not go out before its platform packages can be
       # installed, or installs fail on every platform still processing.
       - name: Wait until the platform packages can be installed
+        # The 30-minute deadline is checked between rounds, and a round of
+        # bounded requests takes at most 12 minutes, so this caps the step
+        # outright.
+        timeout-minutes: 45
         run: |
           PKG_VERSION="${VERSION#v}"
           # These platforms' publish steps may fail without failing the release.
@@ -258,8 +262,10 @@ jobs:
           while [ -n "$pending" ] && [ "$SECONDS" -lt "$deadline" ]; do
             waiting=""
             for pkg in $pending; do
-              tarball=$(npm view --prefer-online "${pkg}@${PKG_VERSION}" dist.tarball 2>/dev/null || true)
-              if [ -n "$tarball" ] && curl -fsIL -o /dev/null "$tarball"; then
+              # Each request is bounded, so a stalled one cannot hold the
+              # loop past its deadline.
+              tarball=$(npm view --prefer-online --fetch-timeout=30000 --fetch-retries=0 "${pkg}@${PKG_VERSION}" dist.tarball 2>/dev/null || true)
+              if [ -n "$tarball" ] && curl -fsIL --connect-timeout 10 --max-time 30 -o /dev/null "$tarball"; then
                 echo "${pkg}@${PKG_VERSION} can be installed"
               else
                 waiting="$waiting $pkg"
