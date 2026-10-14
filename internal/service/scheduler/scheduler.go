@@ -35,6 +35,7 @@ import (
 	persisfile "github.com/dagucloud/dagu/v2/internal/persis/file"
 	"github.com/dagucloud/dagu/v2/internal/proc"
 	"github.com/dagucloud/dagu/v2/internal/profile"
+	"github.com/dagucloud/dagu/v2/internal/publicwebhook"
 	queuedomain "github.com/dagucloud/dagu/v2/internal/queue"
 	"github.com/dagucloud/dagu/v2/internal/runtime"
 	"github.com/dagucloud/dagu/v2/internal/schedulerstate"
@@ -93,6 +94,7 @@ type Scheduler struct {
 	eventCollector      func(context.Context)
 	notificationMonitor *chatbridge.NotificationMonitor
 	incidentMonitor     *chatbridge.NotificationMonitor
+	publicWebhooks      *publicwebhook.Service
 }
 
 type schedulerHooks struct {
@@ -126,6 +128,11 @@ type Dependencies struct {
 	IncidentState        chatbridge.StateStore
 	NewIncidentLease     func() chatbridge.Lease
 	LicenseManager       *license.Manager
+	// Webhooks, PublicWebhookStore, and CloudCredentials enable public
+	// webhook URLs; the feature is off unless all are set.
+	Webhooks           publicwebhook.Webhooks
+	PublicWebhookStore publicwebhook.Store
+	CloudCredentials   func() (license.CloudCredentials, bool)
 }
 
 type startupState struct {
@@ -167,6 +174,7 @@ func New(cfg *config.Config, deps Dependencies) (*Scheduler, error) {
 		scheduler.notificationMonitor = newNotificationMonitor(cfg, deps)
 		scheduler.incidentMonitor = newIncidentMonitor(cfg, deps)
 	}
+	scheduler.publicWebhooks = newPublicWebhooks(cfg, deps, scheduler)
 	scheduler.queueProcessor.dagRunLeaseStore = deps.DAGRunLeaseStore
 	scheduler.queueProcessor.dispatchTaskStore = deps.DispatchTaskStore
 	scheduler.queueProcessor.dispatchAdmissionStore = dispatchAdmissionStoreFromTaskStore(deps.DispatchTaskStore)
@@ -676,6 +684,10 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	})
 
 	wg.Go(func() {
+		s.startPublicWebhooks(ctx)
+	})
+
+	wg.Go(func() {
 		s.entryReader.Start(ctx)
 	})
 
@@ -763,6 +775,13 @@ func (s *Scheduler) startIncidentMonitor(ctx context.Context) {
 		return
 	}
 	s.incidentMonitor.Run(ctx)
+}
+
+func (s *Scheduler) startPublicWebhooks(ctx context.Context) {
+	if s.publicWebhooks == nil {
+		return
+	}
+	s.publicWebhooks.Run(ctx)
 }
 
 func (s *Scheduler) startHeartbeat(ctx context.Context) {

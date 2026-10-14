@@ -34,6 +34,8 @@ const (
 	storageRetry   = 30 * time.Second
 	// hookSuffix ends every hook ID: auth.WebhookHookID.
 	hookSuffix = "/webhook"
+	// requestTimeout bounds a ticket request and the relay handshake.
+	requestTimeout = 30 * time.Second
 )
 
 // Status errors the page shows when the server holds no public URLs.
@@ -74,8 +76,10 @@ type Config struct {
 	Webhooks    Webhooks
 	Store       Store
 	Runs        Runs
-	HTTPClient  *http.Client
-	Hello       cloudrelay.Hello
+	// HTTPClient reaches Dagu Cloud; nil means a client with a 30-second
+	// timeout.
+	HTTPClient *http.Client
+	Hello      cloudrelay.Hello
 }
 
 // timing is how the service paces itself; tests shorten it.
@@ -118,6 +122,9 @@ type Service struct {
 
 // New creates a Service.
 func New(cfg Config) *Service {
+	if cfg.HTTPClient == nil {
+		cfg.HTTPClient = &http.Client{Timeout: requestTimeout}
+	}
 	return &Service{cfg: cfg, timing: defaultTiming}
 }
 

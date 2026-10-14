@@ -1057,4 +1057,3 @@ func marshalWebhookHeaders(ctx context.Context, allowList []string) (string, err
 	headers := requestHeadersFromContext(ctx)
 	return intake.WebhookHeaders(allowList, func(name string) []string { return headers[name] })
 }
-
