@@ -220,7 +220,7 @@ func (er *entryReaderImpl) handleFSEvent(ctx context.Context, event fsnotify.Eve
 			return
 		}
 		if snapshot.exists {
-			er.applyDAGFileSnapshot(ctx, fileName, snapshot.dag)
+			er.applyDAGFileSnapshot(ctx, fileName, snapshot)
 			logger.Info(ctx, "DAG added/updated", tag.Name(fileName))
 			return
 		}
@@ -242,12 +242,13 @@ func (er *entryReaderImpl) reloadDAGFile(ctx context.Context, fileName, eventNam
 		return
 	}
 
-	er.applyDAGFileSnapshot(ctx, fileName, snapshot.dag)
+	er.applyDAGFileSnapshot(ctx, fileName, snapshot)
 	logger.Info(ctx, "DAG added/updated", tag.Name(fileName))
 }
 
 // applyDAGFileSnapshot stores a loaded DAG and emits the matching add/update events.
-func (er *entryReaderImpl) applyDAGFileSnapshot(ctx context.Context, fileName string, dag *ir.DAG) {
+func (er *entryReaderImpl) applyDAGFileSnapshot(ctx context.Context, fileName string, snapshot dagFileSnapshot) {
+	dag := snapshot.dag
 	// Determine add vs update by checking registry before updating
 	er.lock.Lock()
 	oldDAG, existed := er.registry[fileName]
@@ -256,6 +257,10 @@ func (er *entryReaderImpl) applyDAGFileSnapshot(ctx context.Context, fileName st
 		oldDAGName = oldDAG.Name
 	}
 	er.registry[fileName] = dag
+	if er.stamps == nil {
+		er.stamps = make(map[string]dagFileStamp)
+	}
+	er.stamps[fileName] = snapshot.stamp
 	er.lock.Unlock()
 
 	// If the DAG name changed, emit delete for the old name first
@@ -288,6 +293,7 @@ func (er *entryReaderImpl) removeDAGFile(ctx context.Context, fileName string) {
 	er.lock.Lock()
 	dag, existed := er.registry[fileName]
 	delete(er.registry, fileName)
+	delete(er.stamps, fileName)
 	er.lock.Unlock()
 
 	if existed && dag != nil {
@@ -458,12 +464,14 @@ func (er *entryReaderImpl) loadRegistry(ctx context.Context) (registryState, err
 		if !strings.Contains(locator, "/") {
 			locator = "./" + locator
 		}
-		dag, err := er.dagRepository.GetMetadata(ctx, locator)
+		// Stat before loading: a write that lands in between must still look
+		// like a change to the next refresh.
+		info, err := os.Stat(listedDAG.Location)
 		if err != nil {
 			issues = append(issues, fmt.Sprintf("reading %s failed: %s", key, err))
 			continue
 		}
-		info, err := os.Stat(dag.Location)
+		dag, err := er.dagRepository.GetMetadata(ctx, locator)
 		if err != nil {
 			issues = append(issues, fmt.Sprintf("reading %s failed: %s", key, err))
 			continue
@@ -573,6 +581,7 @@ func (er *entryReaderImpl) initialize(ctx context.Context) error {
 				continue
 			}
 			er.registry[fi.Name()] = snapshot.dag
+			er.stamps[fi.Name()] = snapshot.stamp
 			dags = append(dags, fi.Name())
 		}
 	}

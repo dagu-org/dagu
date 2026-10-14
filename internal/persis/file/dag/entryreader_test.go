@@ -685,3 +685,67 @@ func TestBaseWatchSymlink(t *testing.T) {
 		})
 	}
 }
+
+// expectEvent waits for an event of the given type for the named DAG.
+func expectEvent(t *testing.T, events <-chan persis.DAGChangeEvent, kind persis.DAGChangeType, name string) {
+	t.Helper()
+
+	timeout := time.NewTimer(5 * time.Second)
+	defer timeout.Stop()
+	for {
+		select {
+		case event := <-events:
+			if event.Type == kind && event.DAG != nil && event.DAG.Name == name {
+				return
+			}
+		case <-timeout.C:
+			t.Fatalf("missing change %v for %q", kind, name)
+		}
+	}
+}
+
+// expectNoEvent fails when any event arrives within the window.
+func expectNoEvent(t *testing.T, events <-chan persis.DAGChangeEvent, window time.Duration) {
+	t.Helper()
+
+	select {
+	case event := <-events:
+		t.Fatalf("unexpected change %v for %q", event.Type, event.DAG.Name)
+	case <-time.After(window):
+	}
+}
+
+// TestEntryReaderRefreshEmitsNothingWhenUnchanged keeps a full refresh from
+// reporting DAGs that did not change, whether they were loaded at start-up or
+// applied from a watcher event.
+func TestEntryReaderRefreshEmitsNothingWhenUnchanged(t *testing.T) {
+	for _, recursive := range []bool{false, true} {
+		name := "NonRecursive"
+		if recursive {
+			name = "Recursive"
+		}
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeDAGFile(t, dir, "existing.yaml", "existing")
+			store := newRepository(dir, WithSkipExamples(true), WithRecursiveDiscovery(recursive))
+			er := NewFileEntryReader(dir, store, recursive, "", "")
+			events := make(chan persis.DAGChangeEvent, 64)
+			er.events = events
+			ctx := context.Background()
+			require.NoError(t, er.Init(ctx))
+			t.Cleanup(er.Stop)
+
+			path := writeDAGFile(t, dir, "applied.yaml", "applied")
+			if recursive {
+				// Recursive readers apply every change through a full refresh.
+				require.NoError(t, er.refreshRegistry(ctx))
+			} else {
+				er.handleFSEvent(ctx, fsnotify.Event{Name: path, Op: fsnotify.Create})
+			}
+			expectEvent(t, events, persis.DAGChangeAdded, "applied")
+
+			require.NoError(t, er.refreshRegistry(ctx))
+			expectNoEvent(t, events, 100*time.Millisecond)
+		})
+	}
+}
