@@ -42,6 +42,8 @@ func TestSplitStatements(t *testing.T) {
 		{"BlockCommentMultiline", "SELECT /* a;\n b; */ 1; SELECT 2", []string{"SELECT /* a;\n b; */ 1", "SELECT 2"}},
 		{"BlockCommentWithQuote", "SELECT /* it's */ 1; SELECT 2", []string{"SELECT /* it's */ 1", "SELECT 2"}},
 		{"UnterminatedBlockComment", "SELECT 1; /* a; SELECT 2", []string{"SELECT 1"}},
+		{"NestedBlockComment", "SELECT 1 /* a /* b; */ c; */; SELECT 2", []string{"SELECT 1 /* a /* b; */ c; */", "SELECT 2"}},
+		{"CommentedOutStatements", "/*\nSELECT 1; /* a */\nSELECT 2;\n*/\nSELECT 3;", []string{"/*\nSELECT 1; /* a */\nSELECT 2;\n*/\nSELECT 3"}},
 		{"CommentOnlyStatementsDropped", "-- a\n; /* b */; SELECT 1; -- tail", []string{"SELECT 1"}},
 		{"LeadingComment", "-- load\nINSERT INTO t VALUES (1); SELECT 2", []string{"-- load\nINSERT INTO t VALUES (1)", "SELECT 2"}},
 		{"CommentMarkerInString", "SELECT '-- not; a comment'; SELECT 2", []string{"SELECT '-- not; a comment'", "SELECT 2"}},

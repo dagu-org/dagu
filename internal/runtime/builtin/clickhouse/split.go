@@ -14,7 +14,7 @@ import "strings"
 // It understands the ClickHouse lexical forms that can hide a semicolon:
 // '...' strings and "..." and `...` identifiers (a backslash or a doubled
 // quote escapes the quote), $$...$$ and $tag$...$tag$ heredocs, -- and
-// "# " / "#!" line comments, and /* ... */ block comments.
+// "# " / "#!" line comments, and nested /* ... */ block comments.
 //
 // Data written inline after INSERT ... FORMAT is not understood: a semicolon
 // in it splits the statement.
@@ -49,11 +49,19 @@ func splitStatements(script string) []string {
 		case c == '#' && i+1 < n && (script[i+1] == ' ' || script[i+1] == '!'):
 			i = skipLine(script, i)
 		case c == '/' && i+1 < n && script[i+1] == '*':
-			end := strings.Index(script[i+2:], "*/")
-			if end < 0 {
-				i = n
-			} else {
-				i += 2 + end + 2
+			// Block comments nest, as they do in the server's lexer.
+			depth := 1
+			for i += 2; i < n && depth > 0; {
+				switch {
+				case i+1 < n && script[i] == '/' && script[i+1] == '*':
+					depth++
+					i += 2
+				case i+1 < n && script[i] == '*' && script[i+1] == '/':
+					depth--
+					i += 2
+				default:
+					i++
+				}
 			}
 		case c == '$' && (i == 0 || !isIdentByte(script[i-1])):
 			if tag, ok := heredocTag(script, i); ok {
