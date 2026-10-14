@@ -270,6 +270,7 @@ func (s *Server) adminToken(t *testing.T) string {
 	return result.Token
 }
 
+// Endpoint returns the URL of the server's MCP endpoint.
 func (s *Server) Endpoint() string {
 	return fmt.Sprintf("http://%s:%d/mcp", s.server.Config.Server.Host, s.server.Config.Server.Port)
 }
