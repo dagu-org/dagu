@@ -193,7 +193,7 @@ func (l stagehandLauncher) Launch(ctx context.Context, opts launchOptions) (engi
 	}
 	cdpURL := fmt.Sprintf("http://127.0.0.1:%d", port)
 	var proxy *certproxy.Handle
-	if len(opts.ClientCertificates) > 0 || opts.Guard {
+	if len(opts.ClientCertificates) > 0 || len(opts.TrustedCAs) > 0 || opts.Guard {
 		if proxy, err = l.startCertProxy(ctx, cdpURL, opts); err != nil {
 			return nil, err
 		}
@@ -273,11 +273,12 @@ func (l stagehandLauncher) startCertProxy(ctx context.Context, cdpURL string, op
 		start = certproxy.Start
 	}
 	proxy, err := start(ctx, cmnconfig.GetConfig(ctx).Paths.Executable, certproxy.Config{
-		Token:     rand.Text(),
-		CDPURL:    cdpURL,
-		SystemPAC: pac,
-		Entries:   opts.ClientCertificates,
-		Guard:     opts.Guard,
+		Token:      rand.Text(),
+		CDPURL:     cdpURL,
+		SystemPAC:  pac,
+		Entries:    opts.ClientCertificates,
+		TrustedCAs: opts.TrustedCAs,
+		Guard:      opts.Guard,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("start the client certificate proxy: %w", err)

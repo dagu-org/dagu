@@ -51,6 +51,9 @@ type Config struct {
 	// Entries are the certificates; the first whose hosts match a host is
 	// presented to it.
 	Entries []Entry `json:"entries"`
+	// TrustedCAs contain only Hosts, Label, and CAPEM. All matching
+	// authorities add server trust without presenting a client identity.
+	TrustedCAs []Entry `json:"trusted_cas,omitempty"`
 	// GraceSeconds is how long the proxy waits for the browser to answer
 	// for the first time; zero means five minutes.
 	GraceSeconds int `json:"grace_seconds,omitempty"`
@@ -125,6 +128,8 @@ type Event struct {
 	// Presented is set on a connection on which the entry's certificate
 	// was presented.
 	Presented bool `json:"presented,omitempty"`
+	// TLSVerified reports a successful, verified upstream TLS connection.
+	TLSVerified bool `json:"tls_verified,omitempty"`
 }
 
 const (
@@ -197,7 +202,7 @@ func (l *eventLog) connect(host, entry string, presented bool, message string) {
 	l.connected[key] = true
 	l.mu.Unlock()
 	if !seen {
-		l.record(Event{Kind: EventConnect, Host: host, Entry: entry, Message: message, Presented: presented})
+		l.record(Event{Kind: EventConnect, Host: host, Entry: entry, Message: message, Presented: presented, TLSVerified: true})
 	}
 }
 

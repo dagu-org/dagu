@@ -68,8 +68,8 @@ func TestServeGuardCarriesOptionalCertificateSite(t *testing.T) {
 	waitForEvent(t, ready, cfg.Token, EventClientCertificateMissing)
 }
 
-// A site that asks for no client certificate opens through the guard, with
-// nothing to report.
+// A site that asks for no client certificate opens through the guard and
+// reports its verified TLS connection.
 func TestServeGuardCarriesOrdinarySite(t *testing.T) {
 	t.Parallel()
 
@@ -83,7 +83,9 @@ func TestServeGuardCarriesOrdinarySite(t *testing.T) {
 	assert.Equal(t, "HTTP/1.1 anonymous", body)
 	events, err := Events(context.Background(), controlURL(ready.Port, cfg.Token), 0)
 	require.NoError(t, err)
-	assert.Empty(t, events)
+	require.Len(t, events, 1)
+	assert.Equal(t, EventConnect, events[0].Kind)
+	assert.True(t, events[0].TLSVerified)
 }
 
 // When the device's proxy asks for credentials, the guard resets the

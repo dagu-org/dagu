@@ -591,7 +591,7 @@ func runBrowserSessionList(ctx *Context, _ []string) error {
 	if err != nil {
 		return writeSessionError(ctx, err)
 	}
-	return writeIndentedJSON(ctx.Command.OutOrStdout(), map[string]any{"sessions": sessions})
+	return writeIndentedJSON(ctx.Command.OutOrStdout(), map[string]any{"sessions": sessions, "capabilities": []string{"trusted_cas"}})
 }
 
 func sessionCharsFlag(ctx *Context, name string) (int, error) {

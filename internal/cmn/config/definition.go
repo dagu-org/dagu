@@ -113,6 +113,7 @@ type OpenCodeDef struct {
 type BrowserDef struct {
 	Sandbox                 *bool                         `mapstructure:"sandbox"`
 	ClientCertificates      []BrowserClientCertificateDef `mapstructure:"client_certificates"`
+	TrustedCAs              []BrowserTrustedCA            `mapstructure:"trusted_cas"`
 	GuardClientCertificates *bool                         `mapstructure:"guard_client_certificates"`
 }
 

@@ -26,7 +26,7 @@ import (
 
 // configVersion versions the configuration a starting process hands the
 // proxy, which may run an executable replaced in the meantime.
-const configVersion = 1
+const configVersion = 2
 
 const (
 	// startAttempts bounds the starts of a proxy that took the browser's

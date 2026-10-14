@@ -50,7 +50,8 @@ type operator struct {
 	certificateProxyLost bool
 	// presented maps the hosts the proxy presented a certificate to, to the
 	// certificate's label.
-	presented map[string]string
+	presented     map[string]string
+	verifiedHosts map[string]bool
 }
 
 // actRecorder keeps the actions acts and uploads performed, keyed by
@@ -188,6 +189,16 @@ func (o *operator) takeCertificateEvents(ctx context.Context, index int) []certp
 	}
 	var failures []certproxy.Event
 	for _, event := range events {
+		if event.Kind == certproxy.EventGuardOff {
+			o.verifiedHosts = nil
+		} else if event.TLSVerified {
+			if o.verifiedHosts == nil {
+				o.verifiedHosts = map[string]bool{}
+			}
+			o.verifiedHosts[hostpattern.Canonical(event.Host)] = true
+		} else if event.Kind == certproxy.EventServerCertificate {
+			delete(o.verifiedHosts, hostpattern.Canonical(event.Host))
+		}
 		if o.certificateEvent != nil {
 			o.certificateEvent(index, event)
 		}

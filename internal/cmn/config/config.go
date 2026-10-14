@@ -64,11 +64,35 @@ type BrowserConfig struct {
 	// ClientCertificates are presented by every browser started on this
 	// host, after the certificates a step names itself.
 	ClientCertificates []BrowserClientCertificate
+	// TrustedCAs add server trust only for the hosts each authority names.
+	TrustedCAs []BrowserTrustedCA
 	// GuardClientCertificates sends a browser's other https: requests
 	// through the certificate proxy too, so the browser never asks the
 	// operating system for a client certificate. Unset, it is on whenever
 	// the browser presents certificates.
 	GuardClientCertificates *bool
+}
+
+// BrowserTrustedCA adds server certificate authorities for specific hosts.
+type BrowserTrustedCA struct {
+	Hosts  []string `json:"hosts" mapstructure:"hosts"`
+	CAFile string   `json:"ca_file" mapstructure:"ca_file"`
+}
+
+// Validate rejects an authority without a file or valid host patterns.
+func (c BrowserTrustedCA) Validate() error {
+	if len(c.Hosts) == 0 {
+		return errors.New("hosts must list at least one host pattern")
+	}
+	for _, host := range c.Hosts {
+		if err := hostpattern.Validate(host); err != nil {
+			return err
+		}
+	}
+	if strings.TrimSpace(c.CAFile) == "" {
+		return errors.New("ca_file must name a PEM certificate authority file")
+	}
+	return nil
 }
 
 // BrowserClientCertificate is a TLS client certificate a browser presents to

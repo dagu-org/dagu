@@ -43,6 +43,13 @@ result carries the session ID, the page's URL, title, and outline, and the
 browser's DevTools address (`cdp_url`), where an application can show the
 page and let a person act on it.
 
+`open` also returns `tls_verified`: true confirms that the certificate proxy
+verified the final HTTPS page's host. False means no such evidence was
+available; it does not by itself mean the certificate failed. This confirms
+transport trust, not login or whether a configured authority was needed.
+`list` includes `capabilities: ["trusted_cas"]` so applications can detect
+support without assuming an engine version.
+
 A session's browser presents the client certificates of the host
 configuration's `browser.client_certificates`, and guards its other HTTPS
 requests as the host configuration says, as a browser step does, for as long
@@ -51,6 +58,9 @@ proxy reports while a command runs, such as a site rejecting the certificate,
 appears in the command's warnings or error. Between commands the browser and
 its proxy keep running, so local processes can use the certificates as long
 as the session lasts, as they can during a browser step.
+
+The host's `browser.trusted_cas` also applies, with the same scoped trust and
+browser-lifetime snapshot as a workflow browser.
 
 ### Lifetime
 

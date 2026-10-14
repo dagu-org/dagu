@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/dagucloud/dagu/v2/internal/browserhost"
+	"github.com/dagucloud/dagu/v2/internal/browserhost/certproxy"
 	cmnconfig "github.com/dagucloud/dagu/v2/internal/cmn/config"
 	"github.com/dagucloud/dagu/v2/internal/ir"
 	llmpkg "github.com/dagucloud/dagu/v2/internal/llm"
@@ -83,6 +84,20 @@ func (ts *testSessions) state(id string) sessionState {
 }
 
 var testModel = &ir.LLMConfig{Provider: "openai", Model: "test-model"}
+
+func TestSessionTLSVerification(t *testing.T) {
+	t.Parallel()
+	for _, verifiedHost := range []string{"portal.example.com", "redirect.example.com", ""} {
+		t.Run(verifiedHost, func(t *testing.T) {
+			t.Parallel()
+			ts := newTestSessions(t, pageModel(nil))
+			ts.engine.handle.CertProxy = &certproxy.Handle{URL: "http://127.0.0.1:1/token"}
+			ts.engine.certificateEvents = []certproxy.Event{{Seq: 1, Kind: certproxy.EventConnect, Host: verifiedHost, TLSVerified: true}}
+			opened := ts.open(SessionOptions{URL: "https://portal.example.com/", Headless: true})
+			assert.Equal(t, verifiedHost == "portal.example.com", opened.TLSVerified)
+		})
+	}
+}
 
 func (ts *testSessions) open(opts SessionOptions) OpenResult {
 	ts.t.Helper()

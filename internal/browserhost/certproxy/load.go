@@ -4,6 +4,7 @@
 package certproxy
 
 import (
+	"bytes"
 	"crypto"
 	"crypto/tls"
 	"crypto/x509"
@@ -74,6 +75,48 @@ func Load(label string, c cmnconfig.BrowserClientCertificate, baseDir string, no
 		entry.CAPEM = encodeCertificates(roots)
 	}
 	return entry, validityWarnings(label, chain[0], now), nil
+}
+
+// LoadTrustedCA reads a scoped server authority without a client identity.
+func LoadTrustedCA(label string, c cmnconfig.BrowserTrustedCA) (Entry, error) {
+	if err := c.Validate(); err != nil {
+		return Entry{}, fmt.Errorf("%s: %w", label, err)
+	}
+	data, err := os.ReadFile(c.CAFile) //nolint:gosec // the authority file is the configured input
+	if err != nil {
+		return Entry{}, fmt.Errorf("%s: %w", label, err)
+	}
+	certs, err := trustedCertificates(data)
+	if err != nil {
+		return Entry{}, fmt.Errorf("%s: %w", label, err)
+	}
+	return Entry{Label: label, Hosts: slices.Clone(c.Hosts), CAPEM: encodeCertificates(certs)}, nil
+}
+
+func trustedCertificates(data []byte) ([]*x509.Certificate, error) {
+	var certs []*x509.Certificate
+	for data = bytes.TrimSpace(data); len(data) > 0; data = bytes.TrimSpace(data) {
+		if !bytes.HasPrefix(data, []byte("-----BEGIN CERTIFICATE-----")) {
+			return nil, errors.New("ca_file must contain only PEM certificate authorities")
+		}
+		block, rest := pem.Decode(data)
+		if block == nil || block.Type != pemCertificate || len(block.Headers) != 0 || bytes.Count(data[:len(data)-len(rest)], []byte("-----BEGIN ")) != 1 {
+			return nil, errors.New("ca_file must contain only PEM certificate authorities")
+		}
+		cert, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("ca_file: %w", err)
+		}
+		if !cert.BasicConstraintsValid || !cert.IsCA || cert.KeyUsage != 0 && cert.KeyUsage&x509.KeyUsageCertSign == 0 {
+			return nil, errors.New("ca_file contains a certificate that is not a certificate authority")
+		}
+		certs = append(certs, cert)
+		data = rest
+	}
+	if len(certs) == 0 {
+		return nil, errors.New("ca_file holds no PEM certificate authority")
+	}
+	return certs, nil
 }
 
 // loadPFX reads a PKCS#12 file and returns its chain, leaf first, and key.

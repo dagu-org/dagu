@@ -261,6 +261,34 @@ func TestLoadCAFile(t *testing.T) {
 	assert.Contains(t, err.Error(), "holds no PEM certificate")
 }
 
+func TestLoadTrustedCA(t *testing.T) {
+	t.Parallel()
+	ca := newTestCA(t, "server CA")
+	leaf, key := ca.issue(t, certOptions{name: siteHost})
+	for name, data := range map[string]string{
+		"authority":       ca.pem(),
+		"leaf":            certPEM(leaf),
+		"private key":     ca.pem() + keyPEM(t, key),
+		"invalid":         "not a certificate",
+		"text prefix":     "unexpected text\n" + ca.pem(),
+		"malformed block": "-----BEGIN CERTIFICATE-----\ninvalid\n" + ca.pem(),
+		"private prefix":  "-----BEGIN PRIVATE KEY-----\ninvalid\n" + ca.pem(),
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeFile(t, dir, "ca.pem", data)
+			entry, err := LoadTrustedCA(testLabel, cmnconfig.BrowserTrustedCA{Hosts: []string{siteHost}, CAFile: filepath.Join(dir, "ca.pem")})
+			if name != "authority" {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, []string{siteHost}, entry.Hosts)
+			assert.True(t, parseChain(t, entry.CAPEM)[0].Equal(ca.cert))
+		})
+	}
+}
+
 func TestLoadRejectsInvalidConfig(t *testing.T) {
 	t.Parallel()
 

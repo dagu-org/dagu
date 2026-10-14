@@ -238,6 +238,31 @@ failure. An operation that times out names the connections the proxy still
 waits on and how far each got. The step's log records each host the proxy
 presented a certificate to, each site that asked for one, and each failure.
 
+### Trusted server authorities
+
+The host configuration `browser.trusted_cas` lists entries with `hosts` and
+`ca_file`, a PEM file containing certificate authorities without private keys.
+It applies to workflow browsers and browser sessions, without requiring a
+client certificate. Host patterns have the same syntax as client certificates.
+All authorities matching the destination host add to its existing trust;
+they do not affect which client certificate is presented. Redirects,
+subresources, and secure WebSockets use their own destination's trust.
+
+These entries never add trust to unrelated hosts through the guard. A named
+host always uses the certificate proxy, including when the guard is disabled;
+failure of that route does not fall back to the browser's route. An HTTPS
+upstream proxy's certificate uses authorities matching the proxy's hostname.
+Server hostname, validity, and certificate-chain verification remain enabled.
+
+Chrome bypasses PAC routing for localhost names, loopback addresses, and
+link-local addresses. An entry naming one reports a warning: its authority
+can verify an HTTPS upstream proxy there, but cannot add trust to a website
+opened directly at that address. Use the site's network hostname or another
+network address. Ordinary private-network IP addresses are supported.
+
+Authority files are read when a browser starts. An existing browser retains
+its original trust until it closes; a later browser reads the current files.
+
 ### Allowed domains
 
 The browser runtime applies `allowed_domains` to the page's HTTP(S) requests,

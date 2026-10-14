@@ -730,6 +730,19 @@ browser:
 	}, cfg.Browser.ClientCertificates)
 }
 
+func TestLoad_BrowserTrustedCAs(t *testing.T) {
+	dir := t.TempDir()
+	configFile := filepath.Join(dir, "config.yaml")
+	caFile := filepath.Join(dir, "ca.pem")
+	require.NoError(t, os.WriteFile(configFile, []byte("browser:\n  trusted_cas:\n    - hosts: [portal.example.com, '*.corp.example']\n      ca_file: "+caFile+"\n"), 0o600))
+	cfg := testLoad(t, WithConfigFile(configFile))
+	assert.Equal(t, []BrowserTrustedCA{{Hosts: []string{"portal.example.com", "*.corp.example"}, CAFile: caFile}}, cfg.Browser.TrustedCAs)
+	for _, value := range []string{"hosts: []\n      ca_file: ca.pem", "hosts: [https://portal.example.com]\n      ca_file: ca.pem", "hosts: [portal.example.com]"} {
+		err := loadWithErrorFromYAML(t, "browser:\n  trusted_cas:\n    - "+value+"\n")
+		require.ErrorContains(t, err, "browser.trusted_cas[0]")
+	}
+}
+
 // The certificate guard follows the browser's certificates unless the
 // config file or the environment turns it on or off.
 func TestLoad_BrowserGuardClientCertificates(t *testing.T) {

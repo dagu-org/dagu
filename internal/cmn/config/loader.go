@@ -411,6 +411,17 @@ func (l *ConfigLoader) loadCoreConfig(cfg *Config, def Definition) error {
 			return err
 		}
 		cfg.Browser.ClientCertificates = certificates
+		for i, authority := range def.Browser.TrustedCAs {
+			field := fmt.Sprintf("browser.trusted_cas[%d]", i)
+			if err := authority.Validate(); err != nil {
+				return fmt.Errorf("%s: %w", field, err)
+			}
+			authority.CAFile, err = l.resolvePath(field+".ca_file", authority.CAFile)
+			if err != nil {
+				return err
+			}
+			cfg.Browser.TrustedCAs = append(cfg.Browser.TrustedCAs, authority)
+		}
 	}
 	cfg.DAGDiscovery = DAGDiscoveryConfig{
 		Recursive: l.v.GetBool("dag_discovery.recursive"),

@@ -377,11 +377,15 @@ func (r *run) launchOptions(ctx context.Context, recordID string) (launchOptions
 	if err != nil {
 		return launchOptions{}, err
 	}
-	for _, warning := range warnings {
+	authorities, trustWarnings, err := loadTrustedCAs(ctx)
+	if err != nil {
+		return launchOptions{}, err
+	}
+	for _, warning := range append(warnings, trustWarnings...) {
 		r.warn(-1, warning)
 	}
 	guard := guardsCertificates(ctx, certificates)
-	r.certificateProxy = len(certificates) > 0 || guard
+	r.certificateProxy = len(certificates) > 0 || len(authorities) > 0 || guard
 	opts := launchOptions{
 		Executable:     r.cfg.Browser.Executable,
 		Headless:       r.cfg.headless(),
@@ -393,6 +397,7 @@ func (r *run) launchOptions(ctx context.Context, recordID string) (launchOptions
 		Generate:       r.bridge.generate,
 
 		ClientCertificates: certificates,
+		TrustedCAs:         authorities,
 		Guard:              guard,
 		Warn:               func(message string) { r.warn(-1, message) },
 	}
@@ -529,7 +534,7 @@ func (r *run) fail(ctx context.Context, index int, kind string, cause error) err
 	}
 	for _, host := range slices.Sorted(maps.Keys(r.certificateFailures)) {
 		if failure := r.masker.MaskString(r.certificateFailures[host]); !strings.Contains(message, failure) {
-			message += "; client certificate: " + failure
+			message += "; browser TLS: " + failure
 		}
 	}
 	usage := r.bridge.totals()

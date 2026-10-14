@@ -1148,6 +1148,28 @@
           "type": "boolean",
           "description": "Send a browser's other HTTPS requests through the certificate proxy too, so the browser never asks the operating system for a client certificate; a site that asks for one gets none and the step says so. Defaults to on whenever the browser presents client certificates."
         },
+        "trusted_cas": {
+          "type": "array",
+          "description": "Server certificate authorities trusted only for the hosts each names, in addition to existing trust. Matching entries combine independently of client certificates.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["hosts", "ca_file"],
+            "properties": {
+              "hosts": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "type": "string", "minLength": 1 },
+                "description": "Host names, IP addresses, *.example.com for subdomains excluding the apex, or * for every host."
+              },
+              "ca_file": {
+                "type": "string",
+                "minLength": 1,
+                "description": "PEM file containing only certificate authorities, without private keys."
+              }
+            }
+          }
+        },
         "client_certificates": {
           "type": "array",
           "description": "TLS client certificates every browser started on this host presents to the hosts each names, after those a step names. The first entry whose hosts match is used.",

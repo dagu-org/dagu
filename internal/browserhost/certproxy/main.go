@@ -15,6 +15,8 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/dagucloud/dagu/v2/internal/cmn/hostpattern"
 )
 
 // Main is the cert-proxy command. It reads a Config as JSON from stdin,
@@ -113,6 +115,8 @@ func Serve(ctx context.Context, cfg Config, ready func(Ready)) error {
 		ctx:        ctx,
 		token:      cfg.Token,
 		entries:    entries,
+		trustedCAs: cfg.TrustedCAs,
+		plainEntry: newGuardEntry(nil),
 		pac:        evaluator,
 		issuer:     issuer,
 		events:     newEventLog(),
@@ -121,7 +125,8 @@ func Serve(ctx context.Context, cfg Config, ready func(Ready)) error {
 		tunnels:    map[net.Conn]struct{}{},
 		guard:      guard,
 	}
-	script := composePAC(port, guardPort, cfg.Entries, system)
+	routes := append(append([]Entry{}, cfg.Entries...), cfg.TrustedCAs...)
+	script := composePAC(port, guardPort, routes, system)
 	pacURL, served := pacLocation(script, controlURL(port, cfg.Token)+"/"+pacPath)
 	if served {
 		s.pacScript = script
@@ -168,8 +173,24 @@ func (c Config) validate() error {
 		return errors.New("the certificate proxy config has no token")
 	case c.CDPURL == "":
 		return errors.New("the certificate proxy config names no browser")
-	case len(c.Entries) == 0 && !c.Guard:
+	case len(c.Entries) == 0 && len(c.TrustedCAs) == 0 && !c.Guard:
 		return errors.New("the certificate proxy config has no certificates and no guard")
+	}
+	for _, authority := range c.TrustedCAs {
+		if len(authority.Hosts) == 0 {
+			return fmt.Errorf("%s: hosts must list at least one host pattern", authority.Label)
+		}
+		for _, host := range authority.Hosts {
+			if err := hostpattern.Validate(host); err != nil {
+				return fmt.Errorf("%s: %w", authority.Label, err)
+			}
+		}
+		if authority.ChainPEM != "" || authority.KeyPEM != "" {
+			return fmt.Errorf("%s: trusted authorities cannot contain a client identity", authority.Label)
+		}
+		if _, err := trustedCertificates([]byte(authority.CAPEM)); err != nil {
+			return fmt.Errorf("%s: %w", authority.Label, err)
+		}
 	}
 	return nil
 }

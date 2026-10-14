@@ -74,14 +74,16 @@ var rejectionAlerts = []tls.AlertError{40, 42, 43, 44, 45, 46, 48, 49, 116}
 // server is a running proxy.
 type server struct {
 	// ctx ends when the proxy stops.
-	ctx       context.Context
-	token     string
-	entries   []*upstreamEntry
-	pac       *pacEvaluator
-	issuer    *leafIssuer
-	events    *eventLog
-	pacScript string // served when too large for a data: URL
-	pending   *pendingLog
+	ctx        context.Context
+	token      string
+	entries    []*upstreamEntry
+	trustedCAs []Entry
+	plainEntry *upstreamEntry
+	pac        *pacEvaluator
+	issuer     *leafIssuer
+	events     *eventLog
+	pacScript  string // served when too large for a data: URL
+	pending    *pendingLog
 	// guardEntry presents no certificate, to the hosts the guard carries.
 	guardEntry *upstreamEntry
 
@@ -220,11 +222,12 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request, guard boo
 		http.Error(w, "the CONNECT request names no host", http.StatusBadRequest)
 		return
 	}
-	entry := s.entryFor(host)
+	entry := s.scopedEntry(host)
+	configured := entry != nil
 	if entry == nil {
 		if !guard {
-			s.events.add(EventRefused, host, "", fmt.Sprintf("the certificate proxy refused a connection to %s, which no client certificate names", host))
-			http.Error(w, "no client certificate names this host", http.StatusForbidden)
+			s.events.add(EventRefused, host, "", fmt.Sprintf("the certificate proxy refused a connection to %s, which no certificate setting names", host))
+			http.Error(w, "no certificate setting names this host", http.StatusForbidden)
 			return
 		}
 		entry = s.guardEntry
@@ -235,7 +238,7 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request, guard boo
 	cancel()
 	if err != nil {
 		s.pending.end(pending)
-		if guard && errors.Is(err, errProxyAuth) {
+		if guard && !configured && errors.Is(err, errProxyAuth) {
 			// A reset connection makes the browser try the route after the
 			// guard; a closed guard keeps it on that route.
 			s.stopGuard(host)
@@ -329,6 +332,31 @@ func (s *server) entryFor(host string) *upstreamEntry {
 	return nil
 }
 
+// scopedEntry combines a host's client identity with every authority that
+// names that host. Authorities never change which identity is presented.
+func (s *server) scopedEntry(host string) *upstreamEntry {
+	entry := s.entryFor(host)
+	var selected *upstreamEntry
+	for _, authority := range s.trustedCAs {
+		if !hostpattern.MatchAny(host, authority.Hosts) {
+			continue
+		}
+		if selected == nil {
+			if entry == nil {
+				entry = s.plainEntry
+			}
+			scoped := *entry
+			scoped.roots = entry.roots.Clone()
+			selected = &scoped
+		}
+		selected.roots.AppendCertsFromPEM([]byte(authority.CAPEM))
+	}
+	if selected != nil {
+		return selected
+	}
+	return entry
+}
+
 // tunnel relays the browser's connection to the server reached over raw.
 // The browser's handshake waits for the one with the server, so it learns
 // the server's application protocol, and fails when that one does.
@@ -391,7 +419,7 @@ func (s *server) reach(ctx context.Context, host, port string, entry *upstreamEn
 // its ca_file is trusted for it.
 func (s *server) proxyTLS(host string) *tls.Config {
 	config := &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}
-	if entry := s.entryFor(hostpattern.Canonical(host)); entry != nil {
+	if entry := s.scopedEntry(hostpattern.Canonical(host)); entry != nil {
 		config.RootCAs = entry.roots
 		config.GetClientCertificate = func(*tls.CertificateRequestInfo) (*tls.Certificate, error) {
 			return &entry.cert, nil
@@ -433,6 +461,7 @@ func (s *server) reportConnected(host string, entry *upstreamEntry, upstream *up
 		if upstream.requested.Load() {
 			s.reportMissing(host)
 		}
+		s.events.connect(host, entry.label, false, fmt.Sprintf("verified the server certificate of %s through %s", host, upstream.via))
 	case upstream.requested.Load():
 		s.events.connect(host, entry.label, true, fmt.Sprintf("presented the client certificate %s to %s through %s", entry.label, host, upstream.via))
 	default:
