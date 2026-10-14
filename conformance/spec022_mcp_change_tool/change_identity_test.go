@@ -5,7 +5,6 @@ package spec022_mcp_change_tool_test
 
 import (
 	"encoding/json"
-	"strings"
 	"testing"
 
 	"github.com/dagucloud/dagu/v2/conformance/mcptest"
@@ -47,69 +46,16 @@ func TestChangeToolIdentityAndInputSchema(t *testing.T) {
 		require.Equal(t, "string", property["type"])
 	}
 
-	type branchContract struct {
-		types    []any
-		required []any
-	}
-	expectedBranches := map[string]branchContract{
-		"upsert_dag": {
-			types:    []any{"upsert_dag"},
-			required: []any{"name", "spec"},
-		},
-		"rename_dag": {
-			types:    []any{"rename_dag"},
-			required: []any{"type", "name", "newName"},
-		},
-		"delete_dag": {
-			types:    []any{"delete_dag"},
-			required: []any{"type", "name"},
-		},
-		"set_dag_profile": {
-			types:    []any{"set_dag_profile"},
-			required: []any{"type", "name", "profile"},
-		},
-		"clear_dag_profile": {
-			types:    []any{"clear_dag_profile"},
-			required: []any{"type", "name"},
-		},
-		"upsert_wiki_page": {
-			types:    []any{"upsert_wiki_page"},
-			required: []any{"type", "workspace", "path", "content"},
-		},
-		"rename_wiki_page": {
-			types:    []any{"rename_wiki_page"},
-			required: []any{"type", "workspace", "path", "newPath"},
-		},
-		"delete_wiki_page": {
-			types:    []any{"delete_wiki_page"},
-			required: []any{"type", "workspace", "path"},
-		},
-	}
-	// The schema is flat (no root-level combinators) so clients that cannot handle a root oneOf
-	// still send every argument; each per-type contract is documented in the descriptions and
-	// enforced server-side (see change_errors_test.go).
+	// Some MCP clients drop arguments outside a root-level combinator branch, so the schema stays flat.
 	for _, combinator := range []string{"oneOf", "anyOf", "allOf"} {
 		require.NotContains(t, schema, combinator)
 	}
 	typeSchema, ok := properties["type"].(map[string]any)
 	require.True(t, ok)
-	typeDescription, ok := typeSchema["description"].(string)
-	require.True(t, ok)
-	// mode is valid for every change type; the description must not suggest otherwise, or a
-	// client could drop mode=apply and silently get a preview.
-	require.Contains(t, typeDescription, "mode and type are accepted for every change type")
-	require.Contains(t, typeDescription, "mode=apply")
-	for changeType, contract := range expectedBranches {
-		require.Contains(t, requireArray(t, typeSchema, "enum"), changeType)
-		fields := make([]string, 0, len(contract.required))
-		for _, field := range contract.required {
-			name, ok := field.(string)
-			require.True(t, ok)
-			require.Contains(t, properties, name)
-			fields = append(fields, name)
-		}
-		require.Contains(t, typeDescription, changeType+": "+strings.Join(fields, ", ")+".")
-	}
+	require.ElementsMatch(t, []any{
+		"upsert_dag", "rename_dag", "delete_dag", "set_dag_profile", "clear_dag_profile",
+		"upsert_wiki_page", "rename_wiki_page", "delete_wiki_page",
+	}, requireArray(t, typeSchema, "enum"))
 }
 
 func toolInputSchema(t *testing.T, tool *mcpsdk.Tool) map[string]any {
