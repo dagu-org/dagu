@@ -6,6 +6,8 @@ package api_test
 import (
 	"context"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -248,4 +250,30 @@ func TestWebhooksPublicURLFollowsTheDAG(t *testing.T) {
 	log, err := f.relay.Log(ctx, webhookID)
 	require.NoError(t, err)
 	assert.Empty(t, log.Deliveries, "deleting the DAG removes its deliveries")
+}
+
+// A rename that cannot finish leaves the webhook with the DAG, and one onto a
+// name whose webhook was left behind is refused before anything moves.
+func TestWebhooksRenameKeepsWebhookWithTheDAG(t *testing.T) {
+	webhookParallel(t)
+	f := setupPublicWebhooks(t)
+	f.webhook(t, "rename_source")
+	createTestDAG(t, f.server, f.token, "rename_taken")
+
+	f.server.Client().Post("/api/v1/dags/rename_source/rename", api.RenameDAGJSONRequestBody{
+		NewFileName: "rename_taken",
+	}).WithBearerToken(f.token).ExpectStatus(http.StatusConflict).Send(t)
+	f.server.Client().Get("/api/v1/dags/rename_source/webhook").
+		WithBearerToken(f.token).ExpectStatus(http.StatusOK).Send(t)
+	f.server.Client().Get("/api/v1/dags/rename_taken/webhook").
+		WithBearerToken(f.token).ExpectStatus(http.StatusNotFound).Send(t)
+
+	// A DAG file removed outside Dagu leaves its webhook behind.
+	f.webhook(t, "rename_orphan")
+	require.NoError(t, os.Remove(filepath.Join(f.server.Config.Paths.DAGsDir, "rename_orphan.yaml")))
+	f.server.Client().Post("/api/v1/dags/rename_source/rename", api.RenameDAGJSONRequestBody{
+		NewFileName: "rename_orphan",
+	}).WithBearerToken(f.token).ExpectStatus(http.StatusConflict).Send(t)
+	f.server.Client().Get("/api/v1/dags/rename_source/webhook").
+		WithBearerToken(f.token).ExpectStatus(http.StatusOK).Send(t)
 }

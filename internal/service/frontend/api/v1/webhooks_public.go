@@ -238,15 +238,36 @@ func (a *API) checkPublicWebhookLimit(ctx context.Context, dagName string) error
 	}
 }
 
-// migrateWebhookAfterRename moves a renamed DAG's webhook to its new name, so
-// its local endpoint and public URL keep starting the DAG.
-func (a *API) migrateWebhookAfterRename(ctx context.Context, oldName, newName string) {
+// moveWebhookForRename moves a DAG's webhook to the DAG's new name before
+// the DAG itself moves, so a rename never succeeds with the webhook left
+// behind, where its local endpoint and public URL could no longer start the
+// DAG. It reports whether the DAG had a webhook to move.
+func (a *API) moveWebhookForRename(ctx context.Context, oldName, newName string) (bool, error) {
 	if a.authService == nil || !a.authService.HasWebhookStore() {
-		return
+		return false, nil
 	}
 	err := a.authService.RenameWebhook(ctx, oldName, newName)
-	if err != nil && !errors.Is(err, auth.ErrWebhookNotFound) {
-		logger.Warn(ctx, "Failed to move webhook after rename",
+	switch {
+	case err == nil:
+		return true, nil
+	case errors.Is(err, auth.ErrWebhookNotFound):
+		return false, nil
+	case errors.Is(err, auth.ErrWebhookAlreadyExists):
+		return false, &Error{
+			HTTPStatus: http.StatusConflict,
+			Code:       api.ErrorCodeAlreadyExists,
+			Message:    fmt.Sprintf("a webhook for DAG %s already exists; delete it before renaming", newName),
+		}
+	default:
+		return false, fmt.Errorf("failed to move webhook: %w", err)
+	}
+}
+
+// restoreWebhookAfterFailedRename moves a webhook back to its DAG's old name
+// when the DAG itself could not move.
+func (a *API) restoreWebhookAfterFailedRename(ctx context.Context, oldName, newName string) {
+	if err := a.authService.RenameWebhook(ctx, newName, oldName); err != nil {
+		logger.Error(ctx, "Failed to move webhook back after a failed rename",
 			tag.Error(err),
 			slog.String("old_name", oldName),
 			slog.String("new_name", newName),

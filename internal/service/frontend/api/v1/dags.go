@@ -415,12 +415,18 @@ func (a *API) RenameDAG(ctx context.Context, request api.RenameDAGRequestObject)
 		}
 	}
 
+	webhookMoved, err := a.moveWebhookForRename(ctx, request.FileName, request.Body.NewFileName)
+	if err != nil {
+		return nil, err
+	}
 	if err := a.dagRepository.Rename(ctx, request.FileName, request.Body.NewFileName); err != nil {
+		if webhookMoved {
+			a.restoreWebhookAfterFailedRename(ctx, request.FileName, request.Body.NewFileName)
+		}
 		return nil, fmt.Errorf("failed to move DAG: %w", err)
 	}
 	a.migrateDAGSettingsAfterRename(ctx, request.FileName, request.Body.NewFileName)
 	a.migrateDAGPinAfterRename(ctx, request.FileName, request.Body.NewFileName)
-	a.migrateWebhookAfterRename(ctx, request.FileName, request.Body.NewFileName)
 
 	a.logAudit(ctx, audit.CategoryDAG, "dag_rename", map[string]any{
 		"old_name": request.FileName,
