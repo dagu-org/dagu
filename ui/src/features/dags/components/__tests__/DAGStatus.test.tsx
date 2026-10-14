@@ -600,6 +600,31 @@ describe('DAGStatus', () => {
       );
     });
 
+    // The page stays mounted when the URL moves to another run, so a step
+    // closed on one run must open again on the next run that names it.
+    it('opens the named step again on another run', async () => {
+      const { rerender } = renderWithURLState(dagRun, {
+        initialStepName: 'step',
+      });
+      fireEvent.keyDown(await screen.findByRole('dialog', { name: 'step' }), {
+        key: 'Escape',
+      });
+      await waitFor(() =>
+        expect(
+          screen.queryByRole('dialog', { name: 'step' })
+        ).not.toBeInTheDocument()
+      );
+
+      rerender(
+        urlStateView(
+          { ...dagRun, dagRunId: 'run-2' },
+          { initialStepName: 'step' }
+        )
+      );
+
+      expect(await screen.findByRole('dialog', { name: 'step' })).toBeVisible();
+    });
+
     it('reports a step opened from the graph', async () => {
       const onStepSelect = vi.fn();
       renderWithURLState(dagRun, { onStepSelect });

@@ -244,26 +244,30 @@ function DAGStatus({
   }, []);
 
   // Each step named by the URL opens once the run lists it, and the drawer
-  // closes when the URL stops naming one.
-  const appliedStepName = React.useRef<string | undefined>(undefined);
+  // closes when the URL stops naming one. The run is part of the key because
+  // the page stays mounted when the URL moves to another run.
+  const appliedStep = React.useRef<string | undefined>(undefined);
   const stepLinked = React.useRef(initialStepName);
   stepLinked.current = initialStepName;
+  const linkedStepKey = initialStepName
+    ? JSON.stringify([dagRun.name, dagRun.dagRunId, initialStepName])
+    : undefined;
   useEffect(() => {
-    if (initialStepName === appliedStepName.current) {
+    if (linkedStepKey === appliedStep.current) {
       return;
     }
     if (!initialStepName) {
-      appliedStepName.current = undefined;
+      appliedStep.current = undefined;
       setIsStepDetailsOpen(false);
       return;
     }
     if (!dagRun.nodes?.some((node) => node.step.name === initialStepName)) {
       return;
     }
-    appliedStepName.current = initialStepName;
+    appliedStep.current = linkedStepKey;
     setSelectedDetailStepName(initialStepName);
     setIsStepDetailsOpen(true);
-  }, [dagRun.nodes, initialStepName]);
+  }, [dagRun.nodes, initialStepName, linkedStepKey]);
 
   useEffect(() => {
     if (activeTab !== 'status') {
