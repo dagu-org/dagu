@@ -28,7 +28,7 @@ steps:
 	require.NoError(t, resolved.Validate(mustParseYAMLDocument(t, strings.Replace(source, "query: SELECT 1", "file: a.sql", 1))))
 	// References are resolved when the step runs.
 	for _, ref := range []string{"timeout: 5", "headers: true", "tls_ca: ca.pem"} {
-		field := strings.SplitN(ref, ":", 2)[0]
+		field, _, _ := strings.Cut(ref, ":")
 		require.NoError(t, resolved.Validate(mustParseYAMLDocument(t, strings.Replace(source, ref, field+": ${VALUE}", 1))), field)
 	}
 
