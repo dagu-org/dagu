@@ -200,6 +200,32 @@ func (m *Manager) CloudCredentials() (CloudCredentials, bool) {
 	}, true
 }
 
+// StoredCloudCredentials returns a function that reads the credentials of
+// the activation saved in store, for a process that does not run the
+// license manager, such as a scheduler on its own. pubKey verifies the
+// activation's token; cloudURL is the configured Dagu Console URL, empty for
+// the production one. The function reports false while there is no
+// activation or its token does not verify.
+func StoredCloudCredentials(store ActivationStore, pubKey ed25519.PublicKey, cloudURL string) func() (CloudCredentials, bool) {
+	baseURL := NewCloudClient(cloudURL).baseURL
+	return func() (CloudCredentials, bool) {
+		ad, err := store.Load()
+		if err != nil || ad == nil || ad.Token == "" || ad.HeartbeatSecret == "" {
+			return CloudCredentials{}, false
+		}
+		claims, err := VerifyTokenLenient(pubKey, ad.Token)
+		if err != nil {
+			return CloudCredentials{}, false
+		}
+		return CloudCredentials{
+			CloudURL:        baseURL,
+			LicenseID:       claims.ID,
+			ServerID:        ad.ServerID,
+			HeartbeatSecret: ad.HeartbeatSecret,
+		}, true
+	}
+}
+
 // Start performs discovery, optional activation, JWT verification, and starts the heartbeat loop.
 // It always returns nil for graceful degradation: license errors are logged but never prevent
 // the application from starting.
