@@ -195,6 +195,7 @@ Current builtin actions:
 | `k8s.run`, `kubernetes.run` | Kubernetes job execution | optional `command`, Kubernetes config |
 | `postgres.query`, `sqlite.query` | SQL queries | `query`, database config |
 | `postgres.import`, `sqlite.import` | SQL imports | `import`, database config |
+| `clickhouse.query` | ClickHouse queries over HTTP | `url`, `query` or `file`, optional `params`, `settings` |
 | `redis.<operation>` | Redis operations | Redis config; operation comes from the action suffix |
 | `jq.filter` | jq transforms | `filter`, plus `data` or `input` |
 | `js.run` | Sandboxed JavaScript | `script`, optional `input` or `input_file` |
