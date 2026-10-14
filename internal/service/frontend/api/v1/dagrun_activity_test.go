@@ -255,12 +255,17 @@ func TestDAGRunActivityStreamTakesOnlyLiveWindows(t *testing.T) {
 	}
 }
 
-// queueRun saves a queued run of name and puts it in the DAG's own queue.
+// queueRun saves a queued run of name and puts it in the DAG's own queue. A
+// zero queuedAt saves the run without a queue time.
 func (f *activityFixture) queueRun(queueStore queue.QueueStore, name, id string, queuedAt time.Time) {
 	f.t.Helper()
 	ctx := f.t.Context()
 	dag := &ir.DAG{Name: name}
-	attempt, err := f.repository.CreateAttempt(ctx, dag, queuedAt, id, persis.DAGRunCreateAttemptOptions{})
+	createdAt := queuedAt
+	if createdAt.IsZero() {
+		createdAt = time.Now()
+	}
+	attempt, err := f.repository.CreateAttempt(ctx, dag, createdAt, id, persis.DAGRunCreateAttemptOptions{})
 	require.NoError(f.t, err)
 	require.NoError(f.t, attempt.Open(ctx))
 	runStatus := ir.InitialStatus(dag)
@@ -268,7 +273,9 @@ func (f *activityFixture) queueRun(queueStore queue.QueueStore, name, id string,
 	runStatus.AttemptID = attempt.ID()
 	runStatus.Status = ir.Queued
 	runStatus.ProcGroup = name
-	runStatus.QueuedAt = queuedAt.UTC().Format(time.RFC3339)
+	if !queuedAt.IsZero() {
+		runStatus.QueuedAt = queuedAt.UTC().Format(time.RFC3339)
+	}
 	require.NoError(f.t, attempt.Write(ctx, runStatus))
 	require.NoError(f.t, attempt.Close(ctx))
 	require.NoError(f.t, queueStore.Enqueue(ctx, name, queue.QueuePriorityLow, ir.NewDAGRunRef(name, id)))
@@ -295,4 +302,21 @@ func TestDAGRunActivityListsQueuesLongestWaitFirst(t *testing.T) {
 	assert.Equal(t, 1, valueOf(etl.MaxConcurrency))
 	assert.Equal(t, now.Add(-10*time.Minute).Unix(), valueOf(etl.NextQueuedAt))
 	assert.Equal(t, "report", first.Queues[1].Name)
+}
+
+// A run in line without a queue time does not hide the wait of the runs
+// behind it.
+func TestDAGRunActivityQueueWaitSkipsRunsWithoutQueueTime(t *testing.T) {
+	f := newActivityFixture(t)
+	queueStore := store.NewQueueStore(file.NewCollection(filepath.Join(t.TempDir(), "queue")))
+	f.api.queueStore = queueStore
+	now := time.Now().Truncate(time.Second)
+	f.queueRun(queueStore, "etl", "etl-1", time.Time{})
+	f.queueRun(queueStore, "etl", "etl-2", now.Add(-5*time.Minute))
+
+	activity := f.activity(now.Add(-time.Hour), now.Add(time.Hour))
+
+	require.Len(t, activity.Queues, 1)
+	assert.Equal(t, 2, activity.Queues[0].Queued)
+	assert.Equal(t, now.Add(-5*time.Minute).Unix(), valueOf(activity.Queues[0].NextQueuedAt))
 }

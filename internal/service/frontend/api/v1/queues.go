@@ -446,8 +446,8 @@ type visibleQueued struct {
 	count int
 	// capped reports that the scan stopped early, so count is a lower bound.
 	capped bool
-	// nextQueuedAt is when the first visible entry, the next to run, was
-	// queued.
+	// nextQueuedAt is when the first visible entry with a queue time, which
+	// is normally the next to run, was queued.
 	nextQueuedAt time.Time
 }
 
@@ -501,7 +501,7 @@ func (a *API) countVisibleQueuedItems(ctx context.Context, queueName string, bud
 			if err == nil {
 				summary, err := a.fetchDAGRunSummary(ctx, *dagRunRef)
 				if err == nil && summary.Status != api.StatusRunning {
-					if result.count == 0 {
+					if result.nextQueuedAt.IsZero() {
 						result.nextQueuedAt = parseQueuedAt(summary.QueuedAt)
 					}
 					result.count++
