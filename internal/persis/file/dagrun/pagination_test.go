@@ -23,11 +23,12 @@ import (
 
 // seededRun is what a test wrote for one run, to compute expected pages.
 type seededRun struct {
-	name    string
-	id      string
-	created time.Time
-	status  ir.Status
-	labels  []string
+	name      string
+	id        string
+	created   time.Time
+	status    ir.Status
+	labels    []string
+	attemptID string
 }
 
 type oracleSeed struct {
@@ -49,12 +50,21 @@ func (s *oracleSeed) write(t *testing.T, run seededRun, retry bool) {
 	require.NoError(t, attempt.Open(ctx))
 	status := ir.InitialStatus(dag)
 	status.DAGRunID = run.id
+	status.AttemptID = attempt.ID()
 	status.Status = run.status
 	status.Labels = run.labels
 	require.NoError(t, attempt.Write(ctx, status))
 	require.NoError(t, attempt.Close(ctx))
+	run.attemptID = attempt.ID()
 	if !retry {
 		s.runs = append(s.runs, run)
+		return
+	}
+	for i := range s.runs {
+		if s.runs[i].name == run.name && s.runs[i].id == run.id {
+			s.runs[i].status = run.status
+			s.runs[i].attemptID = run.attemptID
+		}
 	}
 }
 
@@ -108,9 +118,15 @@ func (s *oracleSeed) expected(query persis.DAGRunStatusQuery) []string {
 	})
 	keys := make([]string, 0, len(matched))
 	for _, run := range matched {
-		keys = append(keys, fmt.Sprintf("%s/%s/%s", run.name, run.id, run.status))
+		keys = append(keys, listKey(run.name, run.id, run.status, run.attemptID, run.labels))
 	}
 	return keys
+}
+
+// listKey identifies a listed run with saved fields both read paths carry,
+// so a path that dropped them would not match.
+func listKey(name, id string, status ir.Status, attemptID string, labels []string) string {
+	return fmt.Sprintf("%s/%s/%s/%s/%s", name, id, status, attemptID, strings.Join(labels, ","))
 }
 
 // listAll follows every cursor of query and returns the runs it listed.
@@ -124,7 +140,7 @@ func listAll(t *testing.T, store *Store, query persis.DAGRunStatusQuery) []strin
 			require.LessOrEqual(t, len(page.Items), query.Limit)
 		}
 		for _, status := range page.Items {
-			keys = append(keys, fmt.Sprintf("%s/%s/%s", status.Name, status.DAGRunID, status.Status))
+			keys = append(keys, listKey(status.Name, status.DAGRunID, status.Status, status.AttemptID, status.Labels))
 		}
 		if page.NextCursor == "" {
 			return keys
@@ -178,7 +194,6 @@ func seedOracleRuns(t *testing.T) *oracleSeed {
 	retry.created = retried.created.Add(time.Minute)
 	retry.status = ir.Succeeded
 	seed.write(t, retry, true)
-	seed.runs[len(seed.runs)-1].status = ir.Succeeded
 
 	// Entries that are not readable runs.
 	dayDir := filepath.Join(seed.th.TmpDir, "alpha", "dag-runs", "2026", "03", "03")
