@@ -238,3 +238,12 @@ func TestOutlineNumbersElementsAndShortensLinks(t *testing.T) {
   [0-7] link "Elsewhere" -> https://example.com/other
 [0-9] button "検索"`, text)
 }
+
+// A file input shows with its ID and label, by which an upload names it.
+func TestOutlineShowsFileInputs(t *testing.T) {
+	t.Parallel()
+
+	snap := pageSnapshot{Tree: "[0-1] RootWebArea: Receipts\n  [0-11] LabelText\n    [0-12] StaticText: Receipt\n    [0-13] input, file: Receipt"}
+	text, _, _ := renderOutline(snap, outlineOptions{})
+	assert.Equal(t, `[0-13] file input "Receipt"`, text)
+}

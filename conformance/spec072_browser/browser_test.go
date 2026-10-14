@@ -53,6 +53,25 @@ const signinPage = `<!doctype html><html><head><title>Sign in</title>
 
 const reportBody = "id,total\n1,10\n2,20\n"
 
+// receiptsPage sends the files its hidden file input gets to the server,
+// and says which arrived. Its button opens the file picker.
+const receiptsPage = `<!doctype html><html><head><title>Receipts</title></head><body>
+<h1>Receipts</h1>
+<input id="files" type="file" multiple hidden>
+<button onclick="document.getElementById('files').click()">Choose files</button>
+<p id="status">No files yet</p>
+<script>
+let uploads = 0;
+document.getElementById('files').addEventListener('change', async (event) => {
+  const form = new FormData();
+  for (const file of event.target.files) form.append('file', file);
+  const response = await fetch(location.pathname, {method: 'POST', body: form});
+  uploads++;
+  document.getElementById('status').textContent = 'Upload ' + uploads + ': ' + (await response.text());
+});
+</script>
+</body></html>`
+
 // layoutPage has a Save button. With ?banner=1 a Dismiss button comes
 // first, at the location Save had.
 const layoutPage = `<!doctype html><html><head><title>Draft</title></head><body>
@@ -75,6 +94,7 @@ var browserSlot = make(chan struct{}, 1)
 // runtime asks for.
 const (
 	kindAct       = "act"
+	kindObserve   = "observe"
 	kindStatement = "statement"
 	kindExtract   = "extract"
 	kindMetadata  = "metadata"
@@ -150,6 +170,15 @@ func (m *scriptedModel) serve(w http.ResponseWriter, r *http.Request) {
 
 	var kind, answer string
 	switch {
+	case strings.Contains(schema, `"elements"`):
+		kind = kindObserve
+		answer = `{"elements":[]}`
+		for _, button := range buttonPattern.FindAllStringSubmatch(page, -1) {
+			if strings.Contains(instruction, strings.TrimSpace(button[2])) {
+				answer = `{"elements":[{"elementId":"` + button[1] + `","description":"button","method":"click","arguments":[]}]}`
+				break
+			}
+		}
 	case strings.Contains(schema, "elementId"):
 		kind = kindAct
 		answer = `{"action":null,"twoStep":false}`
@@ -261,6 +290,60 @@ func requireChrome(t *testing.T) {
 		t.Fatal("Chrome is required in CI; set CHROME_PATH")
 	}
 	t.Skip("Chrome is not installed; set CHROME_PATH to run browser conformance tests")
+}
+
+// receivedFile is a file the receipts page sent.
+type receivedFile struct {
+	Name, Type, Content string
+}
+
+// receiptsServer serves the receipts page and keeps the files it sends.
+type receiptsServer struct {
+	mu       sync.Mutex
+	received [][]receivedFile
+}
+
+func startReceipts(t *testing.T) (*receiptsServer, string) {
+	t.Helper()
+	receipts := &receiptsServer{}
+	server := httptest.NewServer(http.HandlerFunc(receipts.serve))
+	t.Cleanup(server.Close)
+	return receipts, server.URL + "/receipts"
+}
+
+func (s *receiptsServer) serve(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = io.WriteString(w, receiptsPage)
+		return
+	}
+	if err := r.ParseMultipartForm(1 << 20); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	var files []receivedFile
+	var names []string
+	for _, header := range r.MultipartForm.File["file"] {
+		file, err := header.Open()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		content, _ := io.ReadAll(file)
+		_ = file.Close()
+		files = append(files, receivedFile{Name: header.Filename, Type: header.Header.Get("Content-Type"), Content: string(content)})
+		names = append(names, header.Filename)
+	}
+	s.mu.Lock()
+	s.received = append(s.received, files)
+	s.mu.Unlock()
+	_, _ = io.WriteString(w, strings.Join(names, ", "))
+}
+
+func (s *receiptsServer) uploads() [][]receivedFile {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.Clone(s.received)
 }
 
 type browserEnv struct {
@@ -395,6 +478,30 @@ func TestBrowserReplayCacheClear(t *testing.T) {
 	b.dagu.RunWithEnv(env, "rm", "--history", "--force", "click").ExpectExitCode(0)
 	b.dagu.RunWithEnv(env, "start", "click.yaml").ExpectExitCode(0)
 	require.Equal(t, 3, b.model.count(kindAct), "removing all history clears the cache")
+}
+
+// Files an earlier step lists reach the site through the file picker the
+// named button opens, and through the page's only file input without the
+// model. A second run uploads through the recorded button without the model.
+func TestBrowserUpload(t *testing.T) {
+	t.Parallel()
+
+	b := newBrowserEnv(t)
+	receipts, receiptsURL := startReceipts(t)
+	env := append(b.env, "RECEIPTS_URL="+receiptsURL, "DAGU_HOME="+t.TempDir())
+	b.dagu.RunWithEnv(env, "start", "upload.yaml").ExpectExitCode(0)
+
+	invoices := []receivedFile{
+		{Name: "a.pdf", Type: "application/pdf", Content: "invoice A"},
+		{Name: "b.pdf", Type: "application/pdf", Content: "invoice B"},
+	}
+	require.Equal(t, [][]receivedFile{invoices, invoices}, receipts.uploads())
+	require.Equal(t, 1, b.model.count(kindObserve))
+	require.Zero(t, b.model.count(kindAct))
+
+	b.dagu.RunWithEnv(env, "start", "upload.yaml").ExpectExitCode(0)
+	require.Len(t, receipts.uploads(), 4)
+	require.Equal(t, 1, b.model.count(kindObserve), "the recorded upload makes no model request")
 }
 
 func TestBrowserSecretInInstruction(t *testing.T) {

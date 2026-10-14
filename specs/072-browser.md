@@ -5,23 +5,24 @@
 Partially implemented.
 
 Conformance covers extraction into outputs, a multi-operation run with model
-and fixed conditions, screenshots, downloads, the replay cache, the secret
-check, allowed domains, client certificates, dialogs, and validation. Waiting for input and resuming the same
+and fixed conditions, screenshots, downloads, uploads, the replay cache, the
+secret check, allowed domains, client certificates, dialogs, and validation. Waiting for input and resuming the same
 browser need the REST API and are covered by integration tests. Model prompts,
 page interaction internals, and profile locking belong to executor tests.
 
 ## Scope
 
 This spec defines the `browser.extract` and `browser.run` action boundary: the
-`with` contract, model configuration, outputs, artifacts, downloads, the replay
-cache, allowed domains, and human input. It does not define how a model chooses
+`with` contract, model configuration, outputs, artifacts, downloads, uploads,
+the replay cache, allowed domains, and human input. It does not define how a model chooses
 page elements or the browser runtime's prompts.
 
 ## Goal
 
 Workflow authors can drive a website that has no API from a step: act on pages
-in natural language, extract structured data into step outputs, check page
-state, and pause for a person when the site asks for input.
+in natural language, upload local files, extract structured data into step
+outputs, check page state, and pause for a person when the site asks for
+input.
 
 ## Behavior
 
@@ -39,6 +40,8 @@ Each operation sets exactly one of:
 - `act`: perform one action described in natural language, such as a click
   or typing into one field. The value is an instruction string or an object
   with `instruction` and optional `cache`.
+- `upload`: `{files, into, cache}` gives local files to a file input (see
+  Uploads).
 - `extract`: `{instruction, schema}`. The schema must be a JSON Schema with
   `type: object`. A string field with `format: uri` or `format: uri-reference`
   gets the address of the element the model picks, such as a link's target;
@@ -50,8 +53,8 @@ Each operation sets exactly one of:
 - `screenshot`: a name; the page is saved as a PNG run artifact.
 - `ask`: `{prompt, as, timeout}` waits for a person's answer (see Human input).
 
-A `goto`, or an `act` performed or replayed, ends once the page settles, so the
-next operation reads what it brought: a page it loaded waits until its network
+A `goto`, an `upload`, or an `act` performed or replayed, ends once the page
+settles, so the next operation reads what it brought: a page it loaded waits until its network
 is idle, and a page it changed in place until its requests end and it stops
 changing for half a second. A page that has not settled after five seconds is
 read as it is.
@@ -61,6 +64,44 @@ the operation is skipped unless it holds. Any operation may set `timeout`, a
 duration such as `30s`; the default is two minutes. A browser that stops
 responding fails the step: an operation is abandoned a few seconds after its
 timeout, and a screenshot or page check after 30 seconds.
+
+### Uploads
+
+`upload.files` is a string or a nonempty list of strings. Each names files
+in one of these forms, after references are filled in:
+
+- a path, or a glob pattern such as `invoices/*.pdf`, whose matches are taken
+  in sorted order and of which at least one must match. A relative path is
+  under the step's working directory, and a leading `~` is the home
+  directory of the user running the step;
+- several paths or patterns, one per line;
+- JSON as an earlier step publishes it: a list of paths, of objects with a
+  `path`, or of `mail.search` emails, whose attachments the files are; or one
+  such object. An object without a `path`, such as an attachment that was
+  not saved, fails the step, naming `save_attachments: true`.
+
+The files are uploaded in the order named, each once. A file that does not
+exist, a directory, or a file over 50 MB fails the operation before the page
+is touched.
+
+`upload.into` describes, in plain words, the file input, or the button or
+drop area that opens the file picker. The model finds the element once,
+asked with the page's elements and the `into` text; the step records it and
+later runs replay it as acts are replayed (see Replay cache). The element
+gets the files directly when it is a file input or holds exactly one;
+otherwise the step clicks it and gives the files to the file picker the
+click opens, which the browser intercepts so no window shows; when no picker
+opens within five seconds, the one file input nearest the element, the first
+of its ancestors holding any, gets them, and an element with no such single
+input fails the operation. Without `into`, the page's only file input gets
+the files and no model request is made; a page with none, or with several,
+fails the operation, naming the count.
+
+A file input or picker that takes one file fails the operation when given
+several, before any file is given. File inputs given the files directly get
+them as the browser builds them from the files' contents, with the media
+type their extension implies; a file picker gets the files from disk. The
+model never receives the files, their names, or their paths.
 
 ### Conditions
 
@@ -97,8 +138,8 @@ name fails validation. An act that references the answer of an `ask` that was
 skipped fails the step. The browser receives variable values; requests to the
 model carry only the names.
 
-The step fails before starting a browser when an `act`, `extract`, `ask`, or
-model-judged `expect` or `when` text contains the resolved value of a secret
+The step fails before starting a browser when an `act`, `upload` `into`,
+`extract`, `ask`, or model-judged `expect` or `when` text contains the resolved value of a secret
 declared under `secrets:` that has four or more characters. Values that only
 come from `env:` are not secrets and are not checked.
 
@@ -106,10 +147,11 @@ Declared secret values and `ask` answers of four or more characters are masked
 in text sent to the model, including the page text, in the step log, and in
 the timeline. Other variable values are not masked.
 
-A model request carries the instruction or judged statement, the page's
-elements with their roles and visible text, and the extract schema or the
-names of the available variables. It never carries variable values, text the
-browser typed into fields, or screenshots.
+A model request carries the instruction, upload `into` text, or judged
+statement, the page's elements with their roles and visible text, and the
+extract schema or the names of the available variables. It never carries
+variable values, text the browser typed into fields, uploaded files, or
+screenshots.
 
 ### Outputs
 
@@ -273,23 +315,32 @@ elements of that role and name than when the act recorded it. An element
 without a name is told apart by its role only.
 `act.cache: false` disables the cache for one operation.
 
+A successful `upload` with `into` records the element the model found, keyed
+like an act by operation position, `into` text, and page URL, and kept apart
+from an act's recording with the same words. A replay uploads into the
+recorded element without a model request when the page still shows it, told
+apart as a replayed act's element is; otherwise the model is asked again and
+its element replaces the recording. `upload.cache: false` disables the cache
+for one upload.
+
 Runs of a step share its recordings, and each `act` reads them when it runs. A
 recording that another run of the step replaced or removed meanwhile, such as
 an earlier `foreach` item waiting for the same profile, is not replayed.
 
-The cache covers `act` only. `extract` and model-judged conditions make model
-requests on every run.
+The cache covers `act` and `upload`. `extract` and model-judged conditions
+make model requests on every run.
 
-`dagu browser cache clear <dag>` removes the recorded actions of every step of
-the DAG, or of one step with `--step <id>`, and reports the steps it removed.
+`dagu browser cache clear <dag>` removes the recorded acts and uploads of
+every step of the DAG, or of one step with `--step <id>`, and reports the
+steps it removed.
 `DELETE /dags/{fileName}/browser-cache[?step=<id>]` does the same and returns
 the removed steps. Removing all of a DAG's history with `dagu rm --history`
 also clears its cache; removing only older runs keeps it. Each clears the cache
 on its own host only. After a clear, the next run of the step makes a model
 request and records again.
 
-`dagu browser session export` writes the recordings of the acts a browser
-session ran for a step that has not run yet (Spec 079).
+`dagu browser session export` writes the recordings of the acts and uploads a
+browser session ran for a step that has not run yet (Spec 079).
 
 ### Profiles
 
@@ -324,7 +375,9 @@ allowed domains, the browser stops responding, or the browser cannot be
 started. When an `act` fails because its model chose no element, the error
 names the model, since some models give that answer for every request. An
 `act` whose model picks an option that the select does not offer does not
-complete. A page that does not load because of a client certificate fails the
+complete. An `upload` fails when a file cannot be uploaded, the model finds no
+element for `into`, or the element leads to no single file input, as
+described under Uploads. A page that does not load because of a client certificate fails the
 operation that opened it, as described under Client certificates.
 
 Loading a DAG warns, without failing, about each `extract` string field whose
@@ -378,4 +431,34 @@ steps:
   - id: record
     depends: checkout
     run: echo "${steps.checkout.outputs.order_number}"
+```
+
+Uploading the invoices an email brought to a site's file box:
+
+```yaml
+llm:
+  provider: anthropic
+  model: claude-sonnet-5
+
+steps:
+  - id: invoices
+    action: mail.search
+    with:
+      mailbox: billing@example.com
+      subject: Invoice
+      has_attachments: true
+      save_attachments: true
+
+  - id: file_box
+    depends: invoices
+    action: browser.run
+    with:
+      url: https://books.example.com/receipts
+      browser:
+        profile: books
+      do:
+        - upload:
+            files: ${steps.invoices.outputs.messages}
+            into: The receipt drop area
+        - expect: {text: "Uploaded", within: 1m}
 ```

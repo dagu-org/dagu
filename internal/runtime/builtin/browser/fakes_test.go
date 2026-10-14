@@ -108,9 +108,16 @@ type fakeEngine struct {
 	downloadErr error
 	// downloadWaits records the timeout of each download wait.
 	downloadWaits []time.Duration
-	mu            sync.Mutex
-	generate      generateFunc
-	url           string
+	// uploadHow is how uploads report the files reached the page;
+	// uploadDirect when unset.
+	uploadHow string
+	// uploadErr, if set, is what uploads report in place of giving the
+	// files.
+	uploadErr error
+	uploads   []fakeUpload
+	mu        sync.Mutex
+	generate  generateFunc
+	url       string
 	// loads counts the documents the page has loaded.
 	loads    int
 	acts     []fakeAct
@@ -122,6 +129,13 @@ type fakeEngine struct {
 type fakeAct struct {
 	instruction string
 	variables   map[string]string
+}
+
+// fakeUpload is an upload the page was given: the element, or "" for the
+// page's only file input, and the files' paths.
+type fakeUpload struct {
+	selector string
+	paths    []string
 }
 
 func newFakeEngine() *fakeEngine {
@@ -273,6 +287,56 @@ func (e *fakeEngine) Extract(ctx context.Context, instruction string, schema jso
 	return resp.JSON, nil
 }
 
+// Observe asks the model for the elements an instruction describes, as the
+// browser runtime does.
+func (e *fakeEngine) Observe(ctx context.Context, instruction string, _ time.Duration) ([]recordedAction, error) {
+	e.mu.Lock()
+	generate := e.generate
+	e.mu.Unlock()
+	resp, err := generate(ctx, generateRequest{
+		SchemaName: "Observation",
+		Schema:     json.RawMessage(`{"type":"object","properties":{"elements":{"type":"array"}}}`),
+		Messages:   []generateMessage{{Role: "user", Text: "instruction: " + instruction}},
+	})
+	if err != nil {
+		return nil, err
+	}
+	var answer struct {
+		Elements []struct {
+			ElementID   string `json:"elementId"`
+			Description string `json:"description"`
+		} `json:"elements"`
+	}
+	if err := json.Unmarshal(resp.JSON, &answer); err != nil {
+		return nil, err
+	}
+	found := make([]recordedAction, 0, len(answer.Elements))
+	for _, element := range answer.Elements {
+		found = append(found, recordedAction{Selector: "xpath=" + element.ElementID, Description: element.Description, Method: "click"})
+	}
+	return found, nil
+}
+
+func (e *fakeEngine) Upload(_ context.Context, selector string, files []uploadFile, _ time.Duration) (string, error) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	paths := make([]string, 0, len(files))
+	for _, file := range files {
+		paths = append(paths, file.Path)
+	}
+	e.uploads = append(e.uploads, fakeUpload{selector: selector, paths: paths})
+	if e.uploadErr != nil {
+		return "", e.uploadErr
+	}
+	return cmp.Or(e.uploadHow, uploadDirect), nil
+}
+
+func (e *fakeEngine) uploaded() []fakeUpload {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return slices.Clone(e.uploads)
+}
+
 func (e *fakeEngine) WaitForSelector(context.Context, string, time.Duration) error {
 	return nil
 }
@@ -408,6 +472,9 @@ func pageModel(extracts map[string]string, trueStatements ...string) func(req *l
 		properties, _ := req.Tools[0].Function.Parameters["properties"].(map[string]any)
 		if _, ok := properties["elementId"]; ok {
 			return `{"elementId":"/html/body/button"}`, nil
+		}
+		if _, ok := properties["elements"]; ok {
+			return `{"elements":[{"elementId":"/html/body/button","description":"Upload button"}]}`, nil
 		}
 		if _, ok := properties["answer"]; ok {
 			for _, statement := range trueStatements {
