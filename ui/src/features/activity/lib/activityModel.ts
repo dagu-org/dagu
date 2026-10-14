@@ -136,11 +136,17 @@ export function attentionItems(
 }
 
 /**
- * Runs that are running. Queued runs are summarized per queue, and waiting
- * runs are listed as attention.
+ * Runs that are running, and queued runs no queue line covers, such as runs
+ * of a queue past the listed ones. Waiting runs are listed as attention.
  */
 export function inProgressRuns(activity: DAGRunActivity): ActivityRun[] {
-  return activity.active.filter((run) => run.status === Status.Running);
+  const summarized = new Set(activity.queues.map((queue) => queue.name));
+  return activity.active.filter(
+    (run) =>
+      run.status === Status.Running ||
+      (run.status === Status.Queued &&
+        !(run.queue !== undefined && summarized.has(run.queue)))
+  );
 }
 
 /** A queue's next run counts as stuck once it has waited this long. */

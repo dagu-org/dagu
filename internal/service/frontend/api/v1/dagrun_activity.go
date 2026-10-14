@@ -381,7 +381,11 @@ func (a *API) activeRuns(ctx context.Context, query activityQuery, pageRuns, lat
 			return
 		}
 		seen[ref] = struct{}{}
-		active = append(active, toActivityRun(status))
+		run := toActivityRun(status)
+		if status.ProcGroup != "" {
+			run.Queue = &status.ProcGroup
+		}
+		active = append(active, run)
 	}
 	for _, status := range pageRuns {
 		add(status)

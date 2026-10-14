@@ -4251,6 +4251,8 @@ export interface components {
             failedStep?: string;
             /** @description Error of the failed step or the run, shortened; set on attention runs */
             error?: string;
+            /** @description Queue the run runs or waits in; set on active runs */
+            queue?: string;
         };
         DAGRunActivityUpcoming: {
             name: string;

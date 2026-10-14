@@ -344,7 +344,12 @@ describe('DashboardPage', () => {
       activity: makeActivity({
         runs: reportRuns,
         active: [
-          { name: 'etl', dagRunId: 'etl-1', status: Status.Queued },
+          {
+            name: 'etl',
+            dagRunId: 'etl-1',
+            status: Status.Queued,
+            queue: 'default',
+          },
           {
             name: 'train',
             dagRunId: 'train-1',
@@ -375,6 +380,38 @@ describe('DashboardPage', () => {
     ).toHaveAttribute('href', '/queues/default');
     expect(screen.getByRole('link', { name: 'train' })).toBeVisible();
     expect(screen.queryByRole('link', { name: 'etl' })).not.toBeInTheDocument();
+  });
+
+  // A shared queue is named after neither workflow in it.
+  it('keeps a shared queue holding a filtered workflow', () => {
+    mockActivity({
+      activity: makeActivity({
+        runs: reportRuns,
+        active: [
+          {
+            name: 'etl',
+            dagRunId: 'etl-1',
+            status: Status.Queued,
+            queue: 'default',
+          },
+        ],
+        queues: [
+          { name: 'default', running: 1, maxConcurrency: 1, queued: 3 },
+          { name: 'report', running: 1, maxConcurrency: 1, queued: 0 },
+        ],
+      }),
+    });
+
+    renderPage();
+    fireEvent.change(screen.getByLabelText('Filter workflows'), {
+      target: { value: 'etl' },
+    });
+
+    const queues = screen.getByRole('list', { name: 'Queues' });
+    expect(within(queues).getByRole('link', { name: 'default' })).toBeVisible();
+    expect(
+      within(queues).queryByRole('link', { name: 'report' })
+    ).not.toBeInTheDocument();
   });
 
   it('says all is clear when nothing needs attention', () => {

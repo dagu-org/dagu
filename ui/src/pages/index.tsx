@@ -228,7 +228,15 @@ function Dashboard(): React.ReactElement {
         attention: activity.attention.filter((run) => matches(run.name)),
         active: activity.active.filter((run) => matches(run.name)),
         upcoming: activity.upcoming.filter((item) => matches(item.name)),
-        queues: activity.queues.filter((queue) => matches(queue.name)),
+        // A shared queue is named after none of its workflows, so it also
+        // stays while it holds a matching run.
+        queues: activity.queues.filter(
+          (queue) =>
+            matches(queue.name) ||
+            activity.active.some(
+              (run) => run.queue === queue.name && matches(run.name)
+            )
+        ),
       },
       filteredRuns: runs.filter((run) => matches(run.name)),
     };

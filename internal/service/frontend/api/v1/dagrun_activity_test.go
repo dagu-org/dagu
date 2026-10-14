@@ -302,6 +302,13 @@ func TestDAGRunActivityListsQueuesLongestWaitFirst(t *testing.T) {
 	assert.Equal(t, 1, valueOf(etl.MaxConcurrency))
 	assert.Equal(t, now.Add(-10*time.Minute).Unix(), valueOf(etl.NextQueuedAt))
 	assert.Equal(t, "report", first.Queues[1].Name)
+
+	// Runs in progress name their queue, so a client can tell which ones a
+	// queue line already covers.
+	require.NotEmpty(t, first.Active)
+	for _, run := range first.Active {
+		assert.Equal(t, run.Name, valueOf(run.Queue))
+	}
 }
 
 // A run in line without a queue time does not hide the wait of the runs

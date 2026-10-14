@@ -110,19 +110,22 @@ describe('attentionItems', () => {
 });
 
 describe('inProgressRuns', () => {
-  // Queued runs are summarized per queue, and waiting runs need attention.
-  it('lists only running runs', () => {
+  // Waiting runs need attention, and a queue line covers its queued runs.
+  it('lists running runs and queued runs no queue line covers', () => {
     const runs = inProgressRuns(
       activity({
         active: [
-          { name: 'a', dagRunId: '1', status: Status.Running },
+          { name: 'a', dagRunId: '1', status: Status.Running, queue: 'a' },
           { name: 'b', dagRunId: '2', status: Status.Waiting },
-          { name: 'c', dagRunId: '3', status: Status.Queued },
+          { name: 'c', dagRunId: '3', status: Status.Queued, queue: 'c' },
+          { name: 'd', dagRunId: '4', status: Status.Queued, queue: 'd' },
+          { name: 'e', dagRunId: '5', status: Status.Queued },
         ],
+        queues: [{ name: 'c', running: 0, queued: 1 }],
       })
     );
 
-    expect(runs.map((item) => item.dagRunId)).toEqual(['1']);
+    expect(runs.map((item) => item.dagRunId)).toEqual(['1', '4', '5']);
   });
 });
 
