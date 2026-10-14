@@ -180,8 +180,9 @@ func (s *WebhookStore) Create(ctx context.Context, webhook *auth.Webhook) error 
 	return nil
 }
 
-// webhookUndoTimeout bounds undoing half of a create or rename.
-const webhookUndoTimeout = 10 * time.Second
+// webhookUndoTimeout bounds undoing half of a create or rename. It outlasts
+// the wait for a record lock left by a crashed process to be recovered.
+const webhookUndoTimeout = time.Minute
 
 // undoContext is for undoing half of a create or rename. It outlives ctx,
 // since a write the caller gave up on must still be undone.
