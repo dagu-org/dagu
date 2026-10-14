@@ -103,6 +103,12 @@ func (r *DAGRunRepository) LatestAttempt(
 	return newEventingAttempt(attempt, nil), nil
 }
 
+// LatestStatuses returns the status of each DAG's newest run when that run
+// was created at or after query.NotBefore and matches the query's filters.
+func (r *DAGRunRepository) LatestStatuses(ctx context.Context, query DAGRunLatestStatusesQuery) ([]*ir.DAGRunStatus, error) {
+	return r.store.LatestStatuses(ctx, query)
+}
+
 // ListStatuses returns statuses in canonical list order.
 func (r *DAGRunRepository) ListStatuses(ctx context.Context, options DAGRunListOptions) ([]*ir.DAGRunStatus, error) {
 	page, err := r.store.QueryStatuses(ctx, r.statusQuery(options))
