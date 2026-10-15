@@ -441,6 +441,27 @@ func TestBrowserReplayCache(t *testing.T) {
 	require.Equal(t, 1, b.model.count(kindAct), "the replayed act makes no model request")
 }
 
+// A step under ai: never runs without a model: it fails while nothing is
+// recorded, and replays what a run of the step under on_miss recorded.
+func TestBrowserNeverReplaysWithoutModel(t *testing.T) {
+	t.Parallel()
+
+	b := newBrowserEnv(t)
+	env := append(b.env, "DAGU_HOME="+t.TempDir())
+	// The name makes never.yaml the click DAG, whose replay cache it reads.
+	missed := b.dagu.RunWithEnv(env, "start", "--name", "click", "never.yaml")
+	missed.ExpectNonZeroExitCode()
+	missed.ExpectStderrContains("the act cannot run without AI: there is no recording of it on this host")
+	require.Zero(t, b.model.total())
+
+	b.dagu.RunWithEnv(env, "start", "click.yaml").ExpectExitCode(0)
+	requests := b.model.total()
+	require.Equal(t, 1, b.model.count(kindAct))
+
+	b.dagu.RunWithEnv(env, "start", "--name", "click", "never.yaml").ExpectExitCode(0)
+	require.Equal(t, requests, b.model.total(), "the replay makes no model request")
+}
+
 // A replay acts only on the element it recorded. When the layout puts
 // another element at the recorded location, the act asks the model again
 // instead of clicking that element.
