@@ -30,10 +30,9 @@ func TestRetryReexecutesStep(t *testing.T) {
 	dagu.ExpectFileContent("attempts.out", "attempt\nattempt\n")
 }
 
-// TestRetryRecoversPartiallySucceededForeach proves that a normal retry
-// retries the whole foreach expansion and resets its downstream steps while
-// preserving an unrelated successful step.
-func TestRetryRecoversPartiallySucceededForeach(t *testing.T) {
+// TestRetryPartialForeach proves retry recovers a partial foreach and keeps
+// unrelated successful work complete.
+func TestRetryPartialForeach(t *testing.T) {
 	t.Parallel()
 
 	dagu := harness.NewRunner(t)
@@ -62,10 +61,9 @@ func TestRetryRecoversPartiallySucceededForeach(t *testing.T) {
 	dagu.ExpectFileContent("foreach-downstream.out", "downstream\ndownstream\n")
 }
 
-// TestRetryRecoversPartiallySucceededParallel proves that a normal retry
-// retries the whole parallel expansion and recovers a partially succeeded
-// child DAG while preserving an unrelated successful step.
-func TestRetryRecoversPartiallySucceededParallel(t *testing.T) {
+// TestRetryPartialParallel proves retry recovers a partial child DAG and keeps
+// unrelated successful work complete.
+func TestRetryPartialParallel(t *testing.T) {
 	t.Parallel()
 
 	dagu := harness.NewRunner(t)

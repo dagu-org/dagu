@@ -249,10 +249,10 @@ func hasRetryableNode(nodes []*ir.Node) bool {
 			continue
 		}
 		switch node.Status {
-		case ir.NodeFailed, ir.NodeRetrying, ir.NodeAborted, ir.NodeRejected:
+		case ir.NodeFailed, ir.NodeRetrying, ir.NodeAborted, ir.NodeRejected, ir.NodePartiallySucceeded:
 			return true
 		case ir.NodeNotStarted, ir.NodeRunning, ir.NodeSucceeded, ir.NodeSkipped,
-			ir.NodePartiallySucceeded, ir.NodeWaiting:
+			ir.NodeWaiting:
 		}
 	}
 	return false
