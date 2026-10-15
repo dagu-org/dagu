@@ -516,6 +516,26 @@ func TestFenceToken_LostOwnerDoesNotDeleteReplacementLock(t *testing.T) {
 	require.True(t, os.IsNotExist(statErr), "lock directory should be removed after lockB unlocks")
 }
 
+// A returning owner unlocks after its stale lock was taken over: the new
+// holder's lock must survive.
+func TestUnlock_TakenOverBeforeRemoval(t *testing.T) {
+	dir := t.TempDir()
+	owner := New(dir, nil).(*dirLock)
+	next := New(dir, nil)
+	require.NoError(t, owner.TryLock())
+
+	owner.beforeUnlockRemoval = func() {
+		old := time.Now().Add(-time.Hour)
+		require.NoError(t, os.Chtimes(owner.lockPath, old, old))
+		require.NoError(t, next.TryLock())
+	}
+
+	require.ErrorIs(t, owner.Unlock(), ErrLockNotHeld)
+	require.False(t, owner.IsHeldByMe())
+	require.True(t, next.IsHeldByMe())
+	require.NoError(t, next.Unlock())
+}
+
 func TestFenceToken_UnlockDetectsTokenMismatch(t *testing.T) {
 	tmpDir := t.TempDir()
 	lockPath := filepath.Join(tmpDir, ".dagu_lock")

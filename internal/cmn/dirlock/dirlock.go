@@ -95,9 +95,10 @@ type dirLock struct {
 	fenceToken string // unique token written at acquire time
 	mu         sync.Mutex
 
-	// Test seams, called at the named point of a lock takeover when set.
-	afterStaleObserved func() // after a stale lock was observed, before the claim
-	beforeStaleRemoval func() // after verification under the claim, before the rename
+	// Test seams, called when set at the point named by each comment.
+	afterStaleObserved  func() // takeover: stale lock observed, before the claim
+	beforeStaleRemoval  func() // takeover: verified under the claim, before the rename
+	beforeUnlockRemoval func() // Unlock: token checked, before the rename
 }
 
 var _ DirLock = (*dirLock)(nil)
@@ -341,7 +342,7 @@ func removeIfUnchanged(path string, unchanged func(movedPath string, moved os.Fi
 		case isRetryableLockStateError(err):
 			return ErrLockConflict
 		default:
-			return fmt.Errorf("failed to remove stale directory %q: %w", filepath.Base(path), err)
+			return fmt.Errorf("failed to remove directory %q: %w", filepath.Base(path), err)
 		}
 	}
 
@@ -480,8 +481,22 @@ func (l *dirLock) Unlock() error {
 		return fmt.Errorf("%w: token mismatch (lock was acquired by another process)", ErrLockNotHeld)
 	}
 
-	// We still own the lock — safe to remove.
-	if err := removeLockDir(l.lockPath); err != nil && !os.IsNotExist(err) {
+	if l.beforeUnlockRemoval != nil {
+		l.beforeUnlockRemoval()
+	}
+
+	// The token check above does not stop another process from taking over
+	// the lock before the rename, so check the renamed directory too: only a
+	// directory that still carries our token may be removed.
+	err = removeIfUnchanged(l.lockPath, func(movedPath string, _ os.FileInfo) bool {
+		data, err := fileutil.ReadFile(filepath.Join(movedPath, lockOwnerFileName))
+		return err == nil && string(data) == l.fenceToken
+	})
+	if errors.Is(err, errDirChanged) {
+		l.isHeld = false
+		return fmt.Errorf("%w: token mismatch (lock was acquired by another process)", ErrLockNotHeld)
+	}
+	if err != nil {
 		return fmt.Errorf("failed to remove lock directory: %w", err)
 	}
 
