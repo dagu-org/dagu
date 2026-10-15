@@ -215,7 +215,7 @@ func captureCommand(outPath string) string {
 }
 
 func executionLogPath(text string) string {
-	for _, line := range strings.Split(text, "\n") {
+	for line := range strings.SplitSeq(text, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" || line == "daily-report" || line == "failed" || strings.HasPrefix(line, "#") {
 			continue

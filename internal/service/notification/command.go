@@ -140,8 +140,7 @@ func (s *Service) runNotificationCommand(
 	if runErr == nil {
 		return nil
 	}
-	var exitErr *exec.ExitError
-	if errors.As(runErr, &exitErr) {
+	if exitErr, ok := errors.AsType[*exec.ExitError](runErr); ok {
 		detail := stderr.String()
 		if detail != "" {
 			return fmt.Errorf("command exited with status %d: %s", exitErr.ExitCode(), detail)
