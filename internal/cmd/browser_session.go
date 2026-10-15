@@ -457,6 +457,9 @@ func runBrowserSessionDescribe(ctx *Context, args []string) error {
 	if result.Screenshot != "" {
 		fmt.Fprintf(&b, "Screenshot: %s\n", result.Screenshot)
 	}
+	if result.Refused != nil {
+		fmt.Fprintf(&b, "Refused: %s\n", result.Refused.Message)
+	}
 	for _, warning := range result.Warnings {
 		fmt.Fprintf(&b, "Warning: %s\n", warning)
 	}

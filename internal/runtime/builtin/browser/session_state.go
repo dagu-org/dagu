@@ -55,6 +55,8 @@ type sessionState struct {
 type sessionPage struct {
 	URL   string `json:"url"`
 	Title string `json:"title"`
+	// Refused is the refusal the page showed, if any.
+	Refused *refusal `json:"refused,omitempty"`
 }
 
 type sessionUsage struct {

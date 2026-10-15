@@ -149,6 +149,17 @@ type SessionPageView struct {
 	OutlineTruncated bool   `json:"outline_truncated,omitempty"`
 }
 
+// SessionRefusal is a site answering with a refusal or a bot check in place
+// of the page the browser asked for.
+type SessionRefusal struct {
+	Host   string `json:"host"`
+	Status int    `json:"status"`
+	// BotCheck names the check the site answered with, such as cloudflare.
+	BotCheck string `json:"bot_check,omitempty"`
+	// Message says what happened in a sentence.
+	Message string `json:"message"`
+}
+
 // OpenResult reports an opened session.
 type OpenResult struct {
 	ID string `json:"id"`
@@ -163,6 +174,8 @@ type OpenResult struct {
 	Model        string    `json:"model,omitempty"`
 	IdleDeadline time.Time `json:"idle_deadline"`
 	Warnings     []string  `json:"warnings"`
+	// Refused is the refusal the page shows, if any.
+	Refused *SessionRefusal `json:"refused,omitempty"`
 	SessionPageView
 }
 
@@ -221,6 +234,8 @@ type DoResult struct {
 	DurationMS   int64           `json:"duration_ms"`
 	Warnings     []string        `json:"warnings"`
 	IdleDeadline time.Time       `json:"idle_deadline"`
+	// Refused is the refusal the page shows after the operation, if any.
+	Refused *SessionRefusal `json:"refused,omitempty"`
 	SessionPageView
 }
 
@@ -247,6 +262,8 @@ type DescribeResult struct {
 	Screenshot   string    `json:"screenshot,omitempty"`
 	IdleDeadline time.Time `json:"idle_deadline"`
 	Warnings     []string  `json:"warnings"`
+	// Refused is the refusal the page shows, if any.
+	Refused *SessionRefusal `json:"refused,omitempty"`
 }
 
 // SessionSummary describes a session for a list.
@@ -410,15 +427,19 @@ func (s *Sessions) Open(ctx context.Context, opts SessionOptions) (OpenResult, e
 	op := s.operator(eng, bridge, state, nil, workDir, &warnings)
 	if opts.URL != "" {
 		if _, err := op.gotoURL(ctx, -1, opts.URL, defaultOperationTimeout); err != nil {
-			return OpenResult{}, errors.Join(&SessionError{Code: CodeOperationFailed, Message: "open " + opts.URL + ": " + err.Error()},
-				closeSession(ctx, eng, store, record))
+			message := "open " + opts.URL + ": " + err.Error()
+			if refused, ok := op.pageRefusal(ctx); ok {
+				message += "; " + refused.String()
+			}
+			return OpenResult{}, errors.Join(&SessionError{Code: CodeOperationFailed, Message: message}, closeSession(ctx, eng, store, record))
 		}
 	}
 	if err := op.checkPage(ctx, -1); err != nil {
 		return OpenResult{}, errors.Join(&SessionError{Code: CodeOperationFailed, Message: err.Error()}, closeSession(ctx, eng, store, record))
 	}
 	view, pageURL := s.view(ctx, eng, masker, opts.OutlineChars, &warnings)
-	state.Page = sessionPage{URL: pageURL, Title: view.Title}
+	refused := pageRefusal(ctx, op, sessionPage{}, pageURL)
+	state.Page = sessionPage{URL: pageURL, Title: view.Title, Refused: refused}
 	deadline := now.Add(idle)
 	if err := s.park(ctx, eng, store, &record, state, deadline); err != nil {
 		return OpenResult{}, err
@@ -432,6 +453,7 @@ func (s *Sessions) Open(ctx context.Context, opts SessionOptions) (OpenResult, e
 		Model:           state.modelLabel(),
 		IdleDeadline:    deadline,
 		Warnings:        nonNil(warnings),
+		Refused:         sessionRefusal(refused, masker),
 		SessionPageView: view,
 	}, nil
 }
@@ -740,9 +762,16 @@ func (s *Sessions) Do(ctx context.Context, req DoRequest) (DoResult, error) {
 		}
 	}
 	view, pageURL := s.view(ctx, eng, masker, req.OutlineChars, &warnings)
+	refused := pageRefusal(ctx, operator, state.Page, pageURL)
+	if refused != nil && result.Error != nil {
+		note := masker.MaskString(refused.String())
+		result.Error.Message += "; " + note
+		entry.Error += "; " + note
+	}
+	result.Refused = sessionRefusal(refused, masker)
 	entry.URLAfter = pageURL
 	state.Ops = append(state.Ops, entry)
-	state.Page = sessionPage{URL: pageURL, Title: view.Title}
+	state.Page = sessionPage{URL: pageURL, Title: view.Title, Refused: refused}
 	usage := bridge.totals()
 	state.Usage.Input += usage.Input
 	state.Usage.Output += usage.Output
@@ -825,7 +854,9 @@ func (s *Sessions) Describe(ctx context.Context, req DescribeRequest) (DescribeR
 			warnings = append(warnings, "screenshot: "+masker.MaskString(err.Error()))
 		}
 	}
-	state.Page = sessionPage{URL: snap.URL, Title: result.Title}
+	refused := pageRefusal(ctx, &operator{eng: eng, certificateProxy: eng.Handle().CertProxy != nil}, state.Page, snap.URL)
+	result.Refused = sessionRefusal(refused, masker)
+	state.Page = sessionPage{URL: snap.URL, Title: result.Title, Refused: refused}
 	result.IdleDeadline = s.now().Add(state.idleTimeout())
 	if err := use.park(ctx, state, result.IdleDeadline); err != nil {
 		return result, err
@@ -1089,6 +1120,29 @@ func (s *Sessions) view(ctx context.Context, eng engine, masker *masking.Masker,
 		Outline:          masker.MaskString(text),
 		OutlineTruncated: truncated,
 	}, snap.URL
+}
+
+// pageRefusal returns the refusal the page at pageURL shows after a
+// command, with the bot check an earlier command saw on that page: a
+// browser reattached since cannot tell it, as when a person reloaded the
+// page between commands.
+func pageRefusal(ctx context.Context, op *operator, before sessionPage, pageURL string) *refusal {
+	refused, ok := op.pageRefusal(ctx)
+	if !ok {
+		return nil
+	}
+	if seen := before.Refused; refused.BotCheck == "" && seen != nil && before.URL == pageURL && seen.Host == refused.Host && seen.Status == refused.Status {
+		refused.BotCheck = seen.BotCheck
+	}
+	return &refused
+}
+
+// sessionRefusal reports refused in a command's result.
+func sessionRefusal(refused *refusal, masker *masking.Masker) *SessionRefusal {
+	if refused == nil {
+		return nil
+	}
+	return &SessionRefusal{Host: refused.Host, Status: refused.Status, BotCheck: refused.BotCheck, Message: masker.MaskString(refused.String())}
 }
 
 // closeSession closes a session whose opening failed.

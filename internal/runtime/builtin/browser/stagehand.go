@@ -126,18 +126,23 @@ const selectorVisibleExpression = `Array.from(document.querySelectorAll(%s)).som
 
 // pageOutcomeExpression describes what the browser shows. On its error page
 // that is the network error code and the host of the page that did not
-// load, which Chrome uses as the error page's title; on a page, its host,
-// HTTP status, title, and the start of its text.
-const pageOutcomeExpression = `(() => {
+// load, which Chrome uses as the error page's title, with the status of an
+// HTTP error answer without a body, which the page shows as "HTTP ERROR
+// 403" in every language; on a page, its host, HTTP status, title, and the
+// start of its text.
+var pageOutcomeExpression = fmt.Sprintf(`(() => {
 	const text = ((document.body && document.body.innerText) || "").slice(0, 500);
 	if (location.protocol === "chrome-error:") {
 		const code = document.querySelector(".error-code");
-		const match = ((code && code.textContent) || text).match(/ERR_[A-Z0-9_]+/);
+		const shown = (code && code.textContent) || text;
+		const status = shown.match(/HTTP ERROR (\d{3})/);
+		if (status) return {code: %q, host: document.title, status: Number(status[1]), title: "", text: ""};
+		const match = shown.match(/ERR_[A-Z0-9_]+/);
 		return {code: match ? match[0] : "ERR_FAILED", host: document.title, status: 0, title: "", text: ""};
 	}
 	const entry = performance.getEntriesByType("navigation")[0];
 	return {code: "", host: location.hostname, status: (entry && entry.responseStatus) || 0, title: document.title, text};
-})()`
+})()`, httpErrorCode)
 
 var errImageInput = errors.New("browser: image input to the model is not supported")
 
@@ -412,6 +417,11 @@ func startEngine(ctx context.Context, browser *stagehand.Browser, cdpURL string,
 	if eng.dialogs, err = browserhost.WatchDialogs(ctx, cdpURL); err != nil {
 		return nil, errors.Join(fmt.Errorf("watch dialogs: %w", err), eng.release(context.WithoutCancel(ctx)))
 	}
+	// A site that refuses the browser answers with a status or a bot check
+	// the page itself may not show.
+	if eng.responses, err = browserhost.WatchPageResponses(ctx, cdpURL); err != nil {
+		return nil, errors.Join(fmt.Errorf("watch page responses: %w", err), eng.release(context.WithoutCancel(ctx)))
+	}
 	if len(opts.AllowedDomains) > 0 {
 		// Blocked requests leave a broken page and a later, unrelated
 		// failure, so they are reported by host.
@@ -441,6 +451,7 @@ type stagehandEngine struct {
 	// downloads are refused.
 	downloads *browserhost.DownloadWatcher
 	dialogs   *browserhost.DialogWatcher
+	responses *browserhost.PageResponseWatcher
 	// blocked counts requests allowed_domains blocks; nil without
 	// allowed_domains.
 	blocked *browserhost.BlockedRequestWatcher
@@ -875,6 +886,13 @@ func (e *stagehandEngine) PageOutcome(ctx context.Context) (pageOutcome, error) 
 	if hostpattern.Validate(outcome.Host) != nil || strings.Contains(outcome.Host, "*") {
 		outcome.Host = ""
 	}
+	// The answer the host gave the page tells whether it was a bot check.
+	// An answer of another status was to an earlier page.
+	if e.responses != nil && outcome.Host != "" {
+		if response, ok := e.responses.Response(outcome.Host); ok && response.Status == outcome.Status {
+			outcome.BotCheck = response.BotCheck
+		}
+	}
 	return outcome, nil
 }
 
@@ -979,6 +997,10 @@ func (e *stagehandEngine) release(ctx context.Context) error {
 	if e.dialogs != nil {
 		errs = append(errs, e.dialogs.Close())
 		e.dialogs = nil
+	}
+	if e.responses != nil {
+		errs = append(errs, e.responses.Close())
+		e.responses = nil
 	}
 	if e.blocked != nil {
 		errs = append(errs, e.blocked.Close())

@@ -259,6 +259,14 @@ func startShop(t *testing.T) string {
 			_, _ = fmt.Fprintf(w, layoutPage, banner)
 			return
 		}
+		if r.URL.Path == "/guarded" {
+			// Cloudflare marks every answer that is one of its checks.
+			w.Header().Set("Content-Type", "text/html")
+			w.Header().Set("Cf-Mitigated", "challenge")
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = io.WriteString(w, `<title>Just a moment...</title><p>Checking your browser</p>`)
+			return
+		}
 		if r.URL.Path == "/agent" {
 			sent, _ := json.Marshal(r.UserAgent())
 			w.Header().Set("Content-Type", "text/html")
@@ -437,6 +445,16 @@ func TestBrowserLooksHeaded(t *testing.T) {
 		result.ExpectExitCode(0)
 		result.ExpectStderrNotContains("warning:")
 	}
+}
+
+// A step that fails on a page the site answered with a bot check says so.
+func TestBrowserNamesBotCheck(t *testing.T) {
+	t.Parallel()
+
+	b := newBrowserEnv(t)
+	result := b.dagu.RunWithEnv(b.env, "start", "bot_check.yaml")
+	result.ExpectNonZeroExitCode()
+	result.ExpectStderrContains("answered with a Cloudflare bot check (HTTP 403) in place of the page")
 }
 
 // With the sandbox on, a browser step fails before starting a browser where

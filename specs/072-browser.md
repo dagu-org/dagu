@@ -311,6 +311,23 @@ later operation. A request blocked after its operation returns is counted with
 the next one. When counting stops, for example because the browser's DevTools
 connection closes, the step log warns once.
 
+### Refused pages
+
+A page counts as refused when its site answered with a bot check in place of
+it, which for Cloudflare is any answer with the header `cf-mitigated:
+challenge`, or answered `403` or `429`, with a body or without one, which
+Chrome shows as its own error page. A page a client certificate kept from
+opening is not counted; Client certificates explains it.
+
+After the start URL and after every operation, a refused page adds a line to
+the timeline and the step log, such as `page refused shop.example.com
+answered with a Cloudflare bot check (HTTP 403) in place of the page` or
+`page refused portal.example.com refused the page (HTTP 403 Forbidden)`, once
+while the browser keeps showing it. A step that fails while the browser
+shows a refused page ends its error with the same sentence, since a refusal
+usually fails a later operation, and keeps the recordings it replayed, since
+the refusal says nothing about them.
+
 ### Artifacts
 
 A DAG with a browser action enables artifact storage unless it sets
@@ -458,7 +475,9 @@ some models give that answer for every request. An
 complete. An `upload` fails when a file cannot be uploaded, the model finds no
 element for `into`, or the element leads to no single file input, as
 described under Uploads. A page that does not load because of a client certificate fails the
-operation that opened it, as described under Client certificates.
+operation that opened it, as described under Client certificates. A failure
+on a page the site refused names the refusal, as described under Refused
+pages.
 
 Loading a DAG warns, without failing, about each `extract` string field whose
 name ends in `url`, `uri`, `link`, or `href`, singular or plural, and that has

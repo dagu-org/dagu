@@ -1244,6 +1244,56 @@ func TestStagehandLearnsUserAgentOnce(t *testing.T) {
 	assert.Equal(t, headed, kept.UserAgent)
 }
 
+// serveRefusals serves a page behind a bot check, answered as Cloudflare
+// answers, and a forbidden page without a body.
+func serveRefusals(t *testing.T) string {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/checked":
+			w.Header().Set("Content-Type", "text/html")
+			w.Header().Set("Cf-Mitigated", "challenge")
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = io.WriteString(w, "<title>Just a moment...</title><p>Checking your browser</p>")
+		case "/forbidden":
+			w.WriteHeader(http.StatusForbidden)
+		default:
+			w.Header().Set("Content-Type", "text/html")
+			_, _ = io.WriteString(w, "<p>Welcome</p>")
+		}
+	}))
+	t.Cleanup(server.Close)
+	return server.URL
+}
+
+// A page a site refused tells how: a bot check, or a refusal the browser
+// shows its own error page for.
+func TestStagehandTellsRefusedPages(t *testing.T) {
+	t.Parallel()
+
+	eng := launchBrowser(t, launchOptions{Generate: (&shopModel{}).generate})
+	site := serveRefusals(t)
+	host := urlHost(site)
+	for path, want := range map[string]refusal{
+		"/checked":   {Host: host, Status: http.StatusForbidden, BotCheck: browserhost.BotCheckCloudflare},
+		"/forbidden": {Host: host, Status: http.StatusForbidden},
+	} {
+		// A browser that shows its own error page for the answer reports
+		// the navigation as failed.
+		_ = eng.Goto(t.Context(), site+path, time.Minute)
+		page, err := eng.PageOutcome(t.Context())
+		require.NoError(t, err, path)
+		refused, ok := refusalOf(page)
+		require.True(t, ok, "%s: %+v", path, page)
+		assert.Equal(t, want, refused, path)
+	}
+	require.NoError(t, eng.Goto(t.Context(), site, time.Minute))
+	page, err := eng.PageOutcome(t.Context())
+	require.NoError(t, err)
+	_, refused := refusalOf(page)
+	assert.False(t, refused, "%+v", page)
+}
+
 // A real page's snapshot renders as the outline the renderer is built for,
 // so a change in the tree the browser runtime reports shows up here.
 func TestStagehandSnapshotOutlinesThePage(t *testing.T) {

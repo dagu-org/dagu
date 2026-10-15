@@ -88,7 +88,8 @@ type engine interface {
 	// answers.
 	TakeCertificateEvents(ctx context.Context) ([]certproxy.Event, error)
 	// PageOutcome describes what the browser shows: a page, or the error
-	// page it shows in place of one it could not load.
+	// page it shows in place of one it could not load, and whether its host
+	// answered with a bot check.
 	PageOutcome(ctx context.Context) (pageOutcome, error)
 	// PendingConnections returns the connections the certificate proxy has
 	// not yet heard a site answer on, or nothing without a proxy.
@@ -163,6 +164,9 @@ type pageOutcome struct {
 	Title  string `json:"title"`
 	// Text is the start of the page's visible text.
 	Text string `json:"text"`
+	// BotCheck names the check the site answered with in place of the page,
+	// such as browserhost.BotCheckCloudflare, or is empty.
+	BotCheck string `json:"-"`
 }
 
 // pageSnapshot is the accessibility tree of a page.

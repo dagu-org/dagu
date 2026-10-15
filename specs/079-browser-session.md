@@ -113,6 +113,16 @@ used, and the page the browser is on next with its outline. A failed
 operation is kept in the history and the session stays open. An extract
 warns about the same link fields loading a step does.
 
+`open`, `do`, and `describe` report a page its site refused, as a browser
+step counts one, as `refused`: the `host`, the HTTP `status`, `bot_check`
+naming the check, such as `cloudflare`, when the site answered with one, and
+a `message` saying so in a sentence. The error of an operation that failed on
+it ends with that sentence. A browser reattached by a later command learns a
+bot check only from pages it loads, so a command that finds the browser on
+the same page, with the same host and status, as the command before keeps the
+bot check that command reported, as after a person reloaded the page between
+commands.
+
 ### Variables
 
 Variable values come with the operation on stdin, under `variables`, never

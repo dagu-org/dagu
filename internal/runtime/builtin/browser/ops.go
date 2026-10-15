@@ -83,6 +83,8 @@ type run struct {
 	// certificateFailures holds, by host, the last trouble with a client
 	// certificate the proxy reported in this attempt.
 	certificateFailures map[string]string
+	// refused is the refusal reported last, while the page still shows it.
+	refused *refusal
 	// downloadWindow is the longest timeout of the acts and gotos run so
 	// far, which can start downloads; zero until one runs.
 	downloadWindow time.Duration
@@ -181,6 +183,7 @@ func (r *run) execute(ctx context.Context) error {
 	if err != nil {
 		return r.fail(ctx, -1, "", err)
 	}
+	r.reportRefusal(ctx, -1)
 	for i := start; i < len(r.cfg.Do); i++ {
 		op := r.cfg.Do[i]
 		if op.When != nil {
@@ -215,6 +218,7 @@ func (r *run) execute(ctx context.Context) error {
 		if err := r.checkPage(ctx, i); err != nil {
 			return r.fail(ctx, i, op.kind(), err)
 		}
+		r.reportRefusal(ctx, i)
 		if op.Act != nil || op.Goto != "" {
 			r.downloadWindow = max(r.downloadWindow, op.timeout())
 		}
@@ -261,6 +265,24 @@ func (r *run) reportBlocked(index int) {
 		r.blocked[host] += count
 	}
 	logBlocked(r.timeline, index, describeBlocked(blocked))
+}
+
+// reportRefusal records the refusal the page shows after the operation at
+// index, once while the page keeps showing it, and returns it.
+func (r *run) reportRefusal(ctx context.Context, index int) *refusal {
+	if r.eng == nil {
+		return nil
+	}
+	refused, ok := r.pageRefusal(ctx)
+	if !ok {
+		r.refused = nil
+		return nil
+	}
+	if r.refused == nil || *r.refused != refused {
+		r.refused = &refused
+		logRefusal(r.timeline, index, refused)
+	}
+	return &refused
 }
 
 // settleDownloads waits for downloads that are still running and records the
@@ -513,6 +535,12 @@ func (r *run) fail(ctx context.Context, index int, kind string, cause error) err
 	}
 	r.reportBlocked(index)
 	r.takeCertificateEvents(ctx, index)
+	// A page the site refused explains a failure that follows, however long
+	// after the refusal.
+	var refused *refusal
+	if ctx.Err() == nil && !errors.Is(cause, errBrowserUnresponsive) {
+		refused = r.reportRefusal(ctx, index)
+	}
 	var files []string
 	if r.cfg.screenshotPolicy() != screenshotsNever && r.artifacts.Enabled() && r.eng != nil {
 		if rel, err := r.capture(context.WithoutCancel(ctx), failureShotLabel); err == nil {
@@ -520,10 +548,15 @@ func (r *run) fail(ctx context.Context, index int, kind string, cause error) err
 		}
 	}
 	_ = r.shutdown(ctx)
-	r.forgetReplays(ctx, index, kind, cause)
+	r.forgetReplays(ctx, index, kind, cause, refused != nil)
 	message := r.masker.MaskString(cause.Error())
 	if index >= 0 {
 		message = fmt.Sprintf("do[%d] %s failed: %s", index, kind, message)
+	}
+	if refused != nil {
+		if note := r.masker.MaskString(refused.String()); !strings.Contains(message, note) {
+			message += "; " + note
+		}
 	}
 	// A blocked request often breaks the page long before an operation
 	// fails, so the failure summarizes every request blocked in the attempt.
@@ -549,11 +582,12 @@ func (r *run) fail(ctx context.Context, index int, kind string, cause error) err
 // failed on the page may have followed a replay that did the wrong thing, so
 // the recordings the step replayed are dropped. A failure of the model, the
 // browser, a download, an ask, or the run itself says nothing about them,
-// so they stay. So does a replay that stopped because it no longer fit the
-// page under ai: never: the recording is what a run under ai: on_miss
-// repairs. What the step recorded is never kept.
-func (r *run) forgetReplays(ctx context.Context, index int, kind string, cause error) {
-	if index < 0 || ctx.Err() != nil || kind == opAsk || kind == kindDownload ||
+// so they stay, as they do when the site refused the page. So does a replay
+// that stopped because it no longer fit the page under ai: never: the
+// recording is what a run under ai: on_miss repairs. What the step recorded
+// is never kept.
+func (r *run) forgetReplays(ctx context.Context, index int, kind string, cause error, refused bool) {
+	if index < 0 || ctx.Err() != nil || refused || kind == opAsk || kind == kindDownload ||
 		errors.Is(cause, errBrowserUnresponsive) || errors.Is(cause, errPageSessionLost) || r.bridge.failedRequest() ||
 		errors.As(cause, new(replayMiss)) {
 		r.cache.Discard()
