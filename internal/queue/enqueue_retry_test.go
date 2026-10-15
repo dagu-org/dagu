@@ -83,6 +83,30 @@ func TestRetryResumeFlag(t *testing.T) {
 	assert.True(t, backend.status.Resume)
 }
 
+func TestRetryAdmissionUsesChildStorageRoot(t *testing.T) {
+	status := &ir.DAGRunStatus{
+		Name:      "child",
+		DAGRunID:  "child-run",
+		AttemptID: "attempt",
+		Status:    ir.Waiting,
+	}
+	root := ir.NewDAGRunRef("root", "root-run")
+	backend := &stubDAGRunStore{status: cloneDAGRunStatus(status)}
+	repository := persis.NewDAGRunRepository(backend, nil, persis.DAGRunRepositoryOptions{})
+
+	admission, err := queue.PrepareRetry(t.Context(), repository, nil, status, queue.EnqueueRetryOptions{
+		Resume:     true,
+		RootDAGRun: root,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, admission)
+	assert.Equal(t, root, backend.lastRoot)
+
+	require.NoError(t, admission.Rollback(t.Context()))
+	assert.Equal(t, root, backend.lastRoot)
+	assert.Equal(t, ir.Waiting, backend.status.Status)
+}
+
 func TestRetryAdmissionConcurrent(t *testing.T) {
 	repository := testutil.NewFileDAGRunRepository(t.TempDir(), persis.DAGRunRepositoryOptions{})
 	dag := &ir.DAG{Name: "manual"}
@@ -613,6 +637,7 @@ type stubDAGRunStore struct {
 	firstErr  error
 	secondErr error
 	casCalls  int
+	lastRoot  ir.DAGRunRef
 }
 
 func (s *stubDAGRunStore) CompareAndSwapLatestAttemptStatus(
@@ -620,6 +645,7 @@ func (s *stubDAGRunStore) CompareAndSwapLatestAttemptStatus(
 	req persis.DAGRunCompareAndSwapStatusRequest,
 ) (*ir.DAGRunStatus, bool, error) {
 	s.casCalls++
+	s.lastRoot = req.RootDAGRun
 	if s.casCalls == 1 && s.firstErr != nil {
 		return nil, false, s.firstErr
 	}
