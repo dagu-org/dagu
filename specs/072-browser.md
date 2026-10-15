@@ -181,7 +181,9 @@ a window, by starting it once on a profile of its own, and kept under the
 data directory's `browser/user-agents/`. A launch whose browser reports
 another version than the one kept learns it again, and starts the browser
 again only when the user agent changed with it. When the user agent cannot be
-learned or kept, the step runs and warns.
+learned or kept, the step runs and warns. It reports a screen of 1920x1080,
+or its viewport's size when that is larger, where Chrome would report one
+smaller than its window.
 
 The host configuration `browser.sandbox: false`, or the environment variable
 `DAGU_BROWSER_SANDBOX=false`, turns off Chromium's sandbox for every browser

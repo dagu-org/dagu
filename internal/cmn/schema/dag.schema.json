@@ -7582,7 +7582,7 @@
         "headless": {
           "type": "boolean",
           "default": true,
-          "description": "Run Chrome without a window. Pages see the user agent the same Chrome sends with one."
+          "description": "Run Chrome without a window. Pages see the user agent the same Chrome sends with one, and a screen that holds the window."
         },
         "executable": {
           "type": "string",

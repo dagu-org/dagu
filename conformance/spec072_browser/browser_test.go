@@ -80,13 +80,17 @@ const layoutPage = `<!doctype html><html><head><title>Draft</title></head><body>
 </body></html>`
 
 // agentPage says whether the user agent its request came with, given as a
-// JSON string, is the one its scripts see and names no headless browser.
+// JSON string, is the one its scripts see and names no headless browser,
+// and whether the screen holds the browser's window.
 const agentPage = `<!doctype html><html><head><title>Agent</title></head><body>
 <p id="agent"></p>
+<p id="screen"></p>
 <script>
 const sent = %s;
 document.getElementById('agent').textContent = sent === navigator.userAgent && !sent.includes('Headless')
   ? 'user agent: headed' : 'user agent: ' + sent + ' / ' + navigator.userAgent;
+document.getElementById('screen').textContent = screen.width >= outerWidth && screen.height >= outerHeight
+  ? 'screen holds window' : 'screen ' + screen.width + 'x' + screen.height + ', window ' + outerWidth + 'x' + outerHeight;
 </script>
 </body></html>`
 
@@ -422,7 +426,8 @@ func TestBrowserDialogs(t *testing.T) {
 }
 
 // A browser without a window sends the user agent the same browser sends
-// with one, learned on the first run and kept for the next.
+// with one, learned on the first run and kept for the next, and reports a
+// screen that holds its window.
 func TestBrowserLooksHeaded(t *testing.T) {
 	t.Parallel()
 

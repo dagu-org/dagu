@@ -57,6 +57,13 @@ const (
 	settleQuiet   = 500 * time.Millisecond
 	settleTimeout = 5 * time.Second
 	settlePoll    = 100 * time.Millisecond
+	// headlessScreenWidth and headlessScreenHeight size the screen a browser
+	// without a window reports: a common desktop's, or its window's when
+	// that is larger. Chrome otherwise reports 800x600, smaller than its
+	// window, which pages that size themselves by the screen read as a
+	// phone.
+	headlessScreenWidth  = 1920
+	headlessScreenHeight = 1080
 )
 
 // watchExpression counts the page's requests in flight, including reads of
@@ -147,6 +154,16 @@ func sandboxHint(noSandbox bool) string {
 		"with browser.sandbox: false in the Dagu config or DAGU_BROWSER_SANDBOX=false"
 }
 
+// headlessScreen returns the flag that gives a browser without a window, at
+// viewport v or the runtime's default size, a screen that holds its window.
+func headlessScreen(v *viewport) string {
+	width, height := headlessScreenWidth, headlessScreenHeight
+	if v != nil {
+		width, height = max(width, v.Width), max(height, v.Height)
+	}
+	return fmt.Sprintf("--screen-info={%dx%d}", width, height)
+}
+
 // sandboxOverride reports why the browser runtime would turn off the sandbox
 // whatever the host setting says, or "" when it keeps it.
 func sandboxOverride() string {
@@ -234,6 +251,9 @@ func (l stagehandLauncher) start(ctx context.Context, opts launchOptions, userAg
 	}
 	if userAgent != "" {
 		launch.Args = append(launch.Args, "--user-agent="+userAgent)
+	}
+	if opts.Headless {
+		launch.Args = append(launch.Args, headlessScreen(opts.Viewport))
 	}
 	cdpURL := fmt.Sprintf("http://127.0.0.1:%d", port)
 	var proxy *certproxy.Handle

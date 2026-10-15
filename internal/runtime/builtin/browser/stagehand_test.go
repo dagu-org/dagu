@@ -1162,6 +1162,26 @@ func TestStagehandLooksHeaded(t *testing.T) {
 	assert.NotContains(t, brands, "HeadlessChrome")
 }
 
+// A browser without a window reports a desktop's screen, one that holds its
+// window, so a page that sizes itself by the screen lays out as it does for
+// a person.
+func TestStagehandScreenHoldsWindow(t *testing.T) {
+	t.Parallel()
+
+	for name, size := range map[string]*viewport{"default size": nil, "large viewport": {Width: 2400, Height: 1300}} {
+		eng := launchBrowser(t, launchOptions{Viewport: size, Generate: (&shopModel{}).generate})
+		require.NoError(t, eng.Goto(t.Context(), "data:text/html,<p>screen</p>", time.Minute))
+		raw, err := eng.(*stagehandEngine).evaluate(t.Context(), `[screen.width, screen.height, outerWidth, outerHeight]`)
+		require.NoError(t, err)
+		var sizes [4]int
+		require.NoError(t, json.Unmarshal(raw, &sizes), name)
+		screenWidth, screenHeight, windowWidth, windowHeight := sizes[0], sizes[1], sizes[2], sizes[3]
+		t.Logf("%s: screen %dx%d, window %dx%d", name, screenWidth, screenHeight, windowWidth, windowHeight)
+		assert.GreaterOrEqual(t, screenWidth, max(windowWidth, headlessScreenWidth), name)
+		assert.GreaterOrEqual(t, screenHeight, max(windowHeight, headlessScreenHeight), name)
+	}
+}
+
 // The user agent an executable sends with a window is learned once, by a
 // browser started for it alone, and asked again only once the executable
 // reports another version, starting the browser again only when the user

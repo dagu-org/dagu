@@ -8,3 +8,4 @@ steps:
       url: ${SHOP_URL}/agent
       do:
         - expect: {text: "user agent: headed"}
+        - expect: {text: "screen holds window"}
