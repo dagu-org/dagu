@@ -234,7 +234,8 @@ func countWaitingNodes(nodes []*ir.Node) int {
 }
 
 // resumeReady reports whether a resumed attempt can make progress: either no
-// manual step is waiting, or a completed human task unblocked a step.
+// manual step is waiting, or a completed human task unblocked a step and no
+// node would be re-run by the resume.
 func resumeReady(nodes []*ir.Node) bool {
 	return !hasWaitingNodes(nodes) || (!hasRetryableNode(nodes) && hasUnblockedNode(nodes))
 }
