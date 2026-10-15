@@ -10,6 +10,11 @@
 //	browser ── PAC ──┬─ https: certificate host ── proxy ── TLS + client cert ── site
 //	                 └─ anything else ───────────── the device's own proxy setup
 //
+// Chrome does not consult a PAC script for localhost names, loopback
+// addresses, or link-local addresses. When an entry names one of those, the
+// browser uses a manual HTTPS proxy instead, and this proxy forwards every
+// other HTTPS request on the device's own route.
+//
 // The proxy runs as a process of its own, because the browser outlives the
 // process that launched it, and exits once that browser is gone.
 package certproxy
@@ -86,6 +91,10 @@ type Ready struct {
 	PACURL string `json:"pac_url"`
 	// GuardPort is the port of the guard, or zero without one.
 	GuardPort int `json:"guard_port,omitempty"`
+	// Manual reports that the browser must use a manual HTTPS proxy. A PAC
+	// script cannot send Chrome to localhost names, loopback addresses, or
+	// link-local addresses.
+	Manual bool `json:"manual,omitempty"`
 }
 
 // Kinds of Event.

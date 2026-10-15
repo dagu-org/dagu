@@ -206,7 +206,19 @@ the proxy reaches those hosts the way the device does: through `proxy` when it
 is set, otherwise through the operating system's proxy settings (the proxy
 auto-config, automatic detection on Windows, or the manual proxies; the proxy
 environment variables on Linux). The browser sends every other request there
-itself. With certificates, `proxy` takes only `[scheme://]host[:port]` with
+itself. Chrome does not consult a PAC script for `localhost`, `*.localhost`,
+the Windows name `loopback`, loopback addresses (`127.0.0.0/8` and `::1`), or
+link-local addresses. When a certificate or trusted authority names one of
+those destinations, or `*`, the browser uses a manual HTTPS proxy with that
+implicit bypass removed, so the destination reaches the certificate proxy.
+Every other HTTPS request still follows the device's proxy settings, applied
+by the certificate proxy, and is not given a configured client certificate or
+authority. A device proxy that asks for credentials cannot be handed back to
+the browser while that manual proxy is in use. Requests that are not HTTPS
+are left direct then, because the manual proxy is HTTPS only. An HTTPS
+upstream proxy may listen on a loopback address; its certificate is checked
+against authorities that name the proxy's host, separately from the website.
+With certificates, `proxy` takes only `[scheme://]host[:port]` with
 scheme `http`, `https`, or `socks5`. A proxy that asks for authentication
 cannot carry requests to certificate hosts, and the proxy, not the browser,
 verifies those hosts' server certificates.
@@ -262,11 +274,12 @@ failure of that route does not fall back to the browser's route. An HTTPS
 upstream proxy's certificate uses authorities matching the proxy's hostname.
 Server hostname, validity, and certificate-chain verification remain enabled.
 
-Chrome bypasses PAC routing for localhost names, loopback addresses, and
-link-local addresses. An entry naming one reports a warning: its authority
-can verify an HTTPS upstream proxy there, but cannot add trust to a website
-opened directly at that address. Use the site's network hostname or another
-network address. Ordinary private-network IP addresses are supported.
+Localhost names, loopback addresses, and link-local addresses are routed as
+described for client certificates, so an authority can verify a website opened
+at one of those destinations. An authority named for a loopback address also
+verifies an HTTPS upstream proxy listening there, and does not verify a
+website at a different host. Ordinary private-network addresses keep using the
+PAC script.
 
 Authority files are read when a browser starts. An existing browser retains
 its original trust until it closes; a later browser reads the current files.

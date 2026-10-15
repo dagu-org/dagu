@@ -60,12 +60,36 @@ type Handle struct {
 	StartedAt int64  `json:"started_at"`
 	PACURL    string `json:"pac_url"`
 	SPKI      string `json:"spki"`
+	// Port is the proxy port the browser connects to.
+	Port int `json:"port,omitempty"`
+	// Manual reports that ChromeArgs uses a manual HTTPS proxy, because a
+	// PAC script cannot route a configured destination.
+	Manual bool `json:"manual,omitempty"`
+	// DebugPort is the browser's debugging port. A manual proxy leaves it
+	// direct: <-loopback> would send the runtime's own WebSocket through
+	// the proxy.
+	DebugPort int `json:"-"`
 }
 
 // ChromeArgs returns the browser flags that send the certificate hosts to
-// the proxy and accept the certificates it shows.
+// the proxy and accept the certificates it shows. A manual proxy is what
+// can include destinations Chrome skips in every PAC script.
 func (h Handle) ChromeArgs() []string {
-	return []string{"--proxy-pac-url=" + h.PACURL, "--ignore-certificate-errors-spki-list=" + h.SPKI}
+	route := "--proxy-pac-url=" + h.PACURL
+	if h.Manual {
+		route = fmt.Sprintf("--proxy-server=https=127.0.0.1:%d", h.Port)
+	}
+	args := []string{route, "--ignore-certificate-errors-spki-list=" + h.SPKI}
+	if h.Manual {
+		// An explicit port bypass stays after <-loopback> removes the
+		// implicit loopback rules, so the debugging socket is not proxied.
+		bypass := "<-loopback>"
+		if h.DebugPort > 0 {
+			bypass += fmt.Sprintf(";127.0.0.1:%d", h.DebugPort)
+		}
+		args = append(args, "--proxy-bypass-list="+bypass)
+	}
+	return args
 }
 
 // Kill ends the proxy process if it is still the one h records. A process
@@ -152,6 +176,8 @@ func startProcess(ctx context.Context, executable string, cfg Config) (*Handle, 
 		StartedAt: startedAt,
 		PACURL:    ready.PACURL,
 		SPKI:      ready.SPKI,
+		Port:      ready.Port,
+		Manual:    ready.Manual,
 	}, ready, nil
 }
 

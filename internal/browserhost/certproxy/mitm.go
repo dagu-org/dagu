@@ -98,6 +98,10 @@ type server struct {
 	// guard accepts the browser's other https: connections; nil without a
 	// guard, or once it stopped.
 	guard net.Listener
+	// carryAll is set when the browser sends every HTTPS request here, so a
+	// destination Chrome skips in a PAC script can still arrive. Hosts no
+	// entry names keep the device's route.
+	carryAll bool
 }
 
 // scopedAuthority is a TrustedCA ready to verify servers.
@@ -226,10 +230,11 @@ func (g guardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	g.s.handleConnect(w, r, true)
 }
 
-// handleConnect opens a tunnel to the host a CONNECT request names, ending
-// the browser's TLS in the proxy. The certificate port tunnels only to the
-// hosts the entries name; the guard tunnels to any host, presenting no
-// certificate to the others.
+// handleConnect opens a tunnel to the host a CONNECT request names. The
+// certificate port ends TLS for the hosts the entries name. The guard, and
+// the certificate port while it carries every HTTPS request, does the same
+// for ordinary hosts and presents no certificate. A loopback host the
+// settings do not name is spliced through without reading TLS.
 func (s *server) handleConnect(w http.ResponseWriter, r *http.Request, guard bool) {
 	host, port := splitAuthority(r.Host)
 	if host == "" {
@@ -238,12 +243,22 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request, guard boo
 	}
 	entry := s.scopedEntry(host)
 	if entry == nil {
-		if !guard {
+		switch {
+		case guard:
+			entry = s.guardEntry
+		case s.carryAll && s.guardListening() && !implicitBypass(host):
+			// The guard still carries ordinary hosts. A loopback host the
+			// settings do not name stays on the browser's own TLS, which is
+			// where Chrome sent it before the manual proxy.
+			entry = s.guardEntry
+		case s.carryAll:
+			s.relayOpaque(w, host, port)
+			return
+		default:
 			s.events.add(EventRefused, host, "", fmt.Sprintf("the certificate proxy refused a connection to %s, which no certificate setting names", host))
 			http.Error(w, "no certificate setting names this host", http.StatusForbidden)
 			return
 		}
-		entry = s.guardEntry
 	}
 	pending := s.pending.start(host)
 	ctx, cancel := context.WithTimeout(s.ctx, handshakeTimeout)
@@ -251,9 +266,10 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request, guard boo
 	cancel()
 	if err != nil {
 		s.pending.end(pending)
-		if guard && errors.Is(err, errProxyAuth) {
+		if errors.Is(err, errProxyAuth) && (guard || s.carriedByGuard(entry)) {
 			// A reset connection makes the browser try the route after the
-			// guard; a closed guard keeps it on that route.
+			// guard; a closed guard keeps it on that route. While a manual
+			// proxy is carrying loopback, there is no later browser route.
 			s.stopGuard(host)
 			resetConnection(w)
 			return
@@ -304,9 +320,12 @@ func (s *server) stopGuard(host string) {
 	}
 	_ = guard.Close()
 	s.verified.dropGuarded()
+	detail := "sites without a client certificate now go through the browser's own route; one of them that asks for a client certificate can make the system prompt for it"
+	if s.carryAll {
+		detail = "HTTPS stays on the certificate proxy, which is also carrying a loopback destination, so those sites cannot fall through to the browser"
+	}
 	s.events.add(EventGuardOff, host, "", fmt.Sprintf(
-		"the device's proxy asks %s for credentials the certificate proxy cannot give, so sites without a client certificate "+
-			"now go through the browser's own route; one of them that asks for a client certificate can make the system prompt for it", host))
+		"the device's proxy asks %s for credentials the certificate proxy cannot give, so %s", host, detail))
 }
 
 // resetConnection resets the connection of the request w answers, which
@@ -374,6 +393,67 @@ func (s *server) scopedEntry(host string) *upstreamEntry {
 		return selected
 	}
 	return entry
+}
+
+// guardListening reports whether the guard still accepts connections.
+func (s *server) guardListening() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.guard != nil
+}
+
+// relayOpaque tunnels host without ending its TLS, so the browser verifies
+// the server itself and a configured authority is not applied to it.
+func (s *server) relayOpaque(w http.ResponseWriter, host, port string) {
+	pending := s.pending.start(host)
+	defer s.pending.end(pending)
+	ctx, cancel := context.WithTimeout(s.ctx, handshakeTimeout)
+	raw, _, err := s.reach(ctx, host, port, s.guardEntry)
+	cancel()
+	if err != nil {
+		kind := EventUpstream
+		if errors.Is(err, errProxyAuth) {
+			kind = EventProxyAuth
+		}
+		s.events.add(kind, host, "", fmt.Sprintf("the certificate proxy could not reach %s: %s", host, oneLine(err)))
+		http.Error(w, "the certificate proxy could not reach the site", http.StatusBadGateway)
+		return
+	}
+	hijacker, ok := w.(http.Hijacker)
+	if !ok {
+		_ = raw.Close()
+		http.Error(w, "the connection cannot be tunneled", http.StatusInternalServerError)
+		return
+	}
+	conn, buffered, err := hijacker.Hijack()
+	if err != nil {
+		_ = raw.Close()
+		return
+	}
+	if _, err := io.WriteString(conn, connectEstablished); err != nil {
+		_ = raw.Close()
+		_ = conn.Close()
+		return
+	}
+	client := net.Conn(conn)
+	if buffered.Reader.Buffered() > 0 {
+		client = &bufferedConn{Conn: conn, reader: buffered.Reader}
+	}
+	if !s.track(client) {
+		_ = client.Close()
+		_ = raw.Close()
+		return
+	}
+	defer s.untrack(client)
+	done := make(chan struct{})
+	go func() {
+		_, _ = io.Copy(raw, client)
+		_ = raw.Close()
+		close(done)
+	}()
+	_, _ = io.Copy(client, raw)
+	_ = client.Close()
+	<-done
 }
 
 // carriedByGuard reports whether entry is the guard's own, which only the

@@ -119,6 +119,7 @@ func Serve(ctx context.Context, cfg Config, ready func(Ready)) error {
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	manual := manualProxy(cfg.routedHosts())
 	s := &server{
 		ctx:        ctx,
 		token:      cfg.Token,
@@ -132,6 +133,7 @@ func Serve(ctx context.Context, cfg Config, ready func(Ready)) error {
 		guardEntry: newGuardEntry(cfg.Entries),
 		tunnels:    map[net.Conn]struct{}{},
 		guard:      guard,
+		carryAll:   manual,
 	}
 	script := composePAC(port, guardPort, cfg.routedHosts(), system)
 	pacURL, served := pacLocation(script, controlURL(port, cfg.Token)+"/"+pacPath)
@@ -147,7 +149,7 @@ func Serve(ctx context.Context, cfg Config, ready func(Ready)) error {
 		// only the guard's serving.
 		go func() { _ = guardServer.Serve(guard) }()
 	}
-	ready(Ready{Port: port, SPKI: issuer.spki, PACURL: pacURL, GuardPort: guardPort})
+	ready(Ready{Port: port, SPKI: issuer.spki, PACURL: pacURL, GuardPort: guardPort, Manual: manual})
 
 	grace := time.Duration(cfg.GraceSeconds) * time.Second
 	if grace <= 0 {

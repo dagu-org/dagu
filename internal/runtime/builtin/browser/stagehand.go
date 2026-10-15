@@ -197,9 +197,10 @@ func (l stagehandLauncher) Launch(ctx context.Context, opts launchOptions) (engi
 		if proxy, err = l.startCertProxy(ctx, cdpURL, opts); err != nil {
 			return nil, err
 		}
-		// The proxy routes every request the browser makes, through
-		// browser.proxy where one is set.
+		// The proxy routes the browser's requests, through browser.proxy
+		// where one is set. The debugging port stays direct.
 		launch.Proxy = nil
+		proxy.DebugPort = port
 		launch.Args = append(launch.Args, proxy.ChromeArgs()...)
 	}
 	browser, err := stagehand.LaunchLocalBrowser(ctx, launch)
