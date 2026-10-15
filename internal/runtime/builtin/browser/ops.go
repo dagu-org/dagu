@@ -128,6 +128,7 @@ func newRun(ctx context.Context, e *browserExecutor) (*run, error) {
 			bridge:         bridge,
 			variables:      variables,
 			allowedDomains: e.cfg.Browser.AllowedDomains,
+			choice:         e.cfg.operationChoice,
 			shots:          artifacts,
 			workDir:        env.WorkingDir,
 		},
@@ -148,10 +149,8 @@ func newRun(ctx context.Context, e *browserExecutor) (*run, error) {
 
 		certificateFailures: map[string]string{},
 	}
-	if e.cfg.cacheEnabled() {
-		r.cache = openReplayCache(browserDir, dagName, stepKey)
-		r.recorder = stepRecorder{cache: r.cache}
-	}
+	r.cache = openReplayCache(browserDir, dagName, stepKey)
+	r.recorder = stepRecorder{cache: r.cache}
 	r.timeline = &agentstep.Timeline{Log: e.stderr, Masker: masker, Total: len(e.cfg.Do), Update: e.updateSession, Provider: providerName}
 	r.warn = func(index int, message string) {
 		_, _ = fmt.Fprintf(r.timeline.Log, "warning: %s %s\n", r.timeline.Position(index), message)
@@ -192,7 +191,7 @@ func (r *run) execute(ctx context.Context) error {
 			}
 			if !holds {
 				r.timeline.Operation(agentstep.Report{
-					Index: i, Kind: op.kind(), Subject: op.When.String(), Status: agentstep.StatusSkipped, Detail: reason,
+					Index: i, Kind: op.kind(), Subject: op.When.String(), Status: agentstep.StatusSkipped, Via: op.When.via(), Detail: reason,
 					Tokens: r.bridge.totals().sub(before).total(), Duration: time.Since(began),
 				})
 				continue
@@ -483,10 +482,8 @@ func (r *run) succeed(ctx context.Context) error {
 	if err := r.shutdown(ctx); err != nil {
 		_, _ = fmt.Fprintf(r.timeline.Log, "warning: browser cleanup: %s\n", r.masker.MaskString(err.Error()))
 	}
-	if r.cache != nil {
-		if err := r.cache.Commit(ctx); err != nil {
-			_, _ = fmt.Fprintf(r.timeline.Log, "warning: keep replay recordings: %s\n", r.masker.MaskString(err.Error()))
-		}
+	if err := r.cache.Commit(ctx); err != nil {
+		_, _ = fmt.Fprintf(r.timeline.Log, "warning: keep replay recordings: %s\n", r.masker.MaskString(err.Error()))
 	}
 	usage := r.bridge.totals()
 	summary := fmt.Sprintf("Completed %d operations using %d tokens", len(r.cfg.Do), usage.total())
@@ -551,13 +548,13 @@ func (r *run) fail(ctx context.Context, index int, kind string, cause error) err
 // failed on the page may have followed a replay that did the wrong thing, so
 // the recordings the step replayed are dropped. A failure of the model, the
 // browser, a download, an ask, or the run itself says nothing about them,
-// so they stay. What the step recorded is never kept.
+// so they stay. So does a replay that stopped because it no longer fit the
+// page under ai: never: the recording is what a run under ai: on_miss
+// repairs. What the step recorded is never kept.
 func (r *run) forgetReplays(ctx context.Context, index int, kind string, cause error) {
-	if r.cache == nil {
-		return
-	}
 	if index < 0 || ctx.Err() != nil || kind == opAsk || kind == kindDownload ||
-		errors.Is(cause, errBrowserUnresponsive) || errors.Is(cause, errPageSessionLost) || r.bridge.failedRequest() {
+		errors.Is(cause, errBrowserUnresponsive) || errors.Is(cause, errPageSessionLost) || r.bridge.failedRequest() ||
+		errors.As(cause, new(replayMiss)) {
 		r.cache.Discard()
 		return
 	}
