@@ -135,6 +135,8 @@ func TestRetryPlan(t *testing.T) {
 		{Name: "1"}, {Name: "2", Depends: []string{"1"}}, {Name: "3", Depends: []string{"2"}},
 		{Name: "4"}, {Name: "5", Depends: []string{"4"}}, {Name: "6", Depends: []string{"5"}}, {Name: "7", Depends: []string{"6"}},
 		{Name: "8"},
+		{Name: "9"}, {Name: "10", Depends: []string{"9"}},
+		{Name: "11"}, {Name: "12", Depends: []string{"11"}},
 	}}
 	nodes := []*runtime.Node{
 		makeNode("1", ir.NodeSucceeded),
@@ -145,11 +147,15 @@ func TestRetryPlan(t *testing.T) {
 		makeNode("6", ir.NodeSucceeded, "5"),
 		makeNode("7", ir.NodeSkipped, "6"),
 		makeNode("8", ir.NodeSkipped),
+		makeNode("9", ir.NodePartiallySucceeded),
+		makeNode("10", ir.NodeSucceeded, "9"),
+		makeNode("11", ir.NodeSucceeded),
+		makeNode("12", ir.NodeSucceeded, "11"),
 	}
 	p, err := runtime.CreateRetryPlan(ctx, dag, nodes...)
 	require.NoError(t, err)
 	require.NotNil(t, p)
-	// expectations based on upstream failures and aborted states triggering retry propagation
+	// expectations based on failed, partially succeeded, and aborted states triggering retry propagation
 	require.Equal(t, ir.NodeSucceeded, nodes[0].State().Status)
 	require.Equal(t, ir.NodeNotStarted, nodes[1].State().Status)
 	require.Equal(t, ir.NodeNotStarted, nodes[2].State().Status)
@@ -158,6 +164,10 @@ func TestRetryPlan(t *testing.T) {
 	require.Equal(t, ir.NodeNotStarted, nodes[5].State().Status)
 	require.Equal(t, ir.NodeNotStarted, nodes[6].State().Status)
 	require.Equal(t, ir.NodeSkipped, nodes[7].State().Status)
+	require.Equal(t, ir.NodeNotStarted, nodes[8].State().Status)
+	require.Equal(t, ir.NodeNotStarted, nodes[9].State().Status)
+	require.Equal(t, ir.NodeSucceeded, nodes[10].State().Status)
+	require.Equal(t, ir.NodeSucceeded, nodes[11].State().Status)
 }
 
 func TestRetryPlanWithRejectedNode(t *testing.T) {

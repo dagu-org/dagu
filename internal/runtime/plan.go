@@ -454,9 +454,9 @@ func (p *Plan) isCyclic() bool {
 	return processedCount != len(p.nodes)
 }
 
-// setupRetry resets the state of failed/aborted nodes and their dependents.
+// setupRetry resets the state of failed/partially succeeded/aborted nodes and their dependents.
 func (p *Plan) setupRetry(ctx context.Context, steps map[string]ir.Step) error {
-	// Identify nodes that need to be retried (failed or aborted)
+	// Identify nodes that need to be retried (failed, partially succeeded, or aborted)
 	toRetry := make(map[int]bool)
 	nodeStatus := make(map[int]ir.NodeStatus)
 
@@ -477,6 +477,7 @@ func (p *Plan) setupRetry(ctx context.Context, steps map[string]ir.Step) error {
 		for _, u := range frontier {
 			shouldRetry := toRetry[u] ||
 				nodeStatus[u] == ir.NodeFailed ||
+				nodeStatus[u] == ir.NodePartiallySucceeded ||
 				nodeStatus[u] == ir.NodeRetrying ||
 				nodeStatus[u] == ir.NodeAborted ||
 				nodeStatus[u] == ir.NodeRejected
