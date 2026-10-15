@@ -56,6 +56,33 @@ func TestRetryAdmissionRollback(t *testing.T) {
 	}
 }
 
+// Resume intent is set only for checkpoint admission, cleared by ordinary
+// retry admission, and restored if that admission is rolled back.
+func TestRetryResumeFlag(t *testing.T) {
+	status := &ir.DAGRunStatus{Name: "manual", DAGRunID: "run", AttemptID: "attempt", Status: ir.Waiting}
+	backend := &stubDAGRunStore{status: cloneDAGRunStatus(status)}
+	repository := persis.NewDAGRunRepository(backend, nil, persis.DAGRunRepositoryOptions{})
+
+	admission, err := queue.PrepareRetry(t.Context(), repository, nil, status, queue.EnqueueRetryOptions{Resume: true})
+	require.NoError(t, err)
+	require.NotNil(t, admission)
+	assert.True(t, admission.Status.Resume)
+	require.NoError(t, admission.Rollback(t.Context()))
+	assert.False(t, backend.status.Resume)
+
+	status = cloneDAGRunStatus(backend.status)
+	status.Status = ir.Waiting
+	status.Resume = true
+	backend.status.Status = ir.Waiting
+	backend.status.Resume = true
+	admission, err = queue.PrepareRetry(t.Context(), repository, nil, status, queue.EnqueueRetryOptions{})
+	require.NoError(t, err)
+	require.NotNil(t, admission)
+	assert.False(t, admission.Status.Resume)
+	require.NoError(t, admission.Rollback(t.Context()))
+	assert.True(t, backend.status.Resume)
+}
+
 func TestRetryAdmissionConcurrent(t *testing.T) {
 	repository := testutil.NewFileDAGRunRepository(t.TempDir(), persis.DAGRunRepositoryOptions{})
 	dag := &ir.DAG{Name: "manual"}

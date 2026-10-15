@@ -45,6 +45,9 @@ type RunProcesses interface {
 
 // EnqueueRetryOptions configure a retry enqueue.
 type EnqueueRetryOptions struct {
+	// Resume preserves partially succeeded nodes and completed manual gates in
+	// a checkpoint resume. Ordinary retries leave this false.
+	Resume bool
 	// AutoRetry marks scheduler-issued DAG auto-retries. These consume the
 	// DAG-level retry budget at enqueue time.
 	AutoRetry bool
@@ -191,6 +194,7 @@ func PrepareRetry(
 			latest.PIDStartedAt = 0
 			latest.LeaseAt = 0
 			latest.TriggerType = ir.TriggerTypeRetry
+			latest.Resume = opts.Resume
 			if opts.TriggerActor != nil {
 				latest.TriggerActor = *opts.TriggerActor
 			}
@@ -254,6 +258,7 @@ func rollbackQueuedRetry(
 			latest.LeaseAt = original.LeaseAt
 			latest.TriggerType = original.TriggerType
 			latest.TriggerActor = original.TriggerActor
+			latest.Resume = original.Resume
 			latest.AutoRetryCount = original.AutoRetryCount
 			latest.Root = original.Root
 			return nil

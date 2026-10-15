@@ -332,8 +332,8 @@ func TestCompleteKeepsWaitingWhenNoStepIsReady(t *testing.T) {
 	}
 }
 
-// A partially succeeded branch must hold an intermediate completion while
-// another manual task waits, then allow the final completion to queue it.
+// A partially succeeded branch may make intermediate progress while another
+// manual task waits, then the final completion queues the remaining work.
 func TestCompletePartialRetry(t *testing.T) {
 	fixture := newServiceFixture(t, nil)
 	other := waitingHumanTaskNode("Other")
@@ -345,11 +345,16 @@ func TestCompletePartialRetry(t *testing.T) {
 
 	result, err := fixture.completeReview(t)
 	require.NoError(t, err)
-	assert.False(t, result.ResumeRequested)
-	assert.False(t, result.Queued)
+	assert.True(t, result.ResumeRequested)
+	assert.True(t, result.Queued)
 	assert.Equal(t, 1, result.RemainingWaitingSteps)
-	assert.Equal(t, ir.Waiting, fixture.status.Status)
-	assert.Empty(t, fixture.queue.enqueued)
+	assert.Equal(t, ir.Queued, fixture.status.Status)
+	assert.Len(t, fixture.queue.enqueued, 1)
+
+	// The checkpoint resume runs the newly unblocked branch while Other waits.
+	fixture.status.Status = ir.Waiting
+	fixture.status.Nodes[0].Status = ir.NodeSucceeded
+	fixture.status.Nodes[0].HumanTaskInput = []byte(`{}`)
 
 	result, err = fixture.service.Complete(t.Context(), CompleteRequest{
 		DAGName: fixture.dag.Name, DAGRunID: fixture.status.DAGRunID, StepID: other.Step.ID, Input: Input{Values: map[string]any{}},
@@ -360,7 +365,7 @@ func TestCompletePartialRetry(t *testing.T) {
 	assert.True(t, result.Queued)
 	assert.Zero(t, result.RemainingWaitingSteps)
 	assert.Equal(t, ir.Queued, fixture.status.Status)
-	assert.Len(t, fixture.queue.enqueued, 1)
+	assert.Len(t, fixture.queue.enqueued, 2)
 }
 
 // The unblocked step marks a resume as pending until an attempt runs it.
@@ -425,7 +430,7 @@ func TestUnblockedNodeReady(t *testing.T) {
 			stepNode("lint", ir.NodeFailed),
 			stepNode("after", ir.NodeNotStarted, "gate"),
 		}},
-		{name: "partially succeeded step elsewhere", want: false, nodes: []*ir.Node{
+		{name: "partially succeeded step elsewhere", want: true, nodes: []*ir.Node{
 			{Step: ir.Step{ID: "gate", Name: "gate", Approval: &ir.ApprovalConfig{}}, Status: ir.NodeSucceeded},
 			waitingApprovalNode(),
 			stepNode("lint", ir.NodePartiallySucceeded),

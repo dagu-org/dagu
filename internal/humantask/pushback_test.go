@@ -406,6 +406,7 @@ func TestPushBackResumeGate(t *testing.T) {
 					stepNode("lint", ir.NodePartiallySucceeded, "setup"),
 				)
 			},
+			queued: true,
 		},
 		{
 			name: "rewind target with build inputs while another task waits",

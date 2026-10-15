@@ -4011,7 +4011,7 @@ func (a *API) resumeWaitingDAGRun(ctx context.Context, ref ir.DAGRunRef, status 
 	if group == "" {
 		group = dag.ProcGroup()
 	}
-	opts := queue.EnqueueRetryOptions{Processes: a.procRepository}
+	opts := queue.EnqueueRetryOptions{Processes: a.procRepository, Resume: true}
 	if actor := triggerActorFromContext(ctx); actor != "" {
 		opts.TriggerActor = &actor
 	}

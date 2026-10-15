@@ -697,6 +697,7 @@ func TestManualResumeLaunchFailure(t *testing.T) {
 			latest, err := attempt.ReadStatusUncached(t.Context())
 			require.NoError(t, err)
 			assert.Equal(t, status.Nodes, latest.Nodes)
+			assert.False(t, latest.Resume)
 			// A failed launch must leave the checkpoint available for admission.
 			admission, err := queue.PrepareRetry(t.Context(), repository, dag, latest, queue.EnqueueRetryOptions{})
 			require.NoError(t, err)
@@ -737,6 +738,7 @@ func TestManualResumeDispatch(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				assert.Equal(t, ir.Queued, status.Status)
+				assert.True(t, status.Resume)
 				require.NoError(t, a.resumeWaitingDAGRun(t.Context(), status.DAGRun(), before))
 				assert.Len(t, recorder.dispatched, 1)
 			}
@@ -1804,12 +1806,14 @@ func TestAgentResumeQueue(t *testing.T) {
 				assert.Empty(t, f.recorder.dispatched)
 			} else if tt.direct {
 				assert.Equal(t, ir.Queued, status.Status)
+				assert.True(t, f.recorder.dispatched[0].PreviousStatus.Resume)
 				assert.Empty(t, items)
 				require.Len(t, f.recorder.dispatched, 1)
 				assert.Equal(t, ir.Queued, f.recorder.dispatched[0].PreviousStatus.Status)
 			} else {
 				assert.Empty(t, f.recorder.dispatched)
 				assert.Equal(t, ir.Queued, status.Status)
+				assert.True(t, status.Resume)
 				require.Len(t, items, 1)
 				ref, err := items[0].Data()
 				require.NoError(t, err)

@@ -11,6 +11,7 @@ import (
 	"github.com/dagucloud/dagu/v2/internal/ir"
 	"github.com/dagucloud/dagu/v2/internal/runtime"
 	agent "github.com/dagucloud/dagu/v2/internal/runtime/agent"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -143,4 +144,27 @@ func TestRetryPlanReopensResetHumanTaskFromTemplate(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, sourceStep.HumanTask, nodes[0].Step().HumanTask)
+}
+
+func TestRetryPlanForwardsResumeIntent(t *testing.T) {
+	t.Parallel()
+
+	dag := &ir.DAG{Steps: []ir.Step{
+		{Name: "partial"},
+		{Name: "review", Depends: []string{"partial"}, HumanTask: &ir.HumanTaskConfig{Prompt: "Review"}},
+		{Name: "after", Depends: []string{"review"}},
+	}}
+	status := &ir.DAGRunStatus{
+		Resume: true,
+		Nodes: []*ir.Node{
+			{Step: ir.Step{Name: "partial"}, Status: ir.NodePartiallySucceeded},
+			{Step: ir.Step{Name: "review", Depends: []string{"partial"}, HumanTask: dag.Steps[1].HumanTask}, Status: ir.NodeSucceeded, HumanTaskInput: []byte(`{}`)},
+			{Step: ir.Step{Name: "after", Depends: []string{"review"}}, Status: ir.NodeNotStarted},
+		},
+	}
+	plan, err := agent.RetryPlanForTest(dag, status)
+	require.NoError(t, err)
+	assert.Equal(t, ir.NodePartiallySucceeded, plan.GetNodeByName("partial").State().Status)
+	assert.Equal(t, ir.NodeSucceeded, plan.GetNodeByName("review").State().Status)
+	assert.Equal(t, ir.NodeNotStarted, plan.GetNodeByName("after").State().Status)
 }

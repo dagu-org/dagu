@@ -170,6 +170,40 @@ func TestRetryPlan(t *testing.T) {
 	require.Equal(t, ir.NodeSucceeded, nodes[11].State().Status)
 }
 
+// Checkpoint resume preserves partial work, human completion, and approval
+// inputs, while leaving downstream work eligible and explicit retry behavior unchanged.
+func TestRetryPlanResume(t *testing.T) {
+	dag := &ir.DAG{Steps: []ir.Step{
+		{Name: "partial"},
+		{Name: "review", Depends: []string{"partial"}, HumanTask: &ir.HumanTaskConfig{Prompt: "Review"}},
+		{Name: "approve", Depends: []string{"partial"}, Approval: &ir.ApprovalConfig{}},
+		{Name: "after", Depends: []string{"review", "approve"}},
+		{Name: "independent"},
+	}}
+	partial := makeNode("partial", ir.NodePartiallySucceeded)
+	review := runtime.NodeWithData(runtime.NodeData{
+		Step:  ir.Step{Name: "review", Depends: []string{"partial"}, HumanTask: &ir.HumanTaskConfig{Prompt: "Review"}},
+		State: runtime.NodeState{Status: ir.NodeSucceeded, HumanTaskInput: []byte(`{}`)},
+	})
+	approve := runtime.NodeWithData(runtime.NodeData{
+		Step: ir.Step{Name: "approve", Depends: []string{"partial"}, Approval: &ir.ApprovalConfig{}},
+		State: runtime.NodeState{
+			Status:         ir.NodeSucceeded,
+			ApprovalInputs: map[string]string{"environment": "production"},
+		},
+	})
+	after := makeNode("after", ir.NodeNotStarted, "review", "approve")
+	independent := makeNode("independent", ir.NodeSucceeded)
+
+	plan, err := runtime.CreateRetryPlanWithOptions(context.Background(), dag, runtime.RetryPlanOptions{Resume: true}, partial, review, approve, after, independent)
+	require.NoError(t, err)
+	require.Equal(t, ir.NodePartiallySucceeded, partial.State().Status)
+	require.Equal(t, ir.NodeSucceeded, review.State().Status)
+	require.Equal(t, map[string]string{"environment": "production"}, plan.GetNodeByName("approve").State().ApprovalInputs)
+	require.Equal(t, ir.NodeNotStarted, after.State().Status)
+	require.Equal(t, ir.NodeSucceeded, independent.State().Status)
+}
+
 func TestRetryPlanWithRejectedNode(t *testing.T) {
 	ctx := context.Background()
 	dag := &ir.DAG{Steps: []ir.Step{

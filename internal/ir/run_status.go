@@ -160,17 +160,20 @@ func sortDAGRunConditions(conditions []DAGRunCondition) {
 
 // DAGRunStatus represents the complete execution state of a dag-run.
 type DAGRunStatus struct {
-	Root           DAGRunRef              `json:"root,omitzero"`
-	Parent         DAGRunRef              `json:"parent,omitzero"`
-	Name           string                 `json:"name"`
-	DAGRunID       string                 `json:"dagRunId"`
-	AttemptID      string                 `json:"attemptId"`
-	AttemptKey     string                 `json:"attemptKey,omitempty"` // Globally unique attempt identifier
-	ClaimKey       string                 `json:"claimKey,omitempty"`   // Worker claim that executes this attempt
-	Status         Status                 `json:"status"`
-	Conditions     []DAGRunCondition      `json:"conditions,omitempty"`
-	TriggerType    TriggerType            `json:"triggerType,omitempty"`
-	TriggerActor   string                 `json:"triggerActor,omitempty"`
+	Root         DAGRunRef         `json:"root,omitzero"`
+	Parent       DAGRunRef         `json:"parent,omitzero"`
+	Name         string            `json:"name"`
+	DAGRunID     string            `json:"dagRunId"`
+	AttemptID    string            `json:"attemptId"`
+	AttemptKey   string            `json:"attemptKey,omitempty"` // Globally unique attempt identifier
+	ClaimKey     string            `json:"claimKey,omitempty"`   // Worker claim that executes this attempt
+	Status       Status            `json:"status"`
+	Conditions   []DAGRunCondition `json:"conditions,omitempty"`
+	TriggerType  TriggerType       `json:"triggerType,omitempty"`
+	TriggerActor string            `json:"triggerActor,omitempty"`
+	// Resume marks a queued checkpoint resume. It is consumed by the next
+	// attempt so ordinary explicit retries keep their normal reset semantics.
+	Resume         bool                   `json:"resume,omitempty"`
 	WorkerID       string                 `json:"workerId,omitempty"`
 	PID            PID                    `json:"pid,omitempty"`
 	PIDStartedAt   int64                  `json:"pidStartedAt,omitempty"`
