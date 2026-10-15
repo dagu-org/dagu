@@ -92,6 +92,11 @@ type dirLock struct {
 	isHeld     bool
 	fenceToken string // unique token written at acquire time
 	mu         sync.Mutex
+
+	// afterStaleObserved is a test seam. When set, TryLock calls it after it
+	// has observed a stale lock and before it starts replacing it, so tests
+	// can interleave another contender at that point.
+	afterStaleObserved func()
 }
 
 var _ DirLock = (*dirLock)(nil)
@@ -173,36 +178,52 @@ func (l *dirLock) TryLock() error {
 	info, err := os.Stat(l.lockPath)
 	if err == nil {
 		// Lock exists, check if it's stale
-		if l.isStaleInfo(info) {
-			// This is detection-based, not prevention-based: two contenders may
-			// both observe a stale lock and one cleanup can race with the
-			// other's new lock creation. The fence token lets us detect ownership
-			// loss on the next Heartbeat/IsHeldByMe check and self-fence safely.
-			// Remove stale lock
-			if err := removeLockDir(l.lockPath); err != nil && !os.IsNotExist(err) {
-				if isRetryableLockStateError(err) {
-					return ErrLockConflict
-				}
-				return fmt.Errorf("failed to remove stale lock: %w", err)
-			}
-		} else {
+		if !l.isStaleInfo(info) {
 			// Lock is held by another process
 			return ErrLockConflict
 		}
-	} else if !os.IsNotExist(err) {
+		return l.takeOverStaleLock()
+	}
+	if !os.IsNotExist(err) {
 		if isRetryableLockStateError(err) {
 			return ErrLockConflict
 		}
 		return fmt.Errorf("failed to check lock status: %w", err)
 	}
+	return l.createLock()
+}
 
+// takeOverStaleLock replaces the stale lock TryLock just observed with a lock
+// owned by this instance. The caller must hold l.mu.
+func (l *dirLock) takeOverStaleLock() error {
+	if l.afterStaleObserved != nil {
+		l.afterStaleObserved()
+	}
+
+	// This is detection-based, not prevention-based: two contenders may
+	// both observe a stale lock and one cleanup can race with the
+	// other's new lock creation. The fence token lets us detect ownership
+	// loss on the next Heartbeat/IsHeldByMe check and self-fence safely.
+	// Remove stale lock
+	if err := removeLockDir(l.lockPath); err != nil && !os.IsNotExist(err) {
+		if isRetryableLockStateError(err) {
+			return ErrLockConflict
+		}
+		return fmt.Errorf("failed to remove stale lock: %w", err)
+	}
+	return l.createLock()
+}
+
+// createLock creates the lock directory and writes this instance's fence
+// token into it. The caller must hold l.mu.
+func (l *dirLock) createLock() error {
 	// Ensure the target directory exists
 	if err := fileutil.MkdirAll(l.targetDir, 0750); err != nil {
 		return fmt.Errorf("failed to create target directory: %w", err)
 	}
 
 	// Try to create the lock directory
-	err = os.Mkdir(l.lockPath, 0700)
+	err := os.Mkdir(l.lockPath, 0700)
 	if err != nil {
 		if os.IsExist(err) || isRetryableLockStateError(err) {
 			return ErrLockConflict
