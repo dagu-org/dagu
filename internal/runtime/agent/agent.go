@@ -1506,6 +1506,27 @@ func (a *Agent) buildOutputs(ctx context.Context, finalStatus ir.Status) *ir.DAG
 	}
 }
 
+// DryRunChecks returns the problems a dry run recorded, in plan order.
+// The slice is empty when the run recorded none.
+func (a *Agent) DryRunChecks() []runtime.DryRunCheck {
+	a.lock.RLock()
+	runner := a.runner
+	plan := a.plan
+	a.lock.RUnlock()
+
+	var checks []runtime.DryRunCheck
+	if runner != nil {
+		checks = runner.DryRunChecks()
+	}
+	var order []string
+	if plan != nil {
+		for _, node := range plan.Nodes() {
+			order = append(order, node.Name())
+		}
+	}
+	return runtime.OrderDryRunChecks(order, checks)
+}
+
 func (a *Agent) PrintSummary(ctx context.Context) {
 	// Always print tree-structured summary after execution
 	status := a.Status(ctx)

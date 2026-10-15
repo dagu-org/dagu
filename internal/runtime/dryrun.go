@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/dagucloud/dagu/v2/internal/cmn/cmdutil"
@@ -20,14 +21,128 @@ import (
 	dagutools "github.com/dagucloud/dagu/v2/internal/tools"
 )
 
-// warnDryRunStep logs the checkDryRunStep result as a warning. A missing
-// executable never fails a dry run: the real run may execute on another host
-// (a distributed worker, a server rather than a CI checkout), and an upstream
-// step may create or install the executable first.
-func warnDryRunStep(ctx context.Context, node *Node) {
-	if err := checkDryRunStep(ctx, node.Step()); err != nil {
-		logger.Warn(ctx, "Dry run: step may fail on this host", tag.Error(err))
+// DryRunCheck is one problem a dry run can show for a step. Field is the
+// step field the problem concerns, such as "with.sheet" or "run", and
+// Message is the text after that field label.
+type DryRunCheck struct {
+	Step    string `json:"step"`
+	Field   string `json:"field"`
+	Message string `json:"message"`
+}
+
+// noteDryRunStep logs the checkDryRunStep result as a warning and keeps it
+// for a machine-readable report. A missing executable never fails a dry run:
+// the real run may execute on another host (a distributed worker, a server
+// rather than a CI checkout), and an upstream step may create or install the
+// executable first.
+func (r *Runner) noteDryRunStep(ctx context.Context, node *Node) {
+	err := checkDryRunStep(ctx, node.Step())
+	if err == nil {
+		return
 	}
+	logger.Warn(ctx, "Dry run: step may fail on this host", tag.Error(err))
+	r.mu.Lock()
+	r.dryChecks = append(r.dryChecks, dryRunChecksFor(node.Name(), err)...)
+	r.mu.Unlock()
+}
+
+// DryRunChecks returns the problems recorded for this dry run, in the order
+// they were recorded. The slice is empty when every step passed.
+func (r *Runner) DryRunChecks() []DryRunCheck {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if len(r.dryChecks) == 0 {
+		return []DryRunCheck{}
+	}
+	out := make([]DryRunCheck, len(r.dryChecks))
+	copy(out, r.dryChecks)
+	return out
+}
+
+// OrderDryRunChecks returns checks in stepOrder. Problems for one step stay
+// in the order they were reported. A step that is not in stepOrder follows
+// the named steps, in the order it was recorded.
+func OrderDryRunChecks(stepOrder []string, checks []DryRunCheck) []DryRunCheck {
+	if len(checks) == 0 {
+		return []DryRunCheck{}
+	}
+	rank := make(map[string]int, len(stepOrder))
+	for i, name := range stepOrder {
+		if _, seen := rank[name]; !seen {
+			rank[name] = i
+		}
+	}
+	type ordered struct {
+		rank  int
+		index int
+		check DryRunCheck
+	}
+	items := make([]ordered, len(checks))
+	seen := make(map[string]int, len(checks))
+	next := len(stepOrder)
+	for i, check := range checks {
+		place, ok := rank[check.Step]
+		if !ok {
+			place = next
+			next++
+			rank[check.Step] = place
+		}
+		index := seen[check.Step]
+		seen[check.Step]++
+		items[i] = ordered{rank: place, index: index, check: check}
+	}
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].rank != items[j].rank {
+			return items[i].rank < items[j].rank
+		}
+		return items[i].index < items[j].index
+	})
+	out := make([]DryRunCheck, len(items))
+	for i, item := range items {
+		out[i] = item.check
+	}
+	return out
+}
+
+// dryRunChecksFor splits a joined check error into one check per problem.
+// Each problem is reported as field '<name>': <message>.
+func dryRunChecksFor(step string, err error) []DryRunCheck {
+	flat := flattenJoined(err)
+	checks := make([]DryRunCheck, 0, len(flat))
+	for _, item := range flat {
+		field, message := splitDryRunField(item.Error())
+		checks = append(checks, DryRunCheck{Step: step, Field: field, Message: message})
+	}
+	return checks
+}
+
+func flattenJoined(err error) []error {
+	if err == nil {
+		return nil
+	}
+	type joined interface{ Unwrap() []error }
+	group, ok := err.(joined)
+	if !ok {
+		return []error{err}
+	}
+	var out []error
+	for _, item := range group.Unwrap() {
+		out = append(out, flattenJoined(item)...)
+	}
+	return out
+}
+
+func splitDryRunField(message string) (string, string) {
+	const prefix = "field '"
+	if !strings.HasPrefix(message, prefix) {
+		return "", message
+	}
+	rest := message[len(prefix):]
+	field, text, ok := strings.Cut(rest, "': ")
+	if !ok {
+		return "", message
+	}
+	return field, text
 }
 
 // checkDryRunStep reports what a dry run can tell would fail if the step ran

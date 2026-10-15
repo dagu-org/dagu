@@ -61,6 +61,12 @@ var (
 		usage:  "Recompute build steps instead of reusing prior materializations",
 		isBool: true,
 	}
+
+	dryFormatFlag = commandLineFlag{
+		name:         "format",
+		defaultValue: "text",
+		usage:        "Output format for dry-run checks: text (default) or json",
+	}
 )
 
 // Server and directory flags
