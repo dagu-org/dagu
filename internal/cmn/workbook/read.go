@@ -6,7 +6,6 @@ package workbook
 import (
 	"context"
 	"fmt"
-	"io"
 	"strings"
 )
 
@@ -75,10 +74,10 @@ func Read(ctx context.Context, path string, opts ReadOptions) (*ReadResult, erro
 	return w.read(ctx, opts)
 }
 
-// ReadReader reads a workbook supplied by a reader. Path is used only as the
+// ReadBytes reads a workbook supplied as bytes. Path is used only as the
 // result and error label, so callers can report stdin as "-".
-func ReadReader(ctx context.Context, path string, r io.Reader, opts ReadOptions) (*ReadResult, error) {
-	w, err := openReader(path, r, opts.Password)
+func ReadBytes(ctx context.Context, path string, data []byte, opts ReadOptions) (*ReadResult, error) {
+	w, err := openBytes(path, data, opts.Password)
 	if err != nil {
 		return nil, err
 	}

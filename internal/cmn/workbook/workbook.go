@@ -160,14 +160,9 @@ func open(path, password string) (*file, error) {
 	return w, nil
 }
 
-// openReader opens a workbook from a bounded in-memory stream. The caller
-// owns the stream limit; keeping the path label preserves the file error
-// messages and the inspect result for stdin.
-func openReader(path string, r io.Reader, password string) (*file, error) {
-	b, err := io.ReadAll(r)
-	if err != nil {
-		return nil, fmt.Errorf("%s: %w", filepath.Base(path), err)
-	}
+// openBytes opens a workbook from bounded in-memory bytes. Keeping the path
+// label preserves the file error messages and the inspect result for stdin.
+func openBytes(path string, b []byte, password string) (*file, error) {
 	f, err := excelize.OpenReader(bytes.NewReader(b), excelize.Options{Password: password})
 	if err != nil {
 		if decryptFailed(err) {

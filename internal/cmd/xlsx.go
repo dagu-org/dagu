@@ -4,7 +4,6 @@
 package cmd
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -194,7 +193,7 @@ func runXlsxInspect(cmd *cobra.Command, args []string) error {
 		if readErr != nil {
 			return readErr
 		}
-		info, err = workbook.InspectReader(cmd.Context(), "-", bytes.NewReader(data), opts)
+		info, err = workbook.InspectBytes(cmd.Context(), "-", data, opts)
 	} else {
 		path, pathErr := xlsxPath(args[0])
 		if pathErr != nil {
@@ -239,7 +238,7 @@ func runXlsxRead(cmd *cobra.Command, args []string) error {
 		if readErr != nil {
 			return readErr
 		}
-		result, err = workbook.ReadReader(cmd.Context(), "-", bytes.NewReader(data), opts)
+		result, err = workbook.ReadBytes(cmd.Context(), "-", data, opts)
 	} else {
 		path, pathErr := xlsxPath(args[0])
 		if pathErr != nil {

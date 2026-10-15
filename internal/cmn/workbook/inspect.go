@@ -6,7 +6,6 @@ package workbook
 import (
 	"context"
 	"fmt"
-	"io"
 	"path/filepath"
 	"strings"
 )
@@ -132,10 +131,10 @@ func Inspect(ctx context.Context, path string, opts InspectOptions) (*Info, erro
 	return inspect(ctx, w, opts)
 }
 
-// InspectReader describes a workbook supplied by a reader. Path is used only
-// as the result and error label, so callers can report stdin as "-".
-func InspectReader(ctx context.Context, path string, r io.Reader, opts InspectOptions) (*Info, error) {
-	w, err := openReader(path, r, opts.Password)
+// InspectBytes describes a workbook supplied as bytes. Path is used only as
+// the result and error label, so callers can report stdin as "-".
+func InspectBytes(ctx context.Context, path string, data []byte, opts InspectOptions) (*Info, error) {
+	w, err := openBytes(path, data, opts.Password)
 	if err != nil {
 		return nil, err
 	}
