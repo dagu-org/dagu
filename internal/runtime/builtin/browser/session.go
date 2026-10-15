@@ -762,7 +762,11 @@ func (s *Sessions) Do(ctx context.Context, req DoRequest) (DoResult, error) {
 		}
 	}
 	view, pageURL := s.view(ctx, eng, masker, req.OutlineChars, &warnings)
-	refused := pageRefusal(ctx, operator, state.Page, pageURL)
+	// Reading a browser that stopped answering would only wait for it again.
+	var refused *refusal
+	if !errors.Is(opErr, errBrowserUnresponsive) {
+		refused = pageRefusal(ctx, operator, state.Page, pageURL)
+	}
 	if refused != nil && result.Error != nil {
 		note := masker.MaskString(refused.String())
 		result.Error.Message += "; " + note
