@@ -48,6 +48,8 @@ type testRun struct {
 	hostTrustedCAs   []cmnconfig.BrowserTrustedCA
 	// hostGuard is the host config's guard_client_certificates.
 	hostGuard *bool
+	// noModel runs the step without an llm block.
+	noModel bool
 }
 
 func newTestRun(t *testing.T, answer func(*llmpkg.ChatRequest) (string, error)) *testRun {
@@ -80,6 +82,9 @@ func (r *testRun) execute(withJSON string, session *ir.AgentSession) *stepExecut
 		Name:           "shop",
 		ExecutorConfig: ir.ExecutorConfig{Type: executorType, Config: with},
 		LLM:            &ir.LLMConfig{Provider: "openai", Model: "test-model"},
+	}
+	if r.noModel {
+		step.LLM = nil
 	}
 	created, err := newExecutor(r.t.Context(), step)
 	require.NoError(r.t, err)
@@ -417,6 +422,126 @@ func TestReplayCacheCanBeDisabled(t *testing.T) {
 
 	assert.Empty(t, run.engine.replays)
 	assert.Len(t, run.engine.acts, 2)
+}
+
+// operationVias returns the kind and via of each operation event, such as
+// act:element.
+func operationVias(session *ir.AgentSession) []string {
+	vias := make([]string, 0, len(session.Events))
+	for _, event := range session.Events {
+		if event.Type == agentstep.EventOperation {
+			vias = append(vias, event.Name+":"+event.Via)
+		}
+	}
+	return vias
+}
+
+// cacheFile returns the contents of the shop step's replay cache.
+func (r *testRun) cacheFile() string {
+	r.t.Helper()
+	data, err := os.ReadFile(replaycache.New(filepath.Join(r.dataDir, browserhost.DataDirName)).Path("orders", "shop"))
+	require.NoError(r.t, err)
+	return string(data)
+}
+
+// Under ai: never, a recorded act replays with no model configured, and the
+// timeline says each operation ran without one.
+func TestNeverReplaysWithoutModel(t *testing.T) {
+	t.Parallel()
+
+	run := newTestRun(t, pageModel(nil))
+	run.engine.pageText = "Order placed"
+	require.NoError(t, run.execute(`{"url": "https://shop.example.com/cart", "do": [{"act": "Click the checkout button"}]}`, nil).err)
+	modelCalls := run.provider.callCount()
+
+	run.noModel = true
+	replayed := run.execute(`{"url": "https://shop.example.com/cart", "ai": "never", "do": [
+		{"act": "Click the checkout button"},
+		{"expect": {"text": "Order placed"}},
+		{"screenshot": "placed"}
+	]}`, nil)
+	require.NoError(t, replayed.err)
+
+	assert.Equal(t, modelCalls, run.provider.callCount(), "no model call")
+	assert.Len(t, run.engine.actInstructions(), 1, "the browser runtime does not act")
+	session := replayed.exec.GetAgentSession()
+	assert.Equal(t, []string{"goto:completed", "act:cache-hit", "expect:completed", "screenshot:completed"}, eventNames(session))
+	assert.Equal(t, []string{"goto:", "act:element", "expect:exact", "screenshot:"}, operationVias(session))
+	assert.Zero(t, session.Usage.TotalTokens)
+}
+
+// An act under ai: never with nothing recorded fails without asking the
+// model, and the step's other recordings stay.
+func TestNeverWithoutRecordingFails(t *testing.T) {
+	t.Parallel()
+
+	run := newTestRun(t, pageModel(nil))
+	require.NoError(t, run.execute(`{"url": "https://shop.example.com/cart", "do": [{"act": "Click the checkout button"}]}`, nil).err)
+	cache := run.cacheFile()
+	modelCalls := run.provider.callCount()
+
+	run.noModel = true
+	failed := run.execute(`{"url": "https://shop.example.com/cart", "ai": "never", "do": [
+		{"act": "Click the checkout button"},
+		{"act": "Accept the terms"}
+	]}`, nil)
+
+	require.ErrorContains(t, failed.err, "do[1] act failed: the act cannot run without AI: there is no recording of it on this host")
+	assert.Equal(t, modelCalls, run.provider.callCount())
+	assert.Len(t, run.engine.actInstructions(), 1)
+	assert.Equal(t, cache, run.cacheFile(), "the replayed recording is kept")
+}
+
+// A replay that misses under ai: never fails the step and keeps the
+// recording, so a run that lets the model repair it starts from it.
+func TestNeverReplayMissKeepsRecording(t *testing.T) {
+	t.Parallel()
+
+	const steps = `{"url": "https://shop.example.com/cart", "ai": "never", "do": [{"act": "Click the checkout button"}]}`
+	run := newTestRun(t, pageModel(nil))
+	require.NoError(t, run.execute(`{"url": "https://shop.example.com/cart", "do": [{"act": "Click the checkout button"}]}`, nil).err)
+	modelCalls := run.provider.callCount()
+
+	run.noModel = true
+	run.engine.replayFails = true
+	missed := run.execute(steps, nil)
+	require.ErrorContains(t, missed.err, "do[0] act failed: the act cannot run without AI: "+
+		"recorded action 1 of 1, click xpath=/html/body/button, did not replay")
+	assert.Equal(t, modelCalls, run.provider.callCount())
+	assert.Len(t, run.engine.actInstructions(), 1, "the browser runtime does not act")
+
+	run.engine.replayFails = false
+	again := run.execute(steps, nil)
+	require.NoError(t, again.err)
+	assert.Equal(t, []string{"goto:completed", "act:cache-hit"}, eventNames(again.exec.GetAgentSession()))
+}
+
+// Under ai: every_run the model acts on every run, and what it did is still
+// recorded, so a later switch to never replays it.
+func TestEveryRunRecordsForLaterReplay(t *testing.T) {
+	t.Parallel()
+
+	const steps = `{"url": "https://shop.example.com/cart", "ai": "every_run", "do": [{"act": "Click the checkout button"}]}`
+	run := newTestRun(t, pageModel(nil))
+	require.NoError(t, run.execute(steps, nil).err)
+	second := run.execute(steps, nil)
+	require.NoError(t, second.err)
+	assert.Empty(t, run.engine.replays)
+	assert.Len(t, run.engine.actInstructions(), 2)
+	assert.Equal(t, []string{"goto:", "act:model"}, operationVias(second.exec.GetAgentSession()))
+
+	run.noModel = true
+	replayed := run.execute(strings.Replace(steps, "every_run", "never", 1), nil)
+	require.NoError(t, replayed.err)
+	assert.Equal(t, []string{"goto:completed", "act:cache-hit"}, eventNames(replayed.exec.GetAgentSession()))
+}
+
+// Kitewell computes this key too; change both.
+func TestReplayKeyIsStable(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "b7906f2d843adb04cdc0ff580f334a9ce280ec5e6a71aad6291d7b3ad2baab69",
+		replayKey(0, "Click the Sign in button", "http://127.0.0.1:19742/login?x=1#f"))
 }
 
 // A step's recordings are kept only when the step succeeds, and a replay the

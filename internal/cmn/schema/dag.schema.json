@@ -7554,10 +7554,11 @@
           "items": { "$ref": "#/definitions/browserOperation" },
           "description": "Operations run in order in one browser session."
         },
+        "ai": { "$ref": "#/definitions/browserAI" },
         "cache": {
           "type": "boolean",
           "default": true,
-          "description": "Record the act and upload operations of a step that succeeds and replay them on later runs without a model call."
+          "description": "Set false to ask the model every run, the same as ai: every_run. Set ai or cache, not both."
         },
         "llm": {
           "$ref": "#/definitions/standardLLMConfig",
@@ -7567,6 +7568,12 @@
         "variables": { "$ref": "#/definitions/browserVariables" }
       },
       "description": "Configuration for action: browser.run. Extract operations publish their schema fields as step outputs."
+    },
+    "browserAI": {
+      "type": "string",
+      "enum": ["every_run", "on_miss", "never"],
+      "default": "on_miss",
+      "description": "How much the model decides for act operations and uploads with into: every_run asks it every run; on_miss replays the acts and uploads of a step that succeeded while the page shows their elements and lets the model repair a replay that fails; never replays only, fails the step when there is no recording or a replay fails, and needs no llm when nothing in the step can call the model. A step under never refuses extract and statement conditions."
     },
     "browserOptions": {
       "type": "object",
@@ -7746,9 +7753,13 @@
               "required": ["instruction"],
               "properties": {
                 "instruction": { "type": "string", "minLength": 1 },
+                "ai": {
+                  "$ref": "#/definitions/browserAI",
+                  "description": "How much the model decides for this act, in place of with.ai."
+                },
                 "cache": {
                   "type": "boolean",
-                  "description": "Set false to disable the replay cache for this operation. Has no effect when with.cache is false."
+                  "description": "Set false to ask the model every run for this act, the same as ai: every_run. Set ai or cache, not both."
                 }
               }
             }
@@ -7776,9 +7787,13 @@
               "minLength": 1,
               "description": "The file input, or the button or drop area that opens the file picker, in plain words. The model finds it once and later runs replay it. Leave it out when the page has only one file input."
             },
+            "ai": {
+              "$ref": "#/definitions/browserAI",
+              "description": "How much the model decides for finding into, in place of with.ai."
+            },
             "cache": {
               "type": "boolean",
-              "description": "Set false to disable the replay cache for this operation. Has no effect when with.cache is false."
+              "description": "Set false to ask the model every run for into, the same as ai: every_run. Set ai or cache, not both."
             }
           },
           "description": "Give local files to a file input of the page. The model sees the into text and the page, never the files."

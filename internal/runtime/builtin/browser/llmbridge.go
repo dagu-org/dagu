@@ -18,6 +18,9 @@ import (
 	"github.com/dagucloud/dagu/v2/internal/runtime/builtin/internal/agentstep"
 )
 
+// errNoStepModel answers a model request of a step that has no model.
+var errNoStepModel = errors.New("the step has no model: set llm at the DAG level or with.llm on the step")
+
 // providerFactory builds a provider for one resolved model configuration.
 type providerFactory func(ctx context.Context, cfg *ir.LLMConfig) (llmpkg.Provider, error)
 
@@ -41,8 +44,11 @@ type modelBridge struct {
 // newModelBridge resolves every configured model against the step's
 // runtime environment. Provider settings such as base_url and API keys are
 // resolved here because the browser runtime's callbacks carry no step
-// environment.
+// environment. Without a configuration, every request fails.
 func newModelBridge(ctx context.Context, cfg *ir.LLMConfig, masker *masking.Masker, factory providerFactory) (*modelBridge, error) {
+	if cfg == nil {
+		return &modelBridge{masker: masker, runCtx: ctx}, nil
+	}
 	models, err := runtime.ResolveModels(ctx, cfg.GetModels())
 	if err != nil {
 		return nil, err
@@ -97,6 +103,12 @@ func (b *modelBridge) modelName() string {
 }
 
 func (b *modelBridge) generate(ctx context.Context, req generateRequest) (generateResponse, error) {
+	if len(b.models) == 0 {
+		b.mu.Lock()
+		b.failed = true
+		b.mu.Unlock()
+		return generateResponse{}, errNoStepModel
+	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	stop := context.AfterFunc(b.runCtx, cancel)

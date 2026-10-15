@@ -111,6 +111,32 @@ func TestUploadCacheCanBeDisabled(t *testing.T) {
 	assert.Equal(t, 2, run.provider.callCount())
 }
 
+// Under ai: never, an upload into a recorded element runs with no model
+// configured, and one whose element is no longer on the page fails the step
+// without asking for it.
+func TestUploadUnderNeverReplaysWithoutModel(t *testing.T) {
+	t.Parallel()
+
+	files := writeFiles(t, t.TempDir(), "invoice.pdf")
+	run := newTestRun(t, pageModel(nil))
+	run.engine.snapshot = uploadPage("Upload receipt")
+	require.NoError(t, run.execute(uploadSteps(t, map[string]any{"files": files[0], "into": "the Upload receipt button"}), nil).err)
+
+	run.noModel = true
+	steps := uploadSteps(t, map[string]any{"files": files[0], "into": "the Upload receipt button", "ai": "never"})
+	replayed := run.execute(steps, nil)
+	require.NoError(t, replayed.err)
+	assert.Equal(t, 1, run.provider.callCount(), "a replay makes no model call")
+	assert.Equal(t, []string{"goto:", "upload:element"}, operationVias(replayed.exec.GetAgentSession()))
+
+	run.engine.snapshot = uploadPage("Delete receipt")
+	missed := run.execute(steps, nil)
+	require.ErrorContains(t, missed.err, "do[0] upload failed: the upload cannot run without AI: "+
+		"its recorded element xpath=/html/body/button is gone or no longer the one recorded")
+	assert.Equal(t, 1, run.provider.callCount())
+	assert.Len(t, run.engine.uploaded(), 2, "the missed upload gives no file")
+}
+
 // An upload that fails on the page fails the step with the reason, and the
 // recording it replayed is dropped.
 func TestUploadFailureFailsTheStep(t *testing.T) {
