@@ -2535,7 +2535,7 @@ func (a *Agent) setupStepRetryPlan(nodes []*runtime.Node) (*runtime.Plan, error)
 // setupDefaultRetryPlan sets up the plan for the default retry behavior (all failed/canceled nodes and downstreams).
 func (a *Agent) setupDefaultRetryPlan(ctx context.Context, nodes []*runtime.Node) (*runtime.Plan, error) {
 	plan, err := runtime.CreateRetryPlanWithOptions(ctx, a.dag, runtime.RetryPlanOptions{
-		Resume: a.retryTarget != nil && a.retryTarget.Resume,
+		Resume: a.retryTarget != nil && a.retryTarget.Status == ir.Queued && a.retryTarget.Resume,
 	}, nodes...)
 	if err != nil {
 		return nil, err

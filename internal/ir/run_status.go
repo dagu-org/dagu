@@ -171,8 +171,8 @@ type DAGRunStatus struct {
 	Conditions   []DAGRunCondition `json:"conditions,omitempty"`
 	TriggerType  TriggerType       `json:"triggerType,omitempty"`
 	TriggerActor string            `json:"triggerActor,omitempty"`
-	// Resume marks a queued checkpoint resume. It is consumed by the next
-	// attempt so ordinary explicit retries keep their normal reset semantics.
+	// Resume marks a queued checkpoint resume. Retry planning honors it only
+	// while the attempt is queued, so retries of finished runs reset as usual.
 	Resume         bool                   `json:"resume,omitempty"`
 	WorkerID       string                 `json:"workerId,omitempty"`
 	PID            PID                    `json:"pid,omitempty"`

@@ -146,7 +146,9 @@ func TestRetryPlanReopensResetHumanTaskFromTemplate(t *testing.T) {
 	require.Equal(t, sourceStep.HumanTask, nodes[0].Step().HumanTask)
 }
 
-func TestRetryPlanForwardsResumeIntent(t *testing.T) {
+// Resume intent applies only to a queued checkpoint. A flag left on a finished
+// run must not stop an explicit retry from rerunning partial work.
+func TestRetryPlanResumeIntent(t *testing.T) {
 	t.Parallel()
 
 	dag := &ir.DAG{Steps: []ir.Step{
@@ -154,17 +156,32 @@ func TestRetryPlanForwardsResumeIntent(t *testing.T) {
 		{Name: "review", Depends: []string{"partial"}, HumanTask: &ir.HumanTaskConfig{Prompt: "Review"}},
 		{Name: "after", Depends: []string{"review"}},
 	}}
-	status := &ir.DAGRunStatus{
-		Resume: true,
-		Nodes: []*ir.Node{
-			{Step: ir.Step{Name: "partial"}, Status: ir.NodePartiallySucceeded},
-			{Step: ir.Step{Name: "review", Depends: []string{"partial"}, HumanTask: dag.Steps[1].HumanTask}, Status: ir.NodeSucceeded, HumanTaskInput: []byte(`{}`)},
-			{Step: ir.Step{Name: "after", Depends: []string{"review"}}, Status: ir.NodeNotStarted},
-		},
+	for _, tt := range []struct {
+		name    string
+		status  ir.Status
+		partial ir.NodeStatus
+		review  ir.NodeStatus
+	}{
+		{name: "QueuedCheckpoint", status: ir.Queued, partial: ir.NodePartiallySucceeded, review: ir.NodeSucceeded},
+		{name: "FinishedRun", status: ir.Failed, partial: ir.NodeNotStarted, review: ir.NodeNotStarted},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			status := &ir.DAGRunStatus{
+				Status: tt.status,
+				Resume: true,
+				Nodes: []*ir.Node{
+					{Step: ir.Step{Name: "partial"}, Status: ir.NodePartiallySucceeded},
+					{Step: ir.Step{Name: "review", Depends: []string{"partial"}, HumanTask: dag.Steps[1].HumanTask}, Status: ir.NodeSucceeded, HumanTaskInput: []byte(`{}`)},
+					{Step: ir.Step{Name: "after", Depends: []string{"review"}}, Status: ir.NodeNotStarted},
+				},
+			}
+			plan, err := agent.RetryPlanForTest(dag, status)
+			require.NoError(t, err)
+			assert.Equal(t, tt.partial, plan.GetNodeByName("partial").State().Status)
+			assert.Equal(t, tt.review, plan.GetNodeByName("review").State().Status)
+			assert.Equal(t, ir.NodeNotStarted, plan.GetNodeByName("after").State().Status)
+		})
 	}
-	plan, err := agent.RetryPlanForTest(dag, status)
-	require.NoError(t, err)
-	assert.Equal(t, ir.NodePartiallySucceeded, plan.GetNodeByName("partial").State().Status)
-	assert.Equal(t, ir.NodeSucceeded, plan.GetNodeByName("review").State().Status)
-	assert.Equal(t, ir.NodeNotStarted, plan.GetNodeByName("after").State().Status)
 }
