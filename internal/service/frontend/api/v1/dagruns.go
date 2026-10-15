@@ -4057,7 +4057,7 @@ func (a *API) resumeSubDAGRun(ctx context.Context, rootRef ir.DAGRunRef, subDAGR
 	if status.Status == ir.Queued {
 		return nil
 	}
-	if status.Status != ir.Waiting {
+	if status.Status == ir.Running {
 		return fmt.Errorf("sub DAG-run is not waiting for resume (status: %s)", status.Status)
 	}
 

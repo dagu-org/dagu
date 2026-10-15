@@ -1823,6 +1823,24 @@ func TestAgentResumeQueue(t *testing.T) {
 	}
 }
 
+// A failed agent step in a finished child run offers a clean restart, which
+// must start a new attempt rather than require the child to be waiting.
+func TestAgentRestartFinishedChild(t *testing.T) {
+	f := newAgentResumeFixture(t, true, false)
+	f.status.Status = ir.Failed
+	f.status.Nodes = f.status.Nodes[:1]
+	agentNode := f.status.Nodes[0]
+	agentNode.Status = ir.NodeFailed
+	agentNode.AgentSession.State = ir.AgentSessionFailed
+	agentNode.AgentSession.Interactions = nil
+
+	_, err := f.api.restartAgentSession(t.Context(), f.root, f.subRunID, "agent")
+	require.NoError(t, err)
+	require.Len(t, f.recorder.dispatched, 1)
+	assert.Equal(t, ir.Queued, f.recorder.dispatched[0].PreviousStatus.Status)
+	assert.True(t, f.recorder.dispatched[0].PreviousStatus.Resume)
+}
+
 // Agent actions on a run that is still executing must leave it untouched: a
 // resume would start a second execution beside the running sibling step.
 func TestAgentActionWhileRunning(t *testing.T) {

@@ -130,7 +130,7 @@ func TestResumeSubDAGRunLaunchFailureRollsBackChild(t *testing.T) {
 	assert.False(t, latest.Resume)
 }
 
-func TestResumeSubDAGRunRequiresWaiting(t *testing.T) {
+func TestResumeSubDAGRunActiveChild(t *testing.T) {
 	for _, statusCode := range []ir.Status{ir.Running, ir.Queued} {
 		t.Run(statusCode.String(), func(t *testing.T) {
 			root := ir.NewDAGRunRef("root", "root-run")
