@@ -1272,6 +1272,8 @@ func TestStagehandTellsRefusedPages(t *testing.T) {
 	t.Parallel()
 
 	eng := launchBrowser(t, launchOptions{Generate: (&shopModel{}).generate})
+	// The check here never passes.
+	eng.(*stagehandEngine).botCheckWait = time.Second
 	site := serveRefusals(t)
 	host := urlHost(site)
 	for path, want := range map[string]refusal{
@@ -1288,6 +1290,42 @@ func TestStagehandTellsRefusedPages(t *testing.T) {
 		assert.Equal(t, want, refused, path)
 	}
 	require.NoError(t, eng.Goto(t.Context(), site, time.Minute))
+	page, err := eng.PageOutcome(t.Context())
+	require.NoError(t, err)
+	_, refused := refusalOf(page)
+	assert.False(t, refused, "%+v", page)
+}
+
+// serveCheckThatPasses serves a page behind a bot check that passes on its
+// own a moment after it loads, as one that needs no person does: it marks
+// the browser and loads the page again.
+func serveCheckThatPasses(t *testing.T) string {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		if _, err := r.Cookie("passed"); err == nil {
+			_, _ = io.WriteString(w, "<p>Welcome</p>")
+			return
+		}
+		w.Header().Set("Cf-Mitigated", "challenge")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = io.WriteString(w, `<title>Just a moment...</title><p>Checking your browser</p>
+<script>setTimeout(() => { document.cookie = "passed=1; path=/"; location.reload(); }, 1000);</script>`)
+	}))
+	t.Cleanup(server.Close)
+	return server.URL
+}
+
+// Going to a page behind a bot check that passes on its own returns once it
+// passed, so the next operation reads the page and not the check.
+func TestStagehandWaitsForBotCheckToPass(t *testing.T) {
+	t.Parallel()
+
+	eng := launchBrowser(t, launchOptions{Generate: (&shopModel{}).generate})
+	require.NoError(t, eng.Goto(t.Context(), serveCheckThatPasses(t), time.Minute))
+	text, err := eng.PageText(t.Context())
+	require.NoError(t, err)
+	assert.Contains(t, text, "Welcome")
 	page, err := eng.PageOutcome(t.Context())
 	require.NoError(t, err)
 	_, refused := refusalOf(page)

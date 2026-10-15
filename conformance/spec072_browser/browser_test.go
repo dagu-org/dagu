@@ -267,6 +267,21 @@ func startShop(t *testing.T) string {
 			_, _ = io.WriteString(w, `<title>Just a moment...</title><p>Checking your browser</p>`)
 			return
 		}
+		if r.URL.Path == "/passing" {
+			if _, err := r.Cookie("passed"); err == nil {
+				w.Header().Set("Content-Type", "text/html")
+				_, _ = io.WriteString(w, shopPage)
+				return
+			}
+			// A check that needs no person marks the browser and loads the
+			// page again.
+			w.Header().Set("Content-Type", "text/html")
+			w.Header().Set("Cf-Mitigated", "challenge")
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = io.WriteString(w, `<title>Just a moment...</title><p>Checking your browser</p>
+<script>setTimeout(() => { document.cookie = "passed=1; path=/"; location.reload(); }, 1000);</script>`)
+			return
+		}
 		if r.URL.Path == "/agent" {
 			sent, _ := json.Marshal(r.UserAgent())
 			w.Header().Set("Content-Type", "text/html")
@@ -455,6 +470,15 @@ func TestBrowserNamesBotCheck(t *testing.T) {
 	result := b.dagu.RunWithEnv(b.env, "start", "bot_check.yaml")
 	result.ExpectNonZeroExitCode()
 	result.ExpectStderrContains("answered with a Cloudflare bot check (HTTP 403) in place of the page")
+}
+
+// A bot check that passes on its own is waited out, so the step reads the
+// page it stood in for.
+func TestBrowserWaitsForBotCheckToPass(t *testing.T) {
+	t.Parallel()
+
+	b := newBrowserEnv(t)
+	b.dagu.RunWithEnv(b.env, "start", "bot_check_passes.yaml").ExpectExitCode(0)
 }
 
 // With the sandbox on, a browser step fails before starting a browser where

@@ -57,6 +57,11 @@ const (
 	settleQuiet   = 500 * time.Millisecond
 	settleTimeout = 5 * time.Second
 	settlePoll    = 100 * time.Millisecond
+	// botCheckWait bounds how long an action waits for a bot check the site
+	// answered with to pass. A check that needs no person passes within
+	// seconds by loading the page it stood in for, as it would for a
+	// person waiting in front of the window.
+	botCheckWait = 10 * time.Second
 	// headlessScreenWidth and headlessScreenHeight size the screen a browser
 	// without a window reports: a common desktop's, or its window's when
 	// that is larger. Chrome otherwise reports 800x600, smaller than its
@@ -411,6 +416,7 @@ func startEngine(ctx context.Context, browser *stagehand.Browser, cdpURL string,
 		sink:            sink,
 		handle:          browserHandle{CDPURL: cdpURL},
 		pageCallTimeout: pageCallTimeout,
+		botCheckWait:    botCheckWait,
 	}
 	// An unanswered dialog blocks its page, and the runtime does not answer
 	// dialogs itself.
@@ -457,6 +463,8 @@ type stagehandEngine struct {
 	blocked *browserhost.BlockedRequestWatcher
 	// pageCallTimeout bounds calls that take no timeout of their own.
 	pageCallTimeout time.Duration
+	// botCheckWait bounds the wait for a bot check to pass.
+	botCheckWait time.Duration
 	// certificateEventsSeen is the last certificate proxy event taken.
 	certificateEventsSeen int64
 }
@@ -614,11 +622,57 @@ func (e *stagehandEngine) watch(ctx context.Context) {
 	})
 }
 
-// settle waits, up to settleTimeout, for what an action started to finish
-// before the next operation reads the page: a new document until its network
-// is idle, and the document the action began on until its requests end and
-// it stops changing. A page that does not settle in time is left as it is.
+// settle waits for what an action started to finish before the next
+// operation reads the page: for the document it shows to settle, and for a
+// bot check the site answered with to pass.
 func (e *stagehandEngine) settle(ctx context.Context) {
+	e.settleDocument(ctx)
+	e.awaitBotCheck(ctx)
+}
+
+// awaitBotCheck waits, up to botCheckWait, while the page shows a bot check.
+// A check passes by loading another document, which settles in turn, and
+// may ask again. A check still shown when the wait ends is left to the
+// operations that follow.
+func (e *stagehandEngine) awaitBotCheck(ctx context.Context) {
+	if !e.showsBotCheck(ctx) {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, e.botCheckWait)
+	defer cancel()
+	document, _ := e.DocumentID(ctx)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(settlePoll):
+		}
+		current, err := e.DocumentID(ctx)
+		if err != nil || current == document {
+			continue
+		}
+		e.settleDocument(ctx)
+		if !e.showsBotCheck(ctx) {
+			return
+		}
+		document = current
+	}
+}
+
+// showsBotCheck reports whether the page shows a bot check, reading it no
+// longer than a page settles, so a page that does not answer delays nothing.
+func (e *stagehandEngine) showsBotCheck(ctx context.Context) bool {
+	ctx, cancel := context.WithTimeout(ctx, settleTimeout)
+	defer cancel()
+	page, err := e.PageOutcome(ctx)
+	return err == nil && page.BotCheck != ""
+}
+
+// settleDocument waits, up to settleTimeout, for the document the page shows
+// to settle: a new document until its network is idle, and the document an
+// action began on until its requests end and it stops changing. A page that
+// does not settle in time is left as it is.
+func (e *stagehandEngine) settleDocument(ctx context.Context) {
 	ctx, cancel := context.WithTimeout(ctx, settleTimeout)
 	defer cancel()
 	page, err := e.page(ctx)

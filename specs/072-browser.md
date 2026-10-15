@@ -328,6 +328,12 @@ shows a refused page ends its error with the same sentence, since a refusal
 usually fails a later operation, and keeps the recordings it replayed, since
 the refusal says nothing about them.
 
+An action that leaves the browser on a bot check, such as `goto` or an `act`
+that loads a page, waits up to 10 seconds for the check to pass, as a check
+that needs no person does by loading the page it stood in for, and then
+lets the page settle as any new page does. A check still shown after the
+wait is left to the operations that follow and reported as above.
+
 ### Artifacts
 
 A DAG with a browser action enables artifact storage unless it sets
