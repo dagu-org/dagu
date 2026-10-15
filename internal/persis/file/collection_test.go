@@ -302,6 +302,7 @@ func TestFileCollectionListingIgnoresLockMetadata(t *testing.T) {
 	for _, name := range []string{
 		dirlock.LockDirectoryName,
 		dirlock.LockDirectoryName + ".releasing.1234.test",
+		dirlock.LockDirectoryName + ".takeover.0123456789abcdef",
 	} {
 		lockDir := filepath.Join(root, "queue", name)
 		require.NoError(t, os.MkdirAll(lockDir, 0o750))

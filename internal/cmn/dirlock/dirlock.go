@@ -8,12 +8,14 @@ package dirlock
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -93,10 +95,9 @@ type dirLock struct {
 	fenceToken string // unique token written at acquire time
 	mu         sync.Mutex
 
-	// afterStaleObserved is a test seam. When set, TryLock calls it after it
-	// has observed a stale lock and before it starts replacing it, so tests
-	// can interleave another contender at that point.
-	afterStaleObserved func()
+	// Test seams, called at the named point of a lock takeover when set.
+	afterStaleObserved func() // after a stale lock was observed, before the claim
+	beforeStaleRemoval func() // after verification under the claim, before the rename
 }
 
 var _ DirLock = (*dirLock)(nil)
@@ -105,12 +106,15 @@ const (
 	// LockDirectoryName is the reserved directory name for lock metadata.
 	LockDirectoryName           = ".dagu_lock"
 	releasedLockDirectoryPrefix = LockDirectoryName + ".releasing."
+	takeoverClaimPrefix         = LockDirectoryName + ".takeover."
 	lockOwnerFileName           = "owner"
 )
 
 // IsLockDirectoryName reports whether name is reserved for lock metadata.
 func IsLockDirectoryName(name string) bool {
-	return name == LockDirectoryName || strings.HasPrefix(name, releasedLockDirectoryPrefix)
+	return name == LockDirectoryName ||
+		strings.HasPrefix(name, releasedLockDirectoryPrefix) ||
+		strings.HasPrefix(name, takeoverClaimPrefix)
 }
 
 // New creates a new directory lock instance
@@ -182,7 +186,7 @@ func (l *dirLock) TryLock() error {
 			// Lock is held by another process
 			return ErrLockConflict
 		}
-		return l.takeOverStaleLock()
+		return l.takeOverStaleLock(info)
 	}
 	if !os.IsNotExist(err) {
 		if isRetryableLockStateError(err) {
@@ -193,25 +197,146 @@ func (l *dirLock) TryLock() error {
 	return l.createLock()
 }
 
-// takeOverStaleLock replaces the stale lock TryLock just observed with a lock
-// owned by this instance. The caller must hold l.mu.
-func (l *dirLock) takeOverStaleLock() error {
+// takeOverStaleLock replaces the stale lock TryLock observed as info with a
+// lock owned by this instance. The caller must hold l.mu.
+//
+// Contenders that observed the same stale lock race to create a claim
+// directory for it. Only the creator may remove the lock and install its own;
+// the others return ErrLockConflict and see the winner's lock on their next
+// attempt. Without the claim, a slow contender would rename away the fresh
+// lock of a faster one, because the rename acts on the path and not on the
+// directory that was observed.
+func (l *dirLock) takeOverStaleLock(info os.FileInfo) error {
+	identity := lockIdentity(l.lockPath, info)
 	if l.afterStaleObserved != nil {
 		l.afterStaleObserved()
 	}
 
-	// This is detection-based, not prevention-based: two contenders may
-	// both observe a stale lock and one cleanup can race with the
-	// other's new lock creation. The fence token lets us detect ownership
-	// loss on the next Heartbeat/IsHeldByMe check and self-fence safely.
-	// Remove stale lock
-	if err := removeLockDir(l.lockPath); err != nil && !os.IsNotExist(err) {
-		if isRetryableLockStateError(err) {
+	claimPath := takeoverClaimPath(l.lockPath, identity)
+	if err := claimTakeover(claimPath); err != nil {
+		return err
+	}
+	// A crash between creating the lock and this removal leaves an empty
+	// claim behind. Scanners skip it, and nothing removes it later because
+	// the stale lock it names is gone.
+	defer func() { _ = removeLockDir(claimPath) }()
+
+	// Check, while holding the claim, that the lock is still the one that was
+	// observed: another contender may have completed a takeover and released
+	// its claim before ours was created.
+	current, err := os.Stat(l.lockPath)
+	switch {
+	case err == nil:
+		if !l.isStaleInfo(current) || lockIdentity(l.lockPath, current) != identity {
 			return ErrLockConflict
 		}
-		return fmt.Errorf("failed to remove stale lock: %w", err)
+		if l.beforeStaleRemoval != nil {
+			l.beforeStaleRemoval()
+		}
+		if err := l.removeStaleLock(identity); err != nil {
+			return err
+		}
+	case os.IsNotExist(err):
+		// Already gone. Creating the new lock below is still exclusive.
+	case isRetryableLockStateError(err):
+		return ErrLockConflict
+	default:
+		return fmt.Errorf("failed to check lock status: %w", err)
 	}
 	return l.createLock()
+}
+
+// claimTakeover creates the claim directory for a stale lock. It returns
+// ErrLockConflict when another contender holds the claim.
+func claimTakeover(claimPath string) error {
+	err := os.Mkdir(claimPath, 0700)
+	switch {
+	case err == nil:
+		return nil
+	case os.IsExist(err), os.IsNotExist(err), isRetryableLockStateError(err):
+		return ErrLockConflict
+	default:
+		return fmt.Errorf("failed to claim stale lock takeover: %w", err)
+	}
+}
+
+// removeStaleLock removes the lock at l.lockPath, which the caller verified
+// under the takeover claim to be the stale lock identified by identity.
+//
+// The directory is renamed aside and checked once more. If it is not the
+// observed one, the stale holder released and another process locked in the
+// meantime; it is put back and ErrLockConflict is returned. This window stays
+// detection-based, see removeIfUnchanged.
+func (l *dirLock) removeStaleLock(identity string) error {
+	err := removeIfUnchanged(l.lockPath, func(movedPath string, moved os.FileInfo) bool {
+		return l.isStaleInfo(moved) && lockIdentity(movedPath, moved) == identity
+	})
+	if errors.Is(err, errDirChanged) {
+		return ErrLockConflict
+	}
+	return err
+}
+
+// errDirChanged reports that removeIfUnchanged found a different directory
+// than the one the caller expected and left it in place.
+var errDirChanged = errors.New("directory changed since it was observed")
+
+// removeIfUnchanged renames the directory at path aside, checks the moved
+// directory with unchanged and removes it only if that holds. Otherwise it
+// returns errDirChanged. A path that does not exist is not an error.
+//
+// The check cannot be atomic with the rename, so a directory that is not the
+// expected one is moved briefly. It is renamed back on a best-effort basis:
+// rename replaces an empty directory at path, and fails on a non-empty one, in
+// which case the moved directory is dropped. In that window a lock can be
+// lost, held twice, or left without an owner file until it goes stale. The
+// fence token lets the displaced holder notice the loss.
+func removeIfUnchanged(path string, unchanged func(movedPath string, moved os.FileInfo) bool) error {
+	releasedPath := releasedLockPath(path)
+	if err := fileutil.Rename(path, releasedPath); err != nil {
+		switch {
+		case os.IsNotExist(err):
+			return nil
+		case isRetryableLockStateError(err):
+			return ErrLockConflict
+		default:
+			return fmt.Errorf("failed to remove stale directory %q: %w", filepath.Base(path), err)
+		}
+	}
+
+	moved, err := os.Stat(releasedPath)
+	if err != nil || !unchanged(releasedPath, moved) {
+		if err := fileutil.Rename(releasedPath, path); err != nil {
+			_ = fileutil.RemoveAll(releasedPath)
+		}
+		return errDirChanged
+	}
+
+	// The live name is already free. Cleanup failures should not keep other
+	// contenders blocked.
+	_ = fileutil.RemoveAll(releasedPath)
+	return nil
+}
+
+// lockIdentity returns a string that identifies the lock directory at path,
+// whose file info is info. It is the owner token when the directory has one.
+// A directory without a readable token, left behind by a process that
+// crashed between creating it and writing the token, is identified by its
+// modification time instead. That time no longer changes once the lock is
+// stale, and a replacement lock gets a new one.
+func lockIdentity(path string, info os.FileInfo) string {
+	data, err := fileutil.ReadFile(filepath.Join(path, lockOwnerFileName))
+	if err == nil && len(data) > 0 {
+		return "token:" + string(data)
+	}
+	return "mtime:" + strconv.FormatInt(info.ModTime().UnixNano(), 10)
+}
+
+// takeoverClaimPath returns the claim directory for the stale lock identified
+// by identity.
+func takeoverClaimPath(lockPath, identity string) string {
+	sum := sha256.Sum256([]byte(identity))
+	return filepath.Join(filepath.Dir(lockPath), takeoverClaimPrefix+hex.EncodeToString(sum[:8]))
 }
 
 // createLock creates the lock directory and writes this instance's fence

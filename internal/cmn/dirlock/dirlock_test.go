@@ -6,10 +6,13 @@ package dirlock
 import (
 	"context"
 	"errors"
+	"math/rand/v2"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -643,4 +646,206 @@ func TestEdgeCases(t *testing.T) {
 		require.NoError(t, err)
 		require.Nil(t, info)
 	})
+}
+
+// makeStaleLock leaves a lock directory behind, as a crashed holder would,
+// and ages it past the default stale threshold.
+func makeStaleLock(t *testing.T, dir, token string) string {
+	t.Helper()
+
+	lockPath := filepath.Join(dir, LockDirectoryName)
+	require.NoError(t, os.Mkdir(lockPath, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(lockPath, lockOwnerFileName), []byte(token), 0o600))
+	old := time.Now().Add(-time.Hour)
+	require.NoError(t, os.Chtimes(lockPath, old, old))
+	return lockPath
+}
+
+// Two contenders see the same stale lock. The second is held back after
+// observing it while the first completes its takeover.
+func TestTakeover_SlowContender(t *testing.T) {
+	dir := t.TempDir()
+	makeStaleLock(t, dir, "crashed-holder")
+
+	first := New(dir, nil).(*dirLock)
+	second := New(dir, nil).(*dirLock)
+
+	var hookRuns int
+	second.afterStaleObserved = func() {
+		hookRuns++
+		require.NoError(t, first.TryLock())
+	}
+
+	require.ErrorIs(t, second.TryLock(), ErrLockConflict)
+	require.Equal(t, 1, hookRuns)
+	require.False(t, second.IsHeldByMe())
+	require.True(t, first.IsHeldByMe())
+
+	require.NoError(t, first.Unlock())
+}
+
+// Contenders race for a lock left stale by a crashed holder; the critical
+// section must stay exclusive.
+func TestTakeover_Concurrent(t *testing.T) {
+	const (
+		rounds     = 40
+		contenders = 6
+	)
+
+	for round := range rounds {
+		dir := t.TempDir()
+		makeStaleLock(t, dir, "crashed-holder")
+
+		var (
+			inside  atomic.Int32
+			maxSeen atomic.Int32
+			entered atomic.Int32
+			start   = make(chan struct{})
+			wg      sync.WaitGroup
+		)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+
+		for range contenders {
+			l := New(dir, &LockOptions{RetryInterval: time.Millisecond}).(*dirLock)
+			// Widen the window between observing the stale lock and
+			// replacing it, so the racy interleavings are hit reliably.
+			l.afterStaleObserved = func() {
+				time.Sleep(time.Duration(rand.IntN(300)) * time.Microsecond)
+			}
+
+			wg.Go(func() {
+				<-start
+				if err := l.Lock(ctx); err != nil {
+					t.Errorf("round %d: Lock: %v", round, err)
+					return
+				}
+				n := inside.Add(1)
+				for {
+					prev := maxSeen.Load()
+					if n <= prev || maxSeen.CompareAndSwap(prev, n) {
+						break
+					}
+				}
+				entered.Add(1)
+				time.Sleep(time.Millisecond)
+				inside.Add(-1)
+				_ = l.Unlock()
+			})
+		}
+
+		close(start)
+		wg.Wait()
+		cancel()
+
+		require.EqualValues(t, contenders, entered.Load(), "round %d", round)
+		require.EqualValues(t, 1, maxSeen.Load(), "round %d: contenders shared the lock", round)
+	}
+}
+
+// Another lock appears after the stale one was observed: the winner must back
+// off before renaming it, and must release its claim.
+func TestTakeover_ReplacedBeforeRename(t *testing.T) {
+	dir := t.TempDir()
+	lockPath := makeStaleLock(t, dir, "crashed-holder")
+
+	l := New(dir, nil).(*dirLock)
+	l.afterStaleObserved = func() {
+		require.NoError(t, os.RemoveAll(lockPath))
+		require.NoError(t, os.Mkdir(lockPath, 0o700))
+		require.NoError(t, os.WriteFile(filepath.Join(lockPath, lockOwnerFileName), []byte("new-holder"), 0o600))
+	}
+	l.beforeStaleRemoval = func() { t.Error("renamed a lock that was not the observed one") }
+
+	require.ErrorIs(t, l.TryLock(), ErrLockConflict)
+	require.False(t, l.IsHeldByMe())
+
+	data, err := os.ReadFile(filepath.Join(lockPath, lockOwnerFileName))
+	require.NoError(t, err)
+	require.Equal(t, "new-holder", string(data))
+
+	entries, err := os.ReadDir(dir)
+	require.NoError(t, err)
+	require.Len(t, entries, 1, "claim must be released")
+}
+
+func TestTakeover_FreshClaim(t *testing.T) {
+	dir := t.TempDir()
+	lockPath := makeStaleLock(t, dir, "crashed-holder")
+
+	claimPath := takeoverClaimPath(lockPath, "token:crashed-holder")
+	require.NoError(t, os.Mkdir(claimPath, 0o700))
+
+	l := New(dir, nil)
+	require.ErrorIs(t, l.TryLock(), ErrLockConflict)
+	require.False(t, l.IsHeldByMe())
+
+	// The stale lock and the other contender's claim are left alone.
+	require.DirExists(t, lockPath)
+	require.DirExists(t, claimPath)
+	data, err := os.ReadFile(filepath.Join(lockPath, lockOwnerFileName))
+	require.NoError(t, err)
+	require.Equal(t, "crashed-holder", string(data))
+}
+
+func TestTakeover_ClaimReleased(t *testing.T) {
+	dir := t.TempDir()
+	makeStaleLock(t, dir, "crashed-holder")
+
+	l := New(dir, nil)
+	require.NoError(t, l.TryLock())
+	require.True(t, l.IsHeldByMe())
+
+	entries, err := os.ReadDir(dir)
+	require.NoError(t, err)
+	require.Len(t, entries, 1, "only the lock directory should remain")
+	require.Equal(t, LockDirectoryName, entries[0].Name())
+
+	require.NoError(t, l.Unlock())
+}
+
+func TestTakeover_NoOwnerToken(t *testing.T) {
+	dir := t.TempDir()
+	lockPath := filepath.Join(dir, LockDirectoryName)
+	require.NoError(t, os.Mkdir(lockPath, 0o700))
+	old := time.Now().Add(-time.Hour)
+	require.NoError(t, os.Chtimes(lockPath, old, old))
+
+	info, err := os.Stat(lockPath)
+	require.NoError(t, err)
+	require.Equal(t, "mtime:"+strconv.FormatInt(old.UnixNano(), 10), lockIdentity(lockPath, info))
+
+	l := New(dir, nil)
+	require.NoError(t, l.TryLock())
+	require.True(t, l.IsHeldByMe())
+	require.NoError(t, l.Unlock())
+}
+
+// The stale holder released and another process locked between the winner's
+// verification and its rename: the moved directory is put back.
+func TestTakeover_PutBack(t *testing.T) {
+	dir := t.TempDir()
+	lockPath := makeStaleLock(t, dir, "someone-else")
+
+	l := New(dir, nil).(*dirLock)
+	require.ErrorIs(t, l.removeStaleLock("token:crashed-holder"), ErrLockConflict)
+
+	data, err := os.ReadFile(filepath.Join(lockPath, lockOwnerFileName))
+	require.NoError(t, err)
+	require.Equal(t, "someone-else", string(data))
+
+	entries, err := os.ReadDir(dir)
+	require.NoError(t, err)
+	require.Len(t, entries, 1)
+}
+
+func TestIsLockDirectoryName(t *testing.T) {
+	lockPath := filepath.Join("dir", LockDirectoryName)
+	claim := filepath.Base(takeoverClaimPath(lockPath, "token:abc"))
+
+	require.True(t, IsLockDirectoryName(LockDirectoryName))
+	require.True(t, IsLockDirectoryName(filepath.Base(releasedLockPath(lockPath))))
+	require.True(t, IsLockDirectoryName(claim))
+	require.True(t, IsLockDirectoryName(filepath.Base(releasedLockPath(takeoverClaimPath(lockPath, "token:abc")))))
+	require.False(t, IsLockDirectoryName("record"))
+	require.False(t, IsLockDirectoryName(".dagu_lockfile"))
 }
