@@ -5,7 +5,8 @@
 Partially implemented.
 
 Conformance covers extraction into outputs, a multi-operation run with model
-and fixed conditions, screenshots, downloads, uploads, the replay cache, the
+and fixed conditions, screenshots, downloads, uploads, the replay cache, a
+replay under `ai: never` with no model, the
 secret check, allowed domains, client certificates, dialogs, and validation. Waiting for input and resuming the same
 browser need the REST API and are covered by integration tests. Model prompts,
 page interaction internals, and profile locking belong to executor tests.
@@ -39,8 +40,8 @@ Each operation sets exactly one of:
 - `goto`: navigate to a URL.
 - `act`: perform one action described in natural language, such as a click
   or typing into one field. The value is an instruction string or an object
-  with `instruction` and optional `cache`.
-- `upload`: `{files, into, cache}` gives local files to a file input (see
+  with `instruction` and optional `ai` or `cache`.
+- `upload`: `{files, into, ai, cache}` gives local files to a file input (see
   Uploads).
 - `extract`: `{instruction, schema}`. The schema must be a JSON Schema with
   `type: object`. A string field with `format: uri` or `format: uri-reference`
@@ -122,8 +123,12 @@ holds when any matching element is visible.
 
 A browser step uses the DAG-level `llm` block. `with.llm` replaces it entirely,
 with the same shape and providers as the DAG-level block. A browser step with no
-model configuration fails validation. When several models are listed, each
-model request tries them in order.
+model configuration fails validation when some operation can call the model
+under its choice of how much AI decides: an `act`, or an `upload` with `into`,
+whose choice is not `never`, an `extract`, or an `expect` or `when` that is a
+statement. The error names the first such operation. A step none of whose
+operations can call the model runs without one. When several models are
+listed, each model request tries them in order.
 
 Every model request asks for a tool call whose parameters are the response
 schema. A reply without a tool call is accepted when its text is valid JSON.
@@ -328,12 +333,43 @@ blocks the page: `alert`, `confirm`, and `beforeunload` are accepted, and a
 `prompt` is answered with its default text. Each accepted dialog appears in
 the timeline and the step log after the operation that opened it.
 
+### How much AI decides
+
+`with.ai` chooses how much the model decides for the step's `act` operations
+and `upload` operations with `into`, and `ai` on an `act` or an `upload`
+replaces it for that operation:
+
+- `every_run`: the model decides every run. A successful `act` or `upload`
+  still records what it did.
+- `on_miss` (the default): a recorded `act` or `upload` replays without a
+  model request while the page still shows its elements, and the model acts
+  when a replay fails and repairs the recording.
+- `never`: a recorded `act` or `upload` replays, and a miss fails the step.
+  No model is called. The failure names the reason: no recording of the
+  operation on this host, the recorded action that did not replay, or the
+  recorded element of an upload that is gone. The actions replayed before the
+  miss have already run on the page, which is left as it is. The recording is
+  kept, so a later run under `on_miss` repairs it.
+
+`with.cache: false`, `act.cache: false`, and `upload.cache: false`, from before
+the choice existed, mean `every_run`. Setting both `ai` and `cache` on the
+step, an act, or an upload fails validation. A statement is judged by the
+model, and an `extract` reads the page through the model, so a step whose `ai`
+is `never` fails validation with an `extract`, or with an `expect` or `when`
+that is a statement. A fixed check is allowed, and so is an `upload` without
+`into`, which makes no model request.
+
+Each operation's timeline event records `via`, how it ran: `element` for a
+replay of recorded elements, `model` for a model request, `exact` for a fixed
+check, and nothing for an operation that decides nothing, such as `goto`.
+
 ### Replay cache
 
-With `with.cache` true (the default), a successful `act` records the actions it
-performed. A later run of the same step on the same host replays them without a
-model request when the operation position, instruction, and page URL without
-query or fragment match. When a replay fails, the step asks the model again.
+A successful `act` records the actions it performed. A later run of the same
+step on the same host replays them without a model request when the operation
+position, instruction, and page URL without query or fragment match, unless
+the act's choice is `every_run`. When a replay fails, the step asks the model
+again, or fails under `never` (see How much AI decides).
 If the step succeeds, the model's new actions replace the recording; an act
 that records no actions, such as one whose click loaded a new document before
 it reported back, removes the recording instead, unless another run of the step
@@ -346,15 +382,13 @@ name, such as a Delete button in each row of a list, the text of its row must
 also match. Without such a row, the replay fails when the page has more
 elements of that role and name than when the act recorded it. An element
 without a name is told apart by its role only.
-`act.cache: false` disables the cache for one operation.
 
 A successful `upload` with `into` records the element the model found, keyed
 like an act by operation position, `into` text, and page URL, and kept apart
 from an act's recording with the same words. A replay uploads into the
 recorded element without a model request when the page still shows it, told
-apart as a replayed act's element is; otherwise the model is asked again and
-its element replaces the recording. `upload.cache: false` disables the cache
-for one upload.
+apart as a replayed act's element is; otherwise, under `on_miss`, the model is
+asked again and its element replaces the recording.
 
 Runs of a step share its recordings, and each `act` reads them when it runs. A
 recording that another run of the step replaced or removed meanwhile, such as
@@ -405,8 +439,10 @@ or condition that sets zero or several keys fails validation. A step fails when
 an `act` does not complete, an `expect` does not hold, a selector does not
 appear before the timeout, a download does not finish, the page leaves the
 allowed domains, the browser stops responding, or the browser cannot be
-started. When an `act` fails because its model chose no element, the error
-names the model, since some models give that answer for every request. An
+started. An `act` or an `upload` under `never` fails when it has no recording
+or its replay misses, as described under How much AI decides. When an `act`
+fails because its model chose no element, the error names the model, since
+some models give that answer for every request. An
 `act` whose model picks an option that the select does not offer does not
 complete. An `upload` fails when a file cannot be uploaded, the model finds no
 element for `into`, or the element leads to no single file input, as
