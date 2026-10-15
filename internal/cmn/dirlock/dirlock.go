@@ -213,12 +213,12 @@ func (l *dirLock) takeOverStaleLock(info os.FileInfo) error {
 	}
 
 	claimPath := takeoverClaimPath(l.lockPath, identity)
-	if err := claimTakeover(claimPath); err != nil {
+	if err := l.claimTakeover(claimPath); err != nil {
 		return err
 	}
 	// A crash between creating the lock and this removal leaves an empty
-	// claim behind. Scanners skip it, and nothing removes it later because
-	// the stale lock it names is gone.
+	// claim behind, named after a stale lock that is gone by then. A later
+	// successful takeover sweeps such claims, see sweepAbandonedClaims.
 	defer func() { _ = removeLockDir(claimPath) }()
 
 	// Check, while holding the claim, that the lock is still the one that was
@@ -243,21 +243,62 @@ func (l *dirLock) takeOverStaleLock(info os.FileInfo) error {
 	default:
 		return fmt.Errorf("failed to check lock status: %w", err)
 	}
-	return l.createLock()
+	if err := l.createLock(); err != nil {
+		return err
+	}
+	l.sweepAbandonedClaims()
+	return nil
+}
+
+// sweepAbandonedClaims removes the claim directories next to the lock that are
+// older than the stale threshold, whichever stale lock they were made for. It
+// runs after a takeover, a rare event, so listing the directory is cheap.
+func (l *dirLock) sweepAbandonedClaims() {
+	entries, err := os.ReadDir(filepath.Dir(l.lockPath))
+	if err != nil {
+		return
+	}
+	for _, entry := range entries {
+		if entry.IsDir() && strings.HasPrefix(entry.Name(), takeoverClaimPrefix) {
+			l.expireAbandonedClaim(filepath.Join(filepath.Dir(l.lockPath), entry.Name()))
+		}
+	}
 }
 
 // claimTakeover creates the claim directory for a stale lock. It returns
 // ErrLockConflict when another contender holds the claim.
-func claimTakeover(claimPath string) error {
+//
+// A claim left by a process that crashed during its takeover would block that
+// lock forever, so a claim older than the stale threshold is treated as
+// abandoned and removed. A takeover takes far less time than the threshold.
+// The removal is detection-based like the rest of the recovery: contenders
+// racing on the same abandoned claim can remove a fresh claim of another.
+// Either way this attempt returns ErrLockConflict; the next one claims anew.
+func (l *dirLock) claimTakeover(claimPath string) error {
 	err := os.Mkdir(claimPath, 0700)
 	switch {
 	case err == nil:
 		return nil
-	case os.IsExist(err), os.IsNotExist(err), isRetryableLockStateError(err):
+	case os.IsExist(err):
+		l.expireAbandonedClaim(claimPath)
+		return ErrLockConflict
+	case os.IsNotExist(err), isRetryableLockStateError(err):
 		return ErrLockConflict
 	default:
 		return fmt.Errorf("failed to claim stale lock takeover: %w", err)
 	}
+}
+
+// expireAbandonedClaim removes the claim directory at claimPath if it is
+// older than the stale threshold.
+func (l *dirLock) expireAbandonedClaim(claimPath string) {
+	info, err := os.Stat(claimPath)
+	if err != nil || !l.isStaleInfo(info) {
+		return
+	}
+	_ = removeIfUnchanged(claimPath, func(_ string, moved os.FileInfo) bool {
+		return l.isStaleInfo(moved) && moved.ModTime().Equal(info.ModTime())
+	})
 }
 
 // removeStaleLock removes the lock at l.lockPath, which the caller verified

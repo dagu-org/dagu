@@ -849,3 +849,62 @@ func TestIsLockDirectoryName(t *testing.T) {
 	require.False(t, IsLockDirectoryName("record"))
 	require.False(t, IsLockDirectoryName(".dagu_lockfile"))
 }
+
+func TestTakeover_AbandonedClaim(t *testing.T) {
+	dir := t.TempDir()
+	lockPath := makeStaleLock(t, dir, "crashed-holder")
+
+	// A contender crashed after creating the claim.
+	claimPath := takeoverClaimPath(lockPath, "token:crashed-holder")
+	require.NoError(t, os.Mkdir(claimPath, 0o700))
+	old := time.Now().Add(-time.Hour)
+	require.NoError(t, os.Chtimes(claimPath, old, old))
+
+	l := New(dir, &LockOptions{RetryInterval: time.Millisecond})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	require.NoError(t, l.Lock(ctx))
+	require.True(t, l.IsHeldByMe())
+
+	require.NoDirExists(t, claimPath)
+	require.NoError(t, l.Unlock())
+}
+
+func TestTakeover_ClaimReplaced(t *testing.T) {
+	dir := t.TempDir()
+	lockPath := makeStaleLock(t, dir, "crashed-holder")
+	claimPath := takeoverClaimPath(lockPath, "token:crashed-holder")
+	require.NoError(t, os.Mkdir(claimPath, 0o700))
+
+	l := New(dir, nil).(*dirLock)
+	observed, err := os.Stat(claimPath)
+	require.NoError(t, err)
+
+	// The observed claim was abandoned, but the one at the path now is fresh.
+	err = removeIfUnchanged(claimPath, func(_ string, moved os.FileInfo) bool {
+		return l.isStaleInfo(moved) && moved.ModTime().Equal(observed.ModTime())
+	})
+	require.ErrorIs(t, err, errDirChanged)
+	require.DirExists(t, claimPath)
+}
+
+func TestTakeover_SweepsOtherAbandonedClaims(t *testing.T) {
+	dir := t.TempDir()
+	lockPath := makeStaleLock(t, dir, "crashed-holder")
+
+	// Claims left by earlier takeovers that crashed, named after other locks.
+	oldClaim := takeoverClaimPath(lockPath, "token:earlier-holder")
+	freshClaim := takeoverClaimPath(lockPath, "token:running-takeover")
+	require.NoError(t, os.Mkdir(oldClaim, 0o700))
+	require.NoError(t, os.Mkdir(freshClaim, 0o700))
+	old := time.Now().Add(-time.Hour)
+	require.NoError(t, os.Chtimes(oldClaim, old, old))
+
+	l := New(dir, nil)
+	require.NoError(t, l.TryLock())
+	require.True(t, l.IsHeldByMe())
+
+	require.NoDirExists(t, oldClaim)
+	require.DirExists(t, freshClaim)
+	require.NoError(t, l.Unlock())
+}
