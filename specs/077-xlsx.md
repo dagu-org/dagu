@@ -509,6 +509,9 @@ is not in the workbook fails with `sheet "Nope" not found; sheets present:
 [--sheet] [--range] [--header] [--columns] [--max-rows] [--skip-hidden]
 [--password P] [--format]` prints what `xlsx.read` publishes, the flags
 taking the values the fields take.
+For both commands, a path of `-` reads the workbook from standard input. The
+input is limited to 64 MiB; larger input fails before workbook parsing. The
+JSON inspect result uses `-` as its `path`.
 `--password` is the password of a protected workbook. When the flag is
 omitted, `DAGU_XLSX_PASSWORD` supplies it; when both are set, the flag
 wins, including when the flag is empty. The variable is the recommended

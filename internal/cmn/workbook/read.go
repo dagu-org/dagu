@@ -6,6 +6,7 @@ package workbook
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
 )
 
@@ -67,6 +68,17 @@ type ReadResult struct {
 // Read returns the typed rows of a sheet.
 func Read(ctx context.Context, path string, opts ReadOptions) (*ReadResult, error) {
 	w, err := open(path, opts.Password)
+	if err != nil {
+		return nil, err
+	}
+	defer w.close()
+	return w.read(ctx, opts)
+}
+
+// ReadReader reads a workbook supplied by a reader. Path is used only as the
+// result and error label, so callers can report stdin as "-".
+func ReadReader(ctx context.Context, path string, r io.Reader, opts ReadOptions) (*ReadResult, error) {
+	w, err := openReader(path, r, opts.Password)
 	if err != nil {
 		return nil, err
 	}
