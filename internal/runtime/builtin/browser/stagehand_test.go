@@ -1099,12 +1099,17 @@ func TestStagehandFailedLaunchEndsBrowser(t *testing.T) {
 	script := fmt.Sprintf("#!/bin/sh\nprintf '%%s\\n' \"$@\" > \"$0.args\"\nexec %s \"$@\" --disable-extensions\n", chrome)
 	require.NoError(t, os.WriteFile(wrapper, []byte(script), 0o700))
 
+	// A kept user agent spares the probe, which would wait out the same
+	// minute first.
+	browserDir := t.TempDir()
+	require.NoError(t, keepUserAgent(browserDir, headedUserAgent{Executable: wrapper, Product: "Chrome/1.0.0.0", UserAgent: "Mozilla/5.0 Chrome/1.0.0.0"}))
 	err := withStartupSlot(func() error {
 		_, err := stagehandLauncher{}.Launch(t.Context(), launchOptions{
 			Executable:  wrapper,
 			Headless:    true,
 			UserDataDir: browserProfileDir(t),
 			NoSandbox:   true,
+			BrowserDir:  browserDir,
 			Generate:    (&shopModel{}).generate,
 		})
 		return err
@@ -1182,22 +1187,43 @@ func TestStagehandScreenHoldsWindow(t *testing.T) {
 	}
 }
 
+// loggingWrapper returns an executable that runs Chrome and logs each start
+// to its .log file: the user agent the start was given, or none. With
+// failProbe, a start on a probe's profile exits at once and logs probe.
+func loggingWrapper(t *testing.T, failProbe bool) string {
+	t.Helper()
+	requireChrome(t)
+	if runtime.GOOS == "windows" {
+		t.Skip("the browser wrapper is a shell script")
+	}
+	probe := ""
+	if failProbe {
+		probe = `--user-data-dir=*dagu-browser-probe-*) echo probe >> "$0.log"; exit 1;; `
+	}
+	wrapper := filepath.Join(t.TempDir(), "chrome")
+	chrome := "'" + strings.ReplaceAll(chromePath(), "'", `'\''`) + "'"
+	script := fmt.Sprintf("#!/bin/sh\nagent=none\nfor arg in \"$@\"; do case \"$arg\" in %s--user-agent=*) agent=\"${arg#--user-agent=}\";; esac; done\n"+
+		"printf '%%s\\n' \"$agent\" >> \"$0.log\"\nexec %s \"$@\"\n", probe, chrome)
+	require.NoError(t, os.WriteFile(wrapper, []byte(script), 0o700))
+	return wrapper
+}
+
+// loggedStarts returns the starts wrapper logged after the first skip.
+func loggedStarts(t *testing.T, wrapper string, skip int) []string {
+	t.Helper()
+	data, err := os.ReadFile(wrapper + ".log")
+	require.NoError(t, err)
+	return strings.Split(strings.TrimSpace(string(data)), "\n")[skip:]
+}
+
 // The user agent an executable sends with a window is learned once, by a
 // browser started for it alone, and asked again only once the executable
 // reports another version, starting the browser again only when the user
 // agent changed with it.
 func TestStagehandLearnsUserAgentOnce(t *testing.T) {
 	t.Parallel()
-	requireChrome(t)
-	if runtime.GOOS == "windows" {
-		t.Skip("the browser wrapper is a shell script")
-	}
-	// The wrapper logs each start, with the user agent it was given, if any.
-	wrapper := filepath.Join(t.TempDir(), "chrome")
-	chrome := "'" + strings.ReplaceAll(chromePath(), "'", `'\''`) + "'"
-	script := fmt.Sprintf("#!/bin/sh\nagent=none\nfor arg in \"$@\"; do case \"$arg\" in --user-agent=*) agent=\"${arg#--user-agent=}\";; esac; done\n"+
-		"printf '%%s\\n' \"$agent\" >> \"$0.log\"\nexec %s \"$@\"\n", chrome)
-	require.NoError(t, os.WriteFile(wrapper, []byte(script), 0o700))
+
+	wrapper := loggingWrapper(t, false)
 	browserDir := t.TempDir()
 	pageURL := serveUserAgent(t)
 	logged := 0
@@ -1208,11 +1234,8 @@ func TestStagehandLearnsUserAgentOnce(t *testing.T) {
 		eng := launchBrowser(t, launchOptions{Executable: wrapper, BrowserDir: browserDir, Generate: (&shopModel{}).generate})
 		header, _, _ := pageUserAgent(t, eng, pageURL)
 		require.NoError(t, eng.Close(t.Context()))
-		data, err := os.ReadFile(wrapper + ".log")
-		require.NoError(t, err)
-		lines := strings.Split(strings.TrimSpace(string(data)), "\n")
-		starts := lines[logged:]
-		logged = len(lines)
+		starts := loggedStarts(t, wrapper, logged)
+		logged += len(starts)
 		return starts, header
 	}
 
@@ -1242,6 +1265,25 @@ func TestStagehandLearnsUserAgentOnce(t *testing.T) {
 	kept, ok = loadUserAgent(browserDir, wrapper)
 	require.True(t, ok)
 	assert.Equal(t, headed, kept.UserAgent)
+}
+
+// A probe that cannot start the browser only warns: the browser starts, its
+// own user agent tells the one it sends with a window, and it starts again
+// sending that.
+func TestStagehandLaunchesWhenTheProbeFails(t *testing.T) {
+	t.Parallel()
+
+	wrapper := loggingWrapper(t, true)
+	var warnings []string
+	eng := launchBrowser(t, launchOptions{
+		Executable: wrapper, BrowserDir: t.TempDir(), Generate: (&shopModel{}).generate,
+		Warn: func(message string) { warnings = append(warnings, message) },
+	})
+	header, _, _ := pageUserAgent(t, eng, serveUserAgent(t))
+	assert.NotContains(t, header, "Headless")
+	assert.Equal(t, []string{"probe", "none", header}, loggedStarts(t, wrapper, 0))
+	require.Len(t, warnings, 1)
+	assert.Contains(t, warnings[0], "learn the user agent the browser sends with a window: start the browser")
 }
 
 // serveRefusals serves a page behind a bot check, answered as Cloudflare

@@ -43,10 +43,6 @@ const (
 	chromePathEnv = "CHROME_PATH"
 )
 
-// errUserAgentUnread reports a browser that started without telling the
-// user agent it sends.
-var errUserAgentUnread = errors.New("the browser did not report its user agent")
-
 // headedUserAgent is the user agent an executable sends with a window.
 type headedUserAgent struct {
 	// Executable is the executable as launches name it; empty for the one
@@ -113,22 +109,19 @@ func keepUserAgent(browserDir string, agent headedUserAgent) error {
 
 // knownUserAgent returns the user agent kept for the executable of opts,
 // which a headless launch sends. A headless launch learns it first when none
-// is kept; an error is then the launch's, as when the executable does not
-// start. The user agent is empty when it is not known.
-func knownUserAgent(ctx context.Context, opts launchOptions, key string) (headedUserAgent, error) {
+// is kept, and warns when it cannot, leaving the user agent empty: the
+// launch itself then reports an executable that does not start.
+func knownUserAgent(ctx context.Context, opts launchOptions, key string) headedUserAgent {
 	if agent, ok := loadUserAgent(opts.BrowserDir, key); ok || !opts.Headless {
-		return agent, nil
+		return agent
 	}
 	agent, err := learnUserAgent(ctx, opts, key)
-	if errors.Is(err, errUserAgentUnread) {
-		warnUserAgent(opts, err)
-		return headedUserAgent{}, nil
-	}
 	if err != nil {
-		return headedUserAgent{}, err
+		warnUserAgent(opts, err)
+		return headedUserAgent{}
 	}
 	keepLearned(opts, agent)
-	return agent, nil
+	return agent
 }
 
 // confirmUserAgent checks the browser started after sending sent against the
@@ -168,8 +161,7 @@ func (l stagehandLauncher) confirmUserAgent(ctx context.Context, opts launchOpti
 
 // learnUserAgent starts the executable of opts without a window, on a
 // profile of its own and without a proxy, to learn the user agent it sends
-// with one. The error is the launch's when the browser does not start, and
-// wraps errUserAgentUnread when it started without telling.
+// with one.
 func learnUserAgent(ctx context.Context, opts launchOptions, key string) (headedUserAgent, error) {
 	dir, err := os.MkdirTemp("", "dagu-browser-probe-")
 	if err != nil {
@@ -191,8 +183,7 @@ func learnUserAgent(ctx context.Context, opts launchOptions, key string) (headed
 		ChromiumSandbox: new(!opts.NoSandbox),
 	})
 	if err != nil {
-		launchErr := fmt.Errorf("launch browser: %w%s", err, sandboxHint(opts.NoSandbox))
-		return headedUserAgent{}, errors.Join(launchErr, endUnstartedBrowser(ctx, nil, cdpURL, dir))
+		return headedUserAgent{}, errors.Join(fmt.Errorf("start the browser: %w", err), endUnstartedBrowser(ctx, nil, cdpURL, dir))
 	}
 	version, err := boundCall(ctx, unstartedCallTimeout, func(ctx context.Context) (browserhost.Version, error) {
 		return browserhost.BrowserVersion(ctx, cdpURL)
@@ -201,7 +192,7 @@ func learnUserAgent(ctx context.Context, opts launchOptions, key string) (headed
 		opts.Warn("end the browser that told its user agent: " + endErr.Error())
 	}
 	if err != nil {
-		return headedUserAgent{}, fmt.Errorf("%w: %w", errUserAgentUnread, err)
+		return headedUserAgent{}, fmt.Errorf("read its version: %w", err)
 	}
 	return headedFrom(key, version), nil
 }

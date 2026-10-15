@@ -202,10 +202,7 @@ func (l stagehandLauncher) Launch(ctx context.Context, opts launchOptions) (engi
 	}
 	opts.Warn = warnOnce(opts.Warn)
 	key := userAgentKey(opts.Executable)
-	known, err := knownUserAgent(ctx, opts, key)
-	if err != nil {
-		return nil, err
-	}
+	known := knownUserAgent(ctx, opts, key)
 	sent := ""
 	if opts.Headless {
 		sent = known.UserAgent
