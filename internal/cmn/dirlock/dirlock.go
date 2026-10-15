@@ -16,6 +16,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/dagucloud/dagu/v2/internal/cmn/fileutil"
@@ -91,21 +92,40 @@ type dirLock struct {
 	opts       *LockOptions
 	isHeld     bool
 	fenceToken string // unique token written at acquire time
+	ownerFile  string // name of the owner file holding fenceToken
 	mu         sync.Mutex
+
+	// beforeStaleClaim, when set by tests, runs after a stale lock has been
+	// observed and before it is claimed.
+	beforeStaleClaim func()
+	// afterClaim, when set by tests, runs after a lock instance has been
+	// claimed for removal and before it is removed.
+	afterClaim func()
 }
 
 var _ DirLock = (*dirLock)(nil)
 
 const (
 	// LockDirectoryName is the reserved directory name for lock metadata.
-	LockDirectoryName           = ".dagu_lock"
-	releasedLockDirectoryPrefix = LockDirectoryName + ".releasing."
-	lockOwnerFileName           = "owner"
+	LockDirectoryName            = ".dagu_lock"
+	releasedLockDirectoryPrefix  = LockDirectoryName + ".releasing."
+	acquiringLockDirectoryPrefix = LockDirectoryName + ".acquiring."
+
+	// lockOwnerFileName is the owner file written by older releases.
+	lockOwnerFileName = "owner"
+	// ownerFilePrefix names the owner file of a live lock. The suffix is unique
+	// per lock instance, so a rename of it can only ever hit that instance.
+	ownerFilePrefix = "owner."
+	// claimedFilePrefix names the owner file after a releaser has claimed the
+	// lock instance for removal.
+	claimedFilePrefix = "claimed."
 )
 
 // IsLockDirectoryName reports whether name is reserved for lock metadata.
 func IsLockDirectoryName(name string) bool {
-	return name == LockDirectoryName || strings.HasPrefix(name, releasedLockDirectoryPrefix)
+	return name == LockDirectoryName ||
+		strings.HasPrefix(name, releasedLockDirectoryPrefix) ||
+		strings.HasPrefix(name, acquiringLockDirectoryPrefix)
 }
 
 // New creates a new directory lock instance
@@ -140,7 +160,7 @@ func (l *dirLock) Heartbeat(_ context.Context) error {
 	}
 
 	// Verify we still own the lock by checking the fence token
-	tokenPath := filepath.Join(l.lockPath, lockOwnerFileName)
+	tokenPath := filepath.Join(l.lockPath, l.ownerFile)
 	data, err := fileutil.ReadFile(tokenPath)
 	if err != nil {
 		l.isHeld = false
@@ -172,23 +192,19 @@ func (l *dirLock) TryLock() error {
 	// Check if lock exists
 	info, err := os.Stat(l.lockPath)
 	if err == nil {
-		// Lock exists, check if it's stale
-		if l.isStaleInfo(info) {
-			// This is detection-based, not prevention-based: two contenders may
-			// both observe a stale lock and one cleanup can race with the
-			// other's new lock creation. The fence token lets us detect ownership
-			// loss on the next Heartbeat/IsHeldByMe check and self-fence safely.
-			// Remove stale lock
-			if err := removeLockDir(l.lockPath); err != nil && !os.IsNotExist(err) {
-				if isRetryableLockStateError(err) {
-					return ErrLockConflict
-				}
-				return fmt.Errorf("failed to remove stale lock: %w", err)
-			}
-		} else {
-			// Lock is held by another process
+		if !l.isStaleInfo(info) {
 			return ErrLockConflict
 		}
+		if err := l.removeStaleLock(); err != nil {
+			return err
+		}
+		if err := l.createLock(); err != nil {
+			return err
+		}
+		// A stale lock means a holder stopped without releasing it, so it may
+		// also have left temporary lock directories behind.
+		l.removeAbandonedTempDirs()
+		return nil
 	} else if !os.IsNotExist(err) {
 		if isRetryableLockStateError(err) {
 			return ErrLockConflict
@@ -196,35 +212,215 @@ func (l *dirLock) TryLock() error {
 		return fmt.Errorf("failed to check lock status: %w", err)
 	}
 
-	// Ensure the target directory exists
+	return l.createLock()
+}
+
+// removeAbandonedTempDirs removes temporary lock directories older than the
+// stale threshold. Errors are ignored; a later takeover retries.
+func (l *dirLock) removeAbandonedTempDirs() {
+	entries, err := os.ReadDir(l.targetDir)
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		name := e.Name()
+		if !e.IsDir() || (!strings.HasPrefix(name, acquiringLockDirectoryPrefix) && !strings.HasPrefix(name, releasedLockDirectoryPrefix)) {
+			continue
+		}
+		info, err := e.Info()
+		if err != nil || !l.isStaleInfo(info) {
+			continue
+		}
+		_ = fileutil.RemoveAll(filepath.Join(l.targetDir, name))
+	}
+}
+
+// removeStaleLock removes the lock directory if it is still the stale instance
+// observed by the caller. Contenders that observe the same stale lock race to
+// claim it with a single atomic operation bound to that instance, so a lock
+// created after the stale one was removed is never taken over. It returns
+// ErrLockConflict when another contender won.
+func (l *dirLock) removeStaleLock() error {
+	// List the entries before re-checking staleness: a lock created after this
+	// listing is fresh, so the entries always belong to the stale instance.
+	entries, err := os.ReadDir(l.lockPath)
+	if err != nil {
+		return staleLockError(err)
+	}
+	info, err := os.Stat(l.lockPath)
+	if err != nil {
+		return staleLockError(err)
+	}
+	if !l.isStaleInfo(info) {
+		return ErrLockConflict
+	}
+	if l.beforeStaleClaim != nil {
+		l.beforeStaleClaim()
+	}
+
+	if len(entries) == 0 {
+		// A live lock is never empty, so removing an empty directory cannot
+		// remove a live lock.
+		return staleLockError(os.Remove(l.lockPath))
+	}
+
+	claimName := claimedFilePrefix + newUniqueID()
+	claimPath := filepath.Join(l.lockPath, claimName)
+	if marker := staleLockMarker(entries); marker != "" {
+		// Only one contender can rename a given marker away.
+		if err := fileutil.Rename(filepath.Join(l.lockPath, marker), claimPath); err != nil {
+			if isLostClaimError(err) {
+				return ErrLockConflict
+			}
+			return staleLockError(err)
+		}
+		l.runAfterClaim()
+		return staleLockError(releaseClaimedLock(l.lockPath, claimName))
+	}
+
+	// No marker to rename: create one exclusively and give up if any other
+	// marker shows up, which means a live lock or a competing claim.
+	// #nosec G304 -- claimPath is the lock directory plus a generated name.
+	f, err := os.OpenFile(claimPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if err != nil {
+		return staleLockError(err)
+	}
+	_ = f.Close()
+	entries, err = os.ReadDir(l.lockPath)
+	if err == nil && staleLockMarker(withoutEntry(entries, claimName)) != "" {
+		err = ErrLockConflict
+	}
+	if err != nil {
+		_ = os.Remove(claimPath)
+		return staleLockError(err)
+	}
+	l.runAfterClaim()
+	return staleLockError(releaseClaimedLock(l.lockPath, claimName))
+}
+
+// staleLockMarker returns the entry that identifies a lock instance, preferring
+// a live owner file, then the legacy owner file, then an abandoned claim.
+func staleLockMarker(entries []os.DirEntry) string {
+	for _, prefix := range []string{ownerFilePrefix, lockOwnerFileName, claimedFilePrefix} {
+		for _, e := range entries {
+			if name := e.Name(); name == prefix || (strings.HasSuffix(prefix, ".") && strings.HasPrefix(name, prefix)) {
+				return name
+			}
+		}
+	}
+	return ""
+}
+
+func withoutEntry(entries []os.DirEntry, name string) []os.DirEntry {
+	out := entries[:0:0]
+	for _, e := range entries {
+		if e.Name() != name {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// staleLockError maps errors caused by losing a stale-lock race to
+// ErrLockConflict.
+func staleLockError(err error) error {
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, ErrLockConflict), os.IsNotExist(err), os.IsExist(err), isRetryableLockStateError(err):
+		return ErrLockConflict
+	default:
+		return fmt.Errorf("failed to remove stale lock: %w", err)
+	}
+}
+
+// releaseClaimedLock deletes a lock directory claimed under claimName. It
+// never renames the directory: a claimer that stalls may lose its claim to a
+// later takeover, and moving the live lock name away would hand it to a third
+// contender. Instead it deletes the entries it listed by name. Those names are
+// unique to the claimed instance, so a newer lock at the same path keeps its
+// files, and the claim file itself is removed last as the final ownership
+// check. It returns ErrLockConflict if the claim was lost.
+func releaseClaimedLock(lockPath, claimName string) error {
+	entries, err := os.ReadDir(lockPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return ErrLockConflict
+		}
+		return err
+	}
+	if !containsEntry(entries, claimName) {
+		return ErrLockConflict
+	}
+	for _, e := range entries {
+		if e.Name() != claimName {
+			_ = fileutil.RemoveAll(filepath.Join(lockPath, e.Name()))
+		}
+	}
+	if err := fileutil.Remove(filepath.Join(lockPath, claimName)); err != nil {
+		if os.IsNotExist(err) {
+			return ErrLockConflict
+		}
+		return err
+	}
+	// A non-empty directory here is a newer lock that replaced the empty one.
+	if err := fileutil.Remove(lockPath); err != nil && !os.IsNotExist(err) && !os.IsExist(err) {
+		return err
+	}
+	return nil
+}
+
+func containsEntry(entries []os.DirEntry, name string) bool {
+	for _, e := range entries {
+		if e.Name() == name {
+			return true
+		}
+	}
+	return false
+}
+
+// createLock builds a complete lock directory under a private name and renames
+// it onto the live lock name, so a live lock always contains its owner file.
+// The rename fails if a non-empty lock directory already exists.
+func (l *dirLock) createLock() error {
 	if err := fileutil.MkdirAll(l.targetDir, 0750); err != nil {
 		return fmt.Errorf("failed to create target directory: %w", err)
 	}
 
-	// Try to create the lock directory
-	err = os.Mkdir(l.lockPath, 0700)
-	if err != nil {
-		if os.IsExist(err) || isRetryableLockStateError(err) {
+	id := newUniqueID()
+	tmpPath := filepath.Join(l.targetDir, acquiringLockDirectoryPrefix+id)
+	if err := os.Mkdir(tmpPath, 0700); err != nil {
+		if isRetryableLockStateError(err) {
 			return ErrLockConflict
 		}
 		return fmt.Errorf("failed to create lock directory: %w", err)
 	}
 
-	// Write a unique ownership token into the lock directory
 	hostname, err := os.Hostname()
 	if err != nil || hostname == "" {
 		hostname = "unknown-host"
 	}
 	token := newFenceToken(hostname)
-	tokenPath := filepath.Join(l.lockPath, lockOwnerFileName)
-	if err := os.WriteFile(tokenPath, []byte(token), 0600); err != nil {
-		_ = removeLockDir(l.lockPath)
-		if isRetryableLockStateError(err) {
+	ownerFile := ownerFilePrefix + id
+	if err := os.WriteFile(filepath.Join(tmpPath, ownerFile), []byte(token), 0600); err != nil {
+		_ = fileutil.RemoveAll(tmpPath)
+		// The temporary directory may have been removed as abandoned.
+		if os.IsNotExist(err) || isRetryableLockStateError(err) {
 			return ErrLockConflict
 		}
 		return fmt.Errorf("failed to write lock token: %w", err)
 	}
+
+	if err := os.Rename(tmpPath, l.lockPath); err != nil {
+		_ = fileutil.RemoveAll(tmpPath)
+		if os.IsExist(err) || os.IsNotExist(err) || isRetryableLockStateError(err) {
+			return ErrLockConflict
+		}
+		return fmt.Errorf("failed to create lock directory: %w", err)
+	}
+
 	l.fenceToken = token
+	l.ownerFile = ownerFile
 	l.isHeld = true
 	return nil
 }
@@ -281,7 +477,7 @@ func (l *dirLock) Unlock() error {
 	}
 
 	// Verify we still own the lock before removing
-	tokenPath := filepath.Join(l.lockPath, lockOwnerFileName)
+	tokenPath := filepath.Join(l.lockPath, l.ownerFile)
 	data, err := fileutil.ReadFile(tokenPath)
 	if err != nil {
 		l.isHeld = false
@@ -293,12 +489,25 @@ func (l *dirLock) Unlock() error {
 		return fmt.Errorf("%w: token mismatch (lock was acquired by another process)", ErrLockNotHeld)
 	}
 
-	// We still own the lock — safe to remove.
-	if err := removeLockDir(l.lockPath); err != nil && !os.IsNotExist(err) {
+	// Claim our own instance so that only it can be removed, even if a stale
+	// takeover replaces it concurrently.
+	claimName := claimedFilePrefix + newUniqueID()
+	if err := fileutil.Rename(tokenPath, filepath.Join(l.lockPath, claimName)); err != nil {
+		if isLostClaimError(err) {
+			l.isHeld = false
+			return fmt.Errorf("%w: lock was taken over: %v", ErrLockNotHeld, err)
+		}
 		return fmt.Errorf("failed to remove lock directory: %w", err)
 	}
-
 	l.isHeld = false
+	l.runAfterClaim()
+
+	if err := releaseClaimedLock(l.lockPath, claimName); err != nil {
+		if errors.Is(err, ErrLockConflict) {
+			return fmt.Errorf("%w: lock was taken over while releasing", ErrLockNotHeld)
+		}
+		return fmt.Errorf("failed to remove lock directory: %w", err)
+	}
 	return nil
 }
 
@@ -322,7 +531,7 @@ func (l *dirLock) IsHeldByMe() bool {
 	}
 
 	// Verify the fence token still matches
-	tokenPath := filepath.Join(l.lockPath, lockOwnerFileName)
+	tokenPath := filepath.Join(l.lockPath, l.ownerFile)
 	data, err := fileutil.ReadFile(tokenPath)
 	if err != nil || string(data) != l.fenceToken {
 		l.isHeld = false
@@ -388,6 +597,27 @@ func releasedLockPath(lockPath string) string {
 func (l *dirLock) isStaleInfo(info os.FileInfo) bool {
 	age := time.Since(info.ModTime())
 	return age > l.opts.StaleThreshold
+}
+
+// isLostClaimError reports whether a claim rename failed because another
+// process moved or removed the lock directory first. macOS reports EINVAL when
+// the source directory is renamed or deleted during the rename.
+func isLostClaimError(err error) bool {
+	return os.IsNotExist(err) || errors.Is(err, syscall.EINVAL)
+}
+
+func (l *dirLock) runAfterClaim() {
+	if l.afterClaim != nil {
+		l.afterClaim()
+	}
+}
+
+func newUniqueID() string {
+	var suffix [16]byte
+	if _, err := rand.Read(suffix[:]); err == nil {
+		return hex.EncodeToString(suffix[:])
+	}
+	return fmt.Sprintf("%d-%d", os.Getpid(), time.Now().UnixNano())
 }
 
 func newFenceToken(hostname string) string {
