@@ -762,10 +762,14 @@ func (s *Sessions) Do(ctx context.Context, req DoRequest) (DoResult, error) {
 		}
 	}
 	view, pageURL := s.view(ctx, eng, masker, req.OutlineChars, &warnings)
-	// Reading a browser that stopped answering would only wait for it again.
-	var refused *refusal
-	if !errors.Is(opErr, errBrowserUnresponsive) {
+	// Reading a browser that stopped answering would only wait for it again,
+	// so a page still at the address last seen keeps the refusal seen there.
+	refused := state.Page.Refused
+	switch {
+	case !errors.Is(opErr, errBrowserUnresponsive):
 		refused = pageRefusal(ctx, operator, state.Page, pageURL)
+	case pageURL != state.Page.URL:
+		refused = nil
 	}
 	if refused != nil && result.Error != nil {
 		note := masker.MaskString(refused.String())
@@ -1146,7 +1150,10 @@ func sessionRefusal(refused *refusal, masker *masking.Masker) *SessionRefusal {
 	if refused == nil {
 		return nil
 	}
-	return &SessionRefusal{Host: refused.Host, Status: refused.Status, BotCheck: refused.BotCheck, Message: masker.MaskString(refused.String())}
+	return &SessionRefusal{
+		Host: masker.MaskString(refused.Host), Status: refused.Status, BotCheck: refused.BotCheck,
+		Message: masker.MaskString(refused.String()),
+	}
 }
 
 // closeSession closes a session whose opening failed.

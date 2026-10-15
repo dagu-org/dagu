@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -331,6 +332,28 @@ func TestSessionReportsRefusedPage(t *testing.T) {
 	result, err = ts.do(opened.ID, `{"goto": "https://shop.example.com/cart"}`)
 	require.NoError(t, err)
 	assert.Nil(t, result.Refused)
+}
+
+// An operation the browser stopped answering leaves the page unread: the
+// refusal seen on it stays, for the commands that follow.
+func TestSessionKeepsRefusalWhenBrowserStopsAnswering(t *testing.T) {
+	t.Parallel()
+
+	files := writeFiles(t, t.TempDir(), "invoice.pdf")
+	ts := newTestSessions(t, pageModel(nil))
+	ts.engine.outcome = pageOutcome{Host: "shop.example.com", Status: 403, BotCheck: browserhost.BotCheckCloudflare}
+	opened := ts.open(SessionOptions{URL: "https://shop.example.com/receipts"})
+	require.NotNil(t, opened.Refused)
+
+	// The page now reads as fine, which only a read would report.
+	ts.engine.outcome = pageOutcome{Host: "shop.example.com", Status: 200}
+	ts.engine.uploadErr = fmt.Errorf("%w within 30s", errBrowserUnresponsive)
+	input, err := json.Marshal(map[string]any{"upload": map[string]any{"files": files}})
+	require.NoError(t, err)
+	result, err := ts.do(opened.ID, string(input))
+	assert.Equal(t, CodeOperationFailed, sessionCode(err))
+	assert.Equal(t, opened.Refused, result.Refused)
+	assert.Equal(t, browserhost.BotCheckCloudflare, ts.state(opened.ID).Page.Refused.BotCheck)
 }
 
 // A session opened without a model refuses the operations that ask one and
