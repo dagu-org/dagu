@@ -79,7 +79,7 @@ func (f *fakeBrowser) start() {
 func (f *fakeBrowser) serve(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/json/version" {
 		wsURL := "ws" + strings.TrimPrefix(f.server.URL, "http") + "/devtools/browser/test"
-		_ = json.NewEncoder(w).Encode(map[string]string{"webSocketDebuggerUrl": wsURL})
+		_ = json.NewEncoder(w).Encode(map[string]string{"webSocketDebuggerUrl": wsURL, "Browser": fakeProduct, "User-Agent": fakeUserAgent})
 		return
 	}
 	conn, err := websocket.Accept(w, r, nil)
@@ -119,6 +119,12 @@ func (f *fakeBrowser) calls() []string {
 	defer f.mu.Unlock()
 	return append([]string(nil), f.methods...)
 }
+
+// fakeProduct and fakeUserAgent are what a fakeBrowser says about itself.
+const (
+	fakeProduct   = "Chrome/155.0.8059.80"
+	fakeUserAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36"
+)
 
 // unreachableURL is a DevTools URL nothing can listen on. A port freed by a
 // closed server is not used, since a concurrent test may bind it again.
@@ -214,6 +220,17 @@ func TestBrowserID(t *testing.T) {
 	assert.NotEqual(t, id, other)
 
 	_, err = browserhost.BrowserID(context.Background(), unreachableURL)
+	assert.ErrorIs(t, err, browserhost.ErrUnreachable)
+}
+
+func TestBrowserVersion(t *testing.T) {
+	t.Parallel()
+
+	version, err := browserhost.BrowserVersion(context.Background(), newFakeBrowser(t).server.URL)
+	require.NoError(t, err)
+	assert.Equal(t, browserhost.Version{Product: fakeProduct, UserAgent: fakeUserAgent}, version)
+
+	_, err = browserhost.BrowserVersion(context.Background(), unreachableURL)
 	assert.ErrorIs(t, err, browserhost.ErrUnreachable)
 }
 

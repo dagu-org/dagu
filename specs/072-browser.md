@@ -174,6 +174,15 @@ those outputs. Operation progress is written to stderr.
 (unauthenticated), `allowed_domains`, `screenshots`, `profile`, and
 `client_certificates`.
 
+A browser without a window sends the user agent its executable sends with
+one, never `HeadlessChrome`, so a site treats the step as it treats a person.
+The user agent is learned from the executable the first time it runs without
+a window, by starting it once on a profile of its own, and kept under the
+data directory's `browser/user-agents/`. A launch whose browser reports
+another version than the one kept learns it again, and starts the browser
+again only when the user agent changed with it. When the user agent cannot be
+learned or kept, the step runs and warns.
+
 The host configuration `browser.sandbox: false`, or the environment variable
 `DAGU_BROWSER_SANDBOX=false`, turns off Chromium's sandbox for every browser
 the host starts, for hosts where the sandbox cannot start. The sandbox is on

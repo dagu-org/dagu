@@ -356,6 +356,7 @@ func (s *Sessions) Open(ctx context.Context, opts SessionOptions) (OpenResult, e
 		TrustedCAs:         authorities,
 		Guard:              guardsCertificates(ctx, certificates),
 		Warn:               func(message string) { warnings = append(warnings, message) },
+		BrowserDir:         browserDir,
 	}
 	if opts.Viewport != nil {
 		launch.Viewport = &viewport{Width: opts.Viewport.Width, Height: opts.Viewport.Height}

@@ -128,6 +128,9 @@ type launchOptions struct {
 	// Warn reports what the launch could not set up as configured without
 	// failing.
 	Warn func(string)
+	// BrowserDir keeps what launches learn about browser executables; empty
+	// keeps nothing, so every headless launch learns it again.
+	BrowserDir string
 }
 
 // browserHandle locates a running browser.

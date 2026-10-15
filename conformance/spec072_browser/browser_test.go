@@ -79,6 +79,17 @@ const layoutPage = `<!doctype html><html><head><title>Draft</title></head><body>
 <div>%s<button onclick="document.getElementById('status').textContent='Saved'">Save</button></div>
 </body></html>`
 
+// agentPage says whether the user agent its request came with, given as a
+// JSON string, is the one its scripts see and names no headless browser.
+const agentPage = `<!doctype html><html><head><title>Agent</title></head><body>
+<p id="agent"></p>
+<script>
+const sent = %s;
+document.getElementById('agent').textContent = sent === navigator.userAgent && !sent.includes('Headless')
+  ? 'user agent: headed' : 'user agent: ' + sent + ' / ' + navigator.userAgent;
+</script>
+</body></html>`
+
 const layoutBanner = `<button onclick="document.getElementById('status').textContent='Banner closed'">Dismiss</button>`
 
 // browserCommandTimeout bounds a command that starts a browser. Starting
@@ -244,6 +255,12 @@ func startShop(t *testing.T) string {
 			_, _ = fmt.Fprintf(w, layoutPage, banner)
 			return
 		}
+		if r.URL.Path == "/agent" {
+			sent, _ := json.Marshal(r.UserAgent())
+			w.Header().Set("Content-Type", "text/html")
+			_, _ = fmt.Fprintf(w, agentPage, sent)
+			return
+		}
 		if r.URL.Path == "/report.csv" {
 			w.Header().Set("Content-Type", "text/csv")
 			w.Header().Set("Content-Disposition", `attachment; filename="report.csv"`)
@@ -402,6 +419,19 @@ func TestBrowserDialogs(t *testing.T) {
 	b := newBrowserEnv(t)
 	b.dagu.RunWithEnv(b.env, "start", "dialogs.yaml").ExpectExitCode(0)
 	require.Equal(t, 1, b.model.count(kindAct))
+}
+
+// A browser without a window sends the user agent the same browser sends
+// with one, learned on the first run and kept for the next.
+func TestBrowserLooksHeaded(t *testing.T) {
+	t.Parallel()
+
+	b := newBrowserEnv(t)
+	for range 2 {
+		result := b.dagu.RunWithEnv(b.env, "start", "looks_headed.yaml")
+		result.ExpectExitCode(0)
+		result.ExpectStderrNotContains("warning:")
+	}
 }
 
 // With the sandbox on, a browser step fails before starting a browser where

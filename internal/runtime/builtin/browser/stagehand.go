@@ -173,9 +173,50 @@ func (l stagehandLauncher) Launch(ctx context.Context, opts launchOptions) (engi
 		return nil, fmt.Errorf("launch browser: the browser sandbox is on, but the browser runtime turns it off %s; "+
 			"set browser.sandbox: false in the Dagu config or DAGU_BROWSER_SANDBOX=false to run without it", reason)
 	}
-	port, err := freeLoopbackPort()
+	opts.Warn = warnOnce(opts.Warn)
+	key := userAgentKey(opts.Executable)
+	known, err := knownUserAgent(ctx, opts, key)
 	if err != nil {
 		return nil, err
+	}
+	sent := ""
+	if opts.Headless {
+		sent = known.UserAgent
+	}
+	started, err := l.start(ctx, opts, sent)
+	if err != nil {
+		return nil, err
+	}
+	if started, err = l.confirmUserAgent(ctx, opts, key, known, sent, started); err != nil {
+		return nil, err
+	}
+	cdpURL := started.cdpURL
+	eng, err := startEngine(ctx, started.browser, cdpURL, opts)
+	if err != nil {
+		return nil, errors.Join(err, endUnstartedBrowser(ctx, started.browser, cdpURL, opts.UserDataDir), killCertProxy(started.proxy))
+	}
+	eng.handle.CertProxy = started.proxy
+	extension, err := browserhost.StagehandExtension(ctx, cdpURL)
+	if err != nil {
+		return nil, errors.Join(fmt.Errorf("locate browser runtime extension: %w", err), eng.Close(context.WithoutCancel(ctx)))
+	}
+	eng.handle.ExtensionID = extension.ID
+	eng.handle.ExtensionDir = extension.Path
+	// Without a process ID, a browser that stops answering cannot be ended.
+	eng.handle.BrowserPID, _ = browserhost.BrowserProcessID(ctx, cdpURL)
+	eng.handle.BrowserStartedAt, _ = procutil.StartTime(eng.handle.BrowserPID)
+	if err := eng.handleDownloads(ctx, opts.DownloadsDir); err != nil {
+		return nil, errors.Join(err, eng.Close(context.WithoutCancel(ctx)))
+	}
+	return eng, nil
+}
+
+// start launches the browser opts describe, with the certificate proxy it
+// needs, sending userAgent when it is set.
+func (l stagehandLauncher) start(ctx context.Context, opts launchOptions, userAgent string) (startedBrowser, error) {
+	port, err := freeLoopbackPort()
+	if err != nil {
+		return startedBrowser{}, err
 	}
 	launch := &stagehand.LocalBrowserLaunchOptions{
 		ExecutablePath: opts.Executable,
@@ -191,11 +232,14 @@ func (l stagehandLauncher) Launch(ctx context.Context, opts launchOptions) (engi
 	if opts.Proxy != "" {
 		launch.Proxy = &stagehand.LocalProxyConfig{Server: opts.Proxy}
 	}
+	if userAgent != "" {
+		launch.Args = append(launch.Args, "--user-agent="+userAgent)
+	}
 	cdpURL := fmt.Sprintf("http://127.0.0.1:%d", port)
 	var proxy *certproxy.Handle
 	if len(opts.ClientCertificates) > 0 || len(opts.TrustedCAs) > 0 || opts.Guard {
 		if proxy, err = l.startCertProxy(ctx, cdpURL, opts); err != nil {
-			return nil, err
+			return startedBrowser{}, err
 		}
 		// The proxy routes every request the browser makes, through
 		// browser.proxy where one is set.
@@ -205,26 +249,9 @@ func (l stagehandLauncher) Launch(ctx context.Context, opts launchOptions) (engi
 	browser, err := stagehand.LaunchLocalBrowser(ctx, launch)
 	if err != nil {
 		launchErr := fmt.Errorf("launch browser: %w%s", err, sandboxHint(opts.NoSandbox))
-		return nil, errors.Join(launchErr, endUnstartedBrowser(ctx, nil, cdpURL, opts.UserDataDir), killCertProxy(proxy))
+		return startedBrowser{}, errors.Join(launchErr, endUnstartedBrowser(ctx, nil, cdpURL, opts.UserDataDir), killCertProxy(proxy))
 	}
-	eng, err := startEngine(ctx, browser, cdpURL, opts)
-	if err != nil {
-		return nil, errors.Join(err, endUnstartedBrowser(ctx, browser, cdpURL, opts.UserDataDir), killCertProxy(proxy))
-	}
-	eng.handle.CertProxy = proxy
-	extension, err := browserhost.StagehandExtension(ctx, cdpURL)
-	if err != nil {
-		return nil, errors.Join(fmt.Errorf("locate browser runtime extension: %w", err), eng.Close(context.WithoutCancel(ctx)))
-	}
-	eng.handle.ExtensionID = extension.ID
-	eng.handle.ExtensionDir = extension.Path
-	// Without a process ID, a browser that stops answering cannot be ended.
-	eng.handle.BrowserPID, _ = browserhost.BrowserProcessID(ctx, cdpURL)
-	eng.handle.BrowserStartedAt, _ = procutil.StartTime(eng.handle.BrowserPID)
-	if err := eng.handleDownloads(ctx, opts.DownloadsDir); err != nil {
-		return nil, errors.Join(err, eng.Close(context.WithoutCancel(ctx)))
-	}
-	return eng, nil
+	return startedBrowser{browser: browser, cdpURL: cdpURL, proxy: proxy}, nil
 }
 
 func (stagehandLauncher) Reattach(ctx context.Context, handle browserHandle, opts launchOptions) (engine, error) {

@@ -5,6 +5,7 @@ package browser
 
 import (
 	"bufio"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -48,6 +49,22 @@ const shopPage = `<!doctype html><html><head><title>Shop</title></head><body>
 <p id="status">open</p>
 <button onclick="document.getElementById('status').textContent='clicked'">Submit</button>
 </body></html>`
+
+// testBrowserDir keeps what test browsers learn about the executable, so
+// only the first headless launch of a test process learns its user agent.
+var testBrowserDir string
+
+func TestMain(m *testing.M) {
+	dir, err := os.MkdirTemp("", "dagu-browser-state-")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	testBrowserDir = dir
+	code := m.Run()
+	_ = os.RemoveAll(dir)
+	os.Exit(code)
+}
 
 // elementIDPattern finds a node ID in the accessibility tree the runtime
 // sends to the model, such as "[0-23] button: Submit".
@@ -157,10 +174,11 @@ func launchBrowser(t *testing.T, opts launchOptions) engine {
 	t.Helper()
 	requireChrome(t)
 	ctx := t.Context()
-	opts.Executable = chromePath()
+	opts.Executable = cmp.Or(opts.Executable, chromePath())
 	opts.Headless = true
 	opts.UserDataDir = browserProfileDir(t)
 	opts.NoSandbox = true
+	opts.BrowserDir = cmp.Or(opts.BrowserDir, testBrowserDir)
 	var eng engine
 	err := withStartupSlot(func() (err error) {
 		eng, err = stagehandLauncher{}.Launch(ctx, opts)
@@ -1100,6 +1118,110 @@ func TestStagehandFailedLaunchEndsBrowser(t *testing.T) {
 	require.Eventually(t, func() bool {
 		return errors.Is(browserhost.Probe(context.Background(), "http://127.0.0.1:"+string(port[1])), browserhost.ErrUnreachable)
 	}, 10*time.Second, 200*time.Millisecond, "the failed launch ends the browser")
+}
+
+// serveUserAgent serves a page showing the user agent its request came
+// with.
+func serveUserAgent(t *testing.T) string {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		_, _ = io.WriteString(w, r.UserAgent())
+	}))
+	t.Cleanup(server.Close)
+	return server.URL
+}
+
+// pageUserAgent reads the user agent a page's request came with, and the
+// one its scripts see, with the brands it reports.
+func pageUserAgent(t *testing.T, eng engine, pageURL string) (header, script string, brands []string) {
+	t.Helper()
+	require.NoError(t, eng.Goto(t.Context(), pageURL, time.Minute))
+	header, err := eng.PageText(t.Context())
+	require.NoError(t, err)
+	raw, err := eng.(*stagehandEngine).evaluate(t.Context(), `({agent: navigator.userAgent, brands: navigator.userAgentData.brands.map((b) => b.brand)})`)
+	require.NoError(t, err)
+	var seen struct {
+		Agent  string   `json:"agent"`
+		Brands []string `json:"brands"`
+	}
+	require.NoError(t, json.Unmarshal(raw, &seen))
+	return strings.TrimSpace(header), seen.Agent, seen.Brands
+}
+
+// A browser without a window sends the user agent it sends with one, so a
+// site treats a step as it treats a person.
+func TestStagehandLooksHeaded(t *testing.T) {
+	t.Parallel()
+
+	eng := launchBrowser(t, launchOptions{Generate: (&shopModel{}).generate})
+	header, script, brands := pageUserAgent(t, eng, serveUserAgent(t))
+	assert.Equal(t, header, script, "the request and the page's scripts see the same user agent")
+	assert.Contains(t, header, headedProduct)
+	assert.NotContains(t, header, "Headless")
+	assert.NotContains(t, brands, "HeadlessChrome")
+}
+
+// The user agent an executable sends with a window is learned once, by a
+// browser started for it alone, and asked again only once the executable
+// reports another version, starting the browser again only when the user
+// agent changed with it.
+func TestStagehandLearnsUserAgentOnce(t *testing.T) {
+	t.Parallel()
+	requireChrome(t)
+	if runtime.GOOS == "windows" {
+		t.Skip("the browser wrapper is a shell script")
+	}
+	// The wrapper logs each start, with the user agent it was given, if any.
+	wrapper := filepath.Join(t.TempDir(), "chrome")
+	chrome := "'" + strings.ReplaceAll(chromePath(), "'", `'\''`) + "'"
+	script := fmt.Sprintf("#!/bin/sh\nagent=none\nfor arg in \"$@\"; do case \"$arg\" in --user-agent=*) agent=\"${arg#--user-agent=}\";; esac; done\n"+
+		"printf '%%s\\n' \"$agent\" >> \"$0.log\"\nexec %s \"$@\"\n", chrome)
+	require.NoError(t, os.WriteFile(wrapper, []byte(script), 0o700))
+	browserDir := t.TempDir()
+	pageURL := serveUserAgent(t)
+	logged := 0
+	// launch starts and closes a browser, and returns the user agents its
+	// starts were given and the one its page's request came with.
+	launch := func() ([]string, string) {
+		t.Helper()
+		eng := launchBrowser(t, launchOptions{Executable: wrapper, BrowserDir: browserDir, Generate: (&shopModel{}).generate})
+		header, _, _ := pageUserAgent(t, eng, pageURL)
+		require.NoError(t, eng.Close(t.Context()))
+		data, err := os.ReadFile(wrapper + ".log")
+		require.NoError(t, err)
+		lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+		starts := lines[logged:]
+		logged = len(lines)
+		return starts, header
+	}
+
+	starts, header := launch()
+	require.Len(t, starts, 2, "a probe, then the browser")
+	assert.Equal(t, "none", starts[0], "the probe sends its own user agent")
+	assert.Equal(t, header, starts[1])
+	assert.NotContains(t, header, "Headless")
+	headed := header
+
+	starts, _ = launch()
+	assert.Equal(t, []string{headed}, starts, "the kept user agent needs no probe")
+
+	kept, ok := loadUserAgent(browserDir, wrapper)
+	require.True(t, ok)
+	updated := kept
+	updated.Product = "Chrome/1.0.0.0"
+	require.NoError(t, keepUserAgent(browserDir, updated))
+	starts, _ = launch()
+	assert.Equal(t, []string{headed, "none"}, starts, "another version is probed, and the same user agent keeps the browser")
+
+	updated.UserAgent = "Mozilla/5.0 Chrome/1.0.0.0"
+	require.NoError(t, keepUserAgent(browserDir, updated))
+	starts, header = launch()
+	assert.Equal(t, []string{updated.UserAgent, "none", headed}, starts, "a changed user agent starts the browser again")
+	assert.Equal(t, headed, header)
+	kept, ok = loadUserAgent(browserDir, wrapper)
+	require.True(t, ok)
+	assert.Equal(t, headed, kept.UserAgent)
 }
 
 // A real page's snapshot renders as the outline the renderer is built for,

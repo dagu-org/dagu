@@ -399,6 +399,7 @@ func (r *run) launchOptions(ctx context.Context, recordID string) (launchOptions
 		TrustedCAs:         authorities,
 		Guard:              guard,
 		Warn:               func(message string) { r.warn(-1, message) },
+		BrowserDir:         r.browser,
 	}
 	if name := r.cfg.Browser.Profile; name != "" {
 		lease, err := acquireProfile(ctx, r.browser, name, recordID, true)
