@@ -304,7 +304,8 @@ func describeWorkspaceBaseConfigState(dir string) string {
 
 	states := make([]string, 0, len(entries))
 	for _, entry := range entries {
-		if !entry.IsDir() {
+		// Workspace base configs are also read through symlinked directories.
+		if !entry.IsDir() && (!fileutil.IsSymlinkDirEntry(entry) || !fileutil.IsDir(filepath.Join(dir, entry.Name()))) {
 			continue
 		}
 
