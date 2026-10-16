@@ -55,6 +55,7 @@ type Runner struct {
 	timeout          time.Duration
 	delay            time.Duration
 	dry              bool
+	dryChecks        []DryRunCheck
 	onInit           *ir.Step
 	onExit           *ir.Step
 	onSuccess        *ir.Step
@@ -1145,7 +1146,7 @@ func disableDeclaredStepOutputs(env *Env) {
 
 func (r *Runner) execNode(ctx context.Context, node *Node, progressCh chan ProgressUpdate) error {
 	if r.dry {
-		warnDryRunStep(ctx, node)
+		r.noteDryRunStep(ctx, node)
 		return nil
 	}
 	report := func() {
@@ -1431,7 +1432,7 @@ func (r *Runner) runEventHandler(ctx context.Context, plan *Plan, node *Node, ex
 	}
 
 	if r.dry {
-		warnDryRunStep(logger.WithValues(ctx, tag.Step(node.Name())), node)
+		r.noteDryRunStep(logger.WithValues(ctx, tag.Step(node.Name())), node)
 		node.SetStatus(ir.NodeSucceeded)
 		return nil
 	}
