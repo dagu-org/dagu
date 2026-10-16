@@ -101,6 +101,9 @@ type dirLock struct {
 	// afterClaim, when set by tests, runs after a lock instance has been
 	// claimed for removal and before it is removed.
 	afterClaim func()
+	// beforeInstall, when set by tests, runs after a new lock's owner file is
+	// written and before the lock is installed under the live lock name.
+	beforeInstall func()
 }
 
 var _ DirLock = (*dirLock)(nil)
@@ -421,12 +424,22 @@ func (l *dirLock) createLock() error {
 		return fmt.Errorf("failed to write lock token: %w", err)
 	}
 
+	if l.beforeInstall != nil {
+		l.beforeInstall()
+	}
 	if err := renameNoReplace(tmpPath, l.lockPath); err != nil {
 		_ = fileutil.RemoveAll(tmpPath)
 		if os.IsExist(err) || os.IsNotExist(err) || isRetryableLockStateError(err) {
 			return ErrLockConflict
 		}
 		return fmt.Errorf("failed to create lock directory: %w", err)
+	}
+	// A sweep of abandoned temporary directories may have emptied this one
+	// before the rename. Removing an empty directory cannot remove a live
+	// lock, because a live lock is never empty.
+	if _, err := os.Lstat(filepath.Join(l.lockPath, ownerFile)); os.IsNotExist(err) {
+		_ = fileutil.Remove(l.lockPath)
+		return ErrLockConflict
 	}
 
 	l.fenceToken = token

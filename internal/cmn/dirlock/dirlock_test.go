@@ -981,6 +981,28 @@ func TestStaleTakeover_CleansAbandonedTempDirs(t *testing.T) {
 	}
 }
 
+// A stale-temp sweep can empty the acquiring directory between writing the
+// owner file and installing the lock. An installed lock without its owner
+// file must not be held.
+func TestCreateLock_OwnerRemovedBeforeInstall(t *testing.T) {
+	dir := t.TempDir()
+	lock := New(dir, nil).(*dirLock)
+	lock.beforeInstall = func() {
+		owners, err := filepath.Glob(filepath.Join(dir, acquiringLockDirectoryPrefix+"*", ownerFilePrefix+"*"))
+		require.NoError(t, err)
+		require.Len(t, owners, 1)
+		require.NoError(t, os.Remove(owners[0]))
+	}
+
+	require.ErrorIs(t, lock.TryLock(), ErrLockConflict)
+	require.False(t, lock.IsHeldByMe())
+	require.NoDirExists(t, filepath.Join(dir, LockDirectoryName))
+
+	next := New(dir, nil)
+	require.NoError(t, next.TryLock())
+	require.NoError(t, next.Unlock())
+}
+
 // Releases before the per-instance owner file create the lock directory empty
 // and write "owner" into it afterwards. Installing a new lock must not replace
 // that empty directory, or both versions hold the lock at once. Old and new
