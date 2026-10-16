@@ -1134,10 +1134,10 @@ func (l legacyLock) unlock() {
 	_ = removeLockDir(l.lockPath)
 }
 
-// An entry that cannot be deleted must not keep the lock name occupied for
-// good. Releasing a lock, by its holder or by a stale takeover, still frees the
-// name for the next contender.
-func TestRelease_UndeletableEntry(t *testing.T) {
+// A read-only entry inside the lock directory must not keep the lock name
+// occupied. Releasing a lock, by its holder or by a stale takeover, deletes it
+// and frees the name for the next contender.
+func TestRelease_ReadOnlyEntry(t *testing.T) {
 	tests := []struct {
 		name    string
 		release func(t *testing.T, dir string)
@@ -1147,7 +1147,7 @@ func TestRelease_UndeletableEntry(t *testing.T) {
 			release: func(t *testing.T, dir string) {
 				holder := New(dir, nil)
 				require.NoError(t, holder.TryLock())
-				addUndeletableEntry(t, dir)
+				addReadOnlyEntry(t, dir)
 				require.NoError(t, holder.Unlock())
 			},
 		},
@@ -1155,7 +1155,7 @@ func TestRelease_UndeletableEntry(t *testing.T) {
 			name: "StaleTakeover",
 			release: func(t *testing.T, dir string) {
 				require.NoError(t, New(dir, nil).TryLock())
-				addUndeletableEntry(t, dir)
+				addReadOnlyEntry(t, dir)
 				backdateLock(t, dir)
 				takeover := New(dir, nil)
 				require.NoError(t, takeover.TryLock())
@@ -1176,9 +1176,9 @@ func TestRelease_UndeletableEntry(t *testing.T) {
 	}
 }
 
-// addUndeletableEntry puts a read-only directory with a file inside the lock
-// directory, so the file cannot be deleted where it is.
-func addUndeletableEntry(t *testing.T, dir string) {
+// addReadOnlyEntry puts a read-only directory with a file inside the lock
+// directory, so the file cannot be deleted until the directory is writable.
+func addReadOnlyEntry(t *testing.T, dir string) {
 	t.Helper()
 	readOnly := filepath.Join(dir, LockDirectoryName, "read-only")
 	require.NoError(t, os.Mkdir(readOnly, 0o700))

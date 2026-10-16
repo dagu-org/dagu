@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -336,11 +337,10 @@ func staleLockError(err error) error {
 	}
 }
 
-// releaseClaimedLock deletes a lock directory claimed under claimName. It does
-// not rename the directory while its entries can be deleted: a claimer that
-// stalls may lose its claim to a later takeover, and moving the live lock name
-// away would hand it to a third contender. Instead it deletes the entries it
-// listed by name. Those names are
+// releaseClaimedLock deletes a lock directory claimed under claimName. It
+// never renames the directory: a claimer that stalls may lose its claim to a
+// later takeover, and moving the live lock name away would hand it to a third
+// contender. Instead it deletes the entries it listed by name. Those names are
 // unique to the claimed instance, so a newer lock at the same path keeps its
 // files, and the claim file itself is removed last as the final ownership
 // check. It returns ErrLockConflict if the claim was lost.
@@ -357,10 +357,10 @@ func releaseClaimedLock(lockPath, claimName string) error {
 	}
 	for _, e := range entries {
 		if e.Name() != claimName {
-			if err := fileutil.RemoveAll(filepath.Join(lockPath, e.Name())); err != nil {
-				// An entry that cannot be deleted would keep the lock name
-				// occupied for good.
-				return moveClaimedLockAside(lockPath, claimName)
+			// An entry that still cannot be deleted keeps the lock occupied
+			// until someone removes it; the error names it.
+			if err := removeEntry(lockPath, e.Name()); err != nil {
+				return err
 			}
 		}
 	}
@@ -378,21 +378,32 @@ func releaseClaimedLock(lockPath, claimName string) error {
 	return nil
 }
 
-// moveClaimedLockAside frees the lock name by moving the directory claimed
-// under claimName aside, as older releases do on every release, and deletes
-// what it can of it. The move goes by path, so it runs only after confirming
-// that the claim is still in the directory. A claim is taken over only once
-// the directory is stale, so moving a newer lock instead would need a stall
-// longer than the stale threshold between that check and the move. It returns
-// ErrLockConflict if the claim was lost.
-func moveClaimedLockAside(lockPath, claimName string) error {
-	if _, err := os.Lstat(filepath.Join(lockPath, claimName)); err != nil {
-		if os.IsNotExist(err) {
-			return ErrLockConflict
-		}
+// removeEntry deletes the entry name of the lock directory and everything
+// below it. When permissions deny that, it gives the owner write access to the
+// directories and files below the entry and tries again, which succeeds for
+// entries this user owns. The permission changes never leave the lock
+// directory, even through symbolic links.
+func removeEntry(lockPath, name string) error {
+	err := fileutil.RemoveAll(filepath.Join(lockPath, name))
+	if err == nil || !errors.Is(err, fs.ErrPermission) {
 		return err
 	}
-	return removeLockDir(lockPath)
+	root, rootErr := os.OpenRoot(lockPath)
+	if rootErr != nil {
+		return err
+	}
+	defer func() { _ = root.Close() }()
+	_ = fs.WalkDir(root.FS(), name, func(p string, d fs.DirEntry, err error) error {
+		switch {
+		case err != nil:
+		case d.IsDir():
+			_ = root.Chmod(p, 0700)
+		case d.Type().IsRegular():
+			_ = root.Chmod(p, 0600)
+		}
+		return nil
+	})
+	return fileutil.RemoveAll(filepath.Join(lockPath, name))
 }
 
 func containsEntry(entries []os.DirEntry, name string) bool {
