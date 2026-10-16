@@ -810,6 +810,7 @@ func (h *Handler) createAttemptForTask(ctx context.Context, task *coordinatorv1.
 		return nil, fmt.Errorf("failed to parse DAG definition: %w", err)
 	}
 	dag.SourceFile = task.SourceFile
+	applyTaskWorkerSelector(dag, task)
 	// An unlabeled legacy child still needs its parent's provenance; named workspaces are already known.
 	if task.BaseConfigWorkspace != nil || (dag.BaseConfigWorkspace != nil && *dag.BaseConfigWorkspace == "") {
 		dag.BaseConfigWorkspace = task.BaseConfigWorkspace
@@ -981,6 +982,7 @@ func (h *Handler) createSubAttemptForTask(ctx context.Context, task *coordinator
 		return nil, fmt.Errorf("failed to parse DAG definition: %w", err)
 	}
 	dag.SourceFile = task.SourceFile
+	applyTaskWorkerSelector(dag, task)
 	if task.BaseConfigWorkspace != nil || (dag.BaseConfigWorkspace != nil && *dag.BaseConfigWorkspace == "") {
 		dag.BaseConfigWorkspace = task.BaseConfigWorkspace
 	}
@@ -1041,6 +1043,17 @@ func (h *Handler) writeInitialStatus(ctx context.Context, attempt dagrun.Attempt
 		ProfileName:  task.ProfileName,
 	}
 	return attempt.Write(ctx, initialStatus)
+}
+
+// applyTaskWorkerSelector records the selector the task was dispatched with in
+// the attempt's DAG snapshot, so a retry, a reschedule, or a queued re-dispatch
+// routes the way the run was routed, not the way its YAML would.
+func applyTaskWorkerSelector(dag *ir.DAG, task *coordinatorv1.Task) {
+	if len(task.WorkerSelector) == 0 {
+		return
+	}
+	dag.WorkerSelector = maps.Clone(task.WorkerSelector)
+	dag.ForceLocal = false
 }
 
 func labelsForInitialStatus(task *coordinatorv1.Task, dag *ir.DAG) []string {

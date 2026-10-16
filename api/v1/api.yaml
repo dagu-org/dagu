@@ -1100,6 +1100,9 @@ paths:
                 dagName:
                   type: string
                   description: "Optional DAG name override to use for the created dag-run"
+                workerSelector:
+                  allOf:
+                    - $ref: "#/components/schemas/WorkerSelectorOverride"
                 profile:
                   allOf:
                     - $ref: "#/components/schemas/RuntimeProfileOverride"
@@ -1223,6 +1226,9 @@ paths:
                 dagName:
                   type: string
                   description: "Optional DAG name override to use for the created dag-run"
+                workerSelector:
+                  allOf:
+                    - $ref: "#/components/schemas/WorkerSelectorOverride"
                 profile:
                   allOf:
                     - $ref: "#/components/schemas/RuntimeProfileOverride"
@@ -1320,6 +1326,9 @@ paths:
                 queue:
                   type: string
                   description: "Override the DAG-level queue definition"
+                workerSelector:
+                  allOf:
+                    - $ref: "#/components/schemas/WorkerSelectorOverride"
                 singleton:
                   type: boolean
                   description: "If true, prevent enqueuing if DAG is already running or queued (returns 409 conflict)"
@@ -2155,6 +2164,9 @@ paths:
                   allOf:
                     - $ref: "#/components/schemas/RuntimeProfileOverride"
                   description: "Runtime profile to apply to this DAG-run. Set to an empty string or omit to run without a profile."
+                workerSelector:
+                  allOf:
+                    - $ref: "#/components/schemas/WorkerSelectorOverride"
                 params:
                   type: string
                   description: "Parameters to pass to the DAG-run in JSON format"
@@ -2286,6 +2298,9 @@ paths:
                 queue:
                   type: string
                   description: "Override the queue to use for this DAG-run"
+                workerSelector:
+                  allOf:
+                    - $ref: "#/components/schemas/WorkerSelectorOverride"
                 singleton:
                   type: boolean
                   description: "If true, prevent enqueuing if DAG is already running or queued (returns 409 conflict)"
@@ -18131,6 +18146,12 @@ components:
       maxLength: 128
       pattern: "^$|^[a-z0-9][a-z0-9._-]*$"
       description: "Runtime profile override. Empty string means no profile."
+
+    WorkerSelectorOverride:
+      type: object
+      additionalProperties:
+        type: string
+      description: "Worker labels this DAG-run requires. Replaces the DAG-level worker_selector for this run, including its \"local\" value, and is kept with the run so retries, reschedules, and queued dispatch route the same way. Not allowed for DAGs with approval steps."
 
     RuntimeProfileKey:
       type: string

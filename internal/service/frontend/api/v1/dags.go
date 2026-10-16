@@ -1065,6 +1065,10 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 		}
 		dag.Name = nameOverride
 	}
+	workerSelector, err := applyWorkerSelectorOverride(dag, request.Body.WorkerSelector)
+	if err != nil {
+		return nil, err
+	}
 
 	if dagRunId == "" {
 		var err error
@@ -1095,16 +1099,25 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 
 	if len(selection.steps) > 0 {
 		if err := a.startSelectedSteps(ctx, dag, selectedStepsStart{
-			selection:   selection,
-			params:      params,
-			dagRunID:    dagRunId,
-			labels:      labels,
-			profileName: profileName,
-			noReuse:     valueOf(request.Body.NoReuse),
+			selection:      selection,
+			params:         params,
+			dagRunID:       dagRunId,
+			labels:         labels,
+			profileName:    profileName,
+			noReuse:        valueOf(request.Body.NoReuse),
+			workerSelector: workerSelector,
 		}); err != nil {
 			return nil, err
 		}
-	} else if _, err := a.startDAGRun(ctx, dag, params, dagRunId, nameOverride, labels, profileName, valueOf(request.Body.NoReuse)); err != nil {
+	} else if _, err := a.startDAGRun(ctx, dag, manualStart{
+		params:         params,
+		dagRunID:       dagRunId,
+		nameOverride:   nameOverride,
+		labels:         labels,
+		profileName:    profileName,
+		noReuse:        valueOf(request.Body.NoReuse),
+		workerSelector: workerSelector,
+	}); err != nil {
 		return nil, fmt.Errorf("error starting dag-run: %w", err)
 	}
 
@@ -1114,6 +1127,9 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 	}
 	if params != "" {
 		detailsMap["params"] = params
+	}
+	if len(workerSelector) > 0 {
+		detailsMap["worker_selector"] = workerSelector
 	}
 	addSelectedStepsAudit(detailsMap, selection)
 	a.logAudit(ctx, audit.CategoryDAG, "dag_execute", detailsMap)
@@ -1174,6 +1190,10 @@ func (a *API) ExecuteDAGSync(ctx context.Context, request api.ExecuteDAGSyncRequ
 		}
 		dag.Name = nameOverride
 	}
+	workerSelector, err := applyWorkerSelectorOverride(dag, request.Body.WorkerSelector)
+	if err != nil {
+		return nil, err
+	}
 
 	if dagRunId == "" {
 		var err error
@@ -1202,7 +1222,15 @@ func (a *API) ExecuteDAGSync(ctx context.Context, request api.ExecuteDAGSyncRequ
 		return nil, err
 	}
 
-	if _, err := a.startDAGRun(ctx, dag, params, dagRunId, nameOverride, labels, profileName, valueOf(request.Body.NoReuse)); err != nil {
+	if _, err := a.startDAGRun(ctx, dag, manualStart{
+		params:         params,
+		dagRunID:       dagRunId,
+		nameOverride:   nameOverride,
+		labels:         labels,
+		profileName:    profileName,
+		noReuse:        valueOf(request.Body.NoReuse),
+		workerSelector: workerSelector,
+	}); err != nil {
 		return nil, fmt.Errorf("error starting dag-run: %w", err)
 	}
 
@@ -1213,6 +1241,9 @@ func (a *API) ExecuteDAGSync(ctx context.Context, request api.ExecuteDAGSyncRequ
 	}
 	if params != "" {
 		detailsMap["params"] = params
+	}
+	if len(workerSelector) > 0 {
+		detailsMap["worker_selector"] = workerSelector
 	}
 	a.logAudit(ctx, audit.CategoryDAG, "dag_execute_sync", detailsMap)
 
@@ -1303,22 +1334,63 @@ func (a *API) readDAGRunStatusForSync(ctx context.Context, dag *ir.DAG, dagRunID
 	return status, nil
 }
 
-func (a *API) startDAGRun(
-	ctx context.Context,
-	dag *ir.DAG,
-	params, dagRunID, nameOverride, labels, profileName string,
-	noReuse bool,
-) (*launcher.StartResult, error) {
+// manualStart is what a start request asks for a run started by a person or
+// an API caller.
+type manualStart struct {
+	params       string
+	dagRunID     string
+	nameOverride string
+	labels       string
+	profileName  string
+	noReuse      bool
+	// workerSelector is the request's override, already applied to the DAG;
+	// it travels to the start subprocess, which reloads the DAG from its file.
+	workerSelector map[string]string
+}
+
+func (a *API) startDAGRun(ctx context.Context, dag *ir.DAG, req manualStart) (*launcher.StartResult, error) {
 	return a.startDAGRunWithOptions(ctx, dag, startDAGRunOptions{
-		params:       params,
-		dagRunID:     dagRunID,
-		nameOverride: nameOverride,
-		triggerType:  ir.TriggerTypeManual,
-		triggerActor: triggerActorFromContext(ctx),
-		labels:       labels,
-		profileName:  profileName,
-		noReuse:      noReuse,
+		params:         req.params,
+		dagRunID:       req.dagRunID,
+		nameOverride:   req.nameOverride,
+		triggerType:    ir.TriggerTypeManual,
+		triggerActor:   triggerActorFromContext(ctx),
+		labels:         req.labels,
+		profileName:    req.profileName,
+		noReuse:        req.noReuse,
+		workerSelector: req.workerSelector,
 	})
+}
+
+// applyWorkerSelectorOverride replaces the loaded DAG's worker selector with
+// the request's, when one was given, and returns it for the launch options
+// and the audit record.
+func applyWorkerSelectorOverride(dag *ir.DAG, override *api.WorkerSelectorOverride) (map[string]string, error) {
+	if override == nil || len(*override) == 0 {
+		return nil, nil
+	}
+	selector := map[string]string(*override)
+	if err := reapplyWorkerSelector(dag, selector); err != nil {
+		return nil, err
+	}
+	return selector, nil
+}
+
+// reapplyWorkerSelector puts a per-run selector on a DAG. Runtime-param
+// resolution rebuilds the DAG from its YAML, so every path that resolves
+// applies the request's selector again to the DAG it goes on to use.
+func reapplyWorkerSelector(dag *ir.DAG, selector map[string]string) error {
+	if len(selector) == 0 {
+		return nil
+	}
+	if err := dag.ApplyWorkerSelector(selector); err != nil {
+		return &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    "invalid workerSelector: " + err.Error(),
+		}
+	}
+	return nil
 }
 
 // extractLabelsParam validates and serializes an optional labels array into a comma-separated string.
@@ -1403,6 +1475,8 @@ type startDAGRunOptions struct {
 	labels       string
 	profileName  string
 	noReuse      bool
+	// workerSelector is a per-run override, passed to the start subprocess.
+	workerSelector map[string]string
 }
 
 // waitForDAGStatusChange waits until the DAG status transitions from NotStarted.
@@ -1581,6 +1655,11 @@ func (a *API) startDAGRunWithOptions(ctx context.Context, dag *ir.DAG, opts star
 			Message:    err.Error(),
 		}
 	}
+	// Resolution rebuilt the DAG from its YAML; the request's selector goes on
+	// the DAG the dispatch reads.
+	if err := reapplyWorkerSelector(resolvedDAG, opts.workerSelector); err != nil {
+		return nil, err
+	}
 	dag = resolvedDAG
 
 	if err := buildErrorsToAPIError(dag.BuildErrors); err != nil {
@@ -1640,18 +1719,19 @@ func (a *API) startPreparedDAGRunWithOptions(
 		}
 	}
 	spec := a.subCmdBuilder.Start(dag, launcher.StartOptions{
-		Params:       dispatchParams,
-		DAGRunID:     opts.dagRunID,
-		Quiet:        true,
-		NameOverride: opts.nameOverride,
-		FromRunID:    fromRunID,
-		Target:       target,
-		SourceFile:   &dag.SourceFile,
-		TriggerType:  triggerTypeStr,
-		TriggerActor: opts.triggerActor,
-		Labels:       opts.labels,
-		ProfileName:  opts.profileName,
-		NoReuse:      opts.noReuse,
+		Params:         dispatchParams,
+		DAGRunID:       opts.dagRunID,
+		Quiet:          true,
+		NameOverride:   opts.nameOverride,
+		FromRunID:      fromRunID,
+		Target:         target,
+		SourceFile:     &dag.SourceFile,
+		TriggerType:    triggerTypeStr,
+		TriggerActor:   opts.triggerActor,
+		Labels:         opts.labels,
+		ProfileName:    opts.profileName,
+		NoReuse:        opts.noReuse,
+		WorkerSelector: opts.workerSelector,
 	})
 	spec.Env = append(spec.Env, a.managedOpenCodeEnv(ctx, dag)...)
 	started, err := launcher.StartProcess(ctx, spec)
@@ -1753,6 +1833,10 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 		}
 		dag.Name = nameOverride
 	}
+	workerSelector, err := applyWorkerSelectorOverride(dag, request.Body.WorkerSelector)
+	if err != nil {
+		return nil, err
+	}
 
 	dagRunId := valueOf(request.Body.DagRunId)
 	if err := validateDAGRunID(dagRunId); err != nil {
@@ -1785,7 +1869,17 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 		return nil, err
 	}
 
-	if err := a.enqueueDAGRun(ctx, dag, valueOf(request.Body.Params), dagRunId, nameOverride, ir.TriggerTypeManual, labels, profileName, valueOf(request.Body.NoReuse), request.FileName); err != nil {
+	if err := a.enqueueDAGRun(ctx, dag, enqueueRequest{
+		params:         valueOf(request.Body.Params),
+		dagRunID:       dagRunId,
+		nameOverride:   nameOverride,
+		triggerType:    ir.TriggerTypeManual,
+		labels:         labels,
+		profileName:    profileName,
+		noReuse:        valueOf(request.Body.NoReuse),
+		definitionID:   request.FileName,
+		workerSelector: workerSelector,
+	}); err != nil {
 		return nil, fmt.Errorf("error enqueuing dag-run: %w", err)
 	}
 
@@ -1796,6 +1890,9 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 	if request.Body.Params != nil && *request.Body.Params != "" {
 		enqueueDetails["params"] = *request.Body.Params
 	}
+	if len(workerSelector) > 0 {
+		enqueueDetails["worker_selector"] = workerSelector
+	}
 	a.logAudit(ctx, audit.CategoryDAG, "dag_enqueue", enqueueDetails)
 
 	return api.EnqueueDAGDAGRun200JSONResponse{
@@ -1803,7 +1900,23 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 	}, nil
 }
 
-func (a *API) enqueueDAGRun(ctx context.Context, dag *ir.DAG, params, dagRunID, nameOverride string, triggerType ir.TriggerType, labels, profileName string, noReuse bool, definitionID string) error {
+// enqueueRequest is what an enqueue asks for one queued run.
+type enqueueRequest struct {
+	params       string
+	dagRunID     string
+	nameOverride string
+	triggerType  ir.TriggerType
+	labels       string
+	profileName  string
+	noReuse      bool
+	definitionID string
+	// workerSelector is the request's override, already applied to the DAG;
+	// it travels to the enqueue subprocess, which reloads the DAG from its file.
+	workerSelector map[string]string
+}
+
+func (a *API) enqueueDAGRun(ctx context.Context, dag *ir.DAG, req enqueueRequest) error {
+	params, dagRunID := req.params, req.dagRunID
 	if err := launchParamsError(params); err != nil {
 		return err
 	}
@@ -1816,6 +1929,9 @@ func (a *API) enqueueDAGRun(ctx context.Context, dag *ir.DAG, params, dagRunID, 
 			Code:       api.ErrorCodeBadRequest,
 			Message:    err.Error(),
 		}
+	}
+	if err := reapplyWorkerSelector(resolvedDAG, req.workerSelector); err != nil {
+		return err
 	}
 	dag = resolvedDAG
 
@@ -1835,19 +1951,20 @@ func (a *API) enqueueDAGRun(ctx context.Context, dag *ir.DAG, params, dagRunID, 
 
 	// Only pass trigger type if it's a known value (not TriggerTypeUnknown)
 	triggerTypeStr := ""
-	if triggerType != ir.TriggerTypeUnknown {
-		triggerTypeStr = triggerType.String()
+	if req.triggerType != ir.TriggerTypeUnknown {
+		triggerTypeStr = req.triggerType.String()
 	}
 	opts := launcher.EnqueueOptions{
-		Params:       params,
-		DAGRunID:     dagRunID,
-		NameOverride: nameOverride,
-		TriggerType:  triggerTypeStr,
-		TriggerActor: triggerActorFromContext(ctx),
-		Labels:       labels,
-		ProfileName:  profileName,
-		DefinitionID: definitionID,
-		NoReuse:      noReuse,
+		Params:         params,
+		DAGRunID:       dagRunID,
+		NameOverride:   req.nameOverride,
+		TriggerType:    triggerTypeStr,
+		TriggerActor:   triggerActorFromContext(ctx),
+		Labels:         req.labels,
+		ProfileName:    req.profileName,
+		DefinitionID:   req.definitionID,
+		NoReuse:        req.noReuse,
+		WorkerSelector: req.workerSelector,
 	}
 	if dag.Queue != "" {
 		opts.Queue = dag.Queue
