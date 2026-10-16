@@ -1133,3 +1133,65 @@ func (l legacyLock) unlock() {
 	}
 	_ = removeLockDir(l.lockPath)
 }
+
+// An entry that cannot be deleted must not keep the lock name occupied for
+// good. Releasing a lock, by its holder or by a stale takeover, still frees the
+// name for the next contender.
+func TestRelease_UndeletableEntry(t *testing.T) {
+	tests := []struct {
+		name    string
+		release func(t *testing.T, dir string)
+	}{
+		{
+			name: "Unlock",
+			release: func(t *testing.T, dir string) {
+				holder := New(dir, nil)
+				require.NoError(t, holder.TryLock())
+				addUndeletableEntry(t, dir)
+				require.NoError(t, holder.Unlock())
+			},
+		},
+		{
+			name: "StaleTakeover",
+			release: func(t *testing.T, dir string) {
+				require.NoError(t, New(dir, nil).TryLock())
+				addUndeletableEntry(t, dir)
+				backdateLock(t, dir)
+				takeover := New(dir, nil)
+				require.NoError(t, takeover.TryLock())
+				require.NoError(t, takeover.Unlock())
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			tt.release(t, dir)
+
+			next := New(dir, nil)
+			require.NoError(t, next.TryLock())
+			require.NoError(t, next.Unlock())
+		})
+	}
+}
+
+// addUndeletableEntry puts a read-only directory with a file inside the lock
+// directory, so the file cannot be deleted where it is.
+func addUndeletableEntry(t *testing.T, dir string) {
+	t.Helper()
+	readOnly := filepath.Join(dir, LockDirectoryName, "read-only")
+	require.NoError(t, os.Mkdir(readOnly, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(readOnly, "file"), nil, 0o600))
+	require.NoError(t, os.Chmod(readOnly, 0o500))
+	t.Cleanup(func() {
+		// Wherever the directory ended up, restore write access so the
+		// temporary directory can be removed.
+		_ = filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+			if err == nil && d.IsDir() {
+				_ = os.Chmod(path, 0o700)
+			}
+			return nil
+		})
+	})
+}

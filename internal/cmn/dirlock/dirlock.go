@@ -336,10 +336,11 @@ func staleLockError(err error) error {
 	}
 }
 
-// releaseClaimedLock deletes a lock directory claimed under claimName. It
-// never renames the directory: a claimer that stalls may lose its claim to a
-// later takeover, and moving the live lock name away would hand it to a third
-// contender. Instead it deletes the entries it listed by name. Those names are
+// releaseClaimedLock deletes a lock directory claimed under claimName. It does
+// not rename the directory while its entries can be deleted: a claimer that
+// stalls may lose its claim to a later takeover, and moving the live lock name
+// away would hand it to a third contender. Instead it deletes the entries it
+// listed by name. Those names are
 // unique to the claimed instance, so a newer lock at the same path keeps its
 // files, and the claim file itself is removed last as the final ownership
 // check. It returns ErrLockConflict if the claim was lost.
@@ -357,7 +358,9 @@ func releaseClaimedLock(lockPath, claimName string) error {
 	for _, e := range entries {
 		if e.Name() != claimName {
 			if err := fileutil.RemoveAll(filepath.Join(lockPath, e.Name())); err != nil {
-				return err
+				// An entry that cannot be deleted would keep the lock name
+				// occupied for good.
+				return moveClaimedLockAside(lockPath, claimName)
 			}
 		}
 	}
@@ -373,6 +376,23 @@ func releaseClaimedLock(lockPath, claimName string) error {
 		return err
 	}
 	return nil
+}
+
+// moveClaimedLockAside frees the lock name by moving the directory claimed
+// under claimName aside, as older releases do on every release, and deletes
+// what it can of it. The move goes by path, so it runs only after confirming
+// that the claim is still in the directory. A claim is taken over only once
+// the directory is stale, so moving a newer lock instead would need a stall
+// longer than the stale threshold between that check and the move. It returns
+// ErrLockConflict if the claim was lost.
+func moveClaimedLockAside(lockPath, claimName string) error {
+	if _, err := os.Lstat(filepath.Join(lockPath, claimName)); err != nil {
+		if os.IsNotExist(err) {
+			return ErrLockConflict
+		}
+		return err
+	}
+	return removeLockDir(lockPath)
 }
 
 func containsEntry(entries []os.DirEntry, name string) bool {
