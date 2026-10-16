@@ -36,7 +36,7 @@ type entryReaderImpl struct {
 	baseWatchPaths         []baseWatchPath
 	targetDir              string
 	registry               map[string]*ir.DAG
-	stamps                 map[string]dagFileStamp
+	loads                  map[string]dagFileLoad
 	watchedDirs            map[string]struct{}
 	lock                   sync.Mutex
 	dagRepository          *persis.DAGRepository
@@ -116,6 +116,11 @@ const (
 	// tools (git, kubectl cp, editors), which native file watches also miss on a
 	// network file system.
 	defaultResyncInterval = 5 * time.Minute
+	// minStampAge is how long before its load a file must have been last
+	// modified for a full refresh to trust an unchanged stamp. File systems
+	// record modification times in ticks of up to 2s, so a write in the same
+	// tick as the load can leave the stamp unchanged.
+	minStampAge = 5 * time.Second
 )
 
 type dagFileStamp struct {
@@ -123,9 +128,19 @@ type dagFileStamp struct {
 	modTime int64
 }
 
+// dagFileLoad records what a registry entry was loaded from, so a full refresh
+// can keep the entry while none of it has changed.
+type dagFileLoad struct {
+	stamp dagFileStamp
+	// statAt is when stamp was taken, before the load, in Unix nanoseconds.
+	statAt int64
+	// baseState describes the base configs the entry was loaded with.
+	baseState string
+}
+
 type registryState struct {
 	dags   map[string]*ir.DAG
-	stamps map[string]dagFileStamp
+	loads  map[string]dagFileLoad
 	issues []string
 }
 
@@ -136,7 +151,7 @@ func NewFileEntryReader(dir string, dagRepository *persis.DAGRepository, recursi
 		baseConfigPath:         baseConfigPath,
 		workspaceBaseConfigDir: workspaceBaseConfigDir,
 		registry:               make(map[string]*ir.DAG),
-		stamps:                 make(map[string]dagFileStamp),
+		loads:                  make(map[string]dagFileLoad),
 		watchedDirs:            make(map[string]struct{}),
 		dagRepository:          dagRepository,
 		dagSource:              newDAGFileSource(dir, dagRepository),
@@ -358,10 +373,10 @@ func (er *entryReaderImpl) applyDAGFileSnapshot(ctx context.Context, fileName st
 		oldDAGName = oldDAG.Name
 	}
 	er.registry[fileName] = dag
-	if er.stamps == nil {
-		er.stamps = make(map[string]dagFileStamp)
+	if er.loads == nil {
+		er.loads = make(map[string]dagFileLoad)
 	}
-	er.stamps[fileName] = snapshot.stamp
+	er.loads[fileName] = er.snapshotLoad(snapshot)
 	er.lock.Unlock()
 
 	// If the DAG name changed, emit delete for the old name first
@@ -388,13 +403,19 @@ func (er *entryReaderImpl) applyDAGFileSnapshot(ctx context.Context, fileName st
 	})
 }
 
+// snapshotLoad records how a watcher snapshot was loaded. The watch loop keeps
+// baseConfigState current before it handles a DAG file event.
+func (er *entryReaderImpl) snapshotLoad(snapshot dagFileSnapshot) dagFileLoad {
+	return dagFileLoad{stamp: snapshot.stamp, statAt: snapshot.statAt, baseState: er.baseConfigState}
+}
+
 // removeDAGFile drops a confirmed-absent DAG file from the registry.
 func (er *entryReaderImpl) removeDAGFile(ctx context.Context, fileName string) {
 	// Capture DAG name from registry before deleting
 	er.lock.Lock()
 	dag, existed := er.registry[fileName]
 	delete(er.registry, fileName)
-	delete(er.stamps, fileName)
+	delete(er.loads, fileName)
 	er.lock.Unlock()
 
 	if existed && dag != nil {
@@ -459,6 +480,7 @@ func definitionIDForFile(fileName string) string {
 func (er *entryReaderImpl) initRecursive(ctx context.Context) error {
 	er.watcher = er.newWatcher()
 
+	scannedAt := time.Now()
 	scan, err := Discover(er.targetDir, DiscoveryOptions{Recursive: true})
 	if err != nil {
 		_ = er.watcher.Close()
@@ -469,7 +491,7 @@ func (er *entryReaderImpl) initRecursive(ctx context.Context) error {
 		return err
 	}
 
-	state, err := er.loadRegistry(ctx)
+	state, err := er.loadRegistry(ctx, scan, scannedAt)
 	if err != nil {
 		_ = er.watcher.Close()
 		return fmt.Errorf("failed to initialize recursive DAGs: %w", err)
@@ -480,19 +502,20 @@ func (er *entryReaderImpl) initRecursive(ctx context.Context) error {
 
 	er.lock.Lock()
 	er.registry = state.dags
-	er.stamps = state.stamps
+	er.loads = state.loads
 	er.lock.Unlock()
 	return nil
 }
 
 func (er *entryReaderImpl) refreshRegistry(ctx context.Context) error {
+	scannedAt := time.Now()
 	scan, err := Discover(er.targetDir, DiscoveryOptions{Recursive: er.recursive})
 	if err != nil {
 		return err
 	}
 	er.syncWatches(ctx, scan.Dirs)
 
-	state, err := er.loadRegistry(ctx)
+	state, err := er.loadRegistry(ctx, scan, scannedAt)
 	if err != nil {
 		return err
 	}
@@ -535,7 +558,18 @@ func (er *entryReaderImpl) syncWatches(ctx context.Context, dirs []string) {
 	}
 }
 
-func (er *entryReaderImpl) loadRegistry(ctx context.Context) (registryState, error) {
+// loadRegistry loads every listed DAG, keeping registry entries that loading
+// again would not change. scan is the target directory as seen at scannedAt,
+// before the listing.
+func (er *entryReaderImpl) loadRegistry(ctx context.Context, scan DiscoveryResult, scannedAt time.Time) (registryState, error) {
+	// Described before loading, so a base config change during the load makes
+	// the next refresh load again.
+	baseState := describeBaseConfigStateSet(er.baseConfigPath, er.workspaceBaseConfigDir)
+	scanned := make(map[string]DiscoveredFile, len(scan.Files))
+	for _, file := range scan.Files {
+		scanned[file.RelPath] = file
+	}
+
 	paginator := pagination.NewPaginator(1, math.MaxInt)
 	result, issues, err := er.dagRepository.List(ctx, persis.DAGListOptions{Paginator: &paginator})
 	if err != nil {
@@ -543,7 +577,7 @@ func (er *entryReaderImpl) loadRegistry(ctx context.Context) (registryState, err
 	}
 
 	dags := make(map[string]*ir.DAG, len(result.Items))
-	stamps := make(map[string]dagFileStamp, len(result.Items))
+	loads := make(map[string]dagFileLoad, len(result.Items))
 	for _, listedDAG := range result.Items {
 		if er.isBaseConfigEvent(fsnotify.Event{Name: listedDAG.Location}) {
 			continue
@@ -565,12 +599,27 @@ func (er *entryReaderImpl) loadRegistry(ctx context.Context) (registryState, err
 		if !strings.Contains(locator, "/") {
 			locator = "./" + locator
 		}
-		// Stat before loading: a write that lands in between must still look
-		// like a change to the next refresh.
-		info, err := os.Stat(listedDAG.Location)
-		if err != nil {
-			issues = append(issues, fmt.Sprintf("reading %s failed: %s", key, err))
-			continue
+		// The stamp is always taken before loading: a write that lands in
+		// between must still look like a change to the next refresh.
+		load := dagFileLoad{baseState: baseState}
+		if file, ok := scanned[key]; ok {
+			load.stamp = dagFileStamp{size: file.Size, modTime: file.ModTime}
+			load.statAt = scannedAt.UnixNano()
+			if dag, prev, ok := er.reusableDAG(key, file.ResolvedPath, load); ok {
+				dags[key] = dag
+				loads[key] = prev
+				continue
+			}
+		} else {
+			// Missing from the scan, such as a file created after it or a
+			// symlink the scan skips.
+			load.statAt = time.Now().UnixNano()
+			info, err := os.Stat(listedDAG.Location)
+			if err != nil {
+				issues = append(issues, fmt.Sprintf("reading %s failed: %s", key, err))
+				continue
+			}
+			load.stamp = dagFileStamp{size: info.Size(), modTime: info.ModTime().UnixNano()}
 		}
 		dag, err := er.dagRepository.GetMetadata(ctx, locator)
 		if err != nil {
@@ -579,14 +628,32 @@ func (er *entryReaderImpl) loadRegistry(ctx context.Context) (registryState, err
 		}
 
 		dags[key] = dag
-		stamps[key] = dagFileStamp{size: info.Size(), modTime: info.ModTime().UnixNano()}
+		loads[key] = load
 	}
 	sort.Strings(issues)
 	return registryState{
 		dags:   dags,
-		stamps: stamps,
+		loads:  loads,
 		issues: issues,
 	}, nil
+}
+
+// reusableDAG returns the registry entry for key, and how it was loaded, when
+// loading the file again would give the same DAG: the file still has the
+// resolved target, stamp and base configs of the earlier load, and had not
+// been modified for minStampAge before that load.
+func (er *entryReaderImpl) reusableDAG(key, resolvedPath string, current dagFileLoad) (*ir.DAG, dagFileLoad, bool) {
+	er.lock.Lock()
+	defer er.lock.Unlock()
+
+	dag, ok := er.registry[key]
+	prev := er.loads[key]
+	if !ok || dag == nil || dag.SourceFile != resolvedPath ||
+		prev.stamp != current.stamp || prev.baseState != current.baseState ||
+		prev.stamp.modTime > prev.statAt-int64(minStampAge) {
+		return nil, dagFileLoad{}, false
+	}
+	return dag, prev, true
 }
 
 func (er *entryReaderImpl) replaceRegistry(state registryState) []persis.DAGChangeEvent {
@@ -630,7 +697,7 @@ func (er *entryReaderImpl) replaceRegistry(state registryState) []persis.DAGChan
 			)
 			continue
 		}
-		if er.stamps[key] != state.stamps[key] || !bytes.Equal(oldDAG.BaseConfigData, dag.BaseConfigData) {
+		if er.loads[key].stamp != state.loads[key].stamp || !bytes.Equal(oldDAG.BaseConfigData, dag.BaseConfigData) {
 			events = append(events, persis.DAGChangeEvent{
 				Type: persis.DAGChangeUpdated,
 				DAGEntry: persis.DAGEntry{
@@ -642,7 +709,7 @@ func (er *entryReaderImpl) replaceRegistry(state registryState) []persis.DAGChan
 	}
 
 	er.registry = state.dags
-	er.stamps = state.stamps
+	er.loads = state.loads
 	return events
 }
 
@@ -682,7 +749,7 @@ func (er *entryReaderImpl) initialize(ctx context.Context) error {
 				continue
 			}
 			er.registry[fi.Name()] = snapshot.dag
-			er.stamps[fi.Name()] = snapshot.stamp
+			er.loads[fi.Name()] = er.snapshotLoad(snapshot)
 			dags = append(dags, fi.Name())
 		}
 	}

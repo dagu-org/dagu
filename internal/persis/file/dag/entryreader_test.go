@@ -5,6 +5,7 @@ package dag
 
 import (
 	"context"
+	"fmt"
 	"github.com/dagucloud/dagu/v2/internal/cmn/filenotify"
 	"github.com/dagucloud/dagu/v2/internal/cmn/fileutil"
 	"github.com/dagucloud/dagu/v2/internal/persis"
@@ -12,6 +13,8 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
+	"sync"
 	"testing"
 	"time"
 
@@ -704,6 +707,19 @@ func expectEvent(t *testing.T, events <-chan persis.DAGChangeEvent, kind persis.
 	}
 }
 
+// nextEvent returns the next event, failing when none arrives in time.
+func nextEvent(t *testing.T, events <-chan persis.DAGChangeEvent) persis.DAGChangeEvent {
+	t.Helper()
+
+	select {
+	case event := <-events:
+		return event
+	case <-time.After(5 * time.Second):
+		t.Fatal("missing change event")
+		return persis.DAGChangeEvent{}
+	}
+}
+
 // expectNoEvent fails when any event arrives within the window.
 func expectNoEvent(t *testing.T, events <-chan persis.DAGChangeEvent, window time.Duration) {
 	t.Helper()
@@ -715,9 +731,62 @@ func expectNoEvent(t *testing.T, events <-chan persis.DAGChangeEvent, window tim
 	}
 }
 
+// countingStore records which DAGs had their metadata loaded.
+type countingStore struct {
+	*Store
+	mu    sync.Mutex
+	loads []string
+}
+
+func (s *countingStore) GetMetadata(ctx context.Context, id string) (*ir.DAG, error) {
+	s.mu.Lock()
+	s.loads = append(s.loads, definitionIDForFile(id))
+	s.mu.Unlock()
+	return s.Store.GetMetadata(ctx, id)
+}
+
+// takeLoads returns the DAGs loaded since the previous call, sorted.
+func (s *countingStore) takeLoads() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	loads := s.loads
+	s.loads = nil
+	sort.Strings(loads)
+	return loads
+}
+
+// newRefreshTestReader returns an initialized reader whose watcher never
+// fires, so the test drives every refresh, and the store it loads through.
+func newRefreshTestReader(t *testing.T, dir string, recursive bool, storeOpts ...Option) (*entryReaderImpl, chan persis.DAGChangeEvent, *countingStore) {
+	t.Helper()
+
+	opts := append([]Option{WithSkipExamples(true), WithRecursiveDiscovery(recursive)}, storeOpts...)
+	store := &countingStore{Store: NewStore(dir, opts...)}
+	repo := persis.NewDAGRepository(store, persis.DAGRepositoryOptions{
+		BaseConfigPath:         store.baseConfigPath,
+		WorkspaceBaseConfigDir: store.workspaceBaseConfigDir,
+	})
+	er := NewFileEntryReader(dir, repo, recursive, store.baseConfigPath, store.workspaceBaseConfigDir,
+		withWatcherFactory(newSilentWatcher))
+	events := make(chan persis.DAGChangeEvent, 64)
+	er.events = events
+	require.NoError(t, er.Init(context.Background()))
+	t.Cleanup(er.Stop)
+	return er, events, store
+}
+
+// ageFile moves a file's modification time an hour back. A refresh reloads a
+// file modified just before its last load, since a write within the same
+// timestamp tick would leave its stamp unchanged.
+func ageFile(t *testing.T, path string) {
+	t.Helper()
+	old := time.Now().Add(-time.Hour)
+	require.NoError(t, os.Chtimes(path, old, old))
+}
+
 // TestEntryReaderRefreshEmitsNothingWhenUnchanged keeps a full refresh from
-// reporting DAGs that did not change, whether they were loaded at start-up or
-// applied from a watcher event.
+// reporting or reloading DAGs that did not change, whether they were loaded at
+// start-up or applied from a watcher event.
 func TestEntryReaderRefreshEmitsNothingWhenUnchanged(t *testing.T) {
 	for _, recursive := range []bool{false, true} {
 		name := "NonRecursive"
@@ -726,16 +795,12 @@ func TestEntryReaderRefreshEmitsNothingWhenUnchanged(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			dir := t.TempDir()
-			writeDAGFile(t, dir, "existing.yaml", "existing")
-			store := newRepository(dir, WithSkipExamples(true), WithRecursiveDiscovery(recursive))
-			er := NewFileEntryReader(dir, store, recursive, "", "", withWatcherFactory(newSilentWatcher))
-			events := make(chan persis.DAGChangeEvent, 64)
-			er.events = events
+			ageFile(t, writeDAGFile(t, dir, "existing.yaml", "existing"))
+			er, events, store := newRefreshTestReader(t, dir, recursive)
 			ctx := context.Background()
-			require.NoError(t, er.Init(ctx))
-			t.Cleanup(er.Stop)
 
 			path := writeDAGFile(t, dir, "applied.yaml", "applied")
+			ageFile(t, path)
 			if recursive {
 				// Recursive readers apply every change through a full refresh.
 				require.NoError(t, er.refreshRegistry(ctx))
@@ -743,11 +808,169 @@ func TestEntryReaderRefreshEmitsNothingWhenUnchanged(t *testing.T) {
 				er.handleFSEvent(ctx, fsnotify.Event{Name: path, Op: fsnotify.Create})
 			}
 			expectEvent(t, events, persis.DAGChangeAdded, "applied")
+			store.takeLoads()
 
 			require.NoError(t, er.refreshRegistry(ctx))
 			expectNoEvent(t, events, 100*time.Millisecond)
+			assert.Empty(t, store.takeLoads())
 		})
 	}
+}
+
+// TestEntryReaderRefreshLoadsOnlyChangedDAGs verifies a full refresh loads
+// only the DAG files that changed and drops deleted ones without loading.
+func TestEntryReaderRefreshLoadsOnlyChangedDAGs(t *testing.T) {
+	for _, recursive := range []bool{false, true} {
+		name := "NonRecursive"
+		if recursive {
+			name = "Recursive"
+		}
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			for _, id := range []string{"a", "b", "c"} {
+				ageFile(t, writeDAGFile(t, dir, id+".yaml", id))
+			}
+			er, events, store := newRefreshTestReader(t, dir, recursive)
+			store.takeLoads()
+
+			edited := filepath.Join(dir, "b.yaml")
+			require.NoError(t, os.WriteFile(edited, []byte("name: b\ndescription: edited\nsteps:\n  - run: echo hello\n"), 0600))
+			ageFile(t, edited)
+			require.NoError(t, os.Remove(filepath.Join(dir, "c.yaml")))
+			require.NoError(t, er.refreshRegistry(context.Background()))
+
+			expectEvent(t, events, persis.DAGChangeDeleted, "c")
+			expectEvent(t, events, persis.DAGChangeUpdated, "b")
+			assert.Equal(t, []string{"b"}, store.takeLoads())
+		})
+	}
+}
+
+// TestEntryReaderRefreshLoadsAllOnBaseConfigChange verifies a base config
+// change loads every DAG again, since each one merges it.
+func TestEntryReaderRefreshLoadsAllOnBaseConfigChange(t *testing.T) {
+	for _, scope := range []string{"global", "workspace"} {
+		t.Run(scope, func(t *testing.T) {
+			root := t.TempDir()
+			dir := filepath.Join(root, "dags")
+			require.NoError(t, os.MkdirAll(dir, 0750))
+			for _, id := range []string{"a", "b"} {
+				path := filepath.Join(dir, id+".yaml")
+				require.NoError(t, os.WriteFile(path, []byte("labels: [workspace=ops]\nsteps:\n  - run: echo tick\n"), 0600))
+				ageFile(t, path)
+			}
+			recursive := scope == "workspace"
+			base := filepath.Join(root, "base.yaml")
+			opts := []Option{WithBaseConfig(base)}
+			if recursive {
+				workspaces := filepath.Join(root, "workspaces")
+				base = filepath.Join(workspaces, "ops", "base.yaml")
+				opts = []Option{WithWorkspaceBaseConfigDir(workspaces)}
+			}
+			require.NoError(t, os.MkdirAll(filepath.Dir(base), 0750))
+			require.NoError(t, os.WriteFile(base, []byte("queue: before\n"), 0600))
+			er, events, store := newRefreshTestReader(t, dir, recursive, opts...)
+			ctx := context.Background()
+			store.takeLoads()
+
+			require.NoError(t, os.WriteFile(base, []byte("queue: after\n"), 0600))
+			require.NoError(t, er.refreshRegistry(ctx))
+			for range 2 {
+				event := nextEvent(t, events)
+				assert.Equal(t, persis.DAGChangeUpdated, event.Type)
+				assert.Equal(t, "after", event.DAG.ProcGroup())
+			}
+			assert.Equal(t, []string{"a", "b"}, store.takeLoads())
+
+			require.NoError(t, er.refreshRegistry(ctx))
+			expectNoEvent(t, events, 100*time.Millisecond)
+			assert.Empty(t, store.takeLoads())
+		})
+	}
+}
+
+// TestEntryReaderRefreshReloadsDAGLoadedWithRemovedBaseConfig covers a base
+// config created and removed again before a refresh runs. A DAG applied in
+// between merged it and must be loaded again, although the base config state
+// is back to what the reader saw at start-up.
+func TestEntryReaderRefreshReloadsDAGLoadedWithRemovedBaseConfig(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "dags")
+	require.NoError(t, os.MkdirAll(dir, 0750))
+	path := filepath.Join(dir, "a.yaml")
+	require.NoError(t, os.WriteFile(path, []byte("steps:\n  - run: echo tick\n"), 0600))
+	ageFile(t, path)
+	base := filepath.Join(root, "base.yaml")
+	er, events, _ := newRefreshTestReader(t, dir, false, WithBaseConfig(base))
+	ctx := context.Background()
+
+	require.NoError(t, os.WriteFile(base, []byte("queue: transient\n"), 0600))
+	// The watch loop records the base config state before it applies a DAG event.
+	er.baseConfigState = describeBaseConfigStateSet(er.baseConfigPath, er.workspaceBaseConfigDir)
+	er.handleFSEvent(ctx, fsnotify.Event{Name: path, Op: fsnotify.Write})
+	require.Equal(t, "transient", nextEvent(t, events).DAG.ProcGroup())
+
+	require.NoError(t, os.Remove(base))
+	require.NoError(t, er.refreshRegistry(ctx))
+	event := nextEvent(t, events)
+	assert.Equal(t, persis.DAGChangeUpdated, event.Type)
+	assert.Equal(t, "a", event.DAG.ProcGroup())
+}
+
+// entrySchedule returns the first schedule expression of the registry entry id.
+func entrySchedule(t *testing.T, er *entryReaderImpl, id string) string {
+	t.Helper()
+	for _, entry := range er.Entries() {
+		if entry.DefinitionID == id {
+			require.NotEmpty(t, entry.DAG.Schedule)
+			return entry.DAG.Schedule[0].Expression
+		}
+	}
+	t.Fatalf("no registry entry %q", id)
+	return ""
+}
+
+// TestEntryReaderRefreshReloadsRecentlyModifiedDAG covers a same-size write
+// within the timestamp tick of the previous load: the stamp does not change,
+// so only the file's age tells the refresh to load it again.
+func TestEntryReaderRefreshReloadsRecentlyModifiedDAG(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "a.yaml")
+	require.NoError(t, os.WriteFile(path, []byte("schedule: \"1 * * * *\"\nsteps:\n  - run: echo tick\n"), 0600))
+	er, _, _ := newRefreshTestReader(t, dir, false)
+	info, err := os.Stat(path)
+	require.NoError(t, err)
+
+	require.NoError(t, os.WriteFile(path, []byte("schedule: \"2 * * * *\"\nsteps:\n  - run: echo tick\n"), 0600))
+	require.NoError(t, os.Chtimes(path, info.ModTime(), info.ModTime()))
+	require.NoError(t, er.refreshRegistry(context.Background()))
+	assert.Equal(t, "2 * * * *", entrySchedule(t, er, "a"))
+}
+
+// TestEntryReaderRefreshFollowsSymlinkRetarget covers a DAG symlink pointed at
+// another file with the same size and modification time: the stamp read
+// through the link is unchanged, but the DAG now comes from the new target.
+func TestEntryReaderRefreshFollowsSymlinkRetarget(t *testing.T) {
+	dir := t.TempDir()
+	targets := filepath.Join(dir, "targets")
+	require.NoError(t, os.MkdirAll(targets, 0750))
+	mtime := time.Now().Add(-time.Hour)
+	for i, schedule := range []string{"1 * * * *", "2 * * * *"} {
+		path := filepath.Join(targets, fmt.Sprintf("v%d.yaml", i+1))
+		require.NoError(t, os.WriteFile(path, []byte("schedule: \""+schedule+"\"\nsteps:\n  - run: echo tick\n"), 0600))
+		require.NoError(t, os.Chtimes(path, mtime, mtime))
+	}
+	link := filepath.Join(dir, "a.yaml")
+	if err := os.Symlink(filepath.Join(targets, "v1.yaml"), link); err != nil {
+		t.Skipf("symlink creation is unavailable: %v", err)
+	}
+	er, _, _ := newRefreshTestReader(t, dir, false)
+	require.Equal(t, "1 * * * *", entrySchedule(t, er, "a"))
+
+	require.NoError(t, os.Remove(link))
+	require.NoError(t, os.Symlink(filepath.Join(targets, "v2.yaml"), link))
+	require.NoError(t, er.refreshRegistry(context.Background()))
+	assert.Equal(t, "2 * * * *", entrySchedule(t, er, "a"))
 }
 
 // silentWatcher models a watcher that never delivers events, like inotify on a
