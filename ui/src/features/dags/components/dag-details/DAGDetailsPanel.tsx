@@ -111,7 +111,7 @@ function DAGDetailsPanel({
   // Keyboard shortcuts
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent): void {
-      if (shouldIgnoreKeyboardShortcuts()) {
+      if (shouldIgnoreKeyboardShortcuts(event)) {
         return;
       }
 

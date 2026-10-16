@@ -358,6 +358,11 @@ export function StepDetailsDrawer({
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      // A dialog or menu inside the drawer already handled the key.
+      if (event.defaultPrevented) {
+        return;
+      }
+
       if (event.key === 'Escape') {
         onClose();
         return;

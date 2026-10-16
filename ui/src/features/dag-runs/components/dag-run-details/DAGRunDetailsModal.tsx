@@ -192,7 +192,7 @@ function DAGRunDetailsModal({
     }
 
     function handleKeyDown(event: KeyboardEvent): void {
-      if (shouldIgnoreKeyboardShortcuts()) {
+      if (shouldIgnoreKeyboardShortcuts(event)) {
         return;
       }
 
