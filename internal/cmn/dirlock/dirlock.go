@@ -212,7 +212,13 @@ func (l *dirLock) TryLock() error {
 		return fmt.Errorf("failed to check lock status: %w", err)
 	}
 
-	return l.createLock()
+	if err := l.createLock(); err != nil {
+		return err
+	}
+	// No live lock means a holder may have crashed before renaming its
+	// temporary directory into place, so clean those up here as well.
+	l.removeAbandonedTempDirs()
+	return nil
 }
 
 // removeAbandonedTempDirs removes temporary lock directories older than the
@@ -354,7 +360,9 @@ func releaseClaimedLock(lockPath, claimName string) error {
 	}
 	for _, e := range entries {
 		if e.Name() != claimName {
-			_ = fileutil.RemoveAll(filepath.Join(lockPath, e.Name()))
+			if err := fileutil.RemoveAll(filepath.Join(lockPath, e.Name())); err != nil {
+				return err
+			}
 		}
 	}
 	if err := fileutil.Remove(filepath.Join(lockPath, claimName)); err != nil {
