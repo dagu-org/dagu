@@ -444,8 +444,17 @@ func (l *dirLock) createLock() error {
 	ownerFile := ownerFilePrefix + newUniqueID()
 	ownerPath := filepath.Join(l.lockPath, ownerFile)
 	if err := os.WriteFile(ownerPath, []byte(token), 0600); err != nil {
-		l.abandonLock(ownerPath)
-		if isLostClaimError(err) || isRetryableLockStateError(err) {
+		if isLostClaimError(err) {
+			// Another process removed or moved the directory, so nothing at
+			// the lock path is this instance's to clean up.
+			return ErrLockConflict
+		}
+		// The directory is still this instance's. Remove it rather than leave
+		// it empty, which would block others until it goes stale; removing
+		// only an empty directory never removes a held lock.
+		_ = fileutil.Remove(ownerPath)
+		_ = fileutil.Remove(l.lockPath)
+		if isRetryableLockStateError(err) {
 			return ErrLockConflict
 		}
 		return fmt.Errorf("failed to write lock token: %w", err)

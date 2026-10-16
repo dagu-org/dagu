@@ -1015,6 +1015,29 @@ func TestStaleTakeover_SlowSweep(t *testing.T) {
 	require.NoError(t, first.Unlock())
 }
 
+// When the owner file cannot be written, the new lock directory must not be
+// left behind: once the cause is fixed, the next attempt acquires the lock
+// without waiting for it to go stale.
+func TestCreateLock_OwnerWriteFails(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("directory permissions do not deny file creation here")
+	}
+	dir := t.TempDir()
+	lockPath := filepath.Join(dir, LockDirectoryName)
+	lock := New(dir, nil).(*dirLock)
+	lock.beforeOwnerWrite = func() {
+		require.NoError(t, os.Chmod(lockPath, 0o500))
+	}
+
+	require.ErrorIs(t, lock.TryLock(), os.ErrPermission)
+	require.False(t, lock.IsHeldByMe())
+	_ = os.Chmod(lockPath, 0o700)
+
+	next := New(dir, nil)
+	require.NoError(t, next.TryLock())
+	require.NoError(t, next.Unlock())
+}
+
 // The lock directory is empty until its owner file is written, so stale-lock
 // recovery may remove it, and another contender may create or claim the
 // directory at that path in the meantime. The creator must back off and leave
