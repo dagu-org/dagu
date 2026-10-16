@@ -97,8 +97,7 @@ function WikiContent() {
   const normalizedWorkspaceSelection =
     sanitizeWorkspaceSelection(workspaceSelection);
   const selectedWorkspace = workspaceNameForSelection(workspaceSelection);
-  const canCreateAtRoot =
-    normalizedWorkspaceSelection.kind !== WorkspaceKind.all;
+  // From the all view, root pages go to the default (no-workspace) Wiki.
   const rootCreateWorkspace =
     normalizedWorkspaceSelection.kind === WorkspaceKind.workspace
       ? (normalizedWorkspaceSelection.workspace ?? null)
@@ -535,12 +534,7 @@ function WikiContent() {
       error={treeError}
       onRetry={() => mutate()}
       onContextAction={handleContextAction}
-      canCreateNew={canCreateAtRoot}
       onCreateNew={() => {
-        if (!canCreateAtRoot) {
-          showToast('Select a workspace before creating a Wiki page');
-          return;
-        }
         setCreateParentDir('');
         setCreateWorkspace(rootCreateWorkspace);
         setCreateError(null);
