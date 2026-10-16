@@ -5,6 +5,7 @@ package certproxy
 
 import (
 	"net/netip"
+	"slices"
 	"strings"
 
 	"github.com/dagucloud/dagu/v2/internal/cmn/hostpattern"
@@ -13,12 +14,7 @@ import (
 // manualProxy reports whether hosts include a destination Chrome will not
 // send through a PAC script. The browser then needs a manual proxy.
 func manualProxy(hosts []string) bool {
-	for _, host := range hosts {
-		if implicitBypass(host) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(hosts, implicitBypass)
 }
 
 // implicitBypass reports whether pattern is, or can match, a destination
