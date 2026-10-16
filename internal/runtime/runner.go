@@ -28,6 +28,7 @@ import (
 	"github.com/dagucloud/dagu/v2/internal/cmn/logger/tag"
 	cmnvalue "github.com/dagucloud/dagu/v2/internal/cmn/value"
 	"github.com/dagucloud/dagu/v2/internal/ir"
+	"github.com/dagucloud/dagu/v2/internal/telemetry"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -570,6 +571,7 @@ func (r *Runner) runNodeExecution(ctx context.Context, plan *Plan, node *Node, p
 	}
 
 	ctx = spanCtx
+	ctx = withStepTraceContext(ctx)
 	ctx = r.setupNodeExecutionEnv(ctx, node)
 	preparedNodeTornDown := false
 	teardownPreparedNode := func() {
@@ -771,6 +773,35 @@ func (r *Runner) setupNodeExecutionEnv(ctx context.Context, node *Node) context.
 		env = env.WithEnvVars(runenv.EnvKeyDAGPushBack, payload)
 	}
 
+	return WithEnv(ctx, env)
+}
+
+// withStepTraceContext gives the step process the W3C trace context of the
+// step span as TRACEPARENT and TRACESTATE. It adds nothing when the context has
+// no valid span, which is the case when tracing is off for the DAG.
+func withStepTraceContext(ctx context.Context) context.Context {
+	if !trace.SpanContextFromContext(ctx).IsValid() {
+		return ctx
+	}
+	values := make(map[string]string, 2)
+	for _, entry := range telemetry.InjectTraceContext(ctx) {
+		if key, value, ok := strings.Cut(entry, "="); ok {
+			values[key] = value
+		}
+	}
+	traceParent := values[runenv.EnvKeyTraceParent]
+	if traceParent == "" {
+		return ctx
+	}
+	env := GetEnv(ctx)
+	scope := env.Scope.WithEntry(runenv.EnvKeyTraceParent, traceParent, cmnvalue.EnvSourceStepEnv)
+	// A TRACESTATE from the run scope belongs to another span, so replace it
+	// even when the step span has no trace state.
+	traceState := values[runenv.EnvKeyTraceState]
+	if _, inherited := scope.Get(runenv.EnvKeyTraceState); traceState != "" || inherited {
+		scope = scope.WithEntry(runenv.EnvKeyTraceState, traceState, cmnvalue.EnvSourceStepEnv)
+	}
+	env.Scope = scope
 	return WithEnv(ctx, env)
 }
 
