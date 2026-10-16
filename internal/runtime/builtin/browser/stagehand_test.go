@@ -5,6 +5,7 @@ package browser
 
 import (
 	"bufio"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -48,6 +49,22 @@ const shopPage = `<!doctype html><html><head><title>Shop</title></head><body>
 <p id="status">open</p>
 <button onclick="document.getElementById('status').textContent='clicked'">Submit</button>
 </body></html>`
+
+// testBrowserDir keeps what test browsers learn about the executable, so
+// only the first headless launch of a test process learns its user agent.
+var testBrowserDir string
+
+func TestMain(m *testing.M) {
+	dir, err := os.MkdirTemp("", "dagu-browser-state-")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	testBrowserDir = dir
+	code := m.Run()
+	_ = os.RemoveAll(dir)
+	os.Exit(code)
+}
 
 // elementIDPattern finds a node ID in the accessibility tree the runtime
 // sends to the model, such as "[0-23] button: Submit".
@@ -157,10 +174,11 @@ func launchBrowser(t *testing.T, opts launchOptions) engine {
 	t.Helper()
 	requireChrome(t)
 	ctx := t.Context()
-	opts.Executable = chromePath()
+	opts.Executable = cmp.Or(opts.Executable, chromePath())
 	opts.Headless = true
 	opts.UserDataDir = browserProfileDir(t)
 	opts.NoSandbox = true
+	opts.BrowserDir = cmp.Or(opts.BrowserDir, testBrowserDir)
 	var eng engine
 	err := withStartupSlot(func() (err error) {
 		eng, err = stagehandLauncher{}.Launch(ctx, opts)
@@ -1081,12 +1099,17 @@ func TestStagehandFailedLaunchEndsBrowser(t *testing.T) {
 	script := fmt.Sprintf("#!/bin/sh\nprintf '%%s\\n' \"$@\" > \"$0.args\"\nexec %s \"$@\" --disable-extensions\n", chrome)
 	require.NoError(t, os.WriteFile(wrapper, []byte(script), 0o700))
 
+	// A kept user agent spares the probe, which would wait out the same
+	// minute first.
+	browserDir := t.TempDir()
+	require.NoError(t, keepUserAgent(browserDir, headedUserAgent{Executable: wrapper, Product: "Chrome/1.0.0.0", UserAgent: "Mozilla/5.0 Chrome/1.0.0.0"}))
 	err := withStartupSlot(func() error {
 		_, err := stagehandLauncher{}.Launch(t.Context(), launchOptions{
 			Executable:  wrapper,
 			Headless:    true,
 			UserDataDir: browserProfileDir(t),
 			NoSandbox:   true,
+			BrowserDir:  browserDir,
 			Generate:    (&shopModel{}).generate,
 		})
 		return err
@@ -1100,6 +1123,255 @@ func TestStagehandFailedLaunchEndsBrowser(t *testing.T) {
 	require.Eventually(t, func() bool {
 		return errors.Is(browserhost.Probe(context.Background(), "http://127.0.0.1:"+string(port[1])), browserhost.ErrUnreachable)
 	}, 10*time.Second, 200*time.Millisecond, "the failed launch ends the browser")
+}
+
+// serveUserAgent serves a page showing the user agent its request came
+// with.
+func serveUserAgent(t *testing.T) string {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		_, _ = io.WriteString(w, r.UserAgent())
+	}))
+	t.Cleanup(server.Close)
+	return server.URL
+}
+
+// pageUserAgent reads the user agent a page's request came with, and the
+// one its scripts see, with the brands it reports.
+func pageUserAgent(t *testing.T, eng engine, pageURL string) (header, script string, brands []string) {
+	t.Helper()
+	require.NoError(t, eng.Goto(t.Context(), pageURL, time.Minute))
+	header, err := eng.PageText(t.Context())
+	require.NoError(t, err)
+	raw, err := eng.(*stagehandEngine).evaluate(t.Context(), `({agent: navigator.userAgent, brands: navigator.userAgentData.brands.map((b) => b.brand)})`)
+	require.NoError(t, err)
+	var seen struct {
+		Agent  string   `json:"agent"`
+		Brands []string `json:"brands"`
+	}
+	require.NoError(t, json.Unmarshal(raw, &seen))
+	return strings.TrimSpace(header), seen.Agent, seen.Brands
+}
+
+// A browser without a window sends the user agent it sends with one, so a
+// site treats a step as it treats a person.
+func TestStagehandLooksHeaded(t *testing.T) {
+	t.Parallel()
+
+	eng := launchBrowser(t, launchOptions{Generate: (&shopModel{}).generate})
+	header, script, brands := pageUserAgent(t, eng, serveUserAgent(t))
+	assert.Equal(t, header, script, "the request and the page's scripts see the same user agent")
+	assert.Contains(t, header, headedProduct)
+	assert.NotContains(t, header, "Headless")
+	assert.NotContains(t, brands, "HeadlessChrome")
+}
+
+// A browser without a window reports a desktop's screen, one that holds its
+// window, so a page that sizes itself by the screen lays out as it does for
+// a person.
+func TestStagehandScreenHoldsWindow(t *testing.T) {
+	t.Parallel()
+
+	for name, size := range map[string]*viewport{"default size": nil, "large viewport": {Width: 2400, Height: 1300}} {
+		eng := launchBrowser(t, launchOptions{Viewport: size, Generate: (&shopModel{}).generate})
+		require.NoError(t, eng.Goto(t.Context(), "data:text/html,<p>screen</p>", time.Minute))
+		raw, err := eng.(*stagehandEngine).evaluate(t.Context(), `[screen.width, screen.height, outerWidth, outerHeight]`)
+		require.NoError(t, err)
+		var sizes [4]int
+		require.NoError(t, json.Unmarshal(raw, &sizes), name)
+		screenWidth, screenHeight, windowWidth, windowHeight := sizes[0], sizes[1], sizes[2], sizes[3]
+		t.Logf("%s: screen %dx%d, window %dx%d", name, screenWidth, screenHeight, windowWidth, windowHeight)
+		assert.GreaterOrEqual(t, screenWidth, max(windowWidth, headlessScreenWidth), name)
+		assert.GreaterOrEqual(t, screenHeight, max(windowHeight, headlessScreenHeight), name)
+	}
+}
+
+// loggingWrapper returns an executable that runs Chrome and logs each start
+// to its .log file: the user agent the start was given, or none. With
+// failProbe, a start on a probe's profile exits at once and logs probe.
+func loggingWrapper(t *testing.T, failProbe bool) string {
+	t.Helper()
+	requireChrome(t)
+	if runtime.GOOS == "windows" {
+		t.Skip("the browser wrapper is a shell script")
+	}
+	probe := ""
+	if failProbe {
+		probe = `--user-data-dir=*dagu-browser-probe-*) echo probe >> "$0.log"; exit 1;; `
+	}
+	wrapper := filepath.Join(t.TempDir(), "chrome")
+	chrome := "'" + strings.ReplaceAll(chromePath(), "'", `'\''`) + "'"
+	script := fmt.Sprintf("#!/bin/sh\nagent=none\nfor arg in \"$@\"; do case \"$arg\" in %s--user-agent=*) agent=\"${arg#--user-agent=}\";; esac; done\n"+
+		"printf '%%s\\n' \"$agent\" >> \"$0.log\"\nexec %s \"$@\"\n", probe, chrome)
+	require.NoError(t, os.WriteFile(wrapper, []byte(script), 0o700))
+	return wrapper
+}
+
+// loggedStarts returns the starts wrapper logged after the first skip.
+func loggedStarts(t *testing.T, wrapper string, skip int) []string {
+	t.Helper()
+	data, err := os.ReadFile(wrapper + ".log")
+	require.NoError(t, err)
+	return strings.Split(strings.TrimSpace(string(data)), "\n")[skip:]
+}
+
+// The user agent an executable sends with a window is learned once, by a
+// browser started for it alone, and asked again only once the executable
+// reports another version, starting the browser again only when the user
+// agent changed with it.
+func TestStagehandLearnsUserAgentOnce(t *testing.T) {
+	t.Parallel()
+
+	wrapper := loggingWrapper(t, false)
+	browserDir := t.TempDir()
+	pageURL := serveUserAgent(t)
+	logged := 0
+	// launch starts and closes a browser, and returns the user agents its
+	// starts were given and the one its page's request came with.
+	launch := func() ([]string, string) {
+		t.Helper()
+		eng := launchBrowser(t, launchOptions{Executable: wrapper, BrowserDir: browserDir, Generate: (&shopModel{}).generate})
+		header, _, _ := pageUserAgent(t, eng, pageURL)
+		require.NoError(t, eng.Close(t.Context()))
+		starts := loggedStarts(t, wrapper, logged)
+		logged += len(starts)
+		return starts, header
+	}
+
+	starts, header := launch()
+	require.Len(t, starts, 2, "a probe, then the browser")
+	assert.Equal(t, "none", starts[0], "the probe sends its own user agent")
+	assert.Equal(t, header, starts[1])
+	assert.NotContains(t, header, "Headless")
+	headed := header
+
+	starts, _ = launch()
+	assert.Equal(t, []string{headed}, starts, "the kept user agent needs no probe")
+
+	kept, ok := loadUserAgent(browserDir, wrapper)
+	require.True(t, ok)
+	updated := kept
+	updated.Product = "Chrome/1.0.0.0"
+	require.NoError(t, keepUserAgent(browserDir, updated))
+	starts, _ = launch()
+	assert.Equal(t, []string{headed, "none"}, starts, "another version is probed, and the same user agent keeps the browser")
+
+	updated.UserAgent = "Mozilla/5.0 Chrome/1.0.0.0"
+	require.NoError(t, keepUserAgent(browserDir, updated))
+	starts, header = launch()
+	assert.Equal(t, []string{updated.UserAgent, "none", headed}, starts, "a changed user agent starts the browser again")
+	assert.Equal(t, headed, header)
+	kept, ok = loadUserAgent(browserDir, wrapper)
+	require.True(t, ok)
+	assert.Equal(t, headed, kept.UserAgent)
+}
+
+// A probe that cannot start the browser only warns: the browser starts, its
+// own user agent tells the one it sends with a window, and it starts again
+// sending that.
+func TestStagehandLaunchesWhenTheProbeFails(t *testing.T) {
+	t.Parallel()
+
+	wrapper := loggingWrapper(t, true)
+	var warnings []string
+	eng := launchBrowser(t, launchOptions{
+		Executable: wrapper, BrowserDir: t.TempDir(), Generate: (&shopModel{}).generate,
+		Warn: func(message string) { warnings = append(warnings, message) },
+	})
+	header, _, _ := pageUserAgent(t, eng, serveUserAgent(t))
+	assert.NotContains(t, header, "Headless")
+	assert.Equal(t, []string{"probe", "none", header}, loggedStarts(t, wrapper, 0))
+	require.Len(t, warnings, 1)
+	assert.Contains(t, warnings[0], "learn the user agent the browser sends with a window: start the browser")
+}
+
+// serveRefusals serves a page behind a bot check, answered as Cloudflare
+// answers, and a forbidden page without a body.
+func serveRefusals(t *testing.T) string {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/checked":
+			w.Header().Set("Content-Type", "text/html")
+			w.Header().Set("Cf-Mitigated", "challenge")
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = io.WriteString(w, "<title>Just a moment...</title><p>Checking your browser</p>")
+		case "/forbidden":
+			w.WriteHeader(http.StatusForbidden)
+		default:
+			w.Header().Set("Content-Type", "text/html")
+			_, _ = io.WriteString(w, "<p>Welcome</p>")
+		}
+	}))
+	t.Cleanup(server.Close)
+	return server.URL
+}
+
+// A page a site refused tells how: a bot check, or a refusal the browser
+// shows its own error page for.
+func TestStagehandTellsRefusedPages(t *testing.T) {
+	t.Parallel()
+
+	eng := launchBrowser(t, launchOptions{Generate: (&shopModel{}).generate})
+	// The check here never passes.
+	eng.(*stagehandEngine).botCheckWait = time.Second
+	site := serveRefusals(t)
+	host := urlHost(site)
+	for path, want := range map[string]refusal{
+		"/checked":   {Host: host, Status: http.StatusForbidden, BotCheck: browserhost.BotCheckCloudflare},
+		"/forbidden": {Host: host, Status: http.StatusForbidden},
+	} {
+		// A browser that shows its own error page for the answer reports
+		// the navigation as failed.
+		_ = eng.Goto(t.Context(), site+path, time.Minute)
+		page, err := eng.PageOutcome(t.Context())
+		require.NoError(t, err, path)
+		refused, ok := refusalOf(page)
+		require.True(t, ok, "%s: %+v", path, page)
+		assert.Equal(t, want, refused, path)
+	}
+	require.NoError(t, eng.Goto(t.Context(), site, time.Minute))
+	page, err := eng.PageOutcome(t.Context())
+	require.NoError(t, err)
+	_, refused := refusalOf(page)
+	assert.False(t, refused, "%+v", page)
+}
+
+// serveCheckThatPasses serves a page behind a bot check that passes on its
+// own a moment after it loads, as one that needs no person does: it marks
+// the browser and loads the page again.
+func serveCheckThatPasses(t *testing.T) string {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		if _, err := r.Cookie("passed"); err == nil {
+			_, _ = io.WriteString(w, "<p>Welcome</p>")
+			return
+		}
+		w.Header().Set("Cf-Mitigated", "challenge")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = io.WriteString(w, `<title>Just a moment...</title><p>Checking your browser</p>
+<script>setTimeout(() => { document.cookie = "passed=1; path=/"; location.reload(); }, 1000);</script>`)
+	}))
+	t.Cleanup(server.Close)
+	return server.URL
+}
+
+// Going to a page behind a bot check that passes on its own returns once it
+// passed, so the next operation reads the page and not the check.
+func TestStagehandWaitsForBotCheckToPass(t *testing.T) {
+	t.Parallel()
+
+	eng := launchBrowser(t, launchOptions{Generate: (&shopModel{}).generate})
+	require.NoError(t, eng.Goto(t.Context(), serveCheckThatPasses(t), time.Minute))
+	text, err := eng.PageText(t.Context())
+	require.NoError(t, err)
+	assert.Contains(t, text, "Welcome")
+	page, err := eng.PageOutcome(t.Context())
+	require.NoError(t, err)
+	_, refused := refusalOf(page)
+	assert.False(t, refused, "%+v", page)
 }
 
 // A real page's snapshot renders as the outline the renderer is built for,

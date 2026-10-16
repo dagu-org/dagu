@@ -174,6 +174,17 @@ those outputs. Operation progress is written to stderr.
 (unauthenticated), `allowed_domains`, `screenshots`, `profile`, and
 `client_certificates`.
 
+A browser without a window sends the user agent its executable sends with
+one, never `HeadlessChrome`, so a site treats the step as it treats a person.
+The user agent is learned from the executable the first time it runs without
+a window, by starting it once on a profile of its own, and kept under the
+data directory's `browser/user-agents/`. A launch whose browser reports
+another version than the one kept learns it again, and starts the browser
+again only when the user agent changed with it. When the user agent cannot be
+learned or kept, the step runs and warns. It reports a screen of 1920x1080,
+or its viewport's size when that is larger, where Chrome would report one
+smaller than its window.
+
 The host configuration `browser.sandbox: false`, or the environment variable
 `DAGU_BROWSER_SANDBOX=false`, turns off Chromium's sandbox for every browser
 the host starts, for hosts where the sandbox cannot start. The sandbox is on
@@ -299,6 +310,29 @@ attempt, since a page missing a script or a sign-in redirect usually fails a
 later operation. A request blocked after its operation returns is counted with
 the next one. When counting stops, for example because the browser's DevTools
 connection closes, the step log warns once.
+
+### Refused pages
+
+A page counts as refused when its site answered with a bot check in place of
+it, which for Cloudflare is any answer with the header `cf-mitigated:
+challenge`, or answered `403` or `429`, with a body or without one, which
+Chrome shows as its own error page. A page a client certificate kept from
+opening is not counted; Client certificates explains it.
+
+After the start URL and after every operation, a refused page adds a line to
+the timeline and the step log, such as `page refused shop.example.com
+answered with a Cloudflare bot check (HTTP 403) in place of the page` or
+`page refused portal.example.com refused the page (HTTP 403 Forbidden)`, once
+while the browser keeps showing it. A step that fails while the browser
+shows a refused page ends its error with the same sentence, since a refusal
+usually fails a later operation, and keeps the recordings it replayed, since
+the refusal says nothing about them.
+
+An action that leaves the browser on a bot check, such as `goto` or an `act`
+that loads a page, waits up to 10 seconds for the check to pass, as a check
+that needs no person does by loading the page it stood in for, and then
+lets the page settle as any new page does. A check still shown after the
+wait is left to the operations that follow and reported as above.
 
 ### Artifacts
 
@@ -447,7 +481,9 @@ some models give that answer for every request. An
 complete. An `upload` fails when a file cannot be uploaded, the model finds no
 element for `into`, or the element leads to no single file input, as
 described under Uploads. A page that does not load because of a client certificate fails the
-operation that opened it, as described under Client certificates.
+operation that opened it, as described under Client certificates. A failure
+on a page the site refused names the refusal, as described under Refused
+pages.
 
 Loading a DAG warns, without failing, about each `extract` string field whose
 name ends in `url`, `uri`, `link`, or `href`, singular or plural, and that has

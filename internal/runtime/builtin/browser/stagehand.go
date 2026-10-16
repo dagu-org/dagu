@@ -57,6 +57,18 @@ const (
 	settleQuiet   = 500 * time.Millisecond
 	settleTimeout = 5 * time.Second
 	settlePoll    = 100 * time.Millisecond
+	// botCheckWait bounds how long an action waits for a bot check the site
+	// answered with to pass. A check that needs no person passes within
+	// seconds by loading the page it stood in for, as it would for a
+	// person waiting in front of the window.
+	botCheckWait = 10 * time.Second
+	// headlessScreenWidth and headlessScreenHeight size the screen a browser
+	// without a window reports: a common desktop's, or its window's when
+	// that is larger. Chrome otherwise reports 800x600, smaller than its
+	// window, which pages that size themselves by the screen read as a
+	// phone.
+	headlessScreenWidth  = 1920
+	headlessScreenHeight = 1080
 )
 
 // watchExpression counts the page's requests in flight, including reads of
@@ -119,18 +131,23 @@ const selectorVisibleExpression = `Array.from(document.querySelectorAll(%s)).som
 
 // pageOutcomeExpression describes what the browser shows. On its error page
 // that is the network error code and the host of the page that did not
-// load, which Chrome uses as the error page's title; on a page, its host,
-// HTTP status, title, and the start of its text.
-const pageOutcomeExpression = `(() => {
+// load, which Chrome uses as the error page's title, with the status of an
+// HTTP error answer without a body, which the page shows as "HTTP ERROR
+// 403" in every language; on a page, its host, HTTP status, title, and the
+// start of its text.
+var pageOutcomeExpression = fmt.Sprintf(`(() => {
 	const text = ((document.body && document.body.innerText) || "").slice(0, 500);
 	if (location.protocol === "chrome-error:") {
 		const code = document.querySelector(".error-code");
-		const match = ((code && code.textContent) || text).match(/ERR_[A-Z0-9_]+/);
+		const shown = (code && code.textContent) || text;
+		const status = shown.match(/HTTP ERROR (\d{3})/);
+		if (status) return {code: %q, host: document.title, status: Number(status[1]), title: "", text: ""};
+		const match = shown.match(/ERR_[A-Z0-9_]+/);
 		return {code: match ? match[0] : "ERR_FAILED", host: document.title, status: 0, title: "", text: ""};
 	}
 	const entry = performance.getEntriesByType("navigation")[0];
 	return {code: "", host: location.hostname, status: (entry && entry.responseStatus) || 0, title: document.title, text};
-})()`
+})()`, httpErrorCode)
 
 var errImageInput = errors.New("browser: image input to the model is not supported")
 
@@ -145,6 +162,16 @@ func sandboxHint(noSandbox bool) string {
 		"run the container with a profile that allows user namespaces, such as " +
 		"/usr/share/dagu/seccomp-chromium.json in the dev image, or turn the sandbox off " +
 		"with browser.sandbox: false in the Dagu config or DAGU_BROWSER_SANDBOX=false"
+}
+
+// headlessScreen returns the flag that gives a browser without a window, at
+// viewport v or the runtime's default size, a screen that holds its window.
+func headlessScreen(v *viewport) string {
+	width, height := headlessScreenWidth, headlessScreenHeight
+	if v != nil {
+		width, height = max(width, v.Width), max(height, v.Height)
+	}
+	return fmt.Sprintf("--screen-info={%dx%d}", width, height)
 }
 
 // sandboxOverride reports why the browser runtime would turn off the sandbox
@@ -173,9 +200,47 @@ func (l stagehandLauncher) Launch(ctx context.Context, opts launchOptions) (engi
 		return nil, fmt.Errorf("launch browser: the browser sandbox is on, but the browser runtime turns it off %s; "+
 			"set browser.sandbox: false in the Dagu config or DAGU_BROWSER_SANDBOX=false to run without it", reason)
 	}
-	port, err := freeLoopbackPort()
+	opts.Warn = warnOnce(opts.Warn)
+	key := userAgentKey(opts.Executable)
+	known := knownUserAgent(ctx, opts, key)
+	sent := ""
+	if opts.Headless {
+		sent = known.UserAgent
+	}
+	started, err := l.start(ctx, opts, sent)
 	if err != nil {
 		return nil, err
+	}
+	if started, err = l.confirmUserAgent(ctx, opts, key, known, sent, started); err != nil {
+		return nil, err
+	}
+	cdpURL := started.cdpURL
+	eng, err := startEngine(ctx, started.browser, cdpURL, opts)
+	if err != nil {
+		return nil, errors.Join(err, endUnstartedBrowser(ctx, started.browser, cdpURL, opts.UserDataDir), killCertProxy(started.proxy))
+	}
+	eng.handle.CertProxy = started.proxy
+	extension, err := browserhost.StagehandExtension(ctx, cdpURL)
+	if err != nil {
+		return nil, errors.Join(fmt.Errorf("locate browser runtime extension: %w", err), eng.Close(context.WithoutCancel(ctx)))
+	}
+	eng.handle.ExtensionID = extension.ID
+	eng.handle.ExtensionDir = extension.Path
+	// Without a process ID, a browser that stops answering cannot be ended.
+	eng.handle.BrowserPID, _ = browserhost.BrowserProcessID(ctx, cdpURL)
+	eng.handle.BrowserStartedAt, _ = procutil.StartTime(eng.handle.BrowserPID)
+	if err := eng.handleDownloads(ctx, opts.DownloadsDir); err != nil {
+		return nil, errors.Join(err, eng.Close(context.WithoutCancel(ctx)))
+	}
+	return eng, nil
+}
+
+// start launches the browser opts describe, with the certificate proxy it
+// needs, sending userAgent when it is set.
+func (l stagehandLauncher) start(ctx context.Context, opts launchOptions, userAgent string) (startedBrowser, error) {
+	port, err := freeLoopbackPort()
+	if err != nil {
+		return startedBrowser{}, err
 	}
 	launch := &stagehand.LocalBrowserLaunchOptions{
 		ExecutablePath: opts.Executable,
@@ -191,11 +256,17 @@ func (l stagehandLauncher) Launch(ctx context.Context, opts launchOptions) (engi
 	if opts.Proxy != "" {
 		launch.Proxy = &stagehand.LocalProxyConfig{Server: opts.Proxy}
 	}
+	if userAgent != "" {
+		launch.Args = append(launch.Args, "--user-agent="+userAgent)
+	}
+	if opts.Headless {
+		launch.Args = append(launch.Args, headlessScreen(opts.Viewport))
+	}
 	cdpURL := fmt.Sprintf("http://127.0.0.1:%d", port)
 	var proxy *certproxy.Handle
 	if len(opts.ClientCertificates) > 0 || len(opts.TrustedCAs) > 0 || opts.Guard {
 		if proxy, err = l.startCertProxy(ctx, cdpURL, opts); err != nil {
-			return nil, err
+			return startedBrowser{}, err
 		}
 		// The proxy routes every request the browser makes, through
 		// browser.proxy where one is set.
@@ -205,26 +276,9 @@ func (l stagehandLauncher) Launch(ctx context.Context, opts launchOptions) (engi
 	browser, err := stagehand.LaunchLocalBrowser(ctx, launch)
 	if err != nil {
 		launchErr := fmt.Errorf("launch browser: %w%s", err, sandboxHint(opts.NoSandbox))
-		return nil, errors.Join(launchErr, endUnstartedBrowser(ctx, nil, cdpURL, opts.UserDataDir), killCertProxy(proxy))
+		return startedBrowser{}, errors.Join(launchErr, endUnstartedBrowser(ctx, nil, cdpURL, opts.UserDataDir), killCertProxy(proxy))
 	}
-	eng, err := startEngine(ctx, browser, cdpURL, opts)
-	if err != nil {
-		return nil, errors.Join(err, endUnstartedBrowser(ctx, browser, cdpURL, opts.UserDataDir), killCertProxy(proxy))
-	}
-	eng.handle.CertProxy = proxy
-	extension, err := browserhost.StagehandExtension(ctx, cdpURL)
-	if err != nil {
-		return nil, errors.Join(fmt.Errorf("locate browser runtime extension: %w", err), eng.Close(context.WithoutCancel(ctx)))
-	}
-	eng.handle.ExtensionID = extension.ID
-	eng.handle.ExtensionDir = extension.Path
-	// Without a process ID, a browser that stops answering cannot be ended.
-	eng.handle.BrowserPID, _ = browserhost.BrowserProcessID(ctx, cdpURL)
-	eng.handle.BrowserStartedAt, _ = procutil.StartTime(eng.handle.BrowserPID)
-	if err := eng.handleDownloads(ctx, opts.DownloadsDir); err != nil {
-		return nil, errors.Join(err, eng.Close(context.WithoutCancel(ctx)))
-	}
-	return eng, nil
+	return startedBrowser{browser: browser, cdpURL: cdpURL, proxy: proxy}, nil
 }
 
 func (stagehandLauncher) Reattach(ctx context.Context, handle browserHandle, opts launchOptions) (engine, error) {
@@ -359,11 +413,17 @@ func startEngine(ctx context.Context, browser *stagehand.Browser, cdpURL string,
 		sink:            sink,
 		handle:          browserHandle{CDPURL: cdpURL},
 		pageCallTimeout: pageCallTimeout,
+		botCheckWait:    botCheckWait,
 	}
 	// An unanswered dialog blocks its page, and the runtime does not answer
 	// dialogs itself.
 	if eng.dialogs, err = browserhost.WatchDialogs(ctx, cdpURL); err != nil {
 		return nil, errors.Join(fmt.Errorf("watch dialogs: %w", err), eng.release(context.WithoutCancel(ctx)))
+	}
+	// A site that refuses the browser answers with a status or a bot check
+	// the page itself may not show.
+	if eng.responses, err = browserhost.WatchPageResponses(ctx, cdpURL); err != nil {
+		return nil, errors.Join(fmt.Errorf("watch page responses: %w", err), eng.release(context.WithoutCancel(ctx)))
 	}
 	if len(opts.AllowedDomains) > 0 {
 		// Blocked requests leave a broken page and a later, unrelated
@@ -394,11 +454,14 @@ type stagehandEngine struct {
 	// downloads are refused.
 	downloads *browserhost.DownloadWatcher
 	dialogs   *browserhost.DialogWatcher
+	responses *browserhost.PageResponseWatcher
 	// blocked counts requests allowed_domains blocks; nil without
 	// allowed_domains.
 	blocked *browserhost.BlockedRequestWatcher
 	// pageCallTimeout bounds calls that take no timeout of their own.
 	pageCallTimeout time.Duration
+	// botCheckWait bounds the wait for a bot check to pass.
+	botCheckWait time.Duration
 	// certificateEventsSeen is the last certificate proxy event taken.
 	certificateEventsSeen int64
 }
@@ -556,11 +619,57 @@ func (e *stagehandEngine) watch(ctx context.Context) {
 	})
 }
 
-// settle waits, up to settleTimeout, for what an action started to finish
-// before the next operation reads the page: a new document until its network
-// is idle, and the document the action began on until its requests end and
-// it stops changing. A page that does not settle in time is left as it is.
+// settle waits for what an action started to finish before the next
+// operation reads the page: for the document it shows to settle, and for a
+// bot check the site answered with to pass.
 func (e *stagehandEngine) settle(ctx context.Context) {
+	e.settleDocument(ctx)
+	e.awaitBotCheck(ctx)
+}
+
+// awaitBotCheck waits, up to botCheckWait, while the page shows a bot check.
+// A check passes by loading another document, which settles in turn, and
+// may ask again. A check still shown when the wait ends is left to the
+// operations that follow.
+func (e *stagehandEngine) awaitBotCheck(ctx context.Context) {
+	if !e.showsBotCheck(ctx) {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, e.botCheckWait)
+	defer cancel()
+	document, _ := e.DocumentID(ctx)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(settlePoll):
+		}
+		current, err := e.DocumentID(ctx)
+		if err != nil || current == document {
+			continue
+		}
+		e.settleDocument(ctx)
+		if !e.showsBotCheck(ctx) {
+			return
+		}
+		document = current
+	}
+}
+
+// showsBotCheck reports whether the page shows a bot check, reading it no
+// longer than a page settles, so a page that does not answer delays nothing.
+func (e *stagehandEngine) showsBotCheck(ctx context.Context) bool {
+	ctx, cancel := context.WithTimeout(ctx, settleTimeout)
+	defer cancel()
+	page, err := e.PageOutcome(ctx)
+	return err == nil && page.BotCheck != ""
+}
+
+// settleDocument waits, up to settleTimeout, for the document the page shows
+// to settle: a new document until its network is idle, and the document an
+// action began on until its requests end and it stops changing. A page that
+// does not settle in time is left as it is.
+func (e *stagehandEngine) settleDocument(ctx context.Context) {
 	ctx, cancel := context.WithTimeout(ctx, settleTimeout)
 	defer cancel()
 	page, err := e.page(ctx)
@@ -828,6 +937,13 @@ func (e *stagehandEngine) PageOutcome(ctx context.Context) (pageOutcome, error) 
 	if hostpattern.Validate(outcome.Host) != nil || strings.Contains(outcome.Host, "*") {
 		outcome.Host = ""
 	}
+	// The answer the host gave the page tells whether it was a bot check.
+	// An answer of another status was to an earlier page.
+	if e.responses != nil && outcome.Host != "" {
+		if response, ok := e.responses.Response(outcome.Host); ok && response.Status == outcome.Status {
+			outcome.BotCheck = response.BotCheck
+		}
+	}
 	return outcome, nil
 }
 
@@ -932,6 +1048,10 @@ func (e *stagehandEngine) release(ctx context.Context) error {
 	if e.dialogs != nil {
 		errs = append(errs, e.dialogs.Close())
 		e.dialogs = nil
+	}
+	if e.responses != nil {
+		errs = append(errs, e.responses.Close())
+		e.responses = nil
 	}
 	if e.blocked != nil {
 		errs = append(errs, e.blocked.Close())

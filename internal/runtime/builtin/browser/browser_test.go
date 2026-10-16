@@ -269,6 +269,48 @@ func TestFailureNamesBlockedHosts(t *testing.T) {
 		"browser.allowed_domains blocked 1 request: sso.example.net (1)")
 }
 
+// A page the site refused is reported once while the browser shows it, and
+// named in the failure it explains, however long after it the step fails.
+func TestRefusedPageIsReported(t *testing.T) {
+	t.Parallel()
+
+	run := newTestRun(t, pageModel(nil))
+	run.engine.outcome = pageOutcome{Host: "shop.example.com", Status: 403, BotCheck: browserhost.BotCheckCloudflare}
+	execution := run.execute(`{"url": "https://shop.example.com/cart", "do": [
+		{"act": "Click the checkout button"},
+		{"expect": {"text": "Order placed", "within": "1ms"}}
+	]}`, nil)
+
+	require.EqualError(t, execution.err, `browser: do[1] expect failed: expectation not met: the page text does not contain "Order placed"; `+
+		"shop.example.com answered with a Cloudflare bot check (HTTP 403) in place of the page")
+	assert.Equal(t, []string{"goto:completed", "page:refused", "act:completed"}, eventNames(execution.exec.GetAgentSession()))
+	assert.Contains(t, execution.stderr.String(), "page refused shop.example.com answered with a Cloudflare bot check (HTTP 403) in place of the page\n")
+}
+
+// A step that fails on a page the site refused keeps the recordings it
+// replayed: the refusal says nothing about them.
+func TestRefusedPageKeepsReplays(t *testing.T) {
+	t.Parallel()
+
+	const steps = `{"url": "https://shop.example.com/cart", "do": [
+		{"act": "Click the checkout button"},
+		{"expect": {"text": "Order placed", "within": "1ms"}}
+	]}`
+	run := newTestRun(t, pageModel(nil))
+	run.engine.setPageText("Order placed")
+	require.NoError(t, run.execute(steps, nil).err)
+
+	run.engine.setPageText("Just a moment...")
+	run.engine.outcome = pageOutcome{Host: "shop.example.com", Status: 403, BotCheck: browserhost.BotCheckCloudflare}
+	refused := run.execute(steps, nil)
+	require.ErrorContains(t, refused.err, "bot check")
+	assert.Contains(t, eventNames(refused.exec.GetAgentSession()), "act:cache-hit")
+
+	run.engine.setPageText("Order placed")
+	run.engine.outcome = pageOutcome{}
+	assert.Contains(t, eventNames(run.execute(steps, nil).exec.GetAgentSession()), "act:cache-hit")
+}
+
 // The browser sandbox stays on unless the host configuration turns it off.
 func TestHostSandboxSetting(t *testing.T) {
 	t.Parallel()
