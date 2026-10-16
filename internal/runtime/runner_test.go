@@ -2249,12 +2249,17 @@ func TestRunner_DryRunStepChecks(t *testing.T) {
 		result.assertNodeStatus(t, "onSuccess", ir.NodeSucceeded)
 	})
 
+	// The following subtests use a missing shell rather than a missing
+	// command: command names are not checked under the Windows default
+	// shell, while a missing shell is reported on every platform.
+	missingShell := withShell(missing + "-shell")
+
 	// A repeating step reports its problems once, not on every pass.
 	t.Run("RepeatingStepCheckedOnce", func(t *testing.T) {
 		r := setupRunner(t, func(cfg *runtime.Config) {
 			cfg.Dry = true
 		})
-		step := newStep("1", withCommand(missing), withRepeatPolicy(true, 0))
+		step := newStep("1", withCommand("true"), missingShell, withRepeatPolicy(true, 0))
 		step.RepeatPolicy.Limit = 3
 
 		plan := r.newPlan(t, step)
@@ -2262,8 +2267,8 @@ func TestRunner_DryRunStepChecks(t *testing.T) {
 		result := plan.assertRun(t, ir.Succeeded)
 		require.Equal(t, []runtime.DryRunCheck{{
 			Step:    "1",
-			Field:   "run",
-			Message: fmt.Sprintf("command %q not found on this host", missing),
+			Field:   "shell",
+			Message: fmt.Sprintf("shell %q not found on this host", missing+"-shell"),
 		}}, result.runner.DryRunChecks(result.Plan))
 	})
 
@@ -2272,11 +2277,11 @@ func TestRunner_DryRunStepChecks(t *testing.T) {
 			func(cfg *runtime.Config) {
 				cfg.Dry = true
 			},
-			withOnInit(newStep("onInit", withCommand(missing+"-init"))),
-			withOnExit(newStep("onExit", withCommand(missing+"-exit"))),
+			withOnInit(newStep("onInit", withCommand("true"), missingShell)),
+			withOnExit(newStep("onExit", withCommand("true"), missingShell)),
 		)
 
-		plan := r.newPlan(t, newStep("1", withCommand(missing)))
+		plan := r.newPlan(t, newStep("1", withCommand("true"), missingShell))
 
 		result := plan.assertRun(t, ir.Succeeded)
 		var steps []string
