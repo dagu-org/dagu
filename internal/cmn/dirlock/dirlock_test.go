@@ -1269,7 +1269,7 @@ func TestStaleTakeover_RestrictedLockDir(t *testing.T) {
 // once, as older releases do by moving the directory aside, rather than block
 // the next holder until the lock goes stale.
 func TestUnlock_RestrictedLockDir(t *testing.T) {
-	for _, mode := range []os.FileMode{0o300, 0o500} {
+	for _, mode := range []os.FileMode{0o000, 0o300, 0o500} {
 		t.Run(strconv.FormatUint(uint64(mode), 8), func(t *testing.T) {
 			dir := t.TempDir()
 			holder := New(dir, nil)

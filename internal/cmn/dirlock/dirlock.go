@@ -562,6 +562,10 @@ func (l *dirLock) Unlock() error {
 		return nil
 	}
 
+	// Releasing reads, renames and deletes entries of the lock directory and
+	// then removes it, so give the owner access back first if it was lost.
+	l.restoreLockDirAccess()
+
 	// Verify we still own the lock before removing
 	tokenPath := filepath.Join(l.lockPath, l.ownerFile)
 	data, err := fileutil.ReadFile(tokenPath)
@@ -578,15 +582,7 @@ func (l *dirLock) Unlock() error {
 	// Claim our own instance so that only it can be removed, even if a stale
 	// takeover replaces it concurrently.
 	claimName := claimedFilePrefix + newUniqueID()
-	claimPath := filepath.Join(l.lockPath, claimName)
-	err = fileutil.Rename(tokenPath, claimPath)
-	if errors.Is(err, fs.ErrPermission) {
-		// The lock directory may have lost owner access, which releasing
-		// needs; see restoreLockDirAccess.
-		l.restoreLockDirAccess()
-		err = fileutil.Rename(tokenPath, claimPath)
-	}
-	if err != nil {
+	if err := fileutil.Rename(tokenPath, filepath.Join(l.lockPath, claimName)); err != nil {
 		if isLostClaimError(err) {
 			l.isHeld = false
 			return fmt.Errorf("%w: lock was taken over: %v", ErrLockNotHeld, err)
@@ -596,12 +592,7 @@ func (l *dirLock) Unlock() error {
 	l.isHeld = false
 	l.runAfterClaim()
 
-	err = releaseClaimedLock(l.lockPath, claimName)
-	if errors.Is(err, fs.ErrPermission) {
-		l.restoreLockDirAccess()
-		err = releaseClaimedLock(l.lockPath, claimName)
-	}
-	if err != nil {
+	if err := releaseClaimedLock(l.lockPath, claimName); err != nil {
 		if errors.Is(err, ErrLockConflict) {
 			return fmt.Errorf("%w: lock was taken over while releasing", ErrLockNotHeld)
 		}
