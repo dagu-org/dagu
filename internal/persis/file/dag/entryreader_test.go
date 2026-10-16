@@ -977,21 +977,37 @@ func entrySchedule(t *testing.T, er *entryReaderImpl, id string) string {
 	return ""
 }
 
+// expectScheduleUpdate verifies a refresh both holds and reports the new
+// schedule of id. The planner only learns about it through the event.
+func expectScheduleUpdate(t *testing.T, er *entryReaderImpl, events <-chan persis.DAGChangeEvent, id, schedule string) {
+	t.Helper()
+	assert.Equal(t, schedule, entrySchedule(t, er, id))
+	event := nextEvent(t, events)
+	assert.Equal(t, persis.DAGChangeUpdated, event.Type)
+	require.NotEmpty(t, event.DAG.Schedule)
+	assert.Equal(t, schedule, event.DAG.Schedule[0].Expression)
+}
+
 // TestEntryReaderRefreshReloadsRecentlyModifiedDAG covers a same-size write
 // within the timestamp tick of the previous load: the stamp does not change,
-// so only the file's age tells the refresh to load it again.
+// so only the file's age tells the refresh to load it again. The store has no
+// metadata cache here, since the cache's own stamp check misses such a write.
 func TestEntryReaderRefreshReloadsRecentlyModifiedDAG(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "a.yaml")
 	require.NoError(t, os.WriteFile(path, []byte("schedule: \"1 * * * *\"\nsteps:\n  - run: echo tick\n"), 0600))
-	er, _, _ := newRefreshTestReader(t, dir, false)
+	er, events, _ := newRefreshTestReader(t, dir, false)
+	ctx := context.Background()
 	info, err := os.Stat(path)
 	require.NoError(t, err)
 
 	require.NoError(t, os.WriteFile(path, []byte("schedule: \"2 * * * *\"\nsteps:\n  - run: echo tick\n"), 0600))
 	require.NoError(t, os.Chtimes(path, info.ModTime(), info.ModTime()))
-	require.NoError(t, er.refreshRegistry(context.Background()))
-	assert.Equal(t, "2 * * * *", entrySchedule(t, er, "a"))
+	require.NoError(t, er.refreshRegistry(ctx))
+	expectScheduleUpdate(t, er, events, "a", "2 * * * *")
+
+	require.NoError(t, er.refreshRegistry(ctx))
+	expectNoEvent(t, events, 100*time.Millisecond)
 }
 
 // TestEntryReaderRefreshFollowsSymlinkRetarget covers a DAG symlink pointed at
@@ -1011,13 +1027,18 @@ func TestEntryReaderRefreshFollowsSymlinkRetarget(t *testing.T) {
 	if err := os.Symlink(filepath.Join(targets, "v1.yaml"), link); err != nil {
 		t.Skipf("symlink creation is unavailable: %v", err)
 	}
-	er, _, _ := newRefreshTestReader(t, dir, false)
+	er, events, _ := newRefreshTestReader(t, dir, false,
+		WithFileCache(fileutil.NewCache[*ir.DAG]("dag_definition", 16, time.Hour)))
+	ctx := context.Background()
 	require.Equal(t, "1 * * * *", entrySchedule(t, er, "a"))
 
 	require.NoError(t, os.Remove(link))
 	require.NoError(t, os.Symlink(filepath.Join(targets, "v2.yaml"), link))
-	require.NoError(t, er.refreshRegistry(context.Background()))
-	assert.Equal(t, "2 * * * *", entrySchedule(t, er, "a"))
+	require.NoError(t, er.refreshRegistry(ctx))
+	expectScheduleUpdate(t, er, events, "a", "2 * * * *")
+
+	require.NoError(t, er.refreshRegistry(ctx))
+	expectNoEvent(t, events, 100*time.Millisecond)
 }
 
 // silentWatcher models a watcher that never delivers events, like inotify on a

@@ -702,7 +702,10 @@ func (er *entryReaderImpl) replaceRegistry(state registryState) []persis.DAGChan
 			)
 			continue
 		}
-		if er.loads[key].stamp != state.loads[key].stamp || !bytes.Equal(oldDAG.BaseConfigData, dag.BaseConfigData) {
+		// A reload can change the DAG without changing the stamp, such as a
+		// symlink retargeted to a file of the same size and time.
+		if er.loads[key].stamp != state.loads[key].stamp || oldDAG.SourceFile != dag.SourceFile ||
+			!bytes.Equal(oldDAG.YamlData, dag.YamlData) || !bytes.Equal(oldDAG.BaseConfigData, dag.BaseConfigData) {
 			events = append(events, persis.DAGChangeEvent{
 				Type: persis.DAGChangeUpdated,
 				DAGEntry: persis.DAGEntry{
