@@ -34,8 +34,12 @@ type DryRunCheck struct {
 // for a machine-readable report. A missing executable never fails a dry run:
 // the real run may execute on another host (a distributed worker, a server
 // rather than a CI checkout), and an upstream step may create or install the
-// executable first.
+// executable first. A repeating step is checked on its first pass only, since
+// later passes would report the same problems again.
 func (r *Runner) noteDryRunStep(ctx context.Context, node *Node) {
+	if node.State().DoneCount > 0 {
+		return
+	}
 	err := checkDryRunStep(ctx, node.Step())
 	if err == nil {
 		return

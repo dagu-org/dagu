@@ -2249,6 +2249,24 @@ func TestRunner_DryRunStepChecks(t *testing.T) {
 		result.assertNodeStatus(t, "onSuccess", ir.NodeSucceeded)
 	})
 
+	// A repeating step reports its problems once, not on every pass.
+	t.Run("RepeatingStepCheckedOnce", func(t *testing.T) {
+		r := setupRunner(t, func(cfg *runtime.Config) {
+			cfg.Dry = true
+		})
+		step := newStep("1", withCommand(missing), withRepeatPolicy(true, 0))
+		step.RepeatPolicy.Limit = 3
+
+		plan := r.newPlan(t, step)
+
+		result := plan.assertRun(t, ir.Succeeded)
+		require.Equal(t, []runtime.DryRunCheck{{
+			Step:    "1",
+			Field:   "run",
+			Message: fmt.Sprintf("command %q not found on this host", missing),
+		}}, result.runner.DryRunChecks())
+	})
+
 	t.Run("HandlerEnvErrorFailsHandler", func(t *testing.T) {
 		handler := successStep("onSuccess")
 		handler.Env = []string{"DAGU_TEST_NO_EQUALS"}
