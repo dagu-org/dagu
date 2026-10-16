@@ -5,6 +5,7 @@ package coordinator
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -195,6 +196,50 @@ func TestDispatchHoldClaimedInTimeIsLeftAlone(t *testing.T) {
 
 	ExpireHeldDispatchesForTest(f.h, time.Now().Add(time.Second))
 	assert.Equal(t, ir.Queued, f.status(t, "run-taken").Status, "a claimed task is the worker's to report")
+}
+
+// A held task whose run cannot be read past the deadline is kept, so the next
+// pass fails the run once the store answers again; dropping the task would
+// leave the run queued with nothing behind it.
+func TestDispatchHoldKeepsTaskWhenRunUnreadable(t *testing.T) {
+	f := newHoldFixture(t, 50*time.Millisecond)
+	ctx := t.Context()
+
+	_, err := f.h.Dispatch(ctx, &coordinatorv1.DispatchRequest{Task: cpuTask("run-unread")})
+	require.NoError(t, err)
+
+	f.runs.mu.Lock()
+	f.runs.findAttemptErr = errors.New("storage unavailable")
+	f.runs.mu.Unlock()
+	ExpireHeldDispatchesForTest(f.h, time.Now().Add(time.Second))
+	assert.Equal(t, ir.Queued, f.status(t, "run-unread").Status)
+
+	f.runs.mu.Lock()
+	f.runs.findAttemptErr = nil
+	f.runs.mu.Unlock()
+	ExpireHeldDispatchesForTest(f.h, time.Now().Add(time.Second))
+	runStatus := f.status(t, "run-unread")
+	assert.Equal(t, ir.Failed, runStatus.Status)
+	assert.Equal(t, "no worker matched the selector {type: cpu} within 50ms", runStatus.Error)
+}
+
+// A held task whose run no longer exists is dropped, so the reaper does not
+// report it on every pass.
+func TestDispatchHoldDropsTaskOfMissingRun(t *testing.T) {
+	f := newHoldFixture(t, 50*time.Millisecond)
+	ctx := t.Context()
+
+	_, err := f.h.Dispatch(ctx, &coordinatorv1.DispatchRequest{Task: cpuTask("run-gone")})
+	require.NoError(t, err)
+
+	f.runs.mu.Lock()
+	delete(f.runs.attempts, "run-gone")
+	f.runs.mu.Unlock()
+	ExpireHeldDispatchesForTest(f.h, time.Now().Add(time.Second))
+
+	expired, err := f.dispatches.ListExpiredHeld(ctx, time.Now().Add(time.Second))
+	require.NoError(t, err)
+	assert.Empty(t, expired, "the task of a missing run is dropped")
 }
 
 // The scheduler re-dispatching a queued run keeps today's refusal: the queue

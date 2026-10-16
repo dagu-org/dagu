@@ -1337,8 +1337,10 @@ func (h *Handler) expireHeldDispatches(ctx context.Context, now time.Time) {
 }
 
 // failHeldDispatch fails the run of one held task that no worker claimed in
-// time, then drops the task. A run that is no longer queued, or was claimed
-// after all, only loses the stale task.
+// time, then drops the task. A run that is no longer queued, was claimed after
+// all, or no longer exists only loses the stale task. A run that cannot be read
+// keeps its task, so the next pass tries again instead of leaving the run
+// queued with nothing behind it.
 func (h *Handler) failHeldDispatch(ctx context.Context, task *dispatch.DispatchTask, now time.Time) {
 	if task == nil {
 		return
@@ -1350,9 +1352,12 @@ func (h *Handler) failHeldDispatch(ctx context.Context, task *dispatch.DispatchT
 	rootRef := ir.DAGRunRef{Name: task.RootDAGRunName, ID: task.RootDAGRunID}
 	attempt, runStatus, err := h.resolveLatestAttempt(storeCtx, task.Target, task.DAGRunID, rootRef)
 	switch {
+	case errors.Is(err, dagrun.ErrDAGRunIDNotFound), errors.Is(err, dagrun.ErrNoStatusData):
+		// Nothing is left to fail; only the task remains.
 	case err != nil:
 		logger.Warn(ctx, "Failed to read the run of a held dispatch past its wait",
 			tag.RunID(task.DAGRunID), tag.Error(err))
+		return
 	case runStatus != nil && runStatus.Status == ir.Queued && runStatus.WorkerID == "" &&
 		(task.AttemptID == "" || runStatus.AttemptID == task.AttemptID):
 		runStatus.Status = ir.Failed
