@@ -1366,14 +1366,28 @@ func (l *ConfigLoader) loadQueuesConfig(cfg *Config, def Definition) {
 	}
 }
 
+// defaultCoordinatorWorkerWaitTimeout outlasts one worker heartbeat staleness
+// window and one dispatch reservation, so a worker that is merely late is not
+// failed, while an unroutable run still fails within the same sitting.
+const defaultCoordinatorWorkerWaitTimeout = 2 * time.Minute
+
 func (l *ConfigLoader) loadCoordinatorConfig(cfg *Config, def Definition) {
 	cfg.Coordinator.Enabled = l.resolveCoordinatorEnabled(def)
+	cfg.Coordinator.WorkerWaitTimeout = defaultCoordinatorWorkerWaitTimeout
 
 	if def.Coordinator != nil {
 		cfg.Coordinator.Host = def.Coordinator.Host
 		cfg.Coordinator.Advertise = def.Coordinator.Advertise
 		cfg.Coordinator.Port = def.Coordinator.Port
 		cfg.Coordinator.HealthPort = def.Coordinator.HealthPort
+		if def.Coordinator.WorkerWaitTimeout != "" {
+			timeout, err := time.ParseDuration(def.Coordinator.WorkerWaitTimeout)
+			if err != nil {
+				l.warnings = append(l.warnings, fmt.Sprintf("Invalid coordinator.worker_wait_timeout value: %s", def.Coordinator.WorkerWaitTimeout))
+			} else {
+				cfg.Coordinator.WorkerWaitTimeout = timeout
+			}
+		}
 	}
 
 	l.setCoordinatorDefaults(cfg)
@@ -2362,6 +2376,7 @@ var envBindings = []envBinding{
 	{key: "coordinator.advertise", env: "COORDINATOR_ADVERTISE"},
 	{key: "coordinator.port", env: "COORDINATOR_PORT"},
 	{key: "coordinator.health_port", env: "COORDINATOR_HEALTH_PORT"},
+	{key: "coordinator.worker_wait_timeout", env: "COORDINATOR_WORKER_WAIT_TIMEOUT"},
 
 	// Worker
 	{key: "worker.id", env: "WORKER_ID"},
