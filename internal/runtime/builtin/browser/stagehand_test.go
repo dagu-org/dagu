@@ -29,6 +29,7 @@ import (
 
 	stagehand "github.com/browserbase/stagehand/packages/sdk-go/v4"
 	"github.com/dagucloud/dagu/v2/internal/browserhost"
+	"github.com/dagucloud/dagu/v2/internal/test/chrometest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -69,48 +70,6 @@ func TestMain(m *testing.M) {
 // elementIDPattern finds a node ID in the accessibility tree the runtime
 // sends to the model, such as "[0-23] button: Submit".
 var elementIDPattern = regexp.MustCompile(`\[(\d+-\d+)\] button: Submit`)
-
-// requireChrome skips when no Chrome is installed, except in CI, where the
-// runners provide one and a missing browser is a setup failure.
-func requireChrome(t *testing.T) {
-	t.Helper()
-	if chromePath() != "" {
-		return
-	}
-	if os.Getenv("CI") != "" {
-		t.Fatal("Chrome is required in CI; set CHROME_PATH")
-	}
-	t.Skip("Chrome is not installed; set CHROME_PATH to run browser tests")
-}
-
-func chromePath() string {
-	if path := os.Getenv("CHROME_PATH"); path != "" {
-		return path
-	}
-	var candidates []string
-	switch runtime.GOOS {
-	case "darwin":
-		candidates = []string{"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "/Applications/Chromium.app/Contents/MacOS/Chromium"}
-	case "windows":
-		for _, root := range []string{os.Getenv("PROGRAMFILES"), os.Getenv("PROGRAMFILES(X86)"), os.Getenv("LOCALAPPDATA")} {
-			if root != "" {
-				candidates = append(candidates, filepath.Join(root, "Google", "Chrome", "Application", "chrome.exe"))
-			}
-		}
-	default:
-		for _, name := range []string{"google-chrome-stable", "google-chrome", "chromium-browser", "chromium"} {
-			if path, err := exec.LookPath(name); err == nil {
-				candidates = append(candidates, path)
-			}
-		}
-	}
-	for _, candidate := range candidates {
-		if _, err := os.Stat(candidate); err == nil {
-			return candidate
-		}
-	}
-	return ""
-}
 
 func serveShop(t *testing.T) string {
 	t.Helper()
@@ -172,9 +131,9 @@ func launchShop(t *testing.T, model *shopModel) engine {
 // test ends.
 func launchBrowser(t *testing.T, opts launchOptions) engine {
 	t.Helper()
-	requireChrome(t)
+	chrometest.Require(t)
 	ctx := t.Context()
-	opts.Executable = cmp.Or(opts.Executable, chromePath())
+	opts.Executable = cmp.Or(opts.Executable, chrometest.Path())
 	opts.Headless = true
 	opts.UserDataDir = browserProfileDir(t)
 	opts.NoSandbox = true
@@ -769,7 +728,7 @@ func TestStagehandDetachHelper(t *testing.T) {
 		t.Skip("helper process")
 	}
 	eng, err := stagehandLauncher{}.Launch(t.Context(), launchOptions{
-		Executable:  chromePath(),
+		Executable:  chrometest.Path(),
 		Headless:    true,
 		UserDataDir: os.Getenv(detachHelperEnv),
 		NoSandbox:   true,
@@ -787,7 +746,7 @@ func TestStagehandDetachHelper(t *testing.T) {
 // its extension's service worker has gone idle, keeps its page, and closes.
 func TestStagehandReattachAfterProcessExit(t *testing.T) {
 	t.Parallel()
-	requireChrome(t)
+	chrometest.Require(t)
 
 	userDataDir := browserProfileDir(t)
 	cmd := exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestStagehandDetachHelper$", "-test.v")
@@ -880,7 +839,7 @@ func reportModel(_ context.Context, req generateRequest) (generateResponse, erro
 // before the watcher reports it.
 func TestStagehandWaitsForDownloads(t *testing.T) {
 	t.Parallel()
-	requireChrome(t)
+	chrometest.Require(t)
 
 	downloads := t.TempDir()
 	eng := launchBrowser(t, launchOptions{DownloadsDir: downloads, Generate: reportModel})
@@ -1072,7 +1031,7 @@ func TestLaunchRefusesSilentSandboxOff(t *testing.T) {
 	t.Setenv("CI", "true")
 
 	_, err := stagehandLauncher{}.Launch(t.Context(), launchOptions{
-		Executable:  chromePath(),
+		Executable:  chrometest.Path(),
 		Headless:    true,
 		UserDataDir: t.TempDir(),
 	})
@@ -1085,7 +1044,7 @@ func TestLaunchRefusesSilentSandboxOff(t *testing.T) {
 // Windows, removing a profile that a running browser holds stalls cleanup.
 func TestStagehandFailedLaunchEndsBrowser(t *testing.T) {
 	t.Parallel()
-	requireChrome(t)
+	chrometest.Require(t)
 	if runtime.GOOS == "windows" {
 		t.Skip("the browser wrapper is a shell script")
 	}
@@ -1095,7 +1054,7 @@ func TestStagehandFailedLaunchEndsBrowser(t *testing.T) {
 	// The wrapper records the browser's arguments and disables extensions,
 	// so the runtime extension never starts.
 	wrapper := filepath.Join(t.TempDir(), "chrome")
-	chrome := "'" + strings.ReplaceAll(chromePath(), "'", `'\''`) + "'"
+	chrome := "'" + strings.ReplaceAll(chrometest.Path(), "'", `'\''`) + "'"
 	script := fmt.Sprintf("#!/bin/sh\nprintf '%%s\\n' \"$@\" > \"$0.args\"\nexec %s \"$@\" --disable-extensions\n", chrome)
 	require.NoError(t, os.WriteFile(wrapper, []byte(script), 0o700))
 
@@ -1192,7 +1151,7 @@ func TestStagehandScreenHoldsWindow(t *testing.T) {
 // failProbe, a start on a probe's profile exits at once and logs probe.
 func loggingWrapper(t *testing.T, failProbe bool) string {
 	t.Helper()
-	requireChrome(t)
+	chrometest.Require(t)
 	if runtime.GOOS == "windows" {
 		t.Skip("the browser wrapper is a shell script")
 	}
@@ -1201,7 +1160,7 @@ func loggingWrapper(t *testing.T, failProbe bool) string {
 		probe = `--user-data-dir=*dagu-browser-probe-*) echo probe >> "$0.log"; exit 1;; `
 	}
 	wrapper := filepath.Join(t.TempDir(), "chrome")
-	chrome := "'" + strings.ReplaceAll(chromePath(), "'", `'\''`) + "'"
+	chrome := "'" + strings.ReplaceAll(chrometest.Path(), "'", `'\''`) + "'"
 	script := fmt.Sprintf("#!/bin/sh\nagent=none\nfor arg in \"$@\"; do case \"$arg\" in %s--user-agent=*) agent=\"${arg#--user-agent=}\";; esac; done\n"+
 		"printf '%%s\\n' \"$agent\" >> \"$0.log\"\nexec %s \"$@\"\n", probe, chrome)
 	require.NoError(t, os.WriteFile(wrapper, []byte(script), 0o700))
@@ -1378,7 +1337,7 @@ func TestStagehandWaitsForBotCheckToPass(t *testing.T) {
 // so a change in the tree the browser runtime reports shows up here.
 func TestStagehandSnapshotOutlinesThePage(t *testing.T) {
 	t.Parallel()
-	requireChrome(t)
+	chrometest.Require(t)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
