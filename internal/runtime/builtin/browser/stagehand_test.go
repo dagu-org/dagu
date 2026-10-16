@@ -1333,7 +1333,9 @@ func TestStagehandWaitEndingMidReadKeepsBrowser(t *testing.T) {
 		"settle": {
 			path:  "/changing",
 			limit: func(e *stagehandEngine, d time.Duration) { e.settleWait = d },
-			wait:  (*stagehandEngine).settleDocument,
+			wait: func(e *stagehandEngine, ctx context.Context) {
+				e.settleDocument(ctx, time.Now().Add(e.settleWait))
+			},
 		},
 	} {
 		t.Run(name, func(t *testing.T) {

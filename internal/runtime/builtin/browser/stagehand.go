@@ -58,8 +58,7 @@ const (
 	settleTimeout = 5 * time.Second
 	settlePoll    = 100 * time.Millisecond
 	// writeGrace is how much longer than the wait it is part of a page read
-	// may take, so that it never writes to the browser runtime on a context
-	// that has ended, which closes the runtime's connection to the browser.
+	// may take; see waitContext.
 	writeGrace = time.Second
 	// botCheckWait bounds how long an action waits for a bot check the site
 	// answered with to pass. A check that needs no person passes within
@@ -492,7 +491,16 @@ func (e *stagehandEngine) page(ctx context.Context) (*stagehand.Page, error) {
 	if err != nil {
 		return nil, err
 	}
-	return browserContext.ActivePage(ctx)
+	page, err := browserContext.ActivePage(ctx)
+	if err != nil {
+		return nil, err
+	}
+	// The caller's next call writes to the browser runtime, which closes its
+	// connection to the browser when that call's context has ended.
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return page, nil
 }
 
 func (e *stagehandEngine) Goto(ctx context.Context, url string, timeout time.Duration) error {
@@ -630,7 +638,7 @@ func (e *stagehandEngine) watch(ctx context.Context) {
 // operation reads the page: for the document it shows to settle, and for a
 // bot check the site answered with to pass.
 func (e *stagehandEngine) settle(ctx context.Context) {
-	e.settleDocument(ctx)
+	e.settleDocument(ctx, time.Now().Add(e.settleWait))
 	e.awaitBotCheck(ctx)
 }
 
@@ -643,14 +651,23 @@ func (e *stagehandEngine) awaitBotCheck(ctx context.Context) {
 		return
 	}
 	deadline := time.Now().Add(e.botCheckWait)
+	if !time.Now().Before(deadline) {
+		return
+	}
+	ctx, cancel := waitContext(ctx, deadline)
+	defer cancel()
 	document, _ := e.DocumentID(ctx)
 	for pause(ctx, settlePoll, deadline) {
 		current, err := e.DocumentID(ctx)
 		if err != nil || current == document {
 			continue
 		}
-		e.settleDocument(ctx)
-		if !e.showsBotCheck(ctx) {
+		settled := time.Now().Add(e.settleWait)
+		if settled.After(deadline) {
+			settled = deadline
+		}
+		e.settleDocument(ctx, settled)
+		if !time.Now().Before(deadline) || !e.showsBotCheck(ctx) {
 			return
 		}
 		document = current
@@ -666,20 +683,22 @@ func (e *stagehandEngine) showsBotCheck(ctx context.Context) bool {
 	return err == nil && page.BotCheck != ""
 }
 
-// settleDocument waits, up to settleWait, for the document the page shows
-// to settle: a new document until its network is idle, and the document an
+// settleDocument waits, until deadline, for the document the page shows to
+// settle: a new document until its network is idle, and the document an
 // action began on until its requests end and it stops changing. A page that
 // does not settle in time is left as it is.
-func (e *stagehandEngine) settleDocument(ctx context.Context) {
-	deadline := time.Now().Add(e.settleWait)
-	page, err := boundCall(ctx, readLimit(deadline), e.page)
+func (e *stagehandEngine) settleDocument(ctx context.Context, deadline time.Time) {
+	if !time.Now().Before(deadline) {
+		return
+	}
+	ctx, cancel := waitContext(ctx, deadline)
+	defer cancel()
+	page, err := e.page(ctx)
 	if err != nil {
 		return
 	}
-	for {
-		quiet, err := boundCall(ctx, readLimit(deadline), func(ctx context.Context) (json.RawMessage, error) {
-			return page.Evaluate(ctx, quietExpression)
-		})
+	for time.Now().Before(deadline) {
+		quiet, err := page.Evaluate(ctx, quietExpression)
 		if err == nil && string(quiet) == "true" {
 			return
 		}
@@ -688,9 +707,7 @@ func (e *stagehandEngine) settleDocument(ctx context.Context) {
 		// wait as a newly loaded page does.
 		if err != nil || string(quiet) != "false" {
 			if wait := time.Until(deadline); wait > 0 {
-				_, _ = boundCall(ctx, wait+callTimeoutSlack, func(ctx context.Context) (struct{}, error) {
-					return struct{}{}, page.WaitForLoadState(ctx, stagehand.LoadStateNetworkIdle, new(int(wait.Milliseconds())))
-				})
+				_ = page.WaitForLoadState(ctx, stagehand.LoadStateNetworkIdle, new(int(wait.Milliseconds())))
 			}
 			return
 		}
@@ -700,16 +717,16 @@ func (e *stagehandEngine) settleDocument(ctx context.Context) {
 	}
 }
 
-// readLimit bounds a page read that is part of a wait ending at deadline.
-func readLimit(deadline time.Time) time.Duration {
-	return max(time.Until(deadline), 0) + writeGrace
+// waitContext returns the context for the page reads of a wait that ends at
+// deadline. A read starts only before the deadline and may take writeGrace
+// past it, so it never writes to the browser runtime on a context that has
+// ended, which closes the runtime's connection to the browser.
+func waitContext(ctx context.Context, deadline time.Time) (context.Context, context.CancelFunc) {
+	return context.WithDeadline(ctx, deadline.Add(writeGrace))
 }
 
 // pause waits up to d, no later than deadline, and reports whether the
-// wait it is part of goes on. A wait made of several calls ends this way,
-// between them, rather than by ending the context they run on: a call whose
-// context has ended when it writes to the browser runtime closes the
-// runtime's connection to the browser.
+// wait it is part of goes on, which waitContext explains.
 func pause(ctx context.Context, d time.Duration, deadline time.Time) bool {
 	timer := time.NewTimer(min(d, time.Until(deadline)))
 	defer timer.Stop()
