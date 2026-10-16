@@ -247,6 +247,8 @@ func (l *dirLock) removeAbandonedTempDirs() {
 // created after the stale one was removed is never taken over. It returns
 // ErrLockConflict when another contender won.
 func (l *dirLock) removeStaleLock() error {
+	l.restoreLockDirAccess()
+
 	// List the entries before re-checking staleness: a lock created after this
 	// listing is fresh, so the entries always belong to the stale instance.
 	entries, err := os.ReadDir(l.lockPath)
@@ -303,6 +305,24 @@ func (l *dirLock) removeStaleLock() error {
 	}
 	l.runAfterClaim()
 	return staleLockError(releaseClaimedLock(l.lockPath, claimName))
+}
+
+// restoreLockDirAccess gives the owner full access to the lock directory again
+// when it has lost some, for example through a restore that did not keep file
+// modes. Taking over a stale lock lists and renames entries inside it, which
+// needs that access. Group and other permissions are kept, and the change
+// never leaves the target directory, even through a symbolic link.
+func (l *dirLock) restoreLockDirAccess() {
+	info, err := os.Lstat(l.lockPath)
+	if err != nil || !info.IsDir() || info.Mode().Perm()&0700 == 0700 {
+		return
+	}
+	root, err := os.OpenRoot(l.targetDir)
+	if err != nil {
+		return
+	}
+	defer func() { _ = root.Close() }()
+	_ = root.Chmod(LockDirectoryName, info.Mode().Perm()|0700)
 }
 
 // staleLockMarker returns the entry that identifies a lock instance, preferring

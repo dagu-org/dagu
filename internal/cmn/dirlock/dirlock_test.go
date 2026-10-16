@@ -1226,9 +1226,16 @@ func addReadOnlyEntry(t *testing.T, dir string) {
 	require.NoError(t, os.Mkdir(readOnly, 0o700))
 	require.NoError(t, os.WriteFile(filepath.Join(readOnly, "file"), nil, 0o600))
 	require.NoError(t, os.Chmod(readOnly, 0o500))
+	restoreAccessOnCleanup(t, dir)
+}
+
+// restoreAccessOnCleanup gives the owner access back to every directory under
+// dir at cleanup, wherever a test's restricted directories ended up, so the
+// temporary directory can be removed.
+func restoreAccessOnCleanup(t *testing.T, dir string) {
+	t.Helper()
 	t.Cleanup(func() {
-		// Wherever the directory ended up, restore write access so the
-		// temporary directory can be removed.
+		_ = os.Chmod(filepath.Join(dir, LockDirectoryName), 0o700)
 		_ = filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
 			if err == nil && d.IsDir() {
 				_ = os.Chmod(path, 0o700)
@@ -1236,4 +1243,24 @@ func addReadOnlyEntry(t *testing.T, dir string) {
 			return nil
 		})
 	})
+}
+
+// A stale lock directory this user owns may have lost permissions, for example
+// through a restore that did not keep modes. Taking it over must still work,
+// as it does when older releases move the directory aside.
+func TestStaleTakeover_RestrictedLockDir(t *testing.T) {
+	for _, mode := range []os.FileMode{0o000, 0o300, 0o500} {
+		t.Run(strconv.FormatUint(uint64(mode), 8), func(t *testing.T) {
+			dir := t.TempDir()
+			require.NoError(t, New(dir, nil).TryLock())
+			lockPath := filepath.Join(dir, LockDirectoryName)
+			require.NoError(t, os.Chmod(lockPath, mode))
+			restoreAccessOnCleanup(t, dir)
+			backdateLock(t, dir)
+
+			lock := New(dir, nil)
+			require.NoError(t, lock.TryLock())
+			require.NoError(t, lock.Unlock())
+		})
+	}
 }
