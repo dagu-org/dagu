@@ -74,6 +74,7 @@ func TestIsExactRef(t *testing.T) {
 		{token: "${foreach.item}", want: true},
 		{token: "${foreach.item.template}", want: true},
 		{token: "${foreach.row._row}", want: true},
+		{token: "${foreach.row.請求番号}", want: true},
 		{token: "${context.run.id}", want: true},
 		{token: "${params}", want: false},
 		{token: "${run.id}", want: false},
