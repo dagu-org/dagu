@@ -226,6 +226,21 @@ func TestHTTPExporter(t *testing.T) {
 	}
 }
 
+func TestHTTPExporterInvalidScheme(t *testing.T) {
+	dag := &ir.DAG{
+		Name: "test-dag",
+		OTel: &ir.OTelConfig{
+			Enabled:  true,
+			Endpoint: "ftp://collector:4318/v1/traces",
+		},
+	}
+
+	tracer, err := NewTracer(context.Background(), dag, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "scheme must be http or https")
+	assert.Nil(t, tracer)
+}
+
 func TestTracerStart(t *testing.T) {
 	t.Run("WithEnabledTracer", func(t *testing.T) {
 		dag := &ir.DAG{
