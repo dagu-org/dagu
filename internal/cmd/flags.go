@@ -64,6 +64,7 @@ var (
 
 	dryFormatFlag = commandLineFlag{
 		name:         "format",
+		shorthand:    "f",
 		defaultValue: "text",
 		usage:        "Output format for dry-run checks: text (default) or json",
 	}

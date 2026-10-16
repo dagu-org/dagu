@@ -137,7 +137,7 @@ dagu human-task push-back --run-id=run-1 --step=review --input feedback="Add tes
 
 ### dagu dry
 
-Dry-run a DAG without executing commands: `dagu dry [--params/-p] [--name/-N] [--no-reuse] [--format text|json] <dag> [-- params...]`
+Dry-run a DAG without executing commands: `dagu dry [--params/-p] [--name/-N] [--no-reuse] [--format/-f text|json] <dag> [-- params...]`
 
 `--format json` prints one JSON object on stdout, `{"checks":[...]}`, and omits the run summary. `text` is the default. A check does not change the exit status.
 
