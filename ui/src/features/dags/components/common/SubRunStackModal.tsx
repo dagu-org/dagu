@@ -142,7 +142,7 @@ export function SubRunStackModal({
   React.useEffect(() => {
     if (!top) return;
     function onKeyDown(event: KeyboardEvent) {
-      if (shouldIgnoreKeyboardShortcuts()) return;
+      if (shouldIgnoreKeyboardShortcuts(event)) return;
       if (event.key === 'Escape') {
         event.stopPropagation();
         popTo(stack.length - 1);

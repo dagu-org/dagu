@@ -13,6 +13,12 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Status, ViewSortField, ViewSortOrder } from '@/api/v1/schema';
 import { PanelWidthContext } from '@/components/SplitLayout';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { WorkspaceKind } from '@/lib/workspace';
 import DAGTable from '../DAGTable';
@@ -623,5 +629,36 @@ describe('DAGTable', () => {
     fireEvent.keyDown(window, { key: 'ArrowDown' });
 
     expect(onSelectDAG).toHaveBeenCalledWith('alpha.yaml', 'alpha');
+  });
+
+  // The detail panel opens over the list, so its fields and dialogs receive
+  // arrow keys meant for them, not for switching workflows.
+  it('leaves ArrowDown to text fields and dialogs above the list', () => {
+    const onSelectDAG = vi.fn();
+    renderTable('', {
+      selectedDAG: 'alpha.yaml',
+      onSelectDAG,
+      dags: [workflow({ name: 'alpha' }), workflow({ name: 'reports' })],
+    });
+
+    render(<input aria-label="Run ID" />);
+    const field = screen.getByRole('textbox', { name: 'Run ID' });
+    field.focus();
+    fireEvent.keyDown(field, { key: 'ArrowDown' });
+
+    render(
+      <Dialog open>
+        <DialogContent>
+          <DialogTitle>Start workflow</DialogTitle>
+          <DialogDescription>Configure the run.</DialogDescription>
+        </DialogContent>
+      </Dialog>
+    );
+    expect(screen.getByRole('dialog')).toContainElement(
+      document.activeElement as HTMLElement
+    );
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' });
+
+    expect(onSelectDAG).not.toHaveBeenCalled();
   });
 });

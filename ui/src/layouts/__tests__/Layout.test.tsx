@@ -14,6 +14,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ConfigContext, type Config } from '@/contexts/ConfigContext';
 import { UserPreferencesProvider } from '@/contexts/UserPreference';
 import { I18nProvider } from '@/i18n/I18nProvider';
+import { dispatchHandledEscape } from '@/test/keyboard';
 import Layout from '../Layout';
 
 vi.mock('@/components/LicenseBadge', () => ({ LicenseBadge: () => null }));
@@ -140,6 +141,15 @@ describe('Layout', () => {
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     await waitFor(() => expect(openButton).toHaveFocus());
+  });
+
+  it('keeps the mobile navigation open when a menu in it handles Escape', () => {
+    renderLayout('/home');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }));
+    dispatchHandledEscape();
+
+    expect(screen.getByRole('dialog', { name: 'Dagu' })).toBeInTheDocument();
   });
 
   it('localizes mobile navigation controls', () => {
