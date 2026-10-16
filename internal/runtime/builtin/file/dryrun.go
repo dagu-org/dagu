@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	cmnvalue "github.com/dagucloud/dagu/v2/internal/cmn/value"
 	"github.com/dagucloud/dagu/v2/internal/ir"
@@ -70,8 +71,15 @@ func missingFile(workDir, raw, field string, follow bool) error {
 	} else {
 		_, statErr = os.Lstat(path)
 	}
-	if statErr == nil || !errors.Is(statErr, fs.ErrNotExist) {
+	if statErr == nil || !pathAbsent(statErr) {
 		return nil
 	}
 	return fmt.Errorf("field 'with.%s': %s: file not found", field, filepath.Base(path))
+}
+
+// pathAbsent reports that the path is not present. ENOTDIR means a parent is
+// a file, so the path cannot exist. Permission and other errors are left
+// unreported; a dry run cannot judge them.
+func pathAbsent(err error) bool {
+	return errors.Is(err, fs.ErrNotExist) || errors.Is(err, syscall.ENOTDIR)
 }

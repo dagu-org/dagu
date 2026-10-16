@@ -5,8 +5,11 @@ package file
 
 import (
 	"context"
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
 
 	"github.com/dagucloud/dagu/v2/internal/ir"
@@ -33,6 +36,28 @@ func TestDryRunCheckMissingFile(t *testing.T) {
 		"copy with dry_run does not look at the source")
 	require.NoError(t, dryRun(t, dir, opWrite, map[string]any{"path": "missing-9f3c2b1a.txt", "content": "x"}),
 		"write creates a missing path")
+
+	// A parent that is a file makes the child path absent (ENOTDIR), which the
+	// real read would fail on. An unreadable directory stays unreported.
+	const nested = "notes.txt/missing-9f3c2b1a.txt"
+	_, statErr := os.Stat(filepath.Join(dir, "notes.txt", "missing-9f3c2b1a.txt"))
+	if errors.Is(statErr, fs.ErrNotExist) || errors.Is(statErr, syscall.ENOTDIR) {
+		require.ErrorContains(t, dryRun(t, dir, opRead, map[string]any{"path": nested}),
+			`field 'with.path': missing-9f3c2b1a.txt: file not found`)
+	} else {
+		require.NoError(t, dryRun(t, dir, opRead, map[string]any{"path": nested}))
+	}
+
+	blocked := filepath.Join(dir, "blocked")
+	require.NoError(t, os.Mkdir(blocked, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(blocked, "secret.txt"), []byte("x"), 0o600))
+	require.NoError(t, os.Chmod(blocked, 0))
+	t.Cleanup(func() { _ = os.Chmod(blocked, 0o700) })
+	_, permErr := os.Stat(filepath.Join(blocked, "secret.txt"))
+	if permErr != nil && !pathAbsent(permErr) {
+		require.NoError(t, dryRun(t, dir, opRead, map[string]any{"path": "blocked/secret.txt"}),
+			"a permission error is not a missing file")
+	}
 }
 
 func dryRun(t *testing.T, workDir, op string, cfg map[string]any) error {
