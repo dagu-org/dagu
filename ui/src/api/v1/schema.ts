@@ -3426,6 +3426,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/license/server-name": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Rename this server in Dagu Console
+         * @description Sets the name Dagu Console and Dagu show for this server, in place of the name it reports. An empty name shows the reported name again. Admin only.
+         */
+        put: operations["renameLicenseServer"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/license/monitoring": {
         parameters: {
             query?: never;
@@ -7022,8 +7042,10 @@ export interface components {
             warningCode: string;
             /** @description User-facing explanation when a configured license is unusable */
             error: string;
-            /** @description Name that identifies this server in Dagu Console */
+            /** @description Name Dagu Console shows for this server: the one a person gave it, else reportedName */
             serverName?: string;
+            /** @description Name this server reports to Dagu Console: license.server_name, else the hostname */
+            reportedName?: string;
             /** @description Identifier of the loaded license */
             licenseId?: string;
             /** @description Dagu Console workspace that owns the license */
@@ -18637,6 +18659,72 @@ export interface operations {
                 };
             };
             /** @description The license does not check in with Dagu Console */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Dagu Console could not be reached */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    renameLicenseServer: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Name to show, at most 100 characters; empty clears it */
+                    name: string;
+                };
+            };
+        };
+        responses: {
+            /** @description License status after the rename */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LicenseStatusResponse"];
+                };
+            };
+            /** @description The name is too long, the license does not check in with Dagu Console, or Dagu Console refused the name */
             400: {
                 headers: {
                     [name: string]: unknown;

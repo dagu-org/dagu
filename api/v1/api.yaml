@@ -8737,6 +8737,60 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /license/server-name:
+    put:
+      summary: "Rename this server in Dagu Console"
+      description: "Sets the name Dagu Console and Dagu show for this server, in place of the name it reports. An empty name shows the reported name again. Admin only."
+      operationId: "renameLicenseServer"
+      tags:
+        - "system"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  maxLength: 100
+                  description: "Name to show, at most 100 characters; empty clears it"
+      responses:
+        "200":
+          description: "License status after the rename"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LicenseStatusResponse"
+        "400":
+          description: "The name is too long, the license does not check in with Dagu Console, or Dagu Console refused the name"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Insufficient permissions"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "502":
+          description: "Dagu Console could not be reached"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /license/monitoring:
     get:
       summary: "Get what this server reports to Dagu Console"
@@ -17174,7 +17228,10 @@ components:
           description: "User-facing explanation when a configured license is unusable"
         serverName:
           type: string
-          description: "Name that identifies this server in Dagu Console"
+          description: "Name Dagu Console shows for this server: the one a person gave it, else reportedName"
+        reportedName:
+          type: string
+          description: "Name this server reports to Dagu Console: license.server_name, else the hostname"
         licenseId:
           type: string
           description: "Identifier of the loaded license"

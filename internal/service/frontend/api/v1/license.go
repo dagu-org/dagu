@@ -6,6 +6,7 @@ package api
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -40,6 +41,7 @@ func toLicenseStatusResponse(status license.Status) api.LicenseStatusResponse {
 		WarningCode:  status.WarningCode,
 		Error:        status.Failure,
 		ServerName:   ptrOf(status.ServerName),
+		ReportedName: ptrOf(status.ReportedServerName),
 		LicenseId:    ptrOf(status.LicenseID),
 		Workspace:    ptrOf(status.Workspace),
 		ConnectedVia: ptrOf(api.LicenseStatusResponseConnectedVia(status.ConnectedVia)),
@@ -204,6 +206,46 @@ func (a *API) RefreshLicense(ctx context.Context, _ api.RefreshLicenseRequestObj
 		return nil, &Error{Code: api.ErrorCodeBadGateway, Message: "Dagu Console could not be reached. Try again later.", HTTPStatus: http.StatusBadGateway}
 	}
 	return api.RefreshLicense200JSONResponse(toLicenseStatusResponse(a.licenseManager.Status())), nil
+}
+
+// RenameLicenseServer sets the name Dagu Console shows for this server.
+func (a *API) RenameLicenseServer(ctx context.Context, request api.RenameLicenseServerRequestObject) (api.RenameLicenseServerResponseObject, error) {
+	if err := a.requireLicenseManagement(ctx); err != nil {
+		return nil, err
+	}
+	if request.Body == nil {
+		return nil, &Error{Code: api.ErrorCodeBadRequest, Message: "name is required", HTTPStatus: http.StatusBadRequest}
+	}
+
+	err := a.licenseManager.RenameServer(ctx, request.Body.Name)
+	if err != nil {
+		return nil, renameServerError(err)
+	}
+	a.logAudit(ctx, audit.CategorySystem, "license_server_rename", map[string]any{
+		"name": strings.TrimSpace(request.Body.Name),
+	})
+	return api.RenameLicenseServer200JSONResponse(toLicenseStatusResponse(a.licenseManager.Status())), nil
+}
+
+// renameServerError explains why renaming this server failed.
+func renameServerError(err error) error {
+	badRequest := func(message string) error {
+		return &Error{Code: api.ErrorCodeBadRequest, Message: message, HTTPStatus: http.StatusBadRequest}
+	}
+	switch {
+	case errors.Is(err, license.ErrServerNameTooLong):
+		return badRequest(fmt.Sprintf("Server names are at most %d characters.", license.MaxServerNameLength))
+	case errors.Is(err, license.ErrNoCheckIn):
+		return badRequest("This license does not check in with Dagu Console.")
+	case errors.Is(err, license.ErrRenameUnsupported):
+		return badRequest("Dagu Console does not support renaming servers yet.")
+	}
+	if cloudErr, ok := errors.AsType[*license.CloudError](err); ok &&
+		cloudErr.StatusCode >= 400 && cloudErr.StatusCode < 500 && cloudErr.StatusCode != http.StatusTooManyRequests {
+		return badRequest("Dagu Console refused the name: " + cloudErr.Message)
+	}
+	slog.Warn("License server rename failed", "error", err)
+	return &Error{Code: api.ErrorCodeBadGateway, Message: "Dagu Console could not be reached. Try again later.", HTTPStatus: http.StatusBadGateway}
 }
 
 func (a *API) requireLicenseManagement(ctx context.Context) error {
