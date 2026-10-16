@@ -12,29 +12,40 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+// problemSessionDisconnected is a Remote Desktop or child session whose
+// client has gone: the session exists but nothing draws it. It is a Windows
+// condition, so it lives with the code that detects it.
+const problemSessionDisconnected = "session_disconnected"
+
+var (
+	wtsapi32                               = windows.NewLazySystemDLL("wtsapi32.dll")
+	procWTSQuerySessionInformationW        = wtsapi32.NewProc("WTSQuerySessionInformationW")
+	procWTSFreeMemory                      = wtsapi32.NewProc("WTSFreeMemory")
+	wtsCurrentSession               uint32 = 0xFFFFFFFF // WTS_CURRENT_SESSION
+	wtsConnectStateClass            uint32 = 8          // WTSConnectState in WTS_INFO_CLASS
+)
+
 // sessionConnectState returns the WTS connect state of the session this
 // process runs in: windows.WTSActive while a client or the console draws it,
-// windows.WTSDisconnected after the Remote Desktop client has gone.
+// windows.WTSDisconnected after the Remote Desktop client has gone. It asks
+// about the current session only, which needs no permission on other
+// sessions, so a restricted account gets an answer rather than a failure.
 func sessionConnectState() (uint32, error) {
-	var session uint32
-	if err := windows.ProcessIdToSessionId(windows.GetCurrentProcessId(), &session); err != nil {
-		return 0, err
-	}
-	var sessions *windows.WTS_SESSION_INFO
-	var count uint32
+	var buffer *uint32
+	var size uint32
 	// Handle 0 is WTS_CURRENT_SERVER_HANDLE.
-	if err := windows.WTSEnumerateSessions(0, 0, 1, &sessions, &count); err != nil {
-		return 0, err
-	}
-	// WTSEnumerateSessions hands back a Win32 array of count entries, owned
-	// by the system until WTSFreeMemory.
-	defer windows.WTSFreeMemory(uintptr(unsafe.Pointer(sessions))) //nolint:gosec // the pointer came from WTSEnumerateSessions
-	for _, info := range unsafe.Slice(sessions, count) {           //nolint:gosec // count is the array length WTSEnumerateSessions reported
-		if info.SessionID == session {
-			return info.State, nil
+	r1, _, callErr := procWTSQuerySessionInformationW.Call(0, uintptr(wtsCurrentSession), uintptr(wtsConnectStateClass), uintptr(unsafe.Pointer(&buffer)), uintptr(unsafe.Pointer(&size))) //nolint:gosec // out-parameters of a Win32 call
+	if r1 == 0 {
+		if callErr != nil {
+			return 0, callErr
 		}
+		return 0, errors.New("WTSQuerySessionInformation failed")
 	}
-	return 0, errors.New("the current session is not listed")
+	defer procWTSFreeMemory.Call(uintptr(unsafe.Pointer(buffer))) //nolint:errcheck,gosec // frees the buffer the system handed out; nothing to report
+	if buffer == nil || size < 4 {
+		return 0, errors.New("WTSQuerySessionInformation returned no connect state")
+	}
+	return *buffer, nil
 }
 
 // sessionProblemForState names a session that is not drawing. Only an active
