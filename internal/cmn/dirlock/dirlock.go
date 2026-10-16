@@ -215,13 +215,7 @@ func (l *dirLock) TryLock() error {
 		return fmt.Errorf("failed to check lock status: %w", err)
 	}
 
-	if err := l.createLock(); err != nil {
-		return err
-	}
-	// No live lock means a holder may have crashed before renaming its
-	// temporary directory into place, so clean those up here as well.
-	l.removeAbandonedTempDirs()
-	return nil
+	return l.createLock()
 }
 
 // removeAbandonedTempDirs removes temporary lock directories older than the
