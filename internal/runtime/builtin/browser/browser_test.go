@@ -137,6 +137,18 @@ func eventNames(session *ir.AgentSession) []string {
 	return names
 }
 
+// eventVias lists name:status:via for every operation event, with an empty
+// via for an operation that decides nothing.
+func eventVias(session *ir.AgentSession) []string {
+	var out []string
+	for _, event := range session.Events {
+		if event.Type == agentstep.EventOperation {
+			out = append(out, event.Name+":"+event.Status+":"+event.Via)
+		}
+	}
+	return out
+}
+
 const checkoutSteps = `{
 	"url": "https://shop.example.com/cart",
 	"do": [
@@ -452,6 +464,52 @@ func TestReplayCache(t *testing.T) {
 	require.NoError(t, third.err)
 	assert.Greater(t, run.provider.callCount(), modelCalls)
 	assert.Equal(t, []string{"goto:completed", "act:healed"}, eventNames(third.exec.GetAgentSession()))
+}
+
+// Every operation event says how the operation ran: a replayed recording by
+// its elements, an act, extract, or statement the model answered, an exact
+// check without a model, and nothing for an operation that decides nothing.
+func TestOperationEventsReportVia(t *testing.T) {
+	t.Parallel()
+
+	const steps = `{"url": "https://shop.example.com/cart", "do": [
+		{"act": "Click the checkout button"},
+		{"expect": {"text": "Order placed"}},
+		{"expect": "The order is confirmed"},
+		{"act": "Close the banner", "when": "A cookie banner is visible"},
+		{"act": "Close the banner", "when": {"text": "Cookies"}}
+	]}`
+	run := newTestRun(t, pageModel(nil, "The order is confirmed"))
+	run.engine.setPageText("Order placed")
+
+	first := run.execute(steps, nil)
+	require.NoError(t, first.err)
+	assert.Equal(t, []string{
+		"goto:completed:",
+		"act:completed:model",
+		"expect:completed:exact",
+		"expect:completed:model",
+		"act:skipped:model",
+		"act:skipped:exact",
+	}, eventVias(first.exec.GetAgentSession()))
+
+	second := run.execute(steps, nil)
+	require.NoError(t, second.err)
+	assert.Equal(t, "act:cache-hit:element", eventVias(second.exec.GetAgentSession())[1])
+
+	run.engine.replayFails = true
+	third := run.execute(steps, nil)
+	require.NoError(t, third.err)
+	assert.Equal(t, "act:healed:model", eventVias(third.exec.GetAgentSession())[1])
+}
+
+func TestExtractReportsModelVia(t *testing.T) {
+	t.Parallel()
+
+	run := newTestRun(t, pageModel(map[string]string{"The order number": `{"order":"A-100"}`}))
+	execution := run.execute(`{"do": [{"extract": {"instruction": "The order number", "schema": {"type": "object", "properties": {"order": {"type": "string"}}}}}]}`, nil)
+	require.NoError(t, execution.err)
+	assert.Equal(t, []string{"extract:completed:model"}, eventVias(execution.exec.GetAgentSession()))
 }
 
 func TestReplayCacheCanBeDisabled(t *testing.T) {
