@@ -148,6 +148,7 @@ func NewStore(baseDir string, opts ...Option) *Store {
 	return &Store{
 		baseDir:                baseDir,
 		indexPath:              resolveIndexPath(baseDir, options.indexDir),
+		changeMarker:           NewChangeMarker(ChangeMarkerPath(options.indexDir, baseDir)),
 		flagsBaseDir:           options.FlagsBaseDir,
 		legacyFlagsBaseDir:     options.legacyFlagsBaseDir,
 		fileCache:              options.FileCache,
@@ -163,9 +164,10 @@ func NewStore(baseDir string, opts ...Option) *Store {
 
 // Store persists DAG definitions in local files.
 type Store struct {
-	baseDir                string // Base directory for DAG storage
-	indexPath              string // DAG definition index file
-	flagsBaseDir           string // Base directory for flag store
+	baseDir                string        // Base directory for DAG storage
+	indexPath              string        // DAG definition index file
+	changeMarker           *ChangeMarker // Signals DAG definition changes to other hosts
+	flagsBaseDir           string        // Base directory for flag store
 	legacyFlagsBaseDir     string
 	fileCache              *fileutil.Cache[*ir.DAG] // Optional cache for DAG objects
 	searchPaths            []string                 // Additional search paths for DAG files
@@ -302,7 +304,8 @@ func describeWorkspaceBaseConfigState(dir string) string {
 
 	states := make([]string, 0, len(entries))
 	for _, entry := range entries {
-		if !entry.IsDir() {
+		// Workspace base configs are also read through symlinked directories.
+		if !entry.IsDir() && (!fileutil.IsSymlinkDirEntry(entry) || !fileutil.IsDir(filepath.Join(dir, entry.Name()))) {
 			continue
 		}
 
@@ -377,11 +380,12 @@ func (store *Store) Update(ctx context.Context, name string, yamlSpec []byte) er
 		store.fileCache.Invalidate(store.metadataCacheKey(resolved, store.refreshBaseConfigState()))
 	}
 	store.invalidateIndex()
+	store.changeMarker.Bump(ctx)
 	return nil
 }
 
 // Create creates a new DAG with the given name and specification.
-func (store *Store) Create(_ context.Context, name string, spec []byte) error {
+func (store *Store) Create(ctx context.Context, name string, spec []byte) error {
 	if err := store.ensureDirExist(); err != nil {
 		return fmt.Errorf("failed to create DAGs directory %s: %w", store.baseDir, err)
 	}
@@ -393,6 +397,7 @@ func (store *Store) Create(_ context.Context, name string, spec []byte) error {
 		return fmt.Errorf("failed to write DAG %s: %w", name, err)
 	}
 	store.invalidateIndex()
+	store.changeMarker.Bump(ctx)
 	return nil
 }
 
@@ -415,6 +420,7 @@ func (store *Store) Delete(ctx context.Context, name string) error {
 		store.fileCache.Invalidate(store.metadataCacheKey(resolved, store.refreshBaseConfigState()))
 	}
 	store.invalidateIndex()
+	store.changeMarker.Bump(ctx)
 	return nil
 }
 
@@ -530,6 +536,7 @@ func (store *Store) Rename(ctx context.Context, oldID, newID string) error {
 		return err
 	}
 	store.invalidateIndex()
+	store.changeMarker.Bump(ctx)
 	return nil
 }
 
@@ -719,6 +726,8 @@ func (store *Store) createExampleDAGs() error {
 			// Continue creating other examples even if one fails
 		}
 	}
+
+	store.changeMarker.Bump(context.Background())
 
 	// Create marker file to indicate examples were created
 	markerFile := filepath.Join(store.baseDir, ".examples-created")
