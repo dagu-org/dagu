@@ -50,6 +50,7 @@ type entryReaderImpl struct {
 	resyncInterval         time.Duration
 	marker                 *ChangeMarker
 	markerInterval         time.Duration
+	markerRefreshGap       time.Duration
 	markerSeen             markerVersions
 	reportedIssues         map[string]struct{}
 }
@@ -68,10 +69,12 @@ func withResyncInterval(interval time.Duration) EntryReaderOption {
 }
 
 // WithChangeMarker makes the reader refresh the registry when the change
-// marker of another host changes, checked every interval. path is this host's
-// marker, as returned by ChangeMarkerPath; the reader ignores it because its
-// file watches already report this host's changes. An empty path disables the
-// marker and a non-positive interval selects the default.
+// marker of another host changes, checked every interval. These refreshes run
+// at most once a minute, so a burst of remote edits costs one full re-read.
+// path is this host's marker, as returned by ChangeMarkerPath; the reader
+// ignores it because its file watches already report this host's changes. An
+// empty path disables the marker and a non-positive interval selects the
+// default.
 func WithChangeMarker(path string, interval time.Duration) EntryReaderOption {
 	return func(er *entryReaderImpl) {
 		er.marker = nil
@@ -94,6 +97,14 @@ func (er *entryReaderImpl) markerSignalsChange(ctx context.Context) bool {
 	return changed
 }
 
+// withMarkerRefreshGap sets the minimum time between refreshes triggered by
+// change markers.
+func withMarkerRefreshGap(gap time.Duration) EntryReaderOption {
+	return func(er *entryReaderImpl) {
+		er.markerRefreshGap = gap
+	}
+}
+
 // withWatcherFactory replaces the file watcher implementation.
 func withWatcherFactory(factory func() filenotify.FileWatcher) EntryReaderOption {
 	return func(er *entryReaderImpl) {
@@ -104,6 +115,11 @@ func withWatcherFactory(factory func() filenotify.FileWatcher) EntryReaderOption
 const (
 	// defaultChangeMarkerInterval is how often the change marker is checked.
 	defaultChangeMarkerInterval = 5 * time.Second
+	// defaultMarkerRefreshGap is the minimum time between refreshes triggered
+	// by change markers. Each one re-reads every DAG, and the shared index is
+	// rebuilt after every store write, so sustained remote edits would
+	// otherwise keep a large registry refreshing.
+	defaultMarkerRefreshGap = time.Minute
 	// defaultResyncInterval is the full re-read period. The change marker covers
 	// edits made through Dagu on another host; this covers edits made by other
 	// tools (git, kubectl cp, editors), which native file watches also miss on a
@@ -153,6 +169,7 @@ func NewFileEntryReader(dir string, dagRepository *persis.DAGRepository, recursi
 		events:                 make(chan persis.DAGChangeEvent, 64),
 		newWatcher:             func() filenotify.FileWatcher { return filenotify.New(time.Minute) },
 		resyncInterval:         defaultResyncInterval,
+		markerRefreshGap:       defaultMarkerRefreshGap,
 	}
 	for _, opt := range opts {
 		opt(er)
@@ -244,6 +261,10 @@ func (er *entryReaderImpl) watch(ctx context.Context) {
 		defer markerTicker.Stop()
 		markerPoll = markerTicker.C
 	}
+	// A marker change that arrives within markerRefreshGap of the previous
+	// marker refresh is deferred, not dropped.
+	var lastMarkerRefresh time.Time
+	var deferredMarkerRefresh <-chan time.Time
 
 	for {
 		select {
@@ -254,9 +275,19 @@ func (er *entryReaderImpl) watch(ctx context.Context) {
 		case <-resync:
 			scheduleRefresh()
 		case <-markerPoll:
-			if er.markerSignalsChange(ctx) {
-				scheduleRefresh()
+			if !er.markerSignalsChange(ctx) || deferredMarkerRefresh != nil {
+				continue
 			}
+			if wait := er.markerRefreshGap - time.Since(lastMarkerRefresh); wait > 0 {
+				deferredMarkerRefresh = time.After(wait)
+				continue
+			}
+			lastMarkerRefresh = time.Now()
+			scheduleRefresh()
+		case <-deferredMarkerRefresh:
+			deferredMarkerRefresh = nil
+			lastMarkerRefresh = time.Now()
+			scheduleRefresh()
 		case event, ok := <-er.watcher.Events():
 			if !ok {
 				return

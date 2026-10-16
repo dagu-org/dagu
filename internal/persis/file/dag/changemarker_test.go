@@ -165,6 +165,7 @@ func startMarkerReaderMode(t *testing.T, dagsDir, markerPath string, recursive b
 		withWatcherFactory(newSilentWatcher),
 		withResyncInterval(0),
 		WithChangeMarker(readerMarkerPath(markerPath), 25*time.Millisecond),
+		withMarkerRefreshGap(0),
 	}, markerOpts...)
 	er := NewFileEntryReader(dagsDir, repo, recursive, "", "", opts...)
 	events := make(chan persis.DAGChangeEvent, 64)
@@ -221,6 +222,24 @@ func TestEntryReaderFollowsChangeMarker(t *testing.T) {
 	require.NoError(t, store.Delete(ctx, "remote"))
 	expectEvent(t, events, persis.DAGChangeDeleted, "remote-edited")
 	expectNoEvent(t, events, 300*time.Millisecond)
+}
+
+// TestEntryReaderSpacesMarkerRefreshes verifies refreshes triggered by change
+// markers keep their minimum gap: a second remote edit right after the first
+// is still applied, but only once the gap has passed.
+func TestEntryReaderSpacesMarkerRefreshes(t *testing.T) {
+	ctx := context.Background()
+	store, dagsDir, markerPath := markerTestStore(t)
+	const gap = time.Second
+	events := startMarkerReader(t, dagsDir, markerPath, withMarkerRefreshGap(gap))
+
+	require.NoError(t, store.Create(ctx, "first", []byte("name: first\n"+markerTestDAG)))
+	expectEvent(t, events, persis.DAGChangeAdded, "first")
+	firstAt := time.Now()
+
+	require.NoError(t, store.Create(ctx, "second", []byte("name: second\n"+markerTestDAG)))
+	expectEvent(t, events, persis.DAGChangeAdded, "second")
+	assert.GreaterOrEqual(t, time.Since(firstAt), gap/2)
 }
 
 // TestEntryReaderStartsWithoutMarker verifies a missing marker is not an error
