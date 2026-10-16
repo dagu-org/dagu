@@ -3844,9 +3844,14 @@ func (a *API) getReferencedDAGRunStatusWithRef(ctx context.Context, parentRef ir
 }
 
 func (a *API) getReferencedAttempt(ctx context.Context, parentRef ir.DAGRunRef, subRunID string, dagName string) (dagrun.Attempt, error) {
+	attempt, _, err := a.getReferencedAttemptWithRoot(ctx, parentRef, subRunID, dagName)
+	return attempt, err
+}
+
+func (a *API) getReferencedAttemptWithRoot(ctx context.Context, parentRef ir.DAGRunRef, subRunID string, dagName string) (dagrun.Attempt, ir.DAGRunRef, error) {
 	attempt, err := a.dagRunRepository.FindSubAttempt(ctx, parentRef, subRunID)
 	if err == nil {
-		return attempt, nil
+		return attempt, parentRef, nil
 	}
 	subErr := err
 
@@ -3856,14 +3861,15 @@ func (a *API) getReferencedAttempt(ctx context.Context, parentRef ir.DAGRunRef, 
 		}
 	}
 	if strings.TrimSpace(dagName) == "" {
-		return nil, subErr
+		return nil, ir.DAGRunRef{}, subErr
 	}
 
-	attempt, err = a.dagRunRepository.FindAttempt(ctx, ir.NewDAGRunRef(dagName, subRunID))
+	ref := ir.NewDAGRunRef(dagName, subRunID)
+	attempt, err = a.dagRunRepository.FindAttempt(ctx, ref)
 	if err != nil {
-		return nil, subErr
+		return nil, ir.DAGRunRef{}, subErr
 	}
-	return attempt, nil
+	return attempt, ref, nil
 }
 
 func (a *API) findReferencedDAGName(ctx context.Context, parentRef ir.DAGRunRef, subRunID string) (string, bool) {
@@ -4011,7 +4017,7 @@ func (a *API) resumeWaitingDAGRun(ctx context.Context, ref ir.DAGRunRef, status 
 	if group == "" {
 		group = dag.ProcGroup()
 	}
-	opts := queue.EnqueueRetryOptions{Processes: a.procRepository}
+	opts := queue.EnqueueRetryOptions{Processes: a.procRepository, Resume: true}
 	if actor := triggerActorFromContext(ctx); actor != "" {
 		opts.TriggerActor = &actor
 	}
@@ -4033,7 +4039,7 @@ func (a *API) resumeWaitingDAGRun(ctx context.Context, ref ir.DAGRunRef, status 
 }
 
 func (a *API) resumeSubDAGRun(ctx context.Context, rootRef ir.DAGRunRef, subDAGRunID string) error {
-	attempt, err := a.getReferencedAttempt(ctx, rootRef, subDAGRunID, "")
+	attempt, storageRoot, err := a.getReferencedAttemptWithRoot(ctx, rootRef, subDAGRunID, "")
 	if err != nil {
 		return fmt.Errorf("find sub-attempt: %w", err)
 	}
@@ -4048,7 +4054,28 @@ func (a *API) resumeSubDAGRun(ctx context.Context, rootRef ir.DAGRunRef, subDAGR
 		return fmt.Errorf("read sub-DAG status: %w", err)
 	}
 
-	return a.resumeManagedAttempt(ctx, dag, status, subDAGRunID, nil)
+	if status.Status == ir.Queued {
+		return nil
+	}
+	if status.Status == ir.Running {
+		return fmt.Errorf("sub DAG-run is not waiting for resume (status: %s)", status.Status)
+	}
+
+	admission, err := queue.PrepareRetry(ctx, a.dagRunRepository, dag, status, queue.EnqueueRetryOptions{
+		Processes:  a.procRepository,
+		Resume:     true,
+		RootDAGRun: storageRoot,
+	})
+	if err != nil || admission == nil {
+		return err
+	}
+	if err := a.resumeManagedAttempt(ctx, dag, admission.Status, subDAGRunID, admission); err != nil {
+		if rollbackErr := admission.Rollback(ctx); rollbackErr != nil && !errors.Is(rollbackErr, queue.ErrRetryStaleLatest) {
+			return errors.Join(err, rollbackErr)
+		}
+		return err
+	}
+	return nil
 }
 
 func (a *API) resumeManagedAttempt(ctx context.Context, dag *ir.DAG, status *ir.DAGRunStatus, runID string, admission *queue.RetryAdmission) error {
