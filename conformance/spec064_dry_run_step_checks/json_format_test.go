@@ -4,9 +4,7 @@
 package spec064_dry_run_step_checks_test
 
 import (
-	"bytes"
 	"encoding/json"
-	"strings"
 	"testing"
 
 	"github.com/dagucloud/dagu/v2/conformance/harness"
@@ -60,23 +58,19 @@ type dryReport struct {
 	Checks []dryCheck `json:"checks"`
 }
 
+// decodeDryChecks requires stdout to hold one object whose only key is
+// checks, an array rather than null.
 func decodeDryChecks(t *testing.T, stdout string) dryReport {
 	t.Helper()
 
-	raw := []byte(strings.TrimSpace(stdout))
 	var object map[string]json.RawMessage
-	require.NoError(t, json.Unmarshal(raw, &object))
+	require.NoError(t, json.Unmarshal([]byte(stdout), &object))
 	require.Len(t, object, 1)
 	checks, ok := object["checks"]
 	require.True(t, ok)
-
-	var compact bytes.Buffer
-	require.NoError(t, json.Compact(&compact, checks))
+	require.NotEqual(t, "null", string(checks), "checks must be an array")
 
 	var report dryReport
-	require.NoError(t, json.Unmarshal(raw, &report))
-	if report.Checks == nil {
-		t.Fatalf("checks is null, want an array: %s", compact.String())
-	}
+	require.NoError(t, json.Unmarshal([]byte(stdout), &report))
 	return report
 }
