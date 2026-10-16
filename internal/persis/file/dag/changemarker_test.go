@@ -356,7 +356,40 @@ func TestChangeMarkerPollIgnoresStaleMarkers(t *testing.T) {
 	seen, changed = reader.poll(ctx, seen)
 	assert.False(t, changed)
 	assert.Empty(t, seen)
-	assert.FileExists(t, stale, "stale markers are ignored, never removed")
+	assert.FileExists(t, stale, "polling never removes a marker")
+}
+
+// TestChangeMarkerBumpRemovesStaleMarkers verifies a bump deletes the marker
+// files that every reader already ignores, and nothing else.
+func TestChangeMarkerBumpRemovesStaleMarkers(t *testing.T) {
+	_, dagsDir, markerPath := markerTestStore(t)
+	dir := filepath.Dir(markerPath)
+	require.NoError(t, os.MkdirAll(dir, 0750))
+	old := time.Now().Add(-staleMarkerAge - time.Hour)
+	writeStale := func(path string) string {
+		t.Helper()
+		require.NoError(t, os.WriteFile(path, []byte("x"), 0600))
+		require.NoError(t, os.Chtimes(path, old, old))
+		return path
+	}
+
+	staleHost := writeStale(hostMarkerPath(markerPath, "old-host"))
+	staleOtherDir := writeStale(changeMarkerPathForHost(dir, filepath.Join(dagsDir, "elsewhere"), "old-host"))
+	staleTemp := writeStale(hostMarkerPath(markerPath, "old-host") + ".tmp.1")
+	staleIndex := writeStale(filepath.Join(dir, "0123456789abcdef.index"))
+	staleDir := filepath.Join(dir, "dir"+changeMarkerSuffix)
+	require.NoError(t, os.Mkdir(staleDir, 0750))
+	require.NoError(t, os.Chtimes(staleDir, old, old))
+	fresh := bumpFrom(t, markerPath, "live-host")
+
+	NewChangeMarker(markerPath).Bump(context.Background())
+
+	assert.NoFileExists(t, staleHost)
+	assert.NoFileExists(t, staleOtherDir)
+	for _, kept := range []string{markerPath, fresh, staleTemp, staleIndex} {
+		assert.FileExists(t, kept)
+	}
+	assert.DirExists(t, staleDir)
 }
 
 // TestChangeMarkerPollIgnoresOtherFiles verifies only regular marker files of

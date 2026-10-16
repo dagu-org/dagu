@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -24,9 +25,9 @@ import (
 // changeMarkerSuffix ends the name of every change marker file.
 const changeMarkerSuffix = ".changed"
 
-// staleMarkerAge is how old a marker file must be before readers ignore it.
-// It lets files left behind by decommissioned hosts or pods be disregarded
-// without ever deleting them.
+// staleMarkerAge is how old a marker file must be before readers ignore it and
+// a bump removes it, so files left behind by decommissioned hosts or pods
+// neither count nor pile up.
 const staleMarkerAge = 7 * 24 * time.Hour
 
 // unknownHostID names the marker file of a host whose name could not be read.
@@ -100,7 +101,8 @@ func NewChangeMarker(path string) *ChangeMarker {
 	return &ChangeMarker{path: path}
 }
 
-// Bump records that DAG definitions changed. Failures are logged and ignored.
+// Bump records that DAG definitions changed and removes stale markers.
+// Failures are logged and ignored.
 func (m *ChangeMarker) Bump(ctx context.Context) {
 	if m == nil || m.path == "" {
 		return
@@ -116,6 +118,33 @@ func (m *ChangeMarker) Bump(ctx context.Context) {
 	}
 	if err := fileutil.WriteFileAtomic(m.path, []byte(token), defaultPerm); err != nil {
 		logger.Warn(ctx, "Failed to update DAG change marker", tag.File(m.path), tag.Error(err))
+		return
+	}
+	removeStaleMarkers(ctx, filepath.Dir(m.path))
+}
+
+// removeStaleMarkers deletes the marker files in dir that every reader already
+// ignores. A marker its host rewrites between the age check and the removal
+// loses that one signal, which the readers' periodic resync covers.
+func removeStaleMarkers(ctx context.Context, dir string) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	for _, entry := range entries {
+		if !strings.HasSuffix(entry.Name(), changeMarkerSuffix) {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil || !info.Mode().IsRegular() || time.Since(info.ModTime()) <= staleMarkerAge {
+			continue
+		}
+		// Not fileutil.Remove: its Windows retries would stall the DAG write
+		// that triggered the bump.
+		path := filepath.Join(dir, entry.Name())
+		if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			logger.Debug(ctx, "Failed to remove stale DAG change marker", tag.File(path), tag.Error(err))
+		}
 	}
 }
 
