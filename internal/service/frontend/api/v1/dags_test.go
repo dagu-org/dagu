@@ -730,6 +730,109 @@ steps:
 		_ = server.Client().Delete("/api/v1/dags/" + dagName).ExpectStatus(http.StatusNoContent).Send(t)
 	})
 
+	// A per-run selector is kept in the run's own DAG snapshot, which is what
+	// the queue dispatcher, a retry, and a reschedule read.
+	t.Run("EnqueueDAGWithWorkerSelector", func(t *testing.T) {
+		spec := `
+worker_selector: local
+steps:
+  - name: echo
+    run: echo "routed"
+`
+		dagName := "test_enqueue_worker_selector_dag"
+
+		_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
+			Name: dagName,
+			Spec: &spec,
+		}).ExpectStatus(http.StatusCreated).Send(t)
+
+		selector := api.WorkerSelectorOverride{"zone": "b", "gpu": "yes"}
+		resp := server.Client().Post("/api/v1/dags/"+dagName+"/enqueue", api.EnqueueDAGDAGRunJSONRequestBody{
+			WorkerSelector: &selector,
+		}).ExpectStatus(http.StatusOK).Send(t)
+
+		var enqResp api.EnqueueDAGDAGRun200JSONResponse
+		resp.Unmarshal(t, &enqResp)
+		require.NotEmpty(t, enqResp.DagRunId)
+
+		snapshot := snapshotDAGOf(t, server, dagName, enqResp.DagRunId)
+		assert.Equal(t, map[string]string{"zone": "b", "gpu": "yes"}, snapshot.WorkerSelector)
+		assert.False(t, snapshot.ForceLocal)
+
+		_ = server.Client().Delete("/api/v1/dags/" + dagName).ExpectStatus(http.StatusNoContent).Send(t)
+	})
+
+	t.Run("StartDAGWithWorkerSelector", func(t *testing.T) {
+		spec := `
+steps:
+  - name: echo
+    run: echo "routed"
+`
+		dagName := "test_start_worker_selector_dag"
+
+		_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
+			Name: dagName,
+			Spec: &spec,
+		}).ExpectStatus(http.StatusCreated).Send(t)
+
+		// Without a coordinator the run executes locally, as the YAML key would.
+		selector := api.WorkerSelectorOverride{"zone": "b"}
+		resp := server.Client().Post("/api/v1/dags/"+dagName+"/start", api.ExecuteDAGJSONRequestBody{
+			WorkerSelector: &selector,
+		}).ExpectStatus(http.StatusOK).Send(t)
+
+		var startResp api.ExecuteDAG200JSONResponse
+		resp.Unmarshal(t, &startResp)
+		require.NotEmpty(t, startResp.DagRunId)
+
+		snapshot := snapshotDAGOf(t, server, dagName, startResp.DagRunId)
+		assert.Equal(t, map[string]string{"zone": "b"}, snapshot.WorkerSelector)
+
+		_ = server.Client().Delete("/api/v1/dags/" + dagName).ExpectStatus(http.StatusNoContent).Send(t)
+	})
+
+	t.Run("WorkerSelectorRefusedWhenInvalidOrWithApproval", func(t *testing.T) {
+		plain := `
+steps:
+  - name: echo
+    run: echo "test"
+`
+		approval := `
+steps:
+  - name: gate
+    run: echo "gate"
+    approval:
+      prompt: "Approve the gate"
+`
+		for _, tc := range []struct {
+			name     string
+			spec     string
+			selector api.WorkerSelectorOverride
+		}{
+			{name: "test_ws_bad_key_dag", spec: plain, selector: api.WorkerSelectorOverride{"bad key": "b"}},
+			{name: "test_ws_empty_value_dag", spec: plain, selector: api.WorkerSelectorOverride{"zone": ""}},
+			{name: "test_ws_approval_dag", spec: approval, selector: api.WorkerSelectorOverride{"zone": "b"}},
+		} {
+			_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
+				Name: tc.name,
+				Spec: &tc.spec,
+			}).ExpectStatus(http.StatusCreated).Send(t)
+
+			for _, path := range []string{"/start", "/enqueue"} {
+				resp := server.Client().Post("/api/v1/dags/"+tc.name+path, api.ExecuteDAGJSONRequestBody{
+					WorkerSelector: &tc.selector,
+				}).ExpectStatus(http.StatusBadRequest).Send(t)
+
+				var errResp api.Error
+				resp.Unmarshal(t, &errResp)
+				require.Equal(t, api.ErrorCodeBadRequest, errResp.Code, "%s %s", tc.name, path)
+				require.Contains(t, errResp.Message, "workerSelector", "%s %s", tc.name, path)
+			}
+
+			_ = server.Client().Delete("/api/v1/dags/" + tc.name).ExpectStatus(http.StatusNoContent).Send(t)
+		}
+	})
+
 	t.Run("EnqueueDAGWithInvalidLabels", func(t *testing.T) {
 		spec := `
 steps:

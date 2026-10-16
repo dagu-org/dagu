@@ -7553,6 +7553,10 @@ export interface components {
         RuntimeProfileName: string;
         /** @description Runtime profile override. Empty string means no profile. */
         RuntimeProfileOverride: string;
+        /** @description Worker labels this DAG-run requires. Replaces the DAG-level worker_selector for this run, including its "local" value, and is kept with the run so retries, reschedules, and queued dispatch route the same way. Not allowed for DAGs with approval steps. */
+        WorkerSelectorOverride: {
+            [key: string]: string;
+        };
         /** @description Environment variable key stored in a runtime profile. Keys with the DAGU_ prefix are reserved. */
         RuntimeProfileKey: string;
         /** @enum {string} */
@@ -9230,6 +9234,7 @@ export interface operations {
                     dagRunId?: components["schemas"]["DAGRunId"] & unknown;
                     /** @description Optional DAG name override to use for the created dag-run */
                     dagName?: string;
+                    workerSelector?: components["schemas"]["WorkerSelectorOverride"];
                     /** @description Runtime profile override. Omit to use the DAG default profile, set to an empty string to run without a profile, or set to a profile name to override the DAG default. */
                     profile?: components["schemas"]["RuntimeProfileOverride"];
                     /**
@@ -9323,6 +9328,7 @@ export interface operations {
                     dagRunId?: components["schemas"]["DAGRunId"] & unknown;
                     /** @description Optional DAG name override to use for the created dag-run */
                     dagName?: string;
+                    workerSelector?: components["schemas"]["WorkerSelectorOverride"];
                     /** @description Runtime profile override. Omit to use the DAG default profile, set to an empty string to run without a profile, or set to a profile name to override the DAG default. */
                     profile?: components["schemas"]["RuntimeProfileOverride"];
                     /**
@@ -9422,6 +9428,7 @@ export interface operations {
                     profile?: components["schemas"]["RuntimeProfileOverride"];
                     /** @description Override the DAG-level queue definition */
                     queue?: string;
+                    workerSelector?: components["schemas"]["WorkerSelectorOverride"];
                     /**
                      * @description If true, prevent enqueuing if DAG is already running or queued (returns 409 conflict)
                      * @default false
@@ -10386,6 +10393,7 @@ export interface operations {
                     name?: string;
                     /** @description Runtime profile to apply to this DAG-run. Set to an empty string or omit to run without a profile. */
                     profile?: components["schemas"]["RuntimeProfileOverride"];
+                    workerSelector?: components["schemas"]["WorkerSelectorOverride"];
                     /** @description Parameters to pass to the DAG-run in JSON format */
                     params?: string;
                     dagRunId?: components["schemas"]["DAGRunId"] & unknown;
@@ -10483,6 +10491,7 @@ export interface operations {
                     dagRunId?: components["schemas"]["DAGRunId"] & unknown;
                     /** @description Override the queue to use for this DAG-run */
                     queue?: string;
+                    workerSelector?: components["schemas"]["WorkerSelectorOverride"];
                     /**
                      * @description If true, prevent enqueuing if DAG is already running or queued (returns 409 conflict)
                      * @default false

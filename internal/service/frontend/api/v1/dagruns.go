@@ -242,6 +242,10 @@ func (a *API) ExecuteDAGRunFromSpec(ctx context.Context, request api.ExecuteDAGR
 	if err := a.requireDAGWriteForWorkspace(ctx, runtimeWorkspaceName(dag, labels)); err != nil {
 		return nil, err
 	}
+	workerSelector, err := applyWorkerSelectorOverride(dag, request.Body.WorkerSelector)
+	if err != nil {
+		return nil, err
+	}
 
 	if err := a.ensureDAGRunIDUnique(ctx, dag, dagRunId); err != nil {
 		return nil, err
@@ -272,7 +276,15 @@ func (a *API) ExecuteDAGRunFromSpec(ctx context.Context, request api.ExecuteDAGR
 			return nil, err
 		}
 	} else {
-		started, err = a.startDAGRun(ctx, dag, params, dagRunId, valueOf(request.Body.Name), labels, profileName, valueOf(request.Body.NoReuse))
+		started, err = a.startDAGRun(ctx, dag, manualStart{
+			params:         params,
+			dagRunID:       dagRunId,
+			nameOverride:   valueOf(request.Body.Name),
+			labels:         labels,
+			profileName:    profileName,
+			noReuse:        valueOf(request.Body.NoReuse),
+			workerSelector: workerSelector,
+		})
 	}
 	if started != nil {
 		cleanupOnReturn = false
@@ -297,6 +309,9 @@ func (a *API) ExecuteDAGRunFromSpec(ctx context.Context, request api.ExecuteDAGR
 	}
 	if params != "" {
 		detailsMap["params"] = params
+	}
+	if len(workerSelector) > 0 {
+		detailsMap["worker_selector"] = workerSelector
 	}
 	addSelectedStepsAudit(detailsMap, selection)
 	a.logAudit(ctx, audit.CategoryDAG, "dag_execute", detailsMap)
@@ -362,6 +377,10 @@ func (a *API) EnqueueDAGRunFromSpec(ctx context.Context, request api.EnqueueDAGR
 	if request.Body.Queue != nil && *request.Body.Queue != "" {
 		dag.Queue = *request.Body.Queue
 	}
+	workerSelector, err := applyWorkerSelectorOverride(dag, request.Body.WorkerSelector)
+	if err != nil {
+		return nil, err
+	}
 
 	if err := a.ensureDAGRunIDUnique(ctx, dag, dagRunId); err != nil {
 		return nil, err
@@ -389,7 +408,15 @@ func (a *API) EnqueueDAGRunFromSpec(ctx context.Context, request api.EnqueueDAGR
 		}
 	}
 
-	if err := a.enqueueDAGRun(ctx, dag, params, dagRunId, valueOf(request.Body.Name), ir.TriggerTypeManual, "", profileName, valueOf(request.Body.NoReuse), ""); err != nil {
+	if err := a.enqueueDAGRun(ctx, dag, enqueueRequest{
+		params:         params,
+		dagRunID:       dagRunId,
+		nameOverride:   valueOf(request.Body.Name),
+		triggerType:    ir.TriggerTypeManual,
+		profileName:    profileName,
+		noReuse:        valueOf(request.Body.NoReuse),
+		workerSelector: workerSelector,
+	}); err != nil {
 		return nil, fmt.Errorf("error enqueuing dag-run: %w", err)
 	}
 
@@ -400,6 +427,9 @@ func (a *API) EnqueueDAGRunFromSpec(ctx context.Context, request api.EnqueueDAGR
 	}
 	if params != "" {
 		detailsMap["params"] = params
+	}
+	if len(workerSelector) > 0 {
+		detailsMap["worker_selector"] = workerSelector
 	}
 	a.logAudit(ctx, audit.CategoryDAG, "dag_enqueue", detailsMap)
 
@@ -3589,12 +3619,16 @@ func (a *API) rescheduleDAGRun(ctx context.Context, dagName, dagRunID string, op
 		cleanup()
 	}()
 
+	// The snapshot's YAML predates any per-run selector, so a reschedule from
+	// the snapshot carries the selector the run was routed with.
+	var rescheduleSelector map[string]string
 	if opts.useCurrentDAGFile {
 		dag, err = a.loadCurrentRescheduleDAG(ctx, storedSourceFile, nameOverride)
 		if err != nil {
 			return rescheduleDAGRunResult{}, err
 		}
 	} else {
+		rescheduleSelector = snapshotDAG.WorkerSelector
 		if len(snapshotDAG.YamlData) == 0 {
 			return rescheduleDAGRunResult{}, fmt.Errorf("failed to enqueue dag-run: DAG snapshot YAML is missing")
 		}
@@ -3637,7 +3671,15 @@ func (a *API) rescheduleDAGRun(ctx context.Context, dagName, dagRunID string, op
 	}
 	var enqueueErr error
 	if opts.useCurrentDAGFile {
-		enqueueErr = a.enqueueDAGRun(ctx, dag, paramsToUse, newDagRunID, "", ir.TriggerTypeManual, "", profileName, status.NoReuse, status.DAGDefinitionID())
+		enqueueErr = a.enqueueDAGRun(ctx, dag, enqueueRequest{
+			params:         paramsToUse,
+			dagRunID:       newDagRunID,
+			triggerType:    ir.TriggerTypeManual,
+			profileName:    profileName,
+			noReuse:        status.NoReuse,
+			definitionID:   status.DAGDefinitionID(),
+			workerSelector: rescheduleSelector,
+		})
 	} else {
 		enqueueErr = a.enqueuePreparedDAGRun(ctx, dag, paramsToUse, newDagRunID, ir.TriggerTypeManual, profileName, status.NoReuse)
 	}
