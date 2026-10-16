@@ -105,6 +105,9 @@ type dirLock struct {
 	// beforeOwnerWrite, when set by tests, runs after a new lock directory is
 	// created and before its owner file is written.
 	beforeOwnerWrite func()
+	// beforeSweep, when set by tests, runs when a takeover starts sweeping
+	// released lock directories.
+	beforeSweep func()
 }
 
 var _ DirLock = (*dirLock)(nil)
@@ -199,13 +202,11 @@ func (l *dirLock) TryLock() error {
 		if err := l.removeStaleLock(); err != nil {
 			return err
 		}
-		if err := l.createLock(); err != nil {
-			return err
-		}
 		// A stale lock means a holder stopped without releasing it, so it may
-		// also have left released lock directories behind.
+		// also have left released lock directories behind. Sweep them before
+		// creating the new lock, so the sweep does not eat into its lease.
 		l.removeAbandonedTempDirs()
-		return nil
+		return l.createLock()
 	} else if !os.IsNotExist(err) {
 		if isRetryableLockStateError(err) {
 			return ErrLockConflict
@@ -220,6 +221,9 @@ func (l *dirLock) TryLock() error {
 // stale threshold, left by a process that stopped while removing them. Errors
 // are ignored; a later takeover retries.
 func (l *dirLock) removeAbandonedTempDirs() {
+	if l.beforeSweep != nil {
+		l.beforeSweep()
+	}
 	entries, err := os.ReadDir(l.targetDir)
 	if err != nil {
 		return

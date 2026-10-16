@@ -996,6 +996,25 @@ func TestStaleTakeover_CleansAbandonedTempDirs(t *testing.T) {
 	}
 }
 
+// A takeover sweeps directories left by earlier releases, which may take a
+// while. The sweep must not eat into the new lock's lease: right after TryLock
+// returns, the lock must not look stale to other contenders.
+func TestStaleTakeover_SlowSweep(t *testing.T) {
+	const threshold = 200 * time.Millisecond
+	dir := t.TempDir()
+	require.NoError(t, New(dir, nil).TryLock())
+	backdateLock(t, dir)
+
+	first := New(dir, &LockOptions{StaleThreshold: threshold}).(*dirLock)
+	first.beforeSweep = func() { time.Sleep(2 * threshold) }
+	require.NoError(t, first.TryLock())
+
+	second := New(dir, &LockOptions{StaleThreshold: threshold})
+	require.ErrorIs(t, second.TryLock(), ErrLockConflict)
+	require.True(t, first.IsHeldByMe())
+	require.NoError(t, first.Unlock())
+}
+
 // The lock directory is empty until its owner file is written, so stale-lock
 // recovery may remove it, and another contender may create or claim the
 // directory at that path in the meantime. The creator must back off and leave
