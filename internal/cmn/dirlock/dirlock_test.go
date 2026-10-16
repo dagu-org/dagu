@@ -1264,3 +1264,24 @@ func TestStaleTakeover_RestrictedLockDir(t *testing.T) {
 		})
 	}
 }
+
+// A held lock whose directory lost owner access must still be released at
+// once, as older releases do by moving the directory aside, rather than block
+// the next holder until the lock goes stale.
+func TestUnlock_RestrictedLockDir(t *testing.T) {
+	for _, mode := range []os.FileMode{0o300, 0o500} {
+		t.Run(strconv.FormatUint(uint64(mode), 8), func(t *testing.T) {
+			dir := t.TempDir()
+			holder := New(dir, nil)
+			require.NoError(t, holder.TryLock())
+			require.NoError(t, os.Chmod(filepath.Join(dir, LockDirectoryName), mode))
+			restoreAccessOnCleanup(t, dir)
+
+			require.NoError(t, holder.Unlock())
+
+			next := New(dir, nil)
+			require.NoError(t, next.TryLock())
+			require.NoError(t, next.Unlock())
+		})
+	}
+}
