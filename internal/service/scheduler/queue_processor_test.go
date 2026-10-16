@@ -1288,6 +1288,14 @@ func (m *mockDispatchTaskStore) HasOutstandingAttempt(ctx context.Context, attem
 	return false, nil
 }
 
+func (m *mockDispatchTaskStore) ListExpiredHeld(context.Context, time.Time) ([]*dispatch.DispatchTask, error) {
+	return nil, nil
+}
+
+func (m *mockDispatchTaskStore) DeletePending(context.Context, string) error {
+	return nil
+}
+
 func TestQueueProcessor_CheckStartupStatusTreatsRunningStatusAsStarted(t *testing.T) {
 	f := newQueueFixture(t).withDAG("startup-running-dag", 1).
 		withProcessor(config.Queues{}, WithLeaseStaleThreshold(freshDistributedTestThreshold))

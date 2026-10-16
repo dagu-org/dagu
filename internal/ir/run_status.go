@@ -68,14 +68,44 @@ func InitialStatus(dag *DAG) DAGRunStatus {
 	}
 }
 
-// The condition type that tells whether a queued DAG-run can start, and the
-// reasons it records when no worker can take the run.
+// The condition types that tell whether a queued DAG-run can start, their
+// statuses, and the reasons recorded when no worker can take the run.
 const (
-	DAGRunConditionRunnable               = "Runnable"
+	DAGRunConditionRunnable    = "Runnable"
+	DAGRunConditionWorkerReady = "WorkerReady"
+
+	DAGRunConditionStatusTrue    = "True"
+	DAGRunConditionStatusFalse   = "False"
+	DAGRunConditionStatusUnknown = "Unknown"
+
 	DAGRunReasonNoMatchingWorker          = "NoMatchingWorker"
 	DAGRunReasonNoAvailableWorker         = "NoAvailableWorker"
 	DAGRunReasonWorkerDispatchUnavailable = "WorkerDispatchUnavailable"
 )
+
+// NoMatchingWorkerConditions are the conditions a run waits under when no
+// healthy worker carries the labels its selector requires. The scheduler's
+// queue and the coordinator write the same pair, so a waiting run reads the
+// same however it was dispatched.
+func NoMatchingWorkerConditions(checkedAt time.Time) []DAGRunCondition {
+	return []DAGRunCondition{
+		NewDAGRunCondition(DAGRunConditionRunnable, DAGRunConditionStatusFalse, DAGRunReasonNoMatchingWorker,
+			"The DAG-run cannot start because no healthy worker matches the required selector.", checkedAt),
+		NewDAGRunCondition(DAGRunConditionWorkerReady, DAGRunConditionStatusFalse, DAGRunReasonNoMatchingWorker,
+			"No healthy worker matches the required worker selector.", checkedAt),
+	}
+}
+
+// NoAvailableWorkerConditions are the conditions a run waits under when no
+// healthy distributed worker exists at all.
+func NoAvailableWorkerConditions(checkedAt time.Time) []DAGRunCondition {
+	return []DAGRunCondition{
+		NewDAGRunCondition(DAGRunConditionRunnable, DAGRunConditionStatusFalse, DAGRunReasonNoAvailableWorker,
+			"The DAG-run cannot start because no healthy distributed worker is available.", checkedAt),
+		NewDAGRunCondition(DAGRunConditionWorkerReady, DAGRunConditionStatusFalse, DAGRunReasonNoAvailableWorker,
+			"No healthy distributed worker is available.", checkedAt),
+	}
+}
 
 // DAGRunCondition describes an observed runtime condition for a DAG-run.
 type DAGRunCondition struct {

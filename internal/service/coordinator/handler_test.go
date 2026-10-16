@@ -1726,6 +1726,14 @@ func (s *failingDispatchTaskStore) HasOutstandingAttempt(context.Context, string
 	return false, nil
 }
 
+func (s *failingDispatchTaskStore) ListExpiredHeld(context.Context, time.Time) ([]*dispatch.DispatchTask, error) {
+	return nil, nil
+}
+
+func (s *failingDispatchTaskStore) DeletePending(context.Context, string) error {
+	return nil
+}
+
 func TestHandler_Heartbeat(t *testing.T) {
 	t.Parallel()
 

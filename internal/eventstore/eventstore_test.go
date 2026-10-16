@@ -105,6 +105,9 @@ func TestNewDAGRunEventEmbedsDAGRunSnapshot(t *testing.T) {
 		FinishedAt:     "2026-04-01T09:02:00Z",
 		AutoRetryCount: 1,
 		AutoRetryLimit: 3,
+		Conditions: []ir.DAGRunCondition{
+			{Type: ir.DAGRunConditionWorkerReady, Status: ir.DAGRunConditionStatusFalse, Reason: ir.DAGRunReasonNoMatchingWorker, Message: "No healthy worker matches the required worker selector.", CheckedAt: "2026-04-01T09:00:30Z"},
+		},
 		Nodes: []*ir.Node{
 			{
 				Step:   ir.Step{Name: "fetch"},
@@ -140,6 +143,7 @@ func TestNewDAGRunEventEmbedsDAGRunSnapshot(t *testing.T) {
 	assert.Equal(t, status.Parent.ID, snapshot.Parent.DAGRunID)
 	assert.Equal(t, status.ProcGroup, snapshot.ProcGroup)
 	assert.Equal(t, status.Labels, snapshot.Labels)
+	assert.Equal(t, status.Conditions, snapshot.Conditions)
 
 	restored, err := DAGRunStatusFromEvent(event)
 	require.NoError(t, err)

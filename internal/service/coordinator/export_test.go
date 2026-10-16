@@ -4,6 +4,7 @@
 package coordinator
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -35,4 +36,9 @@ func SetDispatchPollWaitForTest(t testing.TB, h *Handler, initial, maxWait time.
 // NotifyDispatchAvailableForTest wakes distributed pollers.
 func NotifyDispatchAvailableForTest(h *Handler) {
 	h.notifyDispatchAvailable()
+}
+
+// ExpireHeldDispatchesForTest fails held dispatches whose wait passed at now.
+func ExpireHeldDispatchesForTest(h *Handler, now time.Time) {
+	h.expireHeldDispatches(context.Background(), now)
 }
