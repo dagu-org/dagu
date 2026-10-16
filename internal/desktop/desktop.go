@@ -114,6 +114,9 @@ const (
 	problemScreenRecording = "screen_recording"
 	problemAccessibility   = "accessibility"
 	problemServiceSession  = "service_session"
+	// problemSessionDisconnected is a Remote Desktop or child session whose
+	// client has gone: the session exists but nothing draws it.
+	problemSessionDisconnected = "session_disconnected"
 )
 
 // Err summarizes the problems as one error, or returns nil.
