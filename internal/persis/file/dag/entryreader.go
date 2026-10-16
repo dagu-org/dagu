@@ -57,29 +57,21 @@ type entryReaderImpl struct {
 // EntryReaderOption customizes a filesystem DAG entry reader.
 type EntryReaderOption func(*entryReaderImpl)
 
-// WithResyncInterval sets how often the reader re-reads the whole DAG
+// withResyncInterval sets how often the reader re-reads the whole DAG
 // directory regardless of watcher events or the change marker. It is the safety
 // net for changes that do not go through the Dagu store, such as DAG files
 // edited directly or pulled by git sync. A non-positive value disables it.
-func WithResyncInterval(interval time.Duration) EntryReaderOption {
+func withResyncInterval(interval time.Duration) EntryReaderOption {
 	return func(er *entryReaderImpl) {
 		er.resyncInterval = interval
 	}
 }
 
-// WithChangeMarker makes the reader poll the change markers of the other hosts
-// every interval and refresh the registry when one changes, which is how it
-// learns about DAG changes that another host made through the Dagu store (the
-// UI and API editors). path is this host's own marker file, as returned by
-// ChangeMarkerPath; it identifies the marker directory and is the one marker
-// the reader ignores, because the file watches already report this host's
-// changes. An empty path disables the marker; a non-positive interval selects
-// the default.
-//
-// Changes that do not go through the store, such as DAG files edited directly
-// on the volume or pulled by git sync, are only picked up by the resync. So are
-// changes from machines that share a host name, or that mount the DAG
-// directory at different paths, since the marker name derives from that path.
+// WithChangeMarker makes the reader refresh the registry when the change
+// marker of another host changes, checked every interval. path is this host's
+// marker, as returned by ChangeMarkerPath; the reader ignores it because its
+// file watches already report this host's changes. An empty path disables the
+// marker and a non-positive interval selects the default.
 func WithChangeMarker(path string, interval time.Duration) EntryReaderOption {
 	return func(er *entryReaderImpl) {
 		er.marker = nil

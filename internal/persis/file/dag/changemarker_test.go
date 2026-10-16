@@ -163,7 +163,7 @@ func startMarkerReaderMode(t *testing.T, dagsDir, markerPath string, recursive b
 	repo := persis.NewDAGRepository(NewStore(dagsDir, WithSkipExamples(true), WithRecursiveDiscovery(recursive)), persis.DAGRepositoryOptions{})
 	opts := append([]EntryReaderOption{
 		withWatcherFactory(newSilentWatcher),
-		WithResyncInterval(0),
+		withResyncInterval(0),
 		WithChangeMarker(readerMarkerPath(markerPath), 25*time.Millisecond),
 	}, markerOpts...)
 	er := NewFileEntryReader(dagsDir, repo, recursive, "", "", opts...)

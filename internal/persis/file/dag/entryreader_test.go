@@ -1070,7 +1070,7 @@ func TestEntryReaderResyncSeesChangesWithoutWatcherEvents(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			dir := t.TempDir()
 			writeDAGFile(t, dir, "existing.yaml", "existing")
-			_, events := startSilentEntryReader(t, dir, recursive, WithResyncInterval(100*time.Millisecond))
+			_, events := startSilentEntryReader(t, dir, recursive, withResyncInterval(100*time.Millisecond))
 
 			writeDAGFile(t, dir, "remote.yaml", "remote")
 			expectEvent(t, events, persis.DAGChangeAdded, "remote")
@@ -1092,7 +1092,7 @@ func TestEntryReaderResyncSeesChangesWithoutWatcherEvents(t *testing.T) {
 // TestEntryReaderResyncDisabled keeps the resync opt-out working.
 func TestEntryReaderResyncDisabled(t *testing.T) {
 	dir := t.TempDir()
-	_, events := startSilentEntryReader(t, dir, false, WithResyncInterval(0))
+	_, events := startSilentEntryReader(t, dir, false, withResyncInterval(0))
 
 	writeDAGFile(t, dir, "remote.yaml", "remote")
 	expectNoEvent(t, events, 300*time.Millisecond)

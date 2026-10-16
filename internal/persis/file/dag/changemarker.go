@@ -42,12 +42,9 @@ var localHostName = sync.OnceValue(func() string {
 	return strings.TrimSpace(host)
 })
 
-// ChangeMarkerPath returns the marker file this host writes to signal DAG
-// definition changes for baseDir. The marker lives in indexDir, outside the DAG
-// directory. Every host that uses the same data directory has its own file,
-// "<base hash>.<host hash>.changed", so a writer never overwrites another
-// host's marker. It returns "" when there is no index directory, which
-// disables the marker.
+// ChangeMarkerPath returns this host's change marker for the DAG directory
+// baseDir, kept in indexDir next to the markers of other hosts. It returns ""
+// when indexDir is empty, which disables the marker.
 func ChangeMarkerPath(indexDir, baseDir string) string {
 	return changeMarkerPathForHost(indexDir, baseDir, localHostName())
 }
@@ -72,25 +69,16 @@ func hostID(host string) string {
 	return hex.EncodeToString(sum[:8])
 }
 
-// ChangeMarker is a tiny file that is rewritten whenever a DAG definition is
-// created, updated, deleted or renamed through the Dagu store (the UI and API
-// editors, and base configuration edits). File watches do not fire for writes
-// that another host makes on a shared network volume, so a reader polls the
-// markers of the other hosts instead. The marker is best effort: it is a hint
-// that something may have changed, never the source of truth.
+// ChangeMarker signals DAG definition changes made through the Dagu store to
+// readers on other hosts, whose file watches miss writes made over a shared
+// network volume. It is a hint that something may have changed, never the
+// source of truth.
 //
-// Files that Dagu does not write through the store are not signalled: DAG
-// files edited directly on the volume and changes pulled by git sync are only
-// picked up by the reader's periodic resync. The marker name derives from the
-// DAG directory path, so every host must mount that directory at the same
-// path; otherwise only the resync applies.
-//
-// Each host writes only its own file and a reader ignores its own host's file,
-// because its file watches already report those changes. Ignoring it cannot
-// hide a bump from another host, which lives in a different file. A host whose
-// name is unknown, and two machines that share a host name, share one file and
-// cannot tell their bumps apart: an unknown host therefore ignores nothing,
-// and machines sharing a name rely on the resync.
+// Hosts see each other's signals only when they share the data directory that
+// holds the markers and mount the DAG directory at the same absolute path.
+// Changes made outside the store, such as git sync or direct file edits, are
+// not signalled. Hosts that share a host name, or whose name is unknown, share
+// one marker.
 type ChangeMarker struct {
 	path string
 }
@@ -157,15 +145,9 @@ type markerVersions map[string]fs.FileInfo
 // Removed markers are dropped without counting, markers not modified for
 // staleMarkerAge are ignored, and an unreadable directory counts as unchanged.
 //
-// Only the directory is read, never the marker files. On network file systems
-// open and stat answer from attribute and directory entry caches that can be
-// tens of seconds old (up to acregmax, 60s by default on NFS), so a remote
-// update would be seen late. Listing the directory revalidates it and, through
-// READDIRPLUS, refreshes the attributes of its entries. This relies on the NFS
-// client's directory read refreshing attributes, which is the default on Linux
-// clients; with the nordirplus mount option detection is bounded by the
-// attribute cache timeouts instead. The directory is expected to hold only a
-// few small files.
+// Only the directory is listed; the markers are never opened. On NFS, open
+// and stat can serve attributes cached for up to a minute, while a directory
+// listing with READDIRPLUS (the Linux default) refreshes them.
 func (m *ChangeMarker) poll(ctx context.Context, last markerVersions) (markerVersions, bool) {
 	if m == nil || m.path == "" {
 		return last, false

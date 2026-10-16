@@ -166,7 +166,7 @@ func NewStore(baseDir string, opts ...Option) *Store {
 type Store struct {
 	baseDir                string        // Base directory for DAG storage
 	indexPath              string        // DAG definition index file
-	changeMarker           *ChangeMarker // Bumped after every DAG definition change; nil-path when disabled
+	changeMarker           *ChangeMarker // Signals DAG definition changes to other hosts
 	flagsBaseDir           string        // Base directory for flag store
 	legacyFlagsBaseDir     string
 	fileCache              *fileutil.Cache[*ir.DAG] // Optional cache for DAG objects
