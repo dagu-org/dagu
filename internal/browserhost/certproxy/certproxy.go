@@ -70,7 +70,8 @@ type Config struct {
 	GraceSeconds int `json:"grace_seconds,omitempty"`
 	// Guard sends the browser's other https: requests through the proxy too,
 	// so the browser never answers a site's request for a client
-	// certificate itself; a host no entry names gets none.
+	// certificate itself: a site that may ask for one gets the proxy's TLS,
+	// presenting none, and the others the browser's own.
 	Guard bool `json:"guard,omitempty"`
 }
 

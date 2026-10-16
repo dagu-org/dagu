@@ -207,6 +207,19 @@ func newFakeBrowser(t *testing.T) *fakeBrowser {
 // serveProxy runs Serve until the test ends.
 func serveProxy(t *testing.T, cfg Config) Ready {
 	t.Helper()
+	return runProxy(t, func(ctx context.Context, ready func(Ready)) error { return Serve(ctx, cfg, ready) })
+}
+
+// servePassing is serveProxy with public as the only authority whose sites
+// the guard takes as public.
+func servePassing(t *testing.T, cfg Config, public *testCA) Ready {
+	t.Helper()
+	return runProxy(t, func(ctx context.Context, ready func(Ready)) error { return serve(ctx, cfg, public.pool(), ready) })
+}
+
+// runProxy runs a proxy with run until the test ends.
+func runProxy(t *testing.T, run func(context.Context, func(Ready)) error) Ready {
+	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	ready := make(chan Ready, 1)
 	// done is closed, not sent on, so both the wait below and the cleanup
@@ -215,7 +228,7 @@ func serveProxy(t *testing.T, cfg Config) Ready {
 	var serveErr error
 	go func() {
 		defer close(done)
-		serveErr = Serve(ctx, cfg, func(r Ready) { ready <- r })
+		serveErr = run(ctx, func(r Ready) { ready <- r })
 	}()
 	t.Cleanup(func() {
 		cancel()

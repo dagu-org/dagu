@@ -32,8 +32,8 @@ import (
 )
 
 const (
-	// handshakeTimeout bounds the browser's TLS handshake with the proxy,
-	// which includes reaching the server and the handshake with it.
+	// handshakeTimeout bounds opening a tunnel, from the browser's CONNECT
+	// through reaching the server to the TLS handshakes with both.
 	handshakeTimeout = 30 * time.Second
 	// readHeaderTimeout bounds reading a request to the proxy.
 	readHeaderTimeout = 10 * time.Second
@@ -91,6 +91,10 @@ type server struct {
 	pending    *pendingLog
 	// guardEntry presents no certificate, to the hosts the guard carries.
 	guardEntry *upstreamEntry
+	// publicRoots are the authorities whose sites the guard may pass the
+	// browser's own TLS to; verdicts remembers which sites it may.
+	publicRoots *x509.CertPool
+	verdicts    *passVerdicts
 
 	mu      sync.Mutex
 	closed  bool
@@ -229,7 +233,8 @@ func (g guardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // handleConnect opens a tunnel to the host a CONNECT request names, ending
 // the browser's TLS in the proxy. The certificate port tunnels only to the
 // hosts the entries name; the guard tunnels to any host, presenting no
-// certificate to the others.
+// certificate to the others, or passes the browser's TLS to a site that
+// never asks for one.
 func (s *server) handleConnect(w http.ResponseWriter, r *http.Request, guard bool) {
 	host, port := splitAuthority(r.Host)
 	if host == "" {
@@ -245,8 +250,9 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request, guard boo
 		}
 		entry = s.guardEntry
 	}
+	deadline := time.Now().Add(handshakeTimeout)
 	pending := s.pending.start(host)
-	ctx, cancel := context.WithTimeout(s.ctx, handshakeTimeout)
+	ctx, cancel := context.WithDeadline(s.ctx, deadline)
 	raw, via, err := s.reach(ctx, host, port, entry)
 	cancel()
 	if err != nil {
@@ -258,11 +264,7 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request, guard boo
 			resetConnection(w)
 			return
 		}
-		kind := EventUpstream
-		if errors.Is(err, errProxyAuth) {
-			kind = EventProxyAuth
-		}
-		s.events.add(kind, host, entry.label, fmt.Sprintf("the certificate proxy could not reach %s: %s", host, oneLine(err)))
+		s.reportUnreachable(host, entry, err)
 		http.Error(w, "the certificate proxy could not reach the site", http.StatusBadGateway)
 		return
 	}
@@ -289,7 +291,20 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request, guard boo
 	if buffered.Reader.Buffered() > 0 {
 		client = &bufferedConn{Conn: conn, reader: buffered.Reader}
 	}
-	s.tunnel(client, raw, via, host, entry, pending)
+	if s.carriedByGuard(entry) && !s.intercepted(host, port) {
+		s.passOrTunnel(client, raw, via, host, port, deadline, pending)
+		return
+	}
+	s.tunnel(client, raw, via, host, entry, deadline, pending)
+}
+
+// reportUnreachable records why the proxy could not reach host.
+func (s *server) reportUnreachable(host string, entry *upstreamEntry, err error) {
+	kind := EventUpstream
+	if errors.Is(err, errProxyAuth) {
+		kind = EventProxyAuth
+	}
+	s.events.add(kind, host, entry.label, fmt.Sprintf("the certificate proxy could not reach %s: %s", host, oneLine(err)))
 }
 
 // stopGuard closes the guard, so the browser sends the requests it carried
@@ -384,8 +399,9 @@ func (s *server) carriedByGuard(entry *upstreamEntry) bool {
 
 // tunnel relays the browser's connection to the server reached over raw.
 // The browser's handshake waits for the one with the server, so it learns
-// the server's application protocol, and fails when that one does.
-func (s *server) tunnel(client, raw net.Conn, via route, host string, entry *upstreamEntry, pending int64) {
+// the server's application protocol, and fails when that one does or by
+// deadline.
+func (s *server) tunnel(client, raw net.Conn, via route, host string, entry *upstreamEntry, deadline time.Time, pending int64) {
 	defer s.pending.end(pending)
 	if !s.track(client) {
 		_ = client.Close()
@@ -415,7 +431,7 @@ func (s *server) tunnel(client, raw net.Conn, via route, host string, entry *ups
 			return config, nil
 		},
 	})
-	ctx, cancel := context.WithTimeout(s.ctx, handshakeTimeout)
+	ctx, cancel := context.WithDeadline(s.ctx, deadline)
 	err := downstream.HandshakeContext(ctx)
 	cancel()
 	if err != nil {
