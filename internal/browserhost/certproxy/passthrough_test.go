@@ -5,21 +5,25 @@ package certproxy
 
 import (
 	"context"
-	"encoding/base64"
 	"crypto/tls"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"log"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/dagucloud/dagu/v2/internal/browserhost"
 	"github.com/dagucloud/dagu/v2/internal/test/chrometest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -374,7 +378,13 @@ func TestGuardPassesChromesOwnHandshake(t *testing.T) {
 // certificate, so a handshake of its own that reaches the site completes.
 func runChrome(t *testing.T, chrome string, ready Ready, url string) {
 	t.Helper()
-	profile := t.TempDir()
+	profile, err := os.MkdirTemp("", "dagu-certproxy-chrome-")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		// Chrome's last processes may still be writing as it exits.
+		assert.Eventually(t, func() bool { return os.RemoveAll(profile) == nil },
+			10*time.Second, 200*time.Millisecond, "remove the browser profile")
+	})
 	pac := fmt.Sprintf(`function FindProxyForURL() { return "PROXY 127.0.0.1:%d"; }`, ready.GuardPort)
 	cmd := exec.Command(chrome,
 		"--headless",
@@ -384,14 +394,36 @@ func runChrome(t *testing.T, chrome string, ready Ready, url string) {
 		"--disable-background-networking",
 		"--disable-component-update",
 		"--ignore-certificate-errors",
+		"--remote-debugging-port=0",
 		"--user-data-dir="+profile,
 		"--proxy-pac-url="+pacDataURLPrefix+base64.StdEncoding.EncodeToString([]byte(pac)),
 		"--ignore-certificate-errors-spki-list="+ready.SPKI,
 		url,
 	)
 	require.NoError(t, cmd.Start())
-	t.Cleanup(func() {
-		_ = cmd.Process.Kill()
+	t.Cleanup(func() { closeChrome(cmd, profile) })
+}
+
+// closeChrome closes the Chrome cmd runs through its DevTools port, which
+// ends every process it started; killing it alone would leave them running.
+// It kills Chrome only when that does not end it in time.
+func closeChrome(cmd *exec.Cmd, profile string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	exited := make(chan struct{})
+	go func() {
 		_ = cmd.Wait()
-	})
+		close(exited)
+	}()
+	// Chrome writes the port it chose to the profile's DevToolsActivePort.
+	if data, err := os.ReadFile(filepath.Join(profile, "DevToolsActivePort")); err == nil {
+		port, _, _ := strings.Cut(string(data), "\n")
+		_ = browserhost.CloseBrowser(ctx, "http://127.0.0.1:"+port)
+	}
+	select {
+	case <-exited:
+	case <-ctx.Done():
+		_ = cmd.Process.Kill()
+		<-exited
+	}
 }
