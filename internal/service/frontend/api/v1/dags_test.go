@@ -762,35 +762,6 @@ steps:
 		_ = server.Client().Delete("/api/v1/dags/" + dagName).ExpectStatus(http.StatusNoContent).Send(t)
 	})
 
-	t.Run("StartDAGWithWorkerSelector", func(t *testing.T) {
-		spec := `
-steps:
-  - name: echo
-    run: echo "routed"
-`
-		dagName := "test_start_worker_selector_dag"
-
-		_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
-			Name: dagName,
-			Spec: &spec,
-		}).ExpectStatus(http.StatusCreated).Send(t)
-
-		// Without a coordinator the run executes locally, as the YAML key would.
-		selector := api.WorkerSelectorOverride{"zone": "b"}
-		resp := server.Client().Post("/api/v1/dags/"+dagName+"/start", api.ExecuteDAGJSONRequestBody{
-			WorkerSelector: &selector,
-		}).ExpectStatus(http.StatusOK).Send(t)
-
-		var startResp api.ExecuteDAG200JSONResponse
-		resp.Unmarshal(t, &startResp)
-		require.NotEmpty(t, startResp.DagRunId)
-
-		snapshot := snapshotDAGOf(t, server, dagName, startResp.DagRunId)
-		assert.Equal(t, map[string]string{"zone": "b"}, snapshot.WorkerSelector)
-
-		_ = server.Client().Delete("/api/v1/dags/" + dagName).ExpectStatus(http.StatusNoContent).Send(t)
-	})
-
 	t.Run("WorkerSelectorRefusedWhenInvalidOrWithApproval", func(t *testing.T) {
 		plain := `
 steps:

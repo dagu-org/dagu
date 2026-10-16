@@ -43,14 +43,17 @@ func workerLabelsFromFlags(ctx *Context) (map[string]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read worker-label flags: %w", err)
 	}
+	// pflag drops an empty value before it reaches the array; the flag still
+	// counts as changed, which is how `--worker-label ""` is told from no flag.
+	if len(workerLabelPairs) == 0 && ctx.Command.Flags().Changed(flagWorkerLabel) {
+		return nil, fmt.Errorf("invalid worker label %q: expected key=value", "")
+	}
 
 	workerLabels := make(map[string]string, len(workerLabelPairs))
 	for _, pair := range workerLabelPairs {
-		trimmed := strings.TrimSpace(pair)
-		if trimmed == "" {
-			continue
-		}
-		key, value, found := strings.Cut(trimmed, "=")
+		// An empty entry is a routing request that says nothing; refusing it
+		// keeps a mistyped flag from silently leaving the DAG's selector in place.
+		key, value, found := strings.Cut(strings.TrimSpace(pair), "=")
 		if !found || key == "" || value == "" {
 			return nil, fmt.Errorf("invalid worker label %q: expected key=value", pair)
 		}

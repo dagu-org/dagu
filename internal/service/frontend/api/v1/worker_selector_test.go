@@ -31,7 +31,9 @@ func snapshotDAGOf(t *testing.T, server test.Server, name, runID string) *ir.DAG
 	return dag
 }
 
-// Inline specs take the same per-run selector as DAG files.
+// Inline specs take the same per-run selector as DAG files. The start
+// paths are covered by the internal tests, since a selector dispatches to
+// the coordinator the test server has no running instance of.
 func TestWorkerSelectorFromSpec(t *testing.T) {
 	server := test.SetupServer(t)
 
@@ -52,22 +54,6 @@ steps:
 		}).ExpectStatus(http.StatusOK).Send(t)
 
 		var body api.EnqueueDAGRunFromSpec200JSONResponse
-		resp.Unmarshal(t, &body)
-
-		snapshot := snapshotDAGOf(t, server, name, body.DagRunId)
-		assert.Equal(t, map[string]string{"zone": "b"}, snapshot.WorkerSelector)
-		assert.False(t, snapshot.ForceLocal)
-	})
-
-	t.Run("Start", func(t *testing.T) {
-		name := "inline_ws_start"
-		resp := server.Client().Post("/api/v1/dag-runs", api.ExecuteDAGRunFromSpecJSONRequestBody{
-			Spec:           spec,
-			Name:           &name,
-			WorkerSelector: &selector,
-		}).ExpectStatus(http.StatusOK).Send(t)
-
-		var body api.ExecuteDAGRunFromSpec200JSONResponse
 		resp.Unmarshal(t, &body)
 
 		snapshot := snapshotDAGOf(t, server, name, body.DagRunId)

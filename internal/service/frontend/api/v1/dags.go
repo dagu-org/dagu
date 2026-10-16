@@ -1099,12 +1099,13 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 
 	if len(selection.steps) > 0 {
 		if err := a.startSelectedSteps(ctx, dag, selectedStepsStart{
-			selection:   selection,
-			params:      params,
-			dagRunID:    dagRunId,
-			labels:      labels,
-			profileName: profileName,
-			noReuse:     valueOf(request.Body.NoReuse),
+			selection:      selection,
+			params:         params,
+			dagRunID:       dagRunId,
+			labels:         labels,
+			profileName:    profileName,
+			noReuse:        valueOf(request.Body.NoReuse),
+			workerSelector: workerSelector,
 		}); err != nil {
 			return nil, err
 		}
@@ -1369,14 +1370,27 @@ func applyWorkerSelectorOverride(dag *ir.DAG, override *api.WorkerSelectorOverri
 		return nil, nil
 	}
 	selector := map[string]string(*override)
+	if err := reapplyWorkerSelector(dag, selector); err != nil {
+		return nil, err
+	}
+	return selector, nil
+}
+
+// reapplyWorkerSelector puts a per-run selector on a DAG. Runtime-param
+// resolution rebuilds the DAG from its YAML, so every path that resolves
+// applies the request's selector again to the DAG it goes on to use.
+func reapplyWorkerSelector(dag *ir.DAG, selector map[string]string) error {
+	if len(selector) == 0 {
+		return nil
+	}
 	if err := dag.ApplyWorkerSelector(selector); err != nil {
-		return nil, &Error{
+		return &Error{
 			HTTPStatus: http.StatusBadRequest,
 			Code:       api.ErrorCodeBadRequest,
 			Message:    "invalid workerSelector: " + err.Error(),
 		}
 	}
-	return selector, nil
+	return nil
 }
 
 // extractLabelsParam validates and serializes an optional labels array into a comma-separated string.
@@ -1640,6 +1654,11 @@ func (a *API) startDAGRunWithOptions(ctx context.Context, dag *ir.DAG, opts star
 			Code:       api.ErrorCodeBadRequest,
 			Message:    err.Error(),
 		}
+	}
+	// Resolution rebuilt the DAG from its YAML; the request's selector goes on
+	// the DAG the dispatch reads.
+	if err := reapplyWorkerSelector(resolvedDAG, opts.workerSelector); err != nil {
+		return nil, err
 	}
 	dag = resolvedDAG
 
@@ -1910,6 +1929,9 @@ func (a *API) enqueueDAGRun(ctx context.Context, dag *ir.DAG, req enqueueRequest
 			Code:       api.ErrorCodeBadRequest,
 			Message:    err.Error(),
 		}
+	}
+	if err := reapplyWorkerSelector(resolvedDAG, req.workerSelector); err != nil {
+		return err
 	}
 	dag = resolvedDAG
 

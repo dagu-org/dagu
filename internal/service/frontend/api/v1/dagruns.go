@@ -265,13 +265,14 @@ func (a *API) ExecuteDAGRunFromSpec(ctx context.Context, request api.ExecuteDAGR
 	var started *launcher.StartResult
 	if len(selection.steps) > 0 {
 		if err := a.startSelectedSteps(ctx, dag, selectedStepsStart{
-			selection:   selection,
-			params:      params,
-			dagRunID:    dagRunId,
-			labels:      labels,
-			profileName: profileName,
-			noReuse:     valueOf(request.Body.NoReuse),
-			inline:      true,
+			selection:      selection,
+			params:         params,
+			dagRunID:       dagRunId,
+			labels:         labels,
+			profileName:    profileName,
+			noReuse:        valueOf(request.Body.NoReuse),
+			inline:         true,
+			workerSelector: workerSelector,
 		}); err != nil {
 			return nil, err
 		}
@@ -3672,16 +3673,15 @@ func (a *API) rescheduleDAGRun(ctx context.Context, dagName, dagRunID string, op
 	var enqueueErr error
 	if opts.useCurrentDAGFile {
 		enqueueErr = a.enqueueDAGRun(ctx, dag, enqueueRequest{
-			params:         paramsToUse,
-			dagRunID:       newDagRunID,
-			triggerType:    ir.TriggerTypeManual,
-			profileName:    profileName,
-			noReuse:        status.NoReuse,
-			definitionID:   status.DAGDefinitionID(),
-			workerSelector: rescheduleSelector,
+			params:       paramsToUse,
+			dagRunID:     newDagRunID,
+			triggerType:  ir.TriggerTypeManual,
+			profileName:  profileName,
+			noReuse:      status.NoReuse,
+			definitionID: status.DAGDefinitionID(),
 		})
 	} else {
-		enqueueErr = a.enqueuePreparedDAGRun(ctx, dag, paramsToUse, newDagRunID, ir.TriggerTypeManual, profileName, status.NoReuse)
+		enqueueErr = a.enqueuePreparedDAGRun(ctx, dag, paramsToUse, newDagRunID, ir.TriggerTypeManual, profileName, status.NoReuse, rescheduleSelector)
 	}
 	if enqueueErr != nil {
 		return rescheduleDAGRunResult{}, fmt.Errorf("failed to enqueue dag-run: %w", enqueueErr)
@@ -3714,6 +3714,7 @@ func (a *API) enqueuePreparedDAGRun(
 	triggerType ir.TriggerType,
 	profileName string,
 	noReuse bool,
+	workerSelector map[string]string,
 ) error {
 	resolvedDAG, err := spec.ResolveRuntimeParams(ctx, dag, params, spec.ResolveRuntimeParamsOptions{
 		BaseConfig: a.config.Paths.BaseConfig,
@@ -3726,6 +3727,11 @@ func (a *API) enqueuePreparedDAGRun(
 		}
 	}
 	resolvedDAG.WorkingDir = dag.WorkingDir
+	// Resolution rebuilds the DAG from its YAML, so a per-run selector is
+	// applied again here.
+	if err := reapplyWorkerSelector(resolvedDAG, workerSelector); err != nil {
+		return err
+	}
 	dag = resolvedDAG
 
 	if err := buildErrorsToAPIError(dag.BuildErrors); err != nil {
