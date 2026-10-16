@@ -120,7 +120,7 @@ function DAGRunDetailsPanel({
   // Keyboard shortcuts
   React.useEffect(() => {
     function handleKeyDown(event: KeyboardEvent): void {
-      if (shouldIgnoreKeyboardShortcuts()) {
+      if (shouldIgnoreKeyboardShortcuts(event)) {
         return;
       }
 

@@ -73,8 +73,9 @@ const LogSideModal: React.FC<LogSideModalProps> = ({
   // Add keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      // Close modal with Escape key
-      if (event.key === 'Escape') {
+      // Close modal with Escape key, unless a dialog or menu inside it
+      // already handled the key.
+      if (event.key === 'Escape' && !event.defaultPrevented) {
         onClose();
       }
     };

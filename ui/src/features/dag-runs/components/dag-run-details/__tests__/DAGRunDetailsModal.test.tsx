@@ -4,6 +4,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { dispatchHandledEscape } from '@/test/keyboard';
 import { useBoundedDAGRunDetails } from '../../../hooks/useBoundedDAGRunDetails';
 import DAGRunDetailsModal from '../DAGRunDetailsModal';
 
@@ -114,5 +115,31 @@ describe('DAGRunDetailsModal', () => {
       'data-fill-height',
       'true'
     );
+  });
+
+  it('closes on Escape unless a dialog inside it handled the key', () => {
+    vi.mocked(useBoundedDAGRunDetails).mockReturnValue({
+      data: { dagRunId: 'run-1', name: 'example' },
+      isLoading: false,
+      isValidating: false,
+      refresh: vi.fn(),
+    } as unknown as ReturnType<typeof useBoundedDAGRunDetails>);
+    const onClose = vi.fn();
+    render(
+      <MemoryRouter>
+        <DAGRunDetailsModal
+          name="example"
+          dagRunId="run-1"
+          isOpen
+          onClose={onClose}
+        />
+      </MemoryRouter>
+    );
+
+    dispatchHandledEscape();
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

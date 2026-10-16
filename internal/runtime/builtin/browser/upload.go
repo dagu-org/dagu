@@ -91,10 +91,10 @@ func (o *operator) upload(ctx context.Context, index int, spec uploadSpec, timeo
 	if err != nil {
 		return opResult{}, err
 	}
-	result := func(status string, action *recordedAction, how, pageURL string) opResult {
+	result := func(status, via string, action *recordedAction, how, pageURL string) opResult {
 		done := opResult{
 			Report: agentstep.Report{
-				Index: index, Kind: opUpload, Subject: uploadSubject(spec), Status: status,
+				Index: index, Kind: opUpload, Subject: uploadSubject(spec), Status: status, Via: via,
 				Detail: describeUpload(files, action, how), Tokens: o.bridge.totals().sub(before).total(),
 				Duration: time.Since(began),
 			},
@@ -110,10 +110,10 @@ func (o *operator) upload(ctx context.Context, index int, spec uploadSpec, timeo
 		if err != nil {
 			return opResult{}, err
 		}
-		return result(agentstep.StatusCompleted, nil, how, ""), nil
+		return result(agentstep.StatusCompleted, "", nil, how, ""), nil
 	}
 
-	recorded := o.recorder != nil && (spec.Cache == nil || *spec.Cache)
+	choice, recorded := o.decide(spec.AI, spec.Cache)
 	key, pageURL := "", ""
 	if recorded {
 		if pageURL, err = o.eng.CurrentURL(ctx); err != nil {
@@ -125,14 +125,25 @@ func (o *operator) upload(ctx context.Context, index int, spec uploadSpec, timeo
 	// and tells whether a recorded element is still the one recorded.
 	snap, snapErr := o.eng.Snapshot(ctx)
 	status := agentstep.StatusCompleted
-	if actions, ok := o.lookup(key); ok {
+	actions, ok := o.recording(choice, key)
+	if !ok && choice == aiNever {
+		return opResult{}, replayMiss{kind: opUpload, reason: noRecording}
+	}
+	if ok {
 		action := actions[0]
 		if snapErr == nil && stillTargets(action, snap, o.variables) {
 			how, err := o.eng.Upload(ctx, action.Selector, files, timeout)
 			if err != nil {
 				return opResult{}, err
 			}
-			return result(agentstep.StatusCacheHit, &action, how, pageURL), nil
+			return result(agentstep.StatusCacheHit, agentstep.ViaElement, &action, how, pageURL), nil
+		}
+		if choice == aiNever {
+			reason := fmt.Sprintf("its recorded element %s is gone or no longer the one recorded", action.Selector)
+			if snapErr != nil {
+				reason = "the page could not be read: " + snapErr.Error()
+			}
+			return opResult{}, replayMiss{kind: opUpload, reason: reason}
 		}
 		status = agentstep.StatusHealed
 		// The recording is dropped unless the upload that heals it records
@@ -158,7 +169,7 @@ func (o *operator) upload(ctx context.Context, index int, spec uploadSpec, timeo
 	if recorded {
 		o.recorder.stage(key, []recordedAction{action})
 	}
-	return result(status, &action, how, pageURL), nil
+	return result(status, agentstep.ViaModel, &action, how, pageURL), nil
 }
 
 // uploadSubject names an upload's file input as its report does.

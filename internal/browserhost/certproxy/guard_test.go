@@ -68,8 +68,9 @@ func TestServeGuardCarriesOptionalCertificateSite(t *testing.T) {
 	waitForEvent(t, ready, cfg.Token, EventClientCertificateMissing)
 }
 
-// A site that asks for no client certificate opens through the guard, with
-// nothing to report.
+// A site that asks for no client certificate, under an authority only an
+// entry's ca_file names, opens through the guard's own TLS, with nothing to
+// report.
 func TestServeGuardCarriesOrdinarySite(t *testing.T) {
 	t.Parallel()
 

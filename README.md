@@ -620,6 +620,7 @@ Dagu includes built-in actions that run within the Dagu process or on the select
 | `computer.extract` / `computer.run` | Automate desktop applications on macOS and Windows workers with natural-language tasks, screen extraction, and human input |
 | `postgres.query` / `postgres.import` | PostgreSQL queries and imports |
 | `sqlite.query` / `sqlite.import` | SQLite queries and imports |
+| `clickhouse.query` | ClickHouse queries and statements over the HTTP interface |
 | `redis.<operation>` | Redis commands, pipelines, and Lua scripts |
 | `s3.upload` / `s3.download` / `s3.list` / `s3.delete` | Upload, download, list, and delete S3 objects |
 | `file.stat` / `file.read` / `file.write` / `file.copy` / `file.move` / `file.delete` / `file.mkdir` / `file.list` | Local file operations without shell commands |

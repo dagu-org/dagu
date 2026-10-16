@@ -230,14 +230,10 @@ describe('NotificationChannelsPage', () => {
     const view = render(page('local'));
     await user.click(screen.getByRole('button', { name: 'Add channel' }));
     const editor = screen.getByRole('dialog');
-    await user.type(
-      within(editor).getByLabelText('Channel name'),
-      'Local alerts'
-    );
-    await user.type(
-      within(editor).getByLabelText('Slack webhook URL'),
-      'https://hooks.slack.com/services/test'
-    );
+    await user.click(within(editor).getByLabelText('Channel name'));
+    await user.paste('Local alerts');
+    await user.click(within(editor).getByLabelText('Slack webhook URL'));
+    await user.paste('https://hooks.slack.com/services/test');
     await user.click(
       within(editor).getByRole('button', { name: 'Create channel' })
     );

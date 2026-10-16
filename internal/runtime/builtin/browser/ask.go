@@ -30,9 +30,7 @@ func (r *run) waitForInput(ctx context.Context, index int, spec askSpec) error {
 	r.record.Deadline = time.Now().Add(spec.timeout())
 	r.record.Cursor = index + 1
 	r.record.Outputs = r.outputs
-	if r.cache != nil {
-		r.record.ReplayPending, r.record.ReplayUsed = r.cache.Held()
-	}
+	r.record.ReplayPending, r.record.ReplayUsed = r.cache.Held()
 	r.record.OwnerPID = 0
 	r.record.OwnerStartedAt = 0
 	if err := r.store.Save(r.record); err != nil {
@@ -111,9 +109,7 @@ func (r *run) resumeSession(ctx context.Context, recordID string, session *ir.Ag
 		return 0, err
 	}
 	maps.Copy(r.outputs, record.Outputs)
-	if r.cache != nil {
-		r.cache.Hold(record.ReplayPending, record.ReplayUsed)
-	}
+	r.cache.Hold(record.ReplayPending, record.ReplayUsed)
 	r.timeline.Lifecycle(agentstep.StatusRunning, "Resumed browser after input")
 	return record.Cursor, nil
 }

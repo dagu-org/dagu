@@ -140,6 +140,10 @@ function Content({ navbarColor, children }: LayoutProps) {
 
     closeMenuButtonRef.current?.focus();
     const closeOnEscape = (event: KeyboardEvent) => {
+      // A menu inside the sidebar already handled the key.
+      if (event.defaultPrevented) {
+        return;
+      }
       if (event.key === 'Escape') {
         setIsMobileSidebarOpen(false);
         requestAnimationFrame(() => openMenuButtonRef.current?.focus());

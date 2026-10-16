@@ -52,6 +52,7 @@ import DAGActions from '../common/DAGActions';
 import LiveSwitch from '../common/LiveSwitch';
 import PinToggle from '../common/PinToggle';
 import { formatDurationMs } from '@/lib/formatDuration';
+import { shouldIgnoreKeyboardShortcuts } from '@/lib/keyboard-shortcuts';
 
 // Import shadcn/ui components
 import { PanelWidthContext } from '../../../../components/SplitLayout';
@@ -1620,6 +1621,10 @@ function DAGTable({
     if (!selectedDAG || !tableInstanceRef.current || !onSelectDAG) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (shouldIgnoreKeyboardShortcuts(event)) {
+        return;
+      }
+
       // Get all DAG rows from the sorted table rows (not groups)
       const sortedRows = tableInstanceRef.current?.getRowModel().rows || [];
       const dagRows = sortedRows

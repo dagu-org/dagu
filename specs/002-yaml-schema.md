@@ -69,7 +69,7 @@ Rules:
 - The entrypoint document must not define `name`.
 - Every later document must define `name`.
 - Later document names identify local sub-DAGs inside the same YAML file.
-- Later documents are not executed by `dagu run` unless an execution spec references them as sub-DAGs.
+- Later documents are not executed by `dagu start` unless an execution spec references them as sub-DAGs.
 - DAG document names must be unique inside one YAML file.
 - Every document must contain `steps`.
 - `steps` must be a non-empty sequence.

@@ -5,6 +5,12 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useQuery } from '@/hooks/api';
 import { useDAGSSE } from '@/hooks/useDAGSSE';
@@ -42,27 +48,42 @@ vi.mock('../DAGDetailsContent', () => ({
       dagRunId?: string,
       immediate?: boolean
     ) => string | void | Promise<string | void>;
-  }) => (
-    <div>
+  }) => {
+    const [dialogOpen, setDialogOpen] = React.useState(false);
+    return (
       <div>
-        Previewing {dag.name} [{activeTab}]{' '}
-        {forceEnqueue ? 'forced' : 'default'} {dagRunId || 'latest'}
-      </div>
-      <div>
-        Inherited hints: {editorHints?.inheritedLegacyDefinitions?.length ?? 0}
-      </div>
-      {onEnqueue ? (
-        <button
-          type="button"
-          onClick={async () => {
-            await onEnqueue('["x"]', 'manual-run');
-          }}
-        >
-          Enqueue Now
+        <div>
+          Previewing {dag.name} [{activeTab}]{' '}
+          {forceEnqueue ? 'forced' : 'default'} {dagRunId || 'latest'}
+        </div>
+        <div>
+          Inherited hints:{' '}
+          {editorHints?.inheritedLegacyDefinitions?.length ?? 0}
+        </div>
+        {onEnqueue ? (
+          <button
+            type="button"
+            onClick={async () => {
+              await onEnqueue('["x"]', 'manual-run');
+            }}
+          >
+            Enqueue Now
+          </button>
+        ) : null}
+        <button type="button" onClick={() => setDialogOpen(true)}>
+          Open dialog
         </button>
-      ) : null}
-    </div>
-  ),
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogContent>
+            <DialogTitle>Nested dialog</DialogTitle>
+            <DialogDescription>
+              Opened from the panel content.
+            </DialogDescription>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  },
 }));
 
 const appBarValue = {
@@ -84,6 +105,27 @@ const liveState = {
 const useQueryMock = useQuery as unknown as {
   mockImplementation: (fn: (path: string, init?: unknown) => unknown) => void;
 };
+
+function mockLoadedDAG() {
+  vi.mocked(useDAGSSE).mockReturnValue(liveState);
+  useQueryMock.mockImplementation((path) => {
+    if (path === '/dags/{fileName}') {
+      return {
+        data: {
+          dag: { name: 'example-dag' },
+          latestDAGRun: undefined,
+          localDags: [],
+        },
+        error: undefined,
+        mutate: vi.fn(),
+      } as never;
+    }
+
+    return {
+      data: undefined,
+    } as never;
+  });
+}
 
 function renderPanel(
   props?: Partial<React.ComponentProps<typeof DAGDetailsSidePanel>>
@@ -203,24 +245,7 @@ describe('DAGDetailsSidePanel', () => {
   });
 
   it('renders DAG details content when data is available', () => {
-    vi.mocked(useDAGSSE).mockReturnValue(liveState);
-    useQueryMock.mockImplementation((path) => {
-      if (path === '/dags/{fileName}') {
-        return {
-          data: {
-            dag: { name: 'example-dag' },
-            latestDAGRun: undefined,
-            localDags: [],
-          },
-          error: undefined,
-          mutate: vi.fn(),
-        } as never;
-      }
-
-      return {
-        data: undefined,
-      } as never;
-    });
+    mockLoadedDAG();
 
     renderPanel({ forceEnqueue: true, initialTab: 'history' });
 
@@ -255,5 +280,30 @@ describe('DAGDetailsSidePanel', () => {
     renderPanel();
 
     expect(screen.getByText('Inherited hints: 1')).toBeInTheDocument();
+  });
+
+  it('closes on Escape', () => {
+    const onClose = vi.fn();
+    mockLoadedDAG();
+
+    renderPanel({ onClose });
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('stays open when Escape closes a dialog inside it', () => {
+    const onClose = vi.fn();
+    mockLoadedDAG();
+
+    renderPanel({ onClose });
+    fireEvent.click(screen.getByRole('button', { name: 'Open dialog' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    fireEvent.keyDown(document.activeElement ?? document.body, {
+      key: 'Escape',
+    });
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

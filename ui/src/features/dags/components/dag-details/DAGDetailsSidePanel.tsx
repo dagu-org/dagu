@@ -223,7 +223,7 @@ function DAGDetailsSidePanel({
     }
 
     function handleKeyDown(event: KeyboardEvent): void {
-      if (shouldIgnoreKeyboardShortcuts()) {
+      if (shouldIgnoreKeyboardShortcuts(event)) {
         return;
       }
       if (event.metaKey || event.ctrlKey) {
