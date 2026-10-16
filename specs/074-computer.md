@@ -67,11 +67,13 @@ process runs in, on macOS or Windows. On other systems the step fails with
 `desktop automation is supported on macOS and Windows only`.
 
 The process must run in a logged-in user session: on Windows not as a service
-in session 0, and with the screen unlocked; on macOS with Screen Recording and
-Accessibility granted to the application that starts Dagu, or to the `dagu`
-binary itself. Otherwise the step fails before any action, naming the missing
-condition. A screen that locks, or another user's session taking the display,
-while a step runs fails the operation that next reads the screen.
+in session 0, with the screen unlocked, and, in a Remote Desktop or child
+session, with that session connected so its display draws; on macOS with
+Screen Recording and Accessibility granted to the application that starts
+Dagu, or to the `dagu` binary itself. Otherwise the step fails before any
+action, naming the missing condition. A screen that locks, another user's
+session taking the display, or a Remote Desktop session whose client
+disconnects while a step runs fails the operation that next reads the screen.
 
 `dagu computer check` reports the same conditions for the current session,
 prints the display size, and exits nonzero when the desktop cannot be
@@ -80,8 +82,9 @@ Accessibility prompts for the permissions that are missing. With
 `--format json` it prints one object with `os`, `width`, `height`, `ready`, and
 `problems`, each problem with a `message` and one of these `code`s:
 `unsupported`, `load_failed`, `no_session`, `other_session`, `no_display`,
-`screen_locked`, `screen_recording`, `accessibility`, or `service_session`.
-`width` and `height` are 0 when the display size is unknown.
+`screen_locked`, `screen_recording`, `accessibility`, `service_session`, or
+`session_disconnected`. `width` and `height` are 0 when the display size is
+unknown.
 
 Computer DAGs are routed to such hosts with a DAG-level `worker_selector`.
 

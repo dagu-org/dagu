@@ -206,7 +206,7 @@ func TestComputerElementsUnsupported(t *testing.T) {
 		} `json:"error"`
 	}
 	require.NoError(t, json.Unmarshal([]byte(out), &result), out)
-	assert.Contains(t, []string{"unsupported", "no_session", "other_session", "screen_locked", "no_display", "screen_recording", "accessibility", "load_failed"}, result.Error.Code)
+	assert.Contains(t, []string{"unsupported", "no_session", "other_session", "screen_locked", "no_display", "screen_recording", "accessibility", "load_failed", "service_session", "session_disconnected"}, result.Error.Code)
 	if goruntime.GOOS != "darwin" {
 		assert.Equal(t, "unsupported", result.Error.Code)
 	}
