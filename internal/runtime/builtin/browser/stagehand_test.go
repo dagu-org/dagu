@@ -1297,6 +1297,64 @@ func TestStagehandTellsRefusedPages(t *testing.T) {
 	assert.False(t, refused, "%+v", page)
 }
 
+// A wait that ends while it reads the page leaves the browser answering: a
+// read whose context had ended as it wrote to the browser runtime would
+// close the runtime's connection to the browser.
+func TestStagehandWaitEndingMidReadKeepsBrowser(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		if r.URL.Path == "/checked" {
+			w.Header().Set("Cf-Mitigated", "challenge")
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = io.WriteString(w, "<title>Just a moment...</title><p>Checking your browser</p>")
+			return
+		}
+		// A page that changes all the time never settles, and one that keeps
+		// its main thread busy reads slowly, as on a loaded host.
+		_, _ = io.WriteString(w, `<p id="clock"></p><script>setInterval(() => {
+  const end = Date.now() + 30; while (Date.now() < end) {}
+  clock.textContent = Date.now();
+}, 40);</script>`)
+	}))
+	t.Cleanup(server.Close)
+	for name, tc := range map[string]struct {
+		path string
+		// limit sets the wait's limit, and wait waits.
+		limit func(*stagehandEngine, time.Duration)
+		wait  func(*stagehandEngine, context.Context)
+	}{
+		"bot check": {
+			path:  "/checked",
+			limit: func(e *stagehandEngine, d time.Duration) { e.botCheckWait = d },
+			wait:  (*stagehandEngine).awaitBotCheck,
+		},
+		"settle": {
+			path:  "/changing",
+			limit: func(e *stagehandEngine, d time.Duration) { e.settleWait = d },
+			wait:  (*stagehandEngine).settleDocument,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			eng := launchBrowser(t, launchOptions{Generate: (&shopModel{}).generate})
+			e := eng.(*stagehandEngine)
+			tc.limit(e, 0)
+			require.NoError(t, eng.Goto(t.Context(), server.URL+tc.path, time.Minute))
+			require.Equal(t, tc.path == "/checked", e.showsBotCheck(t.Context()))
+			// Waits a few milliseconds apart end at every moment of a read.
+			for i := range 80 {
+				limit := time.Duration(i) * 3 * time.Millisecond
+				tc.limit(e, limit)
+				tc.wait(e, t.Context())
+				_, err := e.DocumentID(t.Context())
+				require.NoError(t, err, "after a wait of %s", limit)
+			}
+		})
+	}
+}
+
 // serveCheckThatPasses serves a page behind a bot check that passes on its
 // own a moment after it loads, as one that needs no person does: it marks
 // the browser and loads the page again.
