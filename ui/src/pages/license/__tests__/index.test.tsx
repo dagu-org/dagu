@@ -417,6 +417,80 @@ describe('LicensePage', () => {
     ).toHaveAttribute('href', 'https://console.dagu.sh/servers?server=srv-123');
   });
 
+  it('renames this server in Dagu Console', async () => {
+    const reported = 's-macbook-pro.taild5c75a.ts.net';
+    const renamed = makeConfig({
+      ...online,
+      serverName: 'Build box',
+      reportedName: reported,
+    }).license;
+    const put = vi.fn().mockResolvedValue({ data: renamed });
+    useClientMock.mockReturnValue({
+      POST: vi.fn(),
+      PUT: put,
+      GET: vi.fn().mockReturnValue(new Promise(() => {})),
+    } as never);
+    renderPage({ ...online, serverName: reported, reportedName: reported });
+
+    expect(row('Server')).not.toHaveTextContent('Reports as');
+    await userEvent.click(screen.getByRole('button', { name: 'Rename' }));
+    const input = screen.getByLabelText('Server name');
+    expect(input).toHaveValue('');
+    expect(input).toHaveAttribute('placeholder', reported);
+    await userEvent.type(input, '  Build box ');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(put).toHaveBeenCalledWith('/license/server-name', {
+      params: { query: { remoteNode: 'local' } },
+      body: { name: 'Build box' },
+    });
+    await waitFor(() => expect(row('Server')).toHaveTextContent('Build box'));
+    expect(row('Server')).toHaveTextContent(`Reports as ${reported}`);
+    expect(screen.queryByLabelText('Server name')).not.toBeInTheDocument();
+  });
+
+  it('starts a rename from the name a person gave the server', async () => {
+    useClientMock.mockReturnValue({
+      POST: vi.fn(),
+      PUT: vi.fn(),
+      GET: vi.fn().mockReturnValue(new Promise(() => {})),
+    } as never);
+    renderPage({ ...online, serverName: 'Build box', reportedName: 'ip-10' });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Rename' }));
+
+    expect(screen.getByLabelText('Server name')).toHaveValue('Build box');
+  });
+
+  it('says why a rename failed and keeps the form open', async () => {
+    useClientMock.mockReturnValue({
+      POST: vi.fn(),
+      PUT: vi.fn().mockResolvedValue({
+        error: { message: 'Server names are at most 100 characters.' },
+      }),
+      GET: vi.fn().mockReturnValue(new Promise(() => {})),
+    } as never);
+    renderPage({ ...online, serverName: 'build-01', reportedName: 'build-01' });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Rename' }));
+    await userEvent.type(screen.getByLabelText('Server name'), 'Build box');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Server names are at most 100 characters.'
+    );
+    expect(screen.getByLabelText('Server name')).toHaveValue('Build box');
+  });
+
+  it('offers no rename for a license that does not check in', () => {
+    renderPage({ serverName: 'build-01' });
+
+    expect(row('Server')).toHaveTextContent('build-01');
+    expect(
+      within(overview()).queryByRole('button', { name: 'Rename' })
+    ).not.toBeInTheDocument();
+  });
+
   it('checks in with Dagu Console on demand', async () => {
     const checkedIn = makeConfig({
       connectedVia: LicenseStatusResponseConnectedVia.key,
