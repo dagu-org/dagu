@@ -52,6 +52,50 @@ func TestStepTraceContext(t *testing.T) {
 		assert.Equal(t, "vendor=value", traceState)
 	})
 
+	// A trace context that the step declares itself wins over the step span,
+	// and the two names stay together: the step span's TRACESTATE is not added
+	// to a TRACEPARENT of another trace.
+	t.Run("StepEnvWins", func(t *testing.T) {
+		_, tracer := setupTestTracing(t)
+		const own = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+		plan := setupRunner(t).newPlan(t,
+			newStep("1",
+				withEnvVars("TRACEPARENT="+own),
+				withCommand(`printf '%s|%s' "$TRACEPARENT" "${TRACESTATE-unset}"`),
+				withOutput("TRACE"),
+			),
+		)
+
+		var root trace.Span
+		plan.Context, root = tracer.Start(withRemoteTraceState(t, plan.Context, "vendor=value"), "DAG: test_dag")
+		result := plan.assertRun(t, ir.Succeeded)
+		root.End()
+
+		traceParent, traceState := splitTraceOutput(t, result.nodeByName(t, "1"))
+		assert.Equal(t, own, traceParent)
+		assert.Equal(t, "unset", traceState)
+	})
+
+	t.Run("StepEnvClears", func(t *testing.T) {
+		_, tracer := setupTestTracing(t)
+		plan := setupRunner(t).newPlan(t,
+			newStep("1",
+				withEnvVars("TRACEPARENT="),
+				withCommand(`printf '%s|%s' "${TRACEPARENT-unset}" "${TRACESTATE-unset}"`),
+				withOutput("TRACE"),
+			),
+		)
+
+		var root trace.Span
+		plan.Context, root = tracer.Start(plan.Context, "DAG: test_dag")
+		result := plan.assertRun(t, ir.Succeeded)
+		root.End()
+
+		traceParent, traceState := splitTraceOutput(t, result.nodeByName(t, "1"))
+		assert.Equal(t, "", traceParent)
+		assert.Equal(t, "unset", traceState)
+	})
+
 	t.Run("NoSpan", func(t *testing.T) {
 		plan := setupRunner(t).newPlan(t,
 			newStep("1",

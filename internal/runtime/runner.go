@@ -779,8 +779,15 @@ func (r *Runner) setupNodeExecutionEnv(ctx context.Context, node *Node) context.
 // withStepTraceContext gives the step process the W3C trace context of the
 // step span as TRACEPARENT and TRACESTATE. It adds nothing when the context has
 // no valid span, which is the case when tracing is off for the DAG.
+//
+// The names act like initial current-step values (spec 006): a step-local
+// source that sets either name keeps both names as they are.
 func withStepTraceContext(ctx context.Context) context.Context {
 	if !trace.SpanContextFromContext(ctx).IsValid() {
+		return ctx
+	}
+	env := GetEnv(ctx)
+	if hasStepLocalEntry(env.Scope, runenv.EnvKeyTraceParent) || hasStepLocalEntry(env.Scope, runenv.EnvKeyTraceState) {
 		return ctx
 	}
 	values := make(map[string]string, 2)
@@ -793,7 +800,6 @@ func withStepTraceContext(ctx context.Context) context.Context {
 	if traceParent == "" {
 		return ctx
 	}
-	env := GetEnv(ctx)
 	scope := env.Scope.WithEntry(runenv.EnvKeyTraceParent, traceParent, cmnvalue.EnvSourceStepEnv)
 	// A TRACESTATE from the run scope belongs to another span, so replace it
 	// even when the step span has no trace state.
@@ -803,6 +809,14 @@ func withStepTraceContext(ctx context.Context) context.Context {
 	}
 	env.Scope = scope
 	return WithEnv(ctx, env)
+}
+
+// hasStepLocalEntry reports whether key comes from the step's own env, its
+// container env, or a predecessor output. Run-level sources never use these
+// source kinds.
+func hasStepLocalEntry(scope *cmnvalue.EnvScope, key string) bool {
+	entry, ok := scope.GetEntry(key)
+	return ok && (entry.Source == cmnvalue.EnvSourceStepEnv || entry.Source == cmnvalue.EnvSourceOutput)
 }
 
 func (r *Runner) setLastError(err error) {
