@@ -2807,6 +2807,18 @@
         },
         {
           "if": {
+            "properties": { "action": { "const": "clickhouse.query" } },
+            "required": ["action"]
+          },
+          "then": {
+            "required": ["with"],
+            "properties": {
+              "with": { "$ref": "#/definitions/clickhouseQueryActionConfig" }
+            }
+          }
+        },
+        {
+          "if": {
             "properties": { "action": { "const": "mail.send" } },
             "required": ["action"]
           },
@@ -4699,6 +4711,78 @@
         }
       },
       "description": "SQLite executor configuration for database operations. Uses pure Go SQLite with automatic pragmas: foreign_keys=ON, busy_timeout=5000."
+    },
+    "clickhouseQueryActionConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url"],
+      "oneOf": [{ "required": ["query"] }, { "required": ["file"] }],
+      "properties": {
+        "url": {
+          "type": "string",
+          "minLength": 1,
+          "description": "ClickHouse HTTP endpoint, such as http://localhost:8123 or https://host:8443. Must not hold credentials or a query string."
+        },
+        "user": {
+          "type": "string",
+          "description": "ClickHouse user, sent in the X-ClickHouse-User header."
+        },
+        "password": {
+          "type": "string",
+          "description": "Password of the user, sent in the X-ClickHouse-Key header. Use a secret."
+        },
+        "database": {
+          "type": "string",
+          "description": "Default database. A script selects it once with USE, so a USE in the script takes effect for later statements."
+        },
+        "query": {
+          "type": "string",
+          "minLength": 1,
+          "description": "SQL to run. It may hold several statements separated by semicolons; they run in order and the step stops at the first error."
+        },
+        "file": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path of a .sql file to run instead of query. A relative path is resolved against the step working directory."
+        },
+        "params": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Server-side query parameters. Each entry is bound to the {name:Type} placeholder of the same name."
+        },
+        "settings": {
+          "type": "object",
+          "additionalProperties": {
+            "type": ["string", "number", "boolean"]
+          },
+          "description": "ClickHouse settings applied to every statement, such as readonly: 1 or max_execution_time: 30."
+        },
+        "output_format": {
+          "type": "string",
+          "enum": ["jsonl", "json", "csv"],
+          "default": "jsonl",
+          "description": "Result format for statements without their own FORMAT clause. jsonl is JSONEachRow; json is a JSON array of row objects; csv is CSV."
+        },
+        "headers": {
+          "type": ["boolean", "string"],
+          "description": "Include a header row in CSV output (CSVWithNames). A string is a ${...} reference resolved when the step runs."
+        },
+        "timeout": {
+          "type": ["integer", "string"],
+          "minimum": 0,
+          "default": 60,
+          "description": "Timeout of the whole step in seconds. 0 disables it. Default: 60. A string is a ${...} reference resolved when the step runs."
+        },
+        "tls_skip_verify": {
+          "type": ["boolean", "string"],
+          "description": "Skip verification of the server certificate for https URLs. A string is a ${...} reference resolved when the step runs."
+        },
+        "tls_ca": {
+          "type": "string",
+          "description": "Path to a PEM bundle of additional root CAs trusted for https URLs. A relative path is resolved against the step working directory."
+        }
+      },
+      "description": "Configuration for action: clickhouse.query. Statements run over the ClickHouse HTTP interface. Exactly one of query and file is required."
     },
     "redisConnectionConfig": {
       "type": "object",
@@ -6653,6 +6737,7 @@
             "browser.extract",
             "browser.run",
             "chat.completion",
+            "clickhouse.query",
             "computer.extract",
             "computer.run",
             "container.run",

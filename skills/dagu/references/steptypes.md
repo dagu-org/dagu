@@ -698,6 +698,39 @@ steps:
 
 `with` fields include `dsn`, `query`, `params`, `timeout`, `transaction`, `isolation_level`, `output_format`, `headers`, `null_string`, `max_rows`, `streaming`, `output_file`, and `import`.
 
+## clickhouse.query
+
+Run SQL on ClickHouse over its HTTP interface. No ClickHouse client library is needed.
+
+```yaml
+steps:
+  - id: rollup
+    action: clickhouse.query
+    with:
+      url: "https://clickhouse.example.com:8443"
+      user: etl
+      password: ${CLICKHOUSE_PASSWORD}
+      database: analytics
+      query: |
+        INSERT INTO daily SELECT * FROM raw WHERE day = {day:Date};
+        SELECT count() AS rows FROM daily WHERE day = {day:Date}
+      params:
+        day: "2024-01-02"
+      settings:
+        max_execution_time: 300
+      output_format: jsonl
+```
+
+`with` fields: `url` (required, `http://` or `https://`, no credentials in it), `user`, `password` (sent only as request headers), `database`, `query` or `file` (a `.sql` file, relative to the step working directory), `params`, `settings`, `output_format`, `headers`, `timeout`, `tls_skip_verify`, `tls_ca` (PEM bundle of extra root CAs).
+
+- The password travels in a request header, so use an `https://` URL unless the server is on a trusted network.
+- `query` may hold several statements. They run in order in one session (so `SET`, `USE`, and temporary tables carry over) and the step stops at the first error. `database` is the default database; a script selects it once with `USE`, so a `USE` in the script takes effect for later statements. A `SET x` in a script is overridden when `x` is also in `settings`. A multi-replica service behind a load balancer needs session stickiness for scripts.
+- `params` are server-side parameters: write `{name:Type}` in the SQL, for example `WHERE day = {day:Date}`. Values are never interpolated into the SQL.
+- `settings` are ClickHouse settings applied to every statement; the executor reserves the names it manages itself (query and session ids, formats, compression, and exception reporting). Nothing is read-only by default; set `readonly: 1` for a read-only step. A user whose profile sets `readonly = 1` cannot change settings: on ClickHouse 25.11 and later such a user can run `jsonl` and `csv` steps but not `json`, and on earlier versions every statement fails because the executor turns off `http_write_exception_in_output_format`. A profile with `readonly = 2` works on all versions.
+- `output_format` applies to statements without their own `FORMAT` clause: `jsonl` (default, one JSON object per row), `json` (a JSON array of objects), or `csv` (`headers: true` adds a header row). The response is streamed to stdout as it arrives.
+- On timeout or cancellation the running statement is stopped on the server with `KILL QUERY`.
+- Data import is not part of this action. Inline data after `INSERT ... FORMAT` is not supported; use `INSERT ... VALUES` or `INSERT ... SELECT`.
+
 ## redis.<operation>
 
 Redis operations use the operation in the action name.
