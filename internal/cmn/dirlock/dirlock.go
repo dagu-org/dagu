@@ -371,7 +371,8 @@ func releaseClaimedLock(lockPath, claimName string) error {
 		}
 		return err
 	}
-	// A non-empty directory here is a newer lock that replaced the empty one.
+	// A non-empty directory here is a newer lock renamed over the empty one,
+	// which only a platform without no-replace renames allows.
 	if err := fileutil.Remove(lockPath); err != nil && !os.IsNotExist(err) && !os.IsExist(err) {
 		return err
 	}
@@ -389,7 +390,8 @@ func containsEntry(entries []os.DirEntry, name string) bool {
 
 // createLock builds a complete lock directory under a private name and renames
 // it onto the live lock name, so a live lock always contains its owner file.
-// The rename fails if a non-empty lock directory already exists.
+// The rename never replaces an existing lock directory, not even an empty one
+// that an older release created and has not yet written its owner file into.
 func (l *dirLock) createLock() error {
 	if err := fileutil.MkdirAll(l.targetDir, 0750); err != nil {
 		return fmt.Errorf("failed to create target directory: %w", err)
@@ -419,7 +421,7 @@ func (l *dirLock) createLock() error {
 		return fmt.Errorf("failed to write lock token: %w", err)
 	}
 
-	if err := os.Rename(tmpPath, l.lockPath); err != nil {
+	if err := renameNoReplace(tmpPath, l.lockPath); err != nil {
 		_ = fileutil.RemoveAll(tmpPath)
 		if os.IsExist(err) || os.IsNotExist(err) || isRetryableLockStateError(err) {
 			return ErrLockConflict

@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -978,4 +979,82 @@ func TestStaleTakeover_CleansAbandonedTempDirs(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Releases before the per-instance owner file create the lock directory empty
+// and write "owner" into it afterwards. Installing a new lock must not replace
+// that empty directory, or both versions hold the lock at once. Old and new
+// binaries share locks between an in-place upgrade and the next restart.
+func TestTryLock_LegacyContenders(t *testing.T) {
+	const contenders = 6 // per version
+	const increments = 60
+	const retryInterval = 100 * time.Microsecond
+
+	dir := t.TempDir()
+	counter := filepath.Join(dir, "counter")
+	increment := func() {
+		data, _ := os.ReadFile(counter)
+		n, _ := strconv.Atoi(string(data))
+		time.Sleep(time.Duration(rand.IntN(300)) * time.Microsecond)
+		_ = os.WriteFile(counter, []byte(strconv.Itoa(n+1)), 0o600)
+	}
+	acquire := func(tryLock func() bool) {
+		for !tryLock() {
+			time.Sleep(retryInterval)
+		}
+	}
+
+	var wg sync.WaitGroup
+	for range contenders {
+		wg.Go(func() {
+			legacy := legacyLock{lockPath: filepath.Join(dir, LockDirectoryName), token: newUniqueID()}
+			for range increments {
+				acquire(legacy.tryLock)
+				increment()
+				legacy.unlock()
+			}
+		})
+		wg.Go(func() {
+			lock := New(dir, nil)
+			for range increments {
+				acquire(func() bool { return lock.TryLock() == nil })
+				increment()
+				_ = lock.Unlock()
+			}
+		})
+	}
+	wg.Wait()
+
+	data, err := os.ReadFile(counter)
+	require.NoError(t, err)
+	require.Equal(t, strconv.Itoa(2*contenders*increments), string(data))
+}
+
+// legacyLock acquires and releases a fresh lock the way releases before the
+// per-instance owner file did.
+type legacyLock struct {
+	lockPath string
+	token    string
+}
+
+func (l legacyLock) tryLock() bool {
+	if _, err := os.Stat(l.lockPath); !os.IsNotExist(err) {
+		return false
+	}
+	if err := os.Mkdir(l.lockPath, 0o700); err != nil {
+		return false
+	}
+	if err := os.WriteFile(filepath.Join(l.lockPath, lockOwnerFileName), []byte(l.token), 0o600); err != nil {
+		_ = removeLockDir(l.lockPath)
+		return false
+	}
+	return true
+}
+
+func (l legacyLock) unlock() {
+	data, err := os.ReadFile(filepath.Join(l.lockPath, lockOwnerFileName))
+	if err != nil || string(data) != l.token {
+		return
+	}
+	_ = removeLockDir(l.lockPath)
 }
