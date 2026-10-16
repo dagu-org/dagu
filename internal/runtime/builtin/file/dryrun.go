@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"strings"
 	"syscall"
 
@@ -79,8 +80,12 @@ func missingFile(workDir, raw, field string, follow bool) error {
 }
 
 // pathAbsent reports that the path is not present. ENOTDIR means a parent is
-// a file, so the path cannot exist. Permission and other errors are left
-// unreported; a dry run cannot judge them.
+// a file, so the path cannot exist. On Windows that case is ERROR_DIRECTORY
+// (267); syscall.ENOTDIR is ERROR_PATH_NOT_FOUND and does not match it.
+// Permission and other errors are left unreported; a dry run cannot judge them.
 func pathAbsent(err error) bool {
-	return errors.Is(err, fs.ErrNotExist) || errors.Is(err, syscall.ENOTDIR)
+	if errors.Is(err, fs.ErrNotExist) || errors.Is(err, syscall.ENOTDIR) {
+		return true
+	}
+	return goruntime.GOOS == "windows" && errors.Is(err, syscall.Errno(267))
 }

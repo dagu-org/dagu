@@ -5,11 +5,9 @@ package file
 
 import (
 	"context"
-	"errors"
-	"io/fs"
 	"os"
 	"path/filepath"
-	"syscall"
+	goruntime "runtime"
 	"testing"
 
 	"github.com/dagucloud/dagu/v2/internal/ir"
@@ -39,17 +37,24 @@ func TestDryRunCheckMissingFile(t *testing.T) {
 	require.NoError(t, dryRun(t, dir, opWrite, map[string]any{"path": "missing-9f3c2b1a.txt", "content": "x"}),
 		"write creates a missing path")
 
-	// A parent that is a file makes the child path absent (ENOTDIR), which the
-	// real read would fail on. An unreadable directory stays unreported.
+	// A parent that is a file makes the child path absent (ENOTDIR, or
+	// ERROR_DIRECTORY on Windows), which the real read would fail on.
 	const nested = "notes.txt/missing-9f3c2b1a.txt"
-	_, statErr := os.Stat(filepath.Join(dir, "notes.txt", "missing-9f3c2b1a.txt"))
-	if errors.Is(statErr, fs.ErrNotExist) || errors.Is(statErr, syscall.ENOTDIR) {
+	nestedPath, err := resolveFilePath(dir, nested)
+	require.NoError(t, err)
+	_, statErr := os.Stat(nestedPath)
+	if pathAbsent(statErr) {
 		require.ErrorContains(t, dryRun(t, dir, opRead, map[string]any{"path": nested}),
 			`field 'with.path': missing-9f3c2b1a.txt: file not found`)
 	} else {
 		require.NoError(t, dryRun(t, dir, opRead, map[string]any{"path": nested}))
 	}
 
+	// Windows chmod only toggles the read-only attribute. It does not deny
+	// the stat, and a read-only directory makes the temp dir cleanup fail.
+	if goruntime.GOOS == "windows" {
+		return
+	}
 	blocked := filepath.Join(dir, "blocked")
 	require.NoError(t, os.Mkdir(blocked, 0o700))
 	require.NoError(t, os.WriteFile(filepath.Join(blocked, "secret.txt"), []byte("x"), 0o600))
