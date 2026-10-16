@@ -1,4 +1,7 @@
-@layer theme, base, components, utilities;
+/* The API reference stylesheet resets Tailwind's --tw-* variables on every
+   element inside its own layers. Declaring those layers first keeps them below
+   the app's layers once that stylesheet loads. */
+@layer scalar-base, scalar-theme, scalar-config, theme, base, components, utilities;
 
 @import 'tailwindcss';
 @import 'tw-animate-css';
