@@ -651,9 +651,14 @@ func TestEdgeCases(t *testing.T) {
 
 // staleLockKinds builds the stale lock layouts a contender may find: one left
 // by a crashed holder, an empty directory, and the legacy owner-file layout.
+// mayAllBackOff marks layouts where contenders racing at the same moment can
+// all back off: each one that removes an empty stale directory may remove
+// another's new lock directory before its owner file lands. The next attempt
+// then finds the lock free.
 var staleLockKinds = []struct {
-	name   string
-	create func(t *testing.T, dir string)
+	name          string
+	create        func(t *testing.T, dir string)
+	mayAllBackOff bool
 }{
 	{
 		name: "AbandonedHolder",
@@ -670,6 +675,7 @@ var staleLockKinds = []struct {
 			require.NoError(t, os.Mkdir(filepath.Join(dir, LockDirectoryName), 0o700))
 			backdateLock(t, dir)
 		},
+		mayAllBackOff: true,
 	},
 	{
 		name: "LegacyOwnerFile",
@@ -686,8 +692,9 @@ var staleLockKinds = []struct {
 // junkOnlyStaleLock has no owner or claim file. Contenders that claim it at the
 // same moment may all back off, so it is left out of the many-contender test.
 var junkOnlyStaleLock = struct {
-	name   string
-	create func(t *testing.T, dir string)
+	name          string
+	create        func(t *testing.T, dir string)
+	mayAllBackOff bool
 }{
 	name: "JunkOnly",
 	create: func(t *testing.T, dir string) {
@@ -696,6 +703,7 @@ var junkOnlyStaleLock = struct {
 		require.NoError(t, os.MkdirAll(filepath.Join(lockPath, "unexpected"), 0o700))
 		backdateLock(t, dir)
 	},
+	mayAllBackOff: true,
 }
 
 // A single contender takes over every stale layout and leaves no temporary
@@ -752,7 +760,7 @@ func TestStaleTakeover_InterleavedContenders(t *testing.T) {
 }
 
 // Many contenders race on one stale lock with random delays between observing
-// it and claiming it. Exactly one may win.
+// it and claiming it. Exactly one may win, or none where all may back off.
 func TestStaleTakeover_ManyContenders(t *testing.T) {
 	const contenders = 16
 	const rounds = 20
@@ -792,7 +800,11 @@ func TestStaleTakeover_ManyContenders(t *testing.T) {
 						require.ErrorIs(t, err, ErrLockConflict)
 					}
 				}
-				require.Equal(t, int32(1), winners.Load())
+				if tt.mayAllBackOff {
+					require.LessOrEqual(t, winners.Load(), int32(1))
+				} else {
+					require.Equal(t, int32(1), winners.Load())
+				}
 				held := 0
 				for _, lock := range locks {
 					if lock.IsHeldByMe() {
@@ -800,7 +812,12 @@ func TestStaleTakeover_ManyContenders(t *testing.T) {
 						require.NoError(t, lock.Unlock())
 					}
 				}
-				require.Equal(t, 1, held)
+				require.Equal(t, int(winners.Load()), held)
+				if winners.Load() == 0 {
+					next := New(dir, nil)
+					require.NoError(t, next.TryLock())
+					require.NoError(t, next.Unlock())
+				}
 			}
 		})
 	}
@@ -949,9 +966,7 @@ func TestStaleTakeover_CleansAbandonedTempDirs(t *testing.T) {
 		old      bool
 		wantKept bool
 	}{
-		{name: "OldAcquiring", entry: acquiringLockDirectoryPrefix + "x", old: true, wantKept: false},
 		{name: "OldReleasing", entry: releasedLockDirectoryPrefix + "1.x", old: true, wantKept: false},
-		{name: "FreshAcquiring", entry: acquiringLockDirectoryPrefix + "x", old: false, wantKept: true},
 		{name: "FreshReleasing", entry: releasedLockDirectoryPrefix + "1.x", old: false, wantKept: true},
 		{name: "OldUnrelated", entry: "data", old: true, wantKept: true},
 	}
@@ -981,32 +996,70 @@ func TestStaleTakeover_CleansAbandonedTempDirs(t *testing.T) {
 	}
 }
 
-// A stale-temp sweep can empty the acquiring directory between writing the
-// owner file and installing the lock. An installed lock without its owner
-// file must not be held.
-func TestCreateLock_OwnerRemovedBeforeInstall(t *testing.T) {
-	dir := t.TempDir()
-	lock := New(dir, nil).(*dirLock)
-	lock.beforeInstall = func() {
-		owners, err := filepath.Glob(filepath.Join(dir, acquiringLockDirectoryPrefix+"*", ownerFilePrefix+"*"))
-		require.NoError(t, err)
-		require.Len(t, owners, 1)
-		require.NoError(t, os.Remove(owners[0]))
+// The lock directory is empty until its owner file is written, so stale-lock
+// recovery may remove it, and another contender may create or claim the
+// directory at that path in the meantime. The creator must back off and leave
+// the other contender's files alone.
+func TestCreateLock_Contested(t *testing.T) {
+	const otherOwner = ownerFilePrefix + "other"
+	const otherClaim = claimedFilePrefix + "other"
+	tests := []struct {
+		name    string
+		contend func(t *testing.T, lockPath string)
+		want    []string // entries left at the lock path; nil means no directory
+	}{
+		{
+			name: "Removed",
+			contend: func(t *testing.T, lockPath string) {
+				require.NoError(t, os.Remove(lockPath))
+			},
+		},
+		{
+			name: "Replaced",
+			contend: func(t *testing.T, lockPath string) {
+				require.NoError(t, os.Remove(lockPath))
+				require.NoError(t, os.Mkdir(lockPath, 0o700))
+				require.NoError(t, os.WriteFile(filepath.Join(lockPath, otherOwner), nil, 0o600))
+			},
+			want: []string{otherOwner},
+		},
+		{
+			name: "Claimed",
+			contend: func(t *testing.T, lockPath string) {
+				require.NoError(t, os.WriteFile(filepath.Join(lockPath, otherClaim), nil, 0o600))
+			},
+			want: []string{otherClaim},
+		},
 	}
 
-	require.ErrorIs(t, lock.TryLock(), ErrLockConflict)
-	require.False(t, lock.IsHeldByMe())
-	require.NoDirExists(t, filepath.Join(dir, LockDirectoryName))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			lockPath := filepath.Join(dir, LockDirectoryName)
+			lock := New(dir, nil).(*dirLock)
+			lock.beforeOwnerWrite = func() { tt.contend(t, lockPath) }
 
-	next := New(dir, nil)
-	require.NoError(t, next.TryLock())
-	require.NoError(t, next.Unlock())
+			require.ErrorIs(t, lock.TryLock(), ErrLockConflict)
+			require.False(t, lock.IsHeldByMe())
+			if tt.want == nil {
+				require.NoDirExists(t, lockPath)
+				return
+			}
+			entries, err := os.ReadDir(lockPath)
+			require.NoError(t, err)
+			var names []string
+			for _, e := range entries {
+				names = append(names, e.Name())
+			}
+			require.Equal(t, tt.want, names)
+		})
+	}
 }
 
 // Releases before the per-instance owner file create the lock directory empty
-// and write "owner" into it afterwards. Installing a new lock must not replace
-// that empty directory, or both versions hold the lock at once. Old and new
-// binaries share locks between an in-place upgrade and the next restart.
+// and write "owner" into it afterwards. Creating a new lock must stay exclusive
+// against that, or both versions hold the lock at once. Old and new binaries
+// share locks between an in-place upgrade and the next restart.
 func TestTryLock_LegacyContenders(t *testing.T) {
 	const contenders = 6 // per version
 	const increments = 60

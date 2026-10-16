@@ -101,18 +101,17 @@ type dirLock struct {
 	// afterClaim, when set by tests, runs after a lock instance has been
 	// claimed for removal and before it is removed.
 	afterClaim func()
-	// beforeInstall, when set by tests, runs after a new lock's owner file is
-	// written and before the lock is installed under the live lock name.
-	beforeInstall func()
+	// beforeOwnerWrite, when set by tests, runs after a new lock directory is
+	// created and before its owner file is written.
+	beforeOwnerWrite func()
 }
 
 var _ DirLock = (*dirLock)(nil)
 
 const (
 	// LockDirectoryName is the reserved directory name for lock metadata.
-	LockDirectoryName            = ".dagu_lock"
-	releasedLockDirectoryPrefix  = LockDirectoryName + ".releasing."
-	acquiringLockDirectoryPrefix = LockDirectoryName + ".acquiring."
+	LockDirectoryName           = ".dagu_lock"
+	releasedLockDirectoryPrefix = LockDirectoryName + ".releasing."
 
 	// lockOwnerFileName is the owner file written by older releases.
 	lockOwnerFileName = "owner"
@@ -126,9 +125,7 @@ const (
 
 // IsLockDirectoryName reports whether name is reserved for lock metadata.
 func IsLockDirectoryName(name string) bool {
-	return name == LockDirectoryName ||
-		strings.HasPrefix(name, releasedLockDirectoryPrefix) ||
-		strings.HasPrefix(name, acquiringLockDirectoryPrefix)
+	return name == LockDirectoryName || strings.HasPrefix(name, releasedLockDirectoryPrefix)
 }
 
 // New creates a new directory lock instance
@@ -205,7 +202,7 @@ func (l *dirLock) TryLock() error {
 			return err
 		}
 		// A stale lock means a holder stopped without releasing it, so it may
-		// also have left temporary lock directories behind.
+		// also have left released lock directories behind.
 		l.removeAbandonedTempDirs()
 		return nil
 	} else if !os.IsNotExist(err) {
@@ -218,8 +215,9 @@ func (l *dirLock) TryLock() error {
 	return l.createLock()
 }
 
-// removeAbandonedTempDirs removes temporary lock directories older than the
-// stale threshold. Errors are ignored; a later takeover retries.
+// removeAbandonedTempDirs removes released lock directories older than the
+// stale threshold, left by a process that stopped while removing them. Errors
+// are ignored; a later takeover retries.
 func (l *dirLock) removeAbandonedTempDirs() {
 	entries, err := os.ReadDir(l.targetDir)
 	if err != nil {
@@ -227,7 +225,7 @@ func (l *dirLock) removeAbandonedTempDirs() {
 	}
 	for _, e := range entries {
 		name := e.Name()
-		if !e.IsDir() || (!strings.HasPrefix(name, acquiringLockDirectoryPrefix) && !strings.HasPrefix(name, releasedLockDirectoryPrefix)) {
+		if !e.IsDir() || !strings.HasPrefix(name, releasedLockDirectoryPrefix) {
 			continue
 		}
 		info, err := e.Info()
@@ -262,8 +260,9 @@ func (l *dirLock) removeStaleLock() error {
 	}
 
 	if len(entries) == 0 {
-		// A live lock is never empty, so removing an empty directory cannot
-		// remove a live lock.
+		// An empty directory holds no lock: a lock is held only once its owner
+		// file is written and verified. A contender still creating its lock
+		// here finds the directory gone or shared, and backs off.
 		return staleLockError(os.Remove(l.lockPath))
 	}
 
@@ -368,8 +367,8 @@ func releaseClaimedLock(lockPath, claimName string) error {
 		}
 		return err
 	}
-	// A non-empty directory here is a newer lock renamed over the empty one,
-	// which only a platform without no-replace renames allows.
+	// A non-empty directory here holds the owner file of a contender whose own
+	// directory was removed; that contender decides whether it holds the lock.
 	if err := fileutil.Remove(lockPath); err != nil && !os.IsNotExist(err) && !os.IsExist(err) {
 		return err
 	}
@@ -385,22 +384,21 @@ func containsEntry(entries []os.DirEntry, name string) bool {
 	return false
 }
 
-// createLock builds a complete lock directory under a private name and renames
-// it onto the live lock name, so a live lock always contains its owner file.
-// The rename never replaces an existing lock directory, not even an empty one
-// that an older release created and has not yet written its owner file into.
+// createLock creates the lock directory and writes this instance's owner file
+// into it. Creating the directory is exclusive, as in older releases, so a new
+// lock never replaces another one.
 func (l *dirLock) createLock() error {
 	if err := fileutil.MkdirAll(l.targetDir, 0750); err != nil {
 		return fmt.Errorf("failed to create target directory: %w", err)
 	}
-
-	id := newUniqueID()
-	tmpPath := filepath.Join(l.targetDir, acquiringLockDirectoryPrefix+id)
-	if err := os.Mkdir(tmpPath, 0700); err != nil {
-		if isRetryableLockStateError(err) {
+	if err := os.Mkdir(l.lockPath, 0700); err != nil {
+		if os.IsExist(err) || isRetryableLockStateError(err) {
 			return ErrLockConflict
 		}
 		return fmt.Errorf("failed to create lock directory: %w", err)
+	}
+	if l.beforeOwnerWrite != nil {
+		l.beforeOwnerWrite()
 	}
 
 	hostname, err := os.Hostname()
@@ -408,31 +406,28 @@ func (l *dirLock) createLock() error {
 		hostname = "unknown-host"
 	}
 	token := newFenceToken(hostname)
-	ownerFile := ownerFilePrefix + id
-	if err := os.WriteFile(filepath.Join(tmpPath, ownerFile), []byte(token), 0600); err != nil {
-		_ = fileutil.RemoveAll(tmpPath)
-		// The temporary directory may have been removed as abandoned.
-		if os.IsNotExist(err) || isRetryableLockStateError(err) {
+	ownerFile := ownerFilePrefix + newUniqueID()
+	ownerPath := filepath.Join(l.lockPath, ownerFile)
+	if err := os.WriteFile(ownerPath, []byte(token), 0600); err != nil {
+		l.abandonLock(ownerPath)
+		if isLostClaimError(err) || isRetryableLockStateError(err) {
 			return ErrLockConflict
 		}
 		return fmt.Errorf("failed to write lock token: %w", err)
 	}
 
-	if l.beforeInstall != nil {
-		l.beforeInstall()
-	}
-	if err := renameNoReplace(tmpPath, l.lockPath); err != nil {
-		_ = fileutil.RemoveAll(tmpPath)
-		if os.IsExist(err) || os.IsNotExist(err) || isRetryableLockStateError(err) {
-			return ErrLockConflict
+	// Until the owner file exists the directory looks abandoned, so stale-lock
+	// recovery may have removed it, and the owner file may have landed in a
+	// directory another contender created or is taking over. Of the contenders
+	// that wrote into one directory, only one can list it before the others
+	// write, so the lock is held only if the listing shows this owner file and
+	// no other owner or claim marker.
+	entries, err := os.ReadDir(l.lockPath)
+	if err != nil || !containsEntry(entries, ownerFile) || staleLockMarker(withoutEntry(entries, ownerFile)) != "" {
+		l.abandonLock(ownerPath)
+		if err != nil && !isLostClaimError(err) && !isRetryableLockStateError(err) {
+			return fmt.Errorf("failed to verify lock directory: %w", err)
 		}
-		return fmt.Errorf("failed to create lock directory: %w", err)
-	}
-	// A sweep of abandoned temporary directories may have emptied this one
-	// before the rename. Removing an empty directory cannot remove a live
-	// lock, because a live lock is never empty.
-	if _, err := os.Lstat(filepath.Join(l.lockPath, ownerFile)); os.IsNotExist(err) {
-		_ = fileutil.Remove(l.lockPath)
 		return ErrLockConflict
 	}
 
@@ -440,6 +435,16 @@ func (l *dirLock) createLock() error {
 	l.ownerFile = ownerFile
 	l.isHeld = true
 	return nil
+}
+
+// abandonLock removes the owner file of a lock this instance failed to create.
+// Only when that file was still in place is the directory this instance's to
+// clean up, and then it is removed if empty. A held lock always contains its
+// owner file, so removing an empty directory never removes a held lock.
+func (l *dirLock) abandonLock(ownerPath string) {
+	if fileutil.Remove(ownerPath) == nil {
+		_ = fileutil.Remove(l.lockPath)
+	}
 }
 
 func isRetryableLockStateError(err error) bool {
@@ -616,9 +621,9 @@ func (l *dirLock) isStaleInfo(info os.FileInfo) bool {
 	return age > l.opts.StaleThreshold
 }
 
-// isLostClaimError reports whether a claim rename failed because another
-// process moved or removed the lock directory first. macOS reports EINVAL when
-// the source directory is renamed or deleted during the rename.
+// isLostClaimError reports whether an operation inside the lock directory
+// failed because another process moved or removed the directory first. macOS
+// reports EINVAL when the directory is renamed or deleted during the operation.
 func isLostClaimError(err error) bool {
 	return os.IsNotExist(err) || errors.Is(err, syscall.EINVAL)
 }
