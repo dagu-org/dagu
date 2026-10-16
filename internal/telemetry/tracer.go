@@ -8,6 +8,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"os"
+	"strings"
 
 	cmnvalue "github.com/dagucloud/dagu/v2/internal/cmn/value"
 	"github.com/dagucloud/dagu/v2/internal/ir"
@@ -87,18 +88,18 @@ func NewTracer(ctx context.Context, dag *ir.DAG, vars map[string]string) (*Trace
 
 // createExporter creates an OTLP exporter based on the endpoint
 func createExporter(ctx context.Context, config *ir.OTelConfig) (sdktrace.SpanExporter, error) {
-	endpoint := config.Endpoint
-	if endpoint == "" {
+	if config.Endpoint == "" {
 		return nil, fmt.Errorf("OTel endpoint is required")
 	}
-
-	// Determine if it's HTTP or gRPC based on the endpoint
-	isHTTP := len(endpoint) > 4 && endpoint[len(endpoint)-4:] == "/v1/traces"
-
-	if isHTTP {
+	if isHTTPEndpoint(config.Endpoint) {
 		return createHTTPExporter(ctx, config)
 	}
 	return createGRPCExporter(ctx, config)
+}
+
+// isHTTPEndpoint reports whether the endpoint selects the OTLP/HTTP exporter.
+func isHTTPEndpoint(endpoint string) bool {
+	return strings.HasSuffix(endpoint, "/v1/traces")
 }
 
 // createHTTPExporter creates an OTLP HTTP exporter

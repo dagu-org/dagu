@@ -155,6 +155,22 @@ func TestNewTracer(t *testing.T) {
 	})
 }
 
+func TestIsHTTPEndpoint(t *testing.T) {
+	tests := []struct {
+		endpoint string
+		want     bool
+	}{
+		{"localhost:4317", false},
+		{"http://localhost:4317", false},
+		{"localhost:4318/v1/traces", true},
+		{"http://collector:4318/v1/traces", true},
+		{"https://collector.example.com/v1/traces", true},
+	}
+	for _, tt := range tests {
+		assert.Equal(t, tt.want, isHTTPEndpoint(tt.endpoint), tt.endpoint)
+	}
+}
+
 // An endpoint that ends with /v1/traces must reach an OTLP/HTTP receiver,
 // with or without the URL scheme.
 func TestHTTPExporter(t *testing.T) {
