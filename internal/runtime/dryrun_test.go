@@ -178,17 +178,16 @@ func TestDryRunChecksForSplitsProblems(t *testing.T) {
 	require.Equal(t, []runtime.DryRunCheck{{Step: "check", Message: "shell missing"}}, runtime.DryRunChecksFor("check", plain))
 }
 
-func TestOrderDryRunChecksFollowsSteps(t *testing.T) {
+func TestSortDryRunChecksFollowsSteps(t *testing.T) {
 	checks := []runtime.DryRunCheck{
 		{Step: "load", Field: "with.path", Message: "missing"},
 		{Step: "read", Field: "with.sheet", Message: "nope"},
 		{Step: "load", Field: "with.source", Message: "also"},
 	}
-	ordered := runtime.OrderDryRunChecks([]string{"read", "load"}, checks)
+	runtime.SortDryRunChecks([]string{"read", "load"}, checks)
 	require.Equal(t, []runtime.DryRunCheck{
 		{Step: "read", Field: "with.sheet", Message: "nope"},
 		{Step: "load", Field: "with.path", Message: "missing"},
 		{Step: "load", Field: "with.source", Message: "also"},
-	}, ordered)
-	require.Empty(t, runtime.OrderDryRunChecks(nil, nil))
+	}, checks)
 }

@@ -4,12 +4,13 @@
 package runtime
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/dagucloud/dagu/v2/internal/cmn/cmdutil"
@@ -50,62 +51,44 @@ func (r *Runner) noteDryRunStep(ctx context.Context, node *Node) {
 	r.mu.Unlock()
 }
 
-// DryRunChecks returns the problems recorded for this dry run, in the order
-// they were recorded. The slice is empty when every step passed.
-func (r *Runner) DryRunChecks() []DryRunCheck {
+// DryRunChecks returns the problems this dry run recorded for plan, in run
+// order: the init handler, the plan's steps, then the other handlers. It is
+// empty when every step passed.
+func (r *Runner) DryRunChecks(plan *Plan) []DryRunCheck {
 	r.mu.RLock()
-	defer r.mu.RUnlock()
-	if len(r.dryChecks) == 0 {
-		return []DryRunCheck{}
+	checks := slices.Clone(r.dryChecks)
+	r.mu.RUnlock()
+
+	nodes := r.NodesInRunOrder(plan)
+	order := make([]string, len(nodes))
+	for i, node := range nodes {
+		order[i] = node.Name()
 	}
-	out := make([]DryRunCheck, len(r.dryChecks))
-	copy(out, r.dryChecks)
-	return out
+	sortDryRunChecks(order, checks)
+	return checks
 }
 
-// OrderDryRunChecks returns checks in stepOrder. Problems for one step stay
-// in the order they were reported. A step that is not in stepOrder follows
-// the named steps, in the order it was recorded.
-func OrderDryRunChecks(stepOrder []string, checks []DryRunCheck) []DryRunCheck {
-	if len(checks) == 0 {
-		return []DryRunCheck{}
-	}
+// sortDryRunChecks sorts checks in place by the position of their step in
+// stepOrder. Problems of one step keep the order they were reported in. A
+// step missing from stepOrder follows the named steps, in the order it was
+// first recorded.
+func sortDryRunChecks(stepOrder []string, checks []DryRunCheck) {
 	rank := make(map[string]int, len(stepOrder))
 	for i, name := range stepOrder {
 		if _, seen := rank[name]; !seen {
 			rank[name] = i
 		}
 	}
-	type ordered struct {
-		rank  int
-		index int
-		check DryRunCheck
-	}
-	items := make([]ordered, len(checks))
-	seen := make(map[string]int, len(checks))
 	next := len(stepOrder)
-	for i, check := range checks {
-		place, ok := rank[check.Step]
-		if !ok {
-			place = next
+	for _, check := range checks {
+		if _, seen := rank[check.Step]; !seen {
+			rank[check.Step] = next
 			next++
-			rank[check.Step] = place
 		}
-		index := seen[check.Step]
-		seen[check.Step]++
-		items[i] = ordered{rank: place, index: index, check: check}
 	}
-	sort.Slice(items, func(i, j int) bool {
-		if items[i].rank != items[j].rank {
-			return items[i].rank < items[j].rank
-		}
-		return items[i].index < items[j].index
+	slices.SortStableFunc(checks, func(a, b DryRunCheck) int {
+		return cmp.Compare(rank[a.Step], rank[b.Step])
 	})
-	out := make([]DryRunCheck, len(items))
-	for i, item := range items {
-		out[i] = item.check
-	}
-	return out
 }
 
 // dryRunChecksFor splits a joined check error into one check per problem.

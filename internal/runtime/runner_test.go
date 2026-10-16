@@ -2264,7 +2264,26 @@ func TestRunner_DryRunStepChecks(t *testing.T) {
 			Step:    "1",
 			Field:   "run",
 			Message: fmt.Sprintf("command %q not found on this host", missing),
-		}}, result.runner.DryRunChecks())
+		}}, result.runner.DryRunChecks(result.Plan))
+	})
+
+	t.Run("ChecksFollowRunOrder", func(t *testing.T) {
+		r := setupRunner(t,
+			func(cfg *runtime.Config) {
+				cfg.Dry = true
+			},
+			withOnInit(newStep("onInit", withCommand(missing+"-init"))),
+			withOnExit(newStep("onExit", withCommand(missing+"-exit"))),
+		)
+
+		plan := r.newPlan(t, newStep("1", withCommand(missing)))
+
+		result := plan.assertRun(t, ir.Succeeded)
+		var steps []string
+		for _, check := range result.runner.DryRunChecks(result.Plan) {
+			steps = append(steps, check.Step)
+		}
+		require.Equal(t, []string{"onInit", "1", "onExit"}, steps)
 	})
 
 	t.Run("HandlerEnvErrorFailsHandler", func(t *testing.T) {
