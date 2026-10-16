@@ -57,6 +57,9 @@ const (
 	settleQuiet   = 500 * time.Millisecond
 	settleTimeout = 5 * time.Second
 	settlePoll    = 100 * time.Millisecond
+	// writeGrace is how much longer than the wait it is part of a page read
+	// may take; see waitContext.
+	writeGrace = time.Second
 	// botCheckWait bounds how long an action waits for a bot check the site
 	// answered with to pass. A check that needs no person passes within
 	// seconds by loading the page it stood in for, as it would for a
@@ -413,6 +416,7 @@ func startEngine(ctx context.Context, browser *stagehand.Browser, cdpURL string,
 		sink:            sink,
 		handle:          browserHandle{CDPURL: cdpURL},
 		pageCallTimeout: pageCallTimeout,
+		settleWait:      settleTimeout,
 		botCheckWait:    botCheckWait,
 	}
 	// An unanswered dialog blocks its page, and the runtime does not answer
@@ -460,6 +464,8 @@ type stagehandEngine struct {
 	blocked *browserhost.BlockedRequestWatcher
 	// pageCallTimeout bounds calls that take no timeout of their own.
 	pageCallTimeout time.Duration
+	// settleWait bounds the wait for a document to settle.
+	settleWait time.Duration
 	// botCheckWait bounds the wait for a bot check to pass.
 	botCheckWait time.Duration
 	// certificateEventsSeen is the last certificate proxy event taken.
@@ -485,7 +491,16 @@ func (e *stagehandEngine) page(ctx context.Context) (*stagehand.Page, error) {
 	if err != nil {
 		return nil, err
 	}
-	return browserContext.ActivePage(ctx)
+	page, err := browserContext.ActivePage(ctx)
+	if err != nil {
+		return nil, err
+	}
+	// The caller's next call writes to the browser runtime, which closes its
+	// connection to the browser when that call's context has ended.
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return page, nil
 }
 
 func (e *stagehandEngine) Goto(ctx context.Context, url string, timeout time.Duration) error {
@@ -623,7 +638,7 @@ func (e *stagehandEngine) watch(ctx context.Context) {
 // operation reads the page: for the document it shows to settle, and for a
 // bot check the site answered with to pass.
 func (e *stagehandEngine) settle(ctx context.Context) {
-	e.settleDocument(ctx)
+	e.settleDocument(ctx, time.Now().Add(e.settleWait))
 	e.awaitBotCheck(ctx)
 }
 
@@ -635,21 +650,24 @@ func (e *stagehandEngine) awaitBotCheck(ctx context.Context) {
 	if !e.showsBotCheck(ctx) {
 		return
 	}
-	ctx, cancel := context.WithTimeout(ctx, e.botCheckWait)
+	deadline := time.Now().Add(e.botCheckWait)
+	if !time.Now().Before(deadline) {
+		return
+	}
+	ctx, cancel := waitContext(ctx, deadline)
 	defer cancel()
 	document, _ := e.DocumentID(ctx)
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-time.After(settlePoll):
-		}
+	for pause(ctx, settlePoll, deadline) {
 		current, err := e.DocumentID(ctx)
 		if err != nil || current == document {
 			continue
 		}
-		e.settleDocument(ctx)
-		if !e.showsBotCheck(ctx) {
+		settled := time.Now().Add(e.settleWait)
+		if settled.After(deadline) {
+			settled = deadline
+		}
+		e.settleDocument(ctx, settled)
+		if !time.Now().Before(deadline) || !e.showsBotCheck(ctx) {
 			return
 		}
 		document = current
@@ -659,24 +677,27 @@ func (e *stagehandEngine) awaitBotCheck(ctx context.Context) {
 // showsBotCheck reports whether the page shows a bot check, reading it no
 // longer than a page settles, so a page that does not answer delays nothing.
 func (e *stagehandEngine) showsBotCheck(ctx context.Context) bool {
-	ctx, cancel := context.WithTimeout(ctx, settleTimeout)
+	ctx, cancel := context.WithTimeout(ctx, e.settleWait)
 	defer cancel()
 	page, err := e.PageOutcome(ctx)
 	return err == nil && page.BotCheck != ""
 }
 
-// settleDocument waits, up to settleTimeout, for the document the page shows
-// to settle: a new document until its network is idle, and the document an
+// settleDocument waits, until deadline, for the document the page shows to
+// settle: a new document until its network is idle, and the document an
 // action began on until its requests end and it stops changing. A page that
 // does not settle in time is left as it is.
-func (e *stagehandEngine) settleDocument(ctx context.Context) {
-	ctx, cancel := context.WithTimeout(ctx, settleTimeout)
+func (e *stagehandEngine) settleDocument(ctx context.Context, deadline time.Time) {
+	if !time.Now().Before(deadline) {
+		return
+	}
+	ctx, cancel := waitContext(ctx, deadline)
 	defer cancel()
 	page, err := e.page(ctx)
 	if err != nil {
 		return
 	}
-	for {
+	for time.Now().Before(deadline) {
 		quiet, err := page.Evaluate(ctx, quietExpression)
 		if err == nil && string(quiet) == "true" {
 			return
@@ -685,15 +706,36 @@ func (e *stagehandEngine) settleDocument(ctx context.Context) {
 		// reports no quiet state shows a document watch never readied; both
 		// wait as a newly loaded page does.
 		if err != nil || string(quiet) != "false" {
-			_ = page.WaitForLoadState(ctx, stagehand.LoadStateNetworkIdle, new(int(settleTimeout.Milliseconds())))
+			if wait := time.Until(deadline); wait > 0 {
+				_ = page.WaitForLoadState(ctx, stagehand.LoadStateNetworkIdle, new(int(wait.Milliseconds())))
+			}
 			return
 		}
-		select {
-		case <-ctx.Done():
+		if !pause(ctx, settlePoll, deadline) {
 			return
-		case <-time.After(settlePoll):
 		}
 	}
+}
+
+// waitContext returns the context for the page reads of a wait that ends at
+// deadline. A read starts only before the deadline and may take writeGrace
+// past it, so it never writes to the browser runtime on a context that has
+// ended, which closes the runtime's connection to the browser.
+func waitContext(ctx context.Context, deadline time.Time) (context.Context, context.CancelFunc) {
+	return context.WithDeadline(ctx, deadline.Add(writeGrace))
+}
+
+// pause waits up to d, no later than deadline, and reports whether the
+// wait it is part of goes on, which waitContext explains.
+func pause(ctx context.Context, d time.Duration, deadline time.Time) bool {
+	timer := time.NewTimer(min(d, time.Until(deadline)))
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+	}
+	return time.Now().Before(deadline)
 }
 
 // targetVisible reports whether selector, resolved as a replayed action
@@ -1075,6 +1117,12 @@ var errBrowserUnresponsive = errors.New("the browser did not respond")
 // boundCall runs call with a deadline of limit and reports when the browser
 // did not answer in time, so an unresponsive page cannot hang the step.
 func boundCall[T any](ctx context.Context, limit time.Duration, call func(context.Context) (T, error)) (T, error) {
+	// A call whose context has ended when it writes to the browser runtime
+	// closes the runtime's connection to the browser.
+	if err := ctx.Err(); err != nil {
+		var zero T
+		return zero, err
+	}
 	callCtx, cancel := context.WithTimeout(ctx, limit)
 	defer cancel()
 	result, err := call(callCtx)

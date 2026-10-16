@@ -5,6 +5,7 @@ package certproxy
 
 import (
 	"context"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -71,6 +72,16 @@ func (r *readyWriter) write(line readyLine) {
 // Serve runs the proxy until ctx ends or the browser at cfg.CDPURL is gone.
 // It calls ready once the proxy accepts connections, before serving them.
 func Serve(ctx context.Context, cfg Config, ready func(Ready)) error {
+	var public *x509.CertPool
+	if cfg.Guard {
+		public = publicRoots()
+	}
+	return serve(ctx, cfg, public, ready)
+}
+
+// serve is Serve, with the guard passing the browser's own TLS to sites
+// whose certificates the public authorities vouch for.
+func serve(ctx context.Context, cfg Config, public *x509.CertPool, ready func(Ready)) error {
 	if err := cfg.validate(); err != nil {
 		return err
 	}
@@ -120,18 +131,20 @@ func Serve(ctx context.Context, cfg Config, ready func(Ready)) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	s := &server{
-		ctx:        ctx,
-		token:      cfg.Token,
-		entries:    entries,
-		trustedCAs: authorities,
-		pac:        evaluator,
-		issuer:     issuer,
-		events:     newEventLog(),
-		verified:   newVerifiedHosts(),
-		pending:    newPendingLog(),
-		guardEntry: newGuardEntry(cfg.Entries),
-		tunnels:    map[net.Conn]struct{}{},
-		guard:      guard,
+		ctx:         ctx,
+		token:       cfg.Token,
+		entries:     entries,
+		trustedCAs:  authorities,
+		pac:         evaluator,
+		issuer:      issuer,
+		events:      newEventLog(),
+		verified:    newVerifiedHosts(),
+		pending:     newPendingLog(),
+		guardEntry:  newGuardEntry(cfg.Entries),
+		publicRoots: public,
+		verdicts:    newPassVerdicts(),
+		tunnels:     map[net.Conn]struct{}{},
+		guard:       guard,
 	}
 	script := composePAC(port, guardPort, cfg.routedHosts(), system)
 	pacURL, served := pacLocation(script, controlURL(port, cfg.Token)+"/"+pacPath)

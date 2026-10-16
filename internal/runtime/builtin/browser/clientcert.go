@@ -229,8 +229,8 @@ func missingCertificate(host, detail string, proxy bool) error {
 	message := fmt.Sprintf("%s asks for a TLS client certificate, and none is configured for it (%s); "+
 		"set with.browser.client_certificates or browser.client_certificates in the Dagu config", subject, detail)
 	if proxy && clientAuthError.MatchString(detail) {
-		// The proxy answers such a request itself; the browser met it on
-		// a route that bypassed the proxy.
+		// The proxy answers such a request from a host a certificate
+		// names; the browser met it on a route that bypassed the proxy.
 		message += "; if one is configured for it, a Chrome enterprise policy may be setting the browser's proxy"
 	}
 	return errors.New(message)

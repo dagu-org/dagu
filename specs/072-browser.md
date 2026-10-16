@@ -234,15 +234,29 @@ proxy, which listens on the loopback interface. Present certificates only on
 hosts whose users are trusted with them.
 
 While the browser presents certificates, it also guards its other HTTPS
-requests: the proxy carries them too, presenting no certificate, so the
-browser never asks the operating system for one, which would wait on a
-system prompt nobody answers. The host configuration
+requests, so that the browser never asks the operating system for a
+certificate, which would wait on a system prompt nobody answers. The proxy
+makes a TLS handshake of its own with each site, once per host and port
+while the browser runs, and sends nothing over it. A site that chose TLS 1.3,
+asked for no client certificate, and showed a certificate that a root of
+Mozilla's program vouches for gets the browser's own TLS: the proxy passes
+the browser's hello to it and lets the answer through once that answer
+selects TLS 1.3, so the site sees the browser's handshake, and the browser
+verifies the site. The proxy carries every other site itself, presenting no
+certificate: one that asks for a certificate, uses TLS 1.2 or older, or has
+a certificate only the system's or an entry's authorities vouch for, and,
+for a minute before it tries again, one whose handshake failed. It takes
+over a connection that cannot pass without the browser noticing. Under TLS
+1.3 a request for a certificate is encrypted, so a site that asks the
+browser but did not ask the proxy reaches the browser's certificate
+selection; a site that refuses the proxy's handshake stays unreachable
+through the guard. The host configuration
 `browser.guard_client_certificates` (or `DAGU_BROWSER_GUARD_CLIENT_CERTIFICATES`)
 turns the guard off, or on for every browser even without certificates. When
 the device's proxy asks the certificate proxy for credentials it cannot give,
 such as a Windows sign-in, the guard stops and the browser reaches those sites
-itself; the step's log says so. The guard trusts the system's CA certificates
-and every entry's `ca_file`.
+itself; the step's log says so. For the sites it carries, the guard trusts
+the system's CA certificates and every entry's `ca_file`.
 
 A page that does not load because of a client certificate fails the
 operation that opened it: the error names what the proxy saw, such as the
@@ -254,7 +268,8 @@ failure. An operation that times out names the connections the proxy still
 waits on and how far each got. The step's log records each host the proxy
 presented a certificate to or verified with a configured authority, each
 site that asked for one, and each failure. A site the guard carries appears
-only when it asks for a certificate or fails.
+only when it asks for a certificate or fails; one it passes, whose handshake
+only the browser reads, never does.
 
 ### Trusted server authorities
 
