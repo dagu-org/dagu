@@ -51,6 +51,7 @@ type entryReaderImpl struct {
 	marker                 *ChangeMarker
 	markerInterval         time.Duration
 	markerSeen             markerVersions
+	reportedIssues         map[string]struct{}
 }
 
 // EntryReaderOption customizes a filesystem DAG entry reader.
@@ -496,9 +497,7 @@ func (er *entryReaderImpl) initRecursive(ctx context.Context) error {
 		_ = er.watcher.Close()
 		return fmt.Errorf("failed to initialize recursive DAGs: %w", err)
 	}
-	for _, issue := range state.issues {
-		logger.Error(ctx, "DAG excluded from scheduler", tag.Error(errors.New(issue)))
-	}
+	er.reportIssues(ctx, state.issues)
 
 	er.lock.Lock()
 	er.registry = state.dags
@@ -519,15 +518,29 @@ func (er *entryReaderImpl) refreshRegistry(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	for _, issue := range state.issues {
-		logger.Error(ctx, "DAG excluded from scheduler", tag.Error(errors.New(issue)))
-	}
+	er.reportIssues(ctx, state.issues)
 
 	events := er.replaceRegistry(state)
 	for _, event := range events {
 		er.sendEvent(ctx, event)
 	}
 	return nil
+}
+
+// reportIssues logs the DAGs a full refresh excluded. An issue is logged as an
+// error when it first appears and at debug level while it persists, so the
+// periodic refresh does not repeat the same errors.
+func (er *entryReaderImpl) reportIssues(ctx context.Context, issues []string) {
+	reported := make(map[string]struct{}, len(issues))
+	for _, issue := range issues {
+		reported[issue] = struct{}{}
+		if _, seen := er.reportedIssues[issue]; seen {
+			logger.Debug(ctx, "DAG excluded from scheduler", tag.Error(errors.New(issue)))
+			continue
+		}
+		logger.Error(ctx, "DAG excluded from scheduler", tag.Error(errors.New(issue)))
+	}
+	er.reportedIssues = reported
 }
 
 func (er *entryReaderImpl) syncWatches(ctx context.Context, dirs []string) {

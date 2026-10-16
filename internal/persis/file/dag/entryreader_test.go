@@ -4,16 +4,19 @@
 package dag
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"github.com/dagucloud/dagu/v2/internal/cmn/filenotify"
 	"github.com/dagucloud/dagu/v2/internal/cmn/fileutil"
+	"github.com/dagucloud/dagu/v2/internal/cmn/logger"
 	"github.com/dagucloud/dagu/v2/internal/persis"
 	"github.com/dagucloud/dagu/v2/internal/workspace"
 	"os"
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -915,6 +918,50 @@ func TestEntryReaderRefreshReloadsDAGLoadedWithRemovedBaseConfig(t *testing.T) {
 	event := nextEvent(t, events)
 	assert.Equal(t, persis.DAGChangeUpdated, event.Type)
 	assert.Equal(t, "a", event.DAG.ProcGroup())
+}
+
+// TestEntryReaderReportsEachIssueOnce keeps the periodic refresh from logging
+// the same excluded DAG as an error on every pass, while an issue that clears
+// and comes back is reported again.
+func TestEntryReaderReportsEachIssueOnce(t *testing.T) {
+	for _, recursive := range []bool{false, true} {
+		name := "NonRecursive"
+		if recursive {
+			name = "Recursive"
+		}
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			er, _, _ := newRefreshTestReader(t, dir, recursive)
+			var logs bytes.Buffer
+			ctx := logger.WithFixedLogger(context.Background(), logger.NewLogger(
+				logger.WithFormat("text"), logger.WithWriter(&logs),
+			))
+			reported := func() int {
+				t.Helper()
+				require.NoError(t, er.refreshRegistry(ctx))
+				count := 0
+				for line := range strings.SplitSeq(logs.String(), "\n") {
+					if strings.Contains(line, "level=ERROR") && strings.Contains(line, "DAG excluded from scheduler") {
+						count++
+					}
+				}
+				return count
+			}
+			path := filepath.Join(dir, "broken.yaml")
+			write := func(body string) {
+				t.Helper()
+				require.NoError(t, os.WriteFile(path, []byte(body), 0600))
+			}
+
+			write("steps: [\n")
+			assert.Equal(t, 1, reported())
+			assert.Equal(t, 1, reported(), "a persisting issue is not logged again")
+			write("steps:\n  - run: echo fixed\n")
+			assert.Equal(t, 1, reported())
+			write("steps: [\n")
+			assert.Equal(t, 2, reported(), "an issue that comes back is logged again")
+		})
+	}
 }
 
 // entrySchedule returns the first schedule expression of the registry entry id.
