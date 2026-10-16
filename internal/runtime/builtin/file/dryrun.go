@@ -13,7 +13,6 @@ import (
 	"strings"
 	"syscall"
 
-	cmnvalue "github.com/dagucloud/dagu/v2/internal/cmn/value"
 	"github.com/dagucloud/dagu/v2/internal/ir"
 	"github.com/dagucloud/dagu/v2/internal/runtime"
 )
@@ -58,7 +57,9 @@ func dryRunCheck(ctx context.Context, step ir.Step) error {
 }
 
 func missingFile(workDir, raw, field string, follow bool) error {
-	if strings.TrimSpace(raw) == "" || cmnvalue.HasValueReference(raw) {
+	// Params and environment are already resolved, so a "$" left in the path
+	// is a reference only the run can resolve, such as a step output variable.
+	if strings.TrimSpace(raw) == "" || strings.Contains(raw, "$") {
 		return nil
 	}
 	path, err := resolveFilePath(workDir, raw)

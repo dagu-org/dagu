@@ -131,7 +131,8 @@ slash-separated path relative to `with.path`.
 not on this host. `file.read` and `file.list` need `with.path`.
 `file.stat` and `file.delete` need `with.path` unless `with.missing_ok` is
 set. `file.copy` and `file.move` need `with.source`, unless `with.dry_run`
-is set. A path that is still a step-output reference is skipped. `file.write`
+is set. A path that still holds a `$` reference once params and environment
+resolve, such as an earlier step's output variable, is skipped. `file.write`
 and `file.mkdir` create their path, so a missing destination is not a warning.
 
 ## Errors

@@ -27,6 +27,8 @@ func TestDryRunCheckMissingFile(t *testing.T) {
 	require.NoError(t, dryRun(t, dir, opRead, map[string]any{"path": "notes.txt"}))
 	require.NoError(t, dryRun(t, dir, opRead, map[string]any{"path": "${steps.find.outputs.path}"}),
 		"a path still holding a reference cannot be checked")
+	require.NoError(t, dryRun(t, dir, opRead, map[string]any{"path": "${OUT}.bak"}),
+		"an earlier step's output variable resolves only at run time")
 	require.NoError(t, dryRun(t, dir, opStat, map[string]any{"path": "missing-9f3c2b1a.txt", "missing_ok": true}))
 	require.ErrorContains(t, dryRun(t, dir, opStat, map[string]any{"path": "missing-9f3c2b1a.txt"}),
 		`field 'with.path': missing-9f3c2b1a.txt: file not found`)
