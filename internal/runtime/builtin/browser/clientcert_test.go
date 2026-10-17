@@ -71,7 +71,6 @@ func TestTrustedCAsReachBrowser(t *testing.T) {
 			require.Len(t, run.launcher.launches, 1)
 			require.Len(t, run.launcher.launches[0].TrustedCAs, 1)
 			assert.Equal(t, []string{host}, run.launcher.launches[0].TrustedCAs[0].Hosts)
-			assert.NotContains(t, result.stderr.String(), "Chrome bypasses certificate routing")
 		})
 	}
 	run := newTestRun(t, pageModel(nil))

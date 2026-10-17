@@ -81,16 +81,16 @@ func loadClientCertificates(ctx context.Context, step []cmnconfig.BrowserClientC
 }
 
 // loadTrustedCAs loads the host's trusted authorities.
-func loadTrustedCAs(ctx context.Context) ([]certproxy.TrustedCA, []string, error) {
+func loadTrustedCAs(ctx context.Context) ([]certproxy.TrustedCA, error) {
 	var entries []certproxy.TrustedCA
 	for i, authority := range cmnconfig.GetConfig(ctx).Browser.TrustedCAs {
 		entry, err := certproxy.LoadTrustedCA(fmt.Sprintf("browser.trusted_cas[%d]", i), authority)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		entries = append(entries, entry)
 	}
-	return entries, nil, nil
+	return entries, nil
 }
 
 // guardsCertificates reports whether a browser presenting certificates

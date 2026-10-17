@@ -323,11 +323,10 @@ func (s *Sessions) Open(ctx context.Context, opts SessionOptions) (OpenResult, e
 	if err != nil {
 		return OpenResult{}, &SessionError{Code: CodeLaunchFailed, Message: err.Error()}
 	}
-	authorities, trustWarnings, err := loadTrustedCAs(ctx)
+	authorities, err := loadTrustedCAs(ctx)
 	if err != nil {
 		return OpenResult{}, &SessionError{Code: CodeLaunchFailed, Message: err.Error()}
 	}
-	warnings = append(warnings, trustWarnings...)
 
 	id, workDir, err := reserveSession(store)
 	if err != nil {
