@@ -12,6 +12,7 @@ import { Link } from 'react-router-dom';
 import { AppBarContext } from '../contexts/AppBarContext';
 import { useConfig } from '../contexts/ConfigContext';
 import { ActivityLanes } from '../features/activity/components/ActivityLanes';
+import { GettingStartedChecklist } from '../features/activity/components/GettingStartedChecklist';
 import {
   ActivityCounts,
   InProgress,
@@ -22,6 +23,7 @@ import {
   type ActivityWindow,
   useDAGRunActivity,
 } from '../features/activity/hooks/useDAGRunActivity';
+import { useGettingStarted } from '../features/activity/hooks/useGettingStarted';
 import {
   attentionItems,
   fitRange,
@@ -30,6 +32,10 @@ import {
   type TimeRange,
   withEarlierActiveRuns,
 } from '../features/activity/lib/activityModel';
+import {
+  DAG_SAMPLE_SIZE,
+  isExampleDAGName,
+} from '../features/activity/lib/gettingStarted';
 import { CreateDAGButton } from '../features/dags/components/common';
 import PathsCard from '../features/system-status/components/PathsCard';
 import { useQuery } from '../hooks/api';
@@ -42,8 +48,6 @@ import { useI18n } from '@/i18n/I18nProvider';
 
 /** How often the "now" line and attention timings move forward. */
 const NOW_TICK_MS = 30_000;
-/** Workflows read to tell an empty install from one with only examples. */
-const EMPTY_STATE_DAG_SAMPLE = 5;
 
 type LaneScale = 'fit' | 'window';
 
@@ -219,6 +223,7 @@ function Dashboard(): React.ReactElement {
   } = useDAGRunActivity(activityWindow, workspaceQuery, remoteNode);
   // Shares the pause banner's request, so it costs nothing extra.
   const { schedulerRunning } = useSchedulerPause();
+  const gettingStarted = useGettingStarted();
 
   const { filteredActivity, filteredRuns } = React.useMemo(() => {
     const query = filter.trim().toLowerCase();
@@ -287,7 +292,7 @@ function Dashboard(): React.ReactElement {
       ? {
           params: {
             query: {
-              perPage: EMPTY_STATE_DAG_SAMPLE,
+              perPage: DAG_SAMPLE_SIZE,
               remoteNode,
               ...workspaceQuery,
             },
@@ -298,7 +303,7 @@ function Dashboard(): React.ReactElement {
   );
   const hasNoWorkflows = isEmpty && dagList?.pagination?.totalRecords === 0;
   const hasExampleDAGs = !!dagList?.dags.some((dag) =>
-    dag.dag.name.startsWith('example-')
+    isExampleDAGName(dag.dag.name)
   );
 
   let windowRange: TimeRange | null = null;
@@ -341,6 +346,18 @@ function Dashboard(): React.ReactElement {
         aria-label={ts('Loading...')}
         className="h-40 animate-pulse rounded-lg bg-muted/50"
       />
+    );
+  } else if (isEmpty && gettingStarted.status !== 'hidden') {
+    // The checklist already says what to do first; this only reports the
+    // window, and holds back the empty panels until the checklist settles.
+    body = (
+      <p className="text-sm text-muted-foreground">
+        {live ? (
+          <I18nText text={'No runs in the last 24 hours'} />
+        ) : (
+          <I18nText text={'No runs in this range'} />
+        )}
+      </p>
     );
   } else if (hasNoWorkflows) {
     body = <GettingStartedPanel />;
@@ -493,6 +510,12 @@ function Dashboard(): React.ReactElement {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4 overflow-auto p-1">
+      {gettingStarted.status === 'visible' && (
+        <GettingStartedChecklist
+          steps={gettingStarted.steps}
+          onDismiss={gettingStarted.dismiss}
+        />
+      )}
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative">
           <Search

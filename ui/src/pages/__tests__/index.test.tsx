@@ -13,6 +13,10 @@ import {
   type DAGRunActivityState,
   useDAGRunActivity,
 } from '../../features/activity/hooks/useDAGRunActivity';
+import {
+  type GettingStarted,
+  useGettingStarted,
+} from '../../features/activity/hooks/useGettingStarted';
 import type { DAGRunActivity } from '../../features/activity/lib/activityModel';
 import { useQuery } from '../../hooks/api';
 import { useSchedulerPause } from '../../hooks/useSchedulerPause';
@@ -21,6 +25,10 @@ import DashboardPage from '../index';
 
 vi.mock('../../features/activity/hooks/useDAGRunActivity', () => ({
   useDAGRunActivity: vi.fn(),
+}));
+
+vi.mock('../../features/activity/hooks/useGettingStarted', () => ({
+  useGettingStarted: vi.fn(),
 }));
 
 vi.mock('../../features/dags/components/common', async () => ({
@@ -57,6 +65,19 @@ vi.mock('@/contexts/AuthContext', () => ({
 
 const useActivityMock = vi.mocked(useDAGRunActivity);
 const useSchedulerPauseMock = vi.mocked(useSchedulerPause);
+
+function mockGettingStarted(state: GettingStarted) {
+  vi.mocked(useGettingStarted).mockReturnValue(state);
+}
+
+const checklist: GettingStarted = {
+  status: 'visible',
+  steps: [
+    { id: 'run', done: false },
+    { id: 'create', done: false },
+  ],
+  dismiss: vi.fn(),
+};
 
 function mockScheduler(schedulerRunning: boolean | undefined) {
   useSchedulerPauseMock.mockReturnValue({
@@ -229,6 +250,7 @@ const busyActivity = makeActivity({
 describe('DashboardPage', () => {
   beforeEach(() => {
     mockDAGList([]);
+    mockGettingStarted({ status: 'hidden' });
     mockScheduler(true);
     vi.mocked(useCanAccessSystemStatus).mockReturnValue(true);
   });
@@ -682,6 +704,52 @@ describe('DashboardPage', () => {
     renderPage();
 
     expect(screen.getByText(/Run one of the example workflows/)).toBeVisible();
+  });
+
+  it('shows the checklist instead of the empty panels', () => {
+    mockGettingStarted(checklist);
+    mockActivity({ activity: makeActivity() });
+
+    renderPage();
+
+    expect(
+      screen.getByRole('region', { name: 'Getting started' })
+    ).toBeVisible();
+    expect(screen.getByText('No runs in the last 24 hours')).toBeVisible();
+    expect(
+      screen.queryByText('Create your first workflow')
+    ).not.toBeInTheDocument();
+  });
+
+  // Panels that the checklist then replaces would flash on a new install.
+  it('holds back the empty panels while the checklist loads', () => {
+    mockGettingStarted({ status: 'pending' });
+    mockDAGList(['example-01-basic-sequential']);
+    mockActivity({ activity: makeActivity() });
+
+    renderPage();
+
+    expect(screen.getByText('No runs in the last 24 hours')).toBeVisible();
+    expect(
+      screen.queryByText(/Run one of the example workflows/)
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('region', { name: 'Getting started' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('puts the checklist above the lanes', () => {
+    mockGettingStarted(checklist);
+    mockActivity({ activity: busyActivity });
+
+    renderPage();
+
+    const lanes = screen.getByRole('list', { name: 'Runs by workflow' });
+    expect(
+      screen
+        .getByRole('region', { name: 'Getting started' })
+        .compareDocumentPosition(lanes) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
   });
 
   it('explains when the node cannot serve activity', () => {
