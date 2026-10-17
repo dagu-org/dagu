@@ -5,6 +5,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { Status } from '@/api/v1/schema';
+import { formatDurationMs } from '@/lib/formatDuration';
 import type { ActivityRun } from '../../lib/activityModel';
 import { ActivityLanes } from '../ActivityLanes';
 
@@ -183,6 +184,10 @@ describe('ActivityLanes', () => {
     lane.focus();
     fireEvent.keyDown(lane, { key: 'ArrowRight' });
     expect(screen.getByRole('tooltip')).toHaveTextContent('Running');
+    // A running run shows how long it has run so far.
+    expect(screen.getByRole('tooltip')).toHaveTextContent(
+      formatDurationMs((TO - 60 - (FROM - 3600)) * 1000)
+    );
 
     fireEvent.pointerDown(lane, { button: 0, clientX: 4 });
     fireEvent.pointerUp(lane, { clientX: 4 });

@@ -287,6 +287,12 @@ export function ActivityLanes({
     });
   };
 
+  // A running run shows how long it has run so far.
+  const hoverSeconds =
+    hover?.run?.startedAt !== undefined
+      ? runEnd(hover.run, nowSeconds) - hover.run.startedAt
+      : 0;
+
   const tooltip = hover ? (
     <div
       role="tooltip"
@@ -298,8 +304,8 @@ export function ActivityLanes({
         <div className="text-muted-foreground tabular-nums">
           {ts(runStatusText(hover.run.status))} ·{' '}
           {formatTime(hover.run.startedAt ?? 0)}
-          {hover.run.finishedAt && hover.run.startedAt
-            ? ` · ${formatDurationMs((hover.run.finishedAt - hover.run.startedAt) * 1000)}`
+          {hoverSeconds > 0
+            ? ` · ${formatDurationMs(hoverSeconds * 1000)}`
             : ''}
         </div>
       ) : null}
@@ -423,7 +429,9 @@ export function ActivityLanes({
                       key={run.dagRunId}
                       aria-hidden="true"
                       className={cn(
-                        'absolute rounded-sm',
+                        // The card-coloured ring leaves a gap between
+                        // back-to-back runs.
+                        'absolute rounded-sm ring-1 ring-card',
                         problem
                           ? 'top-0.5 bottom-0.5 min-w-[3px]'
                           : 'top-2 bottom-2 min-w-0.5',

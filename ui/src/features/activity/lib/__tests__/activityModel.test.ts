@@ -290,8 +290,11 @@ describe('runEnd', () => {
     ).toBe(8200);
   });
 
-  it('extends a running run to the current time', () => {
-    expect(runEnd({ ...base, status: Status.Running }, 5000)).toBe(5000);
+  it.each([
+    ['running', Status.Running],
+    ['waiting', Status.Waiting],
+  ])('extends a %s run to the current time', (_, status) => {
+    expect(runEnd({ ...base, status }, 5000)).toBe(5000);
   });
 
   it('ends a queued run where it starts', () => {
