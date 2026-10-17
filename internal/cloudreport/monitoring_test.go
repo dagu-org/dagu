@@ -182,14 +182,16 @@ func TestReportFollowsLevel(t *testing.T) {
 	assertNoReport(t, console)
 	assertLeaseFree(t, dir)
 
+	// Turning reporting on ends the wait, so the health report goes out at
+	// once and the next one is an interval later.
 	require.NoError(t, m.SetLevel(t.Context(), config.ReportHealth))
-	dir.emit(eventstore.TypeDAGRunRunning, run("etl", "run-2", ir.Running))
-	dir.statuses.set(run("etl", "run-2", ir.Running))
-	health, passed := clock.nextReport(console)
-	assert.Equal(t, defaultInterval, passed)
+	assert.Equal(t, defaultInterval, clock.wait())
+	health := console.next(t)
 	assert.Equal(t, config.Version, decodeReport(t, health).Health.Version)
 	assertNoRuns(t, health)
 	assertLeaseFree(t, dir)
+	dir.emit(eventstore.TypeDAGRunRunning, run("etl", "run-2", ir.Running))
+	dir.statuses.set(run("etl", "run-2", ir.Running))
 
 	require.NoError(t, m.SetLevel(t.Context(), config.ReportRuns))
 	chosen := nextReport(t, clock, console)

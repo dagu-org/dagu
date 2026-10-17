@@ -3393,7 +3393,7 @@ export interface paths {
         put?: never;
         /**
          * Connect this server to Dagu Console
-         * @description Starts a request for a license from Dagu Console, or returns the pending one. Open connectUrl to approve it; the license is installed once a workspace owner approves. Admin only.
+         * @description Starts a request for a license from Dagu Console, or returns the pending one. Open connectUrl to approve it; the license is installed once a workspace owner approves. A report level, when given, chooses what this server reports to Dagu Console, starting once the license is installed, unless cloud.report in the configuration sets it. Admin only.
          */
         post: operations["startLicenseConnect"];
         /**
@@ -7069,7 +7069,7 @@ export interface components {
              * @enum {string}
              */
             state: LicenseConnectStatusState;
-            /** @description Dagu Console page that approves the request */
+            /** @description Dagu Console page that approves the request. Its report query parameter names what this server reports once connected, and is absent when it reports nothing */
             connectUrl?: string;
             /** @description Short code Dagu Console shows so the approver can confirm the request */
             code?: string;
@@ -18556,7 +18556,13 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    report?: components["schemas"]["LicenseMonitoringLevel"];
+                };
+            };
+        };
         responses: {
             /** @description Current connection request */
             200: {
@@ -18565,6 +18571,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LicenseConnectStatus"];
+                };
+            };
+            /** @description Unknown report level */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Insufficient permissions */

@@ -41,6 +41,10 @@ const (
 	defaultRetryAfter = time.Minute
 	initialBackoff    = time.Minute
 	maxBackoff        = 5 * time.Minute
+	// credentialsCheckInterval is how often a server that is to report
+	// checks for a license, so that its first report follows an approval in
+	// Dagu Console within seconds rather than an interval later.
+	credentialsCheckInterval = 5 * time.Second
 
 	requestTimeout  = 30 * time.Second
 	maxResponseSize = 1 << 20
@@ -182,10 +186,15 @@ func (r *Reporter) run(ctx context.Context) {
 		if r.events != nil && r.level == config.ReportRuns {
 			wait = min(wait, eventCheckInterval)
 		}
-		if !r.sleep(ctx, wait) {
+		live, turnedOn := r.sleep(ctx, wait)
+		if !live {
 			return
 		}
-		until -= wait
+		if turnedOn {
+			until = 0
+		} else {
+			until -= wait
+		}
 		if early := r.pollEvents(ctx, r.readLevel(ctx), until <= 0); until > 0 && !early {
 			continue
 		}
@@ -194,17 +203,22 @@ func (r *Reporter) run(ctx context.Context) {
 }
 
 // sleep waits for d and reports whether ctx is still live. A level changed
-// meanwhile is applied at once, without changing when the wait ends.
-func (r *Reporter) sleep(ctx context.Context, d time.Duration) bool {
+// meanwhile is applied at once, without changing when the wait ends, unless
+// it turns reporting on: then the wait ends early and turnedOn is set, so
+// that a server connecting to Dagu Console reports without delay.
+func (r *Reporter) sleep(ctx context.Context, d time.Duration) (live, turnedOn bool) {
 	timer := r.after(d)
 	for {
 		select {
 		case <-ctx.Done():
-			return false
+			return false, false
 		case <-timer:
-			return true
+			return true, false
 		case <-r.changes:
-			r.readLevel(ctx)
+			before := r.level
+			if r.readLevel(ctx).Reports() && !before.Reports() {
+				return true, true
+			}
 		}
 	}
 }
@@ -300,6 +314,9 @@ func (r *Reporter) report(ctx context.Context) time.Duration {
 	}
 	if !ok || !level.Reports() {
 		r.last = outcome{kind: outcomeNone}
+		if level.Reports() {
+			return credentialsCheckInterval
+		}
 		return r.jitter(r.interval)
 	}
 

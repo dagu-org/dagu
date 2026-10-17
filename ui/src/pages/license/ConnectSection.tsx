@@ -3,10 +3,20 @@
 
 import { useEffect, useState } from 'react';
 import { ExternalLink, Loader2 } from 'lucide-react';
-import { LicenseConnectStatusState } from '@/api/v1/schema';
+import {
+  LicenseConnectStatusState,
+  LicenseMonitoringLevel,
+} from '@/api/v1/schema';
+import {
+  neverSent,
+  ReportingChoices,
+  type ReportingLevel,
+} from '@/components/MonitoringDialog';
 import { Button } from '@/components/ui/button';
+import type { LicenseMonitoring } from '@/hooks/useLicenseMonitoring';
 import { useI18n } from '@/i18n/I18nProvider';
 import dayjs from '@/lib/dayjs';
+import { monitoringLevelLabels } from '@/lib/license';
 import { LicenseCallout } from './LicenseAlerts';
 import type { useLicenseConnect } from './useLicenseConnect';
 
@@ -31,19 +41,36 @@ function Countdown({ expiresAt }: { expiresAt?: string }) {
  * Shows a request to connect the selected server to Dagu Console while it
  * waits for approval, or why the last request failed with a way to retry.
  * Otherwise it offers to connect the server so that Dagu Console monitors it
- * for free; the page header starts the same request.
+ * for free, reporting from the moment it connects at the level chosen here,
+ * or at the level the configuration sets. The page header starts the same
+ * request without choosing a level.
  */
 export function ConnectSection({
   connect,
+  monitoring,
   disabled,
 }: {
   connect: ReturnType<typeof useLicenseConnect>;
+  /** What the server reports; unknown while loading or unavailable. */
+  monitoring?: LicenseMonitoring;
   disabled: boolean;
 }) {
   const { ts } = useI18n();
-  const { status, starting, error, failure, popupBlocked, start, cancel } =
-    connect;
+  const {
+    status,
+    starting,
+    error,
+    failure,
+    popupBlocked,
+    start,
+    retry,
+    cancel,
+  } = connect;
+  const [report, setReport] = useState<ReportingLevel>(
+    LicenseMonitoringLevel.runs
+  );
   const pending = status?.state === LicenseConnectStatusState.pending;
+  const configured = monitoring?.configured ? monitoring.level : undefined;
 
   if (failure)
     return (
@@ -55,7 +82,7 @@ export function ConnectSection({
             size="sm"
             variant="outline"
             disabled={disabled || starting}
-            onClick={() => void start()}
+            onClick={() => void retry()}
           >
             {starting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {ts('Try again')}
@@ -69,30 +96,60 @@ export function ConnectSection({
     return (
       <section
         id="monitoring"
-        className="card-obsidian p-4 scroll-mt-4"
+        className="card-obsidian p-4 space-y-3 scroll-mt-4"
         aria-labelledby="license-free-monitoring"
       >
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0 flex-1 space-y-1">
-            <h2 id="license-free-monitoring" className="text-sm font-medium">
-              {ts('Monitor this server for free')}
-            </h2>
-            <p className="text-sm">
-              {ts(
-                "Dagu Console shows this server's runs, failures, and trends, and emails you when a workflow fails or the server stops reporting. You choose what the server reports once it connects."
-              )}
+        <div className="space-y-1">
+          <h2 id="license-free-monitoring" className="text-sm font-medium">
+            {ts('Monitor this server for free')}
+          </h2>
+          <p className="text-sm">
+            {(configured ?? report) === LicenseMonitoringLevel.health
+              ? ts(
+                  "Dagu Console shows this server's health and emails you when the server stops reporting."
+                )
+              : ts(
+                  "Dagu Console shows this server's runs, failures, and trends, and emails you when a workflow fails or the server stops reporting."
+                )}
+            {configured !== LicenseMonitoringLevel.off && (
+              <> {ts('Reporting starts as soon as the server connects.')}</>
+            )}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {ts(
+              'Free for one server: reports every 5 minutes and keeps 7 days of run history. Paid features stay off.'
+            )}
+          </p>
+        </div>
+        {configured ? (
+          <div className="space-y-1">
+            <p className="flex flex-wrap gap-x-2 text-sm">
+              <span className="text-muted-foreground">{ts('Reports')}</span>
+              <span>{ts(monitoringLevelLabels[configured])}</span>
             </p>
             <p className="text-xs text-muted-foreground">
               {ts(
-                'Free for one server: reports every 5 minutes and keeps 7 days of run history. Paid features stay off.'
+                'cloud.report in the server configuration sets this. Change it there and restart Dagu.'
               )}
             </p>
           </div>
+        ) : (
+          <>
+            <ReportingChoices
+              selected={report}
+              onSelect={setReport}
+              disabled={disabled || starting}
+              className="sm:grid sm:grid-cols-2 sm:gap-2 sm:space-y-0"
+            />
+            <p className="text-xs text-muted-foreground">{ts(neverSent)}</p>
+          </>
+        )}
+        <div className="flex justify-end">
           <Button
             size="sm"
             variant="primary"
             disabled={disabled || starting}
-            onClick={() => void start()}
+            onClick={() => void start(configured ? undefined : report)}
           >
             {starting ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />

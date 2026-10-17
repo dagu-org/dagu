@@ -70,10 +70,17 @@ export default function LicensePage() {
   const { clear: clearConnect } = connect;
   // Only a license that checks in with Dagu Console can report to it.
   const online = !loading && !statusError && Boolean(license.serverId);
+  // The offer to connect shows a level that the configuration sets.
+  const offersConnect =
+    !loading &&
+    !statusError &&
+    license.community &&
+    !isLicenseManagedByEnv(license);
   const monitoring = useLicenseMonitoring(remoteNode, {
-    enabled: online,
-    refreshInterval: MONITORING_REFRESH_MS,
+    enabled: online || offersConnect,
+    refreshInterval: online ? MONITORING_REFRESH_MS : 0,
   });
+  const { refresh: refreshMonitoring } = monitoring;
   const [monitoringDialog, setMonitoringDialog] = useState<
     'choose' | 'prompt' | null
   >(null);
@@ -116,12 +123,23 @@ export default function LicensePage() {
         const { data } = await client.GET('/license/monitoring', {
           params: { query: { remoteNode } },
         });
+        // Replaces the status read before connecting, which a level chosen
+        // when connecting has changed.
+        if (data) void refreshMonitoring(data, { revalidate: false });
         if (shouldAskMonitoring(data)) setMonitoringDialog('prompt');
       } catch {
         // The notice asks later instead.
       }
     });
-  }, [granted, clearConnect, mutate, ts, client, remoteNode]);
+  }, [
+    granted,
+    clearConnect,
+    mutate,
+    ts,
+    client,
+    remoteNode,
+    refreshMonitoring,
+  ]);
 
   async function handleActivate(e: React.FormEvent) {
     e.preventDefault();
@@ -338,8 +356,12 @@ export default function LicensePage() {
           />
         )
       )}
-      {known && license.community && !managedByEnv && (
-        <ConnectSection connect={connect} disabled={busy} />
+      {offersConnect && (
+        <ConnectSection
+          connect={connect}
+          monitoring={monitoring.monitoring}
+          disabled={busy}
+        />
       )}
 
       {loading && (

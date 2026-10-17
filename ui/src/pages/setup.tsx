@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AuthLayout } from '@/components/AuthLayout';
 import { useI18n } from '@/i18n/I18nProvider';
+import { requestedPath } from '@/lib/requestedPath';
 import { AlertCircle, UserPlus, Loader2 } from 'lucide-react';
 
 function getErrorStatus(err: unknown): number | undefined {
@@ -21,6 +22,8 @@ export default function SetupPage() {
   const { t } = useI18n();
   const { setupRequired, setup, completeSetup } = useAuth();
   const navigate = useNavigate();
+  // Where the visitor was going, which the login page also returns to.
+  const { state } = useLocation();
 
   const [setupDone, setSetupDone] = useState(false);
 
@@ -34,9 +37,9 @@ export default function SetupPage() {
   // Skip if we just completed setup ourselves — we handle navigation manually.
   useEffect(() => {
     if (!setupRequired && !setupDone) {
-      navigate('/login', { replace: true });
+      navigate('/login', { replace: true, state });
     }
-  }, [setupRequired, setupDone, navigate]);
+  }, [setupRequired, setupDone, navigate, state]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,10 +67,10 @@ export default function SetupPage() {
       const result = await setup(trimmedUsername, password);
       setSetupDone(true);
       completeSetup(result);
-      navigate('/', { replace: true });
+      navigate(requestedPath(state), { replace: true });
     } catch (err) {
       if (getErrorStatus(err) === 403) {
-        navigate('/login', { replace: true });
+        navigate('/login', { replace: true, state });
         return;
       }
       setError(err instanceof Error ? err.message : t('setup.failed'));
