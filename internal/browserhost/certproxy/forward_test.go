@@ -106,30 +106,59 @@ func TestForwardHTTP(t *testing.T) {
 	})
 }
 
-// A tunnel that does not carry TLS, as a ws: URL opens, is relayed as it
-// is, for a host an entry names as for one the guard carries.
-func TestCarryAllRelaysPlainTunnel(t *testing.T) {
+// A tunnel that does not carry TLS, as a ws: URL opens, takes the route of
+// a ws: URL and is relayed as it is, for a host an entry names, one the
+// guard carries, and one neither does. One that carries TLS keeps the route
+// of an https: URL.
+func TestCarryAllRoutesTunnelByScheme(t *testing.T) {
 	t.Parallel()
 	ca := newTestCA(t, "corp CA")
-	upstream := newTunnelProxy(t, echoServer(t), http.StatusOK)
-	pac := `function FindProxyForURL() { return "PROXY ` + upstream.addr + `"; }`
-	guarded := guardConfig(t, ca, pac)
-	guarded.TrustedCAs = []TrustedCA{trustedCA(ca, "127.0.0.1")}
+	// schemePAC sends ws: URLs to plain and the others to secure.
+	schemePAC := func(plain, secure *tunnelProxy) string {
+		return `function FindProxyForURL(url) { return shExpMatch(url, "ws:*") ? "PROXY ` + plain.addr + `" : "PROXY ` + secure.addr + `"; }`
+	}
+	guarded := func(t *testing.T, pac string) Config {
+		cfg := guardConfig(t, ca, pac)
+		cfg.TrustedCAs = []TrustedCA{trustedCA(ca, "127.0.0.1")}
+		return cfg
+	}
 
-	for name, cfg := range map[string]Config{
-		"Named":   testConfig(t, pac, ca.clientEntry(t, testLabel, siteHost, "127.0.0.1")),
+	for name, config := range map[string]func(t *testing.T, pac string) Config{
+		"Named": func(t *testing.T, pac string) Config {
+			return testConfig(t, pac, ca.clientEntry(t, testLabel, siteHost, "127.0.0.1"))
+		},
 		"Guarded": guarded,
+		"Unguarded": func(t *testing.T, pac string) Config {
+			return testConfig(t, pac, ca.clientEntry(t, testLabel, "127.0.0.1"))
+		},
 	} {
-		t.Run(name, func(t *testing.T) {
+		t.Run("Plain"+name, func(t *testing.T) {
 			t.Parallel()
-			ready := serveProxy(t, cfg)
+			plain := newTunnelProxy(t, echoServer(t), http.StatusOK)
+			secure := newTunnelProxy(t, echoServer(t), http.StatusOK)
+			ready := serveProxy(t, config(t, schemePAC(plain, secure)))
 			require.True(t, ready.Manual)
 			conn, status, err := connectThrough(fmt.Sprintf("127.0.0.1:%d", ready.Port), siteHost+":80")
 			require.NoError(t, err)
 			require.Equal(t, http.StatusOK, status)
 			assert.Equal(t, "hello", readGreeting(t, conn))
+			assert.Equal(t, []string{siteHost + ":80"}, plain.requests())
+			assert.Empty(t, secure.requests())
 		})
 	}
+
+	t.Run("TLS", func(t *testing.T) {
+		t.Parallel()
+		site := newSiteAuth(t, ca, ca, 0, 0)
+		plain := newTunnelProxy(t, echoServer(t), http.StatusOK)
+		secure := newTunnelProxy(t, siteAddr(site), http.StatusOK)
+		ready := serveProxy(t, guarded(t, schemePAC(plain, secure)))
+		body, err := get(t, browserClient(ready, "http/1.1"), "https://"+siteHost+"/")
+		require.NoError(t, err)
+		assert.Equal(t, "HTTP/1.1 anonymous", body)
+		assert.Contains(t, secure.requests(), siteHost+":443")
+		assert.Empty(t, plain.requests())
+	})
 }
 
 // plainClient sends plain HTTP requests through the proxy, as the browser

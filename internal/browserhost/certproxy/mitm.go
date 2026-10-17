@@ -22,6 +22,7 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -53,6 +54,13 @@ const (
 	drainTimeout = 5 * time.Second
 	// defaultTLSPort is the port of a CONNECT authority that names none.
 	defaultTLSPort = "443"
+	// tlsScheme and plainScheme are the URL schemes the device's proxy
+	// settings are asked about for a tunnel that carries TLS, and for one
+	// that does not, which only a ws: URL opens.
+	tlsScheme   = "https"
+	plainScheme = "ws"
+	// defaultPlainPort is the port of a ws: URL that names none.
+	defaultPlainPort = "80"
 	// remoteErrorOp marks the error of an alert a TLS peer sent.
 	remoteErrorOp = "remote error"
 	// alertPrefix starts the text of a TLS alert.
@@ -274,58 +282,118 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request, guard boo
 	}
 	deadline := time.Now().Add(handshakeTimeout)
 	pending := s.pending.start(host)
-	ctx, cancel := context.WithDeadline(s.ctx, deadline)
-	raw, via, err := s.reach(ctx, host, port, entry)
-	cancel()
-	if err != nil {
-		s.pending.end(pending)
-		if errors.Is(err, errProxyAuth) && (guard || s.carriedByGuard(entry)) {
-			// A reset connection makes the browser try the route after the
-			// guard; a closed guard keeps it on that route. While a manual
-			// proxy is carrying loopback, there is no later browser route.
-			s.stopGuard(host)
-			resetConnection(w)
-			return
-		}
-		s.reportUnreachable(host, entry, err)
-		http.Error(w, "the certificate proxy could not reach the site", http.StatusBadGateway)
-		return
-	}
-	hijacker, ok := w.(http.Hijacker)
+	opened, ok := s.openTunnel(w, host, port, entry, guard || s.carriedByGuard(entry), deadline)
 	if !ok {
 		s.pending.end(pending)
-		_ = raw.Close()
-		http.Error(w, "the connection cannot be tunneled", http.StatusInternalServerError)
 		return
 	}
-	conn, buffered, err := hijacker.Hijack()
-	if err != nil {
-		s.pending.end(pending)
-		_ = raw.Close()
-		return
-	}
-	if _, err := io.WriteString(conn, connectEstablished); err != nil {
-		s.pending.end(pending)
-		_ = raw.Close()
-		_ = conn.Close()
-		return
-	}
-	if s.carryAll && !carriesTLS(conn, buffered.Reader, deadline) {
+	if opened.plain {
 		// A ws: URL tunnels plain HTTP while the browser sends every scheme
 		// here; there is no TLS to end.
 		s.pending.end(pending)
-		s.splice(&bufferedConn{Conn: conn, reader: buffered.Reader}, raw)
+		s.splice(opened.client, opened.raw)
 		return
-	}
-	client := conn
-	if buffered.Reader.Buffered() > 0 {
-		client = &bufferedConn{Conn: conn, reader: buffered.Reader}
 	}
 	if s.carriedByGuard(entry) && !s.intercepted(host, port) {
-		s.passOrTunnel(client, raw, via, host, port, deadline, pending)
+		s.passOrTunnel(opened.client, opened.raw, opened.via, host, port, deadline, pending)
 		return
 	}
-	s.tunnel(client, raw, via, host, entry, deadline, pending)
+	s.tunnel(opened.client, opened.raw, opened.via, host, entry, deadline, pending)
+}
+
+// openedTunnel is a tunnel the browser opened with a CONNECT request.
+type openedTunnel struct {
+	// client is the browser's side, and raw the site's.
+	client, raw net.Conn
+	via         route
+	// plain is set for a tunnel that carries no TLS, which the browser opens
+	// for a ws: URL while it sends every request here.
+	plain bool
+}
+
+// openTunnel reaches host and port and answers the browser's CONNECT
+// request with a tunnel there, or with why there is none. guarded is set
+// when the guard carries host, which a proxy asking for credentials stops.
+// While the browser sends every request here, a tunnel takes the route of
+// an https: or a ws: URL by whether it carries TLS, which shows only once
+// it is open: when those routes differ, a site that cannot be reached ends
+// the open tunnel instead.
+func (s *server) openTunnel(w http.ResponseWriter, host, port string, entry *upstreamEntry, guarded bool, deadline time.Time) (openedTunnel, bool) {
+	ctx, cancel := context.WithDeadline(s.ctx, deadline)
+	defer cancel()
+	var opened openedTunnel
+	late := s.carryAll && s.routedByScheme(ctx, host, port)
+	if !late {
+		var err error
+		if opened.raw, opened.via, err = s.reach(ctx, tlsScheme, host, port, entry); err != nil {
+			if s.unreachable(host, entry, guarded, err) {
+				// A reset connection makes the browser try the route after the
+				// guard; a closed guard keeps it on that route. While a manual
+				// proxy is carrying loopback, there is no later browser route.
+				resetConnection(w)
+				return openedTunnel{}, false
+			}
+			http.Error(w, "the certificate proxy could not reach the site", http.StatusBadGateway)
+			return openedTunnel{}, false
+		}
+	}
+	conn, reader, ok := establish(w)
+	if !ok {
+		if opened.raw != nil {
+			_ = opened.raw.Close()
+		}
+		return openedTunnel{}, false
+	}
+	opened.plain = s.carryAll && !carriesTLS(conn, reader, deadline)
+	opened.client = conn
+	if reader.Buffered() > 0 {
+		opened.client = &bufferedConn{Conn: conn, reader: reader}
+	}
+	if late {
+		scheme := tlsScheme
+		if opened.plain {
+			scheme = plainScheme
+		}
+		var err error
+		if opened.raw, opened.via, err = s.reach(ctx, scheme, host, port, entry); err != nil {
+			s.unreachable(host, entry, guarded, err)
+			_ = conn.Close()
+			return openedTunnel{}, false
+		}
+	}
+	return opened, true
+}
+
+// establish takes over the connection of the CONNECT request w answers and
+// tells the browser its tunnel is open. It returns the connection and what
+// was buffered from it.
+func establish(w http.ResponseWriter) (net.Conn, *bufio.Reader, bool) {
+	hijacker, ok := w.(http.Hijacker)
+	if !ok {
+		http.Error(w, "the connection cannot be tunneled", http.StatusInternalServerError)
+		return nil, nil, false
+	}
+	conn, buffered, err := hijacker.Hijack()
+	if err != nil {
+		return nil, nil, false
+	}
+	if _, err := io.WriteString(conn, connectEstablished); err != nil {
+		_ = conn.Close()
+		return nil, nil, false
+	}
+	return conn, buffered.Reader, true
+}
+
+// unreachable records why host could not be reached, and reports whether
+// the guard stopped instead, which a proxy asking for credentials does to a
+// guarded host.
+func (s *server) unreachable(host string, entry *upstreamEntry, guarded bool, err error) bool {
+	if guarded && errors.Is(err, errProxyAuth) {
+		s.stopGuard(host)
+		return true
+	}
+	s.reportUnreachable(host, entry, err)
+	return false
 }
 
 // reportUnreachable records why the proxy could not reach host.
@@ -435,37 +503,12 @@ func (s *server) guardListening() bool {
 // the server itself and a configured authority is not applied to it.
 func (s *server) relayOpaque(w http.ResponseWriter, host, port string) {
 	pending := s.pending.start(host)
-	ctx, cancel := context.WithTimeout(s.ctx, handshakeTimeout)
-	raw, _, err := s.reach(ctx, host, port, s.guardEntry)
-	cancel()
+	opened, ok := s.openTunnel(w, host, port, s.guardEntry, false, time.Now().Add(handshakeTimeout))
 	// Past reaching the site, the proxy waits on nothing of its own.
 	s.pending.end(pending)
-	if err != nil {
-		s.reportUnreachable(host, s.guardEntry, err)
-		http.Error(w, "the certificate proxy could not reach the site", http.StatusBadGateway)
-		return
+	if ok {
+		s.splice(opened.client, opened.raw)
 	}
-	hijacker, ok := w.(http.Hijacker)
-	if !ok {
-		_ = raw.Close()
-		http.Error(w, "the connection cannot be tunneled", http.StatusInternalServerError)
-		return
-	}
-	conn, buffered, err := hijacker.Hijack()
-	if err != nil {
-		_ = raw.Close()
-		return
-	}
-	if _, err := io.WriteString(conn, connectEstablished); err != nil {
-		_ = raw.Close()
-		_ = conn.Close()
-		return
-	}
-	client := net.Conn(conn)
-	if buffered.Reader.Buffered() > 0 {
-		client = &bufferedConn{Conn: conn, reader: buffered.Reader}
-	}
-	s.splice(client, raw)
 }
 
 // splice relays the bytes between client and raw, without reading them,
@@ -552,10 +595,21 @@ func (s *server) tunnel(client, raw net.Conn, via route, host string, entry *ups
 }
 
 // reach connects to host and port on the route the device's proxy settings
-// give it.
-func (s *server) reach(ctx context.Context, host, port string, entry *upstreamEntry) (net.Conn, route, error) {
-	routes := s.routesTo(ctx, pacRequestURL(host, port), host, entry.label)
+// give a scheme URL there.
+func (s *server) reach(ctx context.Context, scheme, host, port string, entry *upstreamEntry) (net.Conn, route, error) {
+	routes := s.routesTo(ctx, pacRequestURL(scheme, host, port), host, entry.label)
 	return dialRoutes(ctx, routes, net.JoinHostPort(host, port), s.proxyTLS)
+}
+
+// routedByScheme reports whether the device's proxy settings route an
+// https: URL to host and port differently from a ws: URL.
+func (s *server) routedByScheme(ctx context.Context, host, port string) bool {
+	if implicitBypass(host) {
+		return false
+	}
+	secure := s.pac.routes(ctx, pacRequestURL(tlsScheme, host, port), host)
+	plain := s.pac.routes(ctx, pacRequestURL(plainScheme, host, port), host)
+	return !slices.Equal(secure.routes, plain.routes)
 }
 
 // routesTo returns the routes to rawURL, whose host is host. Chrome never
@@ -749,16 +803,21 @@ func (s *server) closeTunnels() {
 	}
 }
 
-// pacRequestURL returns the URL a browser hands a PAC script for an https:
-// connection to host and port.
-func pacRequestURL(host, port string) string {
-	if port == defaultTLSPort {
-		if addr, err := netip.ParseAddr(host); err == nil && addr.Is6() {
-			return "https://[" + host + "]/"
-		}
-		return "https://" + host + "/"
+// pacRequestURL returns the URL a browser hands a PAC script for a scheme
+// connection to host and port, scheme being tlsScheme or plainScheme. A
+// browser passes the path of a ws: URL as well; the proxy passes the root.
+func pacRequestURL(scheme, host, port string) string {
+	defaultPort := defaultTLSPort
+	if scheme == plainScheme {
+		defaultPort = defaultPlainPort
 	}
-	return "https://" + net.JoinHostPort(host, port) + "/"
+	if port == defaultPort {
+		if addr, err := netip.ParseAddr(host); err == nil && addr.Is6() {
+			return scheme + "://[" + host + "]/"
+		}
+		return scheme + "://" + host + "/"
+	}
+	return scheme + "://" + net.JoinHostPort(host, port) + "/"
 }
 
 // oneLine joins the lines of err, which errors.Join separates.
