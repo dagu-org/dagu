@@ -130,6 +130,7 @@ func serve(ctx context.Context, cfg Config, public *x509.CertPool, ready func(Re
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	manual := manualProxy(cfg.routedHosts())
 	s := &server{
 		ctx:         ctx,
 		token:       cfg.Token,
@@ -145,7 +146,9 @@ func serve(ctx context.Context, cfg Config, public *x509.CertPool, ready func(Re
 		verdicts:    newPassVerdicts(),
 		tunnels:     map[net.Conn]struct{}{},
 		guard:       guard,
+		carryAll:    manual,
 	}
+	s.forward = newForwarder(s)
 	script := composePAC(port, guardPort, cfg.routedHosts(), system)
 	pacURL, served := pacLocation(script, controlURL(port, cfg.Token)+"/"+pacPath)
 	if served {
@@ -160,7 +163,7 @@ func serve(ctx context.Context, cfg Config, public *x509.CertPool, ready func(Re
 		// only the guard's serving.
 		go func() { _ = guardServer.Serve(guard) }()
 	}
-	ready(Ready{Port: port, SPKI: issuer.spki, PACURL: pacURL, GuardPort: guardPort})
+	ready(Ready{Port: port, SPKI: issuer.spki, PACURL: pacURL, GuardPort: guardPort, Manual: manual})
 
 	grace := time.Duration(cfg.GraceSeconds) * time.Second
 	if grace <= 0 {
@@ -181,6 +184,7 @@ func serve(ctx context.Context, cfg Config, public *x509.CertPool, ready func(Re
 	_ = httpServer.Close()
 	_ = guardServer.Close()
 	s.closeTunnels()
+	s.forward.closeIdle()
 	if errors.Is(failure, http.ErrServerClosed) {
 		return nil
 	}

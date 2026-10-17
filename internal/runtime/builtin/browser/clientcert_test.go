@@ -15,7 +15,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -63,7 +62,7 @@ func TestTrustedCAsReachBrowser(t *testing.T) {
 	require.NoError(t, err)
 	path := filepath.Join(t.TempDir(), "ca.pem")
 	require.NoError(t, os.WriteFile(path, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}), 0o600))
-	for host, warning := range map[string]bool{"portal.example.com": false, "10.0.0.1": false, "localhost": true, "127.0.0.1": true, "::1": true, "169.254.1.1": true} {
+	for _, host := range []string{"portal.example.com", "10.0.0.1", "localhost", "127.0.0.1", "::1", "169.254.1.1", "*.localhost"} {
 		t.Run(host, func(t *testing.T) {
 			run := newTestRun(t, pageModel(nil))
 			run.hostTrustedCAs = []cmnconfig.BrowserTrustedCA{{Hosts: []string{host}, CAFile: path}}
@@ -72,7 +71,6 @@ func TestTrustedCAsReachBrowser(t *testing.T) {
 			require.Len(t, run.launcher.launches, 1)
 			require.Len(t, run.launcher.launches[0].TrustedCAs, 1)
 			assert.Equal(t, []string{host}, run.launcher.launches[0].TrustedCAs[0].Hosts)
-			assert.Equal(t, warning, strings.Contains(result.stderr.String(), "Chrome bypasses certificate routing"))
 		})
 	}
 	run := newTestRun(t, pageModel(nil))

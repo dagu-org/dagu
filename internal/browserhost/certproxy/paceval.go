@@ -216,8 +216,7 @@ func parsePACResult(value string) pacResult {
 }
 
 // proxyKind returns the route a PAC keyword names and its default port.
-// SOCKS and SOCKS4 name SOCKS4, as in Chrome, which the proxy does not
-// speak.
+// SOCKS and SOCKS4 name SOCKS4, as in Chrome.
 func proxyKind(keyword string) (routeKind, string, bool) {
 	switch keyword {
 	case routeKeywordProxy, "HTTP":
@@ -226,6 +225,8 @@ func proxyKind(keyword string) (routeKind, string, bool) {
 		return routeHTTPS, defaultHTTPSProxyPort, true
 	case routeKeywordSOCKS5:
 		return routeSOCKS5, defaultSOCKSPort, true
+	case routeKeywordSOCKS, "SOCKS4":
+		return routeSOCKS4, defaultSOCKSPort, true
 	default:
 		return 0, "", false
 	}

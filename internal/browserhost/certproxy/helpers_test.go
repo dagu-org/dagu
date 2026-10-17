@@ -371,8 +371,8 @@ func (p *tunnelProxy) requests() []string {
 	return append([]string(nil), p.requested...)
 }
 
-// socksProxy is a SOCKS5 server, without authentication, that connects
-// every request to one address and records the address requested.
+// socksProxy is a SOCKS5 and SOCKS4 server, without authentication, that
+// connects every request to one address and records the address requested.
 type socksProxy struct {
 	addr      string
 	mu        sync.Mutex
@@ -403,6 +403,10 @@ func (p *socksProxy) serve(conn net.Conn, target string) {
 	// Greeting: version, method count, methods; answer "no authentication".
 	header := make([]byte, 2)
 	if _, err := io.ReadFull(reader, header); err != nil {
+		return
+	}
+	if header[0] == 4 {
+		p.serve4(conn, reader, target)
 		return
 	}
 	if _, err := io.ReadFull(reader, make([]byte, header[1])); err != nil {
@@ -441,6 +445,28 @@ func (p *socksProxy) serve(conn net.Conn, target string) {
 		return
 	}
 	_, _ = conn.Write([]byte{5, 0, 0, 1, 127, 0, 0, 1, 0, 0})
+	pipe(&readerConn{Conn: conn, reader: reader}, upstream)
+}
+
+// serve4 answers a SOCKS4 request past its version and command: the port,
+// the IPv4 address, and a user ID ending in a zero byte.
+func (p *socksProxy) serve4(conn net.Conn, reader *bufio.Reader, target string) {
+	request := make([]byte, 6)
+	if _, err := io.ReadFull(reader, request); err != nil {
+		return
+	}
+	if _, err := reader.ReadBytes(0); err != nil {
+		return
+	}
+	p.mu.Lock()
+	p.requested = append(p.requested, net.JoinHostPort(net.IP(request[2:]).String(), fmt.Sprint(int(request[0])<<8|int(request[1]))))
+	p.mu.Unlock()
+	upstream, err := net.Dial("tcp", target)
+	if err != nil {
+		_, _ = conn.Write([]byte{0, 91, 0, 0, 0, 0, 0, 0})
+		return
+	}
+	_, _ = conn.Write([]byte{0, 90, 0, 0, 0, 0, 0, 0})
 	pipe(&readerConn{Conn: conn, reader: reader}, upstream)
 }
 
