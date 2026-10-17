@@ -18,6 +18,7 @@ import {
   groupLanes,
   oldestStart,
   percentOf,
+  runEnd,
   sortLanes,
   type TimeRange,
   timeTicks,
@@ -405,20 +406,26 @@ export function ActivityLanes({
                 )}
                 {visibleRuns.map((run) => {
                   const problem = PROBLEM_STATUSES.has(run.status);
+                  const left = percentOf(range, run.startedAt ?? range.from);
+                  const right = percentOf(
+                    range,
+                    Math.min(range.to, runEnd(run, nowSeconds))
+                  );
                   return (
                     <span
                       key={run.dagRunId}
                       aria-hidden="true"
                       className={cn(
-                        'absolute -translate-x-1/2 rounded-sm',
+                        'absolute rounded-sm',
                         problem
-                          ? 'top-0.5 bottom-0.5 w-[3px]'
-                          : 'top-2 bottom-2 w-0.5',
+                          ? 'top-0.5 bottom-0.5 min-w-[3px]'
+                          : 'top-2 bottom-2 min-w-0.5',
                         focused === run &&
                           'ring-2 ring-ring ring-offset-1 ring-offset-background'
                       )}
                       style={{
-                        left: `${percentOf(range, run.startedAt ?? range.from)}%`,
+                        left: `${left}%`,
+                        width: `${Math.max(0, right - left)}%`,
                         backgroundColor:
                           MARK_COLOR[run.status] ?? 'var(--status-success)',
                       }}

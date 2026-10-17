@@ -130,4 +130,34 @@ describe('ActivityLanes', () => {
 
     expect(screen.getByRole('dialog')).toHaveAccessibleName('report report-1');
   });
+
+  it('draws a run as a bar from its start to its end', () => {
+    const long: ActivityRun[] = [
+      {
+        name: 'nightly',
+        dagRunId: 'nightly-1',
+        status: Status.Success,
+        startedAt: FROM,
+        finishedAt: FROM + 24 * 900,
+      },
+    ];
+    render(
+      <MemoryRouter>
+        <ActivityLanes
+          runs={long}
+          active={[]}
+          window={{ from: FROM, to: TO }}
+          hasMore={false}
+          range={{ from: FROM, to: TO }}
+          nowSeconds={TO - 60}
+          remoteNode="local"
+          onZoom={vi.fn()}
+        />
+      </MemoryRouter>
+    );
+
+    const lane = screen.getByRole('group', { name: /^nightly:/ });
+    const bar = lane.querySelector<HTMLElement>('span[style*="left: 0%"]');
+    expect(bar?.style.width).toBe('25%');
+  });
 });

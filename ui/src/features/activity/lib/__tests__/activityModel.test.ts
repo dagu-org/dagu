@@ -12,6 +12,7 @@ import {
   inProgressRuns,
   isQueueStalled,
   isSchedulerHoldingWork,
+  runEnd,
   sortLanes,
   systemAlerts,
   timeTicks,
@@ -276,5 +277,23 @@ describe('timeTicks', () => {
     const ticks = timeTicks({ from: FROM, to: FROM + 6 * HOUR }, 800, offset);
 
     expect(ticks.every((tick) => (tick + offset) % HOUR === 0)).toBe(true);
+  });
+});
+
+describe('runEnd', () => {
+  const base = { name: 'etl', dagRunId: 'r1', startedAt: 1000 };
+
+  it('ends a finished run when it finished', () => {
+    expect(
+      runEnd({ ...base, status: Status.Success, finishedAt: 8200 }, 9000)
+    ).toBe(8200);
+  });
+
+  it('extends a running run to the current time', () => {
+    expect(runEnd({ ...base, status: Status.Running }, 5000)).toBe(5000);
+  });
+
+  it('ends a queued run where it starts', () => {
+    expect(runEnd({ ...base, status: Status.Queued }, 5000)).toBe(1000);
   });
 });

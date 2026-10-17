@@ -316,3 +316,16 @@ export function timeTicks(
 export function percentOf(range: TimeRange, seconds: number): number {
   return ((seconds - range.from) / (range.to - range.from)) * 100;
 }
+
+/**
+ * Returns the time a run's bar ends at, in Unix seconds: when it finished, or
+ * the current time while it is still running. Other runs end where they start.
+ */
+export function runEnd(run: ActivityRun, nowSeconds: number): number {
+  const start = run.startedAt ?? 0;
+  if (run.finishedAt !== undefined) return Math.max(start, run.finishedAt);
+  if (run.status === Status.Running || run.status === Status.Waiting) {
+    return Math.max(start, nowSeconds);
+  }
+  return start;
+}
