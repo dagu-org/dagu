@@ -270,6 +270,103 @@ test('connects a community server through Dagu Console', async ({
   });
 });
 
+test('starts monitoring when a server connects from the free offer', async ({
+  page,
+  context,
+}, testInfo) => {
+  const stack = await loadStack();
+  const connectUrl =
+    'https://console.dagu.test/servers/connect?code=abc&report=runs';
+  let license = community;
+  let approved = false;
+  let connectBody: unknown;
+  let monitoring: LicenseMonitoring = {
+    level: LicenseMonitoringLevel.off,
+    configured: false,
+    chosen: false,
+    noticeDismissed: false,
+  };
+  await context.route('https://console.dagu.test/**', (route) =>
+    route.fulfill({ contentType: 'text/html', body: '<h1>Approve</h1>' })
+  );
+  // Keep license mutations inside this browser context; the shared stack is unchanged.
+  await page.route('**/api/v1/license/**', async (route) => {
+    const url = new URL(route.request().url());
+    expect(url.searchParams.get('remoteNode')).toBe('local');
+    if (url.pathname.endsWith('/license/monitoring')) {
+      await route.fulfill({ json: monitoring });
+      return;
+    }
+    if (url.pathname.endsWith('/connect')) {
+      if (route.request().method() === 'POST') {
+        connectBody = route.request().postDataJSON();
+        // The server saves the level chosen when connecting.
+        const { report } = connectBody as { report: LicenseMonitoringLevel };
+        monitoring = { ...monitoring, level: report, chosen: true };
+      }
+      await route.fulfill({
+        json: approved
+          ? { state: 'granted' }
+          : {
+              state: 'pending',
+              connectUrl,
+              code: 'ABCD1234',
+              expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
+            },
+      });
+      return;
+    }
+    await route.fulfill({ json: license });
+  });
+  await loginViaUI(page, stack.auth.adminUsername, stack.auth.adminPassword);
+  await page.goto('/license#monitoring');
+
+  const offer = page.getByRole('region', {
+    name: 'Monitor this server for free',
+  });
+  await expect(
+    offer.getByRole('radio', { name: 'Health and run status (recommended)' })
+  ).toBeChecked();
+  await offer.screenshot({
+    path: testInfo.outputPath('monitoring-offer-desktop.png'),
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(offer).toContainText(
+    'Reporting starts as soon as the server connects.'
+  );
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth
+    )
+  ).toBe(true);
+  await offer.screenshot({
+    path: testInfo.outputPath('monitoring-offer-mobile.png'),
+  });
+
+  const popup = page.waitForEvent('popup');
+  await offer.getByRole('button', { name: 'Connect for free' }).click();
+  await expect(await popup).toHaveURL(connectUrl);
+  expect(connectBody).toEqual({ report: 'runs' });
+  await expect(page.getByText('ABCD1234')).toBeVisible();
+
+  license = {
+    ...community,
+    valid: true,
+    community: false,
+    plan: 'free',
+    source: 'file',
+    connectedVia: LicenseStatusResponseConnectedVia.console,
+    workspace: 'acme',
+    serverId: 'srv-123',
+    lastCheckIn: new Date().toISOString(),
+  };
+  approved = true;
+  await expect(page.getByText('Connected to acme.')).toBeVisible();
+  const card = page.getByRole('region', { name: 'Monitoring' });
+  await expect(card).toContainText('Health and run status');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+
 test('shows a license that needs attention in the sidebar and on the page', async ({
   page,
 }, testInfo) => {
