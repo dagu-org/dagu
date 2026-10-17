@@ -5,6 +5,7 @@ package certproxy
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -22,7 +23,6 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
-	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -314,22 +314,20 @@ type openedTunnel struct {
 // openTunnel reaches host and port and answers the browser's CONNECT
 // request with a tunnel there, or with why there is none. guarded is set
 // when the guard carries host, which a proxy asking for credentials stops.
-// While the browser sends every request here, a tunnel takes the route of
-// an https: or a ws: URL by whether it carries TLS, which shows only once
-// it is open: when those routes differ, a site that cannot be reached ends
-// the open tunnel instead.
+// While the browser sends every request here, the route depends on what the
+// tunnel carries, which shows only once it is open: the URL Chrome hands a
+// PAC script is an https: one for TLS and the ws: URL of the request
+// otherwise. A site that cannot be reached then ends the open tunnel.
 func (s *server) openTunnel(w http.ResponseWriter, host, port string, entry *upstreamEntry, guarded bool, deadline time.Time) (openedTunnel, bool) {
 	ctx, cancel := context.WithDeadline(s.ctx, deadline)
 	defer cancel()
 	var opened openedTunnel
-	late := s.carryAll && s.routedByScheme(ctx, host, port)
-	if !late {
+	if !s.carryAll {
 		var err error
-		if opened.raw, opened.via, err = s.reach(ctx, tlsScheme, host, port, entry); err != nil {
+		if opened.raw, opened.via, err = s.reach(ctx, pacRequestURL(tlsScheme, host, port, "/"), host, port, entry); err != nil {
 			if s.unreachable(host, entry, guarded, err) {
 				// A reset connection makes the browser try the route after the
-				// guard; a closed guard keeps it on that route. While a manual
-				// proxy is carrying loopback, there is no later browser route.
+				// guard; a closed guard keeps it on that route.
 				resetConnection(w)
 				return openedTunnel{}, false
 			}
@@ -344,22 +342,21 @@ func (s *server) openTunnel(w http.ResponseWriter, host, port string, entry *ups
 		}
 		return openedTunnel{}, false
 	}
-	opened.plain = s.carryAll && !carriesTLS(conn, reader, deadline)
-	opened.client = conn
-	if reader.Buffered() > 0 {
-		opened.client = &bufferedConn{Conn: conn, reader: reader}
-	}
-	if late {
-		scheme := tlsScheme
-		if opened.plain {
-			scheme = plainScheme
+	if s.carryAll {
+		rawURL := pacRequestURL(tlsScheme, host, port, "/")
+		if opened.plain = !carriesTLS(conn, reader, deadline); opened.plain {
+			rawURL = pacRequestURL(plainScheme, host, port, requestTarget(reader))
 		}
 		var err error
-		if opened.raw, opened.via, err = s.reach(ctx, scheme, host, port, entry); err != nil {
+		if opened.raw, opened.via, err = s.reach(ctx, rawURL, host, port, entry); err != nil {
 			s.unreachable(host, entry, guarded, err)
 			_ = conn.Close()
 			return openedTunnel{}, false
 		}
+	}
+	opened.client = conn
+	if reader.Buffered() > 0 {
+		opened.client = &bufferedConn{Conn: conn, reader: reader}
 	}
 	return opened, true
 }
@@ -531,6 +528,20 @@ func (s *server) splice(client, raw net.Conn) {
 	<-done
 }
 
+// requestTarget returns the target of the HTTP request a plain tunnel
+// starts with, as /socket in "GET /socket HTTP/1.1", from what reader holds
+// already, or / without a whole request line there. Chrome sends the
+// request in one write, and a client that sent all of it waits for an
+// answer, so the proxy reads no further.
+func requestTarget(reader *bufio.Reader) string {
+	ahead, _ := reader.Peek(reader.Buffered())
+	line, _, found := bytes.Cut(ahead, []byte("\n"))
+	if fields := strings.Fields(string(line)); found && len(fields) == 3 && strings.HasPrefix(fields[1], "/") {
+		return fields[1]
+	}
+	return "/"
+}
+
 // carriesTLS reports whether what the client sends over conn, read through
 // reader, starts with a TLS handshake record. A client still silent at
 // deadline counts as TLS, which fails the same way.
@@ -595,21 +606,10 @@ func (s *server) tunnel(client, raw net.Conn, via route, host string, entry *ups
 }
 
 // reach connects to host and port on the route the device's proxy settings
-// give a scheme URL there.
-func (s *server) reach(ctx context.Context, scheme, host, port string, entry *upstreamEntry) (net.Conn, route, error) {
-	routes := s.routesTo(ctx, pacRequestURL(scheme, host, port), host, entry.label)
+// give rawURL.
+func (s *server) reach(ctx context.Context, rawURL, host, port string, entry *upstreamEntry) (net.Conn, route, error) {
+	routes := s.routesTo(ctx, rawURL, host, entry.label)
 	return dialRoutes(ctx, routes, net.JoinHostPort(host, port), s.proxyTLS)
-}
-
-// routedByScheme reports whether the device's proxy settings route an
-// https: URL to host and port differently from a ws: URL.
-func (s *server) routedByScheme(ctx context.Context, host, port string) bool {
-	if implicitBypass(host) {
-		return false
-	}
-	secure := s.pac.routes(ctx, pacRequestURL(tlsScheme, host, port), host)
-	plain := s.pac.routes(ctx, pacRequestURL(plainScheme, host, port), host)
-	return !slices.Equal(secure.routes, plain.routes)
 }
 
 // routesTo returns the routes to rawURL, whose host is host. Chrome never
@@ -804,20 +804,23 @@ func (s *server) closeTunnels() {
 }
 
 // pacRequestURL returns the URL a browser hands a PAC script for a scheme
-// connection to host and port, scheme being tlsScheme or plainScheme. A
-// browser passes the path of a ws: URL as well; the proxy passes the root.
-func pacRequestURL(scheme, host, port string) string {
+// request for target at host and port, scheme being tlsScheme or
+// plainScheme. A browser keeps the target of a ws: URL only.
+func pacRequestURL(scheme, host, port, target string) string {
+	if scheme != plainScheme {
+		target = "/"
+	}
 	defaultPort := defaultTLSPort
 	if scheme == plainScheme {
 		defaultPort = defaultPlainPort
 	}
 	if port == defaultPort {
 		if addr, err := netip.ParseAddr(host); err == nil && addr.Is6() {
-			return scheme + "://[" + host + "]/"
+			return scheme + "://[" + host + "]" + target
 		}
-		return scheme + "://" + host + "/"
+		return scheme + "://" + host + target
 	}
-	return scheme + "://" + net.JoinHostPort(host, port) + "/"
+	return scheme + "://" + net.JoinHostPort(host, port) + target
 }
 
 // oneLine joins the lines of err, which errors.Join separates.

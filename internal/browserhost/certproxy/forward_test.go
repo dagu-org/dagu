@@ -113,15 +113,16 @@ func TestForwardHTTP(t *testing.T) {
 }
 
 // A tunnel that does not carry TLS, as a ws: URL opens, takes the route of
-// a ws: URL and is relayed as it is, for a host an entry names, one the
-// guard carries, and one neither does. One that carries TLS keeps the route
-// of an https: URL.
+// its ws: URL, path included, and is relayed as it is, for a host an entry
+// names, one the guard carries, and one neither does. One that carries TLS
+// keeps the route of an https: URL.
 func TestCarryAllRoutesTunnelByScheme(t *testing.T) {
 	t.Parallel()
 	ca := newTestCA(t, "corp CA")
-	// schemePAC sends ws: URLs to plain and the others to secure.
+	// schemePAC sends the ws: URL of /socket to plain and the others to
+	// secure.
 	schemePAC := func(plain, secure *tunnelProxy) string {
-		return `function FindProxyForURL(url) { return shExpMatch(url, "ws:*") ? "PROXY ` + plain.addr + `" : "PROXY ` + secure.addr + `"; }`
+		return `function FindProxyForURL(url) { return shExpMatch(url, "ws://*/socket") ? "PROXY ` + plain.addr + `" : "PROXY ` + secure.addr + `"; }`
 	}
 	guarded := func(t *testing.T, pac string) Config {
 		cfg := guardConfig(t, ca, pac)
@@ -147,7 +148,12 @@ func TestCarryAllRoutesTunnelByScheme(t *testing.T) {
 			conn, status, err := connectThrough(fmt.Sprintf("127.0.0.1:%d", ready.Port), siteHost+":80")
 			require.NoError(t, err)
 			require.Equal(t, http.StatusOK, status)
-			assert.Equal(t, "hello", readGreeting(t, conn))
+			t.Cleanup(func() { _ = conn.Close() })
+			_, err = io.WriteString(conn, "GET /socket HTTP/1.1\r\nHost: "+siteHost+"\r\n\r\n")
+			require.NoError(t, err)
+			greeting, err := io.ReadAll(conn)
+			require.NoError(t, err)
+			assert.Equal(t, "hello", string(greeting))
 			assert.Equal(t, []string{siteHost + ":80"}, plain.requests())
 			assert.Empty(t, secure.requests())
 		})

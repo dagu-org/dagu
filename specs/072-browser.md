@@ -234,10 +234,11 @@ destination reaches it. The certificate proxy reaches those destinations directl
 through `proxy` or the device's proxy settings, and resolves `localhost` and
 `*.localhost` to the loopback addresses itself. Every other request, HTTPS or
 not, still follows the device's proxy settings, applied by the certificate
-proxy, and is not given a configured client certificate or authority; a PAC
-script is given a plain WebSocket's `ws:` URL without its path. A
-device proxy that asks for credentials cannot be handed back to the browser
-while every request goes to the certificate proxy. An HTTPS upstream proxy
+proxy, and is not given a configured client certificate or authority. A site
+the certificate proxy cannot reach then closes the browser's connection
+instead of failing the proxy request. A device proxy that asks for
+credentials cannot be handed back to the browser while every request goes to
+the certificate proxy. An HTTPS upstream proxy
 may listen on a loopback address; its certificate is checked against
 authorities that name the proxy's host, separately from the website.
 With certificates, `proxy` takes only `[scheme://]host[:port]` with
