@@ -329,3 +329,15 @@ export function runEnd(run: ActivityRun, nowSeconds: number): number {
   }
   return start;
 }
+
+/** Visible part of a run's bar inside the range, as percentages from 0 to 100. */
+export function barSpan(
+  run: ActivityRun,
+  range: TimeRange,
+  nowSeconds: number
+): { left: number; right: number } {
+  return {
+    left: Math.max(0, percentOf(range, run.startedAt ?? range.from)),
+    right: Math.min(100, percentOf(range, runEnd(run, nowSeconds))),
+  };
+}

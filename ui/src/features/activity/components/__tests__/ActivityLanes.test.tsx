@@ -68,7 +68,23 @@ function LocationProbe() {
   return <div data-testid="location">{location.pathname}</div>;
 }
 
-function renderLanes() {
+// jsdom lays nothing out, so pointer tests give a lane an explicit width.
+function stubLaneWidth(lane: HTMLElement, width: number) {
+  lane.getBoundingClientRect = () =>
+    ({
+      left: 0,
+      top: 0,
+      right: width,
+      bottom: 36,
+      width,
+      height: 36,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    }) as DOMRect;
+}
+
+function renderLanes(laneRuns: ActivityRun[] = runs) {
   return render(
     <MemoryRouter initialEntries={['/']}>
       <Routes>
@@ -76,7 +92,7 @@ function renderLanes() {
           path="/"
           element={
             <ActivityLanes
-              runs={runs}
+              runs={laneRuns}
               active={[]}
               window={{ from: FROM, to: TO }}
               hasMore={false}
@@ -131,33 +147,24 @@ describe('ActivityLanes', () => {
     expect(screen.getByRole('dialog')).toHaveAccessibleName('report report-1');
   });
 
-  it('draws a run as a bar from its start to its end', () => {
-    const long: ActivityRun[] = [
+  it('opens a long run from anywhere along its bar', () => {
+    renderLanes([
       {
         name: 'nightly',
         dagRunId: 'nightly-1',
         status: Status.Success,
         startedAt: FROM,
-        finishedAt: FROM + 24 * 900,
+        finishedAt: FROM + 48 * 900,
       },
-    ];
-    render(
-      <MemoryRouter>
-        <ActivityLanes
-          runs={long}
-          active={[]}
-          window={{ from: FROM, to: TO }}
-          hasMore={false}
-          range={{ from: FROM, to: TO }}
-          nowSeconds={TO - 60}
-          remoteNode="local"
-          onZoom={vi.fn()}
-        />
-      </MemoryRouter>
-    );
-
+    ]);
     const lane = screen.getByRole('group', { name: /^nightly:/ });
-    const bar = lane.querySelector<HTMLElement>('span[style*="left: 0%"]');
-    expect(bar?.style.width).toBe('25%');
+    stubLaneWidth(lane, 960);
+
+    fireEvent.pointerDown(lane, { button: 0, clientX: 240 });
+    fireEvent.pointerUp(lane, { clientX: 240 });
+
+    expect(screen.getByRole('dialog')).toHaveAccessibleName(
+      'nightly nightly-1'
+    );
   });
 });

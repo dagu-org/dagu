@@ -6,6 +6,7 @@ import { DAGRunActivityQueueBlockedReason, Status } from '@/api/v1/schema';
 import {
   type ActivityRun,
   attentionItems,
+  barSpan,
   type DAGRunActivity,
   fitRange,
   groupLanes,
@@ -295,5 +296,27 @@ describe('runEnd', () => {
 
   it('ends a queued run where it starts', () => {
     expect(runEnd({ ...base, status: Status.Queued }, 5000)).toBe(1000);
+  });
+});
+
+describe('barSpan', () => {
+  const range = { from: 1000, to: 2000 };
+
+  it('clamps a run that started before the range to its left edge', () => {
+    expect(
+      barSpan(run('etl', 'r1', Status.Success, 500, 1500), range, 1900)
+    ).toEqual({ left: 0, right: 50 });
+  });
+
+  it('clamps a run that is still running to the range end', () => {
+    expect(
+      barSpan(run('etl', 'r1', Status.Running, 1500), range, 2500)
+    ).toEqual({ left: 50, right: 100 });
+  });
+
+  it('gives a queued run no width', () => {
+    expect(barSpan(run('etl', 'r1', Status.Queued, 1500), range, 1900)).toEqual(
+      { left: 50, right: 50 }
+    );
   });
 });

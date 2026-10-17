@@ -15,10 +15,10 @@ import { useI18n } from '@/i18n/I18nProvider';
 import {
   type ActivityLane,
   type ActivityRun,
+  barSpan,
   groupLanes,
   oldestStart,
   percentOf,
-  runEnd,
   sortLanes,
   type TimeRange,
   timeTicks,
@@ -75,18 +75,23 @@ type Hover = {
 
 type Drag = { lane: string; startX: number; currentX: number; rect: DOMRect };
 
+// Runs come oldest first, so on a tie the later run, which is drawn on top,
+// wins.
 function runAt(
-  workflow: ActivityLane,
+  runs: ActivityRun[],
   range: TimeRange,
+  nowSeconds: number,
   rect: DOMRect,
   clientX: number
 ): ActivityRun | undefined {
   let best: ActivityRun | undefined;
   let bestDistance = MARK_HIT_PX;
-  for (const run of workflow.runs) {
-    if (run.startedAt === undefined) continue;
-    const x = rect.left + (percentOf(range, run.startedAt) / 100) * rect.width;
-    const distance = Math.abs(x - clientX);
+  for (const run of runs) {
+    const { left, right } = barSpan(run, range, nowSeconds);
+    const x0 = rect.left + (left / 100) * rect.width;
+    const x1 = rect.left + (right / 100) * rect.width;
+    const distance =
+      clientX < x0 ? x0 - clientX : clientX > x1 ? clientX - x1 : 0;
     if (distance <= bestDistance) {
       best = run;
       bestDistance = distance;
@@ -211,7 +216,7 @@ export function ActivityLanes({
       lane: workflow.name,
       clientX: event.clientX,
       clientY: rect.top,
-      run: runAt(workflow, range, rect, event.clientX),
+      run: runAt(sortedRuns(workflow), range, nowSeconds, rect, event.clientX),
     });
   };
 
@@ -232,7 +237,13 @@ export function ActivityLanes({
       return;
     }
     const rect = event.currentTarget.getBoundingClientRect();
-    const run = runAt(workflow, range, rect, event.clientX);
+    const run = runAt(
+      sortedRuns(workflow),
+      range,
+      nowSeconds,
+      rect,
+      event.clientX
+    );
     if (run) {
       openRun(workflow.name, run, event.metaKey || event.ctrlKey);
     }
@@ -269,8 +280,7 @@ export function ActivityLanes({
     setHover({
       lane: workflow.name,
       clientX:
-        rect.left +
-        (percentOf(range, run.startedAt ?? range.from) / 100) * rect.width,
+        rect.left + (barSpan(run, range, nowSeconds).left / 100) * rect.width,
       clientY: rect.top,
       run,
     });
@@ -406,11 +416,7 @@ export function ActivityLanes({
                 )}
                 {visibleRuns.map((run) => {
                   const problem = PROBLEM_STATUSES.has(run.status);
-                  const left = percentOf(range, run.startedAt ?? range.from);
-                  const right = percentOf(
-                    range,
-                    Math.min(range.to, runEnd(run, nowSeconds))
-                  );
+                  const { left, right } = barSpan(run, range, nowSeconds);
                   return (
                     <span
                       key={run.dagRunId}
