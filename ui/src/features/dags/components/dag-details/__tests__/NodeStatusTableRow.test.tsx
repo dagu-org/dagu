@@ -322,6 +322,21 @@ describe('NodeStatusTableRow', () => {
     }
   );
 
+  it.each(['desktop', 'mobile'] as const)(
+    'shows how often a step was retried in the %s view',
+    (view) => {
+      renderRow({ ...timedNode, retryCount: 2 }, view);
+
+      expect(screen.getByText('Retried 2×')).toBeVisible();
+    }
+  );
+
+  it('shows no retry count for a step that ran once', () => {
+    renderRow(timedNode, 'desktop');
+
+    expect(screen.queryByText(/Retried/)).not.toBeInTheDocument();
+  });
+
   it.each([
     [
       'Completed by:',

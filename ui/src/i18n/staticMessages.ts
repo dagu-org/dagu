@@ -2551,6 +2551,7 @@ const english = {
   "DAG name must be {max} characters or less": "DAG name must be {max} characters or less",
   "DAG name can only contain letters, numbers, underscores, dots, and hyphens": "DAG name can only contain letters, numbers, underscores, dots, and hyphens",
   "DAG name cannot contain spaces": "DAG name cannot contain spaces",
+  "Retried {count}×": "Retried {count}×",
 } as const;
 
 export type StaticMessage = keyof typeof english;
@@ -5048,6 +5049,7 @@ const chinese = {
   "DAG name must be {max} characters or less": "DAG 名称不能超过 {max} 个字符",
   "DAG name can only contain letters, numbers, underscores, dots, and hyphens": "DAG 名称只能包含字母、数字、下划线、点和连字符",
   "DAG name cannot contain spaces": "DAG 名称不能包含空格",
+  "Retried {count}×": "已重试 {count} 次",
 } as const satisfies Record<StaticMessage, string>;
 
 const japanese = {
@@ -7621,6 +7623,7 @@ const japanese = {
   "DAG name must be {max} characters or less": "DAG 名は {max} 文字以内にしてください",
   "DAG name can only contain letters, numbers, underscores, dots, and hyphens": "DAG 名に使用できるのは英数字、アンダースコア、ドット、ハイフンのみです",
   "DAG name cannot contain spaces": "DAG 名にスペースは使用できません",
+  "Retried {count}×": "{count} 回再試行",
 } as const satisfies Record<StaticMessage, string>;
 
 export const staticMessages = {
