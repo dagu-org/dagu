@@ -219,13 +219,14 @@ func (a *API) readDAGRunActivity(ctx context.Context, query activityQuery) (api.
 	}
 
 	result := api.DAGRunActivity{
-		From:      query.from.Unix(),
-		To:        query.to.Unix(),
-		Runs:      make([]api.DAGRunActivityRun, 0, len(page.Items)),
-		Attention: []api.DAGRunActivityRun{},
-		Active:    []api.DAGRunActivityRun{},
-		Upcoming:  []api.DAGRunActivityUpcoming{},
-		Queues:    []api.DAGRunActivityQueue{},
+		From:        query.from.Unix(),
+		To:          query.to.Unix(),
+		Runs:        make([]api.DAGRunActivityRun, 0, len(page.Items)),
+		EarlierRuns: []api.DAGRunActivityRun{},
+		Attention:   []api.DAGRunActivityRun{},
+		Active:      []api.DAGRunActivityRun{},
+		Upcoming:    []api.DAGRunActivityUpcoming{},
+		Queues:      []api.DAGRunActivityQueue{},
 	}
 	if page.NextCursor != "" {
 		result.NextCursor = &page.NextCursor
@@ -246,11 +247,52 @@ func (a *API) readDAGRunActivity(ctx context.Context, query activityQuery) (api.
 		return api.DAGRunActivity{}, fmt.Errorf("error reading latest dag-runs: %w", err)
 	}
 	result.Attention = attentionRuns(latest)
+	earlier, err := a.earlierRuns(ctx, query, latest)
+	if err != nil {
+		return api.DAGRunActivity{}, err
+	}
+	result.EarlierRuns = earlier
 	result.Active = a.activeRuns(ctx, query, page.Items, latest)
 	result.Upcoming = a.upcomingRuns(ctx, query)
 	result.Queues = a.activityQueues(ctx, query)
 	result.DiskUsedPercent = a.activityDiskUsedPercent(ctx)
 	return result, nil
+}
+
+// earlierRuns lists the newest run of each DAG that was created before the
+// window and finished inside it, newest first. A run queued before the window
+// that started inside it counts too. The window's run list holds
+// only runs created inside it, so these would otherwise have no bar. Only the
+// newest run before the window is read, so a frequent DAG's run that crossed
+// the window start is missed.
+func (a *API) earlierRuns(ctx context.Context, query activityQuery, latest []*ir.DAGRunStatus) ([]api.DAGRunActivityRun, error) {
+	newest, err := a.dagRunRepository.LatestStatuses(ctx, persis.DAGRunLatestStatusesQuery{
+		Labels:          query.labels,
+		WorkspaceFilter: query.workspaceFilter,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error reading earlier dag-runs: %w", err)
+	}
+	inWindow := make(map[ir.DAGRunRef]struct{}, len(latest))
+	for _, status := range latest {
+		inWindow[ir.NewDAGRunRef(status.Name, status.DAGRunID)] = struct{}{}
+	}
+	from := query.from.Unix()
+	runs := make([]api.DAGRunActivityRun, 0)
+	for _, status := range newest {
+		if _, ok := inWindow[ir.NewDAGRunRef(status.Name, status.DAGRunID)]; ok {
+			continue
+		}
+		run := toActivityRun(status)
+		// Every run left after the in-window check was created before the
+		// window, wherever it started.
+		if run.FinishedAt == nil || *run.FinishedAt < from {
+			continue
+		}
+		runs = append(runs, run)
+	}
+	slices.SortFunc(runs, compareActivityRunsNewestFirst)
+	return runs, nil
 }
 
 // activityQueues lists the queues with runs running or waiting that match the

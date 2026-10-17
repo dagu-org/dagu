@@ -17,7 +17,7 @@ import {
   sortLanes,
   systemAlerts,
   timeTicks,
-  withEarlierActiveRuns,
+  withEarlierRuns,
 } from '../activityModel';
 
 const HOUR = 3600;
@@ -38,6 +38,7 @@ function activity(overrides: Partial<DAGRunActivity> = {}): DAGRunActivity {
   return {
     ...WINDOW,
     runs: [],
+    earlierRuns: [],
     attention: [],
     active: [],
     upcoming: [],
@@ -326,7 +327,7 @@ describe('barSpan', () => {
   });
 });
 
-describe('withEarlierActiveRuns', () => {
+describe('withEarlierRuns', () => {
   const loaded = [
     run('etl', 'etl-2', Status.Success, FROM + 2 * HOUR),
     run('etl', 'etl-1', Status.Running, FROM + HOUR),
@@ -336,26 +337,39 @@ describe('withEarlierActiveRuns', () => {
     const older = run('backfill', 'b-1', Status.Running, FROM - 2 * HOUR);
     const newer = run('sync', 's-1', Status.Running, FROM - HOUR);
 
-    expect(withEarlierActiveRuns(loaded, [older, newer], FROM)).toEqual([
+    expect(withEarlierRuns(loaded, [older, newer], FROM)).toEqual([
       ...loaded,
       newer,
       older,
     ]);
   });
 
+  it('adds runs that finished inside the window', () => {
+    const finished = run(
+      'train',
+      't-1',
+      Status.Success,
+      FROM - 5 * HOUR,
+      FROM + HOUR
+    );
+
+    expect(withEarlierRuns(loaded, [finished], FROM)).toEqual([
+      ...loaded,
+      finished,
+    ]);
+  });
+
   it('skips loaded runs and runs that began inside the window', () => {
     const inside = run('sync', 's-2', Status.Running, FROM + 3 * HOUR);
 
-    expect(withEarlierActiveRuns(loaded, [loaded[1]!, inside], FROM)).toBe(
-      loaded
-    );
+    expect(withEarlierRuns(loaded, [loaded[1]!, inside], FROM)).toBe(loaded);
   });
 
   it('keeps another workflow’s run that shares a loaded run ID', () => {
     const report = run('report', 'daily', Status.Success, FROM + HOUR);
     const backfill = run('backfill', 'daily', Status.Running, FROM - HOUR);
 
-    expect(withEarlierActiveRuns([report], [backfill], FROM)).toEqual([
+    expect(withEarlierRuns([report], [backfill], FROM)).toEqual([
       report,
       backfill,
     ]);

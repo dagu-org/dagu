@@ -28,7 +28,7 @@ import {
   inProgressRuns,
   systemAlerts,
   type TimeRange,
-  withEarlierActiveRuns,
+  withEarlierRuns,
 } from '../features/activity/lib/activityModel';
 import { CreateDAGModal } from '../features/dags/components/common';
 import PathsCard from '../features/system-status/components/PathsCard';
@@ -229,6 +229,7 @@ function Dashboard(): React.ReactElement {
     return {
       filteredActivity: {
         ...activity,
+        earlierRuns: activity.earlierRuns.filter((run) => matches(run.name)),
         attention: activity.attention.filter((run) => matches(run.name)),
         active: activity.active.filter((run) => matches(run.name)),
         upcoming: activity.upcoming.filter((item) => matches(item.name)),
@@ -246,21 +247,25 @@ function Dashboard(): React.ReactElement {
     };
   }, [activity, runs, filter]);
 
-  // The lanes also draw runs still going from before the window, which the
-  // window's run list leaves out, so the empty states count them too.
+  // The lanes also draw runs from before the window that are still going or
+  // finished inside it, which the window's run list leaves out, so the empty states count them too.
   const laneRuns = React.useMemo(
     () =>
       activity
-        ? withEarlierActiveRuns(runs, activity.active, activity.from)
+        ? withEarlierRuns(
+            runs,
+            [...activity.active, ...activity.earlierRuns],
+            activity.from
+          )
         : runs,
     [activity, runs]
   );
   const filteredLaneRuns = React.useMemo(
     () =>
       filteredActivity
-        ? withEarlierActiveRuns(
+        ? withEarlierRuns(
             filteredRuns,
-            filteredActivity.active,
+            [...filteredActivity.active, ...filteredActivity.earlierRuns],
             filteredActivity.from
           )
         : filteredRuns,

@@ -69,6 +69,26 @@ func (f *activityFixture) addRun(name, id string, status ir.Status, start time.T
 	require.NoError(f.t, attempt.Close(ctx))
 }
 
+// addQueuedThenRun saves a succeeded run created at created that started at
+// start and ran for duration.
+func (f *activityFixture) addQueuedThenRun(name, id string, created, start time.Time, duration time.Duration) {
+	f.t.Helper()
+	ctx := f.t.Context()
+	dag := &ir.DAG{Name: name}
+	attempt, err := f.repository.CreateAttempt(ctx, dag, created, id, persis.DAGRunCreateAttemptOptions{})
+	require.NoError(f.t, err)
+	require.NoError(f.t, attempt.Open(ctx))
+	runStatus := ir.InitialStatus(dag)
+	runStatus.DAGRunID = id
+	runStatus.AttemptID = attempt.ID()
+	runStatus.Status = ir.Succeeded
+	runStatus.QueuedAt = created.Format(time.RFC3339)
+	runStatus.StartedAt = start.Format(time.RFC3339)
+	runStatus.FinishedAt = start.Add(duration).Format(time.RFC3339)
+	require.NoError(f.t, attempt.Write(ctx, runStatus))
+	require.NoError(f.t, attempt.Close(ctx))
+}
+
 func (f *activityFixture) activity(from, to time.Time) openapiv1.DAGRunActivity {
 	f.t.Helper()
 	return f.page(from, to, nil)
@@ -533,4 +553,19 @@ func TestDAGRunActivityWarnsOfANearlyFullDisk(t *testing.T) {
 	f.api.authService = struct{ AuthService }{}
 	viewer := auth.WithUser(t.Context(), &auth.User{Role: auth.RoleViewer, WorkspaceAccess: auth.AllWorkspaceAccess()})
 	assert.Nil(t, read(f, viewer), "a viewer cannot view system status")
+}
+
+func TestDAGRunActivityListsEarlierRunsFinishedInWindow(t *testing.T) {
+	f := newActivityFixture(t)
+	day := time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC)
+	f.addRun("long", "long-1", ir.Succeeded, day.Add(-26*time.Hour), 30*time.Hour)
+	f.addRun("done-before", "old-1", ir.Succeeded, day.Add(-5*time.Hour), time.Hour)
+	f.addRun("inside", "in-1", ir.Succeeded, day.Add(time.Hour), time.Hour)
+	// Created before the window, queued until it began, then ran inside it.
+	f.addQueuedThenRun("queued", "queued-1", day.Add(-time.Hour), day.Add(2*time.Hour), time.Hour)
+
+	activity := f.activity(day, day.Add(24*time.Hour))
+
+	assert.ElementsMatch(t, []string{"long-1", "queued-1"}, runIDs(activity.EarlierRuns))
+	assert.Equal(t, []string{"in-1"}, runIDs(activity.Runs))
 }

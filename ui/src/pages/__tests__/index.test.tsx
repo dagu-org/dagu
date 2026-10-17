@@ -153,6 +153,7 @@ function makeActivity(overrides: Partial<DAGRunActivity> = {}): DAGRunActivity {
     from: FROM,
     to: NOW + 600,
     runs: [],
+    earlierRuns: [],
     attention: [],
     active: [],
     upcoming: [],

@@ -220,8 +220,14 @@ export function useDAGRunActivity(
     [data?.runs, pages]
   );
 
+  // An older remote node answers without earlierRuns.
+  const activity = useMemo(
+    () => (data ? { ...data, earlierRuns: data.earlierRuns ?? [] } : undefined),
+    [data]
+  );
+
   return {
-    activity: data,
+    activity,
     runs,
     isLoading: isLoading && !data,
     unavailable,

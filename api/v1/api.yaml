@@ -12059,6 +12059,11 @@ components:
         nextCursor:
           type: string
           description: "Opaque cursor for loading the next page of older runs"
+        earlierRuns:
+          type: array
+          description: "First page only: the newest run of each DAG that was created before the window and finished at or after its start, newest first"
+          items:
+            $ref: "#/components/schemas/DAGRunActivityRun"
         attention:
           type: array
           description: "First page only: the latest run of each DAG whose latest run was created in the window and did not succeed, newest first, at most 20"
@@ -12086,6 +12091,7 @@ components:
         - from
         - to
         - runs
+        - earlierRuns
         - attention
         - active
         - upcoming

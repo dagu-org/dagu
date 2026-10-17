@@ -4332,6 +4332,8 @@ export interface components {
             runs: components["schemas"]["DAGRunActivityRun"][];
             /** @description Opaque cursor for loading the next page of older runs */
             nextCursor?: string;
+            /** @description First page only: the newest run of each DAG that was created before the window and finished at or after its start, newest first */
+            earlierRuns: components["schemas"]["DAGRunActivityRun"][];
             /** @description First page only: the latest run of each DAG whose latest run was created in the window and did not succeed, newest first, at most 20 */
             attention: components["schemas"]["DAGRunActivityRun"][];
             /** @description First page only: runs still running, waiting, or queued, oldest first, at most 100, including up to 50 live runs created before the window */

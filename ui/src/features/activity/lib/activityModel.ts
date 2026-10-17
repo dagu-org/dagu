@@ -257,20 +257,20 @@ const MIN_FIT_SECONDS = 60 * 60;
 const FIT_LEAD_SECONDS = 15 * 60;
 
 /**
- * Adds in-progress runs that began before the window to the loaded runs. The
- * window lists only runs created inside it, so a long run still going would
- * otherwise have no lane. Those runs are older than every loaded run, so the
- * result stays newest first.
+ * Adds runs that began before the window to the loaded runs: those still in
+ * progress and those that finished inside it. The window lists only runs
+ * created inside it, so a long run would otherwise have no lane. Those runs
+ * are older than every loaded run, so the result stays newest first.
  */
-export function withEarlierActiveRuns(
+export function withEarlierRuns(
   runs: ActivityRun[],
-  active: ActivityRun[],
+  earlierRuns: ActivityRun[],
   windowFrom: number
 ): ActivityRun[] {
   // A run ID is unique only within its workflow.
   const key = (run: ActivityRun) => JSON.stringify([run.name, run.dagRunId]);
   const loaded = new Set(runs.map(key));
-  const earlier = active
+  const earlier = earlierRuns
     .filter(
       (run) =>
         run.startedAt !== undefined &&
