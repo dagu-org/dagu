@@ -51,8 +51,11 @@ function getDayBounds(
   date: dayjs.Dayjs,
   tzOffsetInSec: number | undefined
 ): { startOfDay: dayjs.Dayjs; endOfDay: dayjs.Dayjs } {
+  // The picked date is a day in the server's time zone, not the browser's.
   const adjusted =
-    tzOffsetInSec !== undefined ? date.utcOffset(tzOffsetInSec / 60) : date;
+    tzOffsetInSec !== undefined
+      ? date.utcOffset(tzOffsetInSec / 60, true)
+      : date;
   return {
     startOfDay: adjusted.startOf('day'),
     endOfDay: adjusted.endOf('day'),

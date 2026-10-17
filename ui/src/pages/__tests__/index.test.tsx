@@ -120,10 +120,10 @@ function makeConfig(overrides: Partial<Config> = {}): Config {
   };
 }
 
-function pageTree() {
+function pageTree(config: Partial<Config> = {}) {
   return (
     <MemoryRouter initialEntries={['/']}>
-      <ConfigContext.Provider value={makeConfig()}>
+      <ConfigContext.Provider value={makeConfig(config)}>
         <AppBarContext.Provider
           value={{
             title: '',
@@ -144,8 +144,8 @@ function pageTree() {
   );
 }
 
-function renderPage() {
-  return render(pageTree());
+function renderPage(config: Partial<Config> = {}) {
+  return render(pageTree(config));
 }
 
 function makeActivity(overrides: Partial<DAGRunActivity> = {}): DAGRunActivity {
@@ -614,15 +614,32 @@ describe('DashboardPage', () => {
     expect(lanes.getByText('backfill')).toBeVisible();
   });
 
-  it('shows a picked day crossed by a run still going', () => {
+  // A picked day is that calendar day in the server's time zone, whatever the
+  // browser's. A server behind UTC catches a browser that converts the day
+  // instead of reading it in the server's zone.
+  it('shows a picked day in the server time zone, crossed by a run still going', () => {
+    const offset = -5 * 3600;
+    const dayFrom = Date.UTC(2026, 2, 1) / 1000 - offset;
+    const dayTo = dayFrom + 24 * 3600 - 1;
     mockDAGList(['backfill']);
-    mockActivity({ activity: makeActivity({ active: [backfillRun] }) });
+    mockActivity({
+      activity: makeActivity({
+        from: dayFrom,
+        to: dayTo,
+        active: [{ ...backfillRun, startedAt: dayFrom - 3600 }],
+      }),
+    });
 
-    renderPage();
+    renderPage({ tzOffsetInSec: offset });
     fireEvent.change(screen.getByLabelText('Date'), {
       target: { value: '2026-03-01' },
     });
 
+    expect(useActivityMock.mock.lastCall?.[0]).toEqual({
+      kind: 'fixed',
+      from: dayFrom,
+      to: dayTo,
+    });
     const lanes = within(
       screen.getByRole('list', { name: 'Runs by workflow' })
     );
