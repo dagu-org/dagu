@@ -46,6 +46,18 @@ func TestStartAllCommand(t *testing.T) {
 		require.ErrorContains(t, err, "--port")
 		require.ErrorContains(t, err, "DAGU_PORT")
 	})
+	t.Run("CoordinatorPortInUse", func(t *testing.T) {
+		th := test.SetupCommand(t, test.WithCoordinatorEnabled())
+		_, coordinatorPort := test.ReserveServerListener(t)
+		err := commandError(t, th, cmd.StartAll(),
+			"start-all",
+			"--host=127.0.0.1",
+			"--port="+findPort(t),
+			"--coordinator.host=127.0.0.1",
+			"--coordinator.port="+coordinatorPort,
+		)
+		require.ErrorContains(t, err, "DAGU_COORDINATOR_ENABLED=false")
+	})
 }
 
 func TestStartAllSecondInterruptTerminatesBlockedCleanup(t *testing.T) {
