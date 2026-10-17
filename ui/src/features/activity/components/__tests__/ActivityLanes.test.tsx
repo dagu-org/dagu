@@ -182,6 +182,44 @@ describe('ActivityLanes', () => {
     );
   });
 
+  // A mark is drawn at least a few pixels wide, so a click inside a short
+  // run's mark picks it over the longer run drawn beneath it.
+  it.each([
+    ['a queued run', 'etl-3', 481],
+    ['a short finished run', 'etl-2', 241.5],
+  ])('opens %s drawn over a longer run', (_, dagRunId, clientX) => {
+    renderLanes({
+      laneRuns: [
+        {
+          name: 'etl',
+          dagRunId: 'etl-3',
+          status: Status.Queued,
+          startedAt: FROM + 48 * 900,
+        },
+        {
+          name: 'etl',
+          dagRunId: 'etl-2',
+          status: Status.Success,
+          startedAt: FROM + 24 * 900,
+          finishedAt: FROM + 24 * 900 + 10,
+        },
+        {
+          name: 'etl',
+          dagRunId: 'etl-1',
+          status: Status.Running,
+          startedAt: FROM,
+        },
+      ],
+    });
+    const lane = screen.getByRole('group', { name: /^etl:/ });
+    stubLaneWidth(lane, 960);
+
+    fireEvent.pointerDown(lane, { button: 0, clientX });
+    fireEvent.pointerUp(lane, { clientX });
+
+    expect(screen.getByRole('dialog')).toHaveAccessibleName(`etl ${dagRunId}`);
+  });
+
   it('shows a run that started before the window', () => {
     renderLanes({ laneRuns: [backfill] });
     const lane = screen.getByRole('group', { name: /^backfill:/ });

@@ -63,6 +63,14 @@ const PROBLEM_STATUSES = new Set<Status>([
   Status.PartialSuccess,
 ]);
 
+/** Narrowest a run's mark is drawn, in pixels; problem runs draw wider. */
+const MIN_MARK_PX = 2;
+const MIN_PROBLEM_MARK_PX = 3;
+
+function minMarkPx(run: ActivityRun): number {
+  return PROBLEM_STATUSES.has(run.status) ? MIN_PROBLEM_MARK_PX : MIN_MARK_PX;
+}
+
 /** Pixels a pointer may travel before a press becomes a zoom drag. */
 const DRAG_THRESHOLD_PX = 6;
 /** How close, in pixels, a pointer must be to a run to pick it. */
@@ -80,7 +88,7 @@ type Hover = {
 type Drag = { lane: string; startX: number; currentX: number; rect: DOMRect };
 
 // Runs come oldest first, so on a tie the later run, which is drawn on top,
-// wins.
+// wins. Each run counts as wide as its drawn mark.
 function runAt(
   runs: ActivityRun[],
   range: TimeRange,
@@ -93,7 +101,10 @@ function runAt(
   for (const run of runs) {
     const { left, right } = barSpan(run, range, nowSeconds);
     const x0 = rect.left + (left / 100) * rect.width;
-    const x1 = rect.left + (right / 100) * rect.width;
+    const x1 = Math.max(
+      rect.left + (right / 100) * rect.width,
+      x0 + minMarkPx(run)
+    );
     const distance =
       clientX < x0 ? x0 - clientX : clientX > x1 ? clientX - x1 : 0;
     if (distance <= bestDistance) {
@@ -442,15 +453,14 @@ export function ActivityLanes({
                         // The card-coloured ring leaves a gap between
                         // back-to-back runs.
                         'absolute rounded-sm ring-1 ring-card',
-                        problem
-                          ? 'top-0.5 bottom-0.5 min-w-[3px]'
-                          : 'top-2 bottom-2 min-w-0.5',
+                        problem ? 'top-0.5 bottom-0.5' : 'top-2 bottom-2',
                         focused === run &&
                           'ring-2 ring-ring ring-offset-1 ring-offset-background'
                       )}
                       style={{
                         left: `${left}%`,
                         width: `${Math.max(0, right - left)}%`,
+                        minWidth: minMarkPx(run),
                         backgroundColor:
                           MARK_COLOR[run.status] ?? 'var(--status-success)',
                       }}
