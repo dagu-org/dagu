@@ -30,7 +30,7 @@ import {
   type TimeRange,
   withEarlierActiveRuns,
 } from '../features/activity/lib/activityModel';
-import { CreateDAGModal } from '../features/dags/components/common';
+import { CreateDAGButton } from '../features/dags/components/common';
 import PathsCard from '../features/system-status/components/PathsCard';
 import { useQuery } from '../hooks/api';
 import { useSchedulerPause } from '../hooks/useSchedulerPause';
@@ -87,7 +87,7 @@ function GettingStartedPanel(): React.ReactElement {
           }
         />
       </p>
-      <CreateDAGModal />
+      <CreateDAGButton />
       <div className="flex flex-wrap items-center justify-center gap-4 text-sm">
         <a
           href="https://docs.dagu.sh"

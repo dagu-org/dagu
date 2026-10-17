@@ -23,8 +23,10 @@ vi.mock('../../features/activity/hooks/useDAGRunActivity', () => ({
   useDAGRunActivity: vi.fn(),
 }));
 
-vi.mock('../../features/dags/components/common', () => ({
-  CreateDAGModal: () => <button type="button">New workflow</button>,
+vi.mock('../../features/dags/components/common', async () => ({
+  CreateDAGButton: (
+    await import('../../features/dags/components/common/CreateDAGButton')
+  ).default,
 }));
 
 vi.mock('@/features/dag-runs/components/dag-run-details', () => ({
@@ -40,6 +42,7 @@ vi.mock('../../features/system-status/components/PathsCard', () => ({
 }));
 
 vi.mock('../../hooks/api', () => ({
+  useClient: () => ({ POST: vi.fn() }),
   useQuery: vi.fn(),
 }));
 
@@ -49,6 +52,7 @@ vi.mock('../../hooks/useSchedulerPause', () => ({
 
 vi.mock('@/contexts/AuthContext', () => ({
   useCanAccessSystemStatus: vi.fn(),
+  useCanWrite: () => true,
 }));
 
 const useActivityMock = vi.mocked(useDAGRunActivity);
@@ -652,7 +656,10 @@ describe('DashboardPage', () => {
     renderPage();
 
     expect(screen.getByText('Create your first workflow')).toBeVisible();
-    expect(screen.getByText('New workflow')).toBeVisible();
+    // All workspaces, the default selection, still allows creating one.
+    expect(
+      screen.getByRole('button', { name: 'Create new DAG' })
+    ).toBeVisible();
   });
 
   it('points at the Workflows page when workflows exist but nothing ran', () => {

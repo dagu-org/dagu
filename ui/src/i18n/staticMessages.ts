@@ -1211,7 +1211,6 @@ const english = {
   Path: 'Path',
   Paths: 'Paths',
   Pattern: 'Pattern',
-  'Pattern:': 'Pattern:',
   'Permission requested': 'Permission requested',
   'Pin to sidebar': 'Pin to sidebar',
   'Pin workflow': 'Pin workflow',
@@ -2543,6 +2542,15 @@ const english = {
   "Stream": "Stream",
   "Lines shown": "Lines shown",
   "Log display": "Log display",
+  "No workflows yet": "No workflows yet",
+  "Create your first workflow to get started.": "Create your first workflow to get started.",
+  "No workflows match the “{view}” view. Try adjusting its filters or show all workflows.": "No workflows match the “{view}” view. Try adjusting its filters or show all workflows.",
+  "There are no workflows matching your current filters. Try adjusting your search criteria or labels.": "There are no workflows matching your current filters. Try adjusting your search criteria or labels.",
+  "Invalid DAG name": "Invalid DAG name",
+  "DAG name cannot be empty": "DAG name cannot be empty",
+  "DAG name must be {max} characters or less": "DAG name must be {max} characters or less",
+  "DAG name can only contain letters, numbers, underscores, dots, and hyphens": "DAG name can only contain letters, numbers, underscores, dots, and hyphens",
+  "DAG name cannot contain spaces": "DAG name cannot contain spaces",
 } as const;
 
 export type StaticMessage = keyof typeof english;
@@ -3730,7 +3738,6 @@ const chinese = {
   Path: '路径',
   Paths: '路径',
   Pattern: '模式',
-  'Pattern:': '模式:',
   'Permission requested': '请求权限',
   'Pin to sidebar': '固定到侧边栏',
   'Pin workflow': '固定工作流',
@@ -5032,6 +5039,15 @@ const chinese = {
   "Stream": "输出流",
   "Lines shown": "显示的行",
   "Log display": "日志显示",
+  "No workflows yet": "还没有工作流",
+  "Create your first workflow to get started.": "创建第一个工作流即可开始。",
+  "No workflows match the “{view}” view. Try adjusting its filters or show all workflows.": "没有工作流符合“{view}”视图。请调整其筛选条件，或显示全部工作流。",
+  "There are no workflows matching your current filters. Try adjusting your search criteria or labels.": "没有符合当前筛选条件的工作流。请调整搜索条件或标签。",
+  "Invalid DAG name": "DAG 名称无效",
+  "DAG name cannot be empty": "DAG 名称不能为空",
+  "DAG name must be {max} characters or less": "DAG 名称不能超过 {max} 个字符",
+  "DAG name can only contain letters, numbers, underscores, dots, and hyphens": "DAG 名称只能包含字母、数字、下划线、点和连字符",
+  "DAG name cannot contain spaces": "DAG 名称不能包含空格",
 } as const satisfies Record<StaticMessage, string>;
 
 const japanese = {
@@ -6255,7 +6271,6 @@ const japanese = {
   Path: 'パス',
   Paths: 'パス',
   Pattern: 'パターン',
-  'Pattern:': 'パターン:',
   'Permission requested': '権限要求',
   'Pin to sidebar': 'サイドバーにピン留め',
   'Pin workflow': 'ワークフローをピン留め',
@@ -7597,6 +7612,15 @@ const japanese = {
   "Stream": "出力ストリーム",
   "Lines shown": "表示する行",
   "Log display": "ログ表示",
+  "No workflows yet": "ワークフローはまだありません",
+  "Create your first workflow to get started.": "最初のワークフローを作成して始めましょう。",
+  "No workflows match the “{view}” view. Try adjusting its filters or show all workflows.": "「{view}」ビューに一致するワークフローはありません。フィルターを調整するか、すべてのワークフローを表示してください。",
+  "There are no workflows matching your current filters. Try adjusting your search criteria or labels.": "現在のフィルターに一致するワークフローはありません。検索条件またはラベルを調整してください。",
+  "Invalid DAG name": "DAG 名が無効です",
+  "DAG name cannot be empty": "DAG 名を入力してください",
+  "DAG name must be {max} characters or less": "DAG 名は {max} 文字以内にしてください",
+  "DAG name can only contain letters, numbers, underscores, dots, and hyphens": "DAG 名に使用できるのは英数字、アンダースコア、ドット、ハイフンのみです",
+  "DAG name cannot contain spaces": "DAG 名にスペースは使用できません",
 } as const satisfies Record<StaticMessage, string>;
 
 export const staticMessages = {
