@@ -267,6 +267,13 @@ func (er *entryReaderImpl) watch(ctx context.Context) {
 	// that a slow re-read of a large registry cannot use it up.
 	var lastRefreshEnd time.Time
 	var deferredMarkerRefresh <-chan time.Time
+	refreshAfterGap := func() {
+		if wait := er.markerRefreshGap - time.Since(lastRefreshEnd); wait > 0 {
+			deferredMarkerRefresh = time.After(wait)
+			return
+		}
+		scheduleRefresh()
+	}
 
 	for {
 		select {
@@ -280,14 +287,11 @@ func (er *entryReaderImpl) watch(ctx context.Context) {
 			if !er.markerSignalsChange(ctx) || deferredMarkerRefresh != nil {
 				continue
 			}
-			if wait := er.markerRefreshGap - time.Since(lastRefreshEnd); wait > 0 {
-				deferredMarkerRefresh = time.After(wait)
-				continue
-			}
-			scheduleRefresh()
+			refreshAfterGap()
 		case <-deferredMarkerRefresh:
+			// A refresh may have ended since the timer was set.
 			deferredMarkerRefresh = nil
-			scheduleRefresh()
+			refreshAfterGap()
 		case event, ok := <-er.watcher.Events():
 			if !ok {
 				return
