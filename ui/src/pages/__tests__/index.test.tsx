@@ -120,10 +120,10 @@ function makeConfig(overrides: Partial<Config> = {}): Config {
   };
 }
 
-function pageTree() {
+function pageTree(config: Partial<Config> = {}) {
   return (
     <MemoryRouter initialEntries={['/']}>
-      <ConfigContext.Provider value={makeConfig()}>
+      <ConfigContext.Provider value={makeConfig(config)}>
         <AppBarContext.Provider
           value={{
             title: '',
@@ -144,8 +144,8 @@ function pageTree() {
   );
 }
 
-function renderPage() {
-  return render(pageTree());
+function renderPage(config: Partial<Config> = {}) {
+  return render(pageTree(config));
 }
 
 function makeActivity(overrides: Partial<DAGRunActivity> = {}): DAGRunActivity {
@@ -205,6 +205,15 @@ const reportRuns = [1, 2, 3].map((index) => ({
   status: Status.Success,
   startedAt: NOW - 60 * index,
 }));
+
+// A run still going from before the window, which only the in-progress
+// list carries.
+const backfillRun = {
+  name: 'backfill',
+  dagRunId: 'backfill-1',
+  status: Status.Running,
+  startedAt: FROM - 3600,
+};
 
 const busyActivity = makeActivity({
   runs: [...reportRuns, billingFailure],
@@ -575,6 +584,66 @@ describe('DashboardPage', () => {
     );
     expect(lanes.getAllByRole('listitem')).toHaveLength(1);
     expect(lanes.getByText('report')).toBeVisible();
+  });
+
+  it('shows a run still going from before the window', () => {
+    mockActivity({ activity: makeActivity({ active: [backfillRun] }) });
+
+    renderPage();
+
+    const lanes = within(
+      screen.getByRole('list', { name: 'Runs by workflow' })
+    );
+    expect(lanes.getByText('backfill')).toBeVisible();
+  });
+
+  it('filters to a run still going from before the window', () => {
+    mockActivity({
+      activity: { ...busyActivity, active: [backfillRun] },
+    });
+
+    renderPage();
+    fireEvent.change(screen.getByLabelText('Filter workflows'), {
+      target: { value: 'back' },
+    });
+
+    const lanes = within(
+      screen.getByRole('list', { name: 'Runs by workflow' })
+    );
+    expect(lanes.getAllByRole('listitem')).toHaveLength(1);
+    expect(lanes.getByText('backfill')).toBeVisible();
+  });
+
+  // A picked day is that calendar day in the server's time zone, whatever the
+  // browser's. A server behind UTC catches a browser that converts the day
+  // instead of reading it in the server's zone.
+  it('shows a picked day in the server time zone, crossed by a run still going', () => {
+    const offset = -5 * 3600;
+    const dayFrom = Date.UTC(2026, 2, 1) / 1000 - offset;
+    const dayTo = dayFrom + 24 * 3600 - 1;
+    mockDAGList(['backfill']);
+    mockActivity({
+      activity: makeActivity({
+        from: dayFrom,
+        to: dayTo,
+        active: [{ ...backfillRun, startedAt: dayFrom - 3600 }],
+      }),
+    });
+
+    renderPage({ tzOffsetInSec: offset });
+    fireEvent.change(screen.getByLabelText('Date'), {
+      target: { value: '2026-03-01' },
+    });
+
+    expect(useActivityMock.mock.lastCall?.[0]).toEqual({
+      kind: 'fixed',
+      from: dayFrom,
+      to: dayTo,
+    });
+    const lanes = within(
+      screen.getByRole('list', { name: 'Runs by workflow' })
+    );
+    expect(lanes.getByText('backfill')).toBeVisible();
   });
 
   it('invites creating the first workflow when no workflows exist', () => {
