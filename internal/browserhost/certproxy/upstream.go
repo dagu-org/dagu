@@ -68,15 +68,19 @@ func (r route) String() string {
 
 // dialRoutes connects to target through the first of routes that reaches
 // it. proxyTLS returns the TLS configuration for an HTTPS proxy on the way.
+// As in Chrome, a route gives way to the next only when its proxy cannot be
+// reached or a SOCKS proxy fails; an HTTP proxy that answers the CONNECT
+// request without a tunnel, denying the site or asking for credentials,
+// ends the search, so no later route bypasses it.
 func dialRoutes(ctx context.Context, routes []route, target string, proxyTLS func(host string) *tls.Config) (net.Conn, route, error) {
 	var errs []error
 	for _, r := range routes {
-		conn, err := dialRoute(ctx, r, target, proxyTLS)
+		conn, answered, err := dialRoute(ctx, r, target, proxyTLS)
 		if err == nil {
 			return conn, r, nil
 		}
 		errs = append(errs, fmt.Errorf("through %s: %w", r, err))
-		if ctx.Err() != nil {
+		if answered || ctx.Err() != nil {
 			break
 		}
 	}
@@ -86,37 +90,41 @@ func dialRoutes(ctx context.Context, routes []route, target string, proxyTLS fun
 	return nil, route{}, errors.Join(errs...)
 }
 
-func dialRoute(ctx context.Context, r route, target string, proxyTLS func(host string) *tls.Config) (net.Conn, error) {
+// dialRoute connects to target through r. It also reports whether an HTTP
+// proxy took the CONNECT request and opened no tunnel.
+func dialRoute(ctx context.Context, r route, target string, proxyTLS func(host string) *tls.Config) (net.Conn, bool, error) {
 	dialer := &net.Dialer{Timeout: dialTimeout}
 	switch r.kind {
 	case routeProxy, routeHTTPS:
 		conn, err := dialer.DialContext(ctx, "tcp", r.addr)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		if r.kind == routeHTTPS {
 			host, _, _ := net.SplitHostPort(r.addr)
 			tlsConn := tls.Client(conn, proxyTLS(host))
 			if err := tlsConn.HandshakeContext(ctx); err != nil {
 				_ = conn.Close()
-				return nil, err
+				return nil, false, err
 			}
 			conn = tlsConn
 		}
 		if err := connectTunnel(ctx, conn, r.addr, target); err != nil {
 			_ = conn.Close()
-			return nil, err
+			return nil, true, err
 		}
-		return conn, nil
+		return conn, false, nil
 	case routeSOCKS5:
 		socks, err := proxy.SOCKS5("tcp", r.addr, nil, dialer)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
-		return socks.(proxy.ContextDialer).DialContext(ctx, "tcp", target)
+		conn, err := socks.(proxy.ContextDialer).DialContext(ctx, "tcp", target)
+		return conn, false, err
 	case routeDirect:
 	}
-	return dialDirect(ctx, dialer, target)
+	conn, err := dialDirect(ctx, dialer, target)
+	return conn, false, err
 }
 
 // connectTunnel asks the HTTP proxy at proxyAddr, reached over conn, for a

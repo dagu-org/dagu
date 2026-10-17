@@ -64,17 +64,34 @@ func TestDialRoutes(t *testing.T) {
 
 	t.Run("FailsOverInOrder", func(t *testing.T) {
 		t.Parallel()
-		authProxy := newTunnelProxy(t, target, http.StatusProxyAuthRequired)
+		tunnel := newTunnelProxy(t, target, http.StatusOK)
 		routes := []route{
 			{kind: routeProxy, addr: refusing},
-			{kind: routeProxy, addr: authProxy.addr},
+			{kind: routeProxy, addr: tunnel.addr},
 			{kind: routeDirect},
 		}
 		conn, via, err := dialRoutes(context.Background(), routes, target, noCertificate)
 		require.NoError(t, err)
-		assert.Equal(t, route{kind: routeDirect}, via)
+		assert.Equal(t, routes[1], via)
 		assert.Equal(t, "hello", readGreeting(t, conn))
-		assert.Equal(t, []string{target}, authProxy.requests())
+		assert.Equal(t, []string{target}, tunnel.requests())
+	})
+
+	// A proxy that answers the CONNECT request is not bypassed through a
+	// later route, as Chrome does not.
+	t.Run("StopsAtProxyAnswer", func(t *testing.T) {
+		t.Parallel()
+		for _, status := range []int{http.StatusForbidden, http.StatusProxyAuthRequired} {
+			answering := newTunnelProxy(t, target, status)
+			later := newTunnelProxy(t, target, http.StatusOK)
+			_, _, err := dialRoutes(context.Background(), []route{
+				{kind: routeProxy, addr: answering.addr},
+				{kind: routeProxy, addr: later.addr},
+				{kind: routeDirect},
+			}, target, noCertificate)
+			require.Error(t, err, status)
+			assert.Empty(t, later.requests(), status)
+		}
 	})
 
 	t.Run("TunnelsThroughProxy", func(t *testing.T) {
@@ -100,14 +117,14 @@ func TestDialRoutes(t *testing.T) {
 		t.Parallel()
 		authProxy := newTunnelProxy(t, target, http.StatusProxyAuthRequired)
 		_, _, err := dialRoutes(context.Background(), []route{
-			{kind: routeProxy, addr: authProxy.addr},
 			{kind: routeDirect},
+			{kind: routeProxy, addr: authProxy.addr},
 		}, refusing, noCertificate)
 		require.Error(t, err)
 		assert.ErrorIs(t, err, errProxyAuth)
 		message := oneLine(err)
-		proxyAt, directAt := strings.Index(message, "through PROXY "), strings.Index(message, "through DIRECT")
-		assert.True(t, proxyAt >= 0 && directAt > proxyAt, message)
+		directAt, proxyAt := strings.Index(message, "through DIRECT"), strings.Index(message, "through PROXY ")
+		assert.True(t, directAt >= 0 && proxyAt > directAt, message)
 	})
 
 	t.Run("NoRoute", func(t *testing.T) {
