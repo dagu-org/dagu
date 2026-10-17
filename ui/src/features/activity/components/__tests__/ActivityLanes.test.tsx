@@ -85,7 +85,10 @@ function stubLaneWidth(lane: HTMLElement, width: number) {
     }) as DOMRect;
 }
 
-function renderLanes(laneRuns: ActivityRun[] = runs) {
+function renderLanes(
+  laneRuns: ActivityRun[] = runs,
+  active: ActivityRun[] = []
+) {
   return render(
     <MemoryRouter initialEntries={['/']}>
       <Routes>
@@ -94,7 +97,7 @@ function renderLanes(laneRuns: ActivityRun[] = runs) {
           element={
             <ActivityLanes
               runs={laneRuns}
-              active={[]}
+              active={active}
               window={{ from: FROM, to: TO }}
               hasMore={false}
               range={{ from: FROM, to: TO }}
@@ -169,15 +172,20 @@ describe('ActivityLanes', () => {
     );
   });
 
+  // The window lists only runs created inside it; a run still going from
+  // before it comes from the in-progress list.
   it('shows a run that started before the window', () => {
-    renderLanes([
-      {
-        name: 'backfill',
-        dagRunId: 'backfill-1',
-        status: Status.Running,
-        startedAt: FROM - 3600,
-      },
-    ]);
+    renderLanes(
+      [],
+      [
+        {
+          name: 'backfill',
+          dagRunId: 'backfill-1',
+          status: Status.Running,
+          startedAt: FROM - 3600,
+        },
+      ]
+    );
     const lane = screen.getByRole('group', { name: /^backfill:/ });
     stubLaneWidth(lane, 960);
 

@@ -17,6 +17,7 @@ import {
   sortLanes,
   systemAlerts,
   timeTicks,
+  withEarlierActiveRuns,
 } from '../activityModel';
 
 const HOUR = 3600;
@@ -320,6 +321,32 @@ describe('barSpan', () => {
   it('gives a queued run no width', () => {
     expect(barSpan(run('etl', 'r1', Status.Queued, 1500), range, 1900)).toEqual(
       { left: 50, right: 50 }
+    );
+  });
+});
+
+describe('withEarlierActiveRuns', () => {
+  const loaded = [
+    run('etl', 'etl-2', Status.Success, FROM + 2 * HOUR),
+    run('etl', 'etl-1', Status.Running, FROM + HOUR),
+  ];
+
+  it('adds runs still going from before the window, newest first', () => {
+    const older = run('backfill', 'b-1', Status.Running, FROM - 2 * HOUR);
+    const newer = run('sync', 's-1', Status.Running, FROM - HOUR);
+
+    expect(withEarlierActiveRuns(loaded, [older, newer], FROM)).toEqual([
+      ...loaded,
+      newer,
+      older,
+    ]);
+  });
+
+  it('skips loaded runs and runs that began inside the window', () => {
+    const inside = run('sync', 's-2', Status.Running, FROM + 3 * HOUR);
+
+    expect(withEarlierActiveRuns(loaded, [loaded[1]!, inside], FROM)).toBe(
+      loaded
     );
   });
 });

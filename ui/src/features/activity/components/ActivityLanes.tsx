@@ -23,6 +23,7 @@ import {
   sortLanes,
   type TimeRange,
   timeTicks,
+  withEarlierActiveRuns,
 } from '../lib/activityModel';
 import { executionsURL } from '../lib/activityLinks';
 
@@ -132,9 +133,14 @@ export function ActivityLanes({
     dagRunId: string;
   } | null>(null);
   const [peekTab, setPeekTab] = React.useState<StatusTab>('status');
+  const windowFrom = activityWindow.from;
   const lanes = React.useMemo(
-    () => sortLanes(groupLanes(runs), active),
-    [runs, active]
+    () =>
+      sortLanes(
+        groupLanes(withEarlierActiveRuns(runs, active, windowFrom)),
+        active
+      ),
+    [runs, active, windowFrom]
   );
   const loadedFrom = hasMore ? oldestStart(runs) : undefined;
   const unloadedPercent =

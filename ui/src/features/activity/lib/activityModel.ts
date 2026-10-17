@@ -256,6 +256,29 @@ const MIN_FIT_SECONDS = 60 * 60;
 /** Empty time kept before the first run when fitting the range. */
 const FIT_LEAD_SECONDS = 15 * 60;
 
+/**
+ * Adds in-progress runs that began before the window to the loaded runs. The
+ * window lists only runs created inside it, so a long run still going would
+ * otherwise have no lane. Those runs are older than every loaded run, so the
+ * result stays newest first.
+ */
+export function withEarlierActiveRuns(
+  runs: ActivityRun[],
+  active: ActivityRun[],
+  windowFrom: number
+): ActivityRun[] {
+  const loaded = new Set(runs.map((run) => run.dagRunId));
+  const earlier = active
+    .filter(
+      (run) =>
+        run.startedAt !== undefined &&
+        run.startedAt < windowFrom &&
+        !loaded.has(run.dagRunId)
+    )
+    .sort(newestFirst);
+  return earlier.length === 0 ? runs : [...runs, ...earlier];
+}
+
 /** Start time of the oldest run, or undefined when none has one. */
 export function oldestStart(runs: ActivityRun[]): number | undefined {
   let oldest: number | undefined;
