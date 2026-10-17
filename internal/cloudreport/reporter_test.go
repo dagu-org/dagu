@@ -181,6 +181,31 @@ func TestReportWithoutCredentials(t *testing.T) {
 		assert.Equal(t, "srv-1", decodeReport(t, console.next(t)).ServerID)
 	})
 
+	// Choosing a level while connecting ends a long wait, so that the first
+	// report follows the console's approval within seconds.
+	t.Run("turned on while waiting", func(t *testing.T) {
+		t.Parallel()
+
+		console := newFakeConsole(t)
+		var activated atomic.Bool
+		credentials := func() (license.CloudCredentials, bool) {
+			if !activated.Load() {
+				return license.CloudCredentials{}, false
+			}
+			return console.credentials()
+		}
+		monitoring := NewMonitoring("", &memoryStore{})
+		clock := startReporter(t.Context(), t, newReporter(credentials, nil, monitoring), noJitter)
+
+		assert.Equal(t, maxStartDelay/2, clock.wait())
+		require.NoError(t, monitoring.SetLevel(t.Context(), config.ReportRuns))
+		assert.Equal(t, 5*time.Second, clock.wait(), "the start delay ends once reporting is on")
+
+		activated.Store(true)
+		clock.elapse()
+		assert.Equal(t, "srv-1", decodeReport(t, console.next(t)).ServerID)
+	})
+
 	t.Run("off", func(t *testing.T) {
 		t.Parallel()
 
