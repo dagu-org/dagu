@@ -40,6 +40,27 @@ func echoServer(t *testing.T) string {
 	return listener.Addr().String()
 }
 
+// resettingProxy returns the address of a proxy that reads a request and
+// resets the connection without answering.
+func resettingProxy(t *testing.T) string {
+	t.Helper()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = listener.Close() })
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			_, _ = conn.Read(make([]byte, 1024))
+			_ = conn.(*net.TCPConn).SetLinger(0)
+			_ = conn.Close()
+		}
+	}()
+	return listener.Addr().String()
+}
+
 func readGreeting(t *testing.T, conn net.Conn) string {
 	t.Helper()
 	defer func() { _ = conn.Close() }()
@@ -67,12 +88,13 @@ func TestDialRoutes(t *testing.T) {
 		tunnel := newTunnelProxy(t, target, http.StatusOK)
 		routes := []route{
 			{kind: routeProxy, addr: refusing},
+			{kind: routeProxy, addr: resettingProxy(t)},
 			{kind: routeProxy, addr: tunnel.addr},
 			{kind: routeDirect},
 		}
 		conn, via, err := dialRoutes(context.Background(), routes, target, noCertificate)
 		require.NoError(t, err)
-		assert.Equal(t, routes[1], via)
+		assert.Equal(t, routes[2], via)
 		assert.Equal(t, "hello", readGreeting(t, conn))
 		assert.Equal(t, []string{target}, tunnel.requests())
 	})

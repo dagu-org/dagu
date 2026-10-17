@@ -222,9 +222,9 @@ the proxy reaches those hosts the way the device does: through `proxy` when it
 is set, otherwise through the operating system's proxy settings (the proxy
 auto-config, automatic detection on Windows, or the manual proxies; the proxy
 environment variables on Linux). As in Chrome, it moves to the next route of
-a PAC result only when a proxy cannot be reached or a SOCKS proxy fails; an
-HTTP proxy that answers, denying the site or asking for credentials, is not
-bypassed through a later route. The browser sends every other request there
+a PAC result only when a proxy cannot be reached, drops the connection before
+answering, or is a SOCKS proxy that fails; an HTTP proxy that answers, denying
+the site or asking for credentials, is not bypassed through a later route. The browser sends every other request there
 itself. Chrome does not consult a PAC script for `localhost`, `*.localhost`,
 the Windows name `loopback`, loopback addresses (`127.0.0.0/8` and `::1`), or
 link-local addresses, and `*` leaves them to the browser. When a certificate

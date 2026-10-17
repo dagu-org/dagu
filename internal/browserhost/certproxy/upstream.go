@@ -91,7 +91,7 @@ func dialRoutes(ctx context.Context, routes []route, target string, proxyTLS fun
 }
 
 // dialRoute connects to target through r. It also reports whether an HTTP
-// proxy took the CONNECT request and opened no tunnel.
+// proxy answered the CONNECT request without opening a tunnel.
 func dialRoute(ctx context.Context, r route, target string, proxyTLS func(host string) *tls.Config) (net.Conn, bool, error) {
 	dialer := &net.Dialer{Timeout: dialTimeout}
 	switch r.kind {
@@ -109,9 +109,9 @@ func dialRoute(ctx context.Context, r route, target string, proxyTLS func(host s
 			}
 			conn = tlsConn
 		}
-		if err := connectTunnel(ctx, conn, r.addr, target); err != nil {
+		if answered, err := connectTunnel(ctx, conn, r.addr, target); err != nil {
 			_ = conn.Close()
-			return nil, true, err
+			return nil, answered, err
 		}
 		return conn, false, nil
 	case routeSOCKS5:
@@ -128,8 +128,9 @@ func dialRoute(ctx context.Context, r route, target string, proxyTLS func(host s
 }
 
 // connectTunnel asks the HTTP proxy at proxyAddr, reached over conn, for a
-// tunnel to target.
-func connectTunnel(ctx context.Context, conn net.Conn, proxyAddr, target string) error {
+// tunnel to target. It also reports whether the proxy answered, which one
+// that drops the connection first does not.
+func connectTunnel(ctx context.Context, conn net.Conn, proxyAddr, target string) (bool, error) {
 	deadline, ok := ctx.Deadline()
 	if !ok {
 		deadline = time.Now().Add(dialTimeout)
@@ -142,13 +143,13 @@ func connectTunnel(ctx context.Context, conn net.Conn, proxyAddr, target string)
 	}
 	switch {
 	case err != nil:
-		return err
+		return false, err
 	case status == http.StatusProxyAuthRequired:
-		return fmt.Errorf("the proxy %s %w", proxyAddr, errProxyAuth)
+		return true, fmt.Errorf("the proxy %s %w", proxyAddr, errProxyAuth)
 	case status != http.StatusOK:
-		return fmt.Errorf("the proxy %s answered %d %s", proxyAddr, status, http.StatusText(status))
+		return true, fmt.Errorf("the proxy %s answered %d %s", proxyAddr, status, http.StatusText(status))
 	}
-	return conn.SetDeadline(time.Time{})
+	return false, conn.SetDeadline(time.Time{})
 }
 
 // requestTunnel sends a CONNECT request for target over conn and returns
