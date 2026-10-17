@@ -63,12 +63,17 @@ const PROBLEM_STATUSES = new Set<Status>([
   Status.PartialSuccess,
 ]);
 
-/** Narrowest a run's mark is drawn, in pixels; problem runs draw wider. */
-const MIN_MARK_PX = 2;
-const MIN_PROBLEM_MARK_PX = 3;
+type MarkSize = { minWidth: number; inset: number };
 
-function minMarkPx(run: ActivityRun): number {
-  return PROBLEM_STATUSES.has(run.status) ? MIN_PROBLEM_MARK_PX : MIN_MARK_PX;
+/**
+ * A run mark's narrowest width and its space above and below inside the lane,
+ * in pixels. Problem runs draw wider and taller so they stand out.
+ */
+const MARK: MarkSize = { minWidth: 2, inset: 8 };
+const PROBLEM_MARK: MarkSize = { minWidth: 3, inset: 2 };
+
+function markSize(run: ActivityRun): MarkSize {
+  return PROBLEM_STATUSES.has(run.status) ? PROBLEM_MARK : MARK;
 }
 
 /** Pixels a pointer may travel before a press becomes a zoom drag. */
@@ -87,32 +92,40 @@ type Hover = {
 
 type Drag = { lane: string; startX: number; currentX: number; rect: DOMRect };
 
-// Runs come oldest first, so on a tie the later run, which is drawn on top,
-// wins. Each run counts as wide as its drawn mark.
+// A pointer inside a drawn mark picks it, the topmost one where marks
+// overlap. Runs come oldest first, so later runs are drawn on top and win
+// ties. Elsewhere in the lane, the nearest mark by x within MARK_HIT_PX wins.
 function runAt(
   runs: ActivityRun[],
   range: TimeRange,
   nowSeconds: number,
   rect: DOMRect,
-  clientX: number
+  clientX: number,
+  clientY: number
 ): ActivityRun | undefined {
-  let best: ActivityRun | undefined;
-  let bestDistance = MARK_HIT_PX;
+  let inside: ActivityRun | undefined;
+  let nearest: ActivityRun | undefined;
+  let nearestDistance = MARK_HIT_PX;
   for (const run of runs) {
     const { left, right } = barSpan(run, range, nowSeconds);
+    const { minWidth, inset } = markSize(run);
     const x0 = rect.left + (left / 100) * rect.width;
-    const x1 = Math.max(
-      rect.left + (right / 100) * rect.width,
-      x0 + minMarkPx(run)
-    );
+    const x1 = Math.max(rect.left + (right / 100) * rect.width, x0 + minWidth);
     const distance =
       clientX < x0 ? x0 - clientX : clientX > x1 ? clientX - x1 : 0;
-    if (distance <= bestDistance) {
-      best = run;
-      bestDistance = distance;
+    if (
+      distance === 0 &&
+      clientY >= rect.top + inset &&
+      clientY <= rect.bottom - inset
+    ) {
+      inside = run;
+    }
+    if (distance <= nearestDistance) {
+      nearest = run;
+      nearestDistance = distance;
     }
   }
-  return best;
+  return inside ?? nearest;
 }
 
 function timeAt(range: TimeRange, rect: DOMRect, clientX: number): number {
@@ -237,7 +250,14 @@ export function ActivityLanes({
       lane: workflow.name,
       clientX: event.clientX,
       clientY: rect.top,
-      run: runAt(sortedRuns(workflow), range, nowSeconds, rect, event.clientX),
+      run: runAt(
+        sortedRuns(workflow),
+        range,
+        nowSeconds,
+        rect,
+        event.clientX,
+        event.clientY
+      ),
     });
   };
 
@@ -263,7 +283,8 @@ export function ActivityLanes({
       range,
       nowSeconds,
       rect,
-      event.clientX
+      event.clientX,
+      event.clientY
     );
     if (run) {
       openRun(workflow.name, run, event.metaKey || event.ctrlKey);
@@ -443,8 +464,8 @@ export function ActivityLanes({
                   />
                 )}
                 {visibleRuns.map((run) => {
-                  const problem = PROBLEM_STATUSES.has(run.status);
                   const { left, right } = barSpan(run, range, nowSeconds);
+                  const { minWidth, inset } = markSize(run);
                   return (
                     <span
                       key={run.dagRunId}
@@ -453,14 +474,15 @@ export function ActivityLanes({
                         // The card-coloured ring leaves a gap between
                         // back-to-back runs.
                         'absolute rounded-sm ring-1 ring-card',
-                        problem ? 'top-0.5 bottom-0.5' : 'top-2 bottom-2',
                         focused === run &&
                           'ring-2 ring-ring ring-offset-1 ring-offset-background'
                       )}
                       style={{
                         left: `${left}%`,
                         width: `${Math.max(0, right - left)}%`,
-                        minWidth: minMarkPx(run),
+                        minWidth,
+                        top: inset,
+                        bottom: inset,
                         backgroundColor:
                           MARK_COLOR[run.status] ?? 'var(--status-success)',
                       }}

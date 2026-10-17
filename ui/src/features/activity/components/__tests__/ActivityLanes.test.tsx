@@ -220,6 +220,41 @@ describe('ActivityLanes', () => {
     expect(screen.getByRole('dialog')).toHaveAccessibleName(`etl ${dagRunId}`);
   });
 
+  // Problem runs draw taller, so a failed run under a later run shows above
+  // and below it.
+  it.each([
+    ['a failed run where it shows past a later one', 'deploy-1', 4],
+    ['the later run drawn over it', 'deploy-2', 18],
+  ])('opens %s', (_, dagRunId, clientY) => {
+    renderLanes({
+      laneRuns: [
+        {
+          name: 'deploy',
+          dagRunId: 'deploy-2',
+          status: Status.Success,
+          startedAt: FROM + 12 * 900,
+          finishedAt: FROM + 36 * 900,
+        },
+        {
+          name: 'deploy',
+          dagRunId: 'deploy-1',
+          status: Status.Failed,
+          startedAt: FROM,
+          finishedAt: FROM + 48 * 900,
+        },
+      ],
+    });
+    const lane = screen.getByRole('group', { name: /^deploy:/ });
+    stubLaneWidth(lane, 960);
+
+    fireEvent.pointerDown(lane, { button: 0, clientX: 240, clientY });
+    fireEvent.pointerUp(lane, { clientX: 240, clientY });
+
+    expect(screen.getByRole('dialog')).toHaveAccessibleName(
+      `deploy ${dagRunId}`
+    );
+  });
+
   it('shows a run that started before the window', () => {
     renderLanes({ laneRuns: [backfill] });
     const lane = screen.getByRole('group', { name: /^backfill:/ });
