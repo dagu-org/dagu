@@ -675,8 +675,9 @@ func supportedStrictBinding(segments []string) bool {
 			return false
 		}
 		// An item field is a data key, so it may start with an underscore,
-		// as the _row a workbook reader attaches to each row does.
-		return len(segments) == 2 || validOutputPathSegment(segments[2])
+		// as the _row a workbook reader attaches to each row does, and use
+		// any script, as workbook headers do.
+		return len(segments) == 2 || validItemFieldSegment(segments[2])
 	case "inputs", "outputs":
 		return len(segments) == 2 && bindingNamePattern.MatchString(segments[1])
 	case "context":

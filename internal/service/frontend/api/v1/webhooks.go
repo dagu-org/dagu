@@ -780,7 +780,7 @@ func (a *API) TriggerWebhook(ctx context.Context, request api.TriggerWebhookRequ
 
 	// Enqueue directly from the API layer so accepted webhook payloads do not
 	// need to fit in a subprocess command line.
-	if err := a.enqueuePreparedDAGRun(ctx, dag, params, dagRunID, ir.TriggerTypeWebhook, profileName, false); err != nil {
+	if err := a.enqueuePreparedDAGRun(ctx, dag, params, dagRunID, ir.TriggerTypeWebhook, profileName, false, nil); err != nil {
 		logger.Error(ctx, "Webhook: failed to enqueue DAG run",
 			tag.DAG(dag.Name),
 			tag.Error(err),

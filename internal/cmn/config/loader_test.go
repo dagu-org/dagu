@@ -169,6 +169,8 @@ func TestLoad_Env(t *testing.T) {
 		"DAGU_COORDINATOR_PORT":        "50099",
 		"DAGU_COORDINATOR_HEALTH_PORT": "50101",
 
+		"DAGU_COORDINATOR_WORKER_WAIT_TIMEOUT": "90s",
+
 		"DAGU_WORKER_ID":              "test-worker-123",
 		"DAGU_WORKER_MAX_ACTIVE_RUNS": "200",
 		"DAGU_WORKER_HEALTH_PORT":     "50102",
@@ -341,11 +343,12 @@ func TestLoad_Env(t *testing.T) {
 		},
 		Queues: Queues{Enabled: false},
 		Coordinator: Coordinator{
-			Enabled:    true,
-			Host:       "0.0.0.0",
-			Advertise:  "dagu-coordinator",
-			Port:       50099,
-			HealthPort: 50101,
+			Enabled:           true,
+			Host:              "0.0.0.0",
+			Advertise:         "dagu-coordinator",
+			Port:              50099,
+			HealthPort:        50101,
+			WorkerWaitTimeout: 90 * time.Second,
 		},
 		Worker: Worker{
 			ID:              "test-worker-123",
@@ -428,6 +431,29 @@ worker:
 
 	assert.Zero(t, cfg.Coordinator.HealthPort)
 	assert.Zero(t, cfg.Worker.HealthPort)
+}
+
+// The hold for a matching worker defaults to two minutes; "0" turns it into
+// an immediate refusal, and an unparsable value keeps the default.
+func TestLoad_WorkerWaitTimeout(t *testing.T) {
+	for name, tc := range map[string]struct {
+		yaml string
+		want time.Duration
+	}{
+		"default":  {yaml: "# minimal config", want: 2 * time.Minute},
+		"set":      {yaml: "coordinator:\n  worker_wait_timeout: 45s\n", want: 45 * time.Second},
+		"disabled": {yaml: "coordinator:\n  worker_wait_timeout: \"0\"\n", want: 0},
+		"invalid":  {yaml: "coordinator:\n  worker_wait_timeout: soon\n", want: 2 * time.Minute},
+	} {
+		t.Run(name, func(t *testing.T) {
+			configFile := filepath.Join(t.TempDir(), "config.yaml")
+			require.NoError(t, os.WriteFile(configFile, []byte(tc.yaml), 0600))
+
+			cfg := testLoad(t, WithConfigFile(configFile))
+
+			assert.Equal(t, tc.want, cfg.Coordinator.WorkerWaitTimeout)
+		})
+	}
 }
 
 func TestLoad_WorkerShutdownTimeout(t *testing.T) {
@@ -1033,10 +1059,11 @@ scheduler:
 			},
 		},
 		Coordinator: Coordinator{
-			Enabled:    true,
-			Host:       "coordinator.example.com",
-			Port:       8081,
-			HealthPort: 8091,
+			Enabled:           true,
+			Host:              "coordinator.example.com",
+			Port:              8081,
+			HealthPort:        8091,
+			WorkerWaitTimeout: 2 * time.Minute,
 		},
 		Worker: Worker{
 			ID:              "worker-1",

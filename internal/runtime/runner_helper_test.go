@@ -279,6 +279,12 @@ func newHandlerStep(_ *testing.T, name, id, command string) ir.Step {
 	}
 }
 
+func withOnInit(step ir.Step) runnerOption {
+	return func(cfg *runtime.Config) {
+		cfg.OnInit = &step
+	}
+}
+
 func withOnSuccess(step ir.Step) runnerOption {
 	return func(cfg *runtime.Config) {
 		cfg.OnSuccess = &step

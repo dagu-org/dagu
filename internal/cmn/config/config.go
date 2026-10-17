@@ -676,6 +676,10 @@ type Coordinator struct {
 	Advertise  string // Registry address (auto-detected if empty)
 	Port       int
 	HealthPort int // HTTP health check port (default: 8091, 0 disables)
+	// WorkerWaitTimeout is how long a dispatch with no healthy matching worker
+	// is held for one to register before the run fails. Default: 2m; 0 refuses
+	// such a dispatch at once.
+	WorkerWaitTimeout time.Duration
 }
 
 // Worker represents the worker configuration.
@@ -862,6 +866,9 @@ func (c *Config) validateCoordinator() error {
 	}
 	if c.Coordinator.HealthPort != 0 && c.Coordinator.Port == c.Coordinator.HealthPort {
 		return fmt.Errorf("coordinator.port and coordinator.health_port must be different when health checks are enabled")
+	}
+	if c.Coordinator.WorkerWaitTimeout < 0 {
+		return fmt.Errorf("invalid coordinator.worker_wait_timeout: %s (must not be negative)", c.Coordinator.WorkerWaitTimeout)
 	}
 	return nil
 }

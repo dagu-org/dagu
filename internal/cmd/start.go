@@ -82,7 +82,7 @@ This command parses the DAG definition, resolves parameters, and initiates the D
 }
 
 // Command line flags for the start command
-var startFlags = []commandLineFlag{paramsFlag, paramsStdinFlag, nameFlag, dagRunIDFlag, fromRunIDFlag, parentDAGRunFlag, rootDAGRunFlag, labelsFlag, tagsFlag, defaultWorkingDirFlag, profileFlag, startWorkerIDFlag, attemptIDFlag, triggerTypeFlag, triggerActorFlag, scheduleTimeFlag, sourceFileFlag, noReuseFlag, onlyFlag, outputsFromFlag, outputFlag}
+var startFlags = []commandLineFlag{paramsFlag, paramsStdinFlag, nameFlag, dagRunIDFlag, fromRunIDFlag, parentDAGRunFlag, rootDAGRunFlag, workerLabelFlag, labelsFlag, tagsFlag, defaultWorkingDirFlag, profileFlag, startWorkerIDFlag, attemptIDFlag, triggerTypeFlag, triggerActorFlag, scheduleTimeFlag, sourceFileFlag, noReuseFlag, onlyFlag, outputsFromFlag, outputFlag}
 
 var fromRunIDFlag = commandLineFlag{
 	name:  "from-run-id",
@@ -252,6 +252,16 @@ func runStart(ctx *Context, args []string) error {
 		}
 
 		if err := validateStartPositionalParamCount(ctx, args, dag, params); err != nil {
+			return err
+		}
+	}
+
+	if ctx.Command.Flags().Changed(flagWorkerLabel) {
+		// A worker re-invoking start must not re-route the run it was given.
+		if workerID != "local" {
+			return fmt.Errorf("--%s cannot be combined with --worker-id", flagWorkerLabel)
+		}
+		if err := applyWorkerLabelsOverride(ctx, dag); err != nil {
 			return err
 		}
 	}

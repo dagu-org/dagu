@@ -1300,7 +1300,7 @@ Browser behavior:
 
 Automate desktop applications, such as an ERP client or a legacy Windows program, on the desktop of a macOS or Windows worker. The model looks at screenshots and clicks and types; it comes from the DAG-level `llm` block, or `with.llm`, which replaces it entirely. `anthropic`, `openai`, and `gemini` models use their native computer-use tools when they support them (Claude Opus 4.8 or Sonnet 5 and later, Gemini 3.5 and later); other providers, older models, or `mode: generic` use plain function tools with any tool-calling vision model.
 
-The Dagu process that runs the step must run in a logged-in user session: on Windows not as a service, with the screen unlocked; on macOS with Screen Recording and Accessibility granted to the app that starts Dagu. Run `dagu computer check` on the host to verify. Route computer DAGs to such workers with a DAG-level `worker_selector`; other systems fail the step.
+The Dagu process that runs the step must run in a logged-in user session: on Windows not as a service, with the screen unlocked, and with a Remote Desktop or child session kept connected so its display draws; on macOS with Screen Recording and Accessibility granted to the app that starts Dagu. Run `dagu computer check` on the host to verify. Route computer DAGs to such workers with a DAG-level `worker_selector`, or route one run with `workerSelector` on the start and enqueue API requests (`--worker-label` on `dagu start` and `dagu enqueue`); other systems fail the step.
 
 ```yaml
 secrets:
@@ -1355,7 +1355,7 @@ Computer behavior:
 - Each operation's timeline event carries `via` (`element` for a replay or extract read by the window's elements, `screen` for a replay by pixels, `model` for a model request, `exact` for an exact check), `durationMs`, and `tokens`.
 - When a model provider asks for confirmation before sensitive actions, the step fails unless `on_confirmation: allow`. Put an `ask` before such an act instead.
 - `ask: {prompt, as}` puts the step in Waiting and leaves the desktop as it is; the answer becomes `%<as>%` and the step resumes at the next operation.
-- One computer step at a time uses a user's desktop, across Dagu processes with different data directories; others wait. While a step holds the desktop, the display stays awake; a locked screen fails the step. Screenshots are saved under `computer/<step id>/` in the run artifacts on failure by default and are not masked.
+- One computer step at a time uses a user's desktop, across Dagu processes with different data directories; others wait. While a step holds the desktop, the display stays awake. A step that starts on a locked screen, or while nobody is logged in, waits for it to be unlocked, up to its timeout or 24 hours; a screen that locks while a step runs fails it. Screenshots are saved under `computer/<step id>/` in the run artifacts on failure by default and are not masked.
 - Before sending input, a step waits until nobody has touched the desktop for `with.idle` (default `5s`). Actions the model chose on a screen a person has since used are not run; the model gets the new screen instead. `idle: 0` turns this off, for example on a dedicated host.
 
 ## router.route

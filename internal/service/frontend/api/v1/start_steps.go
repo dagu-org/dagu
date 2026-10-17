@@ -28,6 +28,9 @@ type selectedStepsStart struct {
 	noReuse     bool
 	// inline marks a DAG loaded from a submitted spec rather than a DAG file.
 	inline bool
+	// workerSelector is the request's per-run selector; the seeded run is
+	// persisted from the resolved DAG, which must carry it.
+	workerSelector map[string]string
 }
 
 // stepSelection is the step selection of a start request body.
@@ -74,6 +77,9 @@ func (a *API) startSelectedSteps(ctx context.Context, dag *ir.DAG, req selectedS
 	}
 	if err := spec.ValidateStartParams(dag.DefaultParams, spec.StartParamInput{RawParams: req.params}); err != nil {
 		return badSelectedStepsRequest(err.Error())
+	}
+	if err := reapplyWorkerSelector(dag, req.workerSelector); err != nil {
+		return err
 	}
 	if req.inline {
 		// The run executes from its stored snapshot, not the temporary spec file.

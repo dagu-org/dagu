@@ -52,7 +52,9 @@ application that starts Dagu, such as Terminal, or to the dagu binary when it
 runs on its own.
 
 On Windows, the worker must run in a logged-in user session, not as a
-service, and the screen must stay unlocked.
+service, and the screen must stay unlocked. A Remote Desktop or child
+session must stay connected: once its client is gone the session stops
+drawing, which the check reports as session_disconnected.
 
 Computer steps are not supported on other systems.
 

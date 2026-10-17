@@ -18,6 +18,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const maxXlsxStdinBytes = 64 << 20
+
 // xlsxPasswordEnv supplies a workbook password when --password is omitted.
 const xlsxPasswordEnv = "DAGU_XLSX_PASSWORD" //nolint:gosec // This is an environment variable name, not a credential.
 
@@ -65,6 +67,8 @@ column name:
 This is what xlsx.info publishes, read straight from the file. Nothing is
 written and no run is created.
 
+A path of "-" reads the workbook from standard input, up to 64 MiB.
+
 A protected workbook needs a password. Set DAGU_XLSX_PASSWORD rather
 than --password where other users share the host: a flag value shows in
 the process list and stays in shell history. The flag wins when both are
@@ -102,6 +106,8 @@ are read unless --skip-hidden leaves them out.
 With --format json, the result is one JSON object: rows, count, headers,
 sheet, range, warnings, and truncated. The text format prints a tab-separated
 header line and one line per row.
+
+A path of "-" reads the workbook from standard input, up to 64 MiB.
 
 A protected workbook needs a password. Set DAGU_XLSX_PASSWORD rather
 than --password where other users share the host: a flag value shows in
@@ -157,23 +163,44 @@ func xlsxPath(arg string) (string, error) {
 	return filepath.Abs(resolved)
 }
 
+func xlsxStdin(cmd *cobra.Command) ([]byte, error) {
+	data, err := io.ReadAll(io.LimitReader(cmd.InOrStdin(), maxXlsxStdinBytes+1))
+	if err != nil {
+		return nil, fmt.Errorf("reading workbook from stdin: %w", err)
+	}
+	if len(data) > maxXlsxStdinBytes {
+		return nil, fmt.Errorf("stdin workbook exceeds 64 MiB limit")
+	}
+	return data, nil
+}
+
 func runXlsxInspect(cmd *cobra.Command, args []string) error {
 	format, err := xlsxFormat(cmd)
-	if err != nil {
-		return err
-	}
-	path, err := xlsxPath(args[0])
 	if err != nil {
 		return err
 	}
 	rows, _ := cmd.Flags().GetInt("rows")
 	sheet, _ := cmd.Flags().GetString("sheet")
 
-	info, err := workbook.Inspect(cmd.Context(), path, workbook.InspectOptions{
+	var info *workbook.Info
+	opts := workbook.InspectOptions{
 		Password:   xlsxPassword(cmd),
 		Sheet:      sheet,
 		SampleRows: max(rows, 0),
-	})
+	}
+	if strings.TrimSpace(args[0]) == "-" {
+		data, readErr := xlsxStdin(cmd)
+		if readErr != nil {
+			return readErr
+		}
+		info, err = workbook.InspectBytes(cmd.Context(), "-", data, opts)
+	} else {
+		path, pathErr := xlsxPath(args[0])
+		if pathErr != nil {
+			return pathErr
+		}
+		info, err = workbook.Inspect(cmd.Context(), path, opts)
+	}
 	if err != nil {
 		return err
 	}
@@ -186,10 +213,6 @@ func runXlsxInspect(cmd *cobra.Command, args []string) error {
 
 func runXlsxRead(cmd *cobra.Command, args []string) error {
 	format, err := xlsxFormat(cmd)
-	if err != nil {
-		return err
-	}
-	path, err := xlsxPath(args[0])
 	if err != nil {
 		return err
 	}
@@ -209,7 +232,20 @@ func runXlsxRead(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	result, err := workbook.Read(cmd.Context(), path, opts)
+	var result *workbook.ReadResult
+	if strings.TrimSpace(args[0]) == "-" {
+		data, readErr := xlsxStdin(cmd)
+		if readErr != nil {
+			return readErr
+		}
+		result, err = workbook.ReadBytes(cmd.Context(), "-", data, opts)
+	} else {
+		path, pathErr := xlsxPath(args[0])
+		if pathErr != nil {
+			return pathErr
+		}
+		result, err = workbook.Read(cmd.Context(), path, opts)
+	}
 	if err != nil {
 		return err
 	}

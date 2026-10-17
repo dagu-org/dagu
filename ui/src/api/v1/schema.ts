@@ -3426,6 +3426,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/license/server-name": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Rename this server in Dagu Console
+         * @description Sets the name Dagu Console and Dagu show for this server, in place of the name it reports. An empty name shows the reported name again. Admin only.
+         */
+        put: operations["renameLicenseServer"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/license/monitoring": {
         parameters: {
             query?: never;
@@ -7022,8 +7042,10 @@ export interface components {
             warningCode: string;
             /** @description User-facing explanation when a configured license is unusable */
             error: string;
-            /** @description Name that identifies this server in Dagu Console */
+            /** @description Name Dagu Console shows for this server: the one a person gave it, else reportedName */
             serverName?: string;
+            /** @description Name this server reports to Dagu Console: license.server_name, else the hostname */
+            reportedName?: string;
             /** @description Identifier of the loaded license */
             licenseId?: string;
             /** @description Dagu Console workspace that owns the license */
@@ -7553,6 +7575,10 @@ export interface components {
         RuntimeProfileName: string;
         /** @description Runtime profile override. Empty string means no profile. */
         RuntimeProfileOverride: string;
+        /** @description Worker labels this DAG-run requires. Replaces the DAG-level worker_selector for this run, including its "local" value, and is kept with the run so retries, reschedules, and queued dispatch route the same way. Not allowed for DAGs with approval steps. */
+        WorkerSelectorOverride: {
+            [key: string]: string;
+        };
         /** @description Environment variable key stored in a runtime profile. Keys with the DAGU_ prefix are reserved. */
         RuntimeProfileKey: string;
         /** @enum {string} */
@@ -9230,6 +9256,7 @@ export interface operations {
                     dagRunId?: components["schemas"]["DAGRunId"] & unknown;
                     /** @description Optional DAG name override to use for the created dag-run */
                     dagName?: string;
+                    workerSelector?: components["schemas"]["WorkerSelectorOverride"];
                     /** @description Runtime profile override. Omit to use the DAG default profile, set to an empty string to run without a profile, or set to a profile name to override the DAG default. */
                     profile?: components["schemas"]["RuntimeProfileOverride"];
                     /**
@@ -9323,6 +9350,7 @@ export interface operations {
                     dagRunId?: components["schemas"]["DAGRunId"] & unknown;
                     /** @description Optional DAG name override to use for the created dag-run */
                     dagName?: string;
+                    workerSelector?: components["schemas"]["WorkerSelectorOverride"];
                     /** @description Runtime profile override. Omit to use the DAG default profile, set to an empty string to run without a profile, or set to a profile name to override the DAG default. */
                     profile?: components["schemas"]["RuntimeProfileOverride"];
                     /**
@@ -9422,6 +9450,7 @@ export interface operations {
                     profile?: components["schemas"]["RuntimeProfileOverride"];
                     /** @description Override the DAG-level queue definition */
                     queue?: string;
+                    workerSelector?: components["schemas"]["WorkerSelectorOverride"];
                     /**
                      * @description If true, prevent enqueuing if DAG is already running or queued (returns 409 conflict)
                      * @default false
@@ -10386,6 +10415,7 @@ export interface operations {
                     name?: string;
                     /** @description Runtime profile to apply to this DAG-run. Set to an empty string or omit to run without a profile. */
                     profile?: components["schemas"]["RuntimeProfileOverride"];
+                    workerSelector?: components["schemas"]["WorkerSelectorOverride"];
                     /** @description Parameters to pass to the DAG-run in JSON format */
                     params?: string;
                     dagRunId?: components["schemas"]["DAGRunId"] & unknown;
@@ -10483,6 +10513,7 @@ export interface operations {
                     dagRunId?: components["schemas"]["DAGRunId"] & unknown;
                     /** @description Override the queue to use for this DAG-run */
                     queue?: string;
+                    workerSelector?: components["schemas"]["WorkerSelectorOverride"];
                     /**
                      * @description If true, prevent enqueuing if DAG is already running or queued (returns 409 conflict)
                      * @default false
@@ -18628,6 +18659,72 @@ export interface operations {
                 };
             };
             /** @description The license does not check in with Dagu Console */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Dagu Console could not be reached */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    renameLicenseServer: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Name to show, at most 100 characters; empty clears it */
+                    name: string;
+                };
+            };
+        };
+        responses: {
+            /** @description License status after the rename */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LicenseStatusResponse"];
+                };
+            };
+            /** @description The name is too long, the license does not check in with Dagu Console, or Dagu Console refused the name */
             400: {
                 headers: {
                     [name: string]: unknown;

@@ -39,6 +39,11 @@ const (
 	// defaultPersonWait bounds how long a step waits for one to stop.
 	defaultIdlePoll   = 500 * time.Millisecond
 	defaultPersonWait = time.Hour
+	// defaultScreenPoll spaces the checks of a screen waiting for a person
+	// to unlock it, and defaultScreenWait bounds that wait for a step with
+	// no timeout.
+	defaultScreenPoll = 2 * time.Second
+	defaultScreenWait = 24 * time.Hour
 	// artifactLongEdge keeps saved screenshots readable at a modest size.
 	artifactLongEdge = 1920
 	finalShotLabel   = "final"
@@ -255,6 +260,9 @@ func (r *run) start(ctx context.Context) (int, error) {
 		})
 	}
 
+	if err := r.awaitUnlock(ctx); err != nil {
+		return 0, err
+	}
 	lockDir := r.exec.desktopLock
 	if lockDir == "" {
 		lockDir = filepath.Join(r.computerDir, desktopLockName)
@@ -796,6 +804,37 @@ func (r *run) awaitPerson(ctx context.Context) error {
 		r.timeline.Lifecycle(agentstep.StatusRunning, fmt.Sprintf("Nobody has used the desktop for %s; continuing", idle))
 	}
 	return err
+}
+
+// awaitUnlock waits while the desktop is unusable only until a person
+// unlocks it, as when a run caught up on wake starts on the lock screen.
+// Any other problem is left for opening the desktop to report. The step's
+// timeout bounds the wait; a step without one gives up after screenWait.
+func (r *run) awaitUnlock(ctx context.Context) error {
+	diag := r.exec.checkDesktop()
+	if !diag.AwaitsPerson() {
+		return nil
+	}
+	r.timeline.Waiting(waitReasonScreen, "Waiting for the screen to be unlocked: "+diag.Err().Error())
+	// A deadline the step inherits from its DAG may be later than the cap,
+	// so only the step's own timeout replaces it.
+	waitCtx := ctx
+	if r.exec.step.Timeout <= 0 {
+		var cancel context.CancelFunc
+		waitCtx, cancel = context.WithTimeout(ctx, r.exec.screenWait)
+		defer cancel()
+	}
+	for diag.AwaitsPerson() {
+		if err := sleep(waitCtx, r.exec.screenPoll); err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			return fmt.Errorf("open the desktop after waiting %s: %w", stringutil.FormatDuration(r.exec.screenWait), diag.Err())
+		}
+		diag = r.exec.checkDesktop()
+	}
+	r.timeline.Lifecycle(agentstep.StatusRunning, "The screen is unlocked; continuing")
+	return nil
 }
 
 // forgetReplays settles the replay cache of a failed step. An operation that

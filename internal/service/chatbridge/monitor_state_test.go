@@ -1096,9 +1096,12 @@ func TestNotificationMonitor_LockTheftSelfFencesActiveOwner(t *testing.T) {
 		return monitor.ownsNotificationLock() && monitor.notificationSessionActive()
 	}, notificationMonitorEventuallyTimeout(time.Second), 10*time.Millisecond)
 
-	lockDir := filepath.Clean(stateFile) + ".lock"
-	lockTokenPath := filepath.Join(lockDir, ".dagu_lock", "owner")
-	require.NoError(t, os.WriteFile(lockTokenPath, []byte("replacement-owner"), 0o600))
+	// Simulate theft by replacing the whole lock directory with another
+	// owner's, independent of the lock's internal file layout.
+	lockPath := filepath.Join(filepath.Clean(stateFile)+".lock", ".dagu_lock")
+	require.NoError(t, os.RemoveAll(lockPath))
+	require.NoError(t, os.Mkdir(lockPath, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(lockPath, "owner"), []byte("replacement-owner"), 0o600))
 	require.Eventually(t, func() bool {
 		return !monitor.ownsNotificationLock() && !monitor.notificationSessionActive()
 	}, notificationMonitorEventuallyTimeout(2*time.Second), 10*time.Millisecond)

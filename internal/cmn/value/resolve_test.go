@@ -311,12 +311,12 @@ func TestForeachUnbraced(t *testing.T) {
 func TestForeachMissingField(t *testing.T) {
 	t.Parallel()
 
-	for _, ref := range []string{`${foreach.item.missing}`, `${foreach.item."missing"}`, `${foreach.item["missing"]}`} {
+	for _, ref := range []string{`${foreach.item.missing}`, `${foreach.item."missing"}`, `${foreach.item["missing"]}`, `${foreach.item.未設定}`} {
 		t.Run(ref, func(t *testing.T) {
 			var notices ValueReferenceNoticeCollector
 			resolver := NewResolver(StaticScope{}, RuntimeScope{
 				// A missing item field must not fall back to an environment value.
-				Env:     NewEnvScope(nil, false).WithEntry("foreach", `{"item":{"missing":"shadow"}}`, EnvSourceStepEnv),
+				Env:     NewEnvScope(nil, false).WithEntry("foreach", `{"item":{"missing":"shadow","未設定":"shadow"}}`, EnvSourceStepEnv),
 				Foreach: Values{"item": map[string]any{"present": "value"}},
 			}, WithValueReferenceNotices(&notices))
 			got, err := resolver.String(t.Context(), ref, WorkflowField("foreach.collect"))
@@ -372,6 +372,24 @@ func TestForeachQuotedKeys(t *testing.T) {
 				require.NoError(t, err)
 				assert.Equal(t, "value", got, "reference: %s", ref)
 			}
+		})
+	}
+}
+
+// An unquoted item field may be named in any script, as workbook headers are.
+func TestForeachUnicodeFieldNames(t *testing.T) {
+	t.Parallel()
+
+	for _, key := range []string{"請求番号", "リンク", "Straße", "café", "_行", "列2"} {
+		t.Run(key, func(t *testing.T) {
+			var notices ValueReferenceNoticeCollector
+			resolver := NewResolver(StaticScope{}, RuntimeScope{
+				Foreach: Values{"item": map[string]any{key: "value"}},
+			}, WithValueReferenceNotices(&notices))
+			got, err := resolver.String(t.Context(), "${foreach.item."+key+"}", WorkflowField("foreach.collect"))
+			require.NoError(t, err)
+			assert.Equal(t, "value", got)
+			assert.Empty(t, notices.Notices())
 		})
 	}
 }

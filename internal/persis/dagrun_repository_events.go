@@ -5,6 +5,7 @@ package persis
 
 import (
 	"context"
+	"maps"
 	"path/filepath"
 	"sync"
 
@@ -150,8 +151,17 @@ func dagRunEventData(dag *ir.DAG) map[string]any {
 	if fileName == "" && dag.SourceFile != "" {
 		fileName = fileutil.TrimYAMLFileExtension(filepath.Base(dag.SourceFile))
 	}
-	if fileName == "" {
+	if fileName == "" && len(dag.WorkerSelector) == 0 {
 		return nil
 	}
-	return map[string]any{eventstore.DAGFileNameDataKey: fileName}
+	data := make(map[string]any, 2)
+	if fileName != "" {
+		data[eventstore.DAGFileNameDataKey] = fileName
+	}
+	if len(dag.WorkerSelector) > 0 {
+		// A consumer that opens worker capacity on demand reads which labels a
+		// waiting run needs from here.
+		data[eventstore.WorkerSelectorDataKey] = maps.Clone(dag.WorkerSelector)
+	}
+	return data
 }

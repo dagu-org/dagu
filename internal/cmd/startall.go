@@ -109,7 +109,9 @@ func runStartAll(ctx *Context, _ []string) error {
 
 	// Create a context that will be cancelled on interrupt signal.
 	// This must be created BEFORE server initialization so auth provider init can be cancelled.
-	signalCtx, stop := notifyShutdownContext(ctx.Context, syscall.SIGINT, syscall.SIGTERM)
+	// SIGHUP and SIGQUIT end start-all as they end a standalone scheduler, so
+	// a closed terminal never leaves the server running without its scheduler.
+	signalCtx, stop := notifyShutdownContext(ctx.Context, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT)
 	defer stop()
 
 	// Create a signal-aware context for services (used for auth init and all service operations)
@@ -171,6 +173,7 @@ func runStartAll(ctx *Context, _ []string) error {
 	}
 	// Disable health server when running from start-all
 	scheduler.DisableHealthServer()
+	scheduler.DisableSignalHandling()
 	scheduler.SetOpenCodeHost(openCodeHost)
 
 	// Initialize resource monitoring service

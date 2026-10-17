@@ -586,21 +586,33 @@ func (m *Manager) checkIn(ctx context.Context, ad *ActivationData) error {
 		return err
 	}
 
-	// Verify the refreshed token
-	newClaims, verifyErr := VerifyToken(m.pubKey, resp.Token)
-	if verifyErr != nil {
-		m.logger.Warn("Refreshed token verification failed",
-			slog.String("error", verifyErr.Error()))
-		return fmt.Errorf("refreshed token verification failed: %w", verifyErr)
+	newClaims, err := m.applyToken(ad, resp.Token, time.Now())
+	if err != nil {
+		return err
 	}
 
-	m.state.Update(newClaims, resp.Token)
+	m.logger.Debug("License heartbeat successful",
+		slog.String("plan", newClaims.Plan))
+	return nil
+}
+
+// applyToken verifies a token Dagu Console issued for the activation ad,
+// makes it the current license, and saves it with checkedInAt.
+func (m *Manager) applyToken(ad *ActivationData, token string, checkedInAt time.Time) (*LicenseClaims, error) {
+	newClaims, err := VerifyToken(m.pubKey, token)
+	if err != nil {
+		m.logger.Warn("Refreshed token verification failed",
+			slog.String("error", err.Error()))
+		return nil, fmt.Errorf("refreshed token verification failed: %w", err)
+	}
+
+	m.state.Update(newClaims, token)
 	m.setFailure("")
 
 	// Persist the refreshed token using a copy to avoid mutating the shared ActivationData.
 	updated := *ad
-	updated.Token = resp.Token
-	updated.CheckedInAt = time.Now()
+	updated.Token = token
+	updated.CheckedInAt = checkedInAt
 	m.setActivation(&updated)
 	if m.store != nil {
 		if err := m.store.Save(&updated); err != nil {
@@ -608,8 +620,5 @@ func (m *Manager) checkIn(ctx context.Context, ad *ActivationData) error {
 				slog.String("error", err.Error()))
 		}
 	}
-
-	m.logger.Debug("License heartbeat successful",
-		slog.String("plan", newClaims.Plan))
-	return nil
+	return newClaims, nil
 }

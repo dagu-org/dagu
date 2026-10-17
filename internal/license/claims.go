@@ -26,6 +26,9 @@ type LicenseClaims struct {
 	GraceDays     *int     `json:"grace_days,omitempty"`
 	// Workspace names the Dagu Console workspace that owns the license.
 	Workspace string `json:"workspace,omitempty"`
+	// ServerName is the name Dagu Console shows for the server the token was
+	// issued to.
+	ServerName string `json:"server_name,omitempty"`
 }
 
 // HasFeature returns true if the given feature is included in the license claims.

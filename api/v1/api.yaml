@@ -1100,6 +1100,9 @@ paths:
                 dagName:
                   type: string
                   description: "Optional DAG name override to use for the created dag-run"
+                workerSelector:
+                  allOf:
+                    - $ref: "#/components/schemas/WorkerSelectorOverride"
                 profile:
                   allOf:
                     - $ref: "#/components/schemas/RuntimeProfileOverride"
@@ -1223,6 +1226,9 @@ paths:
                 dagName:
                   type: string
                   description: "Optional DAG name override to use for the created dag-run"
+                workerSelector:
+                  allOf:
+                    - $ref: "#/components/schemas/WorkerSelectorOverride"
                 profile:
                   allOf:
                     - $ref: "#/components/schemas/RuntimeProfileOverride"
@@ -1320,6 +1326,9 @@ paths:
                 queue:
                   type: string
                   description: "Override the DAG-level queue definition"
+                workerSelector:
+                  allOf:
+                    - $ref: "#/components/schemas/WorkerSelectorOverride"
                 singleton:
                   type: boolean
                   description: "If true, prevent enqueuing if DAG is already running or queued (returns 409 conflict)"
@@ -2155,6 +2164,9 @@ paths:
                   allOf:
                     - $ref: "#/components/schemas/RuntimeProfileOverride"
                   description: "Runtime profile to apply to this DAG-run. Set to an empty string or omit to run without a profile."
+                workerSelector:
+                  allOf:
+                    - $ref: "#/components/schemas/WorkerSelectorOverride"
                 params:
                   type: string
                   description: "Parameters to pass to the DAG-run in JSON format"
@@ -2286,6 +2298,9 @@ paths:
                 queue:
                   type: string
                   description: "Override the queue to use for this DAG-run"
+                workerSelector:
+                  allOf:
+                    - $ref: "#/components/schemas/WorkerSelectorOverride"
                 singleton:
                   type: boolean
                   description: "If true, prevent enqueuing if DAG is already running or queued (returns 409 conflict)"
@@ -8699,6 +8714,60 @@ paths:
                 $ref: "#/components/schemas/LicenseStatusResponse"
         "400":
           description: "The license does not check in with Dagu Console"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Insufficient permissions"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "502":
+          description: "Dagu Console could not be reached"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /license/server-name:
+    put:
+      summary: "Rename this server in Dagu Console"
+      description: "Sets the name Dagu Console and Dagu show for this server, in place of the name it reports. An empty name shows the reported name again. Admin only."
+      operationId: "renameLicenseServer"
+      tags:
+        - "system"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  maxLength: 100
+                  description: "Name to show, at most 100 characters; empty clears it"
+      responses:
+        "200":
+          description: "License status after the rename"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LicenseStatusResponse"
+        "400":
+          description: "The name is too long, the license does not check in with Dagu Console, or Dagu Console refused the name"
           content:
             application/json:
               schema:
@@ -17159,7 +17228,10 @@ components:
           description: "User-facing explanation when a configured license is unusable"
         serverName:
           type: string
-          description: "Name that identifies this server in Dagu Console"
+          description: "Name Dagu Console shows for this server: the one a person gave it, else reportedName"
+        reportedName:
+          type: string
+          description: "Name this server reports to Dagu Console: license.server_name, else the hostname"
         licenseId:
           type: string
           description: "Identifier of the loaded license"
@@ -18131,6 +18203,12 @@ components:
       maxLength: 128
       pattern: "^$|^[a-z0-9][a-z0-9._-]*$"
       description: "Runtime profile override. Empty string means no profile."
+
+    WorkerSelectorOverride:
+      type: object
+      additionalProperties:
+        type: string
+      description: "Worker labels this DAG-run requires. Replaces the DAG-level worker_selector for this run, including its \"local\" value, and is kept with the run so retries, reschedules, and queued dispatch route the same way. Not allowed for DAGs with approval steps."
 
     RuntimeProfileKey:
       type: string

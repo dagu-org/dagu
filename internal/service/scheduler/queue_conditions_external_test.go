@@ -1441,6 +1441,14 @@ func (s *queueConditionDispatchTaskStore) HasOutstandingAttempt(_ context.Contex
 	return s.attemptKey != "" && s.attemptKey == attemptKey, nil
 }
 
+func (s *queueConditionDispatchTaskStore) ListExpiredHeld(context.Context, time.Time) ([]*dispatch.DispatchTask, error) {
+	return nil, nil
+}
+
+func (s *queueConditionDispatchTaskStore) DeletePending(context.Context, string) error {
+	return nil
+}
+
 type queueConditionDispatcher struct {
 	dispatchErr error
 	dispatchFn  func(context.Context, dispatch.DispatchRequest) error
