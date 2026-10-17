@@ -102,10 +102,13 @@ type server struct {
 	// guard accepts the browser's other https: connections; nil without a
 	// guard, or once it stopped.
 	guard net.Listener
-	// carryAll is set when the browser sends every HTTPS request here, so a
+	// carryAll is set when the browser sends every request here, so a
 	// destination Chrome skips in a PAC script can still arrive. Hosts no
 	// entry names keep the device's route.
 	carryAll bool
+	// forward relays the plain HTTP requests the browser sends while
+	// carryAll is set.
+	forward *forwarder
 }
 
 // scopedAuthority is a TrustedCA ready to verify servers.
@@ -178,6 +181,10 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.handleConnect(w, r, false)
 		return
 	}
+	if s.carryAll && r.URL.IsAbs() && r.URL.Scheme == "http" {
+		s.forward.ServeHTTP(w, r)
+		return
+	}
 	// The control paths answer only requests made to the proxy itself, not
 	// requests for another site that a client sends through it.
 	if r.Method != http.MethodGet || r.URL.IsAbs() {
@@ -236,10 +243,10 @@ func (g guardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // handleConnect opens a tunnel to the host a CONNECT request names. The
 // certificate port ends TLS for the hosts the entries name. The guard, and
-// the certificate port while it carries every HTTPS request, does the same
-// for ordinary hosts and presents no certificate, or passes the browser's
-// TLS to a site that never asks for one. A loopback host the settings do
-// not name is spliced through without reading TLS.
+// the certificate port while it carries every request, does the same for
+// ordinary hosts and presents no certificate, or passes the browser's TLS
+// to a site that never asks for one. A loopback host the settings do not
+// name, and a tunnel that carries no TLS, are spliced through unread.
 func (s *server) handleConnect(w http.ResponseWriter, r *http.Request, guard bool) {
 	host, port := splitAuthority(r.Host)
 	if host == "" {
@@ -303,6 +310,13 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request, guard boo
 		_ = conn.Close()
 		return
 	}
+	if s.carryAll && !carriesTLS(conn, buffered.Reader, deadline) {
+		// A ws: URL tunnels plain HTTP while the browser sends every scheme
+		// here; there is no TLS to end.
+		s.pending.end(pending)
+		s.splice(&bufferedConn{Conn: conn, reader: buffered.Reader}, raw)
+		return
+	}
 	client := conn
 	if buffered.Reader.Buffered() > 0 {
 		client = &bufferedConn{Conn: conn, reader: buffered.Reader}
@@ -337,7 +351,7 @@ func (s *server) stopGuard(host string) {
 	s.verified.dropGuarded()
 	detail := "sites without a client certificate now go through the browser's own route; one of them that asks for a client certificate can make the system prompt for it"
 	if s.carryAll {
-		detail = "HTTPS stays on the certificate proxy, which is also carrying a loopback destination, so those sites cannot fall through to the browser"
+		detail = "requests stay on the certificate proxy, which is also carrying a loopback destination, so those sites cannot fall through to the browser"
 	}
 	s.events.add(EventGuardOff, host, "", fmt.Sprintf(
 		"the device's proxy asks %s for credentials the certificate proxy cannot give, so %s", host, detail))
@@ -421,16 +435,13 @@ func (s *server) guardListening() bool {
 // the server itself and a configured authority is not applied to it.
 func (s *server) relayOpaque(w http.ResponseWriter, host, port string) {
 	pending := s.pending.start(host)
-	defer s.pending.end(pending)
 	ctx, cancel := context.WithTimeout(s.ctx, handshakeTimeout)
 	raw, _, err := s.reach(ctx, host, port, s.guardEntry)
 	cancel()
+	// Past reaching the site, the proxy waits on nothing of its own.
+	s.pending.end(pending)
 	if err != nil {
-		kind := EventUpstream
-		if errors.Is(err, errProxyAuth) {
-			kind = EventProxyAuth
-		}
-		s.events.add(kind, host, "", fmt.Sprintf("the certificate proxy could not reach %s: %s", host, oneLine(err)))
+		s.reportUnreachable(host, s.guardEntry, err)
 		http.Error(w, "the certificate proxy could not reach the site", http.StatusBadGateway)
 		return
 	}
@@ -454,6 +465,12 @@ func (s *server) relayOpaque(w http.ResponseWriter, host, port string) {
 	if buffered.Reader.Buffered() > 0 {
 		client = &bufferedConn{Conn: conn, reader: buffered.Reader}
 	}
+	s.splice(client, raw)
+}
+
+// splice relays the bytes between client and raw, without reading them,
+// until both directions end.
+func (s *server) splice(client, raw net.Conn) {
 	if !s.track(client) {
 		_ = client.Close()
 		_ = raw.Close()
@@ -469,6 +486,16 @@ func (s *server) relayOpaque(w http.ResponseWriter, host, port string) {
 	_, _ = io.Copy(client, raw)
 	_ = client.Close()
 	<-done
+}
+
+// carriesTLS reports whether what the client sends over conn, read through
+// reader, starts with a TLS handshake record. A client still silent at
+// deadline counts as TLS, which fails the same way.
+func carriesTLS(conn net.Conn, reader *bufio.Reader, deadline time.Time) bool {
+	_ = conn.SetReadDeadline(deadline)
+	first, err := reader.Peek(1)
+	_ = conn.SetReadDeadline(time.Time{})
+	return err != nil || first[0] == recordTypeHandshake
 }
 
 // carriedByGuard reports whether entry is the guard's own, which only the

@@ -62,8 +62,8 @@ type Handle struct {
 	SPKI      string `json:"spki"`
 	// Port is the proxy port the browser connects to.
 	Port int `json:"port,omitempty"`
-	// Manual reports that ChromeArgs uses a manual HTTPS proxy, because a
-	// PAC script cannot route a configured destination.
+	// Manual reports that ChromeArgs uses a manual proxy, because a PAC
+	// script cannot route a configured destination.
 	Manual bool `json:"manual,omitempty"`
 	// DebugPort is the browser's debugging port. A manual proxy leaves it
 	// direct: <-loopback> would send the runtime's own WebSocket through
@@ -72,12 +72,13 @@ type Handle struct {
 }
 
 // ChromeArgs returns the browser flags that send the certificate hosts to
-// the proxy and accept the certificates it shows. A manual proxy is what
-// can include destinations Chrome skips in every PAC script.
+// the proxy and accept the certificates it shows. A manual proxy, which
+// carries every request, is what can include destinations Chrome skips in
+// every PAC script.
 func (h Handle) ChromeArgs() []string {
 	route := "--proxy-pac-url=" + h.PACURL
 	if h.Manual {
-		route = fmt.Sprintf("--proxy-server=https=127.0.0.1:%d", h.Port)
+		route = fmt.Sprintf("--proxy-server=127.0.0.1:%d", h.Port)
 	}
 	args := []string{route, "--ignore-certificate-errors-spki-list=" + h.SPKI}
 	if h.Manual {

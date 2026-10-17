@@ -225,15 +225,17 @@ environment variables on Linux). The browser sends every other request there
 itself. Chrome does not consult a PAC script for `localhost`, `*.localhost`,
 the Windows name `loopback`, loopback addresses (`127.0.0.0/8` and `::1`), or
 link-local addresses. When a certificate or trusted authority names one of
-those destinations, or `*`, the browser uses a manual HTTPS proxy with that
-implicit bypass removed, so the destination reaches the certificate proxy.
-Every other HTTPS request still follows the device's proxy settings, applied
-by the certificate proxy, and is not given a configured client certificate or
-authority. A device proxy that asks for credentials cannot be handed back to
-the browser while that manual proxy is in use. Requests that are not HTTPS
-are left direct then, because the manual proxy is HTTPS only. An HTTPS
-upstream proxy may listen on a loopback address; its certificate is checked
-against authorities that name the proxy's host, separately from the website.
+those destinations, or `*`, the browser sends every request to the
+certificate proxy, with that implicit bypass removed, so the destination
+reaches it. The certificate proxy reaches those destinations directly, never
+through `proxy` or the device's proxy settings, and resolves `localhost` and
+`*.localhost` to the loopback addresses itself. Every other request, HTTPS or
+not, still follows the device's proxy settings, applied by the certificate
+proxy, and is not given a configured client certificate or authority. A
+device proxy that asks for credentials cannot be handed back to the browser
+while every request goes to the certificate proxy. An HTTPS upstream proxy
+may listen on a loopback address; its certificate is checked against
+authorities that name the proxy's host, separately from the website.
 With certificates, `proxy` takes only `[scheme://]host[:port]` with
 scheme `http`, `https`, or `socks5`. A proxy that asks for authentication
 cannot carry requests to certificate hosts, and the proxy, not the browser,

@@ -16,6 +16,8 @@ import (
 	"math/big"
 	"net"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -90,7 +92,7 @@ func TestLoopbackClientCertificate(t *testing.T) {
 // Loopback destinations bypass the configured proxy, as Chrome's own route
 // does. Trust and routing for a host the loopback authority does not name
 // stay as they were: the browser rejects its certificate, and the device
-// proxy still carries it.
+// proxy still carries its HTTPS and plain HTTP requests.
 func TestLoopbackTrustStaysOnItsHost(t *testing.T) {
 	t.Parallel()
 	s := newSessionEnv(t)
@@ -99,7 +101,11 @@ func TestLoopbackTrustStaysOnItsHost(t *testing.T) {
 	otherCert := otherCA.issueServer(t, []string{"outside.test"}, nil)
 	v4 := serveCertificate(t, "127.0.0.1:0", loopbackCert, nil, "Loopback portal")
 	other := serveCertificate(t, "127.0.0.1:0", otherCert, nil, "Outside")
-	proxy, proxyURL := startHostProxy(t, map[string]string{"outside.test": other})
+	plain := strings.TrimPrefix(httptestNew(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = io.WriteString(w, "<!doctype html><title>Outside plain</title><h1>Outside plain</h1>")
+	}), "http://")
+	proxy, proxyURL := startHostProxy(t, map[string]string{"outside.test:443": other, "outside.test:80": plain})
 	s.dagu.WriteFile("ca.pem", loopbackCA.pem())
 	writeBrowserConfig(t, s.env, "browser:\n  trusted_cas:\n    - hosts: [127.0.0.1, portal.localhost]\n      ca_file: "+s.dagu.ProjectPath("ca.pem")+"\n")
 
@@ -108,13 +114,17 @@ func TestLoopbackTrustStaysOnItsHost(t *testing.T) {
 	assert.Equal(t, "Loopback portal", opened["title"])
 	s.session(`{"goto":"https://portal.localhost:`+portOf(t, v4)+`/"}`, "do", id).ExpectExitCode(0)
 	s.session(`{"expect":{"text":"Loopback portal"}}`, "do", id).ExpectExitCode(0)
-	assert.NotContains(t, proxy.connects(), "127.0.0.1:"+portOf(t, v4))
-	assert.NotContains(t, proxy.connects(), "portal.localhost:"+portOf(t, v4))
+	assert.NotContains(t, proxy.requests(), "127.0.0.1:"+portOf(t, v4))
+	assert.NotContains(t, proxy.requests(), "portal.localhost:"+portOf(t, v4))
 
 	visited := s.session(`{"goto":"https://outside.test/"}`, "do", id)
 	visited.ExpectExitCode(0)
 	assert.Contains(t, fmt.Sprint(printed(t, visited)["outline"]), "ERR_CERT_AUTHORITY_INVALID")
-	assert.Contains(t, proxy.connects(), "outside.test:443")
+	assert.Contains(t, proxy.requests(), "outside.test:443")
+
+	s.session(`{"goto":"http://outside.test/"}`, "do", id).ExpectExitCode(0)
+	s.session(`{"expect":{"text":"Outside plain"}}`, "do", id).ExpectExitCode(0)
+	assert.Contains(t, proxy.requests(), "http://outside.test/")
 }
 
 func (ca *testCA) issueServer(t *testing.T, dns []string, ips []net.IP) tls.Certificate {
@@ -201,18 +211,29 @@ func portOf(t *testing.T, hostport string) string {
 	return port
 }
 
-// startHostProxy sends each host to the local address sites names.
+// startHostProxy sends each host and port to the local address sites
+// names: a CONNECT tunnel, or a plain HTTP request in absolute form. It
+// records the CONNECT authorities and the plain URLs requested.
 func startHostProxy(t *testing.T, sites map[string]string) (*hostProxy, string) {
 	t.Helper()
 	proxy := &hostProxy{}
 	server := httptestNew(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodConnect {
-			http.Error(w, "CONNECT only", http.StatusMethodNotAllowed)
+			proxy.record(r.URL.String())
+			port := r.URL.Port()
+			if port == "" {
+				port = "80"
+			}
+			siteAddr, ok := sites[net.JoinHostPort(r.URL.Hostname(), port)]
+			if !ok {
+				http.Error(w, "unknown host", http.StatusBadGateway)
+				return
+			}
+			httputil.NewSingleHostReverseProxy(&url.URL{Scheme: "http", Host: siteAddr}).ServeHTTP(w, r)
 			return
 		}
 		proxy.record(r.Host)
-		host, _, _ := net.SplitHostPort(r.Host)
-		siteAddr, ok := sites[host]
+		siteAddr, ok := sites[r.Host]
 		if !ok {
 			http.Error(w, "unknown host", http.StatusBadGateway)
 			return
@@ -256,7 +277,7 @@ func (p *hostProxy) record(target string) {
 	p.targets = append(p.targets, target)
 }
 
-func (p *hostProxy) connects() []string {
+func (p *hostProxy) requests() []string {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return append([]string(nil), p.targets...)

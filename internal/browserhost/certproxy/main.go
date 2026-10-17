@@ -148,6 +148,7 @@ func serve(ctx context.Context, cfg Config, public *x509.CertPool, ready func(Re
 		guard:       guard,
 		carryAll:    manual,
 	}
+	s.forward = newForwarder(s)
 	script := composePAC(port, guardPort, cfg.routedHosts(), system)
 	pacURL, served := pacLocation(script, controlURL(port, cfg.Token)+"/"+pacPath)
 	if served {
@@ -183,6 +184,7 @@ func serve(ctx context.Context, cfg Config, public *x509.CertPool, ready func(Re
 	_ = httpServer.Close()
 	_ = guardServer.Close()
 	s.closeTunnels()
+	s.forward.closeIdle()
 	if errors.Is(failure, http.ErrServerClosed) {
 		return nil
 	}
