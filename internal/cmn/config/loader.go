@@ -2201,6 +2201,9 @@ type envBinding struct {
 	env      string
 	isPath   bool
 	requires ConfigSection
+	// secret marks a setting that carries a credential, which workflow steps
+	// never inherit; see IsCredentialEnv.
+	secret bool
 }
 
 var envBindings = []envBinding{
@@ -2250,7 +2253,7 @@ var envBindings = []envBinding{
 
 	// Secrets
 	{key: "secrets.vault.address", env: "SECRETS_VAULT_ADDRESS"},
-	{key: "secrets.vault.token", env: "SECRETS_VAULT_TOKEN"},
+	{key: "secrets.vault.token", env: "SECRETS_VAULT_TOKEN", secret: true},
 	{key: "secrets.vault.ca_cert", env: "SECRETS_VAULT_CA_CERT", isPath: true},
 	{key: "secrets.vault.client_cert", env: "SECRETS_VAULT_CLIENT_CERT", isPath: true},
 	{key: "secrets.vault.client_key", env: "SECRETS_VAULT_CLIENT_KEY", isPath: true},
@@ -2296,10 +2299,10 @@ var envBindings = []envBinding{
 	// Auth
 	{key: "auth.mode", env: "AUTH_MODE"},
 	{key: "auth.basic.username", env: "AUTH_BASIC_USERNAME"},
-	{key: "auth.basic.password", env: "AUTH_BASIC_PASSWORD"},
+	{key: "auth.basic.password", env: "AUTH_BASIC_PASSWORD", secret: true},
 	// Auth OIDC
 	{key: "auth.oidc.client_id", env: "AUTH_OIDC_CLIENT_ID"},
-	{key: "auth.oidc.client_secret", env: "AUTH_OIDC_CLIENT_SECRET"},
+	{key: "auth.oidc.client_secret", env: "AUTH_OIDC_CLIENT_SECRET", secret: true},
 	{key: "auth.oidc.client_url", env: "AUTH_OIDC_CLIENT_URL"},
 	{key: "auth.oidc.issuer", env: "AUTH_OIDC_ISSUER"},
 	{key: "auth.oidc.scopes", env: "AUTH_OIDC_SCOPES"},
@@ -2327,10 +2330,10 @@ var envBindings = []envBinding{
 	{key: "auth.proxy.role_mapping.require_mapping", env: "AUTH_PROXY_REQUIRE_MAPPING", requires: SectionServer},
 	{key: "auth.proxy.role_mapping.skip_org_role_sync", env: "AUTH_PROXY_SKIP_ORG_ROLE_SYNC", requires: SectionServer},
 	// Auth (builtin)
-	{key: "auth.builtin.token.secret", env: "AUTH_TOKEN_SECRET"},
+	{key: "auth.builtin.token.secret", env: "AUTH_TOKEN_SECRET", secret: true},
 	{key: "auth.builtin.token.ttl", env: "AUTH_TOKEN_TTL"},
 	{key: "auth.builtin.initial_admin.username", env: "AUTH_BUILTIN_INITIAL_ADMIN_USERNAME"},
-	{key: "auth.builtin.initial_admin.password", env: "AUTH_BUILTIN_INITIAL_ADMIN_PASSWORD"},
+	{key: "auth.builtin.initial_admin.password", env: "AUTH_BUILTIN_INITIAL_ADMIN_PASSWORD", secret: true},
 
 	// TLS
 	{key: "tls.cert_file", env: "CERT_FILE"},
@@ -2406,7 +2409,7 @@ var envBindings = []envBinding{
 	// Tunnel
 	{key: "tunnel.enabled", env: "TUNNEL"},
 	{key: "tunnel.enabled", env: "TUNNEL_ENABLED"},
-	{key: "tunnel.tailscale.auth_key", env: "TUNNEL_TAILSCALE_AUTH_KEY"},
+	{key: "tunnel.tailscale.auth_key", env: "TUNNEL_TAILSCALE_AUTH_KEY", secret: true},
 	{key: "tunnel.tailscale.hostname", env: "TUNNEL_TAILSCALE_HOSTNAME"},
 	{key: "tunnel.tailscale.funnel", env: "TUNNEL_TAILSCALE_FUNNEL"},
 	{key: "tunnel.tailscale.https", env: "TUNNEL_TAILSCALE_HTTPS"},
@@ -2419,7 +2422,7 @@ var envBindings = []envBinding{
 	{key: "tunnel.rate_limiting.block_duration_seconds", env: "TUNNEL_RATE_LIMITING_BLOCK_DURATION_SECONDS"},
 
 	// License
-	{key: "license.key", env: "LICENSE_KEY"},
+	{key: "license.key", env: "LICENSE_KEY", secret: true},
 	{key: "license.cloud_url", env: "LICENSE_CLOUD_URL"},
 	{key: "license.server_name", env: "LICENSE_SERVER_NAME"},
 
@@ -2433,9 +2436,9 @@ var envBindings = []envBinding{
 	{key: "git_sync.path", env: "GITSYNC_PATH"},
 	{key: "git_sync.push_enabled", env: "GITSYNC_PUSH_ENABLED"},
 	{key: "git_sync.auth.type", env: "GITSYNC_AUTH_TYPE"},
-	{key: "git_sync.auth.token", env: "GITSYNC_AUTH_TOKEN"},
+	{key: "git_sync.auth.token", env: "GITSYNC_AUTH_TOKEN", secret: true},
 	{key: "git_sync.auth.ssh_key_path", env: "GITSYNC_AUTH_SSH_KEY_PATH", isPath: true},
-	{key: "git_sync.auth.ssh_passphrase", env: "GITSYNC_AUTH_SSH_PASSPHRASE"},
+	{key: "git_sync.auth.ssh_passphrase", env: "GITSYNC_AUTH_SSH_PASSPHRASE", secret: true},
 	{key: "git_sync.auto_sync.enabled", env: "GITSYNC_AUTOSYNC_ENABLED"},
 	{key: "git_sync.auto_sync.on_startup", env: "GITSYNC_AUTOSYNC_ON_STARTUP"},
 	{key: "git_sync.auto_sync.interval", env: "GITSYNC_AUTOSYNC_INTERVAL"},
