@@ -390,7 +390,7 @@ func TestRuntime(t *testing.T) {
 		)
 		result.ExpectExitCode(0)
 		dagu.ExpectFileContent("dagu-credentials-env.txt",
-			"DAGU_ENCRYPTION_KEY unset\nDAGU_SECRETS_VAULT_TOKEN unset\nDAGU_CONFORMANCE_SETTING=visible\nFROM_ROOT_ENV=${DAGU_SECRETS_VAULT_TOKEN}\n")
+			"DAGU_ENCRYPTION_KEY unset\nDAGU_SECRETS_VAULT_TOKEN unset\nDAGU_CONFORMANCE_SETTING=visible\nFROM_ROOT_ENV=${DAGU_SECRETS_VAULT_TOKEN}\nFROM_ENV_REF=${env.DAGU_ENCRYPTION_KEY}\n")
 		dagu.ExpectFileContent("dagu-credentials-expansion.txt",
 			"$DAGU_ENCRYPTION_KEY|${DAGU_SECRETS_VAULT_TOKEN}|visible\n")
 	})

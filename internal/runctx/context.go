@@ -522,7 +522,7 @@ func evaluateDAGEnvRuntime(
 	result := make(map[string]string, len(envList))
 	scope := cmnvalue.NewEnvScope(nil, false)
 	if baseEnv := config.GetBaseEnv(ctx); baseEnv != nil {
-		scope = scope.WithEntries(stringutil.KeyValuesToMap(baseEnv.AsSlice()), cmnvalue.EnvSourceOS)
+		scope = scope.WithEntries(stringutil.KeyValuesToMap(baseEnv.WithoutCredentials()), cmnvalue.EnvSourceOS)
 	}
 	scope = scope.WithEntries(base, cmnvalue.EnvSourceDAGEnv)
 	completionScope := cmnvalue.NewEnvScope(nil, false).WithEntries(runScoped, cmnvalue.EnvSourceDAGEnv)

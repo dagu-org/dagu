@@ -13,6 +13,7 @@ import (
 var directCredentialEnv = []string{
 	"ENCRYPTION_KEY", // the key of the built-in secret store
 	"LICENSE",        // an inline license token
+	"XLSX_PASSWORD",  // a protected workbook's password, for dagu xlsx
 }
 
 // credentialEnv is the set of normalized environment variable names that
