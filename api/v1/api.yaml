@@ -8610,12 +8610,21 @@ paths:
   /license/connect:
     post:
       summary: "Connect this server to Dagu Console"
-      description: "Starts a request for a license from Dagu Console, or returns the pending one. Open connectUrl to approve it; the license is installed once a workspace owner approves. Admin only."
+      description: "Starts a request for a license from Dagu Console, or returns the pending one. Open connectUrl to approve it; the license is installed once a workspace owner approves. A report level, when given, chooses what this server reports to Dagu Console, starting once the license is installed, unless cloud.report in the configuration sets it. Admin only."
       operationId: "startLicenseConnect"
       tags:
         - "system"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                report:
+                  $ref: "#/components/schemas/LicenseMonitoringLevel"
       responses:
         "200":
           description: "Current connection request"
@@ -8623,6 +8632,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/LicenseConnectStatus"
+        "400":
+          description: "Unknown report level"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "403":
           description: "Insufficient permissions"
           content:
@@ -17273,7 +17288,7 @@ components:
           description: "Progress of the request"
         connectUrl:
           type: string
-          description: "Dagu Console page that approves the request"
+          description: "Dagu Console page that approves the request. Its report query parameter names what this server reports once connected, and is absent when it reports nothing"
         code:
           type: string
           description: "Short code Dagu Console shows so the approver can confirm the request"

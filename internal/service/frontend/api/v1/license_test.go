@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -221,6 +222,98 @@ func TestLicenseConnect_Conflicts(t *testing.T) {
 		server := test.SetupServer(t, test.WithServerOptions(frontend.WithLicenseManager(defaultTestLicenseManager())))
 
 		server.Client().Post("/api/v1/license/connect", nil).ExpectStatus(http.StatusConflict).Send(t)
+	})
+}
+
+// Choosing what to report when connecting starts reporting once the license
+// is installed, and the approval page learns the level in effect from the
+// connect URL. Uses t.Setenv because a license set in the environment blocks
+// connecting.
+func TestLicenseConnect_Report(t *testing.T) {
+	t.Setenv("DAGU_LICENSE", "")
+	t.Setenv("DAGU_LICENSE_KEY", "")
+
+	connectServer := func(t *testing.T, manager *license.Manager, monitoring *cloudreport.Monitoring) test.Server {
+		t.Helper()
+		return test.SetupServer(t, test.WithServerOptions(
+			frontend.WithLicenseManager(manager),
+			frontend.WithAPIOption(apiv1.WithCloudReport(monitoring)),
+		))
+	}
+	pendingManager := func(t *testing.T) *license.Manager {
+		t.Helper()
+		manager, _ := newCloudLicenseManager(t, pendingConsole())
+		return manager
+	}
+	reportParam := func(t *testing.T, status api.LicenseConnectStatus) string {
+		t.Helper()
+		require.NotNil(t, status.ConnectUrl)
+		connectURL, err := url.Parse(*status.ConnectUrl)
+		require.NoError(t, err)
+		return connectURL.Query().Get("report")
+	}
+	monitoringOf := func(t *testing.T, server test.Server) api.LicenseMonitoring {
+		t.Helper()
+		var monitoring api.LicenseMonitoring
+		server.Client().Get("/api/v1/license/monitoring").ExpectStatus(http.StatusOK).Send(t).Unmarshal(t, &monitoring)
+		return monitoring
+	}
+
+	t.Run("chosen level", func(t *testing.T) {
+		server := connectServer(t, pendingManager(t), newMonitoring(t, ""))
+
+		var started api.LicenseConnectStatus
+		server.Client().Post("/api/v1/license/connect", map[string]string{"report": "runs"}).
+			ExpectStatus(http.StatusOK).Send(t).Unmarshal(t, &started)
+
+		assert.Equal(t, "runs", reportParam(t, started))
+		assert.Equal(t, api.LicenseMonitoring{Level: api.LicenseMonitoringLevelRuns, Chosen: true}, monitoringOf(t, server))
+		var current api.LicenseConnectStatus
+		server.Client().Get("/api/v1/license/connect").ExpectStatus(http.StatusOK).Send(t).Unmarshal(t, &current)
+		assert.Equal(t, started, current)
+	})
+
+	t.Run("configured level wins", func(t *testing.T) {
+		server := connectServer(t, pendingManager(t), newMonitoring(t, config.ReportHealth))
+
+		var started api.LicenseConnectStatus
+		server.Client().Post("/api/v1/license/connect", map[string]string{"report": "runs"}).
+			ExpectStatus(http.StatusOK).Send(t).Unmarshal(t, &started)
+
+		assert.Equal(t, "health", reportParam(t, started))
+		assert.Equal(t, api.LicenseMonitoringLevelHealth, monitoringOf(t, server).Level)
+	})
+
+	t.Run("unknown level", func(t *testing.T) {
+		server := connectServer(t, pendingManager(t), newMonitoring(t, ""))
+
+		server.Client().Post("/api/v1/license/connect", map[string]string{"report": "everything"}).
+			ExpectStatus(http.StatusBadRequest).Send(t)
+
+		var current api.LicenseConnectStatus
+		server.Client().Get("/api/v1/license/connect").ExpectStatus(http.StatusOK).Send(t).Unmarshal(t, &current)
+		assert.Equal(t, api.LicenseConnectStatusStateIdle, current.State)
+		assert.False(t, monitoringOf(t, server).Chosen)
+	})
+
+	t.Run("already licensed", func(t *testing.T) {
+		server := connectServer(t, defaultTestLicenseManager(), newMonitoring(t, ""))
+
+		server.Client().Post("/api/v1/license/connect", map[string]string{"report": "runs"}).
+			ExpectStatus(http.StatusConflict).Send(t)
+
+		assert.Equal(t, api.LicenseMonitoring{Level: api.LicenseMonitoringLevelOff}, monitoringOf(t, server))
+	})
+
+	t.Run("nothing reported", func(t *testing.T) {
+		server := connectServer(t, pendingManager(t), newMonitoring(t, ""))
+
+		var started api.LicenseConnectStatus
+		server.Client().Post("/api/v1/license/connect", nil).ExpectStatus(http.StatusOK).Send(t).Unmarshal(t, &started)
+
+		require.NotNil(t, started.ConnectUrl)
+		assert.NotContains(t, *started.ConnectUrl, "report=")
+		assert.False(t, monitoringOf(t, server).Chosen)
 	})
 }
 
