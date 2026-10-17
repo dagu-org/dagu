@@ -68,7 +68,8 @@ export function ConnectSection({
   if (!pending)
     return (
       <section
-        className="card-obsidian p-4"
+        id="monitoring"
+        className="card-obsidian p-4 scroll-mt-4"
         aria-labelledby="license-free-monitoring"
       >
         <div className="flex flex-wrap items-start justify-between gap-3">

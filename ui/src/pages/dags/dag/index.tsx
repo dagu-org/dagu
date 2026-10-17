@@ -37,6 +37,7 @@ import {
   NotFoundState,
   PageLoading,
 } from '@/components/PageStates';
+import { MonitoringOffer } from '@/components/MonitoringOffer';
 import { isNotFoundQueryError } from '@/lib/queryErrors';
 import { buildDAGRunPageURL } from '@/features/dag-runs/lib/dagRunUrls';
 
@@ -170,6 +171,8 @@ function DAGDetails() {
     ...(dagData?.dag?.labels ?? []),
     ...(dagData?.dag?.tags ?? []),
   ];
+  // Scheduled runs happen unattended, which is when alerts matter.
+  const runsOnSchedule = !!dagData?.dag?.schedule?.length && !dagData.suspended;
   const dagWorkspaceName = workspaceNameFromLabels(dagLabels);
   const dagHasWorkspaceLabel = hasWorkspaceLabel(dagLabels);
   const dagMatchesWorkspace =
@@ -333,6 +336,9 @@ function DAGDetails() {
                     buildScopedUrl={buildUrl}
                     pinned={dagData.pinned}
                   />
+                  {tab === 'status' && runsOnSchedule && (
+                    <MonitoringOffer className="mt-3" />
+                  )}
                   <div className="min-h-0 flex-1">
                     <DAGDetailsContent
                       fileName={fileName}

@@ -2552,6 +2552,9 @@ const english = {
   "DAG name can only contain letters, numbers, underscores, dots, and hyphens": "DAG name can only contain letters, numbers, underscores, dots, and hyphens",
   "DAG name cannot contain spaces": "DAG name cannot contain spaces",
   "Retried {count}×": "Retried {count}×",
+  "Get an email if this server stops": "Get an email if this server stops",
+  "Alerts from this server stop if the server goes down.": "Alerts from this server stop if the server goes down.",
+  "Set up for free": "Set up for free",
 } as const;
 
 export type StaticMessage = keyof typeof english;
@@ -5050,6 +5053,9 @@ const chinese = {
   "DAG name can only contain letters, numbers, underscores, dots, and hyphens": "DAG 名称只能包含字母、数字、下划线、点和连字符",
   "DAG name cannot contain spaces": "DAG 名称不能包含空格",
   "Retried {count}×": "已重试 {count} 次",
+  "Get an email if this server stops": "在此服务器停止时收到邮件",
+  "Alerts from this server stop if the server goes down.": "此服务器宕机后，它发出的告警也会停止。",
+  "Set up for free": "免费设置",
 } as const satisfies Record<StaticMessage, string>;
 
 const japanese = {
@@ -7624,6 +7630,9 @@ const japanese = {
   "DAG name can only contain letters, numbers, underscores, dots, and hyphens": "DAG 名に使用できるのは英数字、アンダースコア、ドット、ハイフンのみです",
   "DAG name cannot contain spaces": "DAG 名にスペースは使用できません",
   "Retried {count}×": "{count} 回再試行",
+  "Get an email if this server stops": "このサーバーが停止したらメールで通知",
+  "Alerts from this server stop if the server goes down.": "サーバーが停止すると、このサーバーからのアラートも止まります。",
+  "Set up for free": "無料で設定",
 } as const satisfies Record<StaticMessage, string>;
 
 export const staticMessages = {

@@ -64,6 +64,14 @@ test('shows activation, benefits, and deactivation on desktop and mobile', async
     .getByRole('link', { name: 'Plan & features', exact: true })
     .filter({ hasText: /^(Community|Team plan)$/ });
   await expect(badge).toHaveText('Community');
+  const monitoringLink = sidebar.getByRole('link', {
+    name: 'External Monitoring',
+  });
+  await expect(monitoringLink).toHaveAttribute('href', '/license#monitoring');
+  await monitoringLink.click();
+  await expect(
+    page.getByRole('region', { name: 'Monitor this server for free' })
+  ).toBeInViewport();
   await badge.click();
   await expect(
     page.getByRole('heading', { name: 'Plan & features' })
@@ -317,10 +325,11 @@ test('gives non-admins status and administrator guidance', async ({ page }) => {
   await expect(
     page.getByRole('link', { name: 'Start free trial' })
   ).toHaveCount(0);
-  await page
-    .getByTestId('app-sidebar')
-    .getByRole('button', { name: 'Plan & features' })
-    .click();
+  const sidebar = page.getByTestId('app-sidebar');
+  await expect(
+    sidebar.getByRole('link', { name: 'External Monitoring' })
+  ).toHaveCount(0);
+  await sidebar.getByRole('button', { name: 'Plan & features' }).click();
   await expect(page.getByRole('menu')).toContainText('Community');
   await expect(page.getByRole('menu')).toContainText(guidance);
 });
