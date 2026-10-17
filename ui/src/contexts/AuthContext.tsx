@@ -328,6 +328,18 @@ export function useCanManageWebhooks(): boolean {
   return roleAtLeast(user.role, UserRole.developer);
 }
 
+/**
+ * Reports whether the current user may manage notification channels and
+ * rules, which takes a server-wide developer role whatever the workspace
+ * grants.
+ */
+export function useCanManageNotifications(): boolean {
+  const { user } = useAuth();
+  const config = useConfig();
+  if (config.authMode !== 'builtin') return config.permissions.writeDags;
+  return roleAtLeast(user?.role ?? null, UserRole.developer);
+}
+
 export function useCanViewAuditLogs(): boolean {
   const { user } = useAuth();
   const config = useConfig();

@@ -30,6 +30,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// coordinatorPortInUseHint explains a coordinator listen failure caused by a
+// taken port. It names the opt-out because start-all enables the coordinator
+// by default.
+const coordinatorPortInUseHint = "another Dagu may be running; stop it, choose a free port with --coordinator.port or DAGU_COORDINATOR_PORT, or set DAGU_COORDINATOR_ENABLED=false"
+
 func StartAll() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
@@ -179,11 +184,16 @@ func runStartAll(ctx *Context, _ []string) error {
 	// Initialize resource monitoring service
 	resourceService := resource.NewService(ctx.Config)
 
-	serverOpts := []frontend.ServerOption{frontend.WithAPIOption(apiv1.WithOpenCodeHost(openCodeHost))}
+	serverOpts := []frontend.ServerOption{
+		frontend.WithAPIOption(apiv1.WithOpenCodeHost(openCodeHost)),
+		// The scheduler delivers DAG-run notifications and incidents.
+		frontend.WithoutNotificationMonitors(),
+	}
 	cloudMonitoring := newCloudReportMonitoring(serviceCtx)
 	if cloudMonitoring != nil {
 		serverOpts = append(serverOpts, frontend.WithAPIOption(apiv1.WithCloudReport(cloudMonitoring)))
 	}
+	serverOpts = append(serverOpts, frontend.WithOnReady(printStartupBanner(serviceCtx, stores.AuthSetupRequired)))
 
 	// Use serviceCtx so auth initialization can respond to termination signals
 	server, err := newServer(serviceCtx, resourceService, stores, serverOpts...)
@@ -197,7 +207,7 @@ func runStartAll(ctx *Context, _ []string) error {
 		var err error
 		coord, _, err = newCoordinator(serviceCtx, stores.Secret, stores.Profile)
 		if err != nil {
-			return fmt.Errorf("failed to initialize coordinator: %w", err)
+			return fmt.Errorf("failed to initialize coordinator: %w", withPortInUseHint(err, coordinatorPortInUseHint))
 		}
 		coord.DisableHealthServer()
 	} else {
@@ -260,7 +270,7 @@ func runStartAll(ctx *Context, _ []string) error {
 		)
 		if err := server.Serve(serviceCtx); err != nil {
 			select {
-			case errCh <- fmt.Errorf("server failed: %w", err):
+			case errCh <- fmt.Errorf("server failed: %w", withPortInUseHint(err, webPortInUseHint)):
 			default:
 			}
 		}

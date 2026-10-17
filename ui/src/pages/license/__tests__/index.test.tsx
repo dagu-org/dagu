@@ -1652,4 +1652,19 @@ describe('LicensePage', () => {
       expect(screen.getByLabelText('License key')).toHaveFocus();
     });
   });
+
+  // The sidebar and the monitoring offers link to #monitoring.
+  it('scrolls to free monitoring from a link to #monitoring', () => {
+    const scroll = vi.spyOn(Element.prototype, 'scrollIntoView');
+
+    renderPage(
+      { valid: false, community: true, plan: '', features: [] },
+      { path: '/license#monitoring' }
+    );
+
+    expect(scroll.mock.contexts).toContain(
+      screen.getByRole('region', { name: 'Monitor this server for free' })
+    );
+    scroll.mockRestore();
+  });
 });

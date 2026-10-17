@@ -176,6 +176,17 @@ function BuildDecisionBadge({
   );
 }
 
+/** Shows how many times a step was retried, if it was. */
+function RetryCountBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+
+  return (
+    <span className="inline-flex rounded-full border border-warning/30 bg-warning/10 px-2 py-0.5 text-[11px] font-medium text-warning">
+      <I18nText text={'Retried {count}×'} values={{ count }} />
+    </span>
+  );
+}
+
 /**
  * Calculate duration between two timestamps
  * If endTime is not provided, calculate duration from startTime to now (for running tasks)
@@ -1040,6 +1051,7 @@ function NodeStatusTableRow({
                 </div>
               </I18nProps>
               <BuildDecisionBadge build={node.build} remoteNode={remoteNode} />
+              <RetryCountBadge count={node.retryCount} />
             </div>
           </TableCell>
 
@@ -1404,6 +1416,7 @@ function NodeStatusTableRow({
               {currentDuration}
             </div>
           )}
+          <RetryCountBadge count={node.retryCount} />
           <ManualActionDetails node={node} />
         </div>
       </div>

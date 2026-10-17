@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { ExternalLink, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -25,7 +25,12 @@ import {
   LicenseMonitoringLevel,
 } from '@/api/v1/schema';
 import { useI18n } from '@/i18n/I18nProvider';
-import { hasLicense, isFreeLicense, licenseLink } from '@/lib/license';
+import {
+  hasLicense,
+  isFreeLicense,
+  isLicenseManagedByEnv,
+  licenseLink,
+} from '@/lib/license';
 
 /** How often the time of the last report is refreshed. */
 const MONITORING_REFRESH_MS = 30_000;
@@ -78,12 +83,17 @@ export default function LicensePage() {
   }, [setTitle, ts]);
 
   // Each visit to #activate, even a repeated one, opens the key form, which
-  // takes focus, in view.
+  // takes focus, in view. A visit to #monitoring waits for its section, which
+  // appears once the license status is known.
+  const handledVisit = useRef<string | null>(null);
   useEffect(() => {
-    if (hash !== '#activate') return;
-    setKeyOpen(true);
-    document.getElementById('activate')?.scrollIntoView({ block: 'start' });
-  }, [hash, locationKey]);
+    if (hash !== '#activate' && hash !== '#monitoring') return;
+    const target = document.getElementById(hash.slice(1));
+    if (!target || handledVisit.current === locationKey) return;
+    handledVisit.current = locationKey;
+    if (hash === '#activate') setKeyOpen(true);
+    target.scrollIntoView({ block: 'start' });
+  }, [hash, locationKey, loading, statusError, online]);
 
   useEffect(() => {
     if (!granted) return;
@@ -213,7 +223,7 @@ export default function LicensePage() {
   const known = !loading && !statusError;
   const via = license.connectedVia;
   const connectedToConsole = via === 'console' || via === 'key';
-  const managedByEnv = via ? via === 'env' : license.source === 'env';
+  const managedByEnv = isLicenseManagedByEnv(license);
   const free = isFreeLicense(license);
   const restartNote = via ? restartNotes[via] : undefined;
   const consoleHref = license.consoleUrl || licenseLink('manage', 'plan-page');

@@ -30,6 +30,10 @@ vi.mock('@/hooks/api', () => ({
   useQuery: mocks.useQuery,
 }));
 
+vi.mock('@/components/MonitoringOffer', () => ({
+  MonitoringOffer: () => <p>Monitoring offer</p>,
+}));
+
 import NotificationsPage, {
   NotificationChannelsPage,
   NotificationRulesPage,
@@ -753,6 +757,20 @@ describe('NotificationRulesPage', () => {
     expect(
       screen.getByRole('switch', { name: 'Toggle slack-test' })
     ).toBeChecked();
+  });
+
+  // Rules deliver nothing once the server itself is down.
+  it('offers external monitoring while no rule exists', async () => {
+    const user = userEvent.setup();
+    renderRulesPage();
+    expect(screen.queryByText('Monitoring offer')).not.toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole('button', { name: 'Rule actions for slack-test' })
+    );
+    await user.click(screen.getByRole('menuitem', { name: 'Delete rule' }));
+
+    expect(screen.getByText('Monitoring offer')).toBeVisible();
   });
 
   it('retains edits when saving fails', async () => {

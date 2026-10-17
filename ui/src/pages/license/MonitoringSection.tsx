@@ -87,7 +87,8 @@ export function MonitoringSection({
 
   return (
     <section
-      className="card-obsidian p-4 space-y-3"
+      id="monitoring"
+      className="card-obsidian p-4 space-y-3 scroll-mt-4"
       aria-labelledby="license-monitoring"
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
