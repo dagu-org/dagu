@@ -64,6 +64,14 @@ const runs: ActivityRun[] = [
   },
 ];
 
+// A run still going from before the window, as the page appends it.
+const backfill: ActivityRun = {
+  name: 'backfill',
+  dagRunId: 'backfill-1',
+  status: Status.Running,
+  startedAt: FROM - 3600,
+};
+
 function LocationProbe() {
   const location = useLocation();
   return <div data-testid="location">{location.pathname}</div>;
@@ -85,10 +93,10 @@ function stubLaneWidth(lane: HTMLElement, width: number) {
     }) as DOMRect;
 }
 
-function renderLanes(
-  laneRuns: ActivityRun[] = runs,
-  active: ActivityRun[] = []
-) {
+function renderLanes({
+  laneRuns = runs,
+  hasMore = false,
+}: { laneRuns?: ActivityRun[]; hasMore?: boolean } = {}) {
   return render(
     <MemoryRouter initialEntries={['/']}>
       <Routes>
@@ -97,9 +105,9 @@ function renderLanes(
           element={
             <ActivityLanes
               runs={laneRuns}
-              active={active}
+              active={[]}
               window={{ from: FROM, to: TO }}
-              hasMore={false}
+              hasMore={hasMore}
               range={{ from: FROM, to: TO }}
               nowSeconds={TO - 60}
               remoteNode="local"
@@ -152,15 +160,17 @@ describe('ActivityLanes', () => {
   });
 
   it('opens a long run from anywhere along its bar', () => {
-    renderLanes([
-      {
-        name: 'nightly',
-        dagRunId: 'nightly-1',
-        status: Status.Success,
-        startedAt: FROM,
-        finishedAt: FROM + 48 * 900,
-      },
-    ]);
+    renderLanes({
+      laneRuns: [
+        {
+          name: 'nightly',
+          dagRunId: 'nightly-1',
+          status: Status.Success,
+          startedAt: FROM,
+          finishedAt: FROM + 48 * 900,
+        },
+      ],
+    });
     const lane = screen.getByRole('group', { name: /^nightly:/ });
     stubLaneWidth(lane, 960);
 
@@ -172,20 +182,8 @@ describe('ActivityLanes', () => {
     );
   });
 
-  // The window lists only runs created inside it; a run still going from
-  // before it comes from the in-progress list.
   it('shows a run that started before the window', () => {
-    renderLanes(
-      [],
-      [
-        {
-          name: 'backfill',
-          dagRunId: 'backfill-1',
-          status: Status.Running,
-          startedAt: FROM - 3600,
-        },
-      ]
-    );
+    renderLanes({ laneRuns: [backfill] });
     const lane = screen.getByRole('group', { name: /^backfill:/ });
     stubLaneWidth(lane, 960);
 
@@ -202,5 +200,24 @@ describe('ActivityLanes', () => {
     expect(screen.getByRole('dialog')).toHaveAccessibleName(
       'backfill backfill-1'
     );
+  });
+
+  // Older pages hold only runs created in the window, so a run from before
+  // it leaves the unloaded time shaded.
+  it('shades the unloaded time when a run began before the window', () => {
+    renderLanes({
+      laneRuns: [
+        {
+          name: 'backfill',
+          dagRunId: 'backfill-2',
+          status: Status.Success,
+          startedAt: FROM + 24 * 900,
+        },
+        backfill,
+      ],
+      hasMore: true,
+    });
+
+    expect(screen.getByTestId('unloaded-runs')).toHaveStyle({ width: '25%' });
   });
 });

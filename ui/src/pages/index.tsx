@@ -28,6 +28,7 @@ import {
   inProgressRuns,
   systemAlerts,
   type TimeRange,
+  withEarlierActiveRuns,
 } from '../features/activity/lib/activityModel';
 import { CreateDAGModal } from '../features/dags/components/common';
 import PathsCard from '../features/system-status/components/PathsCard';
@@ -242,6 +243,27 @@ function Dashboard(): React.ReactElement {
     };
   }, [activity, runs, filter]);
 
+  // The lanes also draw runs still going from before the window, which the
+  // window's run list leaves out, so the empty states count them too.
+  const laneRuns = React.useMemo(
+    () =>
+      activity
+        ? withEarlierActiveRuns(runs, activity.active, activity.from)
+        : runs,
+    [activity, runs]
+  );
+  const filteredLaneRuns = React.useMemo(
+    () =>
+      filteredActivity
+        ? withEarlierActiveRuns(
+            filteredRuns,
+            filteredActivity.active,
+            filteredActivity.from
+          )
+        : filteredRuns,
+    [filteredActivity, filteredRuns]
+  );
+
   // Telling "no workflows" from "no runs" costs one small request, sent only
   // when the window is empty. A few names are enough to spot the examples.
   // A live window also keeps the page for what its side panels list, such as
@@ -249,7 +271,7 @@ function Dashboard(): React.ReactElement {
   // window shows only runs.
   const isEmpty =
     !!activity &&
-    activity.runs.length === 0 &&
+    laneRuns.length === 0 &&
     (!live ||
       (activity.active.length === 0 &&
         activity.attention.length === 0 &&
@@ -376,7 +398,7 @@ function Dashboard(): React.ReactElement {
                   </ToggleGroup>
                 )}
               </div>
-              {runs.length === 0 ? (
+              {laneRuns.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   {live ? (
                     <I18nText text={'No runs in the last 24 hours'} />
@@ -384,14 +406,14 @@ function Dashboard(): React.ReactElement {
                     <I18nText text={'No runs in this range'} />
                   )}
                 </p>
-              ) : filteredRuns.length === 0 ? (
+              ) : filteredLaneRuns.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   <I18nText text={'No workflows match the filter.'} />
                 </p>
               ) : (
                 <div className="rounded-lg border border-border bg-card px-3">
                   <ActivityLanes
-                    runs={filteredRuns}
+                    runs={filteredLaneRuns}
                     active={filteredActivity.active}
                     window={windowRange}
                     hasMore={hasMore}

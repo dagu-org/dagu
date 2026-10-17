@@ -23,12 +23,14 @@ import {
   sortLanes,
   type TimeRange,
   timeTicks,
-  withEarlierActiveRuns,
 } from '../lib/activityModel';
 import { executionsURL } from '../lib/activityLinks';
 
 type Props = {
-  /** Loaded runs, newest first. */
+  /**
+   * Loaded runs, newest first, followed by runs still going from before the
+   * window.
+   */
   runs: ActivityRun[];
   /** Runs in progress, which rank their workflow's lane higher. */
   active: ActivityRun[];
@@ -133,16 +135,17 @@ export function ActivityLanes({
     dagRunId: string;
   } | null>(null);
   const [peekTab, setPeekTab] = React.useState<StatusTab>('status');
-  const windowFrom = activityWindow.from;
   const lanes = React.useMemo(
-    () =>
-      sortLanes(
-        groupLanes(withEarlierActiveRuns(runs, active, windowFrom)),
-        active
-      ),
-    [runs, active, windowFrom]
+    () => sortLanes(groupLanes(runs), active),
+    [runs, active]
   );
-  const loadedFrom = hasMore ? oldestStart(runs) : undefined;
+  // Older pages hold only runs created in the window, so runs still going
+  // from before it do not move the unloaded boundary.
+  const loadedFrom = hasMore
+    ? oldestStart(
+        runs.filter((run) => (run.startedAt ?? 0) >= activityWindow.from)
+      )
+    : undefined;
   const unloadedPercent =
     loadedFrom === undefined
       ? 0
@@ -423,6 +426,7 @@ export function ActivityLanes({
                 {unloadedPercent > 0 && (
                   <span
                     aria-hidden="true"
+                    data-testid="unloaded-runs"
                     className="absolute inset-y-0 left-0 bg-muted/60"
                     style={{ width: `${unloadedPercent}%` }}
                   />

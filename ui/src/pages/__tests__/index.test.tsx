@@ -206,6 +206,15 @@ const reportRuns = [1, 2, 3].map((index) => ({
   startedAt: NOW - 60 * index,
 }));
 
+// A run still going from before the window, which only the in-progress
+// list carries.
+const backfillRun = {
+  name: 'backfill',
+  dagRunId: 'backfill-1',
+  status: Status.Running,
+  startedAt: FROM - 3600,
+};
+
 const busyActivity = makeActivity({
   runs: [...reportRuns, billingFailure],
   attention: [billingFailure],
@@ -575,6 +584,49 @@ describe('DashboardPage', () => {
     );
     expect(lanes.getAllByRole('listitem')).toHaveLength(1);
     expect(lanes.getByText('report')).toBeVisible();
+  });
+
+  it('shows a run still going from before the window', () => {
+    mockActivity({ activity: makeActivity({ active: [backfillRun] }) });
+
+    renderPage();
+
+    const lanes = within(
+      screen.getByRole('list', { name: 'Runs by workflow' })
+    );
+    expect(lanes.getByText('backfill')).toBeVisible();
+  });
+
+  it('filters to a run still going from before the window', () => {
+    mockActivity({
+      activity: { ...busyActivity, active: [backfillRun] },
+    });
+
+    renderPage();
+    fireEvent.change(screen.getByLabelText('Filter workflows'), {
+      target: { value: 'back' },
+    });
+
+    const lanes = within(
+      screen.getByRole('list', { name: 'Runs by workflow' })
+    );
+    expect(lanes.getAllByRole('listitem')).toHaveLength(1);
+    expect(lanes.getByText('backfill')).toBeVisible();
+  });
+
+  it('shows a picked day crossed by a run still going', () => {
+    mockDAGList(['backfill']);
+    mockActivity({ activity: makeActivity({ active: [backfillRun] }) });
+
+    renderPage();
+    fireEvent.change(screen.getByLabelText('Date'), {
+      target: { value: '2026-03-01' },
+    });
+
+    const lanes = within(
+      screen.getByRole('list', { name: 'Runs by workflow' })
+    );
+    expect(lanes.getByText('backfill')).toBeVisible();
   });
 
   it('invites creating the first workflow when no workflows exist', () => {
