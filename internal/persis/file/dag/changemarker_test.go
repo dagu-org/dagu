@@ -8,10 +8,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/dagucloud/dagu/v2/internal/ir"
 	"github.com/dagucloud/dagu/v2/internal/persis"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -180,6 +182,30 @@ func startMarkerReaderMode(t *testing.T, dagsDir, markerPath string, recursive b
 	return events
 }
 
+// slowFirstLoadStore makes the first metadata load of one DAG take delay.
+type slowFirstLoadStore struct {
+	*Store
+	dagName string
+	delay   time.Duration
+	once    sync.Once
+}
+
+func (s *slowFirstLoadStore) GetMetadata(ctx context.Context, id string) (*ir.DAG, error) {
+	if definitionIDForFile(id) == s.dagName {
+		s.once.Do(func() { time.Sleep(s.delay) })
+	}
+	return s.Store.GetMetadata(ctx, id)
+}
+
+// withSlowFirstLoad makes the reader load DAGs through a slowFirstLoadStore.
+func withSlowFirstLoad(dagsDir, dagName string, delay time.Duration) EntryReaderOption {
+	return func(er *entryReaderImpl) {
+		store := &slowFirstLoadStore{Store: NewStore(dagsDir, WithSkipExamples(true)), dagName: dagName, delay: delay}
+		er.dagRepository = persis.NewDAGRepository(store, persis.DAGRepositoryOptions{})
+		er.dagSource = newDAGFileSource(dagsDir, er.dagRepository)
+	}
+}
+
 // TestChangeMarkerPathPerHost verifies each host gets its own marker file next
 // to the others, and that an unknown host has a fixed one.
 func TestChangeMarkerPathPerHost(t *testing.T) {
@@ -225,13 +251,17 @@ func TestEntryReaderFollowsChangeMarker(t *testing.T) {
 }
 
 // TestEntryReaderSpacesMarkerRefreshes verifies refreshes triggered by change
-// markers keep their minimum gap: a second remote edit right after the first
-// is still applied, but only once the gap has passed.
+// markers keep their minimum gap from the end of the previous refresh: a second
+// remote edit right after the first is still applied, but only once the gap
+// has passed. The first refresh outlasts the gap, so a gap counted from its
+// start would already be over when it ends.
 func TestEntryReaderSpacesMarkerRefreshes(t *testing.T) {
 	ctx := context.Background()
 	store, dagsDir, markerPath := markerTestStore(t)
-	const gap = time.Second
-	events := startMarkerReader(t, dagsDir, markerPath, withMarkerRefreshGap(gap))
+	const gap = 600 * time.Millisecond
+	events := startMarkerReader(t, dagsDir, markerPath,
+		withMarkerRefreshGap(gap),
+		withSlowFirstLoad(dagsDir, "first", 2*gap))
 
 	require.NoError(t, store.Create(ctx, "first", []byte("name: first\n"+markerTestDAG)))
 	expectEvent(t, events, persis.DAGChangeAdded, "first")
