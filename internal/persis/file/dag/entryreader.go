@@ -70,8 +70,8 @@ func withResyncInterval(interval time.Duration) EntryReaderOption {
 
 // WithChangeMarker makes the reader refresh the registry when the change
 // marker of another host changes, checked every interval. Such a refresh
-// starts no sooner than a minute after the previous refresh ends, so a burst
-// of remote edits costs one full re-read.
+// starts no sooner than 15 seconds after the previous refresh ends, so a burst
+// of remote edits costs a few full re-reads rather than one per check.
 // path is this host's marker, as returned by ChangeMarkerPath; the reader
 // ignores it because its file watches already report this host's changes. An
 // empty path disables the marker and a non-positive interval selects the
@@ -120,7 +120,7 @@ const (
 	// a refresh triggered by a change marker. Each refresh re-reads every DAG,
 	// and the shared index is rebuilt after every store write, so sustained
 	// remote edits would otherwise keep a large registry refreshing.
-	defaultMarkerRefreshGap = time.Minute
+	defaultMarkerRefreshGap = 15 * time.Second
 	// defaultResyncInterval is the full re-read period. The change marker covers
 	// edits made through Dagu on another host; this covers edits made by other
 	// tools (git, kubectl cp, editors), which native file watches also miss on a
