@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useStoredValue } from '../useStoredValue';
 
 function Reader({ storageKey }: { storageKey: string }) {
@@ -36,6 +36,30 @@ describe('useStoredValue', () => {
 
     expect(values()).toEqual(['dismissed', 'dismissed', 'unset']);
     expect(localStorage.getItem('offer:local')).toBe('dismissed');
+  });
+
+  // Privacy-restricted browsers reject writes; a dismissal must still apply
+  // for the rest of the page's life.
+  it('keeps a value the browser refuses to store', () => {
+    const setItem = vi
+      .spyOn(Storage.prototype, 'setItem')
+      .mockImplementation(() => {
+        throw new DOMException('blocked', 'SecurityError');
+      });
+    try {
+      render(
+        <>
+          <Reader storageKey="offer:blocked" />
+          <Reader storageKey="offer:blocked" />
+        </>
+      );
+
+      fireEvent.click(screen.getAllByRole('button')[0]!);
+
+      expect(values()).toEqual(['dismissed', 'dismissed']);
+    } finally {
+      setItem.mockRestore();
+    }
   });
 
   it('follows a value stored in another tab', () => {

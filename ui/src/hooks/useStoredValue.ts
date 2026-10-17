@@ -7,8 +7,12 @@ import { writeLocalStorage } from '@/lib/local-storage-migration';
 // Components reading the same key in this tab; the storage event covers
 // other tabs only.
 const listeners = new Map<string, Set<() => void>>();
+// Values the browser refused to store, kept for the life of the page.
+const unstored = new Map<string, string>();
 
 function read(key: string): string | null {
+  const kept = unstored.get(key);
+  if (kept !== undefined) return kept;
   try {
     return localStorage.getItem(key);
   } catch {
@@ -21,7 +25,10 @@ function subscribe(key: string, onChange: () => void): () => void {
   keyListeners.add(onChange);
   listeners.set(key, keyListeners);
   const onStorage = (event: StorageEvent) => {
-    if (event.key === key || event.key === null) onChange();
+    if (event.key === key || event.key === null) {
+      unstored.delete(key);
+      onChange();
+    }
   };
   window.addEventListener('storage', onStorage);
   return () => {
@@ -45,7 +52,8 @@ export function useStoredValue(
   );
   const setValue = useCallback(
     (next: string) => {
-      writeLocalStorage(key, next);
+      if (writeLocalStorage(key, next)) unstored.delete(key);
+      else unstored.set(key, next);
       listeners.get(key)?.forEach((onChange) => onChange());
     },
     [key]
