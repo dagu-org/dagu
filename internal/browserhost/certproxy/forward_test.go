@@ -113,17 +113,20 @@ func TestForwardHTTP(t *testing.T) {
 }
 
 // A tunnel that does not carry TLS, as a ws: URL opens, takes the route of
-// its ws: URL, path included, and is relayed as it is, for a host an entry
+// its ws: URL, path and query included, however long, and is relayed as it
+// is, for a host an entry
 // names, one the guard carries, and one neither does. One that carries TLS
 // keeps the route of an https: URL.
 func TestCarryAllRoutesTunnelByScheme(t *testing.T) {
 	t.Parallel()
 	ca := newTestCA(t, "corp CA")
-	// schemePAC sends the ws: URL of /socket to plain and the others to
+	// schemePAC sends the ws: URLs of /socket to plain and the others to
 	// secure.
 	schemePAC := func(plain, secure *tunnelProxy) string {
-		return `function FindProxyForURL(url) { return shExpMatch(url, "ws://*/socket") ? "PROXY ` + plain.addr + `" : "PROXY ` + secure.addr + `"; }`
+		return `function FindProxyForURL(url) { return shExpMatch(url, "ws://*/socket?*") ? "PROXY ` + plain.addr + `" : "PROXY ` + secure.addr + `"; }`
 	}
+	// The query outgrows what the proxy reads from a connection at once.
+	request := "GET /socket?pad=" + strings.Repeat("a", 8<<10) + " HTTP/1.1\r\nHost: " + siteHost + "\r\n\r\n"
 	guarded := func(t *testing.T, pac string) Config {
 		cfg := guardConfig(t, ca, pac)
 		cfg.TrustedCAs = []TrustedCA{trustedCA(ca, "127.0.0.1")}
@@ -149,7 +152,7 @@ func TestCarryAllRoutesTunnelByScheme(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, http.StatusOK, status)
 			t.Cleanup(func() { _ = conn.Close() })
-			_, err = io.WriteString(conn, "GET /socket HTTP/1.1\r\nHost: "+siteHost+"\r\n\r\n")
+			_, err = io.WriteString(conn, request)
 			require.NoError(t, err)
 			greeting, err := io.ReadAll(conn)
 			require.NoError(t, err)

@@ -5,7 +5,6 @@ package certproxy
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -61,6 +60,8 @@ const (
 	plainScheme = "ws"
 	// defaultPlainPort is the port of a ws: URL that names none.
 	defaultPlainPort = "80"
+	// maxURLBytes is the length of the longest URL Chrome sends.
+	maxURLBytes = 2 << 20
 	// remoteErrorOp marks the error of an alert a TLS peer sent.
 	remoteErrorOp = "remote error"
 	// alertPrefix starts the text of a TLS alert.
@@ -342,10 +343,16 @@ func (s *server) openTunnel(w http.ResponseWriter, host, port string, entry *ups
 		}
 		return openedTunnel{}, false
 	}
+	// sent is what the proxy read of the browser's request, which the site
+	// still gets.
+	var sent []byte
 	if s.carryAll {
 		rawURL := pacRequestURL(tlsScheme, host, port, "/")
-		if opened.plain = !carriesTLS(conn, reader, deadline); opened.plain {
-			rawURL = pacRequestURL(plainScheme, host, port, requestTarget(reader))
+		// A loopback destination's route never depends on its URL.
+		if opened.plain = !carriesTLS(conn, reader, deadline); opened.plain && !implicitBypass(host) {
+			var target string
+			target, sent = readRequestTarget(conn, reader, deadline)
+			rawURL = pacRequestURL(plainScheme, host, port, target)
 		}
 		var err error
 		if opened.raw, opened.via, err = s.reach(ctx, rawURL, host, port, entry); err != nil {
@@ -355,8 +362,11 @@ func (s *server) openTunnel(w http.ResponseWriter, host, port string, entry *ups
 		}
 	}
 	opened.client = conn
-	if reader.Buffered() > 0 {
+	if reader.Buffered() > 0 || len(sent) > 0 {
 		opened.client = &bufferedConn{Conn: conn, reader: reader}
+	}
+	if len(sent) > 0 {
+		opened.client = replayed(opened.client, sent)
 	}
 	return opened, true
 }
@@ -528,18 +538,28 @@ func (s *server) splice(client, raw net.Conn) {
 	<-done
 }
 
-// requestTarget returns the target of the HTTP request a plain tunnel
-// starts with, as /socket in "GET /socket HTTP/1.1", from what reader holds
-// already, or / without a whole request line there. Chrome sends the
-// request in one write, and a client that sent all of it waits for an
-// answer, so the proxy reads no further.
-func requestTarget(reader *bufio.Reader) string {
-	ahead, _ := reader.Peek(reader.Buffered())
-	line, _, found := bytes.Cut(ahead, []byte("\n"))
-	if fields := strings.Fields(string(line)); found && len(fields) == 3 && strings.HasPrefix(fields[1], "/") {
-		return fields[1]
+// readRequestTarget reads the request line a plain tunnel starts with and
+// returns its target, as /socket in "GET /socket HTTP/1.1", with the bytes
+// it read. A line that has not ended by deadline, or within the longest URL
+// Chrome sends, gives /.
+func readRequestTarget(conn net.Conn, reader *bufio.Reader, deadline time.Time) (string, []byte) {
+	_ = conn.SetReadDeadline(deadline)
+	defer func() { _ = conn.SetReadDeadline(time.Time{}) }()
+	var line []byte
+	for len(line) <= maxURLBytes {
+		chunk, err := reader.ReadSlice('\n')
+		line = append(line, chunk...)
+		if err == nil {
+			if fields := strings.Fields(string(line)); len(fields) == 3 && strings.HasPrefix(fields[1], "/") {
+				return fields[1], line
+			}
+			break
+		}
+		if !errors.Is(err, bufio.ErrBufferFull) {
+			break
+		}
 	}
-	return "/"
+	return "/", line
 }
 
 // carriesTLS reports whether what the client sends over conn, read through
