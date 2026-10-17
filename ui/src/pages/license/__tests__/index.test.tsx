@@ -848,6 +848,29 @@ describe('LicensePage', () => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
 
+    it('promises failure emails only with run status', async () => {
+      approveAndConnect(unchosen);
+      const runsText =
+        "Dagu Console shows this server's runs, failures, and trends, and emails you when a workflow fails or the server stops reporting.";
+      expect(
+        await within(offer()).findByText(runsText, { exact: false })
+      ).toBeVisible();
+
+      await userEvent.click(
+        within(offer()).getByRole('radio', { name: 'Health only' })
+      );
+
+      expect(
+        within(offer()).getByText(
+          "Dagu Console shows this server's health and emails you when the server stops reporting.",
+          { exact: false }
+        )
+      ).toBeVisible();
+      expect(
+        within(offer()).queryByText(runsText, { exact: false })
+      ).not.toBeInTheDocument();
+    });
+
     it('shows a level set in the configuration in the offer', async () => {
       const { post, approve } = approveAndConnect({
         ...unchosen,

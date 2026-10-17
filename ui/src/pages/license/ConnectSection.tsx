@@ -104,9 +104,13 @@ export function ConnectSection({
             {ts('Monitor this server for free')}
           </h2>
           <p className="text-sm">
-            {ts(
-              "Dagu Console shows this server's runs, failures, and trends, and emails you when a workflow fails or the server stops reporting."
-            )}
+            {(configured ?? report) === LicenseMonitoringLevel.health
+              ? ts(
+                  "Dagu Console shows this server's health and emails you when the server stops reporting."
+                )
+              : ts(
+                  "Dagu Console shows this server's runs, failures, and trends, and emails you when a workflow fails or the server stops reporting."
+                )}
             {configured !== LicenseMonitoringLevel.off && (
               <> {ts('Reporting starts as soon as the server connects.')}</>
             )}
