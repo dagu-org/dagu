@@ -2384,17 +2384,28 @@ func TestPermissionProblemDoesNotWaitForScreen(t *testing.T) {
 }
 
 // A step with no timeout gives up on a screen nobody unlocks once the wait
-// it allows has passed, naming the problem.
+// it allows has passed, naming the problem, even when the DAG's deadline is
+// later.
 func TestScreenWaitGivesUp(t *testing.T) {
 	t.Parallel()
 
-	run := newTestRun(t)
-	run.screenWait = 50 * time.Millisecond
-	run.checkDesktop = func() desktop.Diagnostics { return screenLocked }
-	execution := run.execute(`{"do": [{"wait": "1ms"}]}`, nil)
-	require.EqualError(t, execution.err, "computer: open the desktop after waiting 50ms: "+
-		"the screen is locked; unlock it and keep it unlocked while computer steps run")
-	assert.Equal(t, []string{waitReasonScreen}, waitReasons(execution.exec.GetAgentSession()))
+	for name, deadline := range map[string]time.Duration{"no deadline": 0, "later DAG deadline": time.Hour} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			run := newTestRun(t)
+			if deadline > 0 {
+				ctx, cancel := context.WithTimeout(t.Context(), deadline)
+				t.Cleanup(cancel)
+				run.parent = ctx
+			}
+			run.screenWait = 50 * time.Millisecond
+			run.checkDesktop = func() desktop.Diagnostics { return screenLocked }
+			execution := run.execute(`{"do": [{"wait": "1ms"}]}`, nil)
+			require.EqualError(t, execution.err, "computer: open the desktop after waiting 50ms: "+
+				"the screen is locked; unlock it and keep it unlocked while computer steps run")
+			assert.Equal(t, []string{waitReasonScreen}, waitReasons(execution.exec.GetAgentSession()))
+		})
+	}
 }
 
 // The model may click an element the observation lists by id. A button is

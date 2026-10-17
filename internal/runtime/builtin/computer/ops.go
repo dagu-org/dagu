@@ -816,8 +816,10 @@ func (r *run) awaitUnlock(ctx context.Context) error {
 		return nil
 	}
 	r.timeline.Waiting(waitReasonScreen, "Waiting for the screen to be unlocked: "+diag.Err().Error())
+	// A deadline the step inherits from its DAG may be later than the cap,
+	// so only the step's own timeout replaces it.
 	waitCtx := ctx
-	if _, bounded := ctx.Deadline(); !bounded {
+	if r.exec.step.Timeout <= 0 {
 		var cancel context.CancelFunc
 		waitCtx, cancel = context.WithTimeout(ctx, r.exec.screenWait)
 		defer cancel()

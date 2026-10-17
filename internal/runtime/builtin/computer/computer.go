@@ -42,7 +42,7 @@ type computerExecutor struct {
 	openDesktop func() (*desktop.Driver, error)
 	// checkDesktop reports whether the desktop can be automated. A step
 	// waits while it reports only problems a person clears, checking every
-	// screenPoll, for up to screenWait when nothing else bounds the step.
+	// screenPoll, for up to screenWait when the step sets no timeout.
 	checkDesktop func() desktop.Diagnostics
 	screenPoll   time.Duration
 	screenWait   time.Duration
