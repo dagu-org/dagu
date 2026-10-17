@@ -40,6 +40,12 @@ type computerExecutor struct {
 	step        ir.Step
 	cfg         config
 	openDesktop func() (*desktop.Driver, error)
+	// checkDesktop reports whether the desktop can be automated. A step
+	// waits while it reports only problems a person clears, checking every
+	// screenPoll, for up to screenWait when the step sets no timeout.
+	checkDesktop func() desktop.Diagnostics
+	screenPoll   time.Duration
+	screenWait   time.Duration
 	// openElements reads the front window's elements for exact checks. It
 	// is called on the first one.
 	openElements func() (desktop.Elements, error)
@@ -87,6 +93,9 @@ func newExecutor(_ context.Context, step ir.Step) (executor.Executor, error) {
 		step:         step,
 		cfg:          cfg,
 		openDesktop:  desktop.Open,
+		checkDesktop: desktop.Check,
+		screenPoll:   defaultScreenPoll,
+		screenWait:   defaultScreenWait,
 		openElements: desktop.OpenElements,
 		launch:       desktop.Launch,
 		newProvider:  runtime.NewLLMProvider,
