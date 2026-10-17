@@ -58,7 +58,7 @@ export function MonitoringOffer({ className }: { className?: string }) {
             <p className="text-sm text-muted-foreground">
               {ts('Alerts from this server stop if the server goes down.')}{' '}
               {ts(
-                "Dagu Console shows this server's runs, failures, and trends, and emails you when a workflow fails or the server stops reporting. You choose what the server reports once it connects."
+                'Dagu Console emails you when a workflow fails or this server stops reporting. Free for one server.'
               )}
             </p>
           </div>
