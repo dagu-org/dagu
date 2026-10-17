@@ -115,7 +115,7 @@ func (b *unsentBody) Close() error {
 // cannot reach the site counts, as it does for Chrome.
 func unreached(err error) bool {
 	var opErr *net.OpError
-	return errors.As(err, &opErr) && (opErr.Op == "dial" || opErr.Op == "proxyconnect" || opErr.Op == "socks connect")
+	return errors.As(err, &opErr) && (opErr.Op == "dial" || opErr.Op == "proxyconnect" || opErr.Op == socksConnectOp)
 }
 
 // transport returns the transport that sends requests on r.
@@ -141,6 +141,10 @@ func (f *forwarder) transport(r route) *http.Transport {
 		transport.TLSClientConfig = f.s.proxyTLS(host)
 	case routeSOCKS5:
 		transport.Proxy = http.ProxyURL(&url.URL{Scheme: "socks5", Host: r.addr})
+	case routeSOCKS4:
+		transport.DialContext = func(ctx context.Context, _, addr string) (net.Conn, error) {
+			return dialSOCKS4(ctx, dialer, r.addr, addr)
+		}
 	case routeDirect:
 	}
 	f.transports[r] = transport

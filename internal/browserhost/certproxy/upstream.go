@@ -7,11 +7,13 @@ import (
 	"bufio"
 	"context"
 	"crypto/tls"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"strconv"
 	"time"
 
 	"golang.org/x/net/proxy"
@@ -22,6 +24,11 @@ const (
 	dialTimeout = 15 * time.Second
 	// maxProxyResponseBytes bounds the header of a proxy's CONNECT answer.
 	maxProxyResponseBytes = 64 << 10
+	// socksConnectOp names the failure of a SOCKS proxy to connect, as Go's
+	// own SOCKS dialer does.
+	socksConnectOp = "socks connect"
+	// socks4Granted is the SOCKS4 reply code of an open connection.
+	socks4Granted = 90
 )
 
 // PAC result keywords.
@@ -29,6 +36,7 @@ const (
 	routeKeywordDirect = "DIRECT"
 	routeKeywordProxy  = "PROXY"
 	routeKeywordHTTPS  = "HTTPS"
+	routeKeywordSOCKS  = "SOCKS"
 	routeKeywordSOCKS5 = "SOCKS5"
 )
 
@@ -44,6 +52,9 @@ const (
 	// routeHTTPS tunnels through an HTTP proxy reached over TLS.
 	routeHTTPS
 	routeSOCKS5
+	// routeSOCKS4 tunnels through a SOCKS4 proxy, which takes an IPv4
+	// address.
+	routeSOCKS4
 )
 
 // route is one way to reach a server.
@@ -61,6 +72,8 @@ func (r route) String() string {
 		return routeKeywordHTTPS + " " + r.addr
 	case routeSOCKS5:
 		return routeKeywordSOCKS5 + " " + r.addr
+	case routeSOCKS4:
+		return routeKeywordSOCKS + " " + r.addr
 	case routeDirect:
 	}
 	return routeKeywordDirect
@@ -121,6 +134,9 @@ func dialRoute(ctx context.Context, r route, target string, proxyTLS func(host s
 		}
 		conn, err := socks.(proxy.ContextDialer).DialContext(ctx, "tcp", target)
 		return conn, false, err
+	case routeSOCKS4:
+		conn, err := dialSOCKS4(ctx, dialer, r.addr, target)
+		return conn, false, err
 	case routeDirect:
 	}
 	conn, err := dialDirect(ctx, dialer, target)
@@ -150,6 +166,54 @@ func connectTunnel(ctx context.Context, conn net.Conn, proxyAddr, target string)
 		return true, fmt.Errorf("the proxy %s answered %d %s", proxyAddr, status, http.StatusText(status))
 	}
 	return false, conn.SetDeadline(time.Time{})
+}
+
+// dialSOCKS4 connects to target through the SOCKS4 proxy at proxyAddr. As
+// Chrome does, it resolves target's host itself, to an IPv4 address. Every
+// failure is the proxy's, after which Chrome tries the next route.
+func dialSOCKS4(ctx context.Context, dialer *net.Dialer, proxyAddr, target string) (conn net.Conn, err error) {
+	defer func() {
+		if err != nil {
+			err = &net.OpError{Op: socksConnectOp, Net: "tcp", Err: err}
+		}
+	}()
+	host, port, err := net.SplitHostPort(target)
+	if err != nil {
+		return nil, err
+	}
+	portNumber, err := strconv.ParseUint(port, 10, 16)
+	if err != nil {
+		return nil, err
+	}
+	addrs, err := net.DefaultResolver.LookupNetIP(ctx, "ip4", host)
+	if err != nil {
+		return nil, err
+	}
+	conn, err = dialer.DialContext(ctx, "tcp", proxyAddr)
+	if err != nil {
+		return nil, err
+	}
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		deadline = time.Now().Add(dialTimeout)
+	}
+	_ = conn.SetDeadline(deadline)
+	// Version 4, CONNECT, the port, the address, and an empty user ID.
+	ip := addrs[0].Unmap().As4()
+	request := binary.BigEndian.AppendUint16([]byte{4, 1}, uint16(portNumber)) //nolint:gosec // ParseUint bounds it to 16 bits
+	request = append(request, ip[:]...)
+	reply := make([]byte, 8)
+	if _, err = conn.Write(append(request, 0)); err == nil {
+		_, err = io.ReadFull(conn, reply)
+	}
+	if err == nil && reply[1] != socks4Granted {
+		err = fmt.Errorf("the SOCKS proxy %s refused the connection to %s (code %d)", proxyAddr, target, reply[1])
+	}
+	if err != nil {
+		_ = conn.Close()
+		return nil, err
+	}
+	return conn, conn.SetDeadline(time.Time{})
 }
 
 // requestTunnel sends a CONNECT request for target over conn and returns

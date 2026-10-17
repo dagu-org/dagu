@@ -135,6 +135,15 @@ func TestDialRoutes(t *testing.T) {
 		assert.Equal(t, []string{"portal.test:443"}, socks.requests())
 	})
 
+	t.Run("TunnelsThroughSOCKS4", func(t *testing.T) {
+		t.Parallel()
+		socks := newSOCKSProxy(t, target)
+		conn, _, err := dialRoutes(context.Background(), []route{{kind: routeSOCKS4, addr: socks.addr}}, target, noCertificate)
+		require.NoError(t, err)
+		assert.Equal(t, "hello", readGreeting(t, conn))
+		assert.Equal(t, []string{target}, socks.requests())
+	})
+
 	t.Run("ReportsEveryRoute", func(t *testing.T) {
 		t.Parallel()
 		authProxy := newTunnelProxy(t, target, http.StatusProxyAuthRequired)
