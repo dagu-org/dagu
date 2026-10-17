@@ -5,6 +5,7 @@ package cmd
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,6 +15,72 @@ import (
 	"github.com/dagucloud/dagu/v2/internal/persis"
 	"github.com/stretchr/testify/require"
 )
+
+// The banner names the web UI URL, the setup step while no admin exists, and
+// free monitoring only when this server could still connect to Dagu Console.
+func TestStartupBanner(t *testing.T) {
+	const url = "http://localhost:8080"
+	community := &license.Status{Community: true}
+	tests := []struct {
+		name        string
+		banner      startupBanner
+		contains    []string
+		notContains []string
+	}{
+		{
+			name:   "FirstRun",
+			banner: startupBanner{version: "v2.1.0", url: url, dagsDir: "/srv/dags", setupRequired: true, license: community},
+			contains: []string{
+				"Dagu v2.1.0 is ready",
+				"Web UI:  " + url + "\n",
+				"create the admin account at " + url + "/setup",
+				"DAGs:    /srv/dags",
+				url + "/license#monitoring",
+			},
+		},
+		{
+			name:        "Licensed",
+			banner:      startupBanner{url: url, license: &license.Status{Plan: "pro", Valid: true}},
+			notContains: []string{"Alerts:"},
+		},
+		{
+			name:        "LicenseFromEnv",
+			banner:      startupBanner{url: url, license: &license.Status{Community: true, Source: license.SourceEnvKey}},
+			notContains: []string{"Alerts:"},
+		},
+		{
+			name:        "NoLicenseManager",
+			banner:      startupBanner{url: url},
+			notContains: []string{"Alerts:"},
+		},
+		{
+			name:        "SetupDone",
+			banner:      startupBanner{url: url, license: community},
+			contains:    []string{"Alerts:"},
+			notContains: []string{"Setup:"},
+		},
+		{
+			name:   "BasePath",
+			banner: startupBanner{url: url + "/dagu", setupRequired: true, license: community},
+			contains: []string{
+				url + "/dagu/setup",
+				url + "/dagu/license#monitoring",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var out strings.Builder
+			tt.banner.write(&out)
+			for _, want := range tt.contains {
+				require.Contains(t, out.String(), want)
+			}
+			for _, unwanted := range tt.notContains {
+				require.NotContains(t, out.String(), unwanted)
+			}
+		})
+	}
+}
 
 func TestStopLocalAgentSessionCleanupHonorsShutdownContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())

@@ -7,10 +7,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
+	"os"
 	"path/filepath"
 	goruntime "runtime"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -21,6 +24,7 @@ import (
 	"github.com/dagucloud/dagu/v2/internal/cmn/logger"
 	"github.com/dagucloud/dagu/v2/internal/cmn/logger/tag"
 	"github.com/dagucloud/dagu/v2/internal/ir"
+	"github.com/dagucloud/dagu/v2/internal/license"
 	"github.com/dagucloud/dagu/v2/internal/opencodehost"
 	filemonitor "github.com/dagucloud/dagu/v2/internal/persis/file/monitor"
 	"github.com/dagucloud/dagu/v2/internal/service/frontend"
@@ -167,6 +171,7 @@ func runServer(ctx *Context, _ []string, serverOpts ...frontend.ServerOption) er
 	if cloudMonitoring != nil {
 		serverOpts = append(serverOpts, frontend.WithAPIOption(apiv1.WithCloudReport(cloudMonitoring)))
 	}
+	serverOpts = append(serverOpts, frontend.WithOnReady(printStartupBanner(serviceCtx, stores.AuthSetupRequired)))
 
 	// Initialize server (includes auth setup). Use serviceCtx so auth providers can
 	// respond to termination signals during potentially slow network operations.
@@ -338,6 +343,55 @@ func cloudReportEvents(ctx *Context) cloudreport.Events {
 		Lease:         filemonitor.NewLease(stateFile, &dirlock.LockOptions{StaleThreshold: cloudReportLeaseStaleThreshold}),
 		Statuses:      ctx.Persistence.DAGRunRepository,
 	}
+}
+
+// startupBanner tells the person who started Dagu where to open it.
+type startupBanner struct {
+	version       string
+	url           string
+	dagsDir       string
+	setupRequired bool
+	// license is nil when no license manager runs.
+	license *license.Status
+}
+
+// printStartupBanner returns a frontend.WithOnReady hook that prints the
+// startup banner to stdout. It returns nil in quiet mode, when stdout is not a
+// terminal, or when the server has no web UI.
+func printStartupBanner(ctx *Context, setupRequired bool) func(url string) {
+	if ctx.Quiet || ctx.Config.Server.Headless || !isTerminal(os.Stdout) {
+		return nil
+	}
+	return func(url string) {
+		banner := startupBanner{
+			version:       config.Version,
+			url:           url,
+			dagsDir:       ctx.Config.Paths.DAGsDir,
+			setupRequired: setupRequired,
+		}
+		if ctx.LicenseManager != nil {
+			status := ctx.LicenseManager.Status()
+			banner.license = &status
+		}
+		banner.write(os.Stdout)
+	}
+}
+
+// write prints the banner in plain ASCII. It offers free monitoring only on
+// Community servers whose license is not managed by the environment.
+func (b startupBanner) write(w io.Writer) {
+	var out strings.Builder
+	fmt.Fprintf(&out, "\nDagu %s is ready\n", b.version)
+	fmt.Fprintf(&out, "  Web UI:  %s\n", b.url)
+	if b.setupRequired {
+		fmt.Fprintf(&out, "  Setup:   create the admin account at %s/setup\n", b.url)
+	}
+	fmt.Fprintf(&out, "  DAGs:    %s\n", b.dagsDir)
+	if b.license != nil && b.license.Community && !b.license.Source.IsEnv() {
+		fmt.Fprintf(&out, "  Alerts:  get an email if a workflow fails or this server stops, free: %s/license#monitoring\n", b.url)
+	}
+	out.WriteString("\n")
+	_, _ = io.WriteString(w, out.String())
 }
 
 // logTunnelStatus logs the tunnel status prominently to the console.
