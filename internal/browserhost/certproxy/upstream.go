@@ -116,7 +116,7 @@ func dialRoute(ctx context.Context, r route, target string, proxyTLS func(host s
 		return socks.(proxy.ContextDialer).DialContext(ctx, "tcp", target)
 	case routeDirect:
 	}
-	return dialer.DialContext(ctx, "tcp", target)
+	return dialDirect(ctx, dialer, target)
 }
 
 // connectTunnel asks the HTTP proxy at proxyAddr, reached over conn, for a

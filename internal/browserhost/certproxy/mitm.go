@@ -527,12 +527,23 @@ func (s *server) tunnel(client, raw net.Conn, via route, host string, entry *ups
 // reach connects to host and port on the route the device's proxy settings
 // give it.
 func (s *server) reach(ctx context.Context, host, port string, entry *upstreamEntry) (net.Conn, route, error) {
-	found := s.pac.routes(ctx, pacRequestURL(host, port), host)
+	routes := s.routesTo(ctx, pacRequestURL(host, port), host, entry.label)
+	return dialRoutes(ctx, routes, net.JoinHostPort(host, port), s.proxyTLS)
+}
+
+// routesTo returns the routes to rawURL, whose host is host. Chrome never
+// sends a destination it implicitly bypasses to a proxy, and never asks
+// the device's proxy settings about it, so neither does the proxy.
+func (s *server) routesTo(ctx context.Context, rawURL, host, label string) []route {
+	if implicitBypass(host) {
+		return []route{{kind: routeDirect}}
+	}
+	found := s.pac.routes(ctx, rawURL, host)
 	for _, skipped := range found.skipped {
-		s.events.add(EventUpstream, host, entry.label, fmt.Sprintf(
+		s.events.add(EventUpstream, host, label, fmt.Sprintf(
 			"the device's proxy settings route %s through %s, which the certificate proxy does not support; it tries the next route", host, skipped))
 	}
-	return dialRoutes(ctx, found.routes, net.JoinHostPort(host, port), s.proxyTLS)
+	return found.routes
 }
 
 // proxyTLS returns the TLS configuration for an HTTPS proxy at host. An

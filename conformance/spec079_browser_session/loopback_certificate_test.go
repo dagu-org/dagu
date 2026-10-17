@@ -87,25 +87,29 @@ func TestLoopbackClientCertificate(t *testing.T) {
 	}
 }
 
-// Trust and routing for a host the loopback authority does not name stay as
-// they were: the browser rejects its certificate, and the device proxy still
-// carries it.
+// Loopback destinations bypass the configured proxy, as Chrome's own route
+// does. Trust and routing for a host the loopback authority does not name
+// stay as they were: the browser rejects its certificate, and the device
+// proxy still carries it.
 func TestLoopbackTrustStaysOnItsHost(t *testing.T) {
 	t.Parallel()
 	s := newSessionEnv(t)
 	loopbackCA, otherCA := newTestCA(t, "Loopback CA"), newTestCA(t, "Other CA")
-	loopbackCert := loopbackCA.issueServer(t, nil, []net.IP{net.ParseIP("127.0.0.1")})
+	loopbackCert := loopbackCA.issueServer(t, []string{"portal.localhost"}, []net.IP{net.ParseIP("127.0.0.1")})
 	otherCert := otherCA.issueServer(t, []string{"outside.test"}, nil)
 	v4 := serveCertificate(t, "127.0.0.1:0", loopbackCert, nil, "Loopback portal")
 	other := serveCertificate(t, "127.0.0.1:0", otherCert, nil, "Outside")
 	proxy, proxyURL := startHostProxy(t, map[string]string{"outside.test": other})
 	s.dagu.WriteFile("ca.pem", loopbackCA.pem())
-	writeBrowserConfig(t, s.env, "browser:\n  trusted_cas:\n    - hosts: [127.0.0.1]\n      ca_file: "+s.dagu.ProjectPath("ca.pem")+"\n")
+	writeBrowserConfig(t, s.env, "browser:\n  trusted_cas:\n    - hosts: [127.0.0.1, portal.localhost]\n      ca_file: "+s.dagu.ProjectPath("ca.pem")+"\n")
 
 	id, opened := openSession(t, s, "https://"+v4+"/", "--proxy", proxyURL)
 	assert.Equal(t, true, opened["tls_verified"])
 	assert.Equal(t, "Loopback portal", opened["title"])
+	s.session(`{"goto":"https://portal.localhost:`+portOf(t, v4)+`/"}`, "do", id).ExpectExitCode(0)
+	s.session(`{"expect":{"text":"Loopback portal"}}`, "do", id).ExpectExitCode(0)
 	assert.NotContains(t, proxy.connects(), "127.0.0.1:"+portOf(t, v4))
+	assert.NotContains(t, proxy.connects(), "portal.localhost:"+portOf(t, v4))
 
 	visited := s.session(`{"goto":"https://outside.test/"}`, "do", id)
 	visited.ExpectExitCode(0)

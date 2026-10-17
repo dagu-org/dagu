@@ -4,10 +4,12 @@
 package certproxy
 
 import (
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -22,6 +24,38 @@ func TestImplicitBypass(t *testing.T) {
 	for _, host := range []string{"portal.example.com", "10.0.0.1", "*.example.com", "192.168.1.1"} {
 		assert.Falsef(t, implicitBypass(host), host)
 	}
+}
+
+// Chrome reaches a localhost name itself, without the system resolver or a
+// proxy, so the certificate proxy does the same even when the device's
+// proxy settings send every request to a proxy.
+func TestLoopbackSkipsDeviceProxy(t *testing.T) {
+	t.Parallel()
+	const host = "portal.localhost"
+	ca := newTestCA(t, "corp CA")
+	cert, key := ca.issue(t, certOptions{name: host, dnsNames: []string{host}})
+	site := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = io.WriteString(w, "local portal")
+	}))
+	site.TLS = &tls.Config{Certificates: []tls.Certificate{{Certificate: [][]byte{cert.Raw}, PrivateKey: key}}}
+	site.StartTLS()
+	t.Cleanup(site.Close)
+	upstream := newTunnelProxy(t, siteAddr(site), http.StatusOK)
+	cfg := testConfig(t, `function FindProxyForURL() { return "PROXY `+upstream.addr+`"; }`)
+	cfg.TrustedCAs = []TrustedCA{trustedCA(ca, host)}
+	ready := serveProxy(t, cfg)
+
+	body, err := get(t, browserClient(ready), "https://"+net.JoinHostPort(host, portOf(t, siteAddr(site)))+"/")
+	require.NoError(t, err)
+	assert.Equal(t, "local portal", body)
+	assert.Empty(t, upstream.requests())
+}
+
+func portOf(t *testing.T, hostport string) string {
+	t.Helper()
+	_, port, err := net.SplitHostPort(hostport)
+	require.NoError(t, err)
+	return port
 }
 
 func TestChromeArgsUsesManualProxyForLoopback(t *testing.T) {
@@ -68,7 +102,9 @@ func TestCarryAllKeepsUnrelatedHosts(t *testing.T) {
 			}
 			accepted <- conn
 		}()
-		ready := serveProxy(t, testConfig(t, "", ca.clientEntry(t, testLabel, "127.0.0.1")))
+		upstream := newTunnelProxy(t, echo.Addr().String(), http.StatusOK)
+		pac := `function FindProxyForURL() { return "PROXY ` + upstream.addr + `"; }`
+		ready := serveProxy(t, testConfig(t, pac, ca.clientEntry(t, testLabel, "127.0.0.1")))
 		conn, status, err := connectThrough(fmt.Sprintf("127.0.0.1:%d", ready.Port), echo.Addr().String())
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, status)
@@ -86,6 +122,7 @@ func TestCarryAllKeepsUnrelatedHosts(t *testing.T) {
 		_, err = io.ReadFull(conn, buf)
 		require.NoError(t, err)
 		assert.Equal(t, "pong", string(buf))
+		assert.Empty(t, upstream.requests())
 	})
 
 	t.Run("Guard", func(t *testing.T) {
