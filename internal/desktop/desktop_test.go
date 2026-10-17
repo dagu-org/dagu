@@ -212,3 +212,23 @@ func TestDriverWaitForIdle(t *testing.T) {
 	defer cancel()
 	assert.ErrorIs(t, driver.WaitForIdle(ctx, time.Hour, poll, onWait), context.DeadlineExceeded)
 }
+
+// Only problems a person clears at the computer are worth waiting for; one
+// that needs a permission or another setup fails at once.
+func TestDiagnosticsAwaitsPerson(t *testing.T) {
+	t.Parallel()
+
+	diagnostics := func(codes ...string) desktop.Diagnostics {
+		var d desktop.Diagnostics
+		for _, code := range codes {
+			d.Problems = append(d.Problems, desktop.Problem{Code: code, Message: code})
+		}
+		return d
+	}
+	for _, codes := range [][]string{{"screen_locked"}, {"no_session"}, {"other_session"}} {
+		assert.True(t, diagnostics(codes...).AwaitsPerson(), codes)
+	}
+	for _, codes := range [][]string{nil, {"screen_recording"}, {"screen_locked", "accessibility"}, {"service_session"}, {"unsupported"}} {
+		assert.False(t, diagnostics(codes...).AwaitsPerson(), codes)
+	}
+}

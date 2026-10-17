@@ -2308,11 +2308,93 @@ func TestOpenDesktopFailure(t *testing.T) {
 	created, err := newExecutor(t.Context(), step)
 	require.NoError(t, err)
 	exec := created.(*computerExecutor)
+	exec.checkDesktop = func() desktop.Diagnostics { return desktop.Diagnostics{} }
 	exec.openDesktop = func() (*desktop.Driver, error) { return nil, errors.New("Screen Recording permission is missing") }
 	exec.newProvider = func(context.Context, *ir.LLMConfig) (llmpkg.Provider, error) { return run.vision, nil }
 	exec.SetStderr(io.Discard)
 	err = exec.Run(run.context())
 	require.ErrorContains(t, err, "open the desktop: Screen Recording permission is missing")
+}
+
+// screenLocked is what a check of a locked screen reports.
+var screenLocked = desktop.Diagnostics{Problems: []desktop.Problem{{
+	Code:    "screen_locked",
+	Message: "the screen is locked; unlock it and keep it unlocked while computer steps run",
+}}}
+
+// lockedFor reports a locked screen for the first checks, then a usable one.
+func lockedFor(checks int) func() desktop.Diagnostics {
+	return func() desktop.Diagnostics {
+		if checks > 0 {
+			checks--
+			return screenLocked
+		}
+		return desktop.Diagnostics{}
+	}
+}
+
+// A step that starts on a locked screen, as a run caught up when a laptop
+// wakes does, waits for a person to unlock it and then runs.
+func TestWaitsForScreenUnlock(t *testing.T) {
+	t.Parallel()
+
+	run := newTestRun(t)
+	run.checkDesktop = lockedFor(2)
+	execution := run.execute(`{"do": [{"wait": "1ms"}]}`, nil)
+	require.NoError(t, execution.err)
+	session := execution.exec.GetAgentSession()
+	assert.Equal(t, []string{"wait:completed"}, eventNames(session))
+	assert.Equal(t, []string{waitReasonScreen}, waitReasons(session))
+	messages := strings.Join(lifecycleMessages(session), "\n")
+	assert.Contains(t, messages, "Waiting for the screen to be unlocked: the screen is locked")
+	assert.Contains(t, messages, "The screen is unlocked; continuing")
+}
+
+// A step canceled while it waits for the screen stops at once rather than
+// at its next check.
+func TestScreenWaitStopsWhenCanceled(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	run := newTestRun(t)
+	run.parent = ctx
+	run.screenPoll = time.Hour
+	run.checkDesktop = func() desktop.Diagnostics { return screenLocked }
+	time.AfterFunc(50*time.Millisecond, cancel)
+	execution := run.execute(`{"do": [{"wait": "1ms"}]}`, nil)
+	require.EqualError(t, execution.err, "computer: context canceled")
+	assert.Equal(t, []string{waitReasonScreen}, waitReasons(execution.exec.GetAgentSession()))
+}
+
+// A problem that unlocking the screen does not clear, such as a missing
+// permission, fails the step at once.
+func TestPermissionProblemDoesNotWaitForScreen(t *testing.T) {
+	t.Parallel()
+
+	run := newTestRun(t)
+	// A wrong wait ends with an error of its own rather than outlasting
+	// the test.
+	run.screenWait = 50 * time.Millisecond
+	run.checkDesktop = func() desktop.Diagnostics {
+		return desktop.Diagnostics{Problems: []desktop.Problem{{Code: "screen_recording", Message: "Screen Recording permission is missing"}}}
+	}
+	execution := run.execute(`{"do": [{"wait": "1ms"}]}`, nil)
+	require.EqualError(t, execution.err, "computer: open the desktop: Screen Recording permission is missing")
+	assert.Empty(t, waitReasons(execution.exec.GetAgentSession()))
+}
+
+// A step with no timeout gives up on a screen nobody unlocks once the wait
+// it allows has passed, naming the problem.
+func TestScreenWaitGivesUp(t *testing.T) {
+	t.Parallel()
+
+	run := newTestRun(t)
+	run.screenWait = 50 * time.Millisecond
+	run.checkDesktop = func() desktop.Diagnostics { return screenLocked }
+	execution := run.execute(`{"do": [{"wait": "1ms"}]}`, nil)
+	require.EqualError(t, execution.err, "computer: open the desktop after waiting 50ms: "+
+		"the screen is locked; unlock it and keep it unlocked while computer steps run")
+	assert.Equal(t, []string{waitReasonScreen}, waitReasons(execution.exec.GetAgentSession()))
 }
 
 // The model may click an element the observation lists by id. A button is
