@@ -153,26 +153,43 @@ func TestReportJitter(t *testing.T) {
 	}
 }
 
+// A server that is to report but has no license yet checks again within
+// seconds, so that its first report follows an approval in Dagu Console
+// closely. One that reports nothing keeps its interval.
 func TestReportWithoutCredentials(t *testing.T) {
 	t.Parallel()
 
-	console := newFakeConsole(t)
-	var activated atomic.Bool
-	credentials := func() (license.CloudCredentials, bool) {
-		if !activated.Load() {
-			return license.CloudCredentials{}, false
+	t.Run("reporting", func(t *testing.T) {
+		t.Parallel()
+
+		console := newFakeConsole(t)
+		var activated atomic.Bool
+		credentials := func() (license.CloudCredentials, bool) {
+			if !activated.Load() {
+				return license.CloudCredentials{}, false
+			}
+			return console.credentials()
 		}
-		return console.credentials()
-	}
-	clock := startReporter(t.Context(), t, newReporter(credentials, nil, fixedLevel(config.ReportRuns)), noJitter)
+		clock := startReporter(t.Context(), t, newReporter(credentials, nil, fixedLevel(config.ReportRuns)), noJitter)
 
-	clock.wait()
-	assert.Equal(t, time.Minute, clock.next())
-	assert.Empty(t, console.reports, "nothing is sent without credentials")
+		clock.wait()
+		assert.Equal(t, 5*time.Second, clock.next())
+		assert.Empty(t, console.reports, "nothing is sent without credentials")
 
-	activated.Store(true)
-	clock.elapse()
-	assert.Equal(t, "srv-1", decodeReport(t, console.next(t)).ServerID)
+		activated.Store(true)
+		clock.elapse()
+		assert.Equal(t, "srv-1", decodeReport(t, console.next(t)).ServerID)
+	})
+
+	t.Run("off", func(t *testing.T) {
+		t.Parallel()
+
+		noCredentials := func() (license.CloudCredentials, bool) { return license.CloudCredentials{}, false }
+		clock := startReporter(t.Context(), t, newReporter(noCredentials, nil, NewMonitoring("", &memoryStore{})), noJitter)
+
+		clock.wait()
+		assert.Equal(t, time.Minute, clock.next())
+	})
 }
 
 func TestReportTooManyRequests(t *testing.T) {

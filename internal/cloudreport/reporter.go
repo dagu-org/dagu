@@ -41,6 +41,10 @@ const (
 	defaultRetryAfter = time.Minute
 	initialBackoff    = time.Minute
 	maxBackoff        = 5 * time.Minute
+	// credentialsCheckInterval is how often a server that is to report
+	// checks for a license, so that its first report follows an approval in
+	// Dagu Console within seconds rather than an interval later.
+	credentialsCheckInterval = 5 * time.Second
 
 	requestTimeout  = 30 * time.Second
 	maxResponseSize = 1 << 20
@@ -300,6 +304,9 @@ func (r *Reporter) report(ctx context.Context) time.Duration {
 	}
 	if !ok || !level.Reports() {
 		r.last = outcome{kind: outcomeNone}
+		if level.Reports() {
+			return credentialsCheckInterval
+		}
 		return r.jitter(r.interval)
 	}
 
