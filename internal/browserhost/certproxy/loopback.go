@@ -8,6 +8,7 @@ import (
 	"errors"
 	"net"
 	"net/netip"
+	"runtime"
 	"slices"
 	"strings"
 
@@ -27,11 +28,11 @@ func manualProxy(hosts []string) bool {
 }
 
 // implicitBypass reports whether pattern is, or can match, a destination
-// Chrome skips in every PAC script: localhost names, the Windows loopback
-// name, *.localhost, a loopback address, or a link-local address.
+// Chrome skips in every PAC script: localhost names, *.localhost, the name
+// loopback on Windows, a loopback address, or a link-local address.
 func implicitBypass(pattern string) bool {
 	pattern = hostpattern.Canonical(pattern)
-	if pattern == "loopback" || isLocalhostName(pattern) {
+	if isLocalhostName(pattern) || (runtime.GOOS == "windows" && pattern == "loopback") {
 		return true
 	}
 	address, err := netip.ParseAddr(pattern)

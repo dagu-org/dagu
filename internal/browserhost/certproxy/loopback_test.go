@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -18,12 +19,14 @@ import (
 
 func TestImplicitBypass(t *testing.T) {
 	t.Parallel()
-	for _, host := range []string{"localhost", "loopback", "*.localhost", "portal.localhost", "127.0.0.1", "127.1.2.3", "::1", "::ffff:127.0.0.1", "169.254.1.1", "fe80::1"} {
+	for _, host := range []string{"localhost", "*.localhost", "portal.localhost", "127.0.0.1", "127.1.2.3", "::1", "::ffff:127.0.0.1", "169.254.1.1", "fe80::1"} {
 		assert.Truef(t, implicitBypass(host), host)
 	}
 	for _, host := range []string{"*", "portal.example.com", "10.0.0.1", "*.example.com", "192.168.1.1"} {
 		assert.Falsef(t, implicitBypass(host), host)
 	}
+	// Chrome leaves the name loopback out of PAC scripts only on Windows.
+	assert.Equal(t, runtime.GOOS == "windows", implicitBypass("loopback"))
 }
 
 // Chrome reaches a localhost name itself, without the system resolver or a
