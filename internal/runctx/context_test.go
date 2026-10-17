@@ -586,6 +586,8 @@ func TestNewContext_AllEnvsUsesFilteredBaseEnv(t *testing.T) {
 		"EXEC_CONTEXT_ALLOWED=allowed",
 		"KUBERNETES_SERVICE_HOST=10.0.0.1",
 		"KUBERNETES_SERVICE_PORT=443",
+		"DAGU_HOME=/srv/dagu",
+		"DAGU_AUTH_BASIC_PASSWORD=server-password",
 	})
 
 	ctx := config.WithConfig(context.Background(), cfg)
@@ -603,7 +605,9 @@ func TestNewContext_AllEnvsUsesFilteredBaseEnv(t *testing.T) {
 	assert.Contains(t, envs, "KUBERNETES_SERVICE_HOST=10.0.0.1")
 	assert.Contains(t, envs, "KUBERNETES_SERVICE_PORT=443")
 	assert.Contains(t, envs, "DAG_VAR=dag")
+	assert.Contains(t, envs, "DAGU_HOME=/srv/dagu")
 	assert.NotContains(t, envs, "EXEC_CONTEXT_HOST_ONLY=host-value")
+	assert.NotContains(t, envs, "DAGU_AUTH_BASIC_PASSWORD=server-password")
 }
 
 func TestPendingStepRetryJSON(t *testing.T) {
