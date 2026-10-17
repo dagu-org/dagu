@@ -227,10 +227,10 @@ HTTP proxy that answers, denying the site or asking for credentials, is not
 bypassed through a later route. The browser sends every other request there
 itself. Chrome does not consult a PAC script for `localhost`, `*.localhost`,
 the Windows name `loopback`, loopback addresses (`127.0.0.0/8` and `::1`), or
-link-local addresses. When a certificate or trusted authority names one of
-those destinations, or `*`, the browser sends every request to the
-certificate proxy, with that implicit bypass removed, so the destination
-reaches it. The certificate proxy reaches those destinations directly, never
+link-local addresses, and `*` leaves them to the browser. When a certificate
+or trusted authority names one of those destinations, the browser sends every
+request to the certificate proxy, with that implicit bypass removed, so the
+destination reaches it. The certificate proxy reaches those destinations directly, never
 through `proxy` or the device's proxy settings, and resolves `localhost` and
 `*.localhost` to the loopback addresses itself. Every other request, HTTPS or
 not, still follows the device's proxy settings, applied by the certificate

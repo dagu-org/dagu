@@ -18,18 +18,20 @@ import (
 // order, without asking the system resolver.
 var localhostAddrs = []string{"::1", "127.0.0.1"}
 
-// manualProxy reports whether hosts include a destination Chrome will not
-// send through a PAC script. The browser then needs a manual proxy.
+// manualProxy reports whether hosts name a destination Chrome will not send
+// through a PAC script. The browser then needs a manual proxy. A * pattern
+// does not count: it leaves those destinations to the browser, as Chrome
+// does.
 func manualProxy(hosts []string) bool {
 	return slices.ContainsFunc(hosts, implicitBypass)
 }
 
 // implicitBypass reports whether pattern is, or can match, a destination
 // Chrome skips in every PAC script: localhost names, the Windows loopback
-// name, *.localhost, *, a loopback address, or a link-local address.
+// name, *.localhost, a loopback address, or a link-local address.
 func implicitBypass(pattern string) bool {
 	pattern = hostpattern.Canonical(pattern)
-	if pattern == hostpattern.Any || pattern == "loopback" || isLocalhostName(pattern) {
+	if pattern == "loopback" || isLocalhostName(pattern) {
 		return true
 	}
 	address, err := netip.ParseAddr(pattern)

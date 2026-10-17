@@ -18,10 +18,10 @@ import (
 
 func TestImplicitBypass(t *testing.T) {
 	t.Parallel()
-	for _, host := range []string{"*", "localhost", "loopback", "*.localhost", "portal.localhost", "127.0.0.1", "127.1.2.3", "::1", "::ffff:127.0.0.1", "169.254.1.1", "fe80::1"} {
+	for _, host := range []string{"localhost", "loopback", "*.localhost", "portal.localhost", "127.0.0.1", "127.1.2.3", "::1", "::ffff:127.0.0.1", "169.254.1.1", "fe80::1"} {
 		assert.Truef(t, implicitBypass(host), host)
 	}
-	for _, host := range []string{"portal.example.com", "10.0.0.1", "*.example.com", "192.168.1.1"} {
+	for _, host := range []string{"*", "portal.example.com", "10.0.0.1", "*.example.com", "192.168.1.1"} {
 		assert.Falsef(t, implicitBypass(host), host)
 	}
 }
@@ -80,6 +80,8 @@ func TestReadyReportsManualProxy(t *testing.T) {
 	ready := serveProxy(t, testConfig(t, "", ca.clientEntry(t, testLabel, "127.0.0.1")))
 	assert.True(t, ready.Manual)
 	ready = serveProxy(t, testConfig(t, "", ca.clientEntry(t, testLabel, siteHost)))
+	assert.False(t, ready.Manual)
+	ready = serveProxy(t, testConfig(t, "", ca.clientEntry(t, testLabel, "*")))
 	assert.False(t, ready.Manual)
 }
 
