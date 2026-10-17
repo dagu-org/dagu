@@ -92,8 +92,11 @@ a way to activate a license, not as a new concept:
    │ persist activation (as `license activate` does today)                     │
 ```
 
-The approval page states what the server will report. Approvals expire after
-15 minutes, as the console enforces today.
+The approval page states what the server will report. The admin may choose
+the report level when starting the connection; the URL then carries the level
+in effect as `report`, the approval page states it, and reporting starts once
+the license is granted. Approvals expire after 15 minutes, as the console
+enforces today.
 
 `version` is the Dagu version, the same string the server sends as
 `client_version`: `2.19.2` from a release, `v2.19.2-3-gabc1234` from a source
