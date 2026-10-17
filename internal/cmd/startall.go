@@ -184,7 +184,11 @@ func runStartAll(ctx *Context, _ []string) error {
 	// Initialize resource monitoring service
 	resourceService := resource.NewService(ctx.Config)
 
-	serverOpts := []frontend.ServerOption{frontend.WithAPIOption(apiv1.WithOpenCodeHost(openCodeHost))}
+	serverOpts := []frontend.ServerOption{
+		frontend.WithAPIOption(apiv1.WithOpenCodeHost(openCodeHost)),
+		// The scheduler delivers DAG-run notifications and incidents.
+		frontend.WithoutNotificationMonitors(),
+	}
 	cloudMonitoring := newCloudReportMonitoring(serviceCtx)
 	if cloudMonitoring != nil {
 		serverOpts = append(serverOpts, frontend.WithAPIOption(apiv1.WithCloudReport(cloudMonitoring)))

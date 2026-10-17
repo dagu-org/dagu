@@ -24,9 +24,15 @@ import (
 
 	authmodel "github.com/dagucloud/dagu/v2/internal/auth"
 	"github.com/dagucloud/dagu/v2/internal/cmn/config"
+	"github.com/dagucloud/dagu/v2/internal/cmn/crypto"
 	"github.com/dagucloud/dagu/v2/internal/cmn/fileutil"
 	"github.com/dagucloud/dagu/v2/internal/eventstore"
+	"github.com/dagucloud/dagu/v2/internal/persis"
+	persisfile "github.com/dagucloud/dagu/v2/internal/persis/file"
+	fileeventstore "github.com/dagucloud/dagu/v2/internal/persis/file/eventstore"
+	filemonitor "github.com/dagucloud/dagu/v2/internal/persis/file/monitor"
 	authservice "github.com/dagucloud/dagu/v2/internal/service/auth"
+	"github.com/dagucloud/dagu/v2/internal/service/chatbridge"
 	apiv1 "github.com/dagucloud/dagu/v2/internal/service/frontend/api/v1"
 	frontendauth "github.com/dagucloud/dagu/v2/internal/service/frontend/auth"
 	"github.com/dagucloud/dagu/v2/internal/service/frontend/sse"
@@ -707,6 +713,94 @@ func TestServeListenFailure(t *testing.T) {
 
 		require.ErrorContains(t, serveError(t, cfg, WithListener(listener)), "load TLS certificate")
 	})
+}
+
+// standbyLease grants the bootstrap lock but never the delivery lock, so a
+// started monitor stays idle until its context ends.
+type standbyLease struct{}
+
+func (standbyLease) TryLock() error { return nil }
+
+func (standbyLease) Lock(ctx context.Context) error {
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+func (standbyLease) Unlock() error                   { return nil }
+func (standbyLease) Heartbeat(context.Context) error { return nil }
+func (standbyLease) IsHeldByMe() bool                { return false }
+func (standbyLease) Location() string                { return "standby" }
+
+// newNotificationStores returns file-backed stores that give the server a
+// DAG-run notification monitor built with newLease.
+func newNotificationStores(t *testing.T, newLease func() chatbridge.Lease) Stores {
+	t.Helper()
+	dataDir := t.TempDir()
+	events, err := fileeventstore.New(filepath.Join(dataDir, "events"))
+	require.NoError(t, err)
+	key, err := crypto.ResolveKey(dataDir)
+	require.NoError(t, err)
+	encryptor, err := crypto.NewEncryptor(key)
+	require.NoError(t, err)
+	backend := persisfile.NewBackend(config.PathsConfig{DataDir: dataDir})
+	notifications, err := persisfile.NewNotificationStore(backend.Collection(persis.CollectionNotifications), encryptor)
+	require.NoError(t, err)
+	return Stores{
+		Event:                eventstore.New(events),
+		Notification:         notifications,
+		NotificationState:    filemonitor.NewStateStore(filepath.Join(dataDir, "notifications", "monitor-state.json")),
+		NewNotificationLease: newLease,
+	}
+}
+
+// Start-all disables the server's monitors because its scheduler runs the
+// same ones; a monitor exists exactly when Serve requests its lease.
+func TestServeWithoutNotificationMonitors(t *testing.T) {
+	tests := []struct {
+		name       string
+		opts       []ServerOption
+		wantLeases int64
+	}{
+		{name: "Default", wantLeases: 1},
+		{name: "Disabled", opts: []ServerOption{WithoutNotificationMonitors()}, wantLeases: 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var leases atomic.Int64
+			stores := newNotificationStores(t, func() chatbridge.Lease {
+				leases.Add(1)
+				return standbyLease{}
+			})
+			listener, err := net.Listen("tcp", "127.0.0.1:0")
+			require.NoError(t, err)
+			ready := make(chan struct{})
+			opts := append([]ServerOption{
+				WithListener(listener),
+				WithOnReady(func(string) { close(ready) }),
+			}, tt.opts...)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			srv, err := NewServer(ServerConfig{Context: ctx, Config: newServeConfig(), Stores: stores}, opts...)
+			require.NoError(t, err)
+			serveDone := make(chan error, 1)
+			go func() {
+				serveDone <- srv.Serve(ctx)
+			}()
+			t.Cleanup(func() {
+				cancel()
+				<-serveDone
+			})
+
+			select {
+			case <-ready:
+			case err := <-serveDone:
+				t.Fatalf("Serve returned before it was ready: %v", err)
+			case <-time.After(5 * time.Second):
+				t.Fatal("server never became ready")
+			}
+			assert.Equal(t, tt.wantLeases, leases.Load())
+		})
+	}
 }
 
 func TestLocalURL(t *testing.T) {

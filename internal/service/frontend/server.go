@@ -138,6 +138,10 @@ type Server struct {
 	remoteNodeResolver   *remotenode.Resolver
 	upgradeStore         upgrade.CacheStore
 	routeRegistrars      []RouteRegistrar
+
+	// notificationMonitorsDisabled leaves DAG-run notification and incident
+	// delivery to another service in the same process.
+	notificationMonitorsDisabled bool
 }
 
 // ServerOption is a functional option for configuring the Server.
@@ -155,6 +159,14 @@ func WithListener(l net.Listener) ServerOption {
 func WithOnReady(fn func(url string)) ServerOption {
 	return func(s *Server) {
 		s.onReady = fn
+	}
+}
+
+// WithoutNotificationMonitors keeps Serve from delivering DAG-run
+// notifications and incidents; their APIs stay available.
+func WithoutNotificationMonitors() ServerOption {
+	return func(s *Server) {
+		s.notificationMonitorsDisabled = true
 	}
 }
 
@@ -940,9 +952,11 @@ func (srv *Server) Serve(ctx context.Context) error {
 	if err := srv.listen(addr); err != nil {
 		return err
 	}
-	if err := srv.startMonitors(ctx); err != nil {
-		_ = srv.listener.Close()
-		return err
+	if !srv.notificationMonitorsDisabled {
+		if err := srv.startMonitors(ctx); err != nil {
+			_ = srv.listener.Close()
+			return err
+		}
 	}
 
 	webURL := localURL(srv.listener.Addr(), srv.config.Server.TLS != nil, srv.funcsConfig.BasePath)
