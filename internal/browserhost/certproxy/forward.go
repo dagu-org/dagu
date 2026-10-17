@@ -111,10 +111,11 @@ func (b *unsentBody) Close() error {
 }
 
 // unreached reports whether err is the failure to connect to a request's
-// next hop, before anything of the request was sent.
+// next hop, before anything of the request was sent. A SOCKS proxy that
+// cannot reach the site counts, as it does for Chrome.
 func unreached(err error) bool {
 	var opErr *net.OpError
-	return errors.As(err, &opErr) && (opErr.Op == "dial" || opErr.Op == "proxyconnect")
+	return errors.As(err, &opErr) && (opErr.Op == "dial" || opErr.Op == "proxyconnect" || opErr.Op == "socks connect")
 }
 
 // transport returns the transport that sends requests on r.

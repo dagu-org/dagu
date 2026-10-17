@@ -47,6 +47,8 @@ func TestForwardHTTP(t *testing.T) {
 		}
 	}))
 	t.Cleanup(site.Close)
+	// refusingSOCKS answers every request that it cannot reach the site.
+	refusingSOCKS := newSOCKSProxy(t, strings.TrimPrefix(closedURL, "http://"))
 
 	tests := []struct {
 		name string
@@ -60,6 +62,7 @@ func TestForwardHTTP(t *testing.T) {
 	}{
 		{name: "ThroughProxy", routes: "PROXY %s", url: "http://" + siteHost + "/page", body: "plain /page", proxied: true},
 		{name: "Fallback", routes: "PROXY 127.0.0.1:1; PROXY %s", url: "http://" + siteHost + "/page", body: "plain /page", proxied: true},
+		{name: "FallbackAfterSOCKS", routes: "SOCKS5 " + refusingSOCKS.addr + "; PROXY %s", url: "http://" + siteHost + "/page", body: "plain /page", proxied: true},
 		{name: "FallbackWithBody", routes: "PROXY 127.0.0.1:1; PROXY %s", url: "http://" + siteHost + "/form", send: "a=1", body: "plain /form a=1", proxied: true},
 		{name: "Loopback", routes: "PROXY %s", url: site.URL + "/page?a=1;b=2", body: "plain /page?a=1;b=2"},
 	}
