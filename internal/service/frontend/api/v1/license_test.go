@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -303,6 +304,18 @@ func TestLicenseConnect_Report(t *testing.T) {
 			ExpectStatus(http.StatusConflict).Send(t)
 
 		assert.Equal(t, api.LicenseMonitoring{Level: api.LicenseMonitoringLevelOff}, monitoringOf(t, server))
+	})
+
+	// A link without the level would let the approval page say that
+	// nothing is reported when the server may report.
+	t.Run("unreadable level", func(t *testing.T) {
+		settings := filepath.Join(t.TempDir(), "report-settings.json")
+		require.NoError(t, os.WriteFile(settings, []byte("{"), 0o600))
+		monitoring := cloudreport.NewMonitoring("", filemonitor.NewStateStore(settings))
+		server := connectServer(t, pendingManager(t), monitoring)
+
+		server.Client().Post("/api/v1/license/connect", nil).ExpectStatus(http.StatusInternalServerError).Send(t)
+		server.Client().Get("/api/v1/license/connect").ExpectStatus(http.StatusInternalServerError).Send(t)
 	})
 
 	t.Run("nothing reported", func(t *testing.T) {

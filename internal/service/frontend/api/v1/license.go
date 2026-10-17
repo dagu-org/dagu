@@ -185,7 +185,11 @@ func (a *API) StartLicenseConnect(ctx context.Context, request api.StartLicenseC
 			return nil, internalError(err)
 		}
 	}
-	return api.StartLicenseConnect200JSONResponse(a.licenseConnectStatus(ctx, status)), nil
+	described, err := a.licenseConnectStatus(ctx, status)
+	if err != nil {
+		return nil, internalError(err)
+	}
+	return api.StartLicenseConnect200JSONResponse(described), nil
 }
 
 // GetLicenseConnect returns the latest request to connect this server to
@@ -194,30 +198,37 @@ func (a *API) GetLicenseConnect(ctx context.Context, _ api.GetLicenseConnectRequ
 	if err := a.requireLicenseManagement(ctx); err != nil {
 		return nil, err
 	}
-	return api.GetLicenseConnect200JSONResponse(a.licenseConnectStatus(ctx, a.licenseManager.ConnectStatus())), nil
+	described, err := a.licenseConnectStatus(ctx, a.licenseManager.ConnectStatus())
+	if err != nil {
+		return nil, internalError(err)
+	}
+	return api.GetLicenseConnect200JSONResponse(described), nil
 }
 
 // licenseConnectStatus describes a connection request. Its connect URL names
 // the level this server reports at, if any, so that the approval page in
-// Dagu Console can state what is reported once connected.
-func (a *API) licenseConnectStatus(ctx context.Context, status license.ConnectStatus) api.LicenseConnectStatus {
+// Dagu Console can state what is reported once connected. It fails when the
+// level cannot be read, rather than offer a link that may understate it.
+func (a *API) licenseConnectStatus(ctx context.Context, status license.ConnectStatus) (api.LicenseConnectStatus, error) {
 	if a.cloudReport == nil || status.URL == "" {
-		return toLicenseConnectStatus(status)
+		return toLicenseConnectStatus(status), nil
 	}
-	// A level that cannot be read reports nothing, which the bare URL says.
 	monitoring, err := a.cloudReport.Status(ctx)
-	if err != nil || !monitoring.Level.Reports() {
-		return toLicenseConnectStatus(status)
+	if err != nil {
+		return api.LicenseConnectStatus{}, err
+	}
+	if !monitoring.Level.Reports() {
+		return toLicenseConnectStatus(status), nil
 	}
 	connectURL, err := url.Parse(status.URL)
 	if err != nil {
-		return toLicenseConnectStatus(status)
+		return api.LicenseConnectStatus{}, err
 	}
 	query := connectURL.Query()
 	query.Set("report", string(monitoring.Level))
 	connectURL.RawQuery = query.Encode()
 	status.URL = connectURL.String()
-	return toLicenseConnectStatus(status)
+	return toLicenseConnectStatus(status), nil
 }
 
 // CancelLicenseConnect abandons the pending request to connect this server
