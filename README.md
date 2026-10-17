@@ -171,7 +171,7 @@ From that folder, run:
 dagu start-all --dags .
 ```
 
-Open http://localhost:8080 and create the admin account.
+Open http://localhost:8080. On first launch, create the admin account unless the installer wizard already created one.
 
 If a script installer set Dagu up as a background service, it is already running on port 8080, so add workflows from the UI or put `hello.yaml` in the DAGs directory the installer printed.
 
