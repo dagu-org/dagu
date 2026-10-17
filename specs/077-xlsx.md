@@ -509,6 +509,9 @@ is not in the workbook fails with `sheet "Nope" not found; sheets present:
 [--sheet] [--range] [--header] [--columns] [--max-rows] [--skip-hidden]
 [--password P] [--format]` prints what `xlsx.read` publishes, the flags
 taking the values the fields take.
+For both commands, a path of `-` reads the workbook from standard input. The
+input is limited to 64 MiB; larger input fails before workbook parsing. The
+JSON inspect result uses `-` as its `path`.
 `--password` is the password of a protected workbook. When the flag is
 omitted, `DAGU_XLSX_PASSWORD` supplies it; when both are set, the flag
 wins, including when the flag is empty. The variable is the recommended
@@ -516,8 +519,9 @@ form, since a flag value is visible in the process list and kept in
 shell history. A protected workbook opened
 without the right password fails with `<name>: workbook password is
 missing or incorrect`.
-Both read the file directly, create no run, and exit non-zero with the
-error on stderr. The `text` format of `inspect` prints a heading,
+Both read the supplied path or standard input directly, create no run, and
+exit non-zero with the error on stderr. The `text` format of `inspect` prints a
+heading,
 `orders.xlsx: 2 sheets, 1900 date system`, then one line per sheet,
 `Sheet "Orders": used A1:C3, table Orders!A1:C3, header row 1, 2 rows`,
 with `(hidden)` after the name of a hidden sheet, `, 3 hidden` after the
