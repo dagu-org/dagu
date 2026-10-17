@@ -260,7 +260,7 @@ func runStartAll(ctx *Context, _ []string) error {
 		)
 		if err := server.Serve(serviceCtx); err != nil {
 			select {
-			case errCh <- fmt.Errorf("server failed: %w", err):
+			case errCh <- fmt.Errorf("server failed: %w", withPortInUseHint(err, webPortInUseHint)):
 			default:
 			}
 		}

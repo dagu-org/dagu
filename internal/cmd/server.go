@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net"
 	"path/filepath"
+	goruntime "runtime"
 	"strconv"
 	"syscall"
 	"time"
@@ -61,6 +62,9 @@ Example:
 var serverFlags = []commandLineFlag{dagsFlag, hostFlag, portFlag, tunnelFlag, tunnelTokenFlag, tunnelFunnelFlag, tunnelHTTPSFlag}
 
 const localAgentSessionShutdownTimeout = 10 * time.Second
+
+// webPortInUseHint explains a web UI listen failure caused by a taken port.
+const webPortInUseHint = "another Dagu may be running; stop it, or choose a free port with --port or DAGU_PORT"
 
 func newServer(ctx *Context, rs *resource.Service, stores frontend.Stores, opts ...frontend.ServerOption) (*frontend.Server, error) {
 	coordinatorClient, err := ctx.NewCoordinatorClient()
@@ -195,10 +199,29 @@ func runServer(ctx *Context, _ []string, serverOpts ...frontend.ServerOption) er
 	err = server.Serve(serviceCtx)
 	stop() // Let a second SIGINT end deferred cleanup; SIGTERM stays absorbed.
 	if err != nil {
-		return fmt.Errorf("failed to start server: %w", err)
+		return fmt.Errorf("failed to start server: %w", withPortInUseHint(err, webPortInUseHint))
 	}
 
 	return nil
+}
+
+// withPortInUseHint appends hint to err when err reports an address already
+// in use, and returns other errors unchanged.
+func withPortInUseHint(err error, hint string) error {
+	if !isAddrInUse(err) {
+		return err
+	}
+	return fmt.Errorf("%w (%s)", err, hint)
+}
+
+// isAddrInUse reports whether err comes from binding an address already in
+// use. Windows reports WSAEADDRINUSE (10048), which syscall.EADDRINUSE does
+// not match there.
+func isAddrInUse(err error) bool {
+	if errors.Is(err, syscall.EADDRINUSE) {
+		return true
+	}
+	return goruntime.GOOS == "windows" && errors.Is(err, syscall.Errno(10048))
 }
 
 func startLocalAgentSessionCleanup(ctx context.Context, persistence Persistence, host *opencodehost.Host) (context.CancelFunc, <-chan struct{}) {

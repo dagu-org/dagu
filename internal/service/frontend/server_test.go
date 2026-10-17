@@ -588,25 +588,8 @@ func TestServerIPAccessProtectsAllRoutes(t *testing.T) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 
-	cfg := &config.Config{
-		DefaultExecMode: config.ExecutionModeLocal,
-		Server: config.Server{
-			APIBasePath: "/api/v1",
-			Auth:        config.Auth{Mode: config.AuthModeNone},
-			AccessLog:   config.AccessLogNone,
-			IPAccess: config.IPAccessConfig{
-				AllowedIPs: []string{"192.0.2.10"},
-			},
-			Terminal: config.TerminalConfig{MaxSessions: 5},
-			SSE: config.SSEConfig{
-				MaxTopicsPerConnection: 20,
-				MaxClients:             100,
-				HeartbeatInterval:      time.Hour,
-			},
-		},
-		UI:       config.UI{MaxDashboardPageLimit: 100},
-		Webhooks: config.WebhooksConfig{MaxPayloadSize: config.DefaultWebhookMaxPayloadSize},
-	}
+	cfg := newServeConfig()
+	cfg.Server.IPAccess = config.IPAccessConfig{AllowedIPs: []string{"192.0.2.10"}}
 	srv, err := NewServer(ServerConfig{Context: ctx, Config: cfg}, WithListener(listener))
 	require.NoError(t, err)
 	srv.RegisterRoutes(func(_ context.Context, router chi.Router, _ string) {
@@ -652,6 +635,100 @@ func TestServerIPAccessProtectsAllRoutes(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
 		require.NoError(t, resp.Body.Close())
+	}
+}
+
+// newServeConfig returns the smallest configuration Serve runs with on the
+// IPv4 loopback address.
+func newServeConfig() *config.Config {
+	return &config.Config{
+		DefaultExecMode: config.ExecutionModeLocal,
+		Server: config.Server{
+			Host:        "127.0.0.1",
+			APIBasePath: "/api/v1",
+			Auth:        config.Auth{Mode: config.AuthModeNone},
+			AccessLog:   config.AccessLogNone,
+			Terminal:    config.TerminalConfig{MaxSessions: 5},
+			SSE: config.SSEConfig{
+				MaxTopicsPerConnection: 20,
+				MaxClients:             100,
+				HeartbeatInterval:      time.Hour,
+			},
+		},
+		UI:       config.UI{MaxDashboardPageLimit: 100},
+		Webhooks: config.WebhooksConfig{MaxPayloadSize: config.DefaultWebhookMaxPayloadSize},
+	}
+}
+
+// serveError runs Serve and returns its error. The test fails when Serve
+// keeps running instead.
+func serveError(t *testing.T, cfg *config.Config, opts ...ServerOption) error {
+	t.Helper()
+	ctx := testContext(t)
+	srv, err := NewServer(ServerConfig{Context: ctx, Config: cfg}, opts...)
+	require.NoError(t, err)
+	done := make(chan error, 1)
+	go func() {
+		done <- srv.Serve(ctx)
+	}()
+	select {
+	case err := <-done:
+		return err
+	case <-time.After(5 * time.Second):
+		t.Fatal("Serve kept running without serving")
+		return nil
+	}
+}
+
+func TestServeListenFailure(t *testing.T) {
+	t.Run("PortInUse", func(t *testing.T) {
+		held, err := net.Listen("tcp", "127.0.0.1:0")
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = held.Close() })
+
+		cfg := newServeConfig()
+		cfg.Server.Port = held.Addr().(*net.TCPAddr).Port
+
+		var opErr *net.OpError
+		require.ErrorAs(t, serveError(t, cfg), &opErr)
+		assert.Equal(t, "listen", opErr.Op)
+	})
+	t.Run("MissingTLSCert", func(t *testing.T) {
+		listener, err := net.Listen("tcp", "127.0.0.1:0")
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = listener.Close() })
+
+		dir := t.TempDir()
+		cfg := newServeConfig()
+		cfg.Server.TLS = &config.TLSConfig{
+			CertFile: filepath.Join(dir, "cert.pem"),
+			KeyFile:  filepath.Join(dir, "key.pem"),
+		}
+
+		require.ErrorContains(t, serveError(t, cfg, WithListener(listener)), "load TLS certificate")
+	})
+}
+
+func TestLocalURL(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		addr     net.Addr
+		useTLS   bool
+		basePath string
+		want     string
+	}{
+		{name: "IPv4Unspecified", addr: &net.TCPAddr{IP: net.IPv4zero, Port: 8080}, want: "http://localhost:8080"},
+		{name: "IPv6Unspecified", addr: &net.TCPAddr{IP: net.IPv6unspecified, Port: 8080}, want: "http://localhost:8080"},
+		{name: "IPv6Loopback", addr: &net.TCPAddr{IP: net.IPv6loopback, Port: 8080}, want: "http://[::1]:8080"},
+		{name: "TLSWithBasePath", addr: &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 8443}, useTLS: true, basePath: "/dagu", want: "https://127.0.0.1:8443/dagu"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, localURL(tt.addr, tt.useTLS, tt.basePath))
+		})
 	}
 }
 
