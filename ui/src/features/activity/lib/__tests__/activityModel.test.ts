@@ -350,4 +350,14 @@ describe('withEarlierActiveRuns', () => {
       loaded
     );
   });
+
+  it('keeps another workflow’s run that shares a loaded run ID', () => {
+    const report = run('report', 'daily', Status.Success, FROM + HOUR);
+    const backfill = run('backfill', 'daily', Status.Running, FROM - HOUR);
+
+    expect(withEarlierActiveRuns([report], [backfill], FROM)).toEqual([
+      report,
+      backfill,
+    ]);
+  });
 });

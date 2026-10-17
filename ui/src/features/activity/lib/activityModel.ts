@@ -267,13 +267,15 @@ export function withEarlierActiveRuns(
   active: ActivityRun[],
   windowFrom: number
 ): ActivityRun[] {
-  const loaded = new Set(runs.map((run) => run.dagRunId));
+  // A run ID is unique only within its workflow.
+  const key = (run: ActivityRun) => JSON.stringify([run.name, run.dagRunId]);
+  const loaded = new Set(runs.map(key));
   const earlier = active
     .filter(
       (run) =>
         run.startedAt !== undefined &&
         run.startedAt < windowFrom &&
-        !loaded.has(run.dagRunId)
+        !loaded.has(key(run))
     )
     .sort(newestFirst);
   return earlier.length === 0 ? runs : [...runs, ...earlier];
