@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"net/http/httputil"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -41,19 +42,25 @@ func TestForwardHTTP(t *testing.T) {
 	ca := newTestCA(t, "corp CA")
 	site := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = fmt.Fprintf(w, "plain %s", r.URL.RequestURI())
+		if sent, _ := io.ReadAll(r.Body); len(sent) > 0 {
+			_, _ = fmt.Fprintf(w, " %s", sent)
+		}
 	}))
 	t.Cleanup(site.Close)
 
 	tests := []struct {
 		name string
 		// routes is the PAC result, with %s for the forward proxy.
-		routes  string
-		url     string
+		routes string
+		url    string
+		// send is the body of a POST; a request without one is a GET.
+		send    string
 		body    string
 		proxied bool
 	}{
 		{name: "ThroughProxy", routes: "PROXY %s", url: "http://" + siteHost + "/page", body: "plain /page", proxied: true},
 		{name: "Fallback", routes: "PROXY 127.0.0.1:1; PROXY %s", url: "http://" + siteHost + "/page", body: "plain /page", proxied: true},
+		{name: "FallbackWithBody", routes: "PROXY 127.0.0.1:1; PROXY %s", url: "http://" + siteHost + "/form", send: "a=1", body: "plain /form a=1", proxied: true},
 		{name: "Loopback", routes: "PROXY %s", url: site.URL + "/page?a=1;b=2", body: "plain /page?a=1;b=2"},
 	}
 	for _, tt := range tests {
@@ -63,7 +70,12 @@ func TestForwardHTTP(t *testing.T) {
 			pac := fmt.Sprintf(`function FindProxyForURL() { return "`+tt.routes+`"; }`, upstream.addr)
 			ready := serveProxy(t, testConfig(t, pac, ca.clientEntry(t, testLabel, "127.0.0.1")))
 
-			response, err := plainClient(ready).Get(tt.url)
+			request, err := http.NewRequest(http.MethodGet, tt.url, nil)
+			if tt.send != "" {
+				request, err = http.NewRequest(http.MethodPost, tt.url, strings.NewReader(tt.send))
+			}
+			require.NoError(t, err)
+			response, err := plainClient(ready).Do(request)
 			require.NoError(t, err)
 			defer func() { _ = response.Body.Close() }()
 			body, err := io.ReadAll(response.Body)

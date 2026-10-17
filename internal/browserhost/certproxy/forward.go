@@ -14,6 +14,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"sync"
+	"sync/atomic"
 
 	"github.com/dagucloud/dagu/v2/internal/cmn/hostpattern"
 )
@@ -59,10 +60,15 @@ func (f *forwarder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // RoundTrip sends req on the first of its routes that reaches the next hop.
-// A request with a body takes only the first route, as it cannot be sent
-// again.
 func (f *forwarder) RoundTrip(req *http.Request) (*http.Response, error) {
 	routes := f.s.routesTo(req.Context(), req.URL.String(), hostpattern.Canonical(req.URL.Hostname()), "")
+	// A transport closes the body of a request it could not send, which
+	// would leave nothing to send on the next route.
+	body := &unsentBody{ReadCloser: req.Body}
+	if req.Body != nil && req.Body != http.NoBody {
+		req = req.Clone(req.Context())
+		req.Body = body
+	}
 	var errs []error
 	for _, r := range routes {
 		response, err := f.transport(r).RoundTrip(req)
@@ -74,7 +80,7 @@ func (f *forwarder) RoundTrip(req *http.Request) (*http.Response, error) {
 			return response, nil
 		}
 		errs = append(errs, fmt.Errorf("through %s: %w", r, err))
-		if !unreached(err) || (req.Body != nil && req.Body != http.NoBody) {
+		if !unreached(err) || body.read.Load() {
 			break
 		}
 	}
@@ -82,6 +88,26 @@ func (f *forwarder) RoundTrip(req *http.Request) (*http.Response, error) {
 		return nil, errors.New("the device's proxy settings give it no route the certificate proxy supports")
 	}
 	return nil, errors.Join(errs...)
+}
+
+// unsentBody is a request body that stays open until the request starts
+// sending it, so a request no route carried can take the next one. The
+// server closes a body never read once the request ends.
+type unsentBody struct {
+	io.ReadCloser
+	read atomic.Bool
+}
+
+func (b *unsentBody) Read(p []byte) (int, error) {
+	b.read.Store(true)
+	return b.ReadCloser.Read(p)
+}
+
+func (b *unsentBody) Close() error {
+	if !b.read.Load() {
+		return nil
+	}
+	return b.ReadCloser.Close()
 }
 
 // unreached reports whether err is the failure to connect to a request's
