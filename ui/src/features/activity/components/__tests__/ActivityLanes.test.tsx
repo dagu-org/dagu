@@ -167,4 +167,27 @@ describe('ActivityLanes', () => {
       'nightly nightly-1'
     );
   });
+
+  it('shows a run that started before the window', () => {
+    renderLanes([
+      {
+        name: 'backfill',
+        dagRunId: 'backfill-1',
+        status: Status.Running,
+        startedAt: FROM - 3600,
+      },
+    ]);
+    const lane = screen.getByRole('group', { name: /^backfill:/ });
+    stubLaneWidth(lane, 960);
+
+    lane.focus();
+    fireEvent.keyDown(lane, { key: 'ArrowRight' });
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Running');
+
+    fireEvent.pointerDown(lane, { button: 0, clientX: 4 });
+    fireEvent.pointerUp(lane, { clientX: 4 });
+    expect(screen.getByRole('dialog')).toHaveAccessibleName(
+      'backfill backfill-1'
+    );
+  });
 });

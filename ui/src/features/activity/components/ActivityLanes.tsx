@@ -19,6 +19,7 @@ import {
   groupLanes,
   oldestStart,
   percentOf,
+  runEnd,
   sortLanes,
   type TimeRange,
   timeTicks,
@@ -198,8 +199,8 @@ export function ActivityLanes({
       .filter(
         (run) =>
           run.startedAt !== undefined &&
-          run.startedAt >= range.from &&
-          run.startedAt <= range.to
+          run.startedAt <= range.to &&
+          runEnd(run, nowSeconds) >= range.from
       )
       .sort((left, right) => (left.startedAt ?? 0) - (right.startedAt ?? 0));
 
