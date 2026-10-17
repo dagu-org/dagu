@@ -291,11 +291,12 @@ describe('runEnd', () => {
     ).toBe(8200);
   });
 
+  // A waiting run keeps the time it paused at as its finish time.
   it.each([
     ['running', Status.Running],
     ['waiting', Status.Waiting],
   ])('extends a %s run to the current time', (_, status) => {
-    expect(runEnd({ ...base, status }, 5000)).toBe(5000);
+    expect(runEnd({ ...base, status, finishedAt: 2000 }, 5000)).toBe(5000);
   });
 
   it('ends a queued run where it starts', () => {

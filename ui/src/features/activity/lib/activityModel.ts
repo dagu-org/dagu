@@ -346,10 +346,11 @@ export function percentOf(range: TimeRange, seconds: number): number {
  */
 export function runEnd(run: ActivityRun, nowSeconds: number): number {
   const start = run.startedAt ?? 0;
-  if (run.finishedAt !== undefined) return Math.max(start, run.finishedAt);
+  // A waiting run keeps the time it paused at as its finish time.
   if (run.status === Status.Running || run.status === Status.Waiting) {
     return Math.max(start, nowSeconds);
   }
+  if (run.finishedAt !== undefined) return Math.max(start, run.finishedAt);
   return start;
 }
 
