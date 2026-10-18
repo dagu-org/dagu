@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ConfigContext, type Config } from '@/contexts/ConfigContext';
 import { AppBarContext } from '@/contexts/AppBarContext';
+import { RemoteNodeProvider } from '@/contexts/RemoteNodeContext';
 import { defaultWorkspaceSelection } from '@/lib/workspace';
 import NotificationsTab from '../NotificationsTab';
 
@@ -86,19 +87,23 @@ function emptyResponse(status: number): Promise<Response> {
   return Promise.resolve(new Response(null, { status }));
 }
 
-function renderTab() {
+// The DAG page scopes its requests to one node, which can differ from the
+// node selected in the toolbar.
+function renderTab(toolbarRemoteNode = 'local') {
   return render(
     <MemoryRouter>
       <ConfigContext.Provider value={config}>
         <AppBarContext.Provider
           value={
             {
-              selectedRemoteNode: 'local',
+              selectedRemoteNode: toolbarRemoteNode,
               workspaceSelection: defaultWorkspaceSelection(),
             } as never
           }
         >
-          <NotificationsTab fileName="example" />
+          <RemoteNodeProvider remoteNode="local">
+            <NotificationsTab fileName="example" />
+          </RemoteNodeProvider>
         </AppBarContext.Provider>
       </ConfigContext.Provider>
     </MemoryRouter>
@@ -262,51 +267,57 @@ describe('NotificationsTab', () => {
     });
   });
 
-  it('locks test sends to a subscribed local command channel', async () => {
-    commandAccess.canManage = false;
-    const defaultFetch = fetchMock.getMockImplementation()!;
-    fetchMock.mockImplementation(
-      (input: RequestInfo | URL, init?: RequestInit) =>
-        String(input) === '/api/v1/notification-channels?remoteNode=local'
-          ? jsonResponse({
-              channels: [
-                {
-                  id: 'command-1',
-                  name: 'Desktop',
-                  type: 'command',
-                  enabled: true,
-                  command: { command: 'exit 0' },
-                  createdAt: '2026-05-17T00:00:00Z',
-                  updatedAt: '2026-05-17T00:00:00Z',
-                },
-              ],
-            })
-          : defaultFetch(input, init)
-    );
-    dagSettingsResponse = () =>
-      jsonResponse({
-        id: 'settings-1',
-        dagName: 'example',
-        enabled: true,
-        events: ['dag_run_failed'],
-        targets: [],
-        subscriptions: [
-          { id: 'subscription-1', channelId: 'command-1', enabled: true },
-        ],
-        createdAt: '2026-05-17T00:00:00Z',
-        updatedAt: '2026-05-17T00:00:00Z',
-      });
-    renderTab();
+  it.each([
+    { name: 'the toolbar node is local', toolbarRemoteNode: 'local' },
+    { name: 'the toolbar shows another node', toolbarRemoteNode: 'edge' },
+  ])(
+    'locks test sends to a local command channel when $name',
+    async ({ toolbarRemoteNode }) => {
+      commandAccess.canManage = false;
+      const defaultFetch = fetchMock.getMockImplementation()!;
+      fetchMock.mockImplementation(
+        (input: RequestInfo | URL, init?: RequestInit) =>
+          String(input) === '/api/v1/notification-channels?remoteNode=local'
+            ? jsonResponse({
+                channels: [
+                  {
+                    id: 'command-1',
+                    name: 'Desktop',
+                    type: 'command',
+                    enabled: true,
+                    command: { command: 'exit 0' },
+                    createdAt: '2026-05-17T00:00:00Z',
+                    updatedAt: '2026-05-17T00:00:00Z',
+                  },
+                ],
+              })
+            : defaultFetch(input, init)
+      );
+      dagSettingsResponse = () =>
+        jsonResponse({
+          id: 'settings-1',
+          dagName: 'example',
+          enabled: true,
+          events: ['dag_run_failed'],
+          targets: [],
+          subscriptions: [
+            { id: 'subscription-1', channelId: 'command-1', enabled: true },
+          ],
+          createdAt: '2026-05-17T00:00:00Z',
+          updatedAt: '2026-05-17T00:00:00Z',
+        });
+      renderTab(toolbarRemoteNode);
 
-    const reason = await screen.findByText(
-      'Only admins can change or test local command channels.'
-    );
-    const card = reason.closest<HTMLElement>('[data-slot="card"]');
-    expect(card).not.toBeNull();
-    expect(
-      within(card!).getByRole('button', { name: /send test/i })
-    ).toBeDisabled();
-  });
+      const reason = await screen.findByText(
+        'Only admins can change or test local command channels.'
+      );
+      const card = reason.closest<HTMLElement>('[data-slot="card"]');
+      expect(card).not.toBeNull();
+      expect(
+        within(card!).getByRole('button', { name: /send test/i })
+      ).toBeDisabled();
+    }
+  );
 
   it('makes empty DAG overrides explicit and keeps one save action', async () => {
     dagSettingsResponse = () =>

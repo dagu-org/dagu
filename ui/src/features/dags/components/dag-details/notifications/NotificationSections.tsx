@@ -13,7 +13,7 @@ import {
   Trash2,
   XCircle,
 } from 'lucide-react';
-import { useContext, useEffect, useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import ConfirmDialog from '@/components/ui/confirm-dialog';
@@ -76,7 +76,7 @@ import { I18nText } from '@/i18n/I18nText';
 import { I18nProps } from '@/i18n/I18nProps';
 import { useI18n } from '@/i18n/I18nProvider';
 import { I18nTemplate } from '@/i18n/I18nTemplate';
-import { AppBarContext } from '@/contexts/AppBarContext';
+import { useRemoteNode } from '@/contexts/RemoteNodeContext';
 import {
   useCanManageCommandChannels,
   useCommandChannelsEnabled,
@@ -1020,13 +1020,12 @@ export function InheritedNotificationRoutesCard({
  * channels on the selected node, or returns undefined when they can.
  */
 export function useCommandChannelLockReason(): string | undefined {
-  const { selectedRemoteNode } = useContext(AppBarContext);
+  const remoteNode = useRemoteNode();
   const enabled = useCommandChannelsEnabled();
   const canManage = useCanManageCommandChannels();
   // A remote node checks its own role and permissions, which this server's
   // configuration does not describe, so its API decides instead.
-  const remote = !!selectedRemoteNode && selectedRemoteNode !== 'local';
-  if (canManage || remote) {
+  if (canManage || remoteNode !== 'local') {
     return undefined;
   }
   return enabled
