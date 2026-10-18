@@ -120,6 +120,12 @@ var ianaTLDs string
 // delegatedTLDs holds the lower-case top-level domains in ianaTLDs.
 var delegatedTLDs = parseTLDList(ianaTLDs)
 
+// localNetworkDomains are special-use domains under a delegated top-level
+// domain that only local networks resolve, as hostListMatches entries:
+// home.arpa for home networks (RFC 8375) and service.arpa for service
+// registration (RFC 9665).
+var localNetworkDomains = []string{".home.arpa", ".service.arpa"}
+
 func parseTLDList(list string) map[string]struct{} {
 	tlds := make(map[string]struct{})
 	for line := range strings.Lines(list) {
@@ -132,13 +138,13 @@ func parseTLDList(list string) map[string]struct{} {
 
 // isPrivateName reports whether only local DNS answers for host: a single
 // label, which resolvers qualify with local search domains and public DNS
-// never publishes, or a name under a top-level domain ICANN has not
-// delegated, such as localhost, local, lan, or internal. A remote page can
-// rebind any other name, including the private suffixes of dynamic DNS
-// services.
+// never publishes, a name in one of localNetworkDomains, or a name under a
+// top-level domain ICANN has not delegated, such as localhost, local, lan,
+// or internal. A remote page can rebind any other name, including the
+// private suffixes of dynamic DNS services.
 func isPrivateName(host string) bool {
 	dot := strings.LastIndexByte(host, '.')
-	if dot < 0 {
+	if dot < 0 || hostListMatches(localNetworkDomains, host) {
 		return true
 	}
 	tld := host[dot+1:]

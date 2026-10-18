@@ -35,9 +35,10 @@ func TestHostPolicyRejectsPublicDomainsWithoutAuth(t *testing.T) {
 	assert.Contains(t, body.Message, "allowed_hosts")
 }
 
-// Single labels and names under a top-level domain ICANN has not delegated
-// resolve only through local DNS, so containers, clusters, and home networks
-// keep working without configuration.
+// Single labels, names under a top-level domain ICANN has not delegated, and
+// the special-use domains reserved for local networks resolve only through
+// local DNS, so containers, clusters, and home networks keep working without
+// configuration.
 func TestHostPolicyAllowsAddressesAndPrivateNames(t *testing.T) {
 	t.Parallel()
 
@@ -55,6 +56,8 @@ func TestHostPolicyAllowsAddressesAndPrivateNames(t *testing.T) {
 		"dagu-ui.dagu.svc.cluster.local",
 		"nas.lan",
 		"build.internal.",
+		"dagu.home.arpa",
+		"dagu.default.service.arpa",
 	} {
 		resp := serveHost(handler, httptest.NewRequest(http.MethodGet, "http://"+host+"/api/v1/dags", nil))
 		assert.Equal(t, http.StatusNoContent, resp.Code, host)
@@ -63,7 +66,7 @@ func TestHostPolicyAllowsAddressesAndPrivateNames(t *testing.T) {
 	// Dynamic DNS suffixes sit under delegated domains, some country domains
 	// appear in the public suffix list only as wildcard rules, and web was
 	// delegated after the copy of that list in golang.org/x/net was made.
-	for _, host := range []string{"rebind.duckdns.org", "rebind.example.co.ck", "rebind.example.com.np", "rebind.example.web"} {
+	for _, host := range []string{"rebind.duckdns.org", "rebind.example.co.ck", "rebind.example.com.np", "rebind.example.web", "nothome.arpa"} {
 		resp := serveHost(handler, httptest.NewRequest(http.MethodGet, "http://"+host+"/api/v1/dags", nil))
 		assert.Equal(t, http.StatusBadRequest, resp.Code, host)
 	}
