@@ -15,6 +15,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -1238,6 +1239,15 @@ func (l *ConfigLoader) loadServerDefaults(cfg *Config, def Definition) {
 	cfg.Server.BasePath = cleanServerBasePath(cfg.Server.BasePath)
 	cfg.Server.CheckUpdates = l.v.GetBool("check_updates")
 	cfg.Server.CORSAllowedOrigins = parseStringList(l.v.Get("cors_allowed_origins"))
+	cfg.Server.AllowedHosts = parseStringList(l.v.Get("allowed_hosts"))
+	if slices.Contains(cfg.Server.AllowedHosts, "*") {
+		warning := `allowed_hosts contains "*"; any website may reach first-admin setup through DNS rebinding`
+		if cfg.Server.Auth.Mode == AuthModeNone {
+			warning = `allowed_hosts contains "*"; any website may reach the Dagu API through DNS rebinding, ` +
+				`and auth.mode "none" allows those requests to execute workflows without authentication`
+		}
+		l.warnings = append(l.warnings, warning)
+	}
 	cfg.Server.IPAccess = IPAccessConfig{
 		AllowedIPs:     parseStringList(l.v.Get("ip_access.allowed_ips")),
 		TrustedProxies: parseStringList(l.v.Get("ip_access.trusted_proxies")),
@@ -2220,6 +2230,7 @@ var envBindings = []envBinding{
 	{key: "headless", env: "HEADLESS"},
 	{key: "check_updates", env: "CHECK_UPDATES"},
 	{key: "cors_allowed_origins", env: "CORS_ALLOWED_ORIGINS"},
+	{key: "allowed_hosts", env: "ALLOWED_HOSTS"},
 	{key: "ip_access.allowed_ips", env: "IP_ACCESS_ALLOWED_IPS", requires: SectionServer},
 	{key: "ip_access.trusted_proxies", env: "IP_ACCESS_TRUSTED_PROXIES", requires: SectionServer},
 	{key: "latest_status_today", env: "LATEST_STATUS_TODAY"},
