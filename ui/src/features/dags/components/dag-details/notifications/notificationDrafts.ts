@@ -143,7 +143,7 @@ export const CHANNEL_PROVIDER_OPTIONS = [
   ...PROVIDER_OPTIONS,
   {
     value: NotificationProviderType.command,
-    label: 'Custom',
+    label: 'Local command',
     icon: Terminal,
   },
 ];

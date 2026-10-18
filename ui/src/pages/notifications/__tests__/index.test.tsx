@@ -18,6 +18,7 @@ vi.hoisted(() => {
 
 const mocks = vi.hoisted(() => ({
   canManageCommandChannels: true,
+  commandChannelsEnabled: true,
   useQuery: vi.fn(),
   client: {
     PUT: vi.fn(),
@@ -34,6 +35,7 @@ vi.mock('@/hooks/api', () => ({
 vi.mock('@/contexts/AuthContext', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/contexts/AuthContext')>()),
   useCanManageCommandChannels: () => mocks.canManageCommandChannels,
+  useCommandChannelsEnabled: () => mocks.commandChannelsEnabled,
 }));
 
 vi.mock('@/components/MonitoringOffer', () => ({
@@ -64,7 +66,11 @@ function renderPage() {
   return { setTitle };
 }
 
-function renderChannelsPage(settings: object, channels: object[] = []) {
+function renderChannelsPage(
+  settings: object,
+  channels: object[] = [],
+  remoteNode = 'local'
+) {
   const settingsQuery = {
     data: settings,
     error: undefined,
@@ -87,7 +93,7 @@ function renderChannelsPage(settings: object, channels: object[] = []) {
         value={
           {
             setTitle: vi.fn(),
-            selectedRemoteNode: 'local',
+            selectedRemoteNode: remoteNode,
           } as never
         }
       >
@@ -167,6 +173,7 @@ function renderRulesPage(
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.canManageCommandChannels = true;
+  mocks.commandChannelsEnabled = true;
   mocks.client.PUT.mockImplementation(
     async (_path: string, { body }: { body: object }) => ({ data: body })
   );
@@ -337,7 +344,7 @@ describe('NotificationChannelsPage', () => {
     expect(mocks.client.POST).not.toHaveBeenCalled();
   });
 
-  it('creates a custom command channel', async () => {
+  it('creates a local command channel', async () => {
     const user = userEvent.setup();
     const command =
       'notify-send "Dagu" "DAG $DAG_NAME finished with status $STATUS"';
@@ -353,7 +360,7 @@ describe('NotificationChannelsPage', () => {
     renderChannelsPage({});
     await user.click(screen.getByRole('button', { name: 'Add channel' }));
     await user.click(screen.getByLabelText('Provider'));
-    await user.click(screen.getByRole('option', { name: 'Custom' }));
+    await user.click(screen.getByRole('option', { name: 'Local command' }));
     const editor = within(screen.getByRole('dialog'));
     await user.clear(editor.getByLabelText('Channel name'));
     await user.paste('Desktop');
@@ -382,8 +389,99 @@ describe('NotificationChannelsPage', () => {
     await user.click(screen.getByRole('button', { name: 'Add channel' }));
     await user.click(screen.getByLabelText('Provider'));
     expect(screen.getByRole('option', { name: 'Slack' })).toBeVisible();
-    expect(screen.queryByRole('option', { name: 'Custom' })).toBeNull();
+    expect(screen.queryByRole('option', { name: 'Local command' })).toBeNull();
   });
+
+  // A remote node checks its own permissions, so this server's settings do
+  // not hide the provider there.
+  it('offers the command provider on a remote node', async () => {
+    const user = userEvent.setup();
+    mocks.canManageCommandChannels = false;
+    mocks.commandChannelsEnabled = false;
+    renderChannelsPage({}, [], 'edge');
+    await user.click(screen.getByRole('button', { name: 'Add channel' }));
+    await user.click(screen.getByLabelText('Provider'));
+    expect(screen.getByRole('option', { name: 'Local command' })).toBeVisible();
+  });
+
+  it('needs a command before creating a local command channel', async () => {
+    const user = userEvent.setup();
+    renderChannelsPage({});
+    await user.click(screen.getByRole('button', { name: 'Add channel' }));
+    await user.click(screen.getByLabelText('Provider'));
+    await user.click(screen.getByRole('option', { name: 'Local command' }));
+    const editor = within(screen.getByRole('dialog'));
+    expect(editor.getByLabelText('Channel name')).toHaveValue('Local command');
+    const create = editor.getByRole('button', { name: 'Create channel' });
+    expect(create).toBeDisabled();
+    await user.click(editor.getByLabelText('Command'));
+    await user.paste('exit 0');
+    expect(create).toBeEnabled();
+  });
+
+  it.each([
+    {
+      name: 'admins on a server that runs commands',
+      canManage: true,
+      enabled: true,
+      reason: undefined,
+    },
+    {
+      name: 'anyone on a remote node, which checks its own permissions',
+      canManage: false,
+      enabled: false,
+      remoteNode: 'edge',
+      reason: undefined,
+    },
+    {
+      name: 'other roles',
+      canManage: false,
+      enabled: true,
+      reason: 'Only admins can change or test local command channels.',
+    },
+    {
+      name: 'a server that does not run commands',
+      canManage: false,
+      enabled: false,
+      reason:
+        'This server does not run local commands. Enable permissions.write_dags and permissions.run_dags to deliver to this channel.',
+    },
+  ])(
+    'shows a local command channel to $name',
+    ({ canManage, enabled, remoteNode, reason }) => {
+      mocks.canManageCommandChannels = canManage;
+      mocks.commandChannelsEnabled = enabled;
+      renderChannelsPage(
+        {},
+        [
+          {
+            id: 'command',
+            name: 'Desktop',
+            type: 'command',
+            enabled: true,
+            command: { command: 'notify-send "Dagu" "$DAG_NAME"\necho sent' },
+          },
+        ],
+        remoteNode
+      );
+      const row = within(screen.getByRole('listitem', { name: 'Desktop' }));
+      // The row lists only the first line of the command.
+      expect(
+        row.getByText('Local command · notify-send "Dagu" "$DAG_NAME"')
+      ).toBeVisible();
+      const controls = [
+        row.getByRole('switch', { name: 'Toggle Desktop' }),
+        row.getByRole('button', { name: 'Test' }),
+        row.getByRole('button', { name: 'Edit' }),
+      ];
+      if (reason) {
+        expect(row.getByText(reason)).toBeVisible();
+        controls.forEach((control) => expect(control).toBeDisabled());
+      } else {
+        controls.forEach((control) => expect(control).toBeEnabled());
+      }
+    }
+  );
 
   it('creates a channel with the selected provider', async () => {
     const user = userEvent.setup();
@@ -745,6 +843,29 @@ describe('NotificationRulesPage', () => {
     expect(
       screen.getAllByRole('checkbox', { name: 'Failed' })[1]
     ).toBeChecked();
+  });
+
+  it('locks rule tests to a local command channel without access', async () => {
+    const user = userEvent.setup();
+    mocks.canManageCommandChannels = false;
+    renderRulesPage([
+      { id: 'command', name: 'Desktop', type: 'command', enabled: true },
+    ]);
+    await user.click(screen.getByRole('button', { name: 'Add rule' }));
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: /Desktop/,
+      })
+    );
+
+    expect(
+      screen.getByText('Only admins can change or test local command channels.')
+    ).toBeVisible();
+    const [slackTest, commandTest] = screen.getAllByRole('button', {
+      name: 'Test channel',
+    });
+    expect(slackTest).toBeEnabled();
+    expect(commandTest).toBeDisabled();
   });
 
   it('edits events through checkboxes and labels and saves them', async () => {
