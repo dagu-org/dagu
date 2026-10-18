@@ -217,10 +217,9 @@ func TestWaitHTTPPolls(t *testing.T) {
 		_ = server.Shutdown(ctx)
 	})
 
-	// with.url must be a literal, already-valid absolute URL: config-schema
-	// validation sees it before with-values resolve, so the fixture is
-	// generated with the test server's ephemeral port rather than kept as
-	// static testdata with a fixed port.
+	// with.url accepts a reference at build time and validates the resolved
+	// value at run time, so the fixture is generated with the test server's
+	// ephemeral port rather than kept as static testdata with a fixed port.
 	dagu := harness.NewRunner(t)
 	dagu.WriteFile("http_wait_ready.yaml", fmt.Sprintf(`steps:
   - action: wait.http
@@ -233,6 +232,29 @@ func TestWaitHTTPPolls(t *testing.T) {
 	result.ExpectExitCode(0)
 	require.GreaterOrEqualf(t, requests.Load(), int32(3),
 		"expected at least 3 requests (2 failing + 1 succeeding), got %d", requests.Load())
+}
+
+// TestWaitHTTPReferenceURL proves a with.url holding a reference passes
+// build-time validation and resolves at run time: the step fails with a
+// runtime URL error when the reference resolves to a bad URL, rather than
+// being rejected before the DAG runs.
+func TestWaitHTTPReferenceURL(t *testing.T) {
+	t.Parallel()
+
+	dagu := harness.NewRunner(t)
+	dagu.WriteFile("http_reference_url.yaml", `params:
+  - name: TARGET
+    default: ftp://example.com/ready
+steps:
+  - action: wait.http
+    with:
+      url: ${params.TARGET}
+      poll_interval: 100ms
+`)
+
+	result := dagu.Run("start", "http_reference_url.yaml")
+	result.ExpectNonZeroExitCode()
+	result.ExpectStderrContains("must be an absolute HTTP URL")
 }
 
 func TestWaitHTTPNoURL(t *testing.T) {

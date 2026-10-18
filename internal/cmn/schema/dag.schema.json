@@ -8939,7 +8939,6 @@
         },
         "until": {
           "type": "string",
-          "format": "date-time",
           "description": "RFC3339 timestamp for wait.until."
         },
         "path": {
@@ -8949,12 +8948,10 @@
         },
         "state": {
           "type": "string",
-          "enum": ["exists", "missing"],
-          "description": "File state to wait for. Defaults to exists."
+          "description": "File state to wait for: exists or missing. Defaults to exists."
         },
         "url": {
           "type": "string",
-          "format": "uri",
           "description": "Absolute URL for wait.http."
         },
         "method": {
@@ -8962,7 +8959,7 @@
           "description": "HTTP method for wait.http. Defaults to GET."
         },
         "status": {
-          "type": "integer",
+          "type": ["integer", "string"],
           "minimum": 100,
           "maximum": 599,
           "description": "Expected HTTP status for wait.http. Defaults to 200."

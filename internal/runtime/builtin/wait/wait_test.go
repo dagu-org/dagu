@@ -96,6 +96,60 @@ func TestExecutorRunWaitsForHTTPStatus(t *testing.T) {
 	require.GreaterOrEqual(t, calls.Load(), int32(3))
 }
 
+func TestValidateStepDefersReferenceFields(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name   string
+		op     string
+		config map[string]any
+	}{
+		{name: "duration", op: opDuration, config: map[string]any{"duration": "${params.delay}"}},
+		{name: "until", op: opUntil, config: map[string]any{"until": "${steps.plan.outputs.deadline}"}},
+		{name: "state", op: opFile, config: map[string]any{"path": "ready.flag", "state": "${params.state}"}},
+		{
+			name:   "http",
+			op:     opHTTP,
+			config: map[string]any{"url": "${steps.plan.outputs.url}", "status": "${steps.plan.outputs.code}"},
+		},
+		{name: "pollInterval", op: opDuration, config: map[string]any{"duration": "5ms", "poll_interval": "${params.interval}"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			require.NoError(t, validateStep(ir.Step{
+				Commands:       []ir.CommandEntry{{Command: tt.op}},
+				ExecutorConfig: ir.ExecutorConfig{Type: "wait", Config: tt.config},
+			}))
+		})
+	}
+}
+
+func TestValidateStepStillRejectsLiteralValues(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name   string
+		op     string
+		config map[string]any
+		want   string
+	}{
+		{name: "duration", op: opDuration, config: map[string]any{"duration": "bogus"}, want: "duration must be a duration"},
+		{name: "until", op: opUntil, config: map[string]any{"until": "tomorrow"}, want: "until must be RFC3339 timestamp"},
+		{name: "state", op: opFile, config: map[string]any{"path": "ready.flag", "state": "soon"}, want: `state must be "exists" or "missing"`},
+		{name: "url", op: opHTTP, config: map[string]any{"url": "ftp://example.com/ready"}, want: "url must be an absolute HTTP URL"},
+		{name: "status", op: opHTTP, config: map[string]any{"url": "http://example.com/", "status": 99}, want: "status must be between 100 and 599"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := validateStep(ir.Step{
+				Commands:       []ir.CommandEntry{{Command: tt.op}},
+				ExecutorConfig: ir.ExecutorConfig{Type: "wait", Config: tt.config},
+			})
+			require.ErrorContains(t, err, tt.want)
+		})
+	}
+}
+
 func TestNewExecutorRejectsNonHTTPURL(t *testing.T) {
 	t.Parallel()
 
