@@ -589,20 +589,51 @@ func TestServerAuthRoutesUseEvaluatedBasePathAndKeepProxyHeadersScoped(t *testin
 }
 
 func TestServerIPAccessProtectsAllRoutes(t *testing.T) {
+	cfg := newServeConfig()
+	cfg.Server.IPAccess = config.IPAccessConfig{AllowedIPs: []string{"192.0.2.10"}}
+	baseURL, client := startServeTestServer(t, cfg, func(srv *Server) {
+		srv.RegisterRoutes(func(_ context.Context, router chi.Router, _ string) {
+			router.Get("/extension", func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusNoContent)
+			})
+		})
+	})
+	for _, requestPath := range []string{"/api/v1/health", "/extension"} {
+		resp, err := client.Get(baseURL + requestPath)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+		require.NoError(t, resp.Body.Close())
+	}
+}
+
+// A DNS-rebinding page reaches the server under the attacker's domain. Without
+// authentication, the host check must reject it before any route runs.
+func TestServerRejectsRebindingHostWithoutAuth(t *testing.T) {
+	baseURL, client := startServeTestServer(t, newServeConfig(), nil)
+
+	req, err := http.NewRequest(http.MethodGet, baseURL+"/api/v1/health", nil)
+	require.NoError(t, err)
+	req.Host = "rebind.example.com"
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	require.NoError(t, resp.Body.Close())
+}
+
+// startServeTestServer serves cfg on an IPv4 loopback listener until the test
+// ends and returns its base URL with a client that closes every connection.
+func startServeTestServer(t *testing.T, cfg *config.Config, configure func(*Server)) (string, *http.Client) {
+	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 
-	cfg := newServeConfig()
-	cfg.Server.IPAccess = config.IPAccessConfig{AllowedIPs: []string{"192.0.2.10"}}
 	srv, err := NewServer(ServerConfig{Context: ctx, Config: cfg}, WithListener(listener))
 	require.NoError(t, err)
-	srv.RegisterRoutes(func(_ context.Context, router chi.Router, _ string) {
-		router.Get("/extension", func(w http.ResponseWriter, _ *http.Request) {
-			w.WriteHeader(http.StatusNoContent)
-		})
-	})
+	if configure != nil {
+		configure(srv)
+	}
 	serveDone := make(chan error, 1)
 	go func() {
 		serveDone <- srv.Serve(ctx)
@@ -618,7 +649,7 @@ func TestServerIPAccessProtectsAllRoutes(t *testing.T) {
 	})
 
 	// Close each connection with its response so server cleanup does not wait
-	// on an unrelated idle connection from this routing-policy test.
+	// on an unrelated idle connection.
 	client := &http.Client{
 		Transport: &http.Transport{DisableKeepAlives: true},
 		Timeout:   5 * time.Second,
@@ -636,12 +667,7 @@ func TestServerIPAccessProtectsAllRoutes(t *testing.T) {
 		}
 		return resp.Body.Close() == nil
 	}, 10*time.Second, 20*time.Millisecond, "server never started serving")
-	for _, requestPath := range []string{"/api/v1/health", "/extension"} {
-		resp, err := client.Get(baseURL + requestPath)
-		require.NoError(t, err)
-		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
-		require.NoError(t, resp.Body.Close())
-	}
+	return baseURL, client
 }
 
 // newServeConfig returns the smallest configuration Serve runs with on the

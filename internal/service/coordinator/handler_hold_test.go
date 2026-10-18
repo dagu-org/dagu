@@ -20,6 +20,11 @@ import (
 	"github.com/dagucloud/dagu/v2/internal/proto/convert"
 )
 
+// holdWait outlasts any test, so a held task stays claimable until a test
+// runs the reaper past the deadline with an explicit clock. A short wait
+// would let a slow runner pass the deadline before a worker polls.
+const holdWait = time.Minute
+
 // holdFixture wires a coordinator over the shared stores with one healthy
 // worker, so a task whose selector that worker does not carry has nowhere to
 // go until another worker registers.
@@ -158,7 +163,7 @@ func TestDispatchHoldsWhenNoWorkerIsAvailable(t *testing.T) {
 // the task is gone, so a worker arriving later does not start a run its
 // owner already saw fail.
 func TestDispatchHoldDeadlineFailsAttempt(t *testing.T) {
-	f := newHoldFixture(t, time.Hour)
+	f := newHoldFixture(t, holdWait)
 	ctx := t.Context()
 
 	_, err := f.h.Dispatch(ctx, &coordinatorv1.DispatchRequest{Task: cpuTask("run-late")})
@@ -169,10 +174,10 @@ func TestDispatchHoldDeadlineFailsAttempt(t *testing.T) {
 	ExpireHeldDispatchesForTest(f.h, time.Now())
 	assert.Equal(t, ir.Queued, f.status(t, "run-late").Status)
 
-	ExpireHeldDispatchesForTest(f.h, time.Now().Add(2*time.Hour))
+	ExpireHeldDispatchesForTest(f.h, time.Now().Add(2*holdWait))
 	runStatus := f.status(t, "run-late")
 	assert.Equal(t, ir.Failed, runStatus.Status)
-	assert.Equal(t, "no worker matched the selector {type: cpu} within 1h0m0s", runStatus.Error)
+	assert.Equal(t, "no worker matched the selector {type: cpu} within 1m0s", runStatus.Error)
 	assert.NotEmpty(t, runStatus.FinishedAt)
 
 	f.heartbeat(t, "worker-cpu", map[string]string{"type": "cpu"})
@@ -182,7 +187,7 @@ func TestDispatchHoldDeadlineFailsAttempt(t *testing.T) {
 // A held task that a worker claims before the deadline is not touched by the
 // reaper afterwards.
 func TestDispatchHoldClaimedInTimeIsLeftAlone(t *testing.T) {
-	f := newHoldFixture(t, time.Hour)
+	f := newHoldFixture(t, holdWait)
 	ctx := t.Context()
 
 	_, err := f.h.Dispatch(ctx, &coordinatorv1.DispatchRequest{Task: cpuTask("run-taken")})
@@ -194,7 +199,7 @@ func TestDispatchHoldClaimedInTimeIsLeftAlone(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, polled.Task)
 
-	ExpireHeldDispatchesForTest(f.h, time.Now().Add(2*time.Hour))
+	ExpireHeldDispatchesForTest(f.h, time.Now().Add(2*holdWait))
 	assert.Equal(t, ir.Queued, f.status(t, "run-taken").Status, "a claimed task is the worker's to report")
 }
 
@@ -202,7 +207,7 @@ func TestDispatchHoldClaimedInTimeIsLeftAlone(t *testing.T) {
 // pass fails the run once the store answers again; dropping the task would
 // leave the run queued with nothing behind it.
 func TestDispatchHoldKeepsTaskWhenRunUnreadable(t *testing.T) {
-	f := newHoldFixture(t, 50*time.Millisecond)
+	f := newHoldFixture(t, holdWait)
 	ctx := t.Context()
 
 	_, err := f.h.Dispatch(ctx, &coordinatorv1.DispatchRequest{Task: cpuTask("run-unread")})
@@ -211,22 +216,22 @@ func TestDispatchHoldKeepsTaskWhenRunUnreadable(t *testing.T) {
 	f.runs.mu.Lock()
 	f.runs.findAttemptErr = errors.New("storage unavailable")
 	f.runs.mu.Unlock()
-	ExpireHeldDispatchesForTest(f.h, time.Now().Add(time.Second))
+	ExpireHeldDispatchesForTest(f.h, time.Now().Add(2*holdWait))
 	assert.Equal(t, ir.Queued, f.status(t, "run-unread").Status)
 
 	f.runs.mu.Lock()
 	f.runs.findAttemptErr = nil
 	f.runs.mu.Unlock()
-	ExpireHeldDispatchesForTest(f.h, time.Now().Add(time.Second))
+	ExpireHeldDispatchesForTest(f.h, time.Now().Add(2*holdWait))
 	runStatus := f.status(t, "run-unread")
 	assert.Equal(t, ir.Failed, runStatus.Status)
-	assert.Equal(t, "no worker matched the selector {type: cpu} within 50ms", runStatus.Error)
+	assert.Equal(t, "no worker matched the selector {type: cpu} within 1m0s", runStatus.Error)
 }
 
 // A held task whose run no longer exists is dropped, so the reaper does not
 // report it on every pass.
 func TestDispatchHoldDropsTaskOfMissingRun(t *testing.T) {
-	f := newHoldFixture(t, 50*time.Millisecond)
+	f := newHoldFixture(t, holdWait)
 	ctx := t.Context()
 
 	_, err := f.h.Dispatch(ctx, &coordinatorv1.DispatchRequest{Task: cpuTask("run-gone")})
@@ -235,9 +240,9 @@ func TestDispatchHoldDropsTaskOfMissingRun(t *testing.T) {
 	f.runs.mu.Lock()
 	delete(f.runs.attempts, "run-gone")
 	f.runs.mu.Unlock()
-	ExpireHeldDispatchesForTest(f.h, time.Now().Add(time.Second))
+	ExpireHeldDispatchesForTest(f.h, time.Now().Add(2*holdWait))
 
-	expired, err := f.dispatches.ListExpiredHeld(ctx, time.Now().Add(time.Second))
+	expired, err := f.dispatches.ListExpiredHeld(ctx, time.Now().Add(2*holdWait))
 	require.NoError(t, err)
 	assert.Empty(t, expired, "the task of a missing run is dropped")
 }
