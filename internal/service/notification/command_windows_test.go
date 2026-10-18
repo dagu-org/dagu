@@ -18,17 +18,17 @@ import (
 )
 
 func TestNotificationCommandStopKillsChildProcess(t *testing.T) {
-	prepared, err := prepareNotificationCommand("ping -n 30 127.0.0.1 >NUL")
+	shell, args, err := notificationShellCommand("ping -n 30 127.0.0.1 > $null")
 	require.NoError(t, err)
-	t.Cleanup(prepared.cleanup)
 
-	proc, err := startNotificationProcess(prepared.shell, prepared.args, os.Environ(), io.Discard)
+	proc, err := startNotificationProcess(shell, args, os.Environ(), io.Discard)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = proc.Release() })
 
 	pid := uint32(proc.PID())
 	var children []uint32
-	deadline := time.Now().Add(5 * time.Second)
+	// PowerShell can take a few seconds to start on a cold CI runner.
+	deadline := time.Now().Add(15 * time.Second)
 	for len(children) == 0 && time.Now().Before(deadline) {
 		time.Sleep(50 * time.Millisecond)
 		children = notificationChildProcessIDs(t, pid)

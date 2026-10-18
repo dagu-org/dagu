@@ -490,19 +490,20 @@ function ProviderFields({ draft, onChange }: ProviderFieldsProps) {
         <p className="text-xs text-muted-foreground">
           <I18nText
             text={
-              'The Dagu server runs this command. Unix uses sh -c and Windows uses cmd.exe /c. The server stops it after 30 seconds, and a non-zero exit fails delivery.'
+              'The Dagu server runs this command. Unix uses sh -c and Windows uses PowerShell. The server stops it after 30 seconds, and a non-zero exit fails delivery.'
             }
           />
         </p>
         <p className="text-xs text-muted-foreground">
           <I18nTemplate
-            text="The command runs as written. Run values are environment variables, such as {dagEnv}, {statusEnv}, {errorEnv}, DAG_RUN_ID, and RUN_URL. Quote them, as in {quotedError}. {logEnv} is a temporary file with up to 1 MiB of the run log, including lifecycle-handler output, and is removed after the command exits. On Windows, cmd.exe reads these as %DAG_NAME%, %STATUS%, %ERROR%, and %EXECUTION_LOG%."
+            text="The command runs as written. Run values are environment variables, such as {dagEnv}, {statusEnv}, {errorEnv}, DAG_RUN_ID, and RUN_URL. Quote them, as in {quotedError}. {logEnv} is a temporary file with up to 1 MiB of the run log, including lifecycle-handler output, and is removed after the command exits. On Windows, PowerShell reads these as {windowsEnv} and so on."
             values={{
               dagEnv: <code>$DAG_NAME</code>,
               statusEnv: <code>$STATUS</code>,
               errorEnv: <code>$ERROR</code>,
               quotedError: <code>"$ERROR"</code>,
               logEnv: <code>$EXECUTION_LOG</code>,
+              windowsEnv: <code>$env:ERROR</code>,
             }}
           />
         </p>

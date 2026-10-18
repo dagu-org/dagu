@@ -81,19 +81,15 @@ func TestDeliverCommandExportsRunContextAndRemovesLogFile(t *testing.T) {
 
 func TestDeliverCommandPassesErrorAsEnv(t *testing.T) {
 	t.Parallel()
-	if runtime.GOOS == "windows" {
-		t.Skip("POSIX shell syntax")
-	}
-
 	dir := t.TempDir()
 	marker := filepath.Join(dir, "pwned")
 	outPath := filepath.Join(dir, "out.txt")
-	payload := "hello'; touch " + marker + "; $(touch " + marker + ")"
+	payload := errorEnvPayload(marker)
 	svc := newCommandService()
 	err := svc.deliverTarget(context.Background(), notificationmodel.Target{
 		Type: notificationmodel.ProviderCommand,
 		Command: &notificationmodel.CommandTarget{
-			Command: fmt.Sprintf(`printf '%%s' "$ERROR" > %q`, outPath),
+			Command: errorEnvCommand(outPath),
 		},
 	}, []chatbridge.NotificationEvent{{
 		Type: eventstore.TypeDAGRunFailed,
@@ -256,16 +252,30 @@ func newCommandService(opts ...Option) *Service {
 	return New(nil, nil, append([]Option{WithCommandChannels(os.Environ())}, opts...)...)
 }
 
+func errorEnvPayload(marker string) string {
+	if runtime.GOOS == "windows" {
+		return "hello'; New-Item -Path '" + marker + "'; $(New-Item -Path '" + marker + "')"
+	}
+	return "hello'; touch " + marker + "; $(touch " + marker + ")"
+}
+
+func errorEnvCommand(outPath string) string {
+	if runtime.GOOS == "windows" {
+		return fmt.Sprintf(`Set-Content -NoNewline -Path '%s' -Value $env:ERROR`, outPath)
+	}
+	return fmt.Sprintf(`printf '%%s' "$ERROR" > %q`, outPath)
+}
+
 func envDumpCommand(outPath string) string {
 	if runtime.GOOS == "windows" {
-		return fmt.Sprintf(`set > "%s"`, outPath)
+		return fmt.Sprintf(`Get-ChildItem env: | ForEach-Object { $_.Name + '=' + $_.Value } | Set-Content -Path '%s'`, outPath)
 	}
 	return fmt.Sprintf("env > %q", outPath)
 }
 
 func captureCommand(outPath string) string {
 	if runtime.GOOS == "windows" {
-		return fmt.Sprintf(`(echo %%DAG_NAME%%& echo %%STATUS%%& echo %%EXECUTION_LOG%%)> "%s" & if not "%%EXECUTION_LOG%%"=="" type "%%EXECUTION_LOG%%" >> "%s"`, outPath, outPath)
+		return fmt.Sprintf(`@($env:DAG_NAME, $env:STATUS, $env:EXECUTION_LOG) | Set-Content -Path '%s'; if ($env:EXECUTION_LOG) { Get-Content -Raw $env:EXECUTION_LOG | Add-Content -Path '%s' }`, outPath, outPath)
 	}
 	return fmt.Sprintf("printf '%%s\\n' \"$DAG_NAME\" \"$STATUS\" \"$EXECUTION_LOG\" > %q && if [ -n \"$EXECUTION_LOG\" ]; then cat \"$EXECUTION_LOG\" >> %q; fi", outPath, outPath)
 }
@@ -285,14 +295,14 @@ func executionLogPath(text string) string {
 
 func failingCommand() string {
 	if runtime.GOOS == "windows" {
-		return "echo boom 1>&2& exit /b 7"
+		return "[Console]::Error.WriteLine('boom'); exit 7"
 	}
 	return "echo boom >&2; exit 7"
 }
 
 func slowCommand() string {
 	if runtime.GOOS == "windows" {
-		return "ping -n 6 127.0.0.1 >NUL"
+		return "Start-Sleep -Seconds 5"
 	}
 	return "sleep 5"
 }

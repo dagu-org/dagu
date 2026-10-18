@@ -106,14 +106,13 @@ func (s *Service) runNotificationCommand(
 		defer func() { _ = os.Remove(logPath) }()
 	}
 
-	prepared, err := prepareNotificationCommand(command)
+	shell, args, err := notificationShellCommand(command)
 	if err != nil {
 		return err
 	}
-	defer prepared.cleanup()
 
 	stderr := &limitedBuffer{remaining: commandStderrLimit}
-	proc, err := startNotificationProcess(prepared.shell, prepared.args, commandEnvironment(s.commandBaseEnv, values, logPath), stderr)
+	proc, err := startNotificationProcess(shell, args, commandEnvironment(s.commandBaseEnv, values, logPath), stderr)
 	if err != nil {
 		return fmt.Errorf("run notification command: %w", err)
 	}
@@ -156,61 +155,23 @@ func (s *Service) executionLogLimit() int {
 	return defaultExecutionLogLimit
 }
 
-type preparedNotificationCommand struct {
-	shell   string
-	args    []string
-	cleanup func()
-}
-
-func prepareNotificationCommand(command string) (preparedNotificationCommand, error) {
+// notificationShellCommand returns the shell and arguments that run command:
+// sh on Unix, and PowerShell on Windows, where cmd.exe would expand %VAR%
+// before parsing and let run values act as syntax.
+func notificationShellCommand(command string) (string, []string, error) {
 	if runtime.GOOS != "windows" {
-		return preparedNotificationCommand{
-			shell:   "/bin/sh",
-			args:    []string{"-c", command},
-			cleanup: func() {},
-		}, nil
+		return "/bin/sh", []string{"-c", command}, nil
 	}
-	path, err := writeNotificationScript(command)
-	if err != nil {
-		return preparedNotificationCommand{}, err
+	for _, name := range []string{"pwsh", "powershell"} {
+		if path, err := exec.LookPath(name); err == nil {
+			return path, []string{"-NoProfile", "-NonInteractive", "-Command", command}, nil
+		}
 	}
-	shell := os.Getenv("ComSpec")
-	if shell == "" {
-		shell = `C:\Windows\System32\cmd.exe`
-	}
-	return preparedNotificationCommand{
-		shell:   shell,
-		args:    []string{"/c", path},
-		cleanup: func() { _ = os.Remove(path) },
-	}, nil
-}
-
-func writeNotificationScript(command string) (string, error) {
-	file, err := os.CreateTemp("", "dagu-notification-cmd-*.cmd")
-	if err != nil {
-		return "", fmt.Errorf("create notification command script: %w", err)
-	}
-	path := file.Name()
-	// A BOM lets cmd.exe read a Unicode command as UTF-8.
-	if _, err := file.Write([]byte{0xEF, 0xBB, 0xBF}); err != nil {
-		_ = file.Close()
-		_ = os.Remove(path)
-		return "", err
-	}
-	if _, err := io.WriteString(file, command+"\r\n"); err != nil {
-		_ = file.Close()
-		_ = os.Remove(path)
-		return "", err
-	}
-	if err := file.Close(); err != nil {
-		_ = os.Remove(path)
-		return "", err
-	}
-	return path, nil
+	return "", nil, errors.New("command channels on Windows need PowerShell (pwsh or powershell)")
 }
 
 func startNotificationProcess(shell string, args []string, env []string, stderr io.Writer) (*cmdutil.ManagedProcess, error) {
-	cmd := exec.Command(shell, args...) // #nosec G204 -- shell is the platform command shell; args are the configured notification script.
+	cmd := exec.Command(shell, args...) // #nosec G204 -- shell is the platform command shell; args carry the configured notification command.
 	cmd.WaitDelay = time.Second
 	cmd.Env = env
 	cmd.Stdout = io.Discard
