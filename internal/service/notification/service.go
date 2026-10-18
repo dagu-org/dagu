@@ -568,9 +568,22 @@ func (s *Service) dagDestinationsForEvent(ctx context.Context, setting *notifica
 	return destinations
 }
 
-func (s *Service) FlushNotificationBatch(ctx context.Context, destination string, batch chatbridge.NotificationBatch, _ bool) bool {
+func (s *Service) FlushNotificationBatch(ctx context.Context, destination string, batch chatbridge.NotificationBatch, allowLLM bool) bool {
+	return s.FlushNotificationBatchWithProgress(ctx, destination, batch, allowLLM, func(chatbridge.NotificationEvent) {})
+}
+
+// FlushNotificationBatchWithProgress delivers batch to destination. For a
+// command channel, each event is passed to delivered once its command
+// succeeds, so a later failure does not repeat it.
+func (s *Service) FlushNotificationBatchWithProgress(
+	ctx context.Context,
+	destination string,
+	batch chatbridge.NotificationBatch,
+	_ bool,
+	delivered func(chatbridge.NotificationEvent),
+) bool {
 	if route := parseRouteDestinationID(destination); route.OK {
-		return s.flushRouteNotificationBatch(ctx, destination, route.Scope, route.Workspace, route.RouteID, batch)
+		return s.flushRouteNotificationBatch(ctx, destination, route.Scope, route.Workspace, route.RouteID, batch, delivered)
 	}
 	parsed := parseDestinationID(destination)
 	if !parsed.OK {
@@ -611,7 +624,7 @@ func (s *Service) FlushNotificationBatch(ctx context.Context, destination string
 			return true
 		}
 		target := channel.ToTarget()
-		if err := s.deliverTarget(ctx, target, events); err != nil {
+		if err := s.deliverChannelEvents(ctx, target, events, delivered); err != nil {
 			s.logger.Warn("Failed to deliver DAG notification",
 				slog.String("destination", destination),
 				slog.String("provider", string(target.Type)),
@@ -659,6 +672,7 @@ func (s *Service) flushRouteNotificationBatch(
 	workspace string,
 	routeID string,
 	batch chatbridge.NotificationBatch,
+	delivered func(chatbridge.NotificationEvent),
 ) bool {
 	if !s.reusableChannelsAllowed() {
 		return true
@@ -697,7 +711,7 @@ func (s *Service) flushRouteNotificationBatch(
 		return true
 	}
 	target := channel.ToTarget()
-	if err := s.deliverTarget(ctx, target, events); err != nil {
+	if err := s.deliverChannelEvents(ctx, target, events, delivered); err != nil {
 		s.logger.Warn("Failed to deliver notification route",
 			slog.String("destination", destination),
 			slog.String("provider", string(target.Type)),
@@ -1002,6 +1016,27 @@ func (s *Service) deliverTarget(ctx context.Context, target notificationmodel.Ta
 	default:
 		return notificationmodel.ErrUnsupportedTarget
 	}
+}
+
+// deliverChannelEvents delivers events to a channel target. A command runs once
+// per event and can take most of the flush deadline, so each event is passed
+// to delivered as its command succeeds.
+func (s *Service) deliverChannelEvents(
+	ctx context.Context,
+	target notificationmodel.Target,
+	events []chatbridge.NotificationEvent,
+	delivered func(chatbridge.NotificationEvent),
+) error {
+	if target.Type != notificationmodel.ProviderCommand {
+		return s.deliverTarget(ctx, target, events)
+	}
+	for _, event := range events {
+		if err := s.deliverTarget(ctx, target, []chatbridge.NotificationEvent{event}); err != nil {
+			return err
+		}
+		delivered(event)
+	}
+	return nil
 }
 
 func (s *Service) listSettings(ctx context.Context) ([]*notificationmodel.Settings, error) {
@@ -2094,3 +2129,4 @@ func webhookPayloadForEvents(events []chatbridge.NotificationEvent, publicURL st
 var _ chatbridge.NotificationTransport = (*Service)(nil)
 var _ chatbridge.NotificationBatchDeliveryPolicyTransport = (*Service)(nil)
 var _ chatbridge.NotificationRoutingTransport = (*Service)(nil)
+var _ chatbridge.NotificationProgressTransport = (*Service)(nil)

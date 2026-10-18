@@ -63,6 +63,15 @@ func (f *fakePolicyNotificationTransport) ShouldDeliverNotificationBatch(batch N
 	return f.shouldDeliverFn(batch)
 }
 
+type fakeProgressNotificationTransport struct {
+	*fakeNotificationTransport
+	progressFn func(NotificationBatch, func(NotificationEvent)) bool
+}
+
+func (f *fakeProgressNotificationTransport) FlushNotificationBatchWithProgress(_ context.Context, _ string, batch NotificationBatch, _ bool, delivered func(NotificationEvent)) bool {
+	return f.progressFn(batch, delivered)
+}
+
 type stubNotificationStore struct {
 	mu        sync.Mutex
 	events    []*eventstore.Event
@@ -990,6 +999,65 @@ func TestNotificationMonitor_SuccessEventsAreAcknowledgedWithoutDelivery(t *test
 	mu.Lock()
 	defer mu.Unlock()
 	assert.Empty(t, calls, "successful completions should be acknowledged without transport delivery")
+}
+
+// A flush that fails after acknowledging some events retries only the rest,
+// so a slow event late in a batch cannot make the earlier ones repeat forever.
+func TestNotificationMonitor_RetrySkipsAcknowledgedEvents(t *testing.T) {
+	t.Parallel()
+
+	var (
+		mu      sync.Mutex
+		batches [][]string
+	)
+	transport := &fakeProgressNotificationTransport{
+		fakeNotificationTransport: &fakeNotificationTransport{
+			destinations: []string{"dest-1"},
+			flushFn:      func(context.Context, string, NotificationBatch, bool) bool { return false },
+		},
+		progressFn: func(batch NotificationBatch, delivered func(NotificationEvent)) bool {
+			mu.Lock()
+			defer mu.Unlock()
+			var runIDs []string
+			for _, event := range batch.Events {
+				runIDs = append(runIDs, event.Status.DAGRunID)
+			}
+			batches = append(batches, runIDs)
+			if len(batches) > 1 {
+				return true
+			}
+			for _, event := range batch.Events {
+				if event.Status.DAGRunID == "run-1" {
+					delivered(event)
+				}
+			}
+			return false
+		},
+	}
+
+	cfg := DefaultNotificationMonitorConfig()
+	cfg.UrgentWindow = 50 * time.Millisecond
+	cfg.PollInterval = 20 * time.Millisecond
+	cfg.SeenEvictInterval = time.Hour
+
+	monitor := NewNotificationMonitor(nil, nil, nil, transport, slog.New(slog.NewTextHandler(io.Discard, nil)), cfg)
+	stopMonitor := testutil.StartContextRunner(t, monitor)
+	defer stopMonitor()
+
+	first := &ir.DAGRunStatus{Name: "briefing", Status: ir.Failed, DAGRunID: "run-1", AttemptID: "attempt-1"}
+	second := &ir.DAGRunStatus{Name: "briefing", Status: ir.Failed, DAGRunID: "run-2", AttemptID: "attempt-2"}
+	require.True(t, monitor.NotifyCompletion(first))
+	require.True(t, monitor.NotifyCompletion(second))
+
+	require.Eventually(t, func() bool {
+		return monitor.IsDelivered("dest-1", first) && monitor.IsDelivered("dest-1", second)
+	}, 2*time.Second, 10*time.Millisecond)
+
+	mu.Lock()
+	defer mu.Unlock()
+	require.Len(t, batches, 2)
+	assert.ElementsMatch(t, []string{"run-1", "run-2"}, batches[0])
+	assert.Equal(t, []string{"run-2"}, batches[1])
 }
 
 func TestNotificationMonitor_PartiallySucceededEventsCanBeDeliveredByOptInTransport(t *testing.T) {

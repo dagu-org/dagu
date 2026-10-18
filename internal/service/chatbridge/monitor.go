@@ -103,6 +103,14 @@ type NotificationBatchDeliveryPolicyTransport interface {
 	ShouldDeliverNotificationBatch(batch NotificationBatch) bool
 }
 
+// NotificationProgressTransport can acknowledge events of a batch as each one
+// is delivered. When the flush then fails, only the events it did not
+// acknowledge are retried. The monitor uses it in place of
+// FlushNotificationBatch.
+type NotificationProgressTransport interface {
+	FlushNotificationBatchWithProgress(ctx context.Context, destination string, batch NotificationBatch, allowLLM bool, delivered func(NotificationEvent)) bool
+}
+
 // StateStore persists the monitor's encoded delivery state.
 type StateStore interface {
 	Load(ctx context.Context) (data []byte, found bool, err error)
@@ -795,7 +803,14 @@ func (m *NotificationMonitor) flushPendingBatch(ctx context.Context, pending Not
 	}
 	defer cancel()
 
-	acked := m.transport.FlushNotificationBatch(flushCtx, pending.Destination, pending.Batch, allowLLM)
+	var acked bool
+	if progress, ok := m.transport.(NotificationProgressTransport); ok {
+		acked = progress.FlushNotificationBatchWithProgress(flushCtx, pending.Destination, pending.Batch, allowLLM, func(event NotificationEvent) {
+			m.markBatchDelivered(ctx, pending.Destination, NotificationBatch{Events: []NotificationEvent{event}})
+		})
+	} else {
+		acked = m.transport.FlushNotificationBatch(flushCtx, pending.Destination, pending.Batch, allowLLM)
+	}
 	if acked {
 		m.markBatchDelivered(ctx, pending.Destination, pending.Batch)
 	}

@@ -249,9 +249,72 @@ func TestDeliverCommandTimesOut(t *testing.T) {
 	assert.Less(t, time.Since(start), 5*time.Second)
 }
 
+// Commands run once per event, so each event is acknowledged as its command
+// succeeds and a later failure leaves only the rest to retry.
+func TestFlushCommandBatchReportsEachDeliveredEvent(t *testing.T) {
+	t.Parallel()
+
+	channel, err := notificationmodel.NormalizeChannel(&notificationmodel.Channel{
+		ID:      "channel-1",
+		Name:    "Local",
+		Type:    notificationmodel.ProviderCommand,
+		Enabled: true,
+		Command: &notificationmodel.CommandTarget{Command: onlyRunCommand("run-1")},
+	}, "tester")
+	require.NoError(t, err)
+	settings, err := notificationmodel.Normalize(&notificationmodel.Settings{
+		DAGName: "daily-report",
+		Enabled: true,
+		Events:  []eventstore.EventType{eventstore.TypeDAGRunFailed},
+		Subscriptions: []notificationmodel.Subscription{{
+			ID:        "subscription-1",
+			ChannelID: channel.ID,
+			Enabled:   true,
+		}},
+	}, "tester")
+	require.NoError(t, err)
+	store := newMemoryStore(settings)
+	require.NoError(t, store.SaveChannel(context.Background(), channel))
+	svc := New(store, nil, commandChannels())
+
+	var delivered []string
+	acked := svc.FlushNotificationBatchWithProgress(
+		context.Background(),
+		channelDestinationID("daily-report", "subscription-1"),
+		chatbridge.NotificationBatch{Events: []chatbridge.NotificationEvent{
+			failedRunEvent("run-1"),
+			failedRunEvent("run-2"),
+		}},
+		false,
+		func(event chatbridge.NotificationEvent) { delivered = append(delivered, event.Status.DAGRunID) },
+	)
+	assert.False(t, acked)
+	assert.Equal(t, []string{"run-1"}, delivered)
+}
+
 func newCommandService(opts ...Option) *Service {
-	logs := filedagrun.NewStore(os.TempDir())
-	return New(nil, nil, append([]Option{WithCommandChannels(os.Environ(), logs)}, opts...)...)
+	return New(nil, nil, append([]Option{commandChannels()}, opts...)...)
+}
+
+func commandChannels() Option {
+	return WithCommandChannels(os.Environ(), filedagrun.NewStore(os.TempDir()))
+}
+
+func failedRunEvent(runID string) chatbridge.NotificationEvent {
+	return chatbridge.NotificationEvent{
+		Key:     runID,
+		Type:    eventstore.TypeDAGRunFailed,
+		DAGFile: "daily-report",
+		Status:  &ir.DAGRunStatus{Name: "daily-report", DAGRunID: runID, Status: ir.Failed},
+	}
+}
+
+// onlyRunCommand succeeds for runID and fails for any other run.
+func onlyRunCommand(runID string) string {
+	if runtime.GOOS == "windows" {
+		return fmt.Sprintf("if ($env:DAG_RUN_ID -ne '%s') { exit 1 }", runID)
+	}
+	return fmt.Sprintf(`[ "$DAG_RUN_ID" = %q ]`, runID)
 }
 
 func errorEnvPayload(marker string) string {
