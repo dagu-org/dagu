@@ -135,6 +135,11 @@ func (s *Service) runNotificationCommand(
 		}
 		return fmt.Errorf("command timed out after %s", timeout)
 	}
+	// Children the shell left behind would keep running after delivery
+	// returns. On Windows, releasing the process's job object stops them.
+	if runtime.GOOS != "windows" {
+		_, _ = proc.Stop(cmdutil.StopRequest{Intent: cmdutil.ForceTermination()})
+	}
 	if runErr == nil {
 		return nil
 	}

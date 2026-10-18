@@ -7,6 +7,7 @@ package notification
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -65,4 +66,46 @@ func TestDeliverCommandSkipsFIFOLog(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(body), "step output")
 	assert.NotContains(t, string(body), "# DAG log")
+}
+
+// No process the command started keeps running after delivery returns,
+// whether or not it still holds the shell's output pipes.
+func TestDeliverCommandStopsLeftoverChildren(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		redirect string
+		wantErr  bool
+	}{
+		// A child holding the pipes outlasts WaitDelay, which fails delivery.
+		{name: "holding output", wantErr: true},
+		{name: "detached output", redirect: " >/dev/null 2>&1", wantErr: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			marker := filepath.Join(t.TempDir(), "late")
+			start := time.Now()
+			err := newCommandService().deliverTarget(context.Background(), notificationmodel.Target{
+				Type: notificationmodel.ProviderCommand,
+				Command: &notificationmodel.CommandTarget{
+					Command: fmt.Sprintf("(sleep 2; touch %q)%s &", marker, tt.redirect),
+				},
+			}, []chatbridge.NotificationEvent{{
+				Type:   eventstore.TypeDAGRunFailed,
+				Status: &ir.DAGRunStatus{Name: "daily-report", Status: ir.Failed},
+			}})
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+
+			time.Sleep(time.Until(start.Add(3 * time.Second)))
+			_, statErr := os.Stat(marker)
+			assert.ErrorIs(t, statErr, os.ErrNotExist)
+		})
+	}
 }
