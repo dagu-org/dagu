@@ -229,5 +229,5 @@ func poll(ctx context.Context, interval time.Duration, check func() (bool, error
 }
 
 func init() {
-	executor.RegisterExecutor(executorType, newExecutor, validateStep, registry.ExecutorCapabilities{Command: true, DryRunCheck: dryRunCheck})
+	executor.RegisterExecutor(executorType, newExecutor, validateStep, registry.ExecutorCapabilities{Command: true})
 }
