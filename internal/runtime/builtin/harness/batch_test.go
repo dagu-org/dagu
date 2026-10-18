@@ -15,8 +15,9 @@ import (
 
 // The wrappers in testdata/shims were written by npm's cmd-shim 3, 8, and 9
 // and pnpm's @zkochan/cmd-shim 9 for a package bin at
-// node_modules/@scope/tool/bin/cli.js. Generators write CRLF, and a checkout
-// may convert it, so both line endings are parsed.
+// node_modules/@scope/tool/bin/cli.js, or cli.cmd for the batch fixture.
+// Generators write CRLF, and a checkout may convert it, so both line endings
+// are parsed.
 func TestParseNodeShim(t *testing.T) {
 	t.Parallel()
 
@@ -39,6 +40,10 @@ func TestParseNodeShim(t *testing.T) {
 			},
 		},
 		{file: "pnpm-cmd-shim.cmd", want: nodeShim{prog: "node", script: script, stripJSPath: true}},
+		{
+			file: "pnpm-cmd-shim-batch.cmd",
+			want: nodeShim{prog: "cmd", args: []string{"/C"}, script: `node_modules\@scope\tool\bin\cli.cmd`, stripJSPath: true},
+		},
 		{
 			file: "pnpm-cmd-shim-node-path.cmd",
 			want: nodeShim{

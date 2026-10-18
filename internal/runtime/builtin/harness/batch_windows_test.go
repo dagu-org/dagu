@@ -31,13 +31,29 @@ func TestHarnessRunsNpmWrapperProgramDirectly(t *testing.T) {
 	script := filepath.Join(binDir, "node_modules", "@scope", "tool", "bin", "cli.js")
 	require.NoError(t, os.MkdirAll(filepath.Dir(script), 0o750))
 	require.NoError(t, os.WriteFile(script, []byte(argDumpScript), 0o600))
-	shim, err := os.ReadFile(filepath.Join("testdata", "shims", "npm-cmd-shim-9.cmd"))
-	require.NoError(t, err)
-	require.NoError(t, os.WriteFile(filepath.Join(binDir, "tool.cmd"), shim, 0o600))
+	installShim(t, binDir, "npm-cmd-shim-9.cmd")
 	marker := filepath.Join(t.TempDir(), "injected")
 	prompt := injectionPrompt(marker) + "\nsecond line"
 
 	stdout, err := runBatchHarness(t, "tool", prompt, binDir, nodeDir)
+	require.NoError(t, err)
+	assert.Equal(t, []string{prompt}, decodeArgs(t, stdout))
+	assert.NoFileExists(t, marker)
+}
+
+// pnpm wraps a bin that is itself a batch file in "cmd /C", which drops the
+// outer quotes of its command line and parses the rest again. That batch
+// file runs in the wrapper's place, with its arguments quoted for cmd.exe.
+func TestHarnessRunsBatchFileBehindPnpmWrapper(t *testing.T) {
+	nodeDir := nodeDirForTest(t)
+	binDir := t.TempDir()
+	writeArgDumpBatch(t, filepath.Join(binDir, "node_modules", "@scope", "tool", "bin", "cli.cmd"))
+	installShim(t, binDir, "pnpm-cmd-shim-batch.cmd")
+	marker := filepath.Join(t.TempDir(), "injected")
+	prompt := injectionPrompt(marker)
+	systemDir := filepath.Join(os.Getenv("SystemRoot"), "System32")
+
+	stdout, err := runBatchHarness(t, "tool", prompt, binDir, nodeDir, systemDir)
 	require.NoError(t, err)
 	assert.Equal(t, []string{prompt}, decodeArgs(t, stdout))
 	assert.NoFileExists(t, marker)
@@ -78,9 +94,27 @@ func injectionPrompt(marker string) string {
 func writeArgDumpWrapper(t *testing.T) string {
 	t.Helper()
 	binDir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(binDir, "dump.js"), []byte(argDumpScript), 0o600))
-	require.NoError(t, os.WriteFile(filepath.Join(binDir, "wrapper.cmd"), []byte("@node \"%~dp0\\dump.js\" %*\r\n"), 0o600))
+	writeArgDumpBatch(t, filepath.Join(binDir, "wrapper.cmd"))
 	return binDir
+}
+
+// writeArgDumpBatch writes a batch file at path that passes its arguments
+// to the Node script beside it.
+func writeArgDumpBatch(t *testing.T, path string) {
+	t.Helper()
+	dir := filepath.Dir(path)
+	require.NoError(t, os.MkdirAll(dir, 0o750))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "dump.js"), []byte(argDumpScript), 0o600))
+	require.NoError(t, os.WriteFile(path, []byte("@node \"%~dp0\\dump.js\" %*\r\n"), 0o600))
+}
+
+// installShim copies the wrapper in testdata/shims named fixture to binDir
+// as tool.cmd.
+func installShim(t *testing.T, binDir, fixture string) {
+	t.Helper()
+	shim, err := os.ReadFile(filepath.Join("testdata", "shims", fixture))
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(binDir, "tool.cmd"), shim, 0o600))
 }
 
 func runBatchHarness(t *testing.T, binary, prompt string, pathDirs ...string) (string, error) {
