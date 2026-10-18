@@ -48,6 +48,8 @@ type Service struct {
 	publicURL                  func() string
 	notificationCommandTimeout time.Duration
 	notificationLogLimit       int
+	commandChannelsEnabled     bool
+	commandBaseEnv             []string
 }
 
 type TestResult struct {
@@ -112,6 +114,22 @@ func WithPublicURLResolver(resolver func() string) Option {
 	return func(s *Service) {
 		s.SetPublicURLResolver(resolver)
 	}
+}
+
+// WithCommandChannels enables delivery to command channels. Each command
+// starts from baseEnv plus the run values. Without this option, command
+// channels fail delivery.
+func WithCommandChannels(baseEnv []string) Option {
+	return func(s *Service) {
+		s.commandChannelsEnabled = true
+		s.commandBaseEnv = slices.Clone(baseEnv)
+	}
+}
+
+// CommandChannelsEnabled reports whether this service delivers to command
+// channels.
+func (s *Service) CommandChannelsEnabled() bool {
+	return s.commandChannelsEnabled
 }
 
 func (s *Service) SetPublicURLResolver(resolver func() string) {

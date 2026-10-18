@@ -59,6 +59,9 @@ var commandEnvFields = []commandEnvField{
 }
 
 func (s *Service) sendCommand(ctx context.Context, target notificationmodel.Target, events []chatbridge.NotificationEvent) error {
+	if !s.commandChannelsEnabled {
+		return errors.New("command channels are disabled on this server")
+	}
 	if target.Command == nil || strings.TrimSpace(target.Command.Command) == "" {
 		return errors.New("command is not configured")
 	}
@@ -110,7 +113,7 @@ func (s *Service) runNotificationCommand(
 	defer prepared.cleanup()
 
 	stderr := &limitedBuffer{remaining: commandStderrLimit}
-	proc, err := startNotificationProcess(prepared.shell, prepared.args, commandEnvironment(os.Environ(), values, logPath), stderr)
+	proc, err := startNotificationProcess(prepared.shell, prepared.args, commandEnvironment(s.commandBaseEnv, values, logPath), stderr)
 	if err != nil {
 		return fmt.Errorf("run notification command: %w", err)
 	}

@@ -35,7 +35,7 @@ func TestDeliverCommandExportsRunContextAndRemovesLogFile(t *testing.T) {
 	handlerErr := filepath.Join(dir, "handler.stderr")
 	require.NoError(t, os.WriteFile(handlerErr, []byte("handler output\n"), 0o644))
 
-	svc := New(nil, nil, WithPublicURL("https://dagu.example.com"))
+	svc := newCommandService(WithPublicURL("https://dagu.example.com"))
 	err := svc.deliverTarget(context.Background(), notificationmodel.Target{
 		Type: notificationmodel.ProviderCommand,
 		Command: &notificationmodel.CommandTarget{
@@ -89,7 +89,7 @@ func TestDeliverCommandPassesErrorAsEnv(t *testing.T) {
 	marker := filepath.Join(dir, "pwned")
 	outPath := filepath.Join(dir, "out.txt")
 	payload := "hello'; touch " + marker + "; $(touch " + marker + ")"
-	svc := New(nil, nil)
+	svc := newCommandService()
 	err := svc.deliverTarget(context.Background(), notificationmodel.Target{
 		Type: notificationmodel.ProviderCommand,
 		Command: &notificationmodel.CommandTarget{
@@ -122,7 +122,7 @@ func TestDeliverCommandLeavesTokensLiteral(t *testing.T) {
 	dir := t.TempDir()
 	marker := filepath.Join(dir, "pwned")
 	outPath := filepath.Join(dir, "out.txt")
-	svc := New(nil, nil)
+	svc := newCommandService()
 	err := svc.deliverTarget(context.Background(), notificationmodel.Target{
 		Type: notificationmodel.ProviderCommand,
 		Command: &notificationmodel.CommandTarget{
@@ -144,6 +144,47 @@ func TestDeliverCommandLeavesTokensLiteral(t *testing.T) {
 	assert.Equal(t, "{{run.error}}", string(body))
 }
 
+// The command starts from the configured base environment, not the
+// server process environment, which can hold Dagu's own credentials.
+func TestDeliverCommandUsesConfiguredEnv(t *testing.T) {
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "env.txt")
+	svc := New(nil, nil, WithCommandChannels(append(os.Environ(), "BASE_ONLY=from-base")))
+	t.Setenv("PROCESS_ONLY", "from-process")
+
+	err := svc.deliverTarget(context.Background(), notificationmodel.Target{
+		Type: notificationmodel.ProviderCommand,
+		Command: &notificationmodel.CommandTarget{
+			Command: envDumpCommand(outPath),
+		},
+	}, []chatbridge.NotificationEvent{{
+		Type:   eventstore.TypeDAGRunFailed,
+		Status: &ir.DAGRunStatus{Name: "daily-report", Status: ir.Failed},
+	}})
+	require.NoError(t, err)
+	body, err := os.ReadFile(outPath)
+	require.NoError(t, err)
+	assert.Contains(t, string(body), "BASE_ONLY=from-base")
+	assert.Contains(t, string(body), "DAG_NAME=daily-report")
+	assert.NotContains(t, string(body), "PROCESS_ONLY")
+}
+
+func TestDeliverCommandDisabled(t *testing.T) {
+	t.Parallel()
+
+	svc := New(nil, nil)
+	err := svc.deliverTarget(context.Background(), notificationmodel.Target{
+		Type: notificationmodel.ProviderCommand,
+		Command: &notificationmodel.CommandTarget{
+			Command: failingCommand(),
+		},
+	}, []chatbridge.NotificationEvent{{
+		Type:   eventstore.TypeDAGRunFailed,
+		Status: &ir.DAGRunStatus{Name: "daily-report", Status: ir.Failed},
+	}})
+	assert.ErrorContains(t, err, "command channels are disabled")
+}
+
 func TestDeliverCommandTruncatesExecutionLog(t *testing.T) {
 	t.Parallel()
 
@@ -151,7 +192,7 @@ func TestDeliverCommandTruncatesExecutionLog(t *testing.T) {
 	logPath := filepath.Join(dir, "run.log")
 	require.NoError(t, os.WriteFile(logPath, bytes.Repeat([]byte("x"), 200), 0o644))
 	outPath := filepath.Join(dir, "captured.txt")
-	svc := New(nil, nil)
+	svc := newCommandService()
 	svc.notificationLogLimit = 64
 	err := svc.deliverTarget(context.Background(), notificationmodel.Target{
 		Type: notificationmodel.ProviderCommand,
@@ -176,7 +217,7 @@ func TestDeliverCommandTruncatesExecutionLog(t *testing.T) {
 func TestDeliverCommandIncludesStderrOnFailure(t *testing.T) {
 	t.Parallel()
 
-	svc := New(nil, nil)
+	svc := newCommandService()
 	err := svc.deliverTarget(context.Background(), notificationmodel.Target{
 		Type: notificationmodel.ProviderCommand,
 		Command: &notificationmodel.CommandTarget{
@@ -194,7 +235,7 @@ func TestDeliverCommandIncludesStderrOnFailure(t *testing.T) {
 func TestDeliverCommandTimesOut(t *testing.T) {
 	t.Parallel()
 
-	svc := New(nil, nil)
+	svc := newCommandService()
 	svc.notificationCommandTimeout = 200 * time.Millisecond
 	start := time.Now()
 	err := svc.deliverTarget(context.Background(), notificationmodel.Target{
@@ -209,6 +250,17 @@ func TestDeliverCommandTimesOut(t *testing.T) {
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "timed out")
 	assert.Less(t, time.Since(start), 5*time.Second)
+}
+
+func newCommandService(opts ...Option) *Service {
+	return New(nil, nil, append([]Option{WithCommandChannels(os.Environ())}, opts...)...)
+}
+
+func envDumpCommand(outPath string) string {
+	if runtime.GOOS == "windows" {
+		return fmt.Sprintf(`set > "%s"`, outPath)
+	}
+	return fmt.Sprintf("env > %q", outPath)
 }
 
 func captureCommand(outPath string) string {

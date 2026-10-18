@@ -42,10 +42,15 @@ func newNotificationService(
 	dagRepository *persis.DAGRepository,
 	opts ...notificationservice.Option,
 ) *notificationservice.Service {
-	opts = append([]notificationservice.Option{
+	base := []notificationservice.Option{
 		notificationservice.WithPublicURL(cfg.Server.PublicURL),
-	}, opts...)
-	return notificationservice.New(store, dagRepository, opts...)
+	}
+	// Command channels run shell commands, so they need the same server
+	// permissions as writing and running DAGs.
+	if cfg.Server.Permissions[config.PermissionWriteDAGs] && cfg.Server.Permissions[config.PermissionRunDAGs] {
+		base = append(base, notificationservice.WithCommandChannels(cfg.Core.BaseEnv.WithoutCredentials()))
+	}
+	return notificationservice.New(store, dagRepository, append(base, opts...)...)
 }
 
 func newIncidentMonitor(cfg *config.Config, deps Dependencies) *chatbridge.NotificationMonitor {
