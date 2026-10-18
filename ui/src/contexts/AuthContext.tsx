@@ -328,13 +328,19 @@ export function useCanManageWebhooks(): boolean {
   return roleAtLeast(user.role, UserRole.developer);
 }
 
-// Command channels run shell commands on the server, so the server delivers to
-// them only while DAGs may be written and run.
+/**
+ * Reports whether this server delivers to local command channels. They run
+ * shell commands on the server, so they need DAGs to be writable and runnable.
+ */
 export function useCommandChannelsEnabled(): boolean {
   const { permissions } = useConfig();
   return permissions.writeDags && permissions.runDags;
 }
 
+/**
+ * Reports whether the current user may add, change, or test local command
+ * channels on this server.
+ */
 export function useCanManageCommandChannels(): boolean {
   const isAdmin = useIsAdmin();
   const enabled = useCommandChannelsEnabled();
