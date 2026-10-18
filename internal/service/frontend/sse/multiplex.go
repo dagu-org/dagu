@@ -9,13 +9,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
+	"runtime/debug"
 	"slices"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/dagucloud/dagu/v2/internal/cmn/backoff"
+	"github.com/dagucloud/dagu/v2/internal/cmn/logger"
+	"github.com/dagucloud/dagu/v2/internal/cmn/logger/tag"
 	"github.com/dagucloud/dagu/v2/internal/persis"
 	"github.com/google/uuid"
 )
@@ -1614,7 +1618,17 @@ func (t *multiplexTopic) sendSnapshotPayload(
 	return nil
 }
 
-func (t *multiplexTopic) fetchPayload(ctx context.Context) ([]byte, error) {
+func (t *multiplexTopic) fetchPayload(ctx context.Context) (_ []byte, err error) {
+	// Fetches run on background goroutines, where a panic would end the process.
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("fetch for topic %s panicked: %v", t.key, r)
+			logger.Error(ctx, "SSE topic fetch panicked",
+				tag.Error(err),
+				slog.String("stack", string(debug.Stack())),
+			)
+		}
+	}()
 	response, err := t.fetcher(ctx, t.identifier)
 	if err != nil {
 		return nil, err
