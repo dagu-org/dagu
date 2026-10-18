@@ -26,7 +26,7 @@ func TestParseNodeShim(t *testing.T) {
 		want nodeShim
 	}{
 		{file: "npm-cmd-shim-3.cmd", want: nodeShim{prog: "node", script: script, stripJSPath: true}},
-		{file: "npm-cmd-shim-8.cmd", want: nodeShim{prog: "node", script: script, stripJSPath: true}},
+		{file: "npm-cmd-shim-8.cmd", want: nodeShim{prog: "node", script: script}},
 		{file: "npm-cmd-shim-9.cmd", want: nodeShim{prog: "node", script: script, stripJSLocal: true, stripJSPath: true}},
 		{
 			file: "npm-cmd-shim-9-shebang-args.cmd",
@@ -121,6 +121,16 @@ func TestBatchCommandLineRejectsUnpassableArguments(t *testing.T) {
 
 	_, err = batchCommandLine(`C:\np"m\tool.cmd`, nil)
 	require.ErrorContains(t, err, "double quote")
+}
+
+// A directory may be named like a variable; cmd.exe must open that path,
+// not the one the variable holds.
+func TestBatchCommandLineEscapesScriptPath(t *testing.T) {
+	t.Parallel()
+
+	got, err := batchCommandLine(`C:\%TEMP%\tool.cmd`, []string{"-p"})
+	require.NoError(t, err)
+	assert.Equal(t, `cmd.exe /e:ON /v:OFF /d /c ""C:\%%cd:~,%TEMP%%cd:~,%\tool.cmd" -p"`, got)
 }
 
 func TestNodeShimEnviron(t *testing.T) {

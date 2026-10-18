@@ -61,16 +61,17 @@ func isBatchFile(path string) bool {
 
 // batchCommandLine builds a cmd.exe command line that runs script with args
 // delivered unchanged. Each argument is quoted where cmd.exe would act on
-// it, a double quote is doubled so the quoting stays balanced, and % is
-// written as %%cd:~,% (an empty substring of %cd%) so that no variable
-// expands. Line breaks end a cmd.exe command and cannot be passed.
+// it, a double quote is doubled so the quoting stays balanced, and % in the
+// script path or an argument is written as %%cd:~,% (an empty substring of
+// %cd%) so that no variable expands. Line breaks end a cmd.exe command and
+// cannot be passed.
 func batchCommandLine(script string, args []string) (string, error) {
 	if strings.Contains(script, `"`) {
 		return "", fmt.Errorf("batch file path %q contains a double quote", script)
 	}
 	var b strings.Builder
 	b.WriteString(`cmd.exe /e:ON /v:OFF /d /c ""`)
-	b.WriteString(script)
+	b.WriteString(strings.ReplaceAll(script, "%", "%%cd:~,%"))
 	b.WriteByte('"')
 	for _, arg := range args {
 		if strings.ContainsAny(arg, "\r\n") {
@@ -161,10 +162,11 @@ var nodeShimTemplates = []nodeShimTemplate{
 		stripJSPath: true,
 	},
 	{
+		// endLocal restores PATHEXT before the program starts, so neither
+		// branch removes .JS for it.
 		text: "@ECHO off\nGOTO start\n:find_dp0\nSET dp0=%~dp0\nEXIT /b\n:start\nSETLOCAL\nCALL :find_dp0\n\n" +
 			"IF EXIST \"%dp0%\\{prog}.exe\" (\n  SET \"_prog=%dp0%\\{prog}.exe\"\n) ELSE (\n  SET \"_prog={prog}\"\n  SET PATHEXT=%PATHEXT:;.JS;=;%\n)\n\n" +
 			"endLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & \"%_prog%\" {args} \"%dp0%\\{script}\" %*\n",
-		stripJSPath: true,
 	},
 	{
 		text: "@ECHO off\nGOTO start\n:find_dp0\nSET dp0=%~dp0\nEXIT /b\n:start\nSETLOCAL\nCALL :find_dp0\n\n" +
