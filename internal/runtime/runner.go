@@ -781,14 +781,29 @@ func (r *Runner) setupNodeExecutionEnv(ctx context.Context, node *Node) context.
 // no valid span, which is the case when tracing is off for the DAG.
 //
 // The names act like initial current-step values (spec 006): a step-local
-// source that sets either name keeps both names as they are.
+// source that sets either name keeps its value, and Dagu adds neither name.
+// The two names form one trace context, so a root-scope value of the other
+// name is replaced with an empty value.
 func withStepTraceContext(ctx context.Context) context.Context {
 	if !trace.SpanContextFromContext(ctx).IsValid() {
 		return ctx
 	}
 	env := GetEnv(ctx)
-	if hasStepLocalEntry(env.Scope, runenv.EnvKeyTraceParent) || hasStepLocalEntry(env.Scope, runenv.EnvKeyTraceState) {
+	parentLocal := hasStepLocalEntry(env.Scope, runenv.EnvKeyTraceParent)
+	stateLocal := hasStepLocalEntry(env.Scope, runenv.EnvKeyTraceState)
+	if parentLocal && stateLocal {
 		return ctx
+	}
+	if parentLocal || stateLocal {
+		other := runenv.EnvKeyTraceState
+		if stateLocal {
+			other = runenv.EnvKeyTraceParent
+		}
+		if _, inherited := env.Scope.Get(other); !inherited {
+			return ctx
+		}
+		env.Scope = env.Scope.WithEntry(other, "", cmnvalue.EnvSourceStepEnv)
+		return WithEnv(ctx, env)
 	}
 	values := make(map[string]string, 2)
 	for _, entry := range telemetry.InjectTraceContext(ctx) {

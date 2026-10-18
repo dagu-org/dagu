@@ -185,7 +185,9 @@ They differ from the other initial current-step names in these ways:
 - They replace a value of the same name from the root run environment scope.
 - A step-local source that sets either name shadows both names. Dagu then adds
   neither name, so a step-local `TRACEPARENT` is never paired with the trace
-  state of the step span.
+  state of the step span. When only one name is step-local, Dagu replaces a
+  root-scope value of the other name with an empty value, because the two
+  names form one trace context.
 
 Execution-attempt Dagu-managed environment names include:
 

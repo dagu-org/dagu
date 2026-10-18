@@ -407,7 +407,8 @@ Rules:
   `DAGU_` families. Tools read these exact names, so the `DAGU_` prefix rule
   for new projection variables does not apply.
 - Precedence follows Spec 006: the names replace root-scope values of the same
-  name, and a step-local source that sets either name shadows both names.
+  name, and a step-local source that sets either name shadows both names. A
+  root-scope value of the name that the step does not set becomes empty.
   A step can set `TRACEPARENT` to an empty string to give its process no
   trace context.
 

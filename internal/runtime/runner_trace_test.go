@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dagucloud/dagu/v2/internal/cmn/config"
 	"github.com/dagucloud/dagu/v2/internal/ir"
 	"github.com/dagucloud/dagu/v2/internal/runtime"
 	"github.com/stretchr/testify/assert"
@@ -31,7 +32,7 @@ func TestStepTraceContext(t *testing.T) {
 		recorder, tracer := setupTestTracing(t)
 		plan := setupRunner(t).newPlan(t,
 			newStep("1",
-				withCommand(`printf '%s|%s' "$TRACEPARENT" "$TRACESTATE"`),
+				withCommand(traceEnvCommand()),
 				withOutput("TRACE"),
 			),
 		)
@@ -61,7 +62,7 @@ func TestStepTraceContext(t *testing.T) {
 		plan := setupRunner(t).newPlan(t,
 			newStep("1",
 				withEnvVars("TRACEPARENT="+own),
-				withCommand(`printf '%s|%s' "$TRACEPARENT" "${TRACESTATE-unset}"`),
+				withCommand(traceEnvCommand()),
 				withOutput("TRACE"),
 			),
 		)
@@ -73,7 +74,45 @@ func TestStepTraceContext(t *testing.T) {
 
 		traceParent, traceState := splitTraceOutput(t, result.nodeByName(t, "1"))
 		assert.Equal(t, own, traceParent)
-		assert.Equal(t, "unset", traceState)
+		assert.Equal(t, unsetTrace(), traceState)
+	})
+
+	// A step-local TRACEPARENT or TRACESTATE replaces a root-scope value of
+	// the other name with an empty value, because the root value belongs to
+	// another trace context.
+	t.Run("StepEnvClearsRootCounterpart", func(t *testing.T) {
+		const own = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+		const rootParent = "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"
+		for _, tc := range []struct {
+			name      string
+			root      string
+			step      string
+			wantTrace string
+		}{
+			{"StepParentRootState", "TRACESTATE=root=state", "TRACEPARENT=" + own, own + "|"},
+			{"StepStateRootParent", "TRACEPARENT=" + rootParent, "TRACESTATE=own=state", "|own=state"},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				_, tracer := setupTestTracing(t)
+				th := setupRunner(t)
+				th.Config.Core.BaseEnv = config.NewBaseEnv(append(th.Config.Core.BaseEnv.AsSlice(), tc.root))
+				plan := th.newPlan(t,
+					newStep("1",
+						withEnvVars(tc.step),
+						withCommand(traceEnvCommand()),
+						withOutput("TRACE"),
+					),
+				)
+
+				var root trace.Span
+				plan.Context, root = tracer.Start(plan.Context, "DAG: test_dag")
+				result := plan.assertRun(t, ir.Succeeded)
+				root.End()
+
+				traceParent, traceState := splitTraceOutput(t, result.nodeByName(t, "1"))
+				assert.Equal(t, tc.wantTrace, traceParent+"|"+traceState)
+			})
+		}
 	})
 
 	t.Run("StepEnvClears", func(t *testing.T) {
@@ -81,7 +120,7 @@ func TestStepTraceContext(t *testing.T) {
 		plan := setupRunner(t).newPlan(t,
 			newStep("1",
 				withEnvVars("TRACEPARENT="),
-				withCommand(`printf '%s|%s' "${TRACEPARENT-unset}" "${TRACESTATE-unset}"`),
+				withCommand(traceEnvCommand()),
 				withOutput("TRACE"),
 			),
 		)
@@ -93,13 +132,13 @@ func TestStepTraceContext(t *testing.T) {
 
 		traceParent, traceState := splitTraceOutput(t, result.nodeByName(t, "1"))
 		assert.Equal(t, "", traceParent)
-		assert.Equal(t, "unset", traceState)
+		assert.Equal(t, unsetTrace(), traceState)
 	})
 
 	t.Run("NoSpan", func(t *testing.T) {
 		plan := setupRunner(t).newPlan(t,
 			newStep("1",
-				withCommand(`printf '%s|%s' "${TRACEPARENT-unset}" "${TRACESTATE-unset}"`),
+				withCommand(traceEnvCommand()),
 				withOutput("TRACE"),
 			),
 		)
@@ -107,9 +146,27 @@ func TestStepTraceContext(t *testing.T) {
 		result := plan.assertRun(t, ir.Succeeded)
 
 		traceParent, traceState := splitTraceOutput(t, result.nodeByName(t, "1"))
-		assert.Equal(t, "unset", traceParent)
-		assert.Equal(t, "unset", traceState)
+		assert.Equal(t, unsetTrace(), traceParent)
+		assert.Equal(t, unsetTrace(), traceState)
 	})
+}
+
+// traceEnvCommand prints TRACEPARENT and TRACESTATE as "parent|state". The
+// POSIX shell prints "unset" for a name that is not set. PowerShell on
+// Windows prints an empty string for a name that is not set or empty.
+func traceEnvCommand() string {
+	if windowsShellTest() {
+		return `Write-Output ($env:TRACEPARENT + '|' + $env:TRACESTATE)`
+	}
+	return `printf '%s|%s' "${TRACEPARENT-unset}" "${TRACESTATE-unset}"`
+}
+
+// unsetTrace is what traceEnvCommand prints for a name that is not set.
+func unsetTrace() string {
+	if windowsShellTest() {
+		return ""
+	}
+	return "unset"
 }
 
 func setupTestTracing(t *testing.T) (*tracetest.SpanRecorder, trace.Tracer) {
