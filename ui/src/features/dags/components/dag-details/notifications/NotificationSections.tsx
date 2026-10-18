@@ -13,7 +13,7 @@ import {
   Trash2,
   XCircle,
 } from 'lucide-react';
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useContext, useEffect, useId, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import ConfirmDialog from '@/components/ui/confirm-dialog';
@@ -76,6 +76,7 @@ import { I18nText } from '@/i18n/I18nText';
 import { I18nProps } from '@/i18n/I18nProps';
 import { useI18n } from '@/i18n/I18nProvider';
 import { I18nTemplate } from '@/i18n/I18nTemplate';
+import { AppBarContext } from '@/contexts/AppBarContext';
 import {
   useCanManageCommandChannels,
   useCommandChannelsEnabled,
@@ -1014,6 +1015,25 @@ export function InheritedNotificationRoutesCard({
   );
 }
 
+/**
+ * Explains why the current user cannot add, toggle, test, or edit local command
+ * channels on the selected node, or returns undefined when they can.
+ */
+export function useCommandChannelLockReason(): string | undefined {
+  const { selectedRemoteNode } = useContext(AppBarContext);
+  const enabled = useCommandChannelsEnabled();
+  const canManage = useCanManageCommandChannels();
+  // A remote node checks its own role and permissions, which this server's
+  // configuration does not describe, so its API decides instead.
+  const remote = !!selectedRemoteNode && selectedRemoteNode !== 'local';
+  if (canManage || remote) {
+    return undefined;
+  }
+  return enabled
+    ? 'Only admins can change or test local command channels.'
+    : 'This server does not run local commands. Enable permissions.write_dags and permissions.run_dags to deliver to this channel.';
+}
+
 type NotificationChannelsSectionProps = {
   channels: DraftChannel[];
   onSave: (channel: DraftChannel) => Promise<void>;
@@ -1207,15 +1227,11 @@ export function NotificationChannelsSection({
   const [deleting, setDeleting] = useState<DraftChannel | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const commandChannelsEnabled = useCommandChannelsEnabled();
-  const canManageCommandChannels = useCanManageCommandChannels();
-  const commandLockedReason = !commandChannelsEnabled
-    ? 'This server does not run local commands. Enable permissions.write_dags and permissions.run_dags to deliver to this channel.'
-    : 'Only admins can change or test local command channels.';
+  const commandLockReason = useCommandChannelLockReason();
   const providerOptions = CHANNEL_PROVIDER_OPTIONS.filter(
     (provider) =>
       provider.value !== NotificationProviderType.command ||
-      canManageCommandChannels
+      commandLockReason === undefined
   );
   const editorIncomplete =
     !editor?.name.trim() ||
@@ -1327,9 +1343,8 @@ export function NotificationChannelsSection({
               key={channel.id}
               channel={channel}
               lockedReason={
-                channel.type === NotificationProviderType.command &&
-                !canManageCommandChannels
-                  ? commandLockedReason
+                channel.type === NotificationProviderType.command
+                  ? commandLockReason
                   : undefined
               }
               onSave={onSave}
@@ -1544,6 +1559,7 @@ export function DAGSubscriptionsSection({
   const [expandedEventRows, setExpandedEventRows] = useState<Set<string>>(
     () => new Set()
   );
+  const commandLockReason = useCommandChannelLockReason();
   const channelsById = useMemo(() => {
     const map = new Map<string, DraftChannel>();
     channels.forEach((channel) => {
@@ -1612,6 +1628,10 @@ export function DAGSubscriptionsSection({
           {draft.subscriptions.map((subscription, index) => {
             const channel = channelsById.get(subscription.channelId);
             const Icon = providerIcon(channel?.type);
+            const lockReason =
+              channel?.type === NotificationProviderType.command
+                ? commandLockReason
+                : undefined;
             const usedChannelIds = new Set(
               draft.subscriptions
                 .filter((_, subIndex) => subIndex !== index)
@@ -1676,7 +1696,11 @@ export function DAGSubscriptionsSection({
                           subscription.id &&
                           onTest(subscription.id, subscription.events)
                         }
-                        disabled={!subscription.id || testingTargetId !== null}
+                        disabled={
+                          !subscription.id ||
+                          testingTargetId !== null ||
+                          lockReason !== undefined
+                        }
                       >
                         {testingTargetId === subscription.id ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
@@ -1696,6 +1720,11 @@ export function DAGSubscriptionsSection({
                     </div>
                   </div>
 
+                  {lockReason && (
+                    <p className="text-sm text-warning">
+                      <I18nText text={lockReason} />
+                    </p>
+                  )}
                   <div className="grid gap-3 md:grid-cols-[minmax(220px,320px)_minmax(0,1fr)]">
                     <Select
                       value={subscription.channelId}

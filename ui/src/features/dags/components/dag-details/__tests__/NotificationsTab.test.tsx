@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -10,6 +10,14 @@ import { ConfigContext, type Config } from '@/contexts/ConfigContext';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { defaultWorkspaceSelection } from '@/lib/workspace';
 import NotificationsTab from '../NotificationsTab';
+
+const commandAccess = vi.hoisted(() => ({ canManage: true }));
+
+vi.mock('@/contexts/AuthContext', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/contexts/AuthContext')>()),
+  useCanManageCommandChannels: () => commandAccess.canManage,
+  useCommandChannelsEnabled: () => true,
+}));
 
 const fetchMock = vi.fn();
 let dagSettingsResponse: () => Promise<Response>;
@@ -98,6 +106,7 @@ function renderTab() {
 }
 
 beforeEach(() => {
+  commandAccess.canManage = true;
   fetchMock.mockReset();
   dagSettingsResponse = () => emptyResponse(404);
   fetchMock.mockImplementation((input: RequestInfo | URL) => {
@@ -251,6 +260,52 @@ describe('NotificationsTab', () => {
     expect(JSON.parse(testCall?.[1]?.body as string)).toEqual({
       eventType: 'dag_run_failed',
     });
+  });
+
+  it('locks test sends to a subscribed local command channel', async () => {
+    commandAccess.canManage = false;
+    const defaultFetch = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation(
+      (input: RequestInfo | URL, init?: RequestInit) =>
+        String(input) === '/api/v1/notification-channels?remoteNode=local'
+          ? jsonResponse({
+              channels: [
+                {
+                  id: 'command-1',
+                  name: 'Desktop',
+                  type: 'command',
+                  enabled: true,
+                  command: { command: 'exit 0' },
+                  createdAt: '2026-05-17T00:00:00Z',
+                  updatedAt: '2026-05-17T00:00:00Z',
+                },
+              ],
+            })
+          : defaultFetch(input, init)
+    );
+    dagSettingsResponse = () =>
+      jsonResponse({
+        id: 'settings-1',
+        dagName: 'example',
+        enabled: true,
+        events: ['dag_run_failed'],
+        targets: [],
+        subscriptions: [
+          { id: 'subscription-1', channelId: 'command-1', enabled: true },
+        ],
+        createdAt: '2026-05-17T00:00:00Z',
+        updatedAt: '2026-05-17T00:00:00Z',
+      });
+    renderTab();
+
+    const reason = await screen.findByText(
+      'Only admins can change or test local command channels.'
+    );
+    const card = reason.closest<HTMLElement>('[data-slot="card"]');
+    expect(card).not.toBeNull();
+    expect(
+      within(card!).getByRole('button', { name: /send test/i })
+    ).toBeDisabled();
   });
 
   it('makes empty DAG overrides explicit and keeps one save action', async () => {
