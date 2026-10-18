@@ -77,6 +77,7 @@ func TestNotificationServiceUsesConfiguredPublicURL(t *testing.T) {
 		cfg,
 		store,
 		nil,
+		nil,
 		notificationservice.WithHTTPClient(httpClient),
 	)
 	results, err := service.SendTest(
@@ -114,7 +115,7 @@ func TestNotificationServiceCommandChannels(t *testing.T) {
 			"DAGU_AUTH_BASIC_PASSWORD=secret",
 		})},
 	}
-	service := newNotificationService(cfg, newNotificationTestStore(t, cfg), nil)
+	service := newNotificationService(cfg, newNotificationTestStore(t, cfg), nil, nil)
 	channel, err := service.SaveChannel(context.Background(), &notificationmodel.Channel{
 		Name:    "env",
 		Type:    notificationmodel.ProviderCommand,
@@ -136,7 +137,7 @@ func TestNotificationServiceCommandChannels(t *testing.T) {
 		denied := maps.Clone(allowed)
 		denied[permission] = false
 		cfg := &config.Config{Server: config.Server{Permissions: denied}}
-		assert.False(t, newNotificationService(cfg, nil, nil).CommandChannelsEnabled(), permission)
+		assert.False(t, newNotificationService(cfg, nil, nil, nil).CommandChannelsEnabled(), permission)
 	}
 }
 

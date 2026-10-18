@@ -25,7 +25,7 @@ func newNotificationMonitor(cfg *config.Config, deps Dependencies) *chatbridge.N
 	if deps.NewNotificationLease != nil {
 		lease = deps.NewNotificationLease()
 	}
-	service := newNotificationService(cfg, deps.NotificationStore, deps.DAGRepository)
+	service := newNotificationService(cfg, deps.NotificationStore, deps.DAGRepository, deps.DAGRunRepository)
 	return chatbridge.NewNotificationMonitor(
 		deps.EventService,
 		deps.NotificationState,
@@ -40,6 +40,7 @@ func newNotificationService(
 	cfg *config.Config,
 	store notificationmodel.Store,
 	dagRepository *persis.DAGRepository,
+	dagRunRepository *persis.DAGRunRepository,
 	opts ...notificationservice.Option,
 ) *notificationservice.Service {
 	base := []notificationservice.Option{
@@ -48,7 +49,7 @@ func newNotificationService(
 	// Command channels run shell commands, so they need the same server
 	// permissions as writing and running DAGs.
 	if cfg.Server.Permissions[config.PermissionWriteDAGs] && cfg.Server.Permissions[config.PermissionRunDAGs] {
-		base = append(base, notificationservice.WithCommandChannels(cfg.Core.BaseEnv.WithoutCredentials()))
+		base = append(base, notificationservice.WithCommandChannels(cfg.Core.BaseEnv.WithoutCredentials(), dagRunRepository))
 	}
 	return notificationservice.New(store, dagRepository, append(base, opts...)...)
 }

@@ -580,7 +580,7 @@ func NewServer(setup ServerConfig, opts ...ServerOption) (*Server, error) {
 		// Command channels run shell commands, so they need the same server
 		// permissions as writing and running DAGs.
 		if cfg.Server.Permissions[config.PermissionWriteDAGs] && cfg.Server.Permissions[config.PermissionRunDAGs] {
-			notificationOpts = append(notificationOpts, notificationservice.WithCommandChannels(cfg.Core.BaseEnv.WithoutCredentials()))
+			notificationOpts = append(notificationOpts, notificationservice.WithCommandChannels(cfg.Core.BaseEnv.WithoutCredentials(), dagRunRepository))
 		}
 		notificationSvc = notificationservice.New(stores.Notification, dr, notificationOpts...)
 		apiOpts = append(apiOpts, apiv1.WithNotificationService(notificationSvc))

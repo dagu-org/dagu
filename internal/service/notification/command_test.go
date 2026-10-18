@@ -17,6 +17,7 @@ import (
 	"github.com/dagucloud/dagu/v2/internal/eventstore"
 	"github.com/dagucloud/dagu/v2/internal/ir"
 	notificationmodel "github.com/dagucloud/dagu/v2/internal/notification"
+	filedagrun "github.com/dagucloud/dagu/v2/internal/persis/file/dagrun"
 	"github.com/dagucloud/dagu/v2/internal/service/chatbridge"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -145,7 +146,7 @@ func TestDeliverCommandLeavesTokensLiteral(t *testing.T) {
 func TestDeliverCommandUsesConfiguredEnv(t *testing.T) {
 	dir := t.TempDir()
 	outPath := filepath.Join(dir, "env.txt")
-	svc := New(nil, nil, WithCommandChannels(append(os.Environ(), "BASE_ONLY=from-base")))
+	svc := New(nil, nil, WithCommandChannels(append(os.Environ(), "BASE_ONLY=from-base"), filedagrun.NewStore(dir)))
 	t.Setenv("PROCESS_ONLY", "from-process")
 
 	err := svc.deliverTarget(context.Background(), notificationmodel.Target{
@@ -249,7 +250,8 @@ func TestDeliverCommandTimesOut(t *testing.T) {
 }
 
 func newCommandService(opts ...Option) *Service {
-	return New(nil, nil, append([]Option{WithCommandChannels(os.Environ())}, opts...)...)
+	logs := filedagrun.NewStore(os.TempDir())
+	return New(nil, nil, append([]Option{WithCommandChannels(os.Environ(), logs)}, opts...)...)
 }
 
 func errorEnvPayload(marker string) string {

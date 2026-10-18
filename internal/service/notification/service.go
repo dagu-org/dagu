@@ -50,6 +50,7 @@ type Service struct {
 	notificationLogLimit       int
 	commandChannelsEnabled     bool
 	commandBaseEnv             []string
+	commandLogs                LogOpener
 }
 
 type TestResult struct {
@@ -116,13 +117,20 @@ func WithPublicURLResolver(resolver func() string) Option {
 	}
 }
 
+// LogOpener opens a run's log file for reading. It refuses files that are not
+// regular files, since opening a pipe or device can block.
+type LogOpener interface {
+	OpenLog(ctx context.Context, path string) (io.ReadCloser, error)
+}
+
 // WithCommandChannels enables delivery to command channels. Each command
-// starts from baseEnv plus the run values. Without this option, command
-// channels fail delivery.
-func WithCommandChannels(baseEnv []string) Option {
+// starts from baseEnv plus the run values, and its execution log is read
+// through logs. Without this option, command channels fail delivery.
+func WithCommandChannels(baseEnv []string, logs LogOpener) Option {
 	return func(s *Service) {
 		s.commandChannelsEnabled = true
 		s.commandBaseEnv = slices.Clone(baseEnv)
+		s.commandLogs = logs
 	}
 }
 

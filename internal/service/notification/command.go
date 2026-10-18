@@ -92,7 +92,7 @@ func (s *Service) runNotificationCommand(
 	cmdCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	logPath, err := writeExecutionLog(cmdCtx, event.Status, s.executionLogLimit())
+	logPath, err := writeExecutionLog(cmdCtx, s.commandLogs, event.Status, s.executionLogLimit())
 	if err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -253,7 +253,7 @@ func executionLogSections(status *ir.DAGRunStatus) []commandLogSection {
 	return sections
 }
 
-func writeExecutionLog(ctx context.Context, status *ir.DAGRunStatus, limit int) (string, error) {
+func writeExecutionLog(ctx context.Context, logs LogOpener, status *ir.DAGRunStatus, limit int) (string, error) {
 	sections := executionLogSections(status)
 	if len(sections) == 0 {
 		return "", nil
@@ -285,7 +285,7 @@ func writeExecutionLog(ctx context.Context, status *ir.DAGRunStatus, limit int) 
 			truncated = true
 			break
 		}
-		src, err := os.Open(section.path) // #nosec G304 -- path is a log file recorded for this run.
+		src, err := logs.OpenLog(ctx, section.path)
 		if err != nil {
 			continue
 		}
