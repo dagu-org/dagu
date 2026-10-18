@@ -4,6 +4,7 @@
 package frontend
 
 import (
+	_ "embed"
 	"fmt"
 	"net"
 	"net/http"
@@ -110,14 +111,44 @@ func (p hostPolicy) allows(host string) bool {
 	return hostListMatches(runtime, host)
 }
 
-// isPrivateName reports whether host sits under a top-level domain that
-// ICANN has not delegated, such as localhost, local, lan, internal, or a
-// single label. Only local DNS answers for such names, so a remote page
-// cannot rebind them; it can rebind any name under a delegated domain,
-// including the private suffixes of dynamic DNS services.
+// ianaTLDs is IANA's list of delegated top-level domains, from
+// https://data.iana.org/TLD/tlds-alpha-by-domain.txt.
+//
+//go:embed iana_tlds.txt
+var ianaTLDs string
+
+// delegatedTLDs holds the lower-case top-level domains in ianaTLDs.
+var delegatedTLDs = parseTLDList(ianaTLDs)
+
+func parseTLDList(list string) map[string]struct{} {
+	tlds := make(map[string]struct{})
+	for line := range strings.Lines(list) {
+		if line = strings.TrimSpace(line); line != "" && !strings.HasPrefix(line, "#") {
+			tlds[strings.ToLower(line)] = struct{}{}
+		}
+	}
+	return tlds
+}
+
+// isPrivateName reports whether only local DNS answers for host: a single
+// label, which resolvers qualify with local search domains and public DNS
+// never publishes, or a name under a top-level domain ICANN has not
+// delegated, such as localhost, local, lan, or internal. A remote page can
+// rebind any other name, including the private suffixes of dynamic DNS
+// services.
 func isPrivateName(host string) bool {
-	tld := host[strings.LastIndexByte(host, '.')+1:]
-	_, icann := publicsuffix.PublicSuffix(tld)
+	dot := strings.LastIndexByte(host, '.')
+	if dot < 0 {
+		return true
+	}
+	tld := host[dot+1:]
+	// Either list may know of a delegation the other lacks. A name under the
+	// top-level domain also matches wildcard-only rules such as *.ck, which
+	// the top-level domain alone does not.
+	if _, ok := delegatedTLDs[tld]; ok {
+		return false
+	}
+	_, icann := publicsuffix.PublicSuffix("dagu." + tld)
 	return !icann
 }
 

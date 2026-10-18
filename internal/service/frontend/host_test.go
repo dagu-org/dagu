@@ -35,9 +35,9 @@ func TestHostPolicyRejectsPublicDomainsWithoutAuth(t *testing.T) {
 	assert.Contains(t, body.Message, "allowed_hosts")
 }
 
-// Names under a top-level domain ICANN has not delegated resolve only
-// through local DNS, so containers, clusters, and home networks keep working
-// without configuration.
+// Single labels and names under a top-level domain ICANN has not delegated
+// resolve only through local DNS, so containers, clusters, and home networks
+// keep working without configuration.
 func TestHostPolicyAllowsAddressesAndPrivateNames(t *testing.T) {
 	t.Parallel()
 
@@ -50,6 +50,8 @@ func TestHostPolicyAllowsAddressesAndPrivateNames(t *testing.T) {
 		"localhost:8080",
 		"app.localhost",
 		"dagu",
+		"app",
+		"dev",
 		"dagu-ui.dagu.svc.cluster.local",
 		"nas.lan",
 		"build.internal.",
@@ -58,8 +60,13 @@ func TestHostPolicyAllowsAddressesAndPrivateNames(t *testing.T) {
 		assert.Equal(t, http.StatusNoContent, resp.Code, host)
 	}
 
-	resp := serveHost(handler, httptest.NewRequest(http.MethodGet, "http://rebind.duckdns.org/api/v1/dags", nil))
-	assert.Equal(t, http.StatusBadRequest, resp.Code, "a dynamic DNS name sits under a delegated domain")
+	// Dynamic DNS suffixes sit under delegated domains, some country domains
+	// appear in the public suffix list only as wildcard rules, and web was
+	// delegated after the copy of that list in golang.org/x/net was made.
+	for _, host := range []string{"rebind.duckdns.org", "rebind.example.co.ck", "rebind.example.com.np", "rebind.example.web"} {
+		resp := serveHost(handler, httptest.NewRequest(http.MethodGet, "http://"+host+"/api/v1/dags", nil))
+		assert.Equal(t, http.StatusBadRequest, resp.Code, host)
+	}
 }
 
 func TestHostPolicyAllowsConfiguredHosts(t *testing.T) {
@@ -121,8 +128,10 @@ func TestHostPolicyGuardsOnlySetupWithAuth(t *testing.T) {
 	resp := serveHost(handler, httptest.NewRequest(http.MethodGet, "http://rebind.example.com/api/v1/dags", nil))
 	assert.Equal(t, http.StatusNoContent, resp.Code)
 
-	resp = serveHost(handler, httptest.NewRequest(http.MethodPost, "http://rebind.example.com"+testSetupPath+"/", nil))
-	assert.Equal(t, http.StatusBadRequest, resp.Code)
+	for _, host := range []string{"rebind.example.com", "rebind.example.co.ck"} {
+		resp = serveHost(handler, httptest.NewRequest(http.MethodPost, "http://"+host+testSetupPath+"/", nil))
+		assert.Equal(t, http.StatusBadRequest, resp.Code, host)
+	}
 
 	resp = serveHost(handler, httptest.NewRequest(http.MethodPost, "http://localhost:8080"+testSetupPath, nil))
 	assert.Equal(t, http.StatusNoContent, resp.Code)
