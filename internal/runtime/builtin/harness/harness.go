@@ -378,7 +378,8 @@ func (e *harnessExecutor) runHostSubprocessOnce(ctx context.Context, cfg provide
 }
 
 func (e *harnessExecutor) invocationCommand(ctx context.Context, cfg providerConfig, args []string, stdin io.Reader, stdout *os.File, stderr io.Writer) (*exec.Cmd, error) {
-	binaryPath, err := resolveBinaryPath(cfg.binaryName(), e.workDir, runtime.AllEnvsMap(ctx))
+	envs := runtime.AllEnvsMap(ctx)
+	binaryPath, err := resolveBinaryPath(cfg.binaryName(), e.workDir, envs)
 	if err != nil {
 		if errors.Is(err, exec.ErrNotFound) {
 			return nil, fmt.Errorf("harness: %q CLI not found in PATH; install it first: %w", cfg.binaryName(), err)
@@ -394,6 +395,11 @@ func (e *harnessExecutor) invocationCommand(ctx context.Context, cfg providerCon
 		cmd.Args[0] = cfg.binaryName()
 	}
 	cmd.Env = append(cmd.Env, runtime.AllEnvs(ctx)...)
+	if err := adaptBatchCommand(cmd, func(name string) (string, error) {
+		return resolveBinaryPath(name, e.workDir, envs)
+	}); err != nil {
+		return nil, err
+	}
 	cmd.Dir = e.workDir
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
