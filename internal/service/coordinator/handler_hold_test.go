@@ -158,7 +158,7 @@ func TestDispatchHoldsWhenNoWorkerIsAvailable(t *testing.T) {
 // the task is gone, so a worker arriving later does not start a run its
 // owner already saw fail.
 func TestDispatchHoldDeadlineFailsAttempt(t *testing.T) {
-	f := newHoldFixture(t, 50*time.Millisecond)
+	f := newHoldFixture(t, time.Hour)
 	ctx := t.Context()
 
 	_, err := f.h.Dispatch(ctx, &coordinatorv1.DispatchRequest{Task: cpuTask("run-late")})
@@ -169,10 +169,10 @@ func TestDispatchHoldDeadlineFailsAttempt(t *testing.T) {
 	ExpireHeldDispatchesForTest(f.h, time.Now())
 	assert.Equal(t, ir.Queued, f.status(t, "run-late").Status)
 
-	ExpireHeldDispatchesForTest(f.h, time.Now().Add(time.Second))
+	ExpireHeldDispatchesForTest(f.h, time.Now().Add(2*time.Hour))
 	runStatus := f.status(t, "run-late")
 	assert.Equal(t, ir.Failed, runStatus.Status)
-	assert.Equal(t, "no worker matched the selector {type: cpu} within 50ms", runStatus.Error)
+	assert.Equal(t, "no worker matched the selector {type: cpu} within 1h0m0s", runStatus.Error)
 	assert.NotEmpty(t, runStatus.FinishedAt)
 
 	f.heartbeat(t, "worker-cpu", map[string]string{"type": "cpu"})
@@ -182,7 +182,7 @@ func TestDispatchHoldDeadlineFailsAttempt(t *testing.T) {
 // A held task that a worker claims before the deadline is not touched by the
 // reaper afterwards.
 func TestDispatchHoldClaimedInTimeIsLeftAlone(t *testing.T) {
-	f := newHoldFixture(t, 50*time.Millisecond)
+	f := newHoldFixture(t, time.Hour)
 	ctx := t.Context()
 
 	_, err := f.h.Dispatch(ctx, &coordinatorv1.DispatchRequest{Task: cpuTask("run-taken")})
@@ -194,7 +194,7 @@ func TestDispatchHoldClaimedInTimeIsLeftAlone(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, polled.Task)
 
-	ExpireHeldDispatchesForTest(f.h, time.Now().Add(time.Second))
+	ExpireHeldDispatchesForTest(f.h, time.Now().Add(2*time.Hour))
 	assert.Equal(t, ir.Queued, f.status(t, "run-taken").Status, "a claimed task is the worker's to report")
 }
 
