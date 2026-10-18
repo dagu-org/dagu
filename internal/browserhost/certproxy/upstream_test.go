@@ -31,9 +31,15 @@ func echoServer(t *testing.T) string {
 			}
 			go func() {
 				defer func() { _ = conn.Close() }()
-				if _, err := conn.Read(make([]byte, 1)); err == nil {
-					_, _ = conn.Write([]byte("hello"))
+				if _, err := conn.Read(make([]byte, 1)); err != nil {
+					return
 				}
+				_, _ = conn.Write([]byte("hello"))
+				// Closing with input still unread resets the connection, and a
+				// relay that sees the reset can drop the greeting. End only the
+				// write side and read until the peer closes.
+				_ = conn.(*net.TCPConn).CloseWrite()
+				_, _ = io.Copy(io.Discard, conn)
 			}()
 		}
 	}()
