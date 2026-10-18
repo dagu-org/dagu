@@ -149,7 +149,7 @@ The script installers run a guided wizard that can add Dagu to your PATH, set it
 
 ### Create and run a workflow
 
-Create `hello.yaml`:
+Create `hello.yaml` in an empty folder:
 
 ```yaml
 steps:
@@ -165,11 +165,15 @@ dagu start hello.yaml
 
 ### Start the server
 
+From that folder, run:
+
 ```sh
 dagu start-all --dags .
 ```
 
-Visit http://localhost:8080
+Open http://localhost:8080. On first launch, create the admin account unless the installer wizard already created one.
+
+If a script installer set Dagu up as a background service, it is already running on port 8080, so add workflows from the UI or put `hello.yaml` in the DAGs directory the installer printed.
 
 ## How You Run Dagu
 

@@ -490,6 +490,11 @@ Rules:
 
 - `${foreach.<as>.field}` resolves to a top-level object field.
 
+- A field name that starts with a letter or underscore and continues with
+  letters, marks, digits, or underscores, in any script, may be written
+  unquoted. Any other field name is written as `${foreach.<as>."name"}` or
+  `${foreach.<as>["name"]}`.
+
 - Nested item field paths such as `${foreach.item.a.b}` are outside this spec.
 
 - Item scope is available to `foreach.key`.

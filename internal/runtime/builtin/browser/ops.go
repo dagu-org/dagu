@@ -398,11 +398,11 @@ func (r *run) launchOptions(ctx context.Context, recordID string) (launchOptions
 	if err != nil {
 		return launchOptions{}, err
 	}
-	authorities, trustWarnings, err := loadTrustedCAs(ctx)
+	authorities, err := loadTrustedCAs(ctx)
 	if err != nil {
 		return launchOptions{}, err
 	}
-	for _, warning := range append(warnings, trustWarnings...) {
+	for _, warning := range warnings {
 		r.warn(-1, warning)
 	}
 	guard := guardsCertificates(ctx, certificates)

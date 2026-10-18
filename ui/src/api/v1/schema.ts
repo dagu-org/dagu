@@ -3393,7 +3393,7 @@ export interface paths {
         put?: never;
         /**
          * Connect this server to Dagu Console
-         * @description Starts a request for a license from Dagu Console, or returns the pending one. Open connectUrl to approve it; the license is installed once a workspace owner approves. Admin only.
+         * @description Starts a request for a license from Dagu Console, or returns the pending one. Open connectUrl to approve it; the license is installed once a workspace owner approves. A report level, when given, chooses what this server reports to Dagu Console, starting once the license is installed, unless cloud.report in the configuration sets it. Admin only.
          */
         post: operations["startLicenseConnect"];
         /**
@@ -4865,6 +4865,11 @@ export interface components {
          */
         NotificationProviderType: NotificationProviderType;
         /**
+         * @description Provider for a DAG-local notification target. Local commands are reusable channels, not inline targets.
+         * @enum {string}
+         */
+        NotificationTargetProviderType: NotificationTargetProviderType;
+        /**
          * @description DAG run event that can trigger server-side notifications. Rules configured for dag.run.succeeded also match dag.run.partially_succeeded; rules configured only for dag.run.partially_succeeded do not match clean successes.
          * @enum {string}
          */
@@ -5127,13 +5132,18 @@ export interface components {
             /** @description Optional Teams message template. When omitted, Dagu sends the default notification text. */
             messageTemplate?: string;
         };
+        /** @description Local shell command run by the Dagu server when this channel delivers a notification. */
+        NotificationCommandTarget: {
+            /** @description Shell command, run as written. Run values are exported as environment variables, including DAG_NAME, DAG_RUN_ID, STATUS, ERROR, and RUN_URL; Dagu does not substitute tokens such as {{dag.name}} into the command. EXECUTION_LOG is the path of a temporary file containing up to 1 MiB of the run log; Dagu removes that file after the command exits. Unix runs the command with sh -c and reads values as "$ERROR". Windows runs it with PowerShell and reads values as $env:ERROR. */
+            command: string;
+        };
         /** @description Notification target input */
         NotificationTargetInput: {
             /** @description Stable target ID. Omit when creating a new target. */
             id?: string;
             /** @description Human-readable target name */
             name?: string;
-            type: components["schemas"]["NotificationProviderType"];
+            type: components["schemas"]["NotificationTargetProviderType"];
             /** @description Whether this target receives notifications */
             enabled: boolean;
             /** @description Optional target-level event filter. When omitted or empty, the target inherits DAG-level events. */
@@ -5150,7 +5160,7 @@ export interface components {
             id: string;
             /** @description Human-readable target name */
             name?: string;
-            type: components["schemas"]["NotificationProviderType"];
+            type: components["schemas"]["NotificationTargetProviderType"];
             /** @description Whether this target receives notifications */
             enabled: boolean;
             /** @description Target-level event filter. Empty means the target inherits DAG-level events. */
@@ -5173,6 +5183,7 @@ export interface components {
             slack?: components["schemas"]["NotificationSlackTargetInput"];
             telegram?: components["schemas"]["NotificationTelegramTargetInput"];
             teams?: components["schemas"]["NotificationTeamsTargetInput"];
+            command?: components["schemas"]["NotificationCommandTarget"];
         };
         /** @description Notification channel. Secrets are never returned. */
         NotificationChannel: {
@@ -5188,6 +5199,7 @@ export interface components {
             slack?: components["schemas"]["NotificationSlackTarget"];
             telegram?: components["schemas"]["NotificationTelegramTarget"];
             teams?: components["schemas"]["NotificationTeamsTarget"];
+            command?: components["schemas"]["NotificationCommandTarget"];
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -7069,7 +7081,7 @@ export interface components {
              * @enum {string}
              */
             state: LicenseConnectStatusState;
-            /** @description Dagu Console page that approves the request */
+            /** @description Dagu Console page that approves the request. Its report query parameter names what this server reports once connected, and is absent when it reports nothing */
             connectUrl?: string;
             /** @description Short code Dagu Console shows so the approver can confirm the request */
             code?: string;
@@ -18556,7 +18568,13 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    report?: components["schemas"]["LicenseMonitoringLevel"];
+                };
+            };
+        };
         responses: {
             /** @description Current connection request */
             200: {
@@ -18565,6 +18583,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LicenseConnectStatus"];
+                };
+            };
+            /** @description Unknown report level */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Insufficient permissions */
@@ -22094,6 +22121,14 @@ export enum WebhookHMACConfigureRequestAuthMode {
     hmac_only = "hmac_only"
 }
 export enum NotificationProviderType {
+    email = "email",
+    webhook = "webhook",
+    slack = "slack",
+    telegram = "telegram",
+    teams = "teams",
+    command = "command"
+}
+export enum NotificationTargetProviderType {
     email = "email",
     webhook = "webhook",
     slack = "slack",

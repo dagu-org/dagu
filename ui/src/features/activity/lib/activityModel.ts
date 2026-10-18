@@ -256,6 +256,31 @@ const MIN_FIT_SECONDS = 60 * 60;
 /** Empty time kept before the first run when fitting the range. */
 const FIT_LEAD_SECONDS = 15 * 60;
 
+/**
+ * Adds in-progress runs that began before the window to the loaded runs. The
+ * window lists only runs created inside it, so a long run still going would
+ * otherwise have no lane. Those runs are older than every loaded run, so the
+ * result stays newest first.
+ */
+export function withEarlierActiveRuns(
+  runs: ActivityRun[],
+  active: ActivityRun[],
+  windowFrom: number
+): ActivityRun[] {
+  // A run ID is unique only within its workflow.
+  const key = (run: ActivityRun) => JSON.stringify([run.name, run.dagRunId]);
+  const loaded = new Set(runs.map(key));
+  const earlier = active
+    .filter(
+      (run) =>
+        run.startedAt !== undefined &&
+        run.startedAt < windowFrom &&
+        !loaded.has(key(run))
+    )
+    .sort(newestFirst);
+  return earlier.length === 0 ? runs : [...runs, ...earlier];
+}
+
 /** Start time of the oldest run, or undefined when none has one. */
 export function oldestStart(runs: ActivityRun[]): number | undefined {
   let oldest: number | undefined;
@@ -315,4 +340,30 @@ export function timeTicks(
 /** Position of a time inside a range, as a percentage. */
 export function percentOf(range: TimeRange, seconds: number): number {
   return ((seconds - range.from) / (range.to - range.from)) * 100;
+}
+
+/**
+ * Returns the time a run's bar ends at, in Unix seconds: when it finished, or
+ * the current time while it is still running. Other runs end where they start.
+ */
+export function runEnd(run: ActivityRun, nowSeconds: number): number {
+  const start = run.startedAt ?? 0;
+  // A waiting run keeps the time it paused at as its finish time.
+  if (run.status === Status.Running || run.status === Status.Waiting) {
+    return Math.max(start, nowSeconds);
+  }
+  if (run.finishedAt !== undefined) return Math.max(start, run.finishedAt);
+  return start;
+}
+
+/** Visible part of a run's bar inside the range, as percentages from 0 to 100. */
+export function barSpan(
+  run: ActivityRun,
+  range: TimeRange,
+  nowSeconds: number
+): { left: number; right: number } {
+  return {
+    left: Math.max(0, percentOf(range, run.startedAt ?? range.from)),
+    right: Math.min(100, percentOf(range, runEnd(run, nowSeconds))),
+  };
 }

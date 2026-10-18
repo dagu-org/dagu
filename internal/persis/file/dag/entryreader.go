@@ -69,8 +69,9 @@ func withResyncInterval(interval time.Duration) EntryReaderOption {
 }
 
 // WithChangeMarker makes the reader refresh the registry when the change
-// marker of another host changes, checked every interval. These refreshes run
-// at most once a minute, so a burst of remote edits costs one full re-read.
+// marker of another host changes, checked every interval. Such a refresh
+// starts no sooner than 15 seconds after the previous refresh ends, so a burst
+// of remote edits costs a few full re-reads rather than one per check.
 // path is this host's marker, as returned by ChangeMarkerPath; the reader
 // ignores it because its file watches already report this host's changes. An
 // empty path disables the marker and a non-positive interval selects the
@@ -115,11 +116,11 @@ func withWatcherFactory(factory func() filenotify.FileWatcher) EntryReaderOption
 const (
 	// defaultChangeMarkerInterval is how often the change marker is checked.
 	defaultChangeMarkerInterval = 5 * time.Second
-	// defaultMarkerRefreshGap is the minimum time between refreshes triggered
-	// by change markers. Each one re-reads every DAG, and the shared index is
-	// rebuilt after every store write, so sustained remote edits would
-	// otherwise keep a large registry refreshing.
-	defaultMarkerRefreshGap = time.Minute
+	// defaultMarkerRefreshGap is the minimum time from the end of a refresh to
+	// a refresh triggered by a change marker. Each refresh re-reads every DAG,
+	// and the shared index is rebuilt after every store write, so sustained
+	// remote edits would otherwise keep a large registry refreshing.
+	defaultMarkerRefreshGap = 15 * time.Second
 	// defaultResyncInterval is the full re-read period. The change marker covers
 	// edits made through Dagu on another host; this covers edits made by other
 	// tools (git, kubectl cp, editors), which native file watches also miss on a
@@ -261,10 +262,18 @@ func (er *entryReaderImpl) watch(ctx context.Context) {
 		defer markerTicker.Stop()
 		markerPoll = markerTicker.C
 	}
-	// A marker change that arrives within markerRefreshGap of the previous
-	// marker refresh is deferred, not dropped.
-	var lastMarkerRefresh time.Time
+	// A marker change that arrives within markerRefreshGap of the end of the
+	// previous refresh is deferred, not dropped. The gap runs from the end so
+	// that a slow re-read of a large registry cannot use it up.
+	var lastRefreshEnd time.Time
 	var deferredMarkerRefresh <-chan time.Time
+	refreshAfterGap := func() {
+		if wait := er.markerRefreshGap - time.Since(lastRefreshEnd); wait > 0 {
+			deferredMarkerRefresh = time.After(wait)
+			return
+		}
+		scheduleRefresh()
+	}
 
 	for {
 		select {
@@ -278,16 +287,11 @@ func (er *entryReaderImpl) watch(ctx context.Context) {
 			if !er.markerSignalsChange(ctx) || deferredMarkerRefresh != nil {
 				continue
 			}
-			if wait := er.markerRefreshGap - time.Since(lastMarkerRefresh); wait > 0 {
-				deferredMarkerRefresh = time.After(wait)
-				continue
-			}
-			lastMarkerRefresh = time.Now()
-			scheduleRefresh()
+			refreshAfterGap()
 		case <-deferredMarkerRefresh:
+			// A refresh may have ended since the timer was set.
 			deferredMarkerRefresh = nil
-			lastMarkerRefresh = time.Now()
-			scheduleRefresh()
+			refreshAfterGap()
 		case event, ok := <-er.watcher.Events():
 			if !ok {
 				return
@@ -326,6 +330,7 @@ func (er *entryReaderImpl) watch(ctx context.Context) {
 			if err := er.refreshRegistry(ctx); err != nil {
 				logger.Error(ctx, "Failed to refresh DAG registry", tag.Error(err))
 			}
+			lastRefreshEnd = time.Now()
 		case err, ok := <-er.watcher.Errors():
 			if !ok {
 				return

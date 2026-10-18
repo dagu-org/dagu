@@ -150,6 +150,13 @@ Rules:
   environment only if Dagu already imported that value into the run environment
   scope through an explicit source such as inherited base environment, root
   `env`, dotenv, runtime profile, or secret exposure.
+- Dagu configuration variables that carry a credential, such as
+  `DAGU_AUTH_BASIC_PASSWORD`, `DAGU_SECRETS_VAULT_TOKEN`, or
+  `DAGU_ENCRYPTION_KEY`, are never inherited into a run environment scope and
+  are never read through host process environment fallback. They reach neither
+  a step's process environment nor an expanded value. Dagu's own child
+  processes still receive them, and other `DAGU_` variables are inherited as
+  before.
 
 - Environment names are matched exactly during Dagu value resolution.
 - When Dagu builds a process environment on a platform where environment names are case-insensitive, duplicate names that differ only by case collapse according to the platform rule, and the higher-precedence Dagu source wins.

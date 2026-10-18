@@ -8,6 +8,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"unicode"
 )
 
 // referenceKind classifies a placeholder found in a value string.
@@ -271,6 +272,24 @@ func validOutputPathSegment(segment string) bool {
 			continue
 		}
 		return false
+	}
+	return true
+}
+
+// validItemFieldSegment reports whether segment names a foreach item field
+// without quoting: a letter or underscore followed by letters, marks, digits,
+// or underscores, in any script.
+func validItemFieldSegment(segment string) bool {
+	if segment == "" {
+		return false
+	}
+	for i, r := range segment {
+		switch {
+		case unicode.IsLetter(r) || r == '_':
+		case i > 0 && (unicode.IsMark(r) || unicode.IsDigit(r)):
+		default:
+			return false
+		}
 	}
 	return true
 }

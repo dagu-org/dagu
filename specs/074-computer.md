@@ -75,6 +75,15 @@ action, naming the missing condition. A screen that locks, another user's
 session taking the display, or a Remote Desktop session whose client
 disconnects while a step runs fails the operation that next reads the screen.
 
+A step that starts while only a person can make the desktop usable, because
+the screen is locked, nobody is logged in, or another user's session has
+the display, waits before it takes the desktop instead of failing, as when
+a run caught up after a laptop wakes starts on the lock screen. It checks
+every two seconds, logs that it is waiting in an event named `screen`, and
+marks the end of the wait with a `running` lifecycle event. The step's
+timeout bounds the wait; a step without one fails after 24 hours, naming
+the condition. Any other missing condition fails the step at once.
+
 `dagu computer check` reports the same conditions for the current session,
 prints the display size, and exits nonzero when the desktop cannot be
 automated. On macOS it also asks the system to show the Screen Recording and

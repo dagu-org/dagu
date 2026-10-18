@@ -1270,3 +1270,29 @@ func TestMultiplexTopicMaxIntervalRefetchesWithoutWakes(t *testing.T) {
 	require.Eventually(t, func() bool { return fetches.Load() == 4 }, 2*maxInterval, 5*time.Millisecond,
 		"the maximum interval refetches without a wake")
 }
+
+// Topic fetches run on a background goroutine, where an unrecovered panic
+// would end the server process. A panicking fetch counts as a failed fetch,
+// and the topic keeps refreshing.
+func TestMultiplexTopicSurvivesFetchPanic(t *testing.T) {
+	mux := NewMultiplexer(StreamConfig{}, nil)
+	t.Cleanup(mux.Shutdown)
+
+	var fetches atomic.Int32
+	mux.RegisterFetcher(TopicTypeDAG, func(_ context.Context, identifier string) (any, error) {
+		if fetches.Add(1) == 1 {
+			panic("fetch failed")
+		}
+		return map[string]string{"id": identifier}, nil
+	})
+
+	result, err := mux.createSession(context.Background(), httptest.NewRecorder(), []string{"dag:test.yaml"}, 0)
+	require.NoError(t, err)
+	defer mux.removeSession(result.session)
+
+	// The failed fetch backs off for about a second before the retry.
+	require.Eventually(t, func() bool {
+		return result.session.popNext() != nil
+	}, 5*time.Second, 10*time.Millisecond)
+	assert.Equal(t, int32(2), fetches.Load())
+}

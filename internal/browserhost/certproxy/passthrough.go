@@ -132,7 +132,7 @@ func (s *server) probe(host, port string) passVerdict {
 	defer cancel()
 	failed := passVerdict{expires: time.Now().Add(probeRetryAfter)}
 	// The browser's own connection reports what reaching the site found.
-	found := s.pac.routes(ctx, pacRequestURL(host, port), host)
+	found := s.pac.routes(ctx, pacRequestURL(tlsScheme, host, port, "/"), host)
 	raw, _, err := dialRoutes(ctx, found.routes, net.JoinHostPort(host, port), s.proxyTLS)
 	if err != nil {
 		return failed
@@ -226,7 +226,7 @@ func (s *server) passOrTunnel(client, raw net.Conn, via route, host, port string
 		s.reportHandshakeFailure(host, s.guardEntry, false, expired)
 		return
 	}
-	raw, via, err = s.reach(ctx, host, port, s.guardEntry)
+	raw, via, err = s.reach(ctx, pacRequestURL(tlsScheme, host, port, "/"), host, port, s.guardEntry)
 	if err != nil {
 		_ = client.Close()
 		s.reportUnreachable(host, s.guardEntry, err)

@@ -147,6 +147,8 @@ func TestForeachRuntime(t *testing.T) {
 			`"markdown":"https://example.com/two"`,
 			`"link":"https://example.com/one"`,
 			`"link":"https://example.com/two"`,
+			`"bare_link":"https://example.com/one"`,
+			`"bare_link":"https://example.com/two"`,
 			`"limit":"1000000"`,
 		)
 	})

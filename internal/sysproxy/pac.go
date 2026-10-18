@@ -121,6 +121,8 @@ type staticConfig struct {
 
 // pac returns a script that sends bypassed and loopback hosts DIRECT, then
 // uses the scheme-specific proxies, then the fallback proxies, then DIRECT.
+// ws: and wss: URLs use the fallback proxies, else the https: ones, else the
+// http: ones, as Chrome does with fixed proxy rules, following RFC 6455.
 func (c staticConfig) pac() string {
 	if len(c.http) == 0 && len(c.https) == 0 && len(c.fallback) == 0 {
 		return directPAC
@@ -135,6 +137,13 @@ func (c staticConfig) pac() string {
 	}
 	if len(c.http) > 0 {
 		fmt.Fprintf(&b, "  if (shExpMatch(url, \"http:*\")) return %s;\n", jsString(route(c.http)))
+	}
+	if len(c.fallback) == 0 {
+		websocket := c.https
+		if len(websocket) == 0 {
+			websocket = c.http
+		}
+		fmt.Fprintf(&b, "  if (shExpMatch(url, \"ws:*\") || shExpMatch(url, \"wss:*\")) return %s;\n", jsString(route(websocket)))
 	}
 	fmt.Fprintf(&b, "  return %s;\n}\n", jsString(route(c.fallback)))
 	return b.String()

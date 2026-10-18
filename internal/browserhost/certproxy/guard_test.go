@@ -154,13 +154,13 @@ func TestServeGuardStopsForProxyCredentials(t *testing.T) {
 	ready := serveProxy(t, cfg)
 	guardAddr := fmt.Sprintf("127.0.0.1:%d", ready.GuardPort)
 
-	conn, _, err := connectThrough(guardAddr, siteAddr(site))
+	conn, _, err := connectThrough(guardAddr, siteHost+":443")
 	if err == nil {
 		_ = conn.Close()
 	}
 	require.Error(t, err, "the guard answers nothing; it resets the connection")
 	event := waitForEvent(t, ready, cfg.Token, EventGuardOff)
-	assert.Contains(t, event.Message, "asks 127.0.0.1 for credentials")
+	assert.Contains(t, event.Message, "asks "+siteHost+" for credentials")
 	require.Eventually(t, func() bool {
 		conn, err := net.DialTimeout("tcp", guardAddr, time.Second)
 		if err == nil {

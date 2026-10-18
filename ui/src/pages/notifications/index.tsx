@@ -54,12 +54,16 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from '@/components/ui/dropdown-menu';
+import { MonitoringOffer } from '@/components/MonitoringOffer';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useClient, useQuery } from '@/hooks/api';
 import { whenEnabled } from '@/hooks/queryUtils';
 import { cn } from '@/lib/utils';
 import { WorkspaceKind, workspaceNameForSelection } from '@/lib/workspace';
-import { NotificationChannelsSection } from '@/features/dags/components/dag-details/notifications/NotificationSections';
+import {
+  NotificationChannelsSection,
+  useCommandChannelLockReason,
+} from '@/features/dags/components/dag-details/notifications/NotificationSections';
 import {
   channelInput,
   DraftChannel,
@@ -71,6 +75,7 @@ import {
 import {
   components,
   NotificationEventType,
+  NotificationProviderType,
   NotificationSMTPOAuthProvider,
 } from '@/api/v1/schema';
 import { Link } from 'react-router-dom';
@@ -379,7 +384,7 @@ export default function NotificationsPage(): ReactElement {
           to: '/notification-channels',
           label: 'Channels',
           description:
-            'Manage Slack, email, webhook, and Telegram destinations.',
+            'Manage Slack, email, webhook, Telegram, and local command destinations.',
         },
       ],
     },
@@ -658,6 +663,11 @@ function RouteRuleCard({
   const channel = channels.find((item) => item.id === route.channelId);
   const Icon = providerIcon(channel?.type);
   const label = channelLabel(channel, route.channelId);
+  const commandLockReason = useCommandChannelLockReason();
+  const lockReason =
+    channel?.type === NotificationProviderType.command
+      ? commandLockReason
+      : undefined;
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{
     delivered: boolean;
@@ -881,11 +891,17 @@ function RouteRuleCard({
           />
         </p>
       )}
+      {lockReason && (
+        <p className="mt-4 flex items-center gap-2 text-sm text-warning">
+          <AlertTriangle className="size-4 shrink-0" />
+          <I18nText text={lockReason} />
+        </p>
+      )}
       <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-border pt-4">
         <Button
           variant="outline"
           onClick={testChannel}
-          disabled={disabled || testing || !channel}
+          disabled={disabled || testing || !channel || lockReason !== undefined}
         >
           {testing ? (
             <Loader2 className="size-4 animate-spin" />
@@ -1417,6 +1433,7 @@ function NotificationRulesContent() {
                     }
                   />
                 </p>
+                <MonitoringOffer className="mx-auto mt-6 max-w-xl" />
               </div>
             )}
             <p className="flex items-start gap-2 text-sm text-muted-foreground">

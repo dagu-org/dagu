@@ -655,6 +655,15 @@ type testRun struct {
 	sessionErrors map[string]error
 	// personWait, when set, bounds how long a step waits for a person.
 	personWait time.Duration
+	// checkDesktop reports whether the desktop can be automated, to the step
+	// and to opening the desktop as desktop.Open does; nil is usable.
+	checkDesktop func() desktop.Diagnostics
+	// screenPoll and screenWait, when set, space and bound the step's wait
+	// for the screen to be unlocked.
+	screenPoll, screenWait time.Duration
+	// parent, when set, is the context the step runs under, so a test can
+	// cancel it.
+	parent context.Context
 	// protect names processes whose windows the step must not operate.
 	protect  []uint32
 	launches [][]string
@@ -698,7 +707,22 @@ func (r *testRun) execute(withJSON string, session *ir.AgentSession) *stepExecut
 	created, err := newExecutor(r.t.Context(), step)
 	require.NoError(r.t, err)
 	execution := &stepExecution{exec: created.(*computerExecutor)}
+	check := r.checkDesktop
+	if check == nil {
+		check = func() desktop.Diagnostics { return desktop.Diagnostics{} }
+	}
+	execution.exec.checkDesktop = check
+	execution.exec.screenPoll = time.Millisecond
+	if r.screenPoll > 0 {
+		execution.exec.screenPoll = r.screenPoll
+	}
+	if r.screenWait > 0 {
+		execution.exec.screenWait = r.screenWait
+	}
 	execution.exec.openDesktop = func() (*desktop.Driver, error) {
+		if err := check().Err(); err != nil {
+			return nil, err
+		}
 		driver := desktop.New(r.backend)
 		driver.Protect(r.protect...)
 		return driver, nil
@@ -769,7 +793,11 @@ func (r *testRun) context() context.Context {
 	for name, secret := range r.secrets {
 		scope = scope.WithEntry(name, secret, value.EnvSourceSecret)
 	}
-	ctx := cmnconfig.WithConfig(r.t.Context(), &cmnconfig.Config{Paths: cmnconfig.PathsConfig{DataDir: r.dataDir}})
+	parent := r.parent
+	if parent == nil {
+		parent = r.t.Context()
+	}
+	ctx := cmnconfig.WithConfig(parent, &cmnconfig.Config{Paths: cmnconfig.PathsConfig{DataDir: r.dataDir}})
 	return runtime.WithEnv(ctx, runtime.Env{
 		DAG:        &ir.DAG{Name: "invoices"},
 		DAGRunID:   "run-1",

@@ -52,6 +52,8 @@ import {
 } from '../../../../../api/v1/schema';
 import {
   blankChannel,
+  CHANNEL_PROVIDER_OPTIONS,
+  DEFAULT_COMMAND_PLACEHOLDER,
   DEFAULT_MESSAGE_TEMPLATE,
   DEFAULT_SUBJECT_TEMPLATE,
   DeliveryDraft,
@@ -74,6 +76,11 @@ import { I18nText } from '@/i18n/I18nText';
 import { I18nProps } from '@/i18n/I18nProps';
 import { useI18n } from '@/i18n/I18nProvider';
 import { I18nTemplate } from '@/i18n/I18nTemplate';
+import { useRemoteNode } from '@/contexts/RemoteNodeContext';
+import {
+  useCanManageCommandChannels,
+  useCommandChannelsEnabled,
+} from '@/contexts/AuthContext';
 
 type ProviderFieldsProps = {
   draft: DeliveryDraft;
@@ -463,6 +470,49 @@ function ProviderFields({ draft, onChange }: ProviderFieldsProps) {
             />
           </I18nProps>
         </label>
+      </div>
+    );
+  }
+
+  if (draft.type === NotificationProviderType.command) {
+    return (
+      <div className="space-y-2">
+        <Label htmlFor={`${fieldId}-command`}>
+          <I18nText text={'Command'} />
+        </Label>
+        <Textarea
+          id={`${fieldId}-command`}
+          className="min-h-24 py-1 font-mono text-xs"
+          required
+          spellCheck={false}
+          value={draft.command.command}
+          placeholder={DEFAULT_COMMAND_PLACEHOLDER}
+          onChange={(event) =>
+            update({
+              command: { command: event.target.value },
+            })
+          }
+        />
+        <p className="text-xs text-muted-foreground">
+          <I18nText
+            text={
+              'The Dagu server runs this command. Unix uses sh -c and Windows uses PowerShell. The server stops it after 30 seconds, and a non-zero exit fails delivery.'
+            }
+          />
+        </p>
+        <p className="text-xs text-muted-foreground">
+          <I18nTemplate
+            text="The command runs as written. Run values are environment variables, such as {dagEnv}, {statusEnv}, {errorEnv}, DAG_RUN_ID, and RUN_URL. Quote them, as in {quotedError}. {logEnv} is a temporary file with up to 1 MiB of the run log, including lifecycle-handler output, and is removed after the command exits. On Windows, PowerShell reads these as {windowsEnv} and so on."
+            values={{
+              dagEnv: <code>$DAG_NAME</code>,
+              statusEnv: <code>$STATUS</code>,
+              errorEnv: <code>$ERROR</code>,
+              quotedError: <code>"$ERROR"</code>,
+              logEnv: <code>$EXECUTION_LOG</code>,
+              windowsEnv: <code>$env:ERROR</code>,
+            }}
+          />
+        </p>
       </div>
     );
   }
@@ -965,6 +1015,24 @@ export function InheritedNotificationRoutesCard({
   );
 }
 
+/**
+ * Explains why the current user cannot add, toggle, test, or edit local command
+ * channels on the selected node, or returns undefined when they can.
+ */
+export function useCommandChannelLockReason(): string | undefined {
+  const remoteNode = useRemoteNode();
+  const enabled = useCommandChannelsEnabled();
+  const canManage = useCanManageCommandChannels();
+  // A remote node checks its own role and permissions, which this server's
+  // configuration does not describe, so its API decides instead.
+  if (canManage || remoteNode !== 'local') {
+    return undefined;
+  }
+  return enabled
+    ? 'Only admins can change or test local command channels.'
+    : 'This server does not run local commands. Enable permissions.write_dags and permissions.run_dags to deliver to this channel.';
+}
+
 type NotificationChannelsSectionProps = {
   channels: DraftChannel[];
   onSave: (channel: DraftChannel) => Promise<void>;
@@ -987,17 +1055,22 @@ function channelDestination(channel: DraftChannel): string {
       } catch {
         return 'Webhook destination';
       }
+    case NotificationProviderType.command:
+      return channel.command.command.split('\n', 1)[0] ?? '';
   }
 }
 
 function ChannelListRow({
   channel,
+  lockedReason,
   onEdit,
   onDelete,
   onSave,
   onTest,
 }: {
   channel: DraftChannel;
+  // lockedReason explains why the channel cannot be toggled, tested, or edited.
+  lockedReason?: string;
   onEdit: () => void;
   onDelete: () => void;
   onSave: NotificationChannelsSectionProps['onSave'];
@@ -1077,6 +1150,11 @@ function ChannelListRow({
               {error}
             </p>
           )}
+          {lockedReason && (
+            <p className="break-words text-sm text-warning">
+              <I18nText text={lockedReason} />
+            </p>
+          )}
         </div>
       </div>
       <div className="flex shrink-0 flex-wrap items-center gap-3 sm:gap-4">
@@ -1084,7 +1162,7 @@ function ChannelListRow({
           <I18nText text={channel.enabled ? 'Enabled' : 'Disabled'} />
           <Switch
             checked={channel.enabled}
-            disabled={pending !== null}
+            disabled={pending !== null || lockedReason !== undefined}
             onCheckedChange={toggle}
             aria-label={ts('Toggle {title}', { title: label })}
           />
@@ -1093,7 +1171,7 @@ function ChannelListRow({
         <Button
           variant="outline"
           className="px-5"
-          disabled={pending !== null}
+          disabled={pending !== null || lockedReason !== undefined}
           onClick={test}
         >
           {pending === 'test' && <Loader2 className="size-4 animate-spin" />}
@@ -1102,7 +1180,7 @@ function ChannelListRow({
         <Button
           variant="outline"
           className="px-5"
-          disabled={pending !== null}
+          disabled={pending !== null || lockedReason !== undefined}
           onClick={onEdit}
         >
           <I18nText text={'Edit'} />
@@ -1148,6 +1226,16 @@ export function NotificationChannelsSection({
   const [deleting, setDeleting] = useState<DraftChannel | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const commandLockReason = useCommandChannelLockReason();
+  const providerOptions = CHANNEL_PROVIDER_OPTIONS.filter(
+    (provider) =>
+      provider.value !== NotificationProviderType.command ||
+      commandLockReason === undefined
+  );
+  const editorIncomplete =
+    !editor?.name.trim() ||
+    (editor.type === NotificationProviderType.command &&
+      !editor.command.command.trim());
   const query = search.trim().toLocaleLowerCase();
   const filteredChannels = channels.filter((channel) =>
     [
@@ -1253,6 +1341,11 @@ export function NotificationChannelsSection({
             <ChannelListRow
               key={channel.id}
               channel={channel}
+              lockedReason={
+                channel.type === NotificationProviderType.command
+                  ? commandLockReason
+                  : undefined
+              }
               onSave={onSave}
               onTest={onTest}
               onEdit={() => edit(channel)}
@@ -1360,7 +1453,7 @@ export function NotificationChannelsSection({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {PROVIDER_OPTIONS.map((provider) => (
+                        {providerOptions.map((provider) => (
                           <SelectItem
                             key={provider.value}
                             value={provider.value}
@@ -1399,7 +1492,7 @@ export function NotificationChannelsSection({
                 <Button
                   type="submit"
                   variant="primary"
-                  disabled={saving || !editor.name.trim()}
+                  disabled={saving || editorIncomplete}
                 >
                   {saving && <Loader2 className="size-4 animate-spin" />}
                   <I18nText
@@ -1465,6 +1558,7 @@ export function DAGSubscriptionsSection({
   const [expandedEventRows, setExpandedEventRows] = useState<Set<string>>(
     () => new Set()
   );
+  const commandLockReason = useCommandChannelLockReason();
   const channelsById = useMemo(() => {
     const map = new Map<string, DraftChannel>();
     channels.forEach((channel) => {
@@ -1533,6 +1627,10 @@ export function DAGSubscriptionsSection({
           {draft.subscriptions.map((subscription, index) => {
             const channel = channelsById.get(subscription.channelId);
             const Icon = providerIcon(channel?.type);
+            const lockReason =
+              channel?.type === NotificationProviderType.command
+                ? commandLockReason
+                : undefined;
             const usedChannelIds = new Set(
               draft.subscriptions
                 .filter((_, subIndex) => subIndex !== index)
@@ -1597,7 +1695,11 @@ export function DAGSubscriptionsSection({
                           subscription.id &&
                           onTest(subscription.id, subscription.events)
                         }
-                        disabled={!subscription.id || testingTargetId !== null}
+                        disabled={
+                          !subscription.id ||
+                          testingTargetId !== null ||
+                          lockReason !== undefined
+                        }
                       >
                         {testingTargetId === subscription.id ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
@@ -1617,6 +1719,11 @@ export function DAGSubscriptionsSection({
                     </div>
                   </div>
 
+                  {lockReason && (
+                    <p className="text-sm text-warning">
+                      <I18nText text={lockReason} />
+                    </p>
+                  )}
                   <div className="grid gap-3 md:grid-cols-[minmax(220px,320px)_minmax(0,1fr)]">
                     <Select
                       value={subscription.channelId}

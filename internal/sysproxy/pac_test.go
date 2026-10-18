@@ -122,6 +122,23 @@ func TestStaticConfigPAC(t *testing.T) {
 		})
 	})
 
+	// Chrome sends WebSockets under fixed rules through the fallback
+	// proxies, else the https: ones, else the http: ones.
+	t.Run("WebSocketPrefersHTTPSProxy", func(t *testing.T) {
+		t.Parallel()
+		script := staticConfig{http: []proxyServer{httpServer}, https: []proxyServer{secureServer}}.pac()
+		assertRoutes(t, script, []routeCase{
+			{"ws://www.example.com/socket", "PROXY secure.example:3129"},
+			{"wss://www.example.com/", "PROXY secure.example:3129"},
+			{"ws://localhost/socket", "DIRECT"},
+		})
+		script = staticConfig{http: []proxyServer{httpServer}}.pac()
+		assertRoutes(t, script, []routeCase{
+			{"ws://www.example.com/socket", "PROXY web.example:3128"},
+			{"https://www.example.com/", "DIRECT"},
+		})
+	})
+
 	t.Run("NoProxies", func(t *testing.T) {
 		t.Parallel()
 		assert.Equal(t, directPAC, staticConfig{bypass: []string{plainHostCondition}}.pac())
