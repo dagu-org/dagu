@@ -200,6 +200,9 @@ func (e *http) writeJSONResult(rsp *resty.Response, body []byte) error {
 				return err
 			}
 			httpJSONResultData.Body = string(body)
+		} else if httpJSONResultData.Body == nil {
+			// Keep a JSON null body as "body": null; omitempty drops a nil any.
+			httpJSONResultData.Body = json.RawMessage("null")
 		}
 	}
 
