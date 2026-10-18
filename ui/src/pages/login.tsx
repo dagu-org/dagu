@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AuthLayout } from '@/components/AuthLayout';
 import { setAuthSession } from '@/lib/authSession';
+import { requestedPath } from '@/lib/requestedPath';
 import {
   AlertCircle,
   LogIn,
@@ -35,7 +36,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [welcomeMessage, setWelcomeMessage] = useState<string | null>(null);
 
-  const from = (location.state as { from?: Location })?.from?.pathname || '/';
+  const from = requestedPath(location.state);
 
   // Handle external authentication callbacks: token from the hash fragment,
   // error/welcome from query parameters.

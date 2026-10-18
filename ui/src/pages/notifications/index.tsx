@@ -54,6 +54,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from '@/components/ui/dropdown-menu';
+import { MonitoringOffer } from '@/components/MonitoringOffer';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useClient, useQuery } from '@/hooks/api';
 import { whenEnabled } from '@/hooks/queryUtils';
@@ -1417,6 +1418,7 @@ function NotificationRulesContent() {
                     }
                   />
                 </p>
+                <MonitoringOffer className="mx-auto mt-6 max-w-xl" />
               </div>
             )}
             <p className="flex items-start gap-2 text-sm text-muted-foreground">

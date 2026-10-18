@@ -231,16 +231,16 @@ func TestServeFollowsSystemRoute(t *testing.T) {
 		assert.Contains(t, event.Message, "not supported for certificate hosts")
 	})
 
-	t.Run("SOCKS4IsSkipped", func(t *testing.T) {
+	t.Run("UnsupportedRouteIsSkipped", func(t *testing.T) {
 		t.Parallel()
 		upstream := newTunnelProxy(t, siteAddr(site), http.StatusOK)
-		cfg := testConfig(t, `function FindProxyForURL(url, host) { return "SOCKS 127.0.0.1:1; PROXY `+upstream.addr+`"; }`, entry)
+		cfg := testConfig(t, `function FindProxyForURL(url, host) { return "QUIC 127.0.0.1:1; PROXY `+upstream.addr+`"; }`, entry)
 		ready := serveProxy(t, cfg)
 		body, err := get(t, browserClient(ready, "http/1.1"), siteURL)
 		require.NoError(t, err)
 		assert.Equal(t, "HTTP/1.1 "+testLabel, body)
 		event := waitForEvent(t, ready, cfg.Token, EventUpstream)
-		assert.Contains(t, event.Message, "SOCKS 127.0.0.1:1")
+		assert.Contains(t, event.Message, "QUIC 127.0.0.1:1")
 	})
 }
 

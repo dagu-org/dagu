@@ -74,6 +74,17 @@ func Read(ctx context.Context, path string, opts ReadOptions) (*ReadResult, erro
 	return w.read(ctx, opts)
 }
 
+// ReadBytes reads a workbook supplied as bytes. Path is used only as the
+// result and error label, so callers can report stdin as "-".
+func ReadBytes(ctx context.Context, path string, data []byte, opts ReadOptions) (*ReadResult, error) {
+	w, err := openBytes(path, data, opts.Password)
+	if err != nil {
+		return nil, err
+	}
+	defer w.close()
+	return w.read(ctx, opts)
+}
+
 func (w *file) read(ctx context.Context, opts ReadOptions) (*ReadResult, error) {
 	result := &ReadResult{Rows: []Row{}, Headers: []string{}, Warnings: []string{}}
 	warn := func(msg string) { result.Warnings = append(result.Warnings, msg) }

@@ -16,7 +16,8 @@ import {
 import { useI18n } from '@/i18n/I18nProvider';
 import { cn } from '@/lib/utils';
 
-type ReportingLevel =
+/** A level at which this server reports to Dagu Console. */
+export type ReportingLevel =
   | LicenseMonitoringLevel.health
   | LicenseMonitoringLevel.runs;
 
@@ -35,6 +36,69 @@ const choices: { level: ReportingLevel; title: string; sends: string }[] = [
       'Sends the health fields, plus the status of each top-level DAG run that finishes, with its failed step names (up to 50) and how it was triggered, and the list of runs queued, running, or waiting. Each run is sent as its DAG name, run ID, attempt ID, status, trigger, and queued, started, and finished times. No parameters, logs, or outputs.',
   },
 ];
+
+/** What no report sends, at any level. */
+export const neverSent =
+  'Never sent: logs, outputs, parameters, environment, step commands, DAG YAML, the values of workflow secrets, and error message text.';
+
+/** Lets an administrator pick a level, listing what each one sends. */
+export function ReportingChoices({
+  selected,
+  onSelect,
+  disabled = false,
+  className,
+}: {
+  selected: ReportingLevel;
+  onSelect: (level: ReportingLevel) => void;
+  disabled?: boolean;
+  className?: string;
+}) {
+  const { ts } = useI18n();
+  const name = useId();
+  return (
+    <fieldset className={cn('space-y-2', className)} disabled={disabled}>
+      <legend className="sr-only">{ts('What to report')}</legend>
+      {choices.map((choice) => {
+        const id = `${name}-${choice.level}`;
+        return (
+          <label
+            key={choice.level}
+            htmlFor={id}
+            className={cn(
+              'flex cursor-pointer items-start gap-3 rounded-md border p-3',
+              selected === choice.level
+                ? 'border-primary bg-primary/5'
+                : 'border-border'
+            )}
+          >
+            <input
+              id={id}
+              type="radio"
+              name={name}
+              value={choice.level}
+              checked={selected === choice.level}
+              onChange={() => onSelect(choice.level)}
+              aria-labelledby={`${id}-title`}
+              aria-describedby={`${id}-sends`}
+              className="mt-1"
+            />
+            <span className="space-y-1">
+              <span id={`${id}-title`} className="block text-sm font-medium">
+                {ts(choice.title)}
+              </span>
+              <span
+                id={`${id}-sends`}
+                className="block text-sm text-muted-foreground"
+              >
+                {ts(choice.sends)}
+              </span>
+            </span>
+          </label>
+        );
+      })}
+    </fieldset>
+  );
+}
 
 /**
  * Asks an administrator what this server reports to Dagu Console. It lists
@@ -56,7 +120,6 @@ export function MonitoringDialog({
   onCancel: () => void;
 }) {
   const { ts } = useI18n();
-  const name = useId();
   const [selected, setSelected] = useState<ReportingLevel>(
     LicenseMonitoringLevel.runs
   );
@@ -114,60 +177,17 @@ export function MonitoringDialog({
             )}
           </DialogDescription>
         </DialogHeader>
-        <fieldset className="space-y-2" disabled={saving}>
-          <legend className="sr-only">{ts('What to report')}</legend>
-          {choices.map((choice) => {
-            const id = `${name}-${choice.level}`;
-            return (
-              <label
-                key={choice.level}
-                htmlFor={id}
-                className={cn(
-                  'flex cursor-pointer items-start gap-3 rounded-md border p-3',
-                  selected === choice.level
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border'
-                )}
-              >
-                <input
-                  id={id}
-                  type="radio"
-                  name={name}
-                  value={choice.level}
-                  checked={selected === choice.level}
-                  onChange={() => setSelected(choice.level)}
-                  aria-labelledby={`${id}-title`}
-                  aria-describedby={`${id}-sends`}
-                  className="mt-1"
-                />
-                <span className="space-y-1">
-                  <span
-                    id={`${id}-title`}
-                    className="block text-sm font-medium"
-                  >
-                    {ts(choice.title)}
-                  </span>
-                  <span
-                    id={`${id}-sends`}
-                    className="block text-sm text-muted-foreground"
-                  >
-                    {ts(choice.sends)}
-                  </span>
-                </span>
-              </label>
-            );
-          })}
-        </fieldset>
+        <ReportingChoices
+          selected={selected}
+          onSelect={setSelected}
+          disabled={saving}
+        />
         <p className="text-sm text-muted-foreground">
           {ts(
             'Every report also carries what identifies and authenticates this server, as its license check-in does: the protocol version, license ID, server ID, and heartbeat secret, and which choice it was sent under. With run status, it also carries the reporter’s cursor and, after events were lost, the time they were lost from. Turning reporting off sends one last report that carries only what identifies and authenticates this server and the choice Off, so that Dagu Console shows monitoring as off.'
           )}
         </p>
-        <p className="text-sm text-muted-foreground">
-          {ts(
-            'Never sent: logs, outputs, parameters, environment, step commands, DAG YAML, the values of workflow secrets, and error message text.'
-          )}
-        </p>
+        <p className="text-sm text-muted-foreground">{ts(neverSent)}</p>
         {error && (
           <p role="alert" className="text-sm text-destructive">
             {error}

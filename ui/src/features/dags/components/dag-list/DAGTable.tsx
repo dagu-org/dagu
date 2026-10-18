@@ -47,11 +47,12 @@ import RelativeTime from '@/components/ui/relative-time';
 import StatusChip from '@/components/ui/status-chip';
 import Ticker from '@/components/ui/ticker';
 import VisuallyHidden from '@/components/ui/visually-hidden';
-import { CreateDAGModal, DAGPagination } from '../common';
+import { CreateDAGButton, DAGPagination } from '../common';
 import DAGActions from '../common/DAGActions';
 import LiveSwitch from '../common/LiveSwitch';
 import PinToggle from '../common/PinToggle';
 import { formatDurationMs } from '@/lib/formatDuration';
+import { shouldIgnoreKeyboardShortcuts } from '@/lib/keyboard-shortcuts';
 
 // Import shadcn/ui components
 import { PanelWidthContext } from '../../../../components/SplitLayout';
@@ -1054,21 +1055,25 @@ function WorkflowsEmptyState({
   icon,
   heading,
   description,
+  descriptionValues,
   showAllButton,
   onShowAllWorkflows,
 }: {
   icon: string;
   heading: string;
   description: string;
+  descriptionValues?: Record<string, string>;
   showAllButton: boolean;
   onShowAllWorkflows?: () => void;
 }) {
   return (
     <>
       <div className="text-6xl mb-4">{icon}</div>
-      <h3 className="text-lg font-medium text-foreground mb-2">{heading}</h3>
+      <h3 className="text-lg font-medium text-foreground mb-2">
+        <I18nText text={heading} />
+      </h3>
       <p className="text-sm text-muted-foreground text-center max-w-md mb-4 whitespace-normal break-words">
-        {description}
+        <I18nText text={description} values={descriptionValues} />
       </p>
       <div className="flex flex-wrap items-center justify-center gap-2">
         {showAllButton && (
@@ -1076,7 +1081,7 @@ function WorkflowsEmptyState({
             <I18nText text={'Show all workflows'} />
           </Button>
         )}
-        <CreateDAGModal />
+        <CreateDAGButton />
       </div>
     </>
   );
@@ -1620,6 +1625,10 @@ function DAGTable({
     if (!selectedDAG || !tableInstanceRef.current || !onSelectDAG) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (shouldIgnoreKeyboardShortcuts(event)) {
+        return;
+      }
+
       // Get all DAG rows from the sorted table rows (not groups)
       const sortedRows = tableInstanceRef.current?.getRowModel().rows || [];
       const dagRows = sortedRows
@@ -1729,7 +1738,9 @@ function DAGTable({
     ? {
         icon: '🔍',
         heading: 'No workflows found',
-        description: `No workflows match the “${activeWorkflowViewName}” view. Try adjusting its filters or show all workflows.`,
+        description:
+          'No workflows match the “{view}” view. Try adjusting its filters or show all workflows.',
+        descriptionValues: { view: activeWorkflowViewName },
       }
     : isPristineAllView
       ? {

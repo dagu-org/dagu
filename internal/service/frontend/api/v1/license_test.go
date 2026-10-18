@@ -9,7 +9,10 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -83,13 +86,21 @@ func newCloudLicenseManager(t *testing.T, handler http.Handler) (*license.Manage
 // signTestLicense signs a one-day Pro license with priv.
 func signTestLicense(t *testing.T, priv ed25519.PrivateKey) string {
 	t.Helper()
+	return signNamedTestLicense(t, priv, "")
+}
+
+// signNamedTestLicense signs the license signTestLicense does, on which Dagu
+// Console names the server serverName.
+func signNamedTestLicense(t *testing.T, priv ed25519.PrivateKey, serverName string) string {
+	t.Helper()
 	token, err := jwt.NewWithClaims(jwt.SigningMethodEdDSA, &license.LicenseClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        "lic-1",
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 		},
-		Plan:     "pro",
-		Features: []string{license.FeatureAudit},
+		Plan:       "pro",
+		Features:   []string{license.FeatureAudit},
+		ServerName: serverName,
 	}).SignedString(priv)
 	require.NoError(t, err)
 	return token
@@ -215,6 +226,110 @@ func TestLicenseConnect_Conflicts(t *testing.T) {
 	})
 }
 
+// Choosing what to report when connecting starts reporting once the license
+// is installed, and the approval page learns the level in effect from the
+// connect URL. Uses t.Setenv because a license set in the environment blocks
+// connecting.
+func TestLicenseConnect_Report(t *testing.T) {
+	t.Setenv("DAGU_LICENSE", "")
+	t.Setenv("DAGU_LICENSE_KEY", "")
+
+	connectServer := func(t *testing.T, manager *license.Manager, monitoring *cloudreport.Monitoring) test.Server {
+		t.Helper()
+		return test.SetupServer(t, test.WithServerOptions(
+			frontend.WithLicenseManager(manager),
+			frontend.WithAPIOption(apiv1.WithCloudReport(monitoring)),
+		))
+	}
+	pendingManager := func(t *testing.T) *license.Manager {
+		t.Helper()
+		manager, _ := newCloudLicenseManager(t, pendingConsole())
+		return manager
+	}
+	reportParam := func(t *testing.T, status api.LicenseConnectStatus) string {
+		t.Helper()
+		require.NotNil(t, status.ConnectUrl)
+		connectURL, err := url.Parse(*status.ConnectUrl)
+		require.NoError(t, err)
+		return connectURL.Query().Get("report")
+	}
+	monitoringOf := func(t *testing.T, server test.Server) api.LicenseMonitoring {
+		t.Helper()
+		var monitoring api.LicenseMonitoring
+		server.Client().Get("/api/v1/license/monitoring").ExpectStatus(http.StatusOK).Send(t).Unmarshal(t, &monitoring)
+		return monitoring
+	}
+
+	t.Run("chosen level", func(t *testing.T) {
+		server := connectServer(t, pendingManager(t), newMonitoring(t, ""))
+
+		var started api.LicenseConnectStatus
+		server.Client().Post("/api/v1/license/connect", map[string]string{"report": "runs"}).
+			ExpectStatus(http.StatusOK).Send(t).Unmarshal(t, &started)
+
+		assert.Equal(t, "runs", reportParam(t, started))
+		assert.Equal(t, api.LicenseMonitoring{Level: api.LicenseMonitoringLevelRuns, Chosen: true}, monitoringOf(t, server))
+		var current api.LicenseConnectStatus
+		server.Client().Get("/api/v1/license/connect").ExpectStatus(http.StatusOK).Send(t).Unmarshal(t, &current)
+		assert.Equal(t, started, current)
+	})
+
+	t.Run("configured level wins", func(t *testing.T) {
+		server := connectServer(t, pendingManager(t), newMonitoring(t, config.ReportHealth))
+
+		var started api.LicenseConnectStatus
+		server.Client().Post("/api/v1/license/connect", map[string]string{"report": "runs"}).
+			ExpectStatus(http.StatusOK).Send(t).Unmarshal(t, &started)
+
+		assert.Equal(t, "health", reportParam(t, started))
+		assert.Equal(t, api.LicenseMonitoringLevelHealth, monitoringOf(t, server).Level)
+	})
+
+	t.Run("unknown level", func(t *testing.T) {
+		server := connectServer(t, pendingManager(t), newMonitoring(t, ""))
+
+		server.Client().Post("/api/v1/license/connect", map[string]string{"report": "everything"}).
+			ExpectStatus(http.StatusBadRequest).Send(t)
+
+		var current api.LicenseConnectStatus
+		server.Client().Get("/api/v1/license/connect").ExpectStatus(http.StatusOK).Send(t).Unmarshal(t, &current)
+		assert.Equal(t, api.LicenseConnectStatusStateIdle, current.State)
+		assert.False(t, monitoringOf(t, server).Chosen)
+	})
+
+	t.Run("already licensed", func(t *testing.T) {
+		server := connectServer(t, defaultTestLicenseManager(), newMonitoring(t, ""))
+
+		server.Client().Post("/api/v1/license/connect", map[string]string{"report": "runs"}).
+			ExpectStatus(http.StatusConflict).Send(t)
+
+		assert.Equal(t, api.LicenseMonitoring{Level: api.LicenseMonitoringLevelOff}, monitoringOf(t, server))
+	})
+
+	// A link without the level would let the approval page say that
+	// nothing is reported when the server may report.
+	t.Run("unreadable level", func(t *testing.T) {
+		settings := filepath.Join(t.TempDir(), "report-settings.json")
+		require.NoError(t, os.WriteFile(settings, []byte("{"), 0o600))
+		monitoring := cloudreport.NewMonitoring("", filemonitor.NewStateStore(settings))
+		server := connectServer(t, pendingManager(t), monitoring)
+
+		server.Client().Post("/api/v1/license/connect", nil).ExpectStatus(http.StatusInternalServerError).Send(t)
+		server.Client().Get("/api/v1/license/connect").ExpectStatus(http.StatusInternalServerError).Send(t)
+	})
+
+	t.Run("nothing reported", func(t *testing.T) {
+		server := connectServer(t, pendingManager(t), newMonitoring(t, ""))
+
+		var started api.LicenseConnectStatus
+		server.Client().Post("/api/v1/license/connect", nil).ExpectStatus(http.StatusOK).Send(t).Unmarshal(t, &started)
+
+		require.NotNil(t, started.ConnectUrl)
+		assert.NotContains(t, *started.ConnectUrl, "report=")
+		assert.False(t, monitoringOf(t, server).Chosen)
+	})
+}
+
 func TestRefreshLicense(t *testing.T) {
 	t.Parallel()
 
@@ -244,6 +359,144 @@ func TestRefreshLicense(t *testing.T) {
 
 		server.Client().Post("/api/v1/license/refresh", nil).ExpectStatus(http.StatusBadRequest).Send(t)
 	})
+}
+
+// renamingConsole is a fake Dagu Console that activates servers and answers
+// renames with rename, and the license manager connected to it.
+func renamingConsole(t *testing.T, rename func(w http.ResponseWriter, name string, priv ed25519.PrivateKey)) *license.Manager {
+	t.Helper()
+	var token string
+	var priv ed25519.PrivateKey
+	mux := http.NewServeMux()
+	mux.Handle("/api/v1/licenses/", fakeConsole(&token, http.StatusOK))
+	mux.HandleFunc("/api/v1/licenses/rename", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Name string `json:"name"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		rename(w, req.Name, priv)
+	})
+	manager, key := newCloudLicenseManager(t, mux)
+	priv = key
+	token = signTestLicense(t, priv)
+	return manager
+}
+
+// renameAsConsole answers a rename as Dagu Console does: with the license
+// naming the server as asked.
+func renameAsConsole(t *testing.T) func(w http.ResponseWriter, name string, priv ed25519.PrivateKey) {
+	return func(w http.ResponseWriter, name string, priv ed25519.PrivateKey) {
+		_ = json.NewEncoder(w).Encode(map[string]string{"token": signNamedTestLicense(t, priv, name)})
+	}
+}
+
+func TestRenameLicenseServer(t *testing.T) {
+	t.Parallel()
+
+	activated := func(t *testing.T, manager *license.Manager) test.Server {
+		t.Helper()
+		server := test.SetupServer(t, test.WithServerOptions(frontend.WithLicenseManager(manager)))
+		server.Client().Post("/api/v1/license/activate", map[string]string{"key": "DAGU-TEST"}).
+			ExpectStatus(http.StatusOK).Send(t)
+		return server
+	}
+
+	t.Run("renames the server in Dagu Console", func(t *testing.T) {
+		t.Parallel()
+
+		server := activated(t, renamingConsole(t, renameAsConsole(t)))
+
+		var status api.LicenseStatusResponse
+		server.Client().Put("/api/v1/license/server-name", map[string]string{"name": " Build box "}).
+			ExpectStatus(http.StatusOK).Send(t).Unmarshal(t, &status)
+
+		require.NotNil(t, status.ServerName)
+		assert.Equal(t, "Build box", *status.ServerName)
+		require.NotNil(t, status.ReportedName)
+		assert.NotEmpty(t, *status.ReportedName)
+		assert.NotEqual(t, "Build box", *status.ReportedName, "the server still reports its own name")
+	})
+
+	t.Run("says why Dagu Console refused", func(t *testing.T) {
+		t.Parallel()
+
+		server := activated(t, renamingConsole(t, func(w http.ResponseWriter, _ string, _ ed25519.PrivateKey) {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "license has expired"})
+		}))
+
+		resp := server.Client().Put("/api/v1/license/server-name", map[string]string{"name": "Build box"}).
+			ExpectStatus(http.StatusBadRequest).Send(t)
+
+		assert.Contains(t, resp.Body, "Dagu Console refused the name: license has expired")
+	})
+
+	t.Run("Dagu Console unreachable", func(t *testing.T) {
+		t.Parallel()
+
+		server := activated(t, renamingConsole(t, func(w http.ResponseWriter, _ string, _ ed25519.PrivateKey) {
+			w.WriteHeader(http.StatusServiceUnavailable)
+		}))
+
+		server.Client().Put("/api/v1/license/server-name", map[string]string{"name": "Build box"}).
+			ExpectStatus(http.StatusBadGateway).Send(t)
+	})
+
+	t.Run("name too long", func(t *testing.T) {
+		t.Parallel()
+
+		server := activated(t, renamingConsole(t, renameAsConsole(t)))
+
+		server.Client().Put("/api/v1/license/server-name", map[string]string{"name": strings.Repeat("a", license.MaxServerNameLength+1)}).
+			ExpectStatus(http.StatusBadRequest).Send(t)
+	})
+
+	t.Run("license that never checks in", func(t *testing.T) {
+		t.Parallel()
+
+		server := test.SetupServer(t, test.WithServerOptions(frontend.WithLicenseManager(defaultTestLicenseManager())))
+
+		resp := server.Client().Put("/api/v1/license/server-name", map[string]string{"name": "Build box"}).
+			ExpectStatus(http.StatusBadRequest).Send(t)
+
+		assert.Contains(t, resp.Body, "does not check in with Dagu Console")
+	})
+}
+
+func TestRenameLicenseServer_Audit(t *testing.T) {
+	t.Parallel()
+
+	server := test.SetupServer(t,
+		test.WithConfigMutator(func(cfg *config.Config) {
+			cfg.Server.Auth.Mode = config.AuthModeBuiltin
+			cfg.Server.Auth.Builtin.Token.Secret = "jwt-secret-license-rename"
+			cfg.Server.Auth.Builtin.Token.TTL = 24 * time.Hour
+			cfg.Server.Audit.Enabled = true
+		}),
+		test.WithServerOptions(frontend.WithLicenseManager(renamingConsole(t, renameAsConsole(t)))),
+	)
+	server.Client().Post("/api/v1/auth/setup", api.SetupRequest{Username: "admin", Password: "adminpass"}).
+		ExpectStatus(http.StatusOK).Send(t)
+	adminToken := getAdminToken(t, server)
+	server.Client().Post("/api/v1/license/activate", map[string]string{"key": "DAGU-TEST"}).
+		WithBearerToken(adminToken).ExpectStatus(http.StatusOK).Send(t)
+
+	server.Client().Put("/api/v1/license/server-name", map[string]string{"name": " Build box "}).
+		WithBearerToken(adminToken).ExpectStatus(http.StatusOK).Send(t)
+
+	var logs api.AuditLogsResponse
+	server.Client().Get("/api/v1/audit?category=system&action=license_server_rename").
+		WithBearerToken(adminToken).ExpectStatus(http.StatusOK).Send(t).Unmarshal(t, &logs)
+	require.Len(t, logs.Entries, 1)
+	entry := logs.Entries[0]
+	assert.Equal(t, "admin", entry.Username)
+	require.NotNil(t, entry.Details)
+	var details map[string]any
+	require.NoError(t, json.Unmarshal([]byte(*entry.Details), &details))
+	assert.Equal(t, "Build box", details["name"])
 }
 
 func TestLicenseEndpoints_RequireAdmin(t *testing.T) {
@@ -278,6 +531,7 @@ func TestLicenseEndpoints_RequireAdmin(t *testing.T) {
 		client.Get("/api/v1/license/connect"),
 		client.Delete("/api/v1/license/connect"),
 		client.Post("/api/v1/license/refresh", nil),
+		client.Put("/api/v1/license/server-name", map[string]string{"name": "Build box"}),
 		client.Get("/api/v1/license/monitoring"),
 		client.Put("/api/v1/license/monitoring", map[string]string{"level": "runs"}),
 		client.Post("/api/v1/license/monitoring/dismiss-notice", nil),

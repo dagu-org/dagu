@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"maps"
 	"net/http"
-	"net/netip"
 	"net/url"
 	"regexp"
 	"slices"
@@ -81,34 +80,17 @@ func loadClientCertificates(ctx context.Context, step []cmnconfig.BrowserClientC
 	return entries, warnings, nil
 }
 
-// loadTrustedCAs loads the host's trusted authorities. Warnings report
-// hosts whose sites Chrome never routes through the certificate proxy.
-func loadTrustedCAs(ctx context.Context) ([]certproxy.TrustedCA, []string, error) {
+// loadTrustedCAs loads the host's trusted authorities.
+func loadTrustedCAs(ctx context.Context) ([]certproxy.TrustedCA, error) {
 	var entries []certproxy.TrustedCA
-	var warnings []string
 	for i, authority := range cmnconfig.GetConfig(ctx).Browser.TrustedCAs {
 		entry, err := certproxy.LoadTrustedCA(fmt.Sprintf("browser.trusted_cas[%d]", i), authority)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		entries = append(entries, entry)
-		for _, host := range authority.Hosts {
-			if bypassesCertificateProxy(host) {
-				warnings = append(warnings, fmt.Sprintf("%s: Chrome bypasses certificate routing for %s; this authority can verify an HTTPS proxy there, but a website must use a non-loopback, non-link-local hostname or address", entry.Label, host))
-			}
-		}
 	}
-	return entries, warnings, nil
-}
-
-// Chrome's implicit bypass applies to PAC routing, even for named hosts.
-func bypassesCertificateProxy(host string) bool {
-	host = hostpattern.Canonical(host)
-	if host == "localhost" || host == "loopback" || strings.HasSuffix(host, ".localhost") {
-		return true
-	}
-	address, err := netip.ParseAddr(host)
-	return err == nil && (address.Unmap().IsLoopback() || address.IsLinkLocalUnicast())
+	return entries, nil
 }
 
 // guardsCertificates reports whether a browser presenting certificates
@@ -229,8 +211,8 @@ func missingCertificate(host, detail string, proxy bool) error {
 	message := fmt.Sprintf("%s asks for a TLS client certificate, and none is configured for it (%s); "+
 		"set with.browser.client_certificates or browser.client_certificates in the Dagu config", subject, detail)
 	if proxy && clientAuthError.MatchString(detail) {
-		// The proxy answers such a request itself; the browser met it on
-		// a route that bypassed the proxy.
+		// The proxy answers such a request from a host a certificate
+		// names; the browser met it on a route that bypassed the proxy.
 		message += "; if one is configured for it, a Chrome enterprise policy may be setting the browser's proxy"
 	}
 	return errors.New(message)

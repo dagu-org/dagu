@@ -715,3 +715,22 @@ func TestStepOutputReferencesKeepsNarrowGrammar(t *testing.T) {
 		})
 	}
 }
+
+// A value that may read the process environment, such as a log path, never
+// resolves Dagu's own credentials: not by name, not by a path into one, and
+// not when shell parsing gives way to the plain fallback.
+func TestResolverProcessEnvironmentHidesDaguCredentials(t *testing.T) {
+	t.Setenv("DAGU_LICENSE", `{"sub":"licensee"}`)
+	t.Setenv("DAGU_HOME", "/srv/dagu")
+	resolver := value.NewResolver(value.StaticScope{}, value.RuntimeScope{})
+
+	for raw, want := range map[string]string{
+		"${DAGU_HOME}/${DAGU_LICENSE}":    "/srv/dagu/${DAGU_LICENSE}",
+		"${DAGU_LICENSE.sub}":             "${DAGU_LICENSE.sub}",
+		"${DAGU_HOME}/${DAGU_LICENSE} $(": "/srv/dagu/${DAGU_LICENSE} $(",
+	} {
+		got, err := resolver.String(context.Background(), raw, value.LogPathField("log_dir"))
+		require.NoError(t, err, raw)
+		assert.Equal(t, want, got, raw)
+	}
+}

@@ -79,6 +79,21 @@ const layoutPage = `<!doctype html><html><head><title>Draft</title></head><body>
 <div>%s<button onclick="document.getElementById('status').textContent='Saved'">Save</button></div>
 </body></html>`
 
+// agentPage says whether the user agent its request came with, given as a
+// JSON string, is the one its scripts see and names no headless browser,
+// and whether the screen holds the browser's window.
+const agentPage = `<!doctype html><html><head><title>Agent</title></head><body>
+<p id="agent"></p>
+<p id="screen"></p>
+<script>
+const sent = %s;
+document.getElementById('agent').textContent = sent === navigator.userAgent && !sent.includes('Headless')
+  ? 'user agent: headed' : 'user agent: ' + sent + ' / ' + navigator.userAgent;
+document.getElementById('screen').textContent = screen.width >= outerWidth && screen.height >= outerHeight
+  ? 'screen holds window' : 'screen ' + screen.width + 'x' + screen.height + ', window ' + outerWidth + 'x' + outerHeight;
+</script>
+</body></html>`
+
 const layoutBanner = `<button onclick="document.getElementById('status').textContent='Banner closed'">Dismiss</button>`
 
 // browserCommandTimeout bounds a command that starts a browser. Starting
@@ -244,6 +259,35 @@ func startShop(t *testing.T) string {
 			_, _ = fmt.Fprintf(w, layoutPage, banner)
 			return
 		}
+		if r.URL.Path == "/guarded" {
+			// Cloudflare marks every answer that is one of its checks.
+			w.Header().Set("Content-Type", "text/html")
+			w.Header().Set("Cf-Mitigated", "challenge")
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = io.WriteString(w, `<title>Just a moment...</title><p>Checking your browser</p>`)
+			return
+		}
+		if r.URL.Path == "/passing" {
+			if _, err := r.Cookie("passed"); err == nil {
+				w.Header().Set("Content-Type", "text/html")
+				_, _ = io.WriteString(w, shopPage)
+				return
+			}
+			// A check that needs no person marks the browser and loads the
+			// page again.
+			w.Header().Set("Content-Type", "text/html")
+			w.Header().Set("Cf-Mitigated", "challenge")
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = io.WriteString(w, `<title>Just a moment...</title><p>Checking your browser</p>
+<script>setTimeout(() => { document.cookie = "passed=1; path=/"; location.reload(); }, 1000);</script>`)
+			return
+		}
+		if r.URL.Path == "/agent" {
+			sent, _ := json.Marshal(r.UserAgent())
+			w.Header().Set("Content-Type", "text/html")
+			_, _ = fmt.Fprintf(w, agentPage, sent)
+			return
+		}
 		if r.URL.Path == "/report.csv" {
 			w.Header().Set("Content-Type", "text/csv")
 			w.Header().Set("Content-Disposition", `attachment; filename="report.csv"`)
@@ -404,6 +448,39 @@ func TestBrowserDialogs(t *testing.T) {
 	require.Equal(t, 1, b.model.count(kindAct))
 }
 
+// A browser without a window sends the user agent the same browser sends
+// with one, learned on the first run and kept for the next, and reports a
+// screen that holds its window.
+func TestBrowserLooksHeaded(t *testing.T) {
+	t.Parallel()
+
+	b := newBrowserEnv(t)
+	for range 2 {
+		result := b.dagu.RunWithEnv(b.env, "start", "looks_headed.yaml")
+		result.ExpectExitCode(0)
+		result.ExpectStderrNotContains("warning:")
+	}
+}
+
+// A step that fails on a page the site answered with a bot check says so.
+func TestBrowserNamesBotCheck(t *testing.T) {
+	t.Parallel()
+
+	b := newBrowserEnv(t)
+	result := b.dagu.RunWithEnv(b.env, "start", "bot_check.yaml")
+	result.ExpectNonZeroExitCode()
+	result.ExpectStderrContains("answered with a Cloudflare bot check (HTTP 403) in place of the page")
+}
+
+// A bot check that passes on its own is waited out, so the step reads the
+// page it stood in for.
+func TestBrowserWaitsForBotCheckToPass(t *testing.T) {
+	t.Parallel()
+
+	b := newBrowserEnv(t)
+	b.dagu.RunWithEnv(b.env, "start", "bot_check_passes.yaml").ExpectExitCode(0)
+}
+
 // With the sandbox on, a browser step fails before starting a browser where
 // the browser runtime would turn the sandbox off, here because CI is set.
 func TestBrowserSandboxNotSilentlyOff(t *testing.T) {
@@ -439,6 +516,27 @@ func TestBrowserReplayCache(t *testing.T) {
 
 	b.dagu.RunWithEnv(env, "start", "click.yaml").ExpectExitCode(0)
 	require.Equal(t, 1, b.model.count(kindAct), "the replayed act makes no model request")
+}
+
+// A step under ai: never runs without a model: it fails while nothing is
+// recorded, and replays what a run of the step under on_miss recorded.
+func TestBrowserNeverReplaysWithoutModel(t *testing.T) {
+	t.Parallel()
+
+	b := newBrowserEnv(t)
+	env := append(b.env, "DAGU_HOME="+t.TempDir())
+	// The name makes never.yaml the click DAG, whose replay cache it reads.
+	missed := b.dagu.RunWithEnv(env, "start", "--name", "click", "never.yaml")
+	missed.ExpectNonZeroExitCode()
+	missed.ExpectStderrContains("the act cannot run without AI: there is no recording of it on this host")
+	require.Zero(t, b.model.total())
+
+	b.dagu.RunWithEnv(env, "start", "click.yaml").ExpectExitCode(0)
+	requests := b.model.total()
+	require.Equal(t, 1, b.model.count(kindAct))
+
+	b.dagu.RunWithEnv(env, "start", "--name", "click", "never.yaml").ExpectExitCode(0)
+	require.Equal(t, requests, b.model.total(), "the replay makes no model request")
 }
 
 // A replay acts only on the element it recorded. When the layout puts

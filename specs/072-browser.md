@@ -5,7 +5,8 @@
 Partially implemented.
 
 Conformance covers extraction into outputs, a multi-operation run with model
-and fixed conditions, screenshots, downloads, uploads, the replay cache, the
+and fixed conditions, screenshots, downloads, uploads, the replay cache, a
+replay under `ai: never` with no model, the
 secret check, allowed domains, client certificates, dialogs, and validation. Waiting for input and resuming the same
 browser need the REST API and are covered by integration tests. Model prompts,
 page interaction internals, and profile locking belong to executor tests.
@@ -39,8 +40,8 @@ Each operation sets exactly one of:
 - `goto`: navigate to a URL.
 - `act`: perform one action described in natural language, such as a click
   or typing into one field. The value is an instruction string or an object
-  with `instruction` and optional `cache`.
-- `upload`: `{files, into, cache}` gives local files to a file input (see
+  with `instruction` and optional `ai` or `cache`.
+- `upload`: `{files, into, ai, cache}` gives local files to a file input (see
   Uploads).
 - `extract`: `{instruction, schema}`. The schema must be a JSON Schema with
   `type: object`. A string field with `format: uri` or `format: uri-reference`
@@ -122,8 +123,12 @@ holds when any matching element is visible.
 
 A browser step uses the DAG-level `llm` block. `with.llm` replaces it entirely,
 with the same shape and providers as the DAG-level block. A browser step with no
-model configuration fails validation. When several models are listed, each
-model request tries them in order.
+model configuration fails validation when some operation can call the model
+under its choice of how much AI decides: an `act`, or an `upload` with `into`,
+whose choice is not `never`, an `extract`, or an `expect` or `when` that is a
+statement. The error names the first such operation. A step none of whose
+operations can call the model runs without one. When several models are
+listed, each model request tries them in order.
 
 Every model request asks for a tool call whose parameters are the response
 schema. A reply without a tool call is accepted when its text is valid JSON.
@@ -169,6 +174,17 @@ those outputs. Operation progress is written to stderr.
 (unauthenticated), `allowed_domains`, `screenshots`, `profile`, and
 `client_certificates`.
 
+A browser without a window sends the user agent its executable sends with
+one, never `HeadlessChrome`, so a site treats the step as it treats a person.
+The user agent is learned from the executable the first time it runs without
+a window, by starting it once on a profile of its own, and kept under the
+data directory's `browser/user-agents/`. A launch whose browser reports
+another version than the one kept learns it again, and starts the browser
+again only when the user agent changed with it. When the user agent cannot be
+learned or kept, the step runs and warns. It reports a screen of 1920x1080,
+or its viewport's size when that is larger, where Chrome would report one
+smaller than its window.
+
 The host configuration `browser.sandbox: false`, or the environment variable
 `DAGU_BROWSER_SANDBOX=false`, turns off Chromium's sandbox for every browser
 the host starts, for hosts where the sandbox cannot start. The sandbox is on
@@ -205,8 +221,27 @@ the browser. The browser sends it the HTTPS requests to the entries' hosts, and
 the proxy reaches those hosts the way the device does: through `proxy` when it
 is set, otherwise through the operating system's proxy settings (the proxy
 auto-config, automatic detection on Windows, or the manual proxies; the proxy
-environment variables on Linux). The browser sends every other request there
-itself. With certificates, `proxy` takes only `[scheme://]host[:port]` with
+environment variables on Linux). As in Chrome, it moves to the next route of
+a PAC result only when a proxy cannot be reached, drops the connection before
+answering, or is a SOCKS proxy that fails; an HTTP proxy that answers, denying
+the site or asking for credentials, is not bypassed through a later route. The browser sends every other request there
+itself. Chrome does not consult a PAC script for `localhost`, `*.localhost`,
+the Windows name `loopback`, loopback addresses (`127.0.0.0/8` and `::1`), or
+link-local addresses, and `*` leaves them to the browser. When a certificate
+or trusted authority names one of those destinations, the browser sends every
+request to the certificate proxy, with that implicit bypass removed, so the
+destination reaches it. The certificate proxy reaches those destinations directly, never
+through `proxy` or the device's proxy settings, and resolves `localhost` and
+`*.localhost` to the loopback addresses itself. Every other request, HTTPS or
+not, still follows the device's proxy settings, applied by the certificate
+proxy, and is not given a configured client certificate or authority. A site
+the certificate proxy cannot reach then closes the browser's connection
+instead of failing the proxy request. A device proxy that asks for
+credentials cannot be handed back to the browser while every request goes to
+the certificate proxy. An HTTPS upstream proxy
+may listen on a loopback address; its certificate is checked against
+authorities that name the proxy's host, separately from the website.
+With certificates, `proxy` takes only `[scheme://]host[:port]` with
 scheme `http`, `https`, or `socks5`. A proxy that asks for authentication
 cannot carry requests to certificate hosts, and the proxy, not the browser,
 verifies those hosts' server certificates.
@@ -218,15 +253,29 @@ proxy, which listens on the loopback interface. Present certificates only on
 hosts whose users are trusted with them.
 
 While the browser presents certificates, it also guards its other HTTPS
-requests: the proxy carries them too, presenting no certificate, so the
-browser never asks the operating system for one, which would wait on a
-system prompt nobody answers. The host configuration
+requests, so that the browser never asks the operating system for a
+certificate, which would wait on a system prompt nobody answers. The proxy
+makes a TLS handshake of its own with each site, once per host and port
+while the browser runs, and sends nothing over it. A site that chose TLS 1.3,
+asked for no client certificate, and showed a certificate that a root of
+Mozilla's program vouches for gets the browser's own TLS: the proxy passes
+the browser's hello to it and lets the answer through once that answer
+selects TLS 1.3, so the site sees the browser's handshake, and the browser
+verifies the site. The proxy carries every other site itself, presenting no
+certificate: one that asks for a certificate, uses TLS 1.2 or older, or has
+a certificate only the system's or an entry's authorities vouch for, and,
+for a minute before it tries again, one whose handshake failed. It takes
+over a connection that cannot pass without the browser noticing. Under TLS
+1.3 a request for a certificate is encrypted, so a site that asks the
+browser but did not ask the proxy reaches the browser's certificate
+selection; a site that refuses the proxy's handshake stays unreachable
+through the guard. The host configuration
 `browser.guard_client_certificates` (or `DAGU_BROWSER_GUARD_CLIENT_CERTIFICATES`)
 turns the guard off, or on for every browser even without certificates. When
 the device's proxy asks the certificate proxy for credentials it cannot give,
 such as a Windows sign-in, the guard stops and the browser reaches those sites
-itself; the step's log says so. The guard trusts the system's CA certificates
-and every entry's `ca_file`.
+itself; the step's log says so. For the sites it carries, the guard trusts
+the system's CA certificates and every entry's `ca_file`.
 
 A page that does not load because of a client certificate fails the
 operation that opened it: the error names what the proxy saw, such as the
@@ -238,7 +287,8 @@ failure. An operation that times out names the connections the proxy still
 waits on and how far each got. The step's log records each host the proxy
 presented a certificate to or verified with a configured authority, each
 site that asked for one, and each failure. A site the guard carries appears
-only when it asks for a certificate or fails.
+only when it asks for a certificate or fails; one it passes, whose handshake
+only the browser reads, never does.
 
 ### Trusted server authorities
 
@@ -262,11 +312,12 @@ failure of that route does not fall back to the browser's route. An HTTPS
 upstream proxy's certificate uses authorities matching the proxy's hostname.
 Server hostname, validity, and certificate-chain verification remain enabled.
 
-Chrome bypasses PAC routing for localhost names, loopback addresses, and
-link-local addresses. An entry naming one reports a warning: its authority
-can verify an HTTPS upstream proxy there, but cannot add trust to a website
-opened directly at that address. Use the site's network hostname or another
-network address. Ordinary private-network IP addresses are supported.
+Localhost names, loopback addresses, and link-local addresses are routed as
+described for client certificates, so an authority can verify a website opened
+at one of those destinations. An authority named for a loopback address also
+verifies an HTTPS upstream proxy listening there, and does not verify a
+website at a different host. Ordinary private-network addresses keep using the
+PAC script.
 
 Authority files are read when a browser starts. An existing browser retains
 its original trust until it closes; a later browser reads the current files.
@@ -294,6 +345,29 @@ attempt, since a page missing a script or a sign-in redirect usually fails a
 later operation. A request blocked after its operation returns is counted with
 the next one. When counting stops, for example because the browser's DevTools
 connection closes, the step log warns once.
+
+### Refused pages
+
+A page counts as refused when its site answered with a bot check in place of
+it, which for Cloudflare is any answer with the header `cf-mitigated:
+challenge`, or answered `403` or `429`, with a body or without one, which
+Chrome shows as its own error page. A page a client certificate kept from
+opening is not counted; Client certificates explains it.
+
+After the start URL and after every operation, a refused page adds a line to
+the timeline and the step log, such as `page refused shop.example.com
+answered with a Cloudflare bot check (HTTP 403) in place of the page` or
+`page refused portal.example.com refused the page (HTTP 403 Forbidden)`, once
+while the browser keeps showing it. A step that fails while the browser
+shows a refused page ends its error with the same sentence, since a refusal
+usually fails a later operation, and keeps the recordings it replayed, since
+the refusal says nothing about them.
+
+An action that leaves the browser on a bot check, such as `goto` or an `act`
+that loads a page, waits up to 10 seconds for the check to pass, as a check
+that needs no person does by loading the page it stood in for, and then
+lets the page settle as any new page does. A check still shown after the
+wait is left to the operations that follow and reported as above.
 
 ### Artifacts
 
@@ -328,12 +402,43 @@ blocks the page: `alert`, `confirm`, and `beforeunload` are accepted, and a
 `prompt` is answered with its default text. Each accepted dialog appears in
 the timeline and the step log after the operation that opened it.
 
+### How much AI decides
+
+`with.ai` chooses how much the model decides for the step's `act` operations
+and `upload` operations with `into`, and `ai` on an `act` or an `upload`
+replaces it for that operation:
+
+- `every_run`: the model decides every run. A successful `act` or `upload`
+  still records what it did.
+- `on_miss` (the default): a recorded `act` or `upload` replays without a
+  model request while the page still shows its elements, and the model acts
+  when a replay fails and repairs the recording.
+- `never`: a recorded `act` or `upload` replays, and a miss fails the step.
+  No model is called. The failure names the reason: no recording of the
+  operation on this host, the recorded action that did not replay, or the
+  recorded element of an upload that is gone. The actions replayed before the
+  miss have already run on the page, which is left as it is. The recording is
+  kept, so a later run under `on_miss` repairs it.
+
+`with.cache: false`, `act.cache: false`, and `upload.cache: false`, from before
+the choice existed, mean `every_run`. Setting both `ai` and `cache` on the
+step, an act, or an upload fails validation. A statement is judged by the
+model, and an `extract` reads the page through the model, so a step whose `ai`
+is `never` fails validation with an `extract`, or with an `expect` or `when`
+that is a statement. A fixed check is allowed, and so is an `upload` without
+`into`, which makes no model request.
+
+Each operation's timeline event records `via`, how it ran: `element` for a
+replay of recorded elements, `model` for a model request, `exact` for a fixed
+check, and nothing for an operation that decides nothing, such as `goto`.
+
 ### Replay cache
 
-With `with.cache` true (the default), a successful `act` records the actions it
-performed. A later run of the same step on the same host replays them without a
-model request when the operation position, instruction, and page URL without
-query or fragment match. When a replay fails, the step asks the model again.
+A successful `act` records the actions it performed. A later run of the same
+step on the same host replays them without a model request when the operation
+position, instruction, and page URL without query or fragment match, unless
+the act's choice is `every_run`. When a replay fails, the step asks the model
+again, or fails under `never` (see How much AI decides).
 If the step succeeds, the model's new actions replace the recording; an act
 that records no actions, such as one whose click loaded a new document before
 it reported back, removes the recording instead, unless another run of the step
@@ -346,15 +451,13 @@ name, such as a Delete button in each row of a list, the text of its row must
 also match. Without such a row, the replay fails when the page has more
 elements of that role and name than when the act recorded it. An element
 without a name is told apart by its role only.
-`act.cache: false` disables the cache for one operation.
 
 A successful `upload` with `into` records the element the model found, keyed
 like an act by operation position, `into` text, and page URL, and kept apart
 from an act's recording with the same words. A replay uploads into the
 recorded element without a model request when the page still shows it, told
-apart as a replayed act's element is; otherwise the model is asked again and
-its element replaces the recording. `upload.cache: false` disables the cache
-for one upload.
+apart as a replayed act's element is; otherwise, under `on_miss`, the model is
+asked again and its element replaces the recording.
 
 Runs of a step share its recordings, and each `act` reads them when it runs. A
 recording that another run of the step replaced or removed meanwhile, such as
@@ -405,13 +508,17 @@ or condition that sets zero or several keys fails validation. A step fails when
 an `act` does not complete, an `expect` does not hold, a selector does not
 appear before the timeout, a download does not finish, the page leaves the
 allowed domains, the browser stops responding, or the browser cannot be
-started. When an `act` fails because its model chose no element, the error
-names the model, since some models give that answer for every request. An
+started. An `act` or an `upload` under `never` fails when it has no recording
+or its replay misses, as described under How much AI decides. When an `act`
+fails because its model chose no element, the error names the model, since
+some models give that answer for every request. An
 `act` whose model picks an option that the select does not offer does not
 complete. An `upload` fails when a file cannot be uploaded, the model finds no
 element for `into`, or the element leads to no single file input, as
 described under Uploads. A page that does not load because of a client certificate fails the
-operation that opened it, as described under Client certificates.
+operation that opened it, as described under Client certificates. A failure
+on a page the site refused names the refusal, as described under Refused
+pages.
 
 Loading a DAG warns, without failing, about each `extract` string field whose
 name ends in `url`, `uri`, `link`, or `href`, singular or plural, and that has

@@ -3,18 +3,30 @@
 
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import {
+  MemoryRouter,
+  Route,
+  Routes,
+  useLocation,
+  type InitialEntry,
+} from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { ConfigContext, type Config } from '@/contexts/ConfigContext';
 import { UserPreferencesProvider } from '@/contexts/UserPreference';
 import { I18nProvider } from '@/i18n/I18nProvider';
 import LoginPage from '../login';
 
+// Signing in authenticates the session until the next test.
+const session = vi.hoisted(() => ({ authenticated: false }));
+
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({
-    login: vi.fn(),
-    isAuthenticated: false,
+    login: vi.fn(async () => {
+      session.authenticated = true;
+    }),
+    isAuthenticated: session.authenticated,
     isLoading: false,
     setupRequired: false,
   }),
@@ -91,10 +103,71 @@ function renderLogin(config: Config) {
   );
 }
 
+function CurrentLocation() {
+  const { pathname, search, hash } = useLocation();
+  return <p data-testid="location">{pathname + search + hash}</p>;
+}
+
+// Renders the app's sign-in flow: protected pages send visitors to the login
+// page, which returns them where they were going.
+function renderSignIn(entry: InitialEntry) {
+  render(
+    <UserPreferencesProvider>
+      <I18nProvider>
+        <MemoryRouter initialEntries={[entry]}>
+          <ConfigContext.Provider value={makeConfig()}>
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+              <Route
+                path="*"
+                element={
+                  <ProtectedRoute>
+                    <CurrentLocation />
+                  </ProtectedRoute>
+                }
+              />
+            </Routes>
+          </ConfigContext.Provider>
+        </MemoryRouter>
+      </I18nProvider>
+    </UserPreferencesProvider>
+  );
+}
+
+async function signIn() {
+  const user = userEvent.setup();
+  await user.type(screen.getByLabelText('Username'), 'admin');
+  await user.type(screen.getByLabelText('Password'), 'password');
+  await user.click(screen.getByRole('button', { name: 'Sign In' }));
+}
+
 describe('LoginPage', () => {
   beforeEach(() => {
     localStorage.clear();
     document.documentElement.lang = 'en';
+    session.authenticated = false;
+  });
+
+  // Links such as the startup banner's point at a section of a page.
+  it('returns to the requested page after sign-in', async () => {
+    renderSignIn('/license?remoteNode=local#monitoring');
+
+    await signIn();
+
+    expect(await screen.findByTestId('location')).toHaveTextContent(
+      '/license?remoteNode=local#monitoring'
+    );
+  });
+
+  it('returns only to a page of the app', async () => {
+    renderSignIn({
+      pathname: '/login',
+      state: { from: { pathname: '//example.com', search: '', hash: '' } },
+    });
+
+    await signIn();
+
+    expect(await screen.findByTestId('location')).toHaveTextContent(/^\/$/);
   });
 
   it('renders the configured explicit login link', () => {

@@ -32,8 +32,8 @@ import (
 )
 
 const (
-	// handshakeTimeout bounds the browser's TLS handshake with the proxy,
-	// which includes reaching the server and the handshake with it.
+	// handshakeTimeout bounds opening a tunnel, from the browser's CONNECT
+	// through reaching the server to the TLS handshakes with both.
 	handshakeTimeout = 30 * time.Second
 	// readHeaderTimeout bounds reading a request to the proxy.
 	readHeaderTimeout = 10 * time.Second
@@ -53,6 +53,15 @@ const (
 	drainTimeout = 5 * time.Second
 	// defaultTLSPort is the port of a CONNECT authority that names none.
 	defaultTLSPort = "443"
+	// tlsScheme and plainScheme are the URL schemes the device's proxy
+	// settings are asked about for a tunnel that carries TLS, and for one
+	// that does not, which only a ws: URL opens.
+	tlsScheme   = "https"
+	plainScheme = "ws"
+	// defaultPlainPort is the port of a ws: URL that names none.
+	defaultPlainPort = "80"
+	// maxURLBytes is the length of the longest URL Chrome sends.
+	maxURLBytes = 2 << 20
 	// remoteErrorOp marks the error of an alert a TLS peer sent.
 	remoteErrorOp = "remote error"
 	// alertPrefix starts the text of a TLS alert.
@@ -91,6 +100,10 @@ type server struct {
 	pending    *pendingLog
 	// guardEntry presents no certificate, to the hosts the guard carries.
 	guardEntry *upstreamEntry
+	// publicRoots are the authorities whose sites the guard may pass the
+	// browser's own TLS to; verdicts remembers which sites it may.
+	publicRoots *x509.CertPool
+	verdicts    *passVerdicts
 
 	mu      sync.Mutex
 	closed  bool
@@ -98,6 +111,13 @@ type server struct {
 	// guard accepts the browser's other https: connections; nil without a
 	// guard, or once it stopped.
 	guard net.Listener
+	// carryAll is set when the browser sends every request here, so a
+	// destination Chrome skips in a PAC script can still arrive. Hosts no
+	// entry names keep the device's route.
+	carryAll bool
+	// forward relays the plain HTTP requests the browser sends while
+	// carryAll is set.
+	forward *forwarder
 }
 
 // scopedAuthority is a TrustedCA ready to verify servers.
@@ -170,6 +190,10 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.handleConnect(w, r, false)
 		return
 	}
+	if s.carryAll && r.URL.IsAbs() && r.URL.Scheme == "http" {
+		s.forward.ServeHTTP(w, r)
+		return
+	}
 	// The control paths answer only requests made to the proxy itself, not
 	// requests for another site that a client sends through it.
 	if r.Method != http.MethodGet || r.URL.IsAbs() {
@@ -226,10 +250,12 @@ func (g guardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	g.s.handleConnect(w, r, true)
 }
 
-// handleConnect opens a tunnel to the host a CONNECT request names, ending
-// the browser's TLS in the proxy. The certificate port tunnels only to the
-// hosts the entries name; the guard tunnels to any host, presenting no
-// certificate to the others.
+// handleConnect opens a tunnel to the host a CONNECT request names. The
+// certificate port ends TLS for the hosts the entries name. The guard, and
+// the certificate port while it carries every request, does the same for
+// ordinary hosts and presents no certificate, or passes the browser's TLS
+// to a site that never asks for one. A loopback host the settings do not
+// name, and a tunnel that carries no TLS, are spliced through unread.
 func (s *server) handleConnect(w http.ResponseWriter, r *http.Request, guard bool) {
 	host, port := splitAuthority(r.Host)
 	if host == "" {
@@ -238,58 +264,152 @@ func (s *server) handleConnect(w http.ResponseWriter, r *http.Request, guard boo
 	}
 	entry := s.scopedEntry(host)
 	if entry == nil {
-		if !guard {
+		switch {
+		case guard:
+			entry = s.guardEntry
+		case s.carryAll && s.guardListening() && !implicitBypass(host):
+			// The guard still carries ordinary hosts. A loopback host the
+			// settings do not name stays on the browser's own TLS, which is
+			// where Chrome sent it before the manual proxy.
+			entry = s.guardEntry
+		case s.carryAll:
+			s.relayOpaque(w, host, port)
+			return
+		default:
 			s.events.add(EventRefused, host, "", fmt.Sprintf("the certificate proxy refused a connection to %s, which no certificate setting names", host))
 			http.Error(w, "no certificate setting names this host", http.StatusForbidden)
 			return
 		}
-		entry = s.guardEntry
 	}
+	deadline := time.Now().Add(handshakeTimeout)
 	pending := s.pending.start(host)
-	ctx, cancel := context.WithTimeout(s.ctx, handshakeTimeout)
-	raw, via, err := s.reach(ctx, host, port, entry)
-	cancel()
-	if err != nil {
-		s.pending.end(pending)
-		if guard && errors.Is(err, errProxyAuth) {
-			// A reset connection makes the browser try the route after the
-			// guard; a closed guard keeps it on that route.
-			s.stopGuard(host)
-			resetConnection(w)
-			return
-		}
-		kind := EventUpstream
-		if errors.Is(err, errProxyAuth) {
-			kind = EventProxyAuth
-		}
-		s.events.add(kind, host, entry.label, fmt.Sprintf("the certificate proxy could not reach %s: %s", host, oneLine(err)))
-		http.Error(w, "the certificate proxy could not reach the site", http.StatusBadGateway)
-		return
-	}
-	hijacker, ok := w.(http.Hijacker)
+	opened, ok := s.openTunnel(w, host, port, entry, guard || s.carriedByGuard(entry), deadline)
 	if !ok {
 		s.pending.end(pending)
-		_ = raw.Close()
-		http.Error(w, "the connection cannot be tunneled", http.StatusInternalServerError)
 		return
+	}
+	if opened.plain {
+		// A ws: URL tunnels plain HTTP while the browser sends every scheme
+		// here; there is no TLS to end.
+		s.pending.end(pending)
+		s.splice(opened.client, opened.raw)
+		return
+	}
+	if s.carriedByGuard(entry) && !s.intercepted(host, port) {
+		s.passOrTunnel(opened.client, opened.raw, opened.via, host, port, deadline, pending)
+		return
+	}
+	s.tunnel(opened.client, opened.raw, opened.via, host, entry, deadline, pending)
+}
+
+// openedTunnel is a tunnel the browser opened with a CONNECT request.
+type openedTunnel struct {
+	// client is the browser's side, and raw the site's.
+	client, raw net.Conn
+	via         route
+	// plain is set for a tunnel that carries no TLS, which the browser opens
+	// for a ws: URL while it sends every request here.
+	plain bool
+}
+
+// openTunnel reaches host and port and answers the browser's CONNECT
+// request with a tunnel there, or with why there is none. guarded is set
+// when the guard carries host, which a proxy asking for credentials stops.
+// While the browser sends every request here, the route depends on what the
+// tunnel carries, which shows only once it is open: the URL Chrome hands a
+// PAC script is an https: one for TLS and the ws: URL of the request
+// otherwise. A site that cannot be reached then ends the open tunnel.
+func (s *server) openTunnel(w http.ResponseWriter, host, port string, entry *upstreamEntry, guarded bool, deadline time.Time) (openedTunnel, bool) {
+	ctx, cancel := context.WithDeadline(s.ctx, deadline)
+	defer cancel()
+	var opened openedTunnel
+	if !s.carryAll {
+		var err error
+		if opened.raw, opened.via, err = s.reach(ctx, pacRequestURL(tlsScheme, host, port, "/"), host, port, entry); err != nil {
+			if s.unreachable(host, entry, guarded, err) {
+				// A reset connection makes the browser try the route after the
+				// guard; a closed guard keeps it on that route.
+				resetConnection(w)
+				return openedTunnel{}, false
+			}
+			http.Error(w, "the certificate proxy could not reach the site", http.StatusBadGateway)
+			return openedTunnel{}, false
+		}
+	}
+	conn, reader, ok := establish(w)
+	if !ok {
+		if opened.raw != nil {
+			_ = opened.raw.Close()
+		}
+		return openedTunnel{}, false
+	}
+	// sent is what the proxy read of the browser's request, which the site
+	// still gets.
+	var sent []byte
+	if s.carryAll {
+		rawURL := pacRequestURL(tlsScheme, host, port, "/")
+		// A loopback destination's route never depends on its URL.
+		if opened.plain = !carriesTLS(conn, reader, deadline); opened.plain && !implicitBypass(host) {
+			var target string
+			target, sent = readRequestTarget(conn, reader, deadline)
+			rawURL = pacRequestURL(plainScheme, host, port, target)
+		}
+		var err error
+		if opened.raw, opened.via, err = s.reach(ctx, rawURL, host, port, entry); err != nil {
+			s.unreachable(host, entry, guarded, err)
+			_ = conn.Close()
+			return openedTunnel{}, false
+		}
+	}
+	opened.client = conn
+	if reader.Buffered() > 0 || len(sent) > 0 {
+		opened.client = &bufferedConn{Conn: conn, reader: reader}
+	}
+	if len(sent) > 0 {
+		opened.client = replayed(opened.client, sent)
+	}
+	return opened, true
+}
+
+// establish takes over the connection of the CONNECT request w answers and
+// tells the browser its tunnel is open. It returns the connection and what
+// was buffered from it.
+func establish(w http.ResponseWriter) (net.Conn, *bufio.Reader, bool) {
+	hijacker, ok := w.(http.Hijacker)
+	if !ok {
+		http.Error(w, "the connection cannot be tunneled", http.StatusInternalServerError)
+		return nil, nil, false
 	}
 	conn, buffered, err := hijacker.Hijack()
 	if err != nil {
-		s.pending.end(pending)
-		_ = raw.Close()
-		return
+		return nil, nil, false
 	}
 	if _, err := io.WriteString(conn, connectEstablished); err != nil {
-		s.pending.end(pending)
-		_ = raw.Close()
 		_ = conn.Close()
-		return
+		return nil, nil, false
 	}
-	client := conn
-	if buffered.Reader.Buffered() > 0 {
-		client = &bufferedConn{Conn: conn, reader: buffered.Reader}
+	return conn, buffered.Reader, true
+}
+
+// unreachable records why host could not be reached, and reports whether
+// the guard stopped instead, which a proxy asking for credentials does to a
+// guarded host.
+func (s *server) unreachable(host string, entry *upstreamEntry, guarded bool, err error) bool {
+	if guarded && errors.Is(err, errProxyAuth) {
+		s.stopGuard(host)
+		return true
 	}
-	s.tunnel(client, raw, via, host, entry, pending)
+	s.reportUnreachable(host, entry, err)
+	return false
+}
+
+// reportUnreachable records why the proxy could not reach host.
+func (s *server) reportUnreachable(host string, entry *upstreamEntry, err error) {
+	kind := EventUpstream
+	if errors.Is(err, errProxyAuth) {
+		kind = EventProxyAuth
+	}
+	s.events.add(kind, host, entry.label, fmt.Sprintf("the certificate proxy could not reach %s: %s", host, oneLine(err)))
 }
 
 // stopGuard closes the guard, so the browser sends the requests it carried
@@ -304,9 +424,12 @@ func (s *server) stopGuard(host string) {
 	}
 	_ = guard.Close()
 	s.verified.dropGuarded()
+	detail := "sites without a client certificate now go through the browser's own route; one of them that asks for a client certificate can make the system prompt for it"
+	if s.carryAll {
+		detail = "requests stay on the certificate proxy, which is also carrying a loopback destination, so those sites cannot fall through to the browser"
+	}
 	s.events.add(EventGuardOff, host, "", fmt.Sprintf(
-		"the device's proxy asks %s for credentials the certificate proxy cannot give, so sites without a client certificate "+
-			"now go through the browser's own route; one of them that asks for a client certificate can make the system prompt for it", host))
+		"the device's proxy asks %s for credentials the certificate proxy cannot give, so %s", host, detail))
 }
 
 // resetConnection resets the connection of the request w answers, which
@@ -376,6 +499,79 @@ func (s *server) scopedEntry(host string) *upstreamEntry {
 	return entry
 }
 
+// guardListening reports whether the guard still accepts connections.
+func (s *server) guardListening() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.guard != nil
+}
+
+// relayOpaque tunnels host without ending its TLS, so the browser verifies
+// the server itself and a configured authority is not applied to it.
+func (s *server) relayOpaque(w http.ResponseWriter, host, port string) {
+	pending := s.pending.start(host)
+	opened, ok := s.openTunnel(w, host, port, s.guardEntry, false, time.Now().Add(handshakeTimeout))
+	// Past reaching the site, the proxy waits on nothing of its own.
+	s.pending.end(pending)
+	if ok {
+		s.splice(opened.client, opened.raw)
+	}
+}
+
+// splice relays the bytes between client and raw, without reading them,
+// until both directions end.
+func (s *server) splice(client, raw net.Conn) {
+	if !s.track(client) {
+		_ = client.Close()
+		_ = raw.Close()
+		return
+	}
+	defer s.untrack(client)
+	done := make(chan struct{})
+	go func() {
+		_, _ = io.Copy(raw, client)
+		_ = raw.Close()
+		close(done)
+	}()
+	_, _ = io.Copy(client, raw)
+	_ = client.Close()
+	<-done
+}
+
+// readRequestTarget reads the request line a plain tunnel starts with and
+// returns its target, as /socket in "GET /socket HTTP/1.1", with the bytes
+// it read. A line that has not ended by deadline, or within the longest URL
+// Chrome sends, gives /.
+func readRequestTarget(conn net.Conn, reader *bufio.Reader, deadline time.Time) (string, []byte) {
+	_ = conn.SetReadDeadline(deadline)
+	defer func() { _ = conn.SetReadDeadline(time.Time{}) }()
+	var line []byte
+	for len(line) <= maxURLBytes {
+		chunk, err := reader.ReadSlice('\n')
+		line = append(line, chunk...)
+		if err == nil {
+			if fields := strings.Fields(string(line)); len(fields) == 3 && strings.HasPrefix(fields[1], "/") {
+				return fields[1], line
+			}
+			break
+		}
+		if !errors.Is(err, bufio.ErrBufferFull) {
+			break
+		}
+	}
+	return "/", line
+}
+
+// carriesTLS reports whether what the client sends over conn, read through
+// reader, starts with a TLS handshake record. A client still silent at
+// deadline counts as TLS, which fails the same way.
+func carriesTLS(conn net.Conn, reader *bufio.Reader, deadline time.Time) bool {
+	_ = conn.SetReadDeadline(deadline)
+	first, err := reader.Peek(1)
+	_ = conn.SetReadDeadline(time.Time{})
+	return err != nil || first[0] == recordTypeHandshake
+}
+
 // carriedByGuard reports whether entry is the guard's own, which only the
 // hosts no entry or authority names use.
 func (s *server) carriedByGuard(entry *upstreamEntry) bool {
@@ -384,8 +580,9 @@ func (s *server) carriedByGuard(entry *upstreamEntry) bool {
 
 // tunnel relays the browser's connection to the server reached over raw.
 // The browser's handshake waits for the one with the server, so it learns
-// the server's application protocol, and fails when that one does.
-func (s *server) tunnel(client, raw net.Conn, via route, host string, entry *upstreamEntry, pending int64) {
+// the server's application protocol, and fails when that one does or by
+// deadline.
+func (s *server) tunnel(client, raw net.Conn, via route, host string, entry *upstreamEntry, deadline time.Time, pending int64) {
 	defer s.pending.end(pending)
 	if !s.track(client) {
 		_ = client.Close()
@@ -415,7 +612,7 @@ func (s *server) tunnel(client, raw net.Conn, via route, host string, entry *ups
 			return config, nil
 		},
 	})
-	ctx, cancel := context.WithTimeout(s.ctx, handshakeTimeout)
+	ctx, cancel := context.WithDeadline(s.ctx, deadline)
 	err := downstream.HandshakeContext(ctx)
 	cancel()
 	if err != nil {
@@ -429,14 +626,25 @@ func (s *server) tunnel(client, raw net.Conn, via route, host string, entry *ups
 }
 
 // reach connects to host and port on the route the device's proxy settings
-// give it.
-func (s *server) reach(ctx context.Context, host, port string, entry *upstreamEntry) (net.Conn, route, error) {
-	found := s.pac.routes(ctx, pacRequestURL(host, port), host)
+// give rawURL.
+func (s *server) reach(ctx context.Context, rawURL, host, port string, entry *upstreamEntry) (net.Conn, route, error) {
+	routes := s.routesTo(ctx, rawURL, host, entry.label)
+	return dialRoutes(ctx, routes, net.JoinHostPort(host, port), s.proxyTLS)
+}
+
+// routesTo returns the routes to rawURL, whose host is host. Chrome never
+// sends a destination it implicitly bypasses to a proxy, and never asks
+// the device's proxy settings about it, so neither does the proxy.
+func (s *server) routesTo(ctx context.Context, rawURL, host, label string) []route {
+	if implicitBypass(host) {
+		return []route{{kind: routeDirect}}
+	}
+	found := s.pac.routes(ctx, rawURL, host)
 	for _, skipped := range found.skipped {
-		s.events.add(EventUpstream, host, entry.label, fmt.Sprintf(
+		s.events.add(EventUpstream, host, label, fmt.Sprintf(
 			"the device's proxy settings route %s through %s, which the certificate proxy does not support; it tries the next route", host, skipped))
 	}
-	return dialRoutes(ctx, found.routes, net.JoinHostPort(host, port), s.proxyTLS)
+	return found.routes
 }
 
 // proxyTLS returns the TLS configuration for an HTTPS proxy at host. An
@@ -615,16 +823,24 @@ func (s *server) closeTunnels() {
 	}
 }
 
-// pacRequestURL returns the URL a browser hands a PAC script for an https:
-// connection to host and port.
-func pacRequestURL(host, port string) string {
-	if port == defaultTLSPort {
-		if addr, err := netip.ParseAddr(host); err == nil && addr.Is6() {
-			return "https://[" + host + "]/"
-		}
-		return "https://" + host + "/"
+// pacRequestURL returns the URL a browser hands a PAC script for a scheme
+// request for target at host and port, scheme being tlsScheme or
+// plainScheme. A browser keeps the target of a ws: URL only.
+func pacRequestURL(scheme, host, port, target string) string {
+	if scheme != plainScheme {
+		target = "/"
 	}
-	return "https://" + net.JoinHostPort(host, port) + "/"
+	defaultPort := defaultTLSPort
+	if scheme == plainScheme {
+		defaultPort = defaultPlainPort
+	}
+	if port == defaultPort {
+		if addr, err := netip.ParseAddr(host); err == nil && addr.Is6() {
+			return scheme + "://[" + host + "]" + target
+		}
+		return scheme + "://" + host + target
+	}
+	return scheme + "://" + net.JoinHostPort(host, port) + target
 }
 
 // oneLine joins the lines of err, which errors.Join separates.

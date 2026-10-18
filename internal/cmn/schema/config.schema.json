@@ -1113,6 +1113,10 @@
           "description": "Coordinator HTTP health check port. Default: 8091. Set to 0 to disable.",
           "minimum": 0,
           "maximum": 65535
+        },
+        "worker_wait_timeout": {
+          "type": "string",
+          "description": "How long a dispatch with no healthy worker matching its selector is held, as a queued run, for such a worker to register before the run fails. Default: '2m'. Set to '0' to refuse the dispatch at once."
         }
       }
     },

@@ -12,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sys/windows"
 )
 
 // SendInput rejects events whose size differs from the platform's INPUT.
@@ -24,6 +25,36 @@ func TestInputMatchesWin32Layout(t *testing.T) {
 	}
 	assert.Equal(t, want, unsafe.Sizeof(input{}))
 	assert.LessOrEqual(t, unsafe.Sizeof(keybdInput{}), unsafe.Sizeof(mouseInput{}))
+}
+
+// Only an active session draws; every other connect state is reported as a
+// disconnected session, which is not a locked screen.
+func TestSessionProblemForState(t *testing.T) {
+	t.Parallel()
+
+	_, ok := sessionProblemForState(windows.WTSActive)
+	assert.False(t, ok)
+
+	for name, state := range map[string]uint32{
+		"connected":    windows.WTSConnected,
+		"disconnected": windows.WTSDisconnected,
+		"idle":         windows.WTSIdle,
+	} {
+		problem, ok := sessionProblemForState(state)
+		require.True(t, ok, name)
+		assert.Equal(t, "session_disconnected", problem.Code, name)
+		assert.Contains(t, problem.Message, "disconnected", name)
+	}
+}
+
+// The current session is always listed, in session 0 as well, so the lookup
+// itself never fails; what it reports depends on where the test runs.
+func TestSessionConnectState(t *testing.T) {
+	t.Parallel()
+
+	state, err := sessionConnectState()
+	require.NoError(t, err)
+	assert.LessOrEqual(t, state, uint32(windows.WTSInit))
 }
 
 // e2eDesktop skips unless the test runs on an interactive desktop, which

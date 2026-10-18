@@ -1506,6 +1506,20 @@ func (a *Agent) buildOutputs(ctx context.Context, finalStatus ir.Status) *ir.DAG
 	}
 }
 
+// DryRunChecks returns the problems a dry run recorded, in run order.
+// It is empty when the run recorded none.
+func (a *Agent) DryRunChecks() []runtime.DryRunCheck {
+	a.lock.RLock()
+	runner := a.runner
+	plan := a.plan
+	a.lock.RUnlock()
+
+	if runner == nil {
+		return nil
+	}
+	return runner.DryRunChecks(plan)
+}
+
 func (a *Agent) PrintSummary(ctx context.Context) {
 	// Always print tree-structured summary after execution
 	status := a.Status(ctx)
@@ -2534,7 +2548,9 @@ func (a *Agent) setupStepRetryPlan(nodes []*runtime.Node) (*runtime.Plan, error)
 
 // setupDefaultRetryPlan sets up the plan for the default retry behavior (all failed/canceled nodes and downstreams).
 func (a *Agent) setupDefaultRetryPlan(ctx context.Context, nodes []*runtime.Node) (*runtime.Plan, error) {
-	plan, err := runtime.CreateRetryPlan(ctx, a.dag, nodes...)
+	plan, err := runtime.CreateRetryPlanWithOptions(ctx, a.dag, runtime.RetryPlanOptions{
+		Resume: a.retryTarget != nil && a.retryTarget.Status == ir.Queued && a.retryTarget.Resume,
+	}, nodes...)
 	if err != nil {
 		return nil, err
 	}

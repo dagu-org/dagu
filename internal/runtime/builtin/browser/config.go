@@ -43,6 +43,14 @@ const (
 	screenshotsNever = "never"
 )
 
+// How much AI decides for an act or an upload: the model every run, the
+// model only when a replay misses, or never.
+const (
+	aiEveryRun = "every_run"
+	aiOnMiss   = "on_miss"
+	aiNever    = "never"
+)
+
 const (
 	defaultOperationTimeout = 2 * time.Minute
 	defaultAskTimeout       = time.Hour
@@ -58,6 +66,7 @@ type config struct {
 	URL       string            `json:"url,omitempty"`
 	Browser   browserOptions    `json:"browser"`
 	Variables map[string]string `json:"variables,omitempty"`
+	AI        string            `json:"ai,omitempty"`
 	Cache     *bool             `json:"cache,omitempty"`
 	Do        []operation       `json:"do"`
 }
@@ -97,6 +106,7 @@ type operation struct {
 
 type actSpec struct {
 	Instruction string `json:"instruction"`
+	AI          string `json:"ai,omitempty"`
 	Cache       *bool  `json:"cache,omitempty"`
 }
 
@@ -106,6 +116,7 @@ type uploadSpec struct {
 	// Into describes the file input, or the button or area that opens the
 	// file picker; empty means the page's only file input.
 	Into  string `json:"into,omitempty"`
+	AI    string `json:"ai,omitempty"`
 	Cache *bool  `json:"cache,omitempty"`
 }
 
@@ -167,7 +178,7 @@ func (a *actSpec) UnmarshalJSON(data []byte) error {
 // MarshalJSON writes an act that sets nothing but its instruction as the
 // instruction string, the form it is usually written in.
 func (a actSpec) MarshalJSON() ([]byte, error) {
-	if a.Cache == nil {
+	if a.AI == "" && a.Cache == nil {
 		return json.Marshal(a.Instruction)
 	}
 	type plain actSpec
@@ -246,8 +257,50 @@ func (c config) headless() bool {
 	return c.Browser.Headless == nil || *c.Browser.Headless
 }
 
-func (c config) cacheEnabled() bool {
-	return c.Cache == nil || *c.Cache
+// choice returns the step's choice of how much AI decides. cache: false,
+// from before the choice existed, means every run.
+func (c config) choice() string {
+	switch {
+	case c.AI != "":
+		return c.AI
+	case c.Cache != nil && !*c.Cache:
+		return aiEveryRun
+	default:
+		return aiOnMiss
+	}
+}
+
+// operationChoice returns how much AI decides for an act or an upload with
+// the given settings: its own, or the step's.
+func (c config) operationChoice(ai string, cache *bool) string {
+	switch {
+	case ai != "":
+		return ai
+	case cache != nil && !*cache:
+		return aiEveryRun
+	default:
+		return c.choice()
+	}
+}
+
+// modelOperation returns the first operation that can call the model under
+// its choice, which is what makes the step need one.
+func (c config) modelOperation() (index int, kind string, found bool) {
+	for i, op := range c.Do {
+		switch {
+		case op.When != nil && op.When.judged():
+			return i, "when", true
+		case op.Expect != nil && op.Expect.judged():
+			return i, opExpect, true
+		case op.Extract != nil:
+			return i, opExtract, true
+		case op.Act != nil && c.operationChoice(op.Act.AI, op.Act.Cache) != aiNever:
+			return i, opAct, true
+		case op.Upload != nil && op.Upload.Into != "" && c.operationChoice(op.Upload.AI, op.Upload.Cache) != aiNever:
+			return i, opUpload, true
+		}
+	}
+	return 0, "", false
 }
 
 func (c config) screenshotPolicy() string {
@@ -289,19 +342,34 @@ func parseConfig(raw map[string]any) (config, error) {
 }
 
 func validateStep(step ir.Step) error {
-	if step.LLM == nil {
-		return errors.New("browser actions need a model: set llm at the DAG level or with.llm on the step")
-	}
+	_, err := checkStep(step)
+	return err
+}
+
+// checkStep parses and validates a step's configuration. A model is
+// required only when some operation can call one.
+func checkStep(step ir.Step) (config, error) {
 	cfg, err := parseConfig(step.ExecutorConfig.Config)
 	if err != nil {
-		return err
+		return cfg, err
 	}
-	return cfg.validate()
+	if err := cfg.validate(); err != nil {
+		return cfg, err
+	}
+	if step.LLM == nil {
+		if index, kind, found := cfg.modelOperation(); found {
+			return cfg, fmt.Errorf("browser actions need a model for do[%d] %s: set llm at the DAG level or with.llm on the step", index, kind)
+		}
+	}
+	return cfg, nil
 }
 
 func (c config) validate() error {
 	if len(c.Do) == 0 {
 		return errors.New("browser: with.do must list at least one operation")
+	}
+	if c.AI != "" && c.Cache != nil {
+		return errors.New("browser: set ai or cache, not both; cache: false means ai: every_run")
 	}
 	for name := range c.Variables {
 		if !agentstep.IdentifierPattern.MatchString(name) {
@@ -331,6 +399,9 @@ func (c config) validate() error {
 		if err := op.validate(); err != nil {
 			return fmt.Errorf("browser: do[%d]: %w", i, err)
 		}
+		if err := c.validateChoice(op); err != nil {
+			return fmt.Errorf("browser: do[%d]: %w", i, err)
+		}
 		if op.Act != nil {
 			for _, name := range agentstep.VariableReferences(op.Act.Instruction) {
 				_, isVariable := c.Variables[name]
@@ -358,6 +429,30 @@ func (c config) validate() error {
 			}
 			asks[op.Ask.As] = i
 		}
+	}
+	return nil
+}
+
+// validateChoice rejects an operation that cannot run under its choice of
+// how much AI decides. A statement is a judgment only the model can make,
+// and an extract reads the page only through the model.
+func (c config) validateChoice(o operation) error {
+	if c.choice() == aiNever {
+		if o.When != nil && o.When.judged() {
+			return errors.New("when is judged by AI, which ai: never on the step does not allow; use an exact check: {text}, {selector}, or {url}")
+		}
+		if o.Expect != nil && o.Expect.judged() {
+			return errors.New("expect is judged by AI, which ai: never on the step does not allow; use an exact check: {text}, {selector}, or {url}")
+		}
+		if o.Extract != nil {
+			return errors.New("extract reads the page with AI, which ai: never on the step does not allow")
+		}
+	}
+	switch {
+	case o.Act != nil && o.Act.AI != "" && o.Act.Cache != nil:
+		return errors.New("act: set ai or cache, not both; cache: false means ai: every_run")
+	case o.Upload != nil && o.Upload.AI != "" && o.Upload.Cache != nil:
+		return errors.New("upload: set ai or cache, not both; cache: false means ai: every_run")
 	}
 	return nil
 }
@@ -427,6 +522,11 @@ func (o operation) validate() error {
 	return nil
 }
 
+// aiSchema accepts a choice of how much AI decides.
+func aiSchema() *jsonschema.Schema {
+	return &jsonschema.Schema{Type: "string", Enum: []any{aiEveryRun, aiOnMiss, aiNever}}
+}
+
 // conditionSchema accepts a statement or an object with exactly one fixed
 // check.
 func conditionSchema() *jsonschema.Schema {
@@ -462,6 +562,7 @@ var operationSchema = &jsonschema.Schema{
 			Required:             []string{"instruction"},
 			Properties: map[string]*jsonschema.Schema{
 				"instruction": agentstep.NonEmptyString(),
+				"ai":          aiSchema(),
 				"cache":       {Type: "boolean"},
 			},
 		},
@@ -475,6 +576,7 @@ var operationSchema = &jsonschema.Schema{
 					{Type: "array", MinItems: new(1), Items: agentstep.NonEmptyString()},
 				}},
 				"into":  agentstep.NonEmptyString(),
+				"ai":    aiSchema(),
 				"cache": {Type: "boolean"},
 			},
 		},
@@ -567,6 +669,7 @@ var configSchema = &jsonschema.Schema{
 			},
 		},
 		"variables": {Type: "object", AdditionalProperties: agentstep.StringSchema()},
+		"ai":        aiSchema(),
 		"cache":     {Type: "boolean"},
 		"do":        {Type: "array", MinItems: new(1), Items: operationSchema},
 	},

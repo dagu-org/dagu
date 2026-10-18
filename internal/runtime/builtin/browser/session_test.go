@@ -7,10 +7,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -297,6 +299,61 @@ func TestSessionFailedAndSkippedOperations(t *testing.T) {
 		statuses = append(statuses, op.Status)
 	}
 	assert.Equal(t, []string{OperationFailed, OperationSkipped, OperationDone}, statuses)
+}
+
+// A page the site refused is reported by every command while the browser
+// shows it, and named in the failure of an operation on it. A bot check an
+// earlier command saw stays named while the page is the same, though a
+// reattached browser cannot tell it, as after a person reloads the page.
+func TestSessionReportsRefusedPage(t *testing.T) {
+	t.Parallel()
+
+	ts := newTestSessions(t, pageModel(nil))
+	ts.engine.pageText = "Just a moment..."
+	ts.engine.outcome = pageOutcome{Host: "shop.example.com", Status: 403, BotCheck: browserhost.BotCheckCloudflare}
+	botCheck := &SessionRefusal{
+		Host: "shop.example.com", Status: 403, BotCheck: browserhost.BotCheckCloudflare,
+		Message: "shop.example.com answered with a Cloudflare bot check (HTTP 403) in place of the page",
+	}
+	opened := ts.open(SessionOptions{URL: "https://shop.example.com/cart", LLM: testModel})
+	assert.Equal(t, botCheck, opened.Refused)
+
+	result, err := ts.do(opened.ID, `{"expect": {"text": "Cart"}, "timeout": "10ms"}`)
+	assert.Equal(t, CodeOperationFailed, sessionCode(err))
+	assert.Equal(t, botCheck, result.Refused)
+	assert.True(t, strings.HasSuffix(result.Error.Message, "; "+botCheck.Message), result.Error.Message)
+
+	ts.engine.outcome.BotCheck = ""
+	described, err := ts.sessions.Describe(ts.context(), DescribeRequest{ID: opened.ID})
+	require.NoError(t, err)
+	assert.Equal(t, botCheck, described.Refused)
+
+	ts.engine.outcome = pageOutcome{Host: "shop.example.com", Status: 200}
+	result, err = ts.do(opened.ID, `{"goto": "https://shop.example.com/cart"}`)
+	require.NoError(t, err)
+	assert.Nil(t, result.Refused)
+}
+
+// An operation the browser stopped answering leaves the page unread: the
+// refusal seen on it stays, for the commands that follow.
+func TestSessionKeepsRefusalWhenBrowserStopsAnswering(t *testing.T) {
+	t.Parallel()
+
+	files := writeFiles(t, t.TempDir(), "invoice.pdf")
+	ts := newTestSessions(t, pageModel(nil))
+	ts.engine.outcome = pageOutcome{Host: "shop.example.com", Status: 403, BotCheck: browserhost.BotCheckCloudflare}
+	opened := ts.open(SessionOptions{URL: "https://shop.example.com/receipts"})
+	require.NotNil(t, opened.Refused)
+
+	// The page now reads as fine, which only a read would report.
+	ts.engine.outcome = pageOutcome{Host: "shop.example.com", Status: 200}
+	ts.engine.uploadErr = fmt.Errorf("%w within 30s", errBrowserUnresponsive)
+	input, err := json.Marshal(map[string]any{"upload": map[string]any{"files": files}})
+	require.NoError(t, err)
+	result, err := ts.do(opened.ID, string(input))
+	assert.Equal(t, CodeOperationFailed, sessionCode(err))
+	assert.Equal(t, opened.Refused, result.Refused)
+	assert.Equal(t, browserhost.BotCheckCloudflare, ts.state(opened.ID).Page.Refused.BotCheck)
 }
 
 // A session opened without a model refuses the operations that ask one and

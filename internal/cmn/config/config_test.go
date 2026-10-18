@@ -127,6 +127,15 @@ func TestConfig_Validate(t *testing.T) {
 		assert.Contains(t, err.Error(), "coordinator.port and coordinator.health_port must be different")
 	})
 
+	t.Run("InvalidCoordinatorWorkerWaitTimeout", func(t *testing.T) {
+		t.Parallel()
+		cfg := validBaseConfig()
+		cfg.Coordinator.WorkerWaitTimeout = -time.Second
+		err := cfg.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid coordinator.worker_wait_timeout")
+	})
+
 	t.Run("ValidCoordinatorHealthPortDisabled", func(t *testing.T) {
 		t.Parallel()
 		cfg := validBaseConfig()

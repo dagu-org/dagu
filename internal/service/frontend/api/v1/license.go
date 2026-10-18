@@ -6,8 +6,10 @@ package api
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/dagucloud/dagu/v2/api/v1"
@@ -40,6 +42,7 @@ func toLicenseStatusResponse(status license.Status) api.LicenseStatusResponse {
 		WarningCode:  status.WarningCode,
 		Error:        status.Failure,
 		ServerName:   ptrOf(status.ServerName),
+		ReportedName: ptrOf(status.ReportedServerName),
 		LicenseId:    ptrOf(status.LicenseID),
 		Workspace:    ptrOf(status.Workspace),
 		ConnectedVia: ptrOf(api.LicenseStatusResponseConnectedVia(status.ConnectedVia)),
@@ -154,10 +157,18 @@ func (a *API) DeactivateLicense(ctx context.Context, _ api.DeactivateLicenseRequ
 }
 
 // StartLicenseConnect starts, or resumes, a request to connect this server to
-// Dagu Console.
-func (a *API) StartLicenseConnect(ctx context.Context, _ api.StartLicenseConnectRequestObject) (api.StartLicenseConnectResponseObject, error) {
+// Dagu Console. A report level in the request chooses what this server
+// reports once connected, unless configuration fixes it.
+func (a *API) StartLicenseConnect(ctx context.Context, request api.StartLicenseConnectRequestObject) (api.StartLicenseConnectResponseObject, error) {
 	if err := a.requireLicenseManagement(ctx); err != nil {
 		return nil, err
+	}
+	var report config.ReportLevel
+	if request.Body != nil && request.Body.Report != nil {
+		report = config.ReportLevel(*request.Body.Report)
+		if !knownReportLevel(report) {
+			return nil, unknownReportLevelError("report")
+		}
 	}
 
 	status, err := a.licenseManager.Connect()
@@ -167,7 +178,18 @@ func (a *API) StartLicenseConnect(ctx context.Context, _ api.StartLicenseConnect
 	case err != nil:
 		return nil, internalError(err)
 	}
-	return api.StartLicenseConnect200JSONResponse(toLicenseConnectStatus(status)), nil
+
+	if report != "" && a.cloudReport != nil {
+		// The configured level applies whatever the request chose.
+		if err := a.setReportLevel(ctx, report); err != nil && !errors.Is(err, cloudreport.ErrLevelConfigured) {
+			return nil, internalError(err)
+		}
+	}
+	described, err := a.licenseConnectStatus(ctx, status)
+	if err != nil {
+		return nil, internalError(err)
+	}
+	return api.StartLicenseConnect200JSONResponse(described), nil
 }
 
 // GetLicenseConnect returns the latest request to connect this server to
@@ -176,7 +198,37 @@ func (a *API) GetLicenseConnect(ctx context.Context, _ api.GetLicenseConnectRequ
 	if err := a.requireLicenseManagement(ctx); err != nil {
 		return nil, err
 	}
-	return api.GetLicenseConnect200JSONResponse(toLicenseConnectStatus(a.licenseManager.ConnectStatus())), nil
+	described, err := a.licenseConnectStatus(ctx, a.licenseManager.ConnectStatus())
+	if err != nil {
+		return nil, internalError(err)
+	}
+	return api.GetLicenseConnect200JSONResponse(described), nil
+}
+
+// licenseConnectStatus describes a connection request. Its connect URL names
+// the level this server reports at, if any, so that the approval page in
+// Dagu Console can state what is reported once connected. It fails when the
+// level cannot be read, rather than offer a link that may understate it.
+func (a *API) licenseConnectStatus(ctx context.Context, status license.ConnectStatus) (api.LicenseConnectStatus, error) {
+	if a.cloudReport == nil || status.URL == "" {
+		return toLicenseConnectStatus(status), nil
+	}
+	monitoring, err := a.cloudReport.Status(ctx)
+	if err != nil {
+		return api.LicenseConnectStatus{}, err
+	}
+	if !monitoring.Level.Reports() {
+		return toLicenseConnectStatus(status), nil
+	}
+	connectURL, err := url.Parse(status.URL)
+	if err != nil {
+		return api.LicenseConnectStatus{}, err
+	}
+	query := connectURL.Query()
+	query.Set("report", string(monitoring.Level))
+	connectURL.RawQuery = query.Encode()
+	status.URL = connectURL.String()
+	return toLicenseConnectStatus(status), nil
 }
 
 // CancelLicenseConnect abandons the pending request to connect this server
@@ -204,6 +256,46 @@ func (a *API) RefreshLicense(ctx context.Context, _ api.RefreshLicenseRequestObj
 		return nil, &Error{Code: api.ErrorCodeBadGateway, Message: "Dagu Console could not be reached. Try again later.", HTTPStatus: http.StatusBadGateway}
 	}
 	return api.RefreshLicense200JSONResponse(toLicenseStatusResponse(a.licenseManager.Status())), nil
+}
+
+// RenameLicenseServer sets the name Dagu Console shows for this server.
+func (a *API) RenameLicenseServer(ctx context.Context, request api.RenameLicenseServerRequestObject) (api.RenameLicenseServerResponseObject, error) {
+	if err := a.requireLicenseManagement(ctx); err != nil {
+		return nil, err
+	}
+	if request.Body == nil {
+		return nil, &Error{Code: api.ErrorCodeBadRequest, Message: "name is required", HTTPStatus: http.StatusBadRequest}
+	}
+
+	err := a.licenseManager.RenameServer(ctx, request.Body.Name)
+	if err != nil {
+		return nil, renameServerError(err)
+	}
+	a.logAudit(ctx, audit.CategorySystem, "license_server_rename", map[string]any{
+		"name": strings.TrimSpace(request.Body.Name),
+	})
+	return api.RenameLicenseServer200JSONResponse(toLicenseStatusResponse(a.licenseManager.Status())), nil
+}
+
+// renameServerError explains why renaming this server failed.
+func renameServerError(err error) error {
+	badRequest := func(message string) error {
+		return &Error{Code: api.ErrorCodeBadRequest, Message: message, HTTPStatus: http.StatusBadRequest}
+	}
+	switch {
+	case errors.Is(err, license.ErrServerNameTooLong):
+		return badRequest(fmt.Sprintf("Server names are at most %d characters.", license.MaxServerNameLength))
+	case errors.Is(err, license.ErrNoCheckIn):
+		return badRequest("This license does not check in with Dagu Console.")
+	case errors.Is(err, license.ErrRenameUnsupported):
+		return badRequest("Dagu Console does not support renaming servers yet.")
+	}
+	if cloudErr, ok := errors.AsType[*license.CloudError](err); ok &&
+		cloudErr.StatusCode >= 400 && cloudErr.StatusCode < 500 && cloudErr.StatusCode != http.StatusTooManyRequests {
+		return badRequest("Dagu Console refused the name: " + cloudErr.Message)
+	}
+	slog.Warn("License server rename failed", "error", err)
+	return &Error{Code: api.ErrorCodeBadGateway, Message: "Dagu Console could not be reached. Try again later.", HTTPStatus: http.StatusBadGateway}
 }
 
 func (a *API) requireLicenseManagement(ctx context.Context) error {
@@ -240,13 +332,8 @@ func (a *API) UpdateLicenseMonitoring(ctx context.Context, request api.UpdateLic
 	if request.Body == nil {
 		return nil, &Error{Code: api.ErrorCodeBadRequest, Message: "level is required", HTTPStatus: http.StatusBadRequest}
 	}
-	previous, err := a.cloudReport.Status(ctx)
-	if err != nil {
-		return nil, internalError(err)
-	}
 
-	level := config.ReportLevel(request.Body.Level)
-	err = a.cloudReport.SetLevel(ctx, level)
+	err := a.setReportLevel(ctx, config.ReportLevel(request.Body.Level))
 	switch {
 	case errors.Is(err, cloudreport.ErrLevelConfigured):
 		return nil, &Error{
@@ -255,24 +342,51 @@ func (a *API) UpdateLicenseMonitoring(ctx context.Context, request api.UpdateLic
 			HTTPStatus: http.StatusConflict,
 		}
 	case errors.Is(err, cloudreport.ErrUnknownLevel):
-		return nil, &Error{
-			Code:       api.ErrorCodeBadRequest,
-			Message:    "level must be one of: off, health, runs",
-			HTTPStatus: http.StatusBadRequest,
-		}
+		return nil, unknownReportLevelError("level")
 	case err != nil:
 		return nil, internalError(err)
 	}
-	a.logAudit(ctx, audit.CategorySystem, "cloud_report_update", map[string]any{
-		"level":          level,
-		"previous_level": previous.Level,
-	})
 
 	status, err := a.licenseMonitoring(ctx)
 	if err != nil {
 		return nil, err
 	}
 	return api.UpdateLicenseMonitoring200JSONResponse(status), nil
+}
+
+// setReportLevel chooses what this server reports to Dagu Console and audits
+// the change. It fails as Monitoring.SetLevel does.
+func (a *API) setReportLevel(ctx context.Context, level config.ReportLevel) error {
+	previous, err := a.cloudReport.Status(ctx)
+	if err != nil {
+		return err
+	}
+	if err := a.cloudReport.SetLevel(ctx, level); err != nil {
+		return err
+	}
+	a.logAudit(ctx, audit.CategorySystem, "cloud_report_update", map[string]any{
+		"level":          level,
+		"previous_level": previous.Level,
+	})
+	return nil
+}
+
+func knownReportLevel(level config.ReportLevel) bool {
+	switch level {
+	case config.ReportOff, config.ReportHealth, config.ReportRuns:
+		return true
+	}
+	return false
+}
+
+// unknownReportLevelError rejects the report level in the request field
+// named field.
+func unknownReportLevelError(field string) error {
+	return &Error{
+		Code:       api.ErrorCodeBadRequest,
+		Message:    field + " must be one of: off, health, runs",
+		HTTPStatus: http.StatusBadRequest,
+	}
 }
 
 // DismissLicenseMonitoringNotice stops asking administrators what this server

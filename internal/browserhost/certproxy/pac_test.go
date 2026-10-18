@@ -333,14 +333,15 @@ func TestParsePACResult(t *testing.T) {
 		"PROXY a:8080; SOCKS b:1080; HTTPS c; SOCKS5 d:1081; DIRECT": {
 			routes: []route{
 				{kind: routeProxy, addr: "a:8080"},
+				{kind: routeSOCKS4, addr: "b:1080"},
 				{kind: routeHTTPS, addr: "c:443"},
 				{kind: routeSOCKS5, addr: "d:1081"},
 				{kind: routeDirect},
 			},
-			skipped: []string{"SOCKS b:1080"},
 		},
 		"proxy a ; http [::1]": {routes: []route{{kind: routeProxy, addr: "a:80"}, {kind: routeProxy, addr: "[::1]:80"}}},
-		"SOCKS4 x:1":           {skipped: []string{"SOCKS4 x:1"}},
+		"SOCKS4 x:1":           {routes: []route{{kind: routeSOCKS4, addr: "x:1"}}},
+		"QUIC x:1":             {skipped: []string{"QUIC x:1"}},
 		"PROXY":                {skipped: []string{"PROXY"}},
 		"SOCKS5 s":             {routes: []route{{kind: routeSOCKS5, addr: "s:1080"}}},
 	} {

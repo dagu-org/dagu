@@ -31,6 +31,10 @@ type operator struct {
 	allowedDomains []string
 	// recorder replays and records acts; nil when acts do neither.
 	recorder actRecorder
+	// choice returns how much AI decides for an act or an upload with the
+	// given settings. nil, as in a browser session, decides on_miss for
+	// each and records only those whose cache is on.
+	choice func(ai string, cache *bool) string
 	// shots stores the screenshots screenshot operations take.
 	shots *agentstep.ArtifactStore
 	// workDir resolves the relative paths of the files uploads give; empty
@@ -60,6 +64,22 @@ type actRecorder interface {
 	lookup(key string) ([]recordedAction, bool)
 	stage(key string, actions []recordedAction)
 	drop(key string)
+}
+
+// noRecording is why an act or an upload that may not call the model
+// cannot run when there is nothing to replay.
+const noRecording = "there is no recording of it on this host"
+
+// replayMiss is the failure of an act or an upload that may not call the
+// model: its recording is missing or no longer fits the page. The recording
+// is kept for a run that lets the model repair it.
+type replayMiss struct {
+	kind   string
+	reason string
+}
+
+func (m replayMiss) Error() string {
+	return fmt.Sprintf("the %s cannot run without AI: %s", m.kind, m.reason)
 }
 
 // opResult is what one operation did.
@@ -150,6 +170,17 @@ func (o *operator) checkNavigation(ctx context.Context, index int, target string
 	return certificateFailure(page, failures, o.presented, o.certificateProxy)
 }
 
+// pageRefusal returns the refusal the page shows, if it shows one. A page a
+// client certificate kept from opening is the certificate's to explain, and
+// a page that cannot be read shows none.
+func (o *operator) pageRefusal(ctx context.Context) (refusal, bool) {
+	page, err := o.eng.PageOutcome(ctx)
+	if err != nil || certificateFailure(page, nil, o.presented, o.certificateProxy) != nil {
+		return refusal{}, false
+	}
+	return refusalOf(page)
+}
+
 // explainWait adds to err the connections the certificate proxy still waits
 // on, which tell where an operation that timed out got stuck.
 func (o *operator) explainWait(ctx context.Context, err error) error {
@@ -230,7 +261,7 @@ func (o *operator) act(ctx context.Context, index int, spec actSpec, timeout tim
 	// The document the page shows before the act tells whether an act that
 	// lost the page took effect. It stays empty when the page cannot be read.
 	document, _ := o.eng.DocumentID(ctx)
-	recorded := o.recorder != nil && (spec.Cache == nil || *spec.Cache)
+	choice, recorded := o.decide(spec.AI, spec.Cache)
 	key, pageURL := "", ""
 	if recorded {
 		var err error
@@ -240,20 +271,29 @@ func (o *operator) act(ctx context.Context, index int, spec actSpec, timeout tim
 		key = replayKey(index, spec.Instruction, pageURL)
 	}
 	status := agentstep.StatusCompleted
-	if actions, ok := o.lookup(key); ok {
+	actions, ok := o.recording(choice, key)
+	if !ok && choice == aiNever {
+		return opResult{}, replayMiss{kind: opAct, reason: noRecording}
+	}
+	if ok {
 		replayed, err := o.replay(ctx, actions, document, timeout)
 		if err != nil {
 			return opResult{}, err
 		}
-		if replayed {
+		if replayed == len(actions) {
 			return opResult{
 				Report: agentstep.Report{
-					Index: index, Kind: opAct, Subject: spec.Instruction, Status: agentstep.StatusCacheHit,
+					Index: index, Kind: opAct, Subject: spec.Instruction, Status: agentstep.StatusCacheHit, Via: agentstep.ViaElement,
 					Detail: describeActions(actions), Duration: time.Since(began),
 				},
 				Actions: actions,
 				PageURL: pageURL,
 			}, nil
+		}
+		if choice == aiNever {
+			return opResult{}, replayMiss{kind: opAct, reason: fmt.Sprintf(
+				"recorded action %d of %d, %s, did not replay: its element is gone, hidden, or no longer the one recorded",
+				replayed+1, len(actions), describeActions(actions[replayed:replayed+1]))}
 		}
 		status = agentstep.StatusHealed
 		// The recording is dropped unless the act that heals it records what
@@ -284,13 +324,36 @@ func (o *operator) act(ctx context.Context, index int, spec actSpec, timeout tim
 	}
 	return opResult{
 		Report: agentstep.Report{
-			Index: index, Kind: opAct, Subject: spec.Instruction, Status: status,
+			Index: index, Kind: opAct, Subject: spec.Instruction, Status: status, Via: agentstep.ViaModel,
 			Detail: detail, Tokens: o.bridge.totals().sub(before).total(),
 			Duration: time.Since(began),
 		},
 		Actions: outcome.Actions,
 		PageURL: pageURL,
 	}, nil
+}
+
+// decide returns how much AI decides for an act or an upload with the given
+// settings, and whether what it does is recorded. A step records under
+// every choice, so a later switch to replaying starts with a recording.
+func (o *operator) decide(ai string, cache *bool) (choice string, recorded bool) {
+	switch {
+	case o.recorder == nil:
+		return aiOnMiss, false
+	case o.choice == nil:
+		return aiOnMiss, cache == nil || *cache
+	default:
+		return o.choice(ai, cache), true
+	}
+}
+
+// recording returns the actions recorded under key when the choice replays
+// them. Under every_run nothing is looked up, so nothing counts as replayed.
+func (o *operator) recording(choice, key string) ([]recordedAction, bool) {
+	if choice == aiEveryRun {
+		return nil, false
+	}
+	return o.lookup(key)
 }
 
 // lookup returns the actions recorded under key, if there are any.
@@ -302,13 +365,14 @@ func (o *operator) lookup(key string) ([]recordedAction, bool) {
 	return actions, ok && len(actions) > 0
 }
 
-// replay performs recorded actions in order and reports whether every one
-// succeeded. document identifies the page's document before the first. An
-// action that lost the page is judged by the document it started on: a new
-// document means it took effect, and the next action runs there; the same
-// document means it did not, and the replay ends so the model acts instead,
-// unless the action lost its script context, as loadedNewDocument says.
-func (o *operator) replay(ctx context.Context, actions []recordedAction, document string, timeout time.Duration) (bool, error) {
+// replay performs recorded actions in order and returns how many
+// succeeded, stopping at the first that did not. document identifies the
+// page's document before the first. An action that lost the page is judged
+// by the document it started on: a new document means it took effect, and
+// the next action runs there; the same document means it did not, and the
+// replay ends so the model acts instead, unless the action lost its script
+// context, as loadedNewDocument says.
+func (o *operator) replay(ctx context.Context, actions []recordedAction, document string, timeout time.Duration) (int, error) {
 	for i, action := range actions {
 		if i > 0 {
 			document, _ = o.eng.DocumentID(ctx)
@@ -318,10 +382,10 @@ func (o *operator) replay(ctx context.Context, actions []recordedAction, documen
 			replayed, err = o.loadedNewDocument(ctx, document, err)
 		}
 		if err != nil || !replayed {
-			return false, err
+			return i, err
 		}
 	}
-	return true, nil
+	return len(actions), nil
 }
 
 // performAct runs an act and judges one that lost the page by the page's
@@ -394,7 +458,7 @@ func (o *operator) extract(ctx context.Context, index int, spec extractSpec, tim
 	}
 	return opResult{
 		Report: agentstep.Report{
-			Index: index, Kind: opExtract, Subject: spec.Instruction, Status: agentstep.StatusCompleted,
+			Index: index, Kind: opExtract, Subject: spec.Instruction, Status: agentstep.StatusCompleted, Via: agentstep.ViaModel,
 			Detail: string(data), Tokens: o.bridge.totals().sub(before).total(), Duration: time.Since(began),
 		},
 		Values: published,
@@ -414,7 +478,7 @@ func (o *operator) expect(ctx context.Context, index int, c condition, timeout t
 		return opResult{}, fmt.Errorf("expectation not met: %s", reason)
 	}
 	return opResult{Report: agentstep.Report{
-		Index: index, Kind: opExpect, Subject: c.String(), Status: agentstep.StatusCompleted, Detail: reason,
+		Index: index, Kind: opExpect, Subject: c.String(), Status: agentstep.StatusCompleted, Via: c.via(), Detail: reason,
 		Tokens: o.bridge.totals().sub(before).total(), Duration: time.Since(began),
 	}}, nil
 }

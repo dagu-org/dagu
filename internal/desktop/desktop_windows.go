@@ -234,6 +234,12 @@ func Check() Diagnostics {
 		diag.Problems = append(diag.Problems, Problem{Code: problemServiceSession, Message: "the process runs in session 0, which has no desktop; run the worker in a logged-in user session instead of as a service"})
 		return diag
 	}
+	// A disconnected session also shows the Winlogon desktop and keeps its
+	// last display size, so it must be named before those checks run.
+	if problem, ok := sessionProblem(); ok {
+		diag.Problems = append(diag.Problems, problem)
+		return diag
+	}
 	if problem, ok := inputDesktopProblem(); ok {
 		diag.Problems = append(diag.Problems, problem)
 	}
@@ -332,6 +338,11 @@ type windowsBackend struct {
 // Capture fails while another desktop has the input, since the user's
 // desktop then captures without error but shows nothing current.
 func (windowsBackend) Capture() (*image.RGBA, error) {
+	// A session whose client has gone keeps serving its last picture; the
+	// next read of the screen names that instead of acting on a stale image.
+	if problem, ok := sessionProblem(); ok {
+		return nil, errors.New(problem.Message)
+	}
 	if problem, ok := inputDesktopProblem(); ok {
 		return nil, errors.New(problem.Message)
 	}

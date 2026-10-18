@@ -93,8 +93,12 @@ type dispatchTaskIndexEntry struct {
 	hasTask        bool
 	enqueuedAt     int64
 	claimedAt      int64
-	createdAt      time.Time
-	updatedAt      time.Time
+	// holdUntil is the task's HoldUntil in Unix milliseconds, 0 when the
+	// task was not held for a worker. A held record outlives the reservation
+	// TTL and is dropped by the coordinator, never by expiry.
+	holdUntil int64
+	createdAt time.Time
+	updatedAt time.Time
 }
 
 type dispatchTaskPayload struct {
@@ -299,6 +303,9 @@ func (idx *dispatchTaskIndex) hasExpired(now time.Time, ttl time.Duration) bool 
 		return false
 	}
 	for _, entry := range idx.pending {
+		if entry.holdUntil != 0 {
+			continue
+		}
 		enqueuedAt := dispatchRecordTimestamp(entry.enqueuedAt, entry.createdAt)
 		if now.Sub(enqueuedAt) >= ttl {
 			return true
@@ -352,8 +359,21 @@ func dispatchTaskIndexEntryFromRecord(rec *persis.Record, payload dispatchTaskPa
 		entry.attemptKey = payload.Task.AttemptKey
 		entry.targetWorkerID = payload.Task.TargetWorkerID
 		entry.workerSelector = maps.Clone(payload.Task.WorkerSelector)
+		if !payload.Task.HoldUntil.IsZero() {
+			entry.holdUntil = payload.Task.HoldUntil.UnixMilli()
+		}
 	}
 	return entry
+}
+
+// heldState tells a held pending task apart from an ordinary one: a held task
+// is never recycled by the reservation TTL, and once its wait has passed it
+// is no longer claimable and waits for the coordinator to drop it.
+func heldState(holdUntil time.Time, now time.Time) (held, expired bool) {
+	if holdUntil.IsZero() {
+		return false, false
+	}
+	return true, !now.Before(holdUntil)
 }
 
 // dispatchNoMatchKey identifies a worker and label set in the no-match
@@ -647,7 +667,13 @@ func (s *DispatchTaskStore) claimNextPending(ctx context.Context, claim dispatch
 			continue
 		}
 		enqueuedAt := dispatchRecordTimestamp(payload.EnqueuedAt, rec.CreatedAt)
-		if now.Sub(enqueuedAt) >= s.reservationTTL {
+		held, holdExpired := heldState(payload.Task.HoldUntil, now)
+		if holdExpired {
+			// The coordinator fails the run and drops the task.
+			s.index.addPending(rec, payload)
+			continue
+		}
+		if !held && now.Sub(enqueuedAt) >= s.reservationTTL {
 			if err := s.col.CompareAndDelete(ctx, rec); err != nil {
 				if errors.Is(err, persis.ErrNotFound) || errors.Is(err, persis.ErrConflict) {
 					s.index.removePending(id)
@@ -901,6 +927,88 @@ func (s *DispatchTaskStore) HasOutstandingAttempt(ctx context.Context, attemptKe
 	return false, nil
 }
 
+func taskHoldUntil(payload dispatchTaskPayload) time.Time {
+	if payload.Task == nil {
+		return time.Time{}
+	}
+	return payload.Task.HoldUntil
+}
+
+// ListExpiredHeld returns the held pending tasks whose wait has passed at now.
+// They stay in the store, unclaimable, until DeletePending removes them, so a
+// coordinator that fails between failing the run and dropping the task finds
+// the task again on its next pass.
+func (s *DispatchTaskStore) ListExpiredHeld(ctx context.Context, now time.Time) ([]*dispatch.DispatchTask, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if err := s.ensureDispatchIndex(ctx); err != nil {
+		return nil, err
+	}
+	var expired []*dispatch.DispatchTask
+	for _, id := range append([]string(nil), s.index.pendingIDs...) {
+		entry, ok := s.index.pending[id]
+		if !ok || entry.holdUntil == 0 || now.UnixMilli() < entry.holdUntil {
+			continue
+		}
+		rec, err := s.col.Get(ctx, id)
+		if err != nil {
+			if errors.Is(err, persis.ErrNotFound) {
+				s.index.removePending(id)
+				continue
+			}
+			return nil, err
+		}
+		payload, err := dispatchTaskPayloadFromRecord(rec)
+		if err != nil {
+			return nil, err
+		}
+		if _, holdExpired := heldState(taskHoldUntil(payload), now); !holdExpired {
+			s.index.addPending(rec, payload)
+			continue
+		}
+		expired = append(expired, cloneDispatchTask(payload.Task))
+	}
+	return expired, nil
+}
+
+// DeletePending removes the pending tasks of an attempt. A task a worker has
+// already claimed is not touched.
+func (s *DispatchTaskStore) DeletePending(ctx context.Context, attemptKey string) error {
+	if attemptKey == "" {
+		return nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if err := s.ensureDispatchIndex(ctx); err != nil {
+		return err
+	}
+	for _, id := range append([]string(nil), s.index.pendingIDs...) {
+		entry, ok := s.index.pending[id]
+		if !ok || entry.attemptKey != attemptKey {
+			continue
+		}
+		rec, err := s.col.Get(ctx, id)
+		if err != nil {
+			if errors.Is(err, persis.ErrNotFound) {
+				s.index.removePending(id)
+				continue
+			}
+			return err
+		}
+		if err := s.col.CompareAndDelete(ctx, rec); err != nil {
+			if errors.Is(err, persis.ErrNotFound) || errors.Is(err, persis.ErrConflict) {
+				s.index.removePending(id)
+				continue
+			}
+			return err
+		}
+		s.index.removePending(id)
+	}
+	return nil
+}
+
 func (s *DispatchTaskStore) recycleExpiredReservations(ctx context.Context) error {
 	if s.index == nil {
 		if err := s.rebuildDispatchIndex(ctx); err != nil {
@@ -1094,7 +1202,7 @@ func (s *DispatchTaskStore) recycleExpiredPending(ctx context.Context) error {
 	ids := append([]string(nil), s.index.pendingIDs...)
 	for _, id := range ids {
 		entry, ok := s.index.pending[id]
-		if !ok {
+		if !ok || entry.holdUntil != 0 {
 			continue
 		}
 		enqueuedAt := dispatchRecordTimestamp(entry.enqueuedAt, entry.createdAt)
@@ -1114,7 +1222,7 @@ func (s *DispatchTaskStore) recycleExpiredPending(ctx context.Context) error {
 			return err
 		}
 		enqueuedAt = dispatchRecordTimestamp(payload.EnqueuedAt, rec.CreatedAt)
-		if now.Sub(enqueuedAt) < s.reservationTTL {
+		if held, _ := heldState(taskHoldUntil(payload), now); held || now.Sub(enqueuedAt) < s.reservationTTL {
 			s.index.addPending(rec, payload)
 			continue
 		}

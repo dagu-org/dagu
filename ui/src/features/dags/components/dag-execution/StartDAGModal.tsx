@@ -403,7 +403,10 @@ function StartDAGModal({
     runConfig?: { disableParamEdit?: boolean; disableRunIdEdit?: boolean };
   };
 
-  const paramsReadOnly = dagWithRunConfig?.runConfig?.disableParamEdit ?? false;
+  // A workflow without parameters has none to lock, so it gets no note.
+  const paramsReadOnly =
+    (dagWithRunConfig?.runConfig?.disableParamEdit ?? false) &&
+    parameterCount > 0;
   const runIdReadOnly = dagWithRunConfig?.runConfig?.disableRunIdEdit ?? false;
   const schemaFormUiSchema = React.useMemo<
     UiSchema<SchemaFormData> | undefined
@@ -845,158 +848,162 @@ function StartDAGModal({
               </Alert>
             )}
 
-            <section
-              aria-labelledby="dag-parameters-heading"
-              className="space-y-4"
-            >
-              <div className="flex items-center gap-2">
-                <h3 id="dag-parameters-heading" className="font-semibold">
-                  <I18nText text={'Parameters'} />
-                </h3>
-                <Badge variant="secondary" className="font-normal">
-                  {parameterCount}{' '}
-                  {parameterCount === 1 ? (
-                    <I18nText text={'field'} />
-                  ) : (
-                    <I18nText text={'fields'} />
-                  )}
-                </Badge>
-              </div>
-
-              {loading && (
-                <div className="rounded-md border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
-                  <I18nText text={'Loading workflow...'} />
+            {(loading || parameterCount > 0) && (
+              <section
+                aria-labelledby="dag-parameters-heading"
+                className="space-y-4"
+              >
+                <div className="flex items-center gap-2">
+                  <h3 id="dag-parameters-heading" className="font-semibold">
+                    <I18nText text={'Parameters'} />
+                  </h3>
+                  <Badge variant="secondary" className="font-normal">
+                    {parameterCount}{' '}
+                    {parameterCount === 1 ? (
+                      <I18nText text={'field'} />
+                    ) : (
+                      <I18nText text={'fields'} />
+                    )}
+                  </Badge>
                 </div>
-              )}
 
-              {!loading && dag && paramSchema && (
-                <Form
-                  ref={schemaFormRef}
-                  tagName="div"
-                  schema={paramSchema as RJSFSchema}
-                  validator={validator}
-                  formData={schemaFormData}
-                  uiSchema={schemaFormUiSchema}
-                  templates={schemaFormTemplates}
-                  widgets={schemaFormWidgets}
-                  disabled={paramsReadOnly || submitting}
-                  readonly={paramsReadOnly}
-                  noHtml5Validate
-                  showErrorList={false}
-                  onChange={(event: IChangeEvent<SchemaFormData>) => {
-                    setSchemaFormData((event.formData ?? {}) as SchemaFormData);
-                    setSubmitError(null);
-                  }}
-                  onError={() =>
-                    setSubmitError(
-                      'Fix the highlighted parameter errors before submitting.'
-                    )
-                  }
-                />
-              )}
+                {loading && (
+                  <div className="rounded-md border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+                    <I18nText text={'Loading workflow...'} />
+                  </div>
+                )}
 
-              {!loading && dag && useTypedFields && (
-                <>
-                  {typedFields.map((field, index) => {
-                    const label = field.name || `Parameter ${index + 1}`;
-                    const error = fieldErrors[field.key];
-                    const disableField = paramsReadOnly || submitting;
-                    const showUnsetButton =
-                      !field.required && !field.hasDefault && field.hasValue;
+                {!loading && dag && paramSchema && (
+                  <Form
+                    ref={schemaFormRef}
+                    tagName="div"
+                    schema={paramSchema as RJSFSchema}
+                    validator={validator}
+                    formData={schemaFormData}
+                    uiSchema={schemaFormUiSchema}
+                    templates={schemaFormTemplates}
+                    widgets={schemaFormWidgets}
+                    disabled={paramsReadOnly || submitting}
+                    readonly={paramsReadOnly}
+                    noHtml5Validate
+                    showErrorList={false}
+                    onChange={(event: IChangeEvent<SchemaFormData>) => {
+                      setSchemaFormData(
+                        (event.formData ?? {}) as SchemaFormData
+                      );
+                      setSubmitError(null);
+                    }}
+                    onError={() =>
+                      setSubmitError(
+                        'Fix the highlighted parameter errors before submitting.'
+                      )
+                    }
+                  />
+                )}
 
-                    return (
-                      <div key={field.key} className="space-y-2">
-                        <div className="flex items-center justify-between gap-3">
-                          <Label htmlFor={`param-${field.key}`}>
-                            {label}
-                            {field.required ? ' *' : ''}
-                          </Label>
-                          {showUnsetButton && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 px-2 text-xs"
-                              disabled={disableField}
-                              onClick={() =>
-                                handleTypedFieldChange(field.key, {
-                                  hasValue: false,
-                                  value: '',
-                                })
-                              }
-                            >
-                              <I18nText text={'Unset'} />
-                            </Button>
+                {!loading && dag && useTypedFields && (
+                  <>
+                    {typedFields.map((field, index) => {
+                      const label = field.name || `Parameter ${index + 1}`;
+                      const error = fieldErrors[field.key];
+                      const disableField = paramsReadOnly || submitting;
+                      const showUnsetButton =
+                        !field.required && !field.hasDefault && field.hasValue;
+
+                      return (
+                        <div key={field.key} className="space-y-2">
+                          <div className="flex items-center justify-between gap-3">
+                            <Label htmlFor={`param-${field.key}`}>
+                              {label}
+                              {field.required ? ' *' : ''}
+                            </Label>
+                            {showUnsetButton && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2 text-xs"
+                                disabled={disableField}
+                                onClick={() =>
+                                  handleTypedFieldChange(field.key, {
+                                    hasValue: false,
+                                    value: '',
+                                  })
+                                }
+                              >
+                                <I18nText text={'Unset'} />
+                              </Button>
+                            )}
+                          </div>
+
+                          {renderTypedField({
+                            field,
+                            disabled: disableField,
+                            onChange: (patch) =>
+                              handleTypedFieldChange(field.key, patch),
+                          })}
+
+                          {field.description && (
+                            <p className="text-xs text-muted-foreground">
+                              {field.description}
+                            </p>
+                          )}
+                          {error && (
+                            <p className="text-xs text-destructive">{error}</p>
                           )}
                         </div>
+                      );
+                    })}
+                  </>
+                )}
 
-                        {renderTypedField({
-                          field,
-                          disabled: disableField,
-                          onChange: (patch) =>
-                            handleTypedFieldChange(field.key, patch),
-                        })}
-
-                        {field.description && (
-                          <p className="text-xs text-muted-foreground">
-                            {field.description}
-                          </p>
-                        )}
-                        {error && (
-                          <p className="text-xs text-destructive">{error}</p>
-                        )}
+                {!loading && dag && !useSchemaFields && !useTypedFields && (
+                  <>
+                    {rawParams.map((param, index) => (
+                      <div
+                        key={`${param.Name ?? 'pos'}-${index}`}
+                        className="space-y-2"
+                      >
+                        <Label htmlFor={`param-${index}`}>
+                          {param.Name ?? `Parameter ${index + 1}`}
+                        </Label>
+                        <Textarea
+                          id={`param-${index}`}
+                          ref={(element) => {
+                            if (element) {
+                              autoGrowTextarea(element);
+                            }
+                          }}
+                          rows={1}
+                          value={rawParams[index]?.Value ?? ''}
+                          readOnly={paramsReadOnly}
+                          disabled={paramsReadOnly || submitting}
+                          className={
+                            paramsReadOnly ? 'bg-muted cursor-not-allowed' : ''
+                          }
+                          onInput={(event) =>
+                            autoGrowTextarea(event.currentTarget)
+                          }
+                          onChange={(event) => {
+                            if (paramsReadOnly) {
+                              return;
+                            }
+                            setRawParams((prev) =>
+                              prev.map((item, itemIndex) =>
+                                itemIndex === index
+                                  ? { ...item, Value: event.target.value }
+                                  : item
+                              )
+                            );
+                            setSubmitError(null);
+                          }}
+                        />
                       </div>
-                    );
-                  })}
-                </>
-              )}
-
-              {!loading && dag && !useSchemaFields && !useTypedFields && (
-                <>
-                  {rawParams.map((param, index) => (
-                    <div
-                      key={`${param.Name ?? 'pos'}-${index}`}
-                      className="space-y-2"
-                    >
-                      <Label htmlFor={`param-${index}`}>
-                        {param.Name ?? `Parameter ${index + 1}`}
-                      </Label>
-                      <Textarea
-                        id={`param-${index}`}
-                        ref={(element) => {
-                          if (element) {
-                            autoGrowTextarea(element);
-                          }
-                        }}
-                        rows={1}
-                        value={rawParams[index]?.Value ?? ''}
-                        readOnly={paramsReadOnly}
-                        disabled={paramsReadOnly || submitting}
-                        className={
-                          paramsReadOnly ? 'bg-muted cursor-not-allowed' : ''
-                        }
-                        onInput={(event) =>
-                          autoGrowTextarea(event.currentTarget)
-                        }
-                        onChange={(event) => {
-                          if (paramsReadOnly) {
-                            return;
-                          }
-                          setRawParams((prev) =>
-                            prev.map((item, itemIndex) =>
-                              itemIndex === index
-                                ? { ...item, Value: event.target.value }
-                                : item
-                            )
-                          );
-                          setSubmitError(null);
-                        }}
-                      />
-                    </div>
-                  ))}
-                </>
-              )}
-            </section>
+                    ))}
+                  </>
+                )}
+              </section>
+            )}
           </div>
         </div>
 

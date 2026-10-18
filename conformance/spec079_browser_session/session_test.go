@@ -267,6 +267,12 @@ func startPortal(t *testing.T) (string, *statements) {
 				return
 			}
 			http.SetCookie(w, &http.Cookie{Name: "sid", Value: "signed-in", Path: "/"})
+		case "/guarded":
+			// Cloudflare marks every answer that is one of its checks.
+			w.Header().Set("Content-Type", "text/html")
+			w.Header().Set("Cf-Mitigated", "challenge")
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = io.WriteString(w, `<title>Just a moment...</title><p>Checking your browser</p>`)
 		case "/orders":
 			if cookie, err := r.Cookie("sid"); err != nil || cookie.Value != "signed-in" {
 				http.Redirect(w, r, "/login", http.StatusFound)
@@ -553,6 +559,29 @@ func TestSessionEndsWhenIdle(t *testing.T) {
 	ended.ExpectNonZeroExitCode()
 	assert.Equal(t, "session_ended", errorCode(t, ended))
 	s.session("", "export", id, "--dag", "orders", "--step", "check", "--dry-run").ExpectExitCode(0)
+}
+
+// A page a site answered with a bot check is reported by every command that
+// finds the browser on it, including one that reattached after it loaded.
+func TestSessionReportsBotCheck(t *testing.T) {
+	t.Parallel()
+
+	s := newSessionEnv(t)
+	result := s.session("", "open", s.portal+"/guarded")
+	result.ExpectExitCode(0)
+	opened := printed(t, result)
+	id, _ := opened["id"].(string)
+	t.Cleanup(func() {
+		s.dagu.RunWithStdin(s.env, strings.NewReader(""), "browser", "session", "close", id, "--force")
+	})
+	refused, _ := opened["refused"].(map[string]any)
+	assert.Equal(t, "cloudflare", refused["bot_check"], result.Stdout())
+	assert.EqualValues(t, http.StatusForbidden, refused["status"])
+
+	described := s.session("", "describe", id)
+	described.ExpectExitCode(0)
+	refused, _ = printed(t, described)["refused"].(map[string]any)
+	assert.Equal(t, "cloudflare", refused["bot_check"], described.Stdout())
 }
 
 // A session opened without a model refuses the operations that ask one and

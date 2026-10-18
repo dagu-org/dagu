@@ -31,6 +31,7 @@ type mockCloudServerConfig struct {
 	heartbeatHandler http.HandlerFunc
 	connectHandler   http.HandlerFunc
 	releaseHandler   http.HandlerFunc
+	renameHandler    http.HandlerFunc
 }
 
 // newMockCloudServer starts an httptest.Server that dispatches to the given
@@ -49,6 +50,9 @@ func newMockCloudServer(t *testing.T, cfg mockCloudServerConfig) *httptest.Serve
 	}
 	if cfg.releaseHandler != nil {
 		mux.HandleFunc("/api/v1/licenses/release", cfg.releaseHandler)
+	}
+	if cfg.renameHandler != nil {
+		mux.HandleFunc("/api/v1/licenses/rename", cfg.renameHandler)
 	}
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)

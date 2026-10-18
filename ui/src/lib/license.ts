@@ -64,6 +64,16 @@ export function isFreeLicense(license: LicenseStatus): boolean {
 }
 
 /**
+ * Reports whether an environment variable supplies the license, so the UI can
+ * neither replace nor remove it.
+ */
+export function isLicenseManagedByEnv(license: LicenseStatus): boolean {
+  return license.connectedVia
+    ? license.connectedVia === 'env'
+    : license.source === 'env';
+}
+
+/**
  * Reports whether any license, free included, is valid or in its grace
  * period.
  */

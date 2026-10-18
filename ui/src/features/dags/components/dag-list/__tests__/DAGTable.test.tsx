@@ -13,11 +13,20 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Status, ViewSortField, ViewSortOrder } from '@/api/v1/schema';
 import { PanelWidthContext } from '@/components/SplitLayout';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { AppBarContext } from '@/contexts/AppBarContext';
+import { UserPreferencesProvider } from '@/contexts/UserPreference';
+import { I18nProvider } from '@/i18n/I18nProvider';
 import { WorkspaceKind } from '@/lib/workspace';
 import DAGTable from '../DAGTable';
 
 vi.mock('@/hooks/api', () => ({
+  useClient: () => ({ POST: vi.fn() }),
   useQuery: () => ({
     data: {
       labels: ['team=ops'],
@@ -33,10 +42,23 @@ vi.mock('@/features/dags/components/common/LiveSwitch', () => ({
   default: () => null,
 }));
 
-vi.mock('@/features/dags/components/common', () => ({
-  CreateDAGModal: () => null,
+vi.mock('@/features/dags/components/common', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   DAGPagination: () => null,
 }));
+
+vi.mock('@/contexts/AuthContext', () => ({
+  useCanWrite: () => true,
+}));
+
+// Reads the locale from stored preferences, as the app does.
+function I18nWrapper({ children }: { children: React.ReactNode }) {
+  return (
+    <UserPreferencesProvider>
+      <I18nProvider>{children}</I18nProvider>
+    </UserPreferencesProvider>
+  );
+}
 
 function renderTable(
   searchText = '',
@@ -131,7 +153,8 @@ function renderTable(
           />
         </PanelWidthContext.Provider>
       </AppBarContext.Provider>
-    </MemoryRouter>
+    </MemoryRouter>,
+    { wrapper: I18nWrapper }
   );
   return {
     ...result,
@@ -181,6 +204,7 @@ describe('DAGTable', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    localStorage.clear();
   });
 
   it('links workflow names to their canonical detail pages', () => {
@@ -460,6 +484,20 @@ describe('DAGTable', () => {
       screen.getAllByText('Create your first workflow to get started.').length
     ).toBeGreaterThan(0);
     expect(screen.queryByText('No workflows found')).not.toBeInTheDocument();
+    // All workspaces, the default selection, still allows creating one.
+    expect(
+      screen.getAllByRole('button', { name: 'Create new DAG' }).length
+    ).toBeGreaterThan(0);
+  });
+
+  it('translates the empty state', () => {
+    localStorage.setItem('user_preferences', JSON.stringify({ locale: 'ja' }));
+
+    renderTable('', { dags: [] });
+
+    expect(
+      screen.getAllByText('ワークフローはまだありません').length
+    ).toBeGreaterThan(0);
   });
 
   it('explains an empty saved view and offers to show all workflows', () => {
@@ -623,5 +661,36 @@ describe('DAGTable', () => {
     fireEvent.keyDown(window, { key: 'ArrowDown' });
 
     expect(onSelectDAG).toHaveBeenCalledWith('alpha.yaml', 'alpha');
+  });
+
+  // The detail panel opens over the list, so its fields and dialogs receive
+  // arrow keys meant for them, not for switching workflows.
+  it('leaves ArrowDown to text fields and dialogs above the list', () => {
+    const onSelectDAG = vi.fn();
+    renderTable('', {
+      selectedDAG: 'alpha.yaml',
+      onSelectDAG,
+      dags: [workflow({ name: 'alpha' }), workflow({ name: 'reports' })],
+    });
+
+    render(<input aria-label="Run ID" />);
+    const field = screen.getByRole('textbox', { name: 'Run ID' });
+    field.focus();
+    fireEvent.keyDown(field, { key: 'ArrowDown' });
+
+    render(
+      <Dialog open>
+        <DialogContent>
+          <DialogTitle>Start workflow</DialogTitle>
+          <DialogDescription>Configure the run.</DialogDescription>
+        </DialogContent>
+      </Dialog>
+    );
+    expect(screen.getByRole('dialog')).toContainElement(
+      document.activeElement as HTMLElement
+    );
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' });
+
+    expect(onSelectDAG).not.toHaveBeenCalled();
   });
 });

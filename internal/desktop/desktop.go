@@ -128,6 +128,24 @@ func (d Diagnostics) Err() error {
 	return errors.New(strings.Join(messages, "; "))
 }
 
+// AwaitsPerson reports whether the desktop is unusable only until a person
+// unlocks the screen, logs in, or switches back to this user, so a caller
+// can wait for it rather than fail. It is false for a usable desktop and
+// whenever a problem needs a permission or the setup changed.
+func (d Diagnostics) AwaitsPerson() bool {
+	if len(d.Problems) == 0 {
+		return false
+	}
+	for _, problem := range d.Problems {
+		switch problem.Code {
+		case problemScreenLocked, problemNoSession, problemOtherSession:
+		default:
+			return false
+		}
+	}
+	return true
+}
+
 // Timing of composite input. Applications miss events that arrive
 // faster than a person could produce them.
 const (

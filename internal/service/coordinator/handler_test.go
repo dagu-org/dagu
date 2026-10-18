@@ -696,6 +696,66 @@ func TestCreateAttemptForTaskCarriesDAGLabels(t *testing.T) {
 	assert.Equal(t, "ops", *dag.BaseConfigWorkspace)
 }
 
+// A task dispatched with its own selector is persisted with it, so a retry or
+// a queued re-dispatch of the attempt routes the way the run was routed.
+func TestCreateAttemptForTaskAppliesWorkerSelector(t *testing.T) {
+	registerCommandExecutorCapsForCoordinatorTest()
+
+	definition := "name: routed\nworker_selector: local\nsteps:\n  - name: step1\n    run: echo hello"
+
+	t.Run("RootRun", func(t *testing.T) {
+		h := NewHandler(HandlerConfig{DAGRunRepository: newMockDAGRunStore().repository})
+		task := &coordinatorv1.Task{
+			DagRunId:       "run-routed",
+			Target:         "routed",
+			Definition:     definition,
+			WorkerSelector: map[string]string{"zone": "b"},
+		}
+		prepared, err := h.createAttemptForTask(context.Background(), task)
+		require.NoError(t, err)
+		require.NotNil(t, prepared)
+
+		dag, err := prepared.attempt.ReadDAG(context.Background())
+		require.NoError(t, err)
+		assert.Equal(t, map[string]string{"zone": "b"}, dag.WorkerSelector)
+		assert.False(t, dag.ForceLocal)
+	})
+
+	t.Run("SubRun", func(t *testing.T) {
+		h := NewHandler(HandlerConfig{DAGRunRepository: newMockDAGRunStore().repository})
+		task := &coordinatorv1.Task{
+			RootDagRunName:   "parent",
+			RootDagRunId:     "run-parent",
+			ParentDagRunName: "parent",
+			ParentDagRunId:   "run-parent",
+			DagRunId:         "run-child",
+			Target:           "routed",
+			Definition:       definition,
+			WorkerSelector:   map[string]string{"zone": "b"},
+		}
+		prepared, err := h.createSubAttemptForTask(context.Background(), task)
+		require.NoError(t, err)
+		require.NotNil(t, prepared)
+
+		dag, err := prepared.attempt.ReadDAG(context.Background())
+		require.NoError(t, err)
+		assert.Equal(t, map[string]string{"zone": "b"}, dag.WorkerSelector)
+		assert.False(t, dag.ForceLocal)
+	})
+
+	t.Run("NoSelectorKeepsTheDefinition", func(t *testing.T) {
+		h := NewHandler(HandlerConfig{DAGRunRepository: newMockDAGRunStore().repository})
+		task := &coordinatorv1.Task{DagRunId: "run-plain", Target: "routed", Definition: definition}
+		prepared, err := h.createAttemptForTask(context.Background(), task)
+		require.NoError(t, err)
+
+		dag, err := prepared.attempt.ReadDAG(context.Background())
+		require.NoError(t, err)
+		assert.Empty(t, dag.WorkerSelector)
+		assert.True(t, dag.ForceLocal)
+	})
+}
+
 // Fresh starts have no previous status from which to copy the queue identity.
 // A run that is already queued keeps its queue, which may be an enqueue-time
 // override absent from the YAML.
@@ -1664,6 +1724,14 @@ func (s *failingDispatchTaskStore) CountOutstandingByQueue(context.Context, stri
 
 func (s *failingDispatchTaskStore) HasOutstandingAttempt(context.Context, string, time.Duration) (bool, error) {
 	return false, nil
+}
+
+func (s *failingDispatchTaskStore) ListExpiredHeld(context.Context, time.Time) ([]*dispatch.DispatchTask, error) {
+	return nil, nil
+}
+
+func (s *failingDispatchTaskStore) DeletePending(context.Context, string) error {
+	return nil
 }
 
 func TestHandler_Heartbeat(t *testing.T) {

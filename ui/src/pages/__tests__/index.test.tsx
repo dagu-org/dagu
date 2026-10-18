@@ -13,6 +13,10 @@ import {
   type DAGRunActivityState,
   useDAGRunActivity,
 } from '../../features/activity/hooks/useDAGRunActivity';
+import {
+  type GettingStarted,
+  useGettingStarted,
+} from '../../features/activity/hooks/useGettingStarted';
 import type { DAGRunActivity } from '../../features/activity/lib/activityModel';
 import { useQuery } from '../../hooks/api';
 import { useSchedulerPause } from '../../hooks/useSchedulerPause';
@@ -23,8 +27,14 @@ vi.mock('../../features/activity/hooks/useDAGRunActivity', () => ({
   useDAGRunActivity: vi.fn(),
 }));
 
-vi.mock('../../features/dags/components/common', () => ({
-  CreateDAGModal: () => <button type="button">New workflow</button>,
+vi.mock('../../features/activity/hooks/useGettingStarted', () => ({
+  useGettingStarted: vi.fn(),
+}));
+
+vi.mock('../../features/dags/components/common', async () => ({
+  CreateDAGButton: (
+    await import('../../features/dags/components/common/CreateDAGButton')
+  ).default,
 }));
 
 vi.mock('@/features/dag-runs/components/dag-run-details', () => ({
@@ -40,6 +50,7 @@ vi.mock('../../features/system-status/components/PathsCard', () => ({
 }));
 
 vi.mock('../../hooks/api', () => ({
+  useClient: () => ({ POST: vi.fn() }),
   useQuery: vi.fn(),
 }));
 
@@ -49,10 +60,24 @@ vi.mock('../../hooks/useSchedulerPause', () => ({
 
 vi.mock('@/contexts/AuthContext', () => ({
   useCanAccessSystemStatus: vi.fn(),
+  useCanWrite: () => true,
 }));
 
 const useActivityMock = vi.mocked(useDAGRunActivity);
 const useSchedulerPauseMock = vi.mocked(useSchedulerPause);
+
+function mockGettingStarted(state: GettingStarted) {
+  vi.mocked(useGettingStarted).mockReturnValue(state);
+}
+
+const checklist: GettingStarted = {
+  status: 'visible',
+  steps: [
+    { id: 'run', done: false },
+    { id: 'create', done: false },
+  ],
+  dismiss: vi.fn(),
+};
 
 function mockScheduler(schedulerRunning: boolean | undefined) {
   useSchedulerPauseMock.mockReturnValue({
@@ -120,10 +145,10 @@ function makeConfig(overrides: Partial<Config> = {}): Config {
   };
 }
 
-function pageTree() {
+function pageTree(config: Partial<Config> = {}) {
   return (
     <MemoryRouter initialEntries={['/']}>
-      <ConfigContext.Provider value={makeConfig()}>
+      <ConfigContext.Provider value={makeConfig(config)}>
         <AppBarContext.Provider
           value={{
             title: '',
@@ -144,8 +169,8 @@ function pageTree() {
   );
 }
 
-function renderPage() {
-  return render(pageTree());
+function renderPage(config: Partial<Config> = {}) {
+  return render(pageTree(config));
 }
 
 function makeActivity(overrides: Partial<DAGRunActivity> = {}): DAGRunActivity {
@@ -206,6 +231,15 @@ const reportRuns = [1, 2, 3].map((index) => ({
   startedAt: NOW - 60 * index,
 }));
 
+// A run still going from before the window, which only the in-progress
+// list carries.
+const backfillRun = {
+  name: 'backfill',
+  dagRunId: 'backfill-1',
+  status: Status.Running,
+  startedAt: FROM - 3600,
+};
+
 const busyActivity = makeActivity({
   runs: [...reportRuns, billingFailure],
   attention: [billingFailure],
@@ -216,6 +250,7 @@ const busyActivity = makeActivity({
 describe('DashboardPage', () => {
   beforeEach(() => {
     mockDAGList([]);
+    mockGettingStarted({ status: 'hidden' });
     mockScheduler(true);
     vi.mocked(useCanAccessSystemStatus).mockReturnValue(true);
   });
@@ -577,13 +612,76 @@ describe('DashboardPage', () => {
     expect(lanes.getByText('report')).toBeVisible();
   });
 
+  it('shows a run still going from before the window', () => {
+    mockActivity({ activity: makeActivity({ active: [backfillRun] }) });
+
+    renderPage();
+
+    const lanes = within(
+      screen.getByRole('list', { name: 'Runs by workflow' })
+    );
+    expect(lanes.getByText('backfill')).toBeVisible();
+  });
+
+  it('filters to a run still going from before the window', () => {
+    mockActivity({
+      activity: { ...busyActivity, active: [backfillRun] },
+    });
+
+    renderPage();
+    fireEvent.change(screen.getByLabelText('Filter workflows'), {
+      target: { value: 'back' },
+    });
+
+    const lanes = within(
+      screen.getByRole('list', { name: 'Runs by workflow' })
+    );
+    expect(lanes.getAllByRole('listitem')).toHaveLength(1);
+    expect(lanes.getByText('backfill')).toBeVisible();
+  });
+
+  // A picked day is that calendar day in the server's time zone, whatever the
+  // browser's. A server behind UTC catches a browser that converts the day
+  // instead of reading it in the server's zone.
+  it('shows a picked day in the server time zone, crossed by a run still going', () => {
+    const offset = -5 * 3600;
+    const dayFrom = Date.UTC(2026, 2, 1) / 1000 - offset;
+    const dayTo = dayFrom + 24 * 3600 - 1;
+    mockDAGList(['backfill']);
+    mockActivity({
+      activity: makeActivity({
+        from: dayFrom,
+        to: dayTo,
+        active: [{ ...backfillRun, startedAt: dayFrom - 3600 }],
+      }),
+    });
+
+    renderPage({ tzOffsetInSec: offset });
+    fireEvent.change(screen.getByLabelText('Date'), {
+      target: { value: '2026-03-01' },
+    });
+
+    expect(useActivityMock.mock.lastCall?.[0]).toEqual({
+      kind: 'fixed',
+      from: dayFrom,
+      to: dayTo,
+    });
+    const lanes = within(
+      screen.getByRole('list', { name: 'Runs by workflow' })
+    );
+    expect(lanes.getByText('backfill')).toBeVisible();
+  });
+
   it('invites creating the first workflow when no workflows exist', () => {
     mockActivity({ activity: makeActivity() });
 
     renderPage();
 
     expect(screen.getByText('Create your first workflow')).toBeVisible();
-    expect(screen.getByText('New workflow')).toBeVisible();
+    // All workspaces, the default selection, still allows creating one.
+    expect(
+      screen.getByRole('button', { name: 'Create new DAG' })
+    ).toBeVisible();
   });
 
   it('points at the Workflows page when workflows exist but nothing ran', () => {
@@ -606,6 +704,52 @@ describe('DashboardPage', () => {
     renderPage();
 
     expect(screen.getByText(/Run one of the example workflows/)).toBeVisible();
+  });
+
+  it('shows the checklist instead of the empty panels', () => {
+    mockGettingStarted(checklist);
+    mockActivity({ activity: makeActivity() });
+
+    renderPage();
+
+    expect(
+      screen.getByRole('region', { name: 'Getting started' })
+    ).toBeVisible();
+    expect(screen.getByText('No runs in the last 24 hours')).toBeVisible();
+    expect(
+      screen.queryByText('Create your first workflow')
+    ).not.toBeInTheDocument();
+  });
+
+  // Panels that the checklist then replaces would flash on a new install.
+  it('holds back the empty panels while the checklist loads', () => {
+    mockGettingStarted({ status: 'pending' });
+    mockDAGList(['example-01-basic-sequential']);
+    mockActivity({ activity: makeActivity() });
+
+    renderPage();
+
+    expect(screen.getByText('No runs in the last 24 hours')).toBeVisible();
+    expect(
+      screen.queryByText(/Run one of the example workflows/)
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('region', { name: 'Getting started' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('puts the checklist above the lanes', () => {
+    mockGettingStarted(checklist);
+    mockActivity({ activity: busyActivity });
+
+    renderPage();
+
+    const lanes = screen.getByRole('list', { name: 'Runs by workflow' });
+    expect(
+      screen
+        .getByRole('region', { name: 'Getting started' })
+        .compareDocumentPosition(lanes) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
   });
 
   it('explains when the node cannot serve activity', () => {

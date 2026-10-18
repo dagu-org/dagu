@@ -1,13 +1,14 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useQuery } from '@/hooks/api';
 import { useDAGSSE } from '@/hooks/useDAGSSE';
+import { dispatchHandledEscape } from '@/test/keyboard';
 import DAGDetailsPanel from '../DAGDetailsPanel';
 
 vi.mock('@/hooks/api', () => ({
@@ -72,11 +73,14 @@ const useQueryMock = useQuery as unknown as {
   mockImplementation: (fn: (path: string, init?: unknown) => unknown) => void;
 };
 
-function renderPanel(appBarOverride?: Partial<typeof appBarValue>) {
+function renderPanel(
+  appBarOverride?: Partial<typeof appBarValue>,
+  onClose: () => void = vi.fn()
+) {
   return render(
     <MemoryRouter>
       <AppBarContext.Provider value={{ ...appBarValue, ...appBarOverride }}>
-        <DAGDetailsPanel fileName="example" onClose={vi.fn()} />
+        <DAGDetailsPanel fileName="example" onClose={onClose} />
       </AppBarContext.Provider>
     </MemoryRouter>
   );
@@ -159,5 +163,25 @@ describe('DAGDetailsPanel', () => {
         path: { fileName: 'example' },
       },
     });
+  });
+
+  it('closes on Escape unless a dialog inside it handled the key', () => {
+    const onClose = vi.fn();
+    vi.mocked(useDAGSSE).mockReturnValue(liveState);
+    useQueryMock.mockImplementation(
+      () =>
+        ({
+          data: undefined,
+          error: undefined,
+          mutate: vi.fn(),
+        }) as never
+    );
+
+    renderPanel(undefined, onClose);
+    dispatchHandledEscape();
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

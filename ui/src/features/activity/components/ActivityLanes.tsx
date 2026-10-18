@@ -15,9 +15,11 @@ import { useI18n } from '@/i18n/I18nProvider';
 import {
   type ActivityLane,
   type ActivityRun,
+  barSpan,
   groupLanes,
   oldestStart,
   percentOf,
+  runEnd,
   sortLanes,
   type TimeRange,
   timeTicks,
@@ -25,7 +27,10 @@ import {
 import { executionsURL } from '../lib/activityLinks';
 
 type Props = {
-  /** Loaded runs, newest first. */
+  /**
+   * Loaded runs, newest first, followed by runs still going from before the
+   * window.
+   */
   runs: ActivityRun[];
   /** Runs in progress, which rank their workflow's lane higher. */
   active: ActivityRun[];
@@ -58,6 +63,19 @@ const PROBLEM_STATUSES = new Set<Status>([
   Status.PartialSuccess,
 ]);
 
+type MarkSize = { minWidth: number; inset: number };
+
+/**
+ * A run mark's narrowest width and its space above and below inside the lane,
+ * in pixels. Problem runs draw wider and taller so they stand out.
+ */
+const MARK: MarkSize = { minWidth: 2, inset: 8 };
+const PROBLEM_MARK: MarkSize = { minWidth: 3, inset: 2 };
+
+function markSize(run: ActivityRun): MarkSize {
+  return PROBLEM_STATUSES.has(run.status) ? PROBLEM_MARK : MARK;
+}
+
 /** Pixels a pointer may travel before a press becomes a zoom drag. */
 const DRAG_THRESHOLD_PX = 6;
 /** How close, in pixels, a pointer must be to a run to pick it. */
@@ -74,24 +92,40 @@ type Hover = {
 
 type Drag = { lane: string; startX: number; currentX: number; rect: DOMRect };
 
+// A pointer inside a drawn mark picks it, the topmost one where marks
+// overlap. Runs come oldest first, so later runs are drawn on top and win
+// ties. Elsewhere in the lane, the nearest mark by x within MARK_HIT_PX wins.
 function runAt(
-  workflow: ActivityLane,
+  runs: ActivityRun[],
   range: TimeRange,
+  nowSeconds: number,
   rect: DOMRect,
-  clientX: number
+  clientX: number,
+  clientY: number
 ): ActivityRun | undefined {
-  let best: ActivityRun | undefined;
-  let bestDistance = MARK_HIT_PX;
-  for (const run of workflow.runs) {
-    if (run.startedAt === undefined) continue;
-    const x = rect.left + (percentOf(range, run.startedAt) / 100) * rect.width;
-    const distance = Math.abs(x - clientX);
-    if (distance <= bestDistance) {
-      best = run;
-      bestDistance = distance;
+  let inside: ActivityRun | undefined;
+  let nearest: ActivityRun | undefined;
+  let nearestDistance = MARK_HIT_PX;
+  for (const run of runs) {
+    const { left, right } = barSpan(run, range, nowSeconds);
+    const { minWidth, inset } = markSize(run);
+    const x0 = rect.left + (left / 100) * rect.width;
+    const x1 = Math.max(rect.left + (right / 100) * rect.width, x0 + minWidth);
+    const distance =
+      clientX < x0 ? x0 - clientX : clientX > x1 ? clientX - x1 : 0;
+    if (
+      distance === 0 &&
+      clientY >= rect.top + inset &&
+      clientY <= rect.bottom - inset
+    ) {
+      inside = run;
+    }
+    if (distance <= nearestDistance) {
+      nearest = run;
+      nearestDistance = distance;
     }
   }
-  return best;
+  return inside ?? nearest;
 }
 
 function timeAt(range: TimeRange, rect: DOMRect, clientX: number): number {
@@ -129,7 +163,13 @@ export function ActivityLanes({
     () => sortLanes(groupLanes(runs), active),
     [runs, active]
   );
-  const loadedFrom = hasMore ? oldestStart(runs) : undefined;
+  // Older pages hold only runs created in the window, so runs still going
+  // from before it do not move the unloaded boundary.
+  const loadedFrom = hasMore
+    ? oldestStart(
+        runs.filter((run) => (run.startedAt ?? 0) >= activityWindow.from)
+      )
+    : undefined;
   const unloadedPercent =
     loadedFrom === undefined
       ? 0
@@ -192,8 +232,8 @@ export function ActivityLanes({
       .filter(
         (run) =>
           run.startedAt !== undefined &&
-          run.startedAt >= range.from &&
-          run.startedAt <= range.to
+          run.startedAt <= range.to &&
+          runEnd(run, nowSeconds) >= range.from
       )
       .sort((left, right) => (left.startedAt ?? 0) - (right.startedAt ?? 0));
 
@@ -210,7 +250,14 @@ export function ActivityLanes({
       lane: workflow.name,
       clientX: event.clientX,
       clientY: rect.top,
-      run: runAt(workflow, range, rect, event.clientX),
+      run: runAt(
+        sortedRuns(workflow),
+        range,
+        nowSeconds,
+        rect,
+        event.clientX,
+        event.clientY
+      ),
     });
   };
 
@@ -231,7 +278,14 @@ export function ActivityLanes({
       return;
     }
     const rect = event.currentTarget.getBoundingClientRect();
-    const run = runAt(workflow, range, rect, event.clientX);
+    const run = runAt(
+      sortedRuns(workflow),
+      range,
+      nowSeconds,
+      rect,
+      event.clientX,
+      event.clientY
+    );
     if (run) {
       openRun(workflow.name, run, event.metaKey || event.ctrlKey);
     }
@@ -268,12 +322,17 @@ export function ActivityLanes({
     setHover({
       lane: workflow.name,
       clientX:
-        rect.left +
-        (percentOf(range, run.startedAt ?? range.from) / 100) * rect.width,
+        rect.left + (barSpan(run, range, nowSeconds).left / 100) * rect.width,
       clientY: rect.top,
       run,
     });
   };
+
+  // A running run shows how long it has run so far.
+  const hoverSeconds =
+    hover?.run?.startedAt !== undefined
+      ? runEnd(hover.run, nowSeconds) - hover.run.startedAt
+      : 0;
 
   const tooltip = hover ? (
     <div
@@ -286,8 +345,8 @@ export function ActivityLanes({
         <div className="text-muted-foreground tabular-nums">
           {ts(runStatusText(hover.run.status))} ·{' '}
           {formatTime(hover.run.startedAt ?? 0)}
-          {hover.run.finishedAt && hover.run.startedAt
-            ? ` · ${formatDurationMs((hover.run.finishedAt - hover.run.startedAt) * 1000)}`
+          {hoverSeconds > 0
+            ? ` · ${formatDurationMs(hoverSeconds * 1000)}`
             : ''}
         </div>
       ) : null}
@@ -399,26 +458,31 @@ export function ActivityLanes({
                 {unloadedPercent > 0 && (
                   <span
                     aria-hidden="true"
+                    data-testid="unloaded-runs"
                     className="absolute inset-y-0 left-0 bg-muted/60"
                     style={{ width: `${unloadedPercent}%` }}
                   />
                 )}
                 {visibleRuns.map((run) => {
-                  const problem = PROBLEM_STATUSES.has(run.status);
+                  const { left, right } = barSpan(run, range, nowSeconds);
+                  const { minWidth, inset } = markSize(run);
                   return (
                     <span
                       key={run.dagRunId}
                       aria-hidden="true"
                       className={cn(
-                        'absolute -translate-x-1/2 rounded-sm',
-                        problem
-                          ? 'top-0.5 bottom-0.5 w-[3px]'
-                          : 'top-2 bottom-2 w-0.5',
+                        // The card-coloured ring leaves a gap between
+                        // back-to-back runs.
+                        'absolute rounded-sm ring-1 ring-card',
                         focused === run &&
                           'ring-2 ring-ring ring-offset-1 ring-offset-background'
                       )}
                       style={{
-                        left: `${percentOf(range, run.startedAt ?? range.from)}%`,
+                        left: `${left}%`,
+                        width: `${Math.max(0, right - left)}%`,
+                        minWidth,
+                        top: inset,
+                        bottom: inset,
                         backgroundColor:
                           MARK_COLOR[run.status] ?? 'var(--status-success)',
                       }}

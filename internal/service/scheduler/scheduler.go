@@ -79,6 +79,7 @@ type Scheduler struct {
 	healthServer        *HealthServer // Health check server for monitoring
 	serviceRegistry     serviceregistry.ServiceRegistry
 	disableHealthServer bool            // Disable health server when running from start-all
+	disableSignals      bool            // Leave OS signals to start-all
 	zombieDetector      *ZombieDetector // Zombie DAG run detector
 	instanceID          string          // Unique instance identifier for service registry
 	queueProcessor      *QueueProcessor // Processor for queued DAG runs
@@ -403,6 +404,12 @@ func (s *Scheduler) DisableHealthServer() {
 	s.disableHealthServer = true
 }
 
+// DisableSignalHandling leaves OS signals to the hosting process, which stops
+// the scheduler through its context and Stop instead.
+func (s *Scheduler) DisableSignalHandling() {
+	s.disableSignals = true
+}
+
 // SetOpenCodeHost enables the process-owned managed OpenCode service.
 func (s *Scheduler) SetOpenCodeHost(host *opencodehost.Host) {
 	s.dagExecutor.openCodeHost = host
@@ -643,8 +650,10 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	s.queueProcessor.Start(ctx, notifyCh)
 	state.queueProcessorStarted = true
 
-	signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
-	defer signal.Stop(sig)
+	if !s.disableSignals {
+		signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+		defer signal.Stop(sig)
+	}
 
 	if err := s.entryReader.Init(ctx); err != nil {
 		logger.Error(ctx, "Failed to initialize entry reader", tag.Error(err))

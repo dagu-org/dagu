@@ -25,6 +25,7 @@ steps:
       collect:
         markdown: ${summarize.output}
         link: ${foreach.episode["リンク"]}
+        bare_link: ${foreach.episode.リンク}
         limit: ${foreach.episode."limit"}
     output: FOREACH_RESULTS
   - name: consume

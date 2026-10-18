@@ -31,6 +31,10 @@ vi.mock('@/hooks/api', () => ({
   useQuery: vi.fn(),
 }));
 
+vi.mock('@/components/MonitoringOffer', () => ({
+  MonitoringOffer: () => <p>Monitoring offer</p>,
+}));
+
 vi.mock('@/hooks/useDAGSSE', () => ({
   useDAGSSE: vi.fn(() => ({})),
 }));
@@ -182,6 +186,48 @@ describe('DAGDetails page', () => {
       expect(screen.getByTestId('location')).toHaveTextContent(
         '/dag-runs/release-notes/run-7?remoteNode=local&subDAGRunId=child-2&dagRunId=run-7&dagRunName=release-notes&step=deploy'
       );
+    });
+  });
+
+  // A schedule runs unattended, which is when an alert matters.
+  describe('monitoring offer', () => {
+    function mockScheduled(suspended: boolean) {
+      useQueryMock.mockImplementation(
+        (path) =>
+          ({
+            data:
+              path === '/dags/{fileName}'
+                ? {
+                    ...dagData,
+                    dag: {
+                      ...dagData.dag,
+                      schedule: [{ expression: '0 9 * * *' }],
+                    },
+                    suspended,
+                  }
+                : undefined,
+            mutate: vi.fn(),
+          }) as never
+      );
+    }
+
+    it('appears on the Overview of a scheduled workflow', () => {
+      mockScheduled(false);
+
+      renderPage();
+
+      expect(screen.getByText('Monitoring offer')).toBeVisible();
+    });
+
+    it.each([
+      ['a suspended schedule', '/dags/release-notes', true],
+      ['another tab', '/dags/release-notes/spec', false],
+    ])('stays out of %s', (_, path, suspended) => {
+      mockScheduled(suspended);
+
+      renderPage(path);
+
+      expect(screen.queryByText('Monitoring offer')).not.toBeInTheDocument();
     });
   });
 

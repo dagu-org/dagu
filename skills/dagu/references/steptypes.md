@@ -698,6 +698,39 @@ steps:
 
 `with` fields include `dsn`, `query`, `params`, `timeout`, `transaction`, `isolation_level`, `output_format`, `headers`, `null_string`, `max_rows`, `streaming`, `output_file`, and `import`.
 
+## clickhouse.query
+
+Run SQL on ClickHouse over its HTTP interface. No ClickHouse client library is needed.
+
+```yaml
+steps:
+  - id: rollup
+    action: clickhouse.query
+    with:
+      url: "https://clickhouse.example.com:8443"
+      user: etl
+      password: ${CLICKHOUSE_PASSWORD}
+      database: analytics
+      query: |
+        INSERT INTO daily SELECT * FROM raw WHERE day = {day:Date};
+        SELECT count() AS rows FROM daily WHERE day = {day:Date}
+      params:
+        day: "2024-01-02"
+      settings:
+        max_execution_time: 300
+      output_format: jsonl
+```
+
+`with` fields: `url` (required, `http://` or `https://`, no credentials in it), `user`, `password` (sent only as request headers), `database`, `query` or `file` (a `.sql` file, relative to the step working directory), `params`, `settings`, `output_format`, `headers`, `timeout`, `tls_skip_verify`, `tls_ca` (PEM bundle of extra root CAs).
+
+- The password travels in a request header, so use an `https://` URL unless the server is on a trusted network.
+- `query` may hold several statements. They run in order in one session (so `SET`, `USE`, and temporary tables carry over) and the step stops at the first error. `database` is the default database; a script selects it once with `USE`, so a `USE` in the script takes effect for later statements. A `SET x` in a script is overridden when `x` is also in `settings`. A multi-replica service behind a load balancer needs session stickiness for scripts.
+- `params` are server-side parameters: write `{name:Type}` in the SQL, for example `WHERE day = {day:Date}`. Values are never interpolated into the SQL.
+- `settings` are ClickHouse settings applied to every statement; the executor reserves the names it manages itself (query and session ids, formats, compression, and exception reporting). Nothing is read-only by default; set `readonly: 1` for a read-only step. A user whose profile sets `readonly = 1` cannot change settings: on ClickHouse 25.11 and later such a user can run `jsonl` and `csv` steps but not `json`, and on earlier versions every statement fails because the executor turns off `http_write_exception_in_output_format`. A profile with `readonly = 2` works on all versions.
+- `output_format` applies to statements without their own `FORMAT` clause: `jsonl` (default, one JSON object per row), `json` (a JSON array of objects), or `csv` (`headers: true` adds a header row). The response is streamed to stdout as it arrives.
+- On timeout or cancellation the running statement is stopped on the server with `KILL QUERY`.
+- Data import is not part of this action. Inline data after `INSERT ... FORMAT` is not supported; use `INSERT ... VALUES` or `INSERT ... SELECT`.
+
 ## redis.<operation>
 
 Redis operations use the operation in the action name.
@@ -1252,6 +1285,7 @@ Browser behavior:
 - The top-level properties of each `extract` schema become `${steps.<id>.outputs.<name>}`. The same property in two extracts is a validation error.
 - A field that should hold the address a link points to needs `format: uri`, as in `link: {type: string, format: uri}`, and a place in `required`. Without the format the model returns the link's element id, such as `0-11` or `[0-11]`, and the step still succeeds; without `required` some models leave the field out. `dagu validate` warns about a string field named like an address (`url`, `link`, `href`, `detail_url`, ...) that has no `format: uri`.
 - The `act` and `upload` operations of a step that succeeded are replayed on later runs on the same host without a model call; `extract` and model-judged conditions still call the model. A replay acts only on an element with the role and name it recorded, in the same row text when the page repeats it (such as a Delete button per row), and on a select offering the recorded option, or else asks the model again. Unnamed elements are told apart by role only, so follow important acts with an `expect`: when a later operation fails on the page, the step's replays are dropped and the next run asks the model again.
+- `with.ai` chooses how much the model decides for `act` and for `upload` with `into`, and `ai` on an `act` or an `upload` replaces it for that operation. `on_miss` (default): replay the recording, and let the model act and repair it when a replay fails. `every_run`: the model acts every run; a successful one still records. `never`: replay only; with no recording on the host, or a replay that fails, the step fails and says why, and the recording is kept for a run under `on_miss` to repair. A step whose operations never call the model needs no `llm`. An `extract` and a statement `expect` or `when` need the model, so a step-level `never` refuses them; fixed checks and an `upload` without `into` are allowed. `cache: false` means `every_run`; set `ai` or `cache`, not both. To run a step with no model, record it under `on_miss` first (or export a browser session), then set `ai: never`.
 - The browser runtime applies `allowed_domains` to the page's HTTP(S) requests, so list CDN and sign-in hosts too; WebSockets are not covered. `example.com` matches only that host; `*.example.com` matches its subdomains. Dagu also fails the step when the page URL leaves the list. Blocked requests are counted per host in the timeline and appended to a failed step's error, so a missing CDN or sign-in host shows up there.
 - For a site that requires a TLS client certificate, set `browser.client_certificates`: entries with `hosts` (a host, `*.example.com`, or `*`) and `pfx_file` with `passphrase: ${CERT_PASSPHRASE}` from a declared secret, or `cert_file` and `key_file` in PEM. The host setting `browser.client_certificates` in the Dagu config applies to every browser on that host, after the step's. Dagu presents the certificate through a local proxy, so the OS never asks for its password. While certificates are presented, other HTTPS requests go through the proxy too, presenting none, so a site that asks for one fails at once with "<host> asks for a TLS client certificate, and none is configured for it" instead of hanging on a system prompt; the host setting `browser.guard_client_certificates` turns that off. Requests follow the OS proxy settings. A rejected certificate fails with the site's reason, and a timed-out operation names the connections still waiting.
 - `ask: {prompt, as}` puts the step in Waiting until someone answers in the Web UI; the answer becomes `%<as>%`. Not supported on Windows. Answers are stored in run history, so use it for short-lived codes.
@@ -1259,13 +1293,14 @@ Browser behavior:
 - JavaScript dialogs are accepted automatically (a `prompt` gets its default text) and listed in the timeline, so an act that raises "Are you sure?" goes through.
 - Where the browser sandbox cannot start, the host setting `browser.sandbox: false` or `DAGU_BROWSER_SANDBOX=false` turns it off for every browser step; a compromised page then runs with the Dagu process's permissions, so prefer the seccomp profile. DAGs cannot change it. With the sandbox on, a browser step fails when `CI` is set or Dagu runs as root on Linux, because the browser would run without the sandbox there; set `DAGU_BROWSER_SANDBOX=false` to allow it.
 - Profiles and the replay cache live on the host that runs the step. Pin such steps with `worker_selector` in distributed mode.
+- A browser without a window (`headless: true`, the default) sends the user agent the same Chrome sends with one and reports a desktop-sized screen, so showing the window does not change how a site sees the step. A page the site refused, with a bot check such as Cloudflare's or a 403 or 429, is logged as `page refused` and named at the end of the error of a step that fails on it; a bot check that passes on its own is waited out for up to 10 seconds.
 - After a site redesign, clear recorded acts with `dagu browser cache clear <dag> [--step <id>]` on that host instead of editing the instruction or setting `cache: false`.
 
 ## computer.extract / computer.run
 
 Automate desktop applications, such as an ERP client or a legacy Windows program, on the desktop of a macOS or Windows worker. The model looks at screenshots and clicks and types; it comes from the DAG-level `llm` block, or `with.llm`, which replaces it entirely. `anthropic`, `openai`, and `gemini` models use their native computer-use tools when they support them (Claude Opus 4.8 or Sonnet 5 and later, Gemini 3.5 and later); other providers, older models, or `mode: generic` use plain function tools with any tool-calling vision model.
 
-The Dagu process that runs the step must run in a logged-in user session: on Windows not as a service, with the screen unlocked; on macOS with Screen Recording and Accessibility granted to the app that starts Dagu. Run `dagu computer check` on the host to verify. Route computer DAGs to such workers with a DAG-level `worker_selector`; other systems fail the step.
+The Dagu process that runs the step must run in a logged-in user session: on Windows not as a service, with the screen unlocked, and with a Remote Desktop or child session kept connected so its display draws; on macOS with Screen Recording and Accessibility granted to the app that starts Dagu. Run `dagu computer check` on the host to verify. Route computer DAGs to such workers with a DAG-level `worker_selector`, or route one run with `workerSelector` on the start and enqueue API requests (`--worker-label` on `dagu start` and `dagu enqueue`); other systems fail the step.
 
 ```yaml
 secrets:
@@ -1320,7 +1355,7 @@ Computer behavior:
 - Each operation's timeline event carries `via` (`element` for a replay or extract read by the window's elements, `screen` for a replay by pixels, `model` for a model request, `exact` for an exact check), `durationMs`, and `tokens`.
 - When a model provider asks for confirmation before sensitive actions, the step fails unless `on_confirmation: allow`. Put an `ask` before such an act instead.
 - `ask: {prompt, as}` puts the step in Waiting and leaves the desktop as it is; the answer becomes `%<as>%` and the step resumes at the next operation.
-- One computer step at a time uses a user's desktop, across Dagu processes with different data directories; others wait. While a step holds the desktop, the display stays awake; a locked screen fails the step. Screenshots are saved under `computer/<step id>/` in the run artifacts on failure by default and are not masked.
+- One computer step at a time uses a user's desktop, across Dagu processes with different data directories; others wait. While a step holds the desktop, the display stays awake. A step that starts on a locked screen, or while nobody is logged in, waits for it to be unlocked, up to its timeout or 24 hours; a screen that locks while a step runs fails it. Screenshots are saved under `computer/<step id>/` in the run artifacts on failure by default and are not masked.
 - Before sending input, a step waits until nobody has touched the desktop for `with.idle` (default `5s`). Actions the model chose on a screen a person has since used are not run; the model gets the new screen instead. `idle: 0` turns this off, for example on a dedicated host.
 
 ## router.route
