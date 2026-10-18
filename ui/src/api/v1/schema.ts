@@ -5134,7 +5134,7 @@ export interface components {
         };
         /** @description Local shell command run by the Dagu server when this channel delivers a notification. */
         NotificationCommandTarget: {
-            /** @description Shell command. Tokens such as {{dag.name}} are inserted as one quoted shell word, so the value is not interpreted as shell syntax. The same fields are exported as environment variables, including DAG_NAME, STATUS, and ERROR. EXECUTION_LOG is the path of a temporary file containing up to 1 MiB of the run log; Dagu removes that file after the command exits. Unix shells expand $DAG_NAME. Windows cmd.exe expands %DAG_NAME%. */
+            /** @description Shell command, run as written. Run values are exported as environment variables, including DAG_NAME, DAG_RUN_ID, STATUS, ERROR, and RUN_URL; Dagu does not substitute tokens such as {{dag.name}} into the command. EXECUTION_LOG is the path of a temporary file containing up to 1 MiB of the run log; Dagu removes that file after the command exits. Unix shells expand $DAG_NAME. Windows cmd.exe expands %DAG_NAME%. */
             command: string;
         };
         /** @description Notification target input */

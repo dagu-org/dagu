@@ -496,12 +496,12 @@ function ProviderFields({ draft, onChange }: ProviderFieldsProps) {
         </p>
         <p className="text-xs text-muted-foreground">
           <I18nTemplate
-            text="Tokens such as {dag} are inserted as one quoted word, so an error or other run value is not executed as shell syntax. Do not add more quotes around a token. Use {errorEnv} for the run error, and quote {dagEnv} and {statusEnv} yourself when the command reads them. {logEnv} is a temporary file with up to 1 MiB of the run log, including lifecycle-handler output, and is removed after the command exits. On Windows, cmd.exe reads these as %DAG_NAME%, %STATUS%, %ERROR%, and %EXECUTION_LOG%."
+            text="The command runs as written. Run values are environment variables, such as {dagEnv}, {statusEnv}, {errorEnv}, DAG_RUN_ID, and RUN_URL. Quote them, as in {quotedError}. {logEnv} is a temporary file with up to 1 MiB of the run log, including lifecycle-handler output, and is removed after the command exits. On Windows, cmd.exe reads these as %DAG_NAME%, %STATUS%, %ERROR%, and %EXECUTION_LOG%."
             values={{
-              dag: <code>{'{{dag.name}}'}</code>,
               dagEnv: <code>$DAG_NAME</code>,
               statusEnv: <code>$STATUS</code>,
               errorEnv: <code>$ERROR</code>,
+              quotedError: <code>"$ERROR"</code>,
               logEnv: <code>$EXECUTION_LOG</code>,
             }}
           />

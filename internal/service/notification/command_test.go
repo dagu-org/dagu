@@ -8,7 +8,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -80,18 +79,21 @@ func TestDeliverCommandExportsRunContextAndRemovesLogFile(t *testing.T) {
 	assert.ErrorIs(t, statErr, os.ErrNotExist)
 }
 
-func TestDeliverCommandQuotesInterpolatedError(t *testing.T) {
+func TestDeliverCommandPassesErrorAsEnv(t *testing.T) {
 	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX shell syntax")
+	}
 
 	dir := t.TempDir()
 	marker := filepath.Join(dir, "pwned")
 	outPath := filepath.Join(dir, "out.txt")
-	payload := interpolatedErrorPayload(marker)
+	payload := "hello'; touch " + marker + "; $(touch " + marker + ")"
 	svc := New(nil, nil)
 	err := svc.deliverTarget(context.Background(), notificationmodel.Target{
 		Type: notificationmodel.ProviderCommand,
 		Command: &notificationmodel.CommandTarget{
-			Command: interpolatedErrorCommand(outPath),
+			Command: fmt.Sprintf(`printf '%%s' "$ERROR" > %q`, outPath),
 		},
 	}, []chatbridge.NotificationEvent{{
 		Type: eventstore.TypeDAGRunFailed,
@@ -106,7 +108,40 @@ func TestDeliverCommandQuotesInterpolatedError(t *testing.T) {
 	assert.ErrorIs(t, statErr, os.ErrNotExist)
 	body, err := os.ReadFile(outPath)
 	require.NoError(t, err)
-	assert.Contains(t, string(body), "hello")
+	assert.Equal(t, payload, string(body))
+}
+
+// A token inside quotes must not let run text, such as a step's stderr in
+// run.error, run as shell syntax.
+func TestDeliverCommandLeavesTokensLiteral(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX shell syntax")
+	}
+
+	dir := t.TempDir()
+	marker := filepath.Join(dir, "pwned")
+	outPath := filepath.Join(dir, "out.txt")
+	svc := New(nil, nil)
+	err := svc.deliverTarget(context.Background(), notificationmodel.Target{
+		Type: notificationmodel.ProviderCommand,
+		Command: &notificationmodel.CommandTarget{
+			Command: fmt.Sprintf(`printf '%%s' "{{run.error}}" > %q`, outPath),
+		},
+	}, []chatbridge.NotificationEvent{{
+		Type: eventstore.TypeDAGRunFailed,
+		Status: &ir.DAGRunStatus{
+			Name:   "daily-report",
+			Status: ir.Failed,
+			Error:  "$(touch " + marker + ")",
+		},
+	}})
+	require.NoError(t, err)
+	_, statErr := os.Stat(marker)
+	assert.ErrorIs(t, statErr, os.ErrNotExist)
+	body, err := os.ReadFile(outPath)
+	require.NoError(t, err)
+	assert.Equal(t, "{{run.error}}", string(body))
 }
 
 func TestDeliverCommandTruncatesExecutionLog(t *testing.T) {
@@ -136,23 +171,6 @@ func TestDeliverCommandTruncatesExecutionLog(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(body), "# log truncated")
 	assert.NotContains(t, string(body), strings.Repeat("x", 80))
-}
-
-func TestQuoteNotificationValueIsOneShellWord(t *testing.T) {
-	t.Parallel()
-
-	assert.Equal(t, `"hello & calc"`, quoteCmdNotificationValue("hello & calc"))
-	assert.Equal(t, `"a"^""b"`, quoteCmdNotificationValue(`a"b`))
-	assert.Equal(t, `"100%%"`, quoteCmdNotificationValue("100%"))
-	if runtime.GOOS == "windows" {
-		return
-	}
-	payload := "hello'; touch /tmp/pwned; printf '"
-	quoted := quotePOSIXNotificationValue(payload)
-	// #nosec G204 -- the shell command is fixed and the only variable is the quoted fixture.
-	out, err := exec.Command("/bin/sh", "-c", "printf %s "+quoted).Output()
-	require.NoError(t, err)
-	assert.Equal(t, payload, string(out))
 }
 
 func TestDeliverCommandIncludesStderrOnFailure(t *testing.T) {
@@ -193,25 +211,11 @@ func TestDeliverCommandTimesOut(t *testing.T) {
 	assert.Less(t, time.Since(start), 5*time.Second)
 }
 
-func interpolatedErrorPayload(marker string) string {
-	if runtime.GOOS == "windows" {
-		return "hello & echo should-not-run> " + marker
-	}
-	return "hello'; touch " + marker + "; printf 'should-not-run"
-}
-
-func interpolatedErrorCommand(outPath string) string {
-	if runtime.GOOS == "windows" {
-		return fmt.Sprintf(`echo {{run.error}}>"%s"`, outPath)
-	}
-	return fmt.Sprintf("printf '%%s' {{run.error}} > %q", outPath)
-}
-
 func captureCommand(outPath string) string {
 	if runtime.GOOS == "windows" {
-		return fmt.Sprintf(`(echo {{dag.name}}& echo %%DAG_NAME%%& echo %%STATUS%%& echo %%EXECUTION_LOG%%)> "%s" & if not "%%EXECUTION_LOG%%"=="" type "%%EXECUTION_LOG%%" >> "%s"`, outPath, outPath)
+		return fmt.Sprintf(`(echo %%DAG_NAME%%& echo %%STATUS%%& echo %%EXECUTION_LOG%%)> "%s" & if not "%%EXECUTION_LOG%%"=="" type "%%EXECUTION_LOG%%" >> "%s"`, outPath, outPath)
 	}
-	return fmt.Sprintf("printf '%%s\\n' '{{dag.name}}' \"$DAG_NAME\" \"$STATUS\" \"$EXECUTION_LOG\" > %q && if [ -n \"$EXECUTION_LOG\" ]; then cat \"$EXECUTION_LOG\" >> %q; fi", outPath, outPath)
+	return fmt.Sprintf("printf '%%s\\n' \"$DAG_NAME\" \"$STATUS\" \"$EXECUTION_LOG\" > %q && if [ -n \"$EXECUTION_LOG\" ]; then cat \"$EXECUTION_LOG\" >> %q; fi", outPath, outPath)
 }
 
 func executionLogPath(text string) string {

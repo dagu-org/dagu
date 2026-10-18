@@ -81,10 +81,6 @@ func (s *Service) runNotificationCommand(
 	publicURL string,
 ) error {
 	values := notificationTemplateValues(event, publicURL)
-	rendered := renderTemplateTokens(command, values, quoteNotificationValue)
-	if strings.TrimSpace(rendered) == "" {
-		return errors.New("command is empty")
-	}
 
 	timeout := s.notificationCommandTimeout
 	if timeout <= 0 {
@@ -107,7 +103,7 @@ func (s *Service) runNotificationCommand(
 		defer func() { _ = os.Remove(logPath) }()
 	}
 
-	prepared, err := prepareNotificationCommand(rendered)
+	prepared, err := prepareNotificationCommand(command)
 	if err != nil {
 		return err
 	}
@@ -163,15 +159,15 @@ type preparedNotificationCommand struct {
 	cleanup func()
 }
 
-func prepareNotificationCommand(rendered string) (preparedNotificationCommand, error) {
+func prepareNotificationCommand(command string) (preparedNotificationCommand, error) {
 	if runtime.GOOS != "windows" {
 		return preparedNotificationCommand{
 			shell:   "/bin/sh",
-			args:    []string{"-c", rendered},
+			args:    []string{"-c", command},
 			cleanup: func() {},
 		}, nil
 	}
-	path, err := writeNotificationScript(rendered)
+	path, err := writeNotificationScript(command)
 	if err != nil {
 		return preparedNotificationCommand{}, err
 	}
@@ -217,39 +213,6 @@ func startNotificationProcess(shell string, args []string, env []string, stderr 
 	cmd.Stdout = io.Discard
 	cmd.Stderr = stderr
 	return cmdutil.StartManagedProcess(cmd)
-}
-
-// quoteNotificationValue inserts a template value as one shell word.
-func quoteNotificationValue(value string) string {
-	if runtime.GOOS == "windows" {
-		return quoteCmdNotificationValue(value)
-	}
-	return quotePOSIXNotificationValue(value)
-}
-
-func quotePOSIXNotificationValue(value string) string {
-	return "'" + strings.ReplaceAll(value, "'", `'\''`) + "'"
-}
-
-// quoteCmdNotificationValue quotes value for a cmd.exe script. A quote is
-// closed, emitted with a caret, and reopened so it cannot end the string.
-func quoteCmdNotificationValue(value string) string {
-	var b strings.Builder
-	b.WriteByte('"')
-	for _, r := range value {
-		switch r {
-		case '"':
-			b.WriteString(`"^""`)
-		case '%':
-			b.WriteString("%%")
-		case '\r', '\n':
-			b.WriteByte(' ')
-		default:
-			b.WriteRune(r)
-		}
-	}
-	b.WriteByte('"')
-	return b.String()
 }
 
 func commandEnvironment(base []string, values map[string]string, logPath string) []string {
