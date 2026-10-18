@@ -76,6 +76,7 @@ import { I18nText } from '@/i18n/I18nText';
 import { I18nProps } from '@/i18n/I18nProps';
 import { useI18n } from '@/i18n/I18nProvider';
 import { I18nTemplate } from '@/i18n/I18nTemplate';
+import { useCanManageCommandChannels } from '@/contexts/AuthContext';
 
 type ProviderFieldsProps = {
   draft: DeliveryDraft;
@@ -1194,6 +1195,15 @@ export function NotificationChannelsSection({
   const [deleting, setDeleting] = useState<DraftChannel | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const canManageCommandChannels = useCanManageCommandChannels();
+  // An existing command channel keeps its provider listed so the editor can
+  // show it; saving it still needs the server's permission.
+  const providerOptions = CHANNEL_PROVIDER_OPTIONS.filter(
+    (provider) =>
+      provider.value !== NotificationProviderType.command ||
+      canManageCommandChannels ||
+      editor?.type === NotificationProviderType.command
+  );
   const query = search.trim().toLocaleLowerCase();
   const filteredChannels = channels.filter((channel) =>
     [
@@ -1406,7 +1416,7 @@ export function NotificationChannelsSection({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {CHANNEL_PROVIDER_OPTIONS.map((provider) => (
+                        {providerOptions.map((provider) => (
                           <SelectItem
                             key={provider.value}
                             value={provider.value}

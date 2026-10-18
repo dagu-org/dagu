@@ -26,6 +26,12 @@ var errNotificationManagementNotAvailable = &Error{
 	Message:    "Notification delivery is unavailable; verify the event store, notification store, and notification state store",
 }
 
+var errCommandChannelsDisabled = &Error{
+	HTTPStatus: http.StatusForbidden,
+	Code:       api.ErrorCodeForbidden,
+	Message:    "Command channels require the writeDAGs and runDAGs permissions",
+}
+
 func (a *API) GetNotificationSettings(ctx context.Context, _ api.GetNotificationSettingsRequestObject) (api.GetNotificationSettingsResponseObject, error) {
 	if err := a.requireNotificationManagement(ctx); err != nil {
 		return nil, err
@@ -181,6 +187,11 @@ func (a *API) CreateNotificationChannel(ctx context.Context, request api.CreateN
 	if request.Body == nil {
 		return nil, badNotificationRequest("request body is required")
 	}
+	if request.Body.Type == api.NotificationProviderTypeCommand {
+		if err := a.requireCommandChannelAccess(ctx); err != nil {
+			return nil, err
+		}
+	}
 
 	channel := notificationChannelFromRequest("", *request.Body)
 	saved, err := a.notificationService.SaveChannel(ctx, channel, getCreatorID(ctx))
@@ -219,6 +230,11 @@ func (a *API) UpdateNotificationChannel(ctx context.Context, request api.UpdateN
 	}
 	if request.Body == nil {
 		return nil, badNotificationRequest("request body is required")
+	}
+	if request.Body.Type == api.NotificationProviderTypeCommand {
+		if err := a.requireCommandChannelAccess(ctx); err != nil {
+			return nil, err
+		}
 	}
 	if _, err := a.notificationService.GetChannel(ctx, request.ChannelId); err != nil {
 		if errors.Is(err, notificationmodel.ErrChannelNotFound) {
@@ -395,6 +411,18 @@ func (a *API) TestNotificationChannel(ctx context.Context, request api.TestNotif
 	if err := a.requireNotificationManagement(ctx); err != nil {
 		return nil, err
 	}
+	channel, err := a.notificationService.GetChannel(ctx, request.ChannelId)
+	if err != nil {
+		if errors.Is(err, notificationmodel.ErrChannelNotFound) {
+			return nil, notificationNotFound(err.Error())
+		}
+		return nil, err
+	}
+	if channel.Type == notificationmodel.ProviderCommand {
+		if err := a.requireCommandChannelAccess(ctx); err != nil {
+			return nil, err
+		}
+	}
 	results, err := a.notificationService.SendChannelTest(ctx, request.ChannelId)
 	if err != nil {
 		if errors.Is(err, notificationmodel.ErrChannelNotFound) {
@@ -415,6 +443,18 @@ func (a *API) requireNotificationManagement(ctx context.Context) error {
 		return errNotificationManagementNotAvailable
 	}
 	return a.requireDeveloperOrAbove(ctx)
+}
+
+// requireCommandChannelAccess guards saving or test-sending a command channel,
+// which runs a shell command on the server.
+func (a *API) requireCommandChannelAccess(ctx context.Context) error {
+	if err := a.requireAdmin(ctx); err != nil {
+		return err
+	}
+	if !a.notificationService.CommandChannelsEnabled() {
+		return errCommandChannelsDisabled
+	}
+	return nil
 }
 
 func (a *API) resolveNotificationRouteWorkspace(ctx context.Context, name string) (string, error) {

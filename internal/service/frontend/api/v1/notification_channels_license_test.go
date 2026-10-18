@@ -51,6 +51,59 @@ func TestNotificationChannels_CreateCommandChannel(t *testing.T) {
 	assert.Equal(t, command, result.Channels[0].Command.Command)
 }
 
+// Command channels run shell commands on the server, so saving or
+// test-sending one is limited to admins.
+func TestNotificationChannels_CommandChannelRequiresAdmin(t *testing.T) {
+	t.Parallel()
+
+	server := setupWebhookTestServer(t)
+	adminToken := getWebhookAdminToken(t, server)
+	developerToken := createRuntimeProfileUserToken(t, server, adminToken, "developer-user", "developer1", api.UserRoleDeveloper)
+	input := commandChannelInput()
+
+	server.Client().Post("/api/v1/notification-channels", input).
+		WithBearerToken(developerToken).ExpectStatus(http.StatusForbidden).Send(t)
+	created := server.Client().Post("/api/v1/notification-channels", input).
+		WithBearerToken(adminToken).ExpectStatus(http.StatusCreated).Send(t)
+	var channel api.NotificationChannel
+	created.Unmarshal(t, &channel)
+
+	server.Client().Put("/api/v1/notification-channels/"+channel.Id, input).
+		WithBearerToken(developerToken).ExpectStatus(http.StatusForbidden).Send(t)
+	server.Client().Post("/api/v1/notification-channels/"+channel.Id+"/test", nil).
+		WithBearerToken(developerToken).ExpectStatus(http.StatusForbidden).Send(t)
+}
+
+func TestNotificationChannels_CommandChannelRequiresDAGPermissions(t *testing.T) {
+	t.Parallel()
+
+	for _, permission := range []config.Permission{config.PermissionWriteDAGs, config.PermissionRunDAGs} {
+		t.Run(string(permission), func(t *testing.T) {
+			t.Parallel()
+
+			server := setupWebhookTestServer(t, func(cfg *config.Config) {
+				cfg.Server.Permissions = map[config.Permission]bool{
+					config.PermissionWriteDAGs: true,
+					config.PermissionRunDAGs:   true,
+				}
+				cfg.Server.Permissions[permission] = false
+			})
+			server.Client().Post("/api/v1/notification-channels", commandChannelInput()).
+				WithBearerToken(getWebhookAdminToken(t, server)).
+				ExpectStatus(http.StatusForbidden).Send(t)
+		})
+	}
+}
+
+func commandChannelInput() api.NotificationChannelInput {
+	return api.NotificationChannelInput{
+		Name:    "Desktop",
+		Type:    api.NotificationProviderTypeCommand,
+		Enabled: true,
+		Command: &api.NotificationCommandTarget{Command: `notify-send "Dagu" "$DAG_NAME $STATUS"`},
+	}
+}
+
 func TestDAGNotifications_RejectCommandTarget(t *testing.T) {
 	t.Parallel()
 

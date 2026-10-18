@@ -17,6 +17,7 @@ vi.hoisted(() => {
 });
 
 const mocks = vi.hoisted(() => ({
+  canManageCommandChannels: true,
   useQuery: vi.fn(),
   client: {
     PUT: vi.fn(),
@@ -28,6 +29,11 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/hooks/api', () => ({
   useClient: () => mocks.client,
   useQuery: mocks.useQuery,
+}));
+
+vi.mock('@/contexts/AuthContext', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/contexts/AuthContext')>()),
+  useCanManageCommandChannels: () => mocks.canManageCommandChannels,
 }));
 
 vi.mock('@/components/MonitoringOffer', () => ({
@@ -160,6 +166,7 @@ function renderRulesPage(
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.canManageCommandChannels = true;
   mocks.client.PUT.mockImplementation(
     async (_path: string, { body }: { body: object }) => ({ data: body })
   );
@@ -366,6 +373,16 @@ describe('NotificationChannelsPage', () => {
     expect(
       await screen.findByRole('listitem', { name: 'Desktop' })
     ).toBeVisible();
+  });
+
+  it('hides the command provider without permission', async () => {
+    const user = userEvent.setup();
+    mocks.canManageCommandChannels = false;
+    renderChannelsPage({});
+    await user.click(screen.getByRole('button', { name: 'Add channel' }));
+    await user.click(screen.getByLabelText('Provider'));
+    expect(screen.getByRole('option', { name: 'Slack' })).toBeVisible();
+    expect(screen.queryByRole('option', { name: 'Custom' })).toBeNull();
   });
 
   it('creates a channel with the selected provider', async () => {

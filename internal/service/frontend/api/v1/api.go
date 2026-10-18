@@ -145,6 +145,7 @@ type NotificationService interface {
 	DeleteChannel(ctx context.Context, channelID string) error
 	SendChannelTest(ctx context.Context, channelID string) ([]notificationservice.TestResult, error)
 	SendTest(ctx context.Context, dagName, targetID string, eventType eventstore.EventType) ([]notificationservice.TestResult, error)
+	CommandChannelsEnabled() bool
 }
 
 type IncidentService interface {
