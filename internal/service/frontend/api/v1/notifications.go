@@ -29,7 +29,13 @@ var errNotificationManagementNotAvailable = &Error{
 var errCommandChannelsDisabled = &Error{
 	HTTPStatus: http.StatusForbidden,
 	Code:       api.ErrorCodeForbidden,
-	Message:    "Command channels require the writeDAGs and runDAGs permissions",
+	Message:    "Local command channels need permissions.write_dags and permissions.run_dags on this server",
+}
+
+var errCommandChannelsAdminOnly = &Error{
+	HTTPStatus: http.StatusForbidden,
+	Code:       api.ErrorCodeForbidden,
+	Message:    "Only admins can change or test local command channels",
 }
 
 func (a *API) GetNotificationSettings(ctx context.Context, _ api.GetNotificationSettingsRequestObject) (api.GetNotificationSettingsResponseObject, error) {
@@ -456,6 +462,9 @@ func (a *API) requireNotificationManagement(ctx context.Context) error {
 // which runs a shell command on the server.
 func (a *API) requireCommandChannelAccess(ctx context.Context) error {
 	if err := a.requireAdmin(ctx); err != nil {
+		if errors.Is(err, errInsufficientPermissions) {
+			return errCommandChannelsAdminOnly
+		}
 		return err
 	}
 	if !a.notificationService.CommandChannelsEnabled() {

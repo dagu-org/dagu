@@ -80,8 +80,12 @@ func TestNotificationChannels_CommandChannelRequiresAdmin(t *testing.T) {
 		Targets:       []api.NotificationTargetInput{},
 		Subscriptions: &[]api.NotificationSubscriptionInput{{ChannelId: channel.Id, Enabled: true}},
 	}).WithBearerToken(developerToken).ExpectStatus(http.StatusOK).Send(t)
-	server.Client().Post("/api/v1/dags/daily-report/notifications/test", nil).
+	// The DAG test does not name the channel it would run, so the error does.
+	denied := server.Client().Post("/api/v1/dags/daily-report/notifications/test", nil).
 		WithBearerToken(developerToken).ExpectStatus(http.StatusForbidden).Send(t)
+	var errResp api.Error
+	denied.Unmarshal(t, &errResp)
+	assert.Equal(t, "Only admins can change or test local command channels", errResp.Message)
 	server.Client().Post("/api/v1/dags/daily-report/notifications/test", nil).
 		WithBearerToken(adminToken).ExpectStatus(http.StatusOK).Send(t)
 }
@@ -100,9 +104,12 @@ func TestNotificationChannels_CommandChannelRequiresDAGPermissions(t *testing.T)
 				}
 				cfg.Server.Permissions[permission] = false
 			})
-			server.Client().Post("/api/v1/notification-channels", commandChannelInput()).
+			resp := server.Client().Post("/api/v1/notification-channels", commandChannelInput()).
 				WithBearerToken(getWebhookAdminToken(t, server)).
 				ExpectStatus(http.StatusForbidden).Send(t)
+			var errResp api.Error
+			resp.Unmarshal(t, &errResp)
+			assert.Equal(t, "Local command channels need permissions.write_dags and permissions.run_dags on this server", errResp.Message)
 		})
 	}
 }
