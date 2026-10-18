@@ -50,7 +50,7 @@
     "allowed_hosts": {
       "type": "array",
       "items": { "type": "string" },
-      "description": "Public domain names the server answers to where no credential is needed: every request with auth mode 'none', and first-admin setup. IP addresses, single-label names, names under the local-network domains home.arpa and service.arpa, names under top-level domains ICANN has not delegated (such as localhost, local, lan, or internal), the configured host, the public_url host, and this machine's hostname are always accepted. Entries are exact names, '.example.com' for a domain and its subdomains, or '*' to accept any name."
+      "description": "Host names the server answers to where no credential is needed: every request with auth mode 'none', and first-admin setup. IP addresses, single-label names, names under the special-use local domains localhost, local, internal, test, example, invalid, alt, home.arpa, and service.arpa, the configured host, the public_url host, and this machine's hostname are always accepted. Entries are exact names, '.example.com' for a domain and its subdomains, or '*' to accept any name."
     },
     "ip_access": {
       "$ref": "#/definitions/IPAccessDef"

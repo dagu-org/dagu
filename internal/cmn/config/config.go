@@ -299,11 +299,11 @@ type Server struct {
 	Audit              AuditConfig
 	SSE                SSEConfig
 	IPAccess           IPAccessConfig
-	// AllowedHosts lists public domain names the server answers to where no
+	// AllowedHosts lists host names the server answers to where no
 	// credential is needed: every request with auth mode none, and
-	// first-admin setup. Addresses, single-label names, names under
-	// home.arpa or service.arpa, and names under undelegated top-level
-	// domains are always accepted. Entries are exact names, ".example.com"
+	// first-admin setup. Addresses, single-label names, and names under
+	// special-use local domains such as localhost, local, internal, and
+	// home.arpa are always accepted. Entries are exact names, ".example.com"
 	// for a domain and its subdomains, or "*" for any name.
 	AllowedHosts []string
 }

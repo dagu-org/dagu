@@ -4,7 +4,6 @@
 package frontend
 
 import (
-	_ "embed"
 	"fmt"
 	"net"
 	"net/http"
@@ -13,20 +12,20 @@ import (
 	"strings"
 
 	"golang.org/x/net/idna"
-	"golang.org/x/net/publicsuffix"
 
 	"github.com/dagucloud/dagu/v2/api/v1"
 	"github.com/dagucloud/dagu/v2/internal/cmn/config"
 	apiv1 "github.com/dagucloud/dagu/v2/internal/service/frontend/api/v1"
 )
 
-// hostPolicy rejects requests that address the server by a public domain it
-// was not configured with. A DNS-rebinding page points its own domain at the
-// server, so the browser sends that domain as both Host and Origin and the
-// cross-origin check sees a same-origin request. Browsers keep credentials per
-// site, so such a page gains nothing where authentication is required; the
-// check applies to every route with auth.mode none, and otherwise only to the
-// endpoint that creates the first admin.
+// hostPolicy rejects requests that address the server by a name it was not
+// configured with and that a remote page could take over. A DNS-rebinding
+// page points its own domain at the server, so the browser sends that domain
+// as both Host and Origin and the cross-origin check sees a same-origin
+// request. Browsers keep credentials per site, so such a page gains nothing
+// where authentication is required; the check applies to every route with
+// auth.mode none, and otherwise only to the endpoint that creates the first
+// admin.
 type hostPolicy struct {
 	allowedHosts []string
 	// runtimeHosts returns names known only while the server runs, such as a
@@ -93,7 +92,7 @@ func (p hostPolicy) allows(host string) bool {
 	if host == "" {
 		return false
 	}
-	if _, err := netip.ParseAddr(host); err == nil || isPrivateName(host) {
+	if _, err := netip.ParseAddr(host); err == nil || isLocalName(host) {
 		return true
 	}
 	if hostListMatches(p.allowedHosts, host) {
@@ -111,51 +110,21 @@ func (p hostPolicy) allows(host string) bool {
 	return hostListMatches(runtime, host)
 }
 
-// ianaTLDs is IANA's list of delegated top-level domains, from
-// https://data.iana.org/TLD/tlds-alpha-by-domain.txt.
-//
-//go:embed iana_tlds.txt
-var ianaTLDs string
-
-// delegatedTLDs holds the lower-case top-level domains in ianaTLDs.
-var delegatedTLDs = parseTLDList(ianaTLDs)
-
-// localNetworkDomains are special-use domains under a delegated top-level
-// domain that only local networks resolve, as hostListMatches entries:
-// home.arpa for home networks (RFC 8375) and service.arpa for service
-// registration (RFC 9665).
-var localNetworkDomains = []string{".home.arpa", ".service.arpa"}
-
-func parseTLDList(list string) map[string]struct{} {
-	tlds := make(map[string]struct{})
-	for line := range strings.Lines(list) {
-		if line = strings.TrimSpace(line); line != "" && !strings.HasPrefix(line, "#") {
-			tlds[strings.ToLower(line)] = struct{}{}
-		}
-	}
-	return tlds
+// localDomains are the special-use domains that public DNS never answers
+// for, as hostListMatches entries: localhost, test, example, and invalid
+// (RFC 6761), local (RFC 6762), alt (RFC 9476), internal, which ICANN
+// reserved for private use, home.arpa (RFC 8375), and service.arpa
+// (RFC 9665).
+var localDomains = []string{
+	".localhost", ".test", ".example", ".invalid", ".local", ".alt", ".internal", ".home.arpa", ".service.arpa",
 }
 
-// isPrivateName reports whether only local DNS answers for host: a single
+// isLocalName reports whether only local DNS can answer for host: a single
 // label, which resolvers qualify with local search domains and public DNS
-// never publishes, a name in one of localNetworkDomains, or a name under a
-// top-level domain ICANN has not delegated, such as localhost, local, lan,
-// or internal. A remote page can rebind any other name, including the
-// private suffixes of dynamic DNS services.
-func isPrivateName(host string) bool {
-	dot := strings.LastIndexByte(host, '.')
-	if dot < 0 || hostListMatches(localNetworkDomains, host) {
-		return true
-	}
-	tld := host[dot+1:]
-	// Either list may know of a delegation the other lacks. A name under the
-	// top-level domain also matches wildcard-only rules such as *.ck, which
-	// the top-level domain alone does not.
-	if _, ok := delegatedTLDs[tld]; ok {
-		return false
-	}
-	_, icann := publicsuffix.PublicSuffix("dagu." + tld)
-	return !icann
+// never publishes, or a name in localDomains. Any other name may sit under a
+// domain that is delegated now or later, so a remote page could rebind it.
+func isLocalName(host string) bool {
+	return !strings.Contains(host, ".") || hostListMatches(localDomains, host)
 }
 
 // hostListMatches matches exact names, ".example.com" for a domain and its
