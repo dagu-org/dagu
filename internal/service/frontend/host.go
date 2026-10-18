@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strings"
 
+	"golang.org/x/net/idna"
 	"golang.org/x/net/publicsuffix"
 
 	"github.com/dagucloud/dagu/v2/api/v1"
@@ -37,6 +38,13 @@ type hostPolicy struct {
 func newHostPolicy(cfg *config.Config, setupPath, machineHostname string, runtimeHosts func() []string) hostPolicy {
 	var allowed []string
 	add := func(name string) {
+		name = strings.TrimSpace(name)
+		if domain, ok := strings.CutPrefix(name, "."); ok {
+			if domain = hostName(domain); domain != "" {
+				allowed = append(allowed, "."+domain)
+			}
+			return
+		}
 		if name = hostName(name); name != "" {
 			allowed = append(allowed, name)
 		}
@@ -128,13 +136,17 @@ func hostListMatches(entries []string, host string) bool {
 	return false
 }
 
-// hostName returns the lower-case name in a Host value or config entry,
-// without a port, IPv6 brackets, or a trailing dot.
+// hostName returns the name in a Host value or config entry in lower-case
+// ASCII form, as browsers send it, without a port, IPv6 brackets, or a
+// trailing dot.
 func hostName(value string) string {
 	value = strings.TrimSpace(value)
 	if host, _, err := net.SplitHostPort(value); err == nil {
 		value = host
 	}
-	value = strings.TrimSuffix(strings.Trim(value, "[]"), ".")
-	return strings.ToLower(value)
+	value = strings.ToLower(strings.TrimSuffix(strings.Trim(value, "[]"), "."))
+	if ascii, err := idna.Lookup.ToASCII(value); err == nil {
+		return ascii
+	}
+	return value
 }

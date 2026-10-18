@@ -68,15 +68,18 @@ func TestHostPolicyAllowsConfiguredHosts(t *testing.T) {
 	handler := newTestHostPolicy(t, config.AuthModeNone, func(cfg *config.Config) {
 		cfg.Server.Host = "dagu.example.org"
 		cfg.Server.PublicURL = "https://dagu.example.com/ui"
-		cfg.Server.AllowedHosts = []string{"Ops.Example.NET:8080", ".corp.example.com"}
+		cfg.Server.AllowedHosts = []string{"Ops.Example.NET:8080", ".corp.example.com", "bücher.de", ".例え.jp"}
 	}, func() []string { return []string{"dagu.tail1234.ts.net"} })
 
+	// Browsers send internationalized names in their Punycode form.
 	for _, host := range []string{
 		"dagu.example.org:8080",
 		"dagu.example.com",
 		"ops.example.net",
 		"corp.example.com",
 		"build.corp.example.com.",
+		"xn--bcher-kva.de",
+		"dagu.xn--r8jz45g.jp",
 		"dagu.tail1234.ts.net",
 	} {
 		resp := serveHost(handler, httptest.NewRequest(http.MethodGet, "http://"+host+"/api/v1/dags", nil))
