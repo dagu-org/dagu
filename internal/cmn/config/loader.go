@@ -15,6 +15,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -1239,6 +1240,14 @@ func (l *ConfigLoader) loadServerDefaults(cfg *Config, def Definition) {
 	cfg.Server.CheckUpdates = l.v.GetBool("check_updates")
 	cfg.Server.CORSAllowedOrigins = parseStringList(l.v.Get("cors_allowed_origins"))
 	cfg.Server.AllowedHosts = parseStringList(l.v.Get("allowed_hosts"))
+	if slices.Contains(cfg.Server.AllowedHosts, "*") {
+		warning := `allowed_hosts contains "*"; any website may reach first-admin setup through DNS rebinding`
+		if cfg.Server.Auth.Mode == AuthModeNone {
+			warning = `allowed_hosts contains "*"; any website may reach the Dagu API through DNS rebinding, ` +
+				`and auth.mode "none" allows those requests to execute workflows without authentication`
+		}
+		l.warnings = append(l.warnings, warning)
+	}
 	cfg.Server.IPAccess = IPAccessConfig{
 		AllowedIPs:     parseStringList(l.v.Get("ip_access.allowed_ips")),
 		TrustedProxies: parseStringList(l.v.Get("ip_access.trusted_proxies")),

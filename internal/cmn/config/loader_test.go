@@ -2363,6 +2363,31 @@ allowed_hosts:
 
 		assert.Equal(t, []string{"dagu.lan", ".corp.example"}, cfg.Server.AllowedHosts)
 	})
+
+	// A wildcard accepts every name even beside specific entries.
+	t.Run("WildcardWarning", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+auth:
+  mode: builtin
+allowed_hosts:
+  - dagu.lan
+  - "*"
+`)
+		require.Len(t, cfg.Warnings, 1)
+		assert.Contains(t, cfg.Warnings[0], "first-admin setup through DNS rebinding")
+	})
+
+	t.Run("WildcardWithoutAuthWarning", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+auth:
+  mode: none
+allowed_hosts:
+  - "*"
+`)
+		require.Len(t, cfg.Warnings, 1)
+		assert.Contains(t, cfg.Warnings[0], `auth.mode "none"`)
+		assert.Contains(t, cfg.Warnings[0], "execute workflows without authentication")
+	})
 }
 
 func TestLoad_AccessLogMode(t *testing.T) {
