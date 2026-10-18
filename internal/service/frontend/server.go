@@ -14,6 +14,7 @@ import (
 	"mime"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"path"
@@ -742,6 +743,18 @@ func (u *updateChecker) GetUpdateInfo() (bool, string) {
 	return cache.UpdateAvailable, cache.LatestVersion
 }
 
+// tunnelHosts returns the tunnel's host name while one is connected.
+func (srv *Server) tunnelHosts() []string {
+	if srv.tunnelService == nil {
+		return nil
+	}
+	tunnelURL, err := url.Parse(srv.tunnelService.PublicURL())
+	if err != nil || tunnelURL.Hostname() == "" {
+		return nil
+	}
+	return []string{tunnelURL.Hostname()}
+}
+
 // setupChecker implements SetupRequiredChecker by counting users via the auth service.
 // Once users exist, caches the result to avoid hitting the store on every page load.
 type setupChecker struct {
@@ -909,10 +922,14 @@ func (srv *Server) Serve(ctx context.Context) error {
 	r.Use(middleware.Recoverer)
 	r.Use(securityHeadersMiddleware(srv.config.Server.TLS != nil))
 	r.Use(ipAccessPolicy.middleware)
+	setupPath := path.Join(apiV1BasePath, "auth/setup")
+	machineHostname, _ := os.Hostname()
+	hostNamePolicy := newHostPolicy(srv.config, setupPath, machineHostname, srv.tunnelHosts)
+	r.Use(hostNamePolicy.middleware)
 	crossOriginPolicy := corsPolicy{
 		allowedOrigins: srv.config.Server.CORSAllowedOrigins,
 		publicURL:      srv.config.Server.PublicURL,
-		setupPath:      path.Join(apiV1BasePath, "auth/setup"),
+		setupPath:      setupPath,
 	}
 	for _, warning := range crossOriginPolicy.originWarnings() {
 		logger.Warn(ctx, warning)

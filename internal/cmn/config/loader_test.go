@@ -2345,6 +2345,26 @@ ip_access:
 	})
 }
 
+func TestLoad_AllowedHosts(t *testing.T) {
+	t.Run("YAML", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+allowed_hosts:
+  - dagu.lan
+  - .corp.example
+`)
+
+		assert.Equal(t, []string{"dagu.lan", ".corp.example"}, cfg.Server.AllowedHosts)
+	})
+
+	t.Run("Environment", func(t *testing.T) {
+		cfg := loadWithEnv(t, "# empty", map[string]string{
+			"DAGU_ALLOWED_HOSTS": "dagu.lan, .corp.example",
+		})
+
+		assert.Equal(t, []string{"dagu.lan", ".corp.example"}, cfg.Server.AllowedHosts)
+	})
+}
+
 func TestLoad_AccessLogMode(t *testing.T) {
 	t.Run("AccessLogAll", func(t *testing.T) {
 		cfg := loadFromYAML(t, `

@@ -299,6 +299,11 @@ type Server struct {
 	Audit              AuditConfig
 	SSE                SSEConfig
 	IPAccess           IPAccessConfig
+	// AllowedHosts lists extra host names browsers may use for the server
+	// when no credential is needed: with auth mode none, and for first-admin
+	// setup. Entries are exact names, ".example.com" for a domain and its
+	// subdomains, or "*" for any name.
+	AllowedHosts []string
 }
 
 // IPAccessConfig restricts HTTP access by client network address.

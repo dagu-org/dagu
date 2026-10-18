@@ -47,6 +47,11 @@
       "items": { "type": "string" },
       "description": "Origins allowed to make cross-origin requests. When unset or empty, cross-origin browser access is disabled. Exact origins enable credentials. An explicit '*' allows every origin without credentials and emits a security warning."
     },
+    "allowed_hosts": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Extra host names browsers may use to reach the server where no credential is needed: every request with auth mode 'none', and first-admin setup. IP addresses, localhost names, the configured host, the public_url host, and this machine's hostname are always allowed. Entries are exact names, '.example.com' for a domain and its subdomains, or '*' to allow any name."
+    },
     "ip_access": {
       "$ref": "#/definitions/IPAccessDef"
     },

@@ -17,6 +17,7 @@ type Definition struct {
 	CheckUpdates       *bool        `mapstructure:"check_updates"`
 	TLS                *TLSDef      `mapstructure:"tls"`
 	CORSAllowedOrigins []string     `mapstructure:"cors_allowed_origins"`
+	AllowedHosts       []string     `mapstructure:"allowed_hosts"`
 	IPAccess           *IPAccessDef `mapstructure:"ip_access"`
 
 	// Core settings

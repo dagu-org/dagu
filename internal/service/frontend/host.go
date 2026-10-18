@@ -1,0 +1,145 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package frontend
+
+import (
+	"fmt"
+	"net"
+	"net/http"
+	"net/netip"
+	"net/url"
+	"strings"
+
+	"github.com/dagucloud/dagu/v2/api/v1"
+	"github.com/dagucloud/dagu/v2/internal/cmn/config"
+	apiv1 "github.com/dagucloud/dagu/v2/internal/service/frontend/api/v1"
+)
+
+// hostPolicy rejects browser requests that address the server by a name it
+// does not answer to. A DNS-rebinding page points its own domain at the
+// server, so the browser sends that domain as both Host and Origin and the
+// cross-origin check sees a same-origin request. Browsers keep credentials per
+// site, so such a page gains nothing where authentication is required; the
+// check applies to every route with auth.mode none, and otherwise only to the
+// endpoint that creates the first admin.
+type hostPolicy struct {
+	allowedHosts []string
+	// runtimeHosts returns names known only while the server runs, such as a
+	// tunnel's.
+	runtimeHosts func() []string
+	guardAll     bool
+	setupPath    string
+}
+
+func newHostPolicy(cfg *config.Config, setupPath, machineHostname string, runtimeHosts func() []string) hostPolicy {
+	var allowed []string
+	add := func(name string) {
+		if name = hostName(name); name != "" {
+			allowed = append(allowed, name)
+		}
+	}
+	add(cfg.Server.Host)
+	if publicURL, err := url.Parse(cfg.Server.PublicURL); err == nil {
+		add(publicURL.Hostname())
+	}
+	if machine := hostName(machineHostname); machine != "" {
+		label, _, _ := strings.Cut(machine, ".")
+		add(machine)
+		add(label)
+		add(label + ".local")
+	}
+	for _, entry := range cfg.Server.AllowedHosts {
+		add(entry)
+	}
+	return hostPolicy{
+		allowedHosts: allowed,
+		runtimeHosts: runtimeHosts,
+		guardAll:     cfg.Server.Auth.Mode == config.AuthModeNone,
+		setupPath:    strings.TrimRight(setupPath, "/"),
+	}
+}
+
+func (p hostPolicy) middleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !p.guards(r) || !isBrowserRequest(r) {
+			next.ServeHTTP(w, r)
+			return
+		}
+		host := hostName(r.Host)
+		if !p.allows(host) {
+			apiv1.WriteErrorResponse(w, &apiv1.Error{
+				HTTPStatus: http.StatusBadRequest,
+				Code:       api.ErrorCodeBadRequest,
+				Message:    fmt.Sprintf("host %q is not allowed; add it to allowed_hosts or set public_url", host),
+			})
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (p hostPolicy) guards(r *http.Request) bool {
+	return p.guardAll || strings.TrimRight(r.URL.Path, "/") == p.setupPath
+}
+
+func (p hostPolicy) allows(host string) bool {
+	if host == "" {
+		return false
+	}
+	// A rebinding page always uses a domain name, so an address is the
+	// server's own.
+	if _, err := netip.ParseAddr(host); err == nil {
+		return true
+	}
+	if host == "localhost" || strings.HasSuffix(host, ".localhost") {
+		return true
+	}
+	if hostListMatches(p.allowedHosts, host) {
+		return true
+	}
+	if p.runtimeHosts == nil {
+		return false
+	}
+	var runtime []string
+	for _, name := range p.runtimeHosts() {
+		if name = hostName(name); name != "" {
+			runtime = append(runtime, name)
+		}
+	}
+	return hostListMatches(runtime, host)
+}
+
+// hostListMatches matches exact names, ".example.com" for a domain and its
+// subdomains, and "*" for any name.
+func hostListMatches(entries []string, host string) bool {
+	for _, entry := range entries {
+		if entry == "*" || entry == host {
+			return true
+		}
+		if domain, ok := strings.CutPrefix(entry, "."); ok &&
+			(host == domain || strings.HasSuffix(host, entry)) {
+			return true
+		}
+	}
+	return false
+}
+
+// isBrowserRequest reports whether a browser sent r: browsers attach Fetch
+// Metadata or Origin to the requests a page makes. Other clients cannot be
+// driven by a rebinding page and may reach the server by any name their
+// network gives it.
+func isBrowserRequest(r *http.Request) bool {
+	return r.Header.Get("Sec-Fetch-Site") != "" || r.Header.Get("Origin") != ""
+}
+
+// hostName returns the lower-case name in a Host value or config entry,
+// without a port, IPv6 brackets, or a trailing dot.
+func hostName(value string) string {
+	value = strings.TrimSpace(value)
+	if host, _, err := net.SplitHostPort(value); err == nil {
+		value = host
+	}
+	value = strings.TrimSuffix(strings.Trim(value, "[]"), ".")
+	return strings.ToLower(value)
+}
