@@ -173,8 +173,8 @@ var fieldsByOperation = map[string][]string{
 	opWrite: {"path", "password", "sheet", "rows", "input", "format", "encoding", "delimiter", "columns", "header",
 		"mode", "style", "types", "atomic", "dry_run", "wait_for_unlock", "artifact"},
 	opAppend: {"path", "password", "sheet", "rows", "input", "format", "encoding", "delimiter", "columns", "header",
-		"types", "atomic", "dry_run", "wait_for_unlock", "artifact"},
-	opUpdateRows: {"path", "password", "sheet", "header", "rows", "key", "set", "missing", "atomic",
+		"types", "output", "atomic", "dry_run", "wait_for_unlock", "artifact"},
+	opUpdateRows: {"path", "password", "sheet", "header", "rows", "key", "set", "missing", "output", "atomic",
 		"dry_run", "wait_for_unlock", "artifact"},
 	opValidate: {"path", "password", "sheet", "range", "header", "columns", "merged", "skip_hidden", "trim", "formulas",
 		"required", "not_blank", "unique", "types", "allowed", "on_problem", "max_problems"},
@@ -497,6 +497,8 @@ func validateWriterConfig(operation string, cfg *config) error {
 				}
 			}
 		}
+	}
+	if operation == opWriteCells || operation == opUpdateRows || operation == opAppend {
 		if cfg.provided("output") {
 			if err := workbook.CheckExtension(cfg.Output); err != nil {
 				return fmt.Errorf("%w: output: %v", errConfig, err)
@@ -556,7 +558,7 @@ func (cfg config) lockOptions(log func(string)) workbook.LockOptions {
 	return workbook.LockOptions{WaitFor: cfg.wait, Log: log}
 }
 
-func (cfg config) writeOptions(log func(string)) workbook.WriteOptions {
+func (cfg config) writeOptions(output string, log func(string)) workbook.WriteOptions {
 	// Writers take header: true or false only; a row-number header is a
 	// read concept.
 	header := cfg.header.Mode != workbook.HeaderNone
@@ -567,6 +569,7 @@ func (cfg config) writeOptions(log func(string)) workbook.WriteOptions {
 		Header:   header,
 		Style:    workbook.StyleMode(cfg.Style),
 		Types:    cfg.types,
+		Output:   output,
 		InPlace:  !cfg.Atomic,
 		DryRun:   cfg.DryRun,
 		Lock:     cfg.lockOptions(log),
@@ -726,7 +729,7 @@ func (cfg config) convertOptions(output string) workbook.ConvertOptions {
 	}
 }
 
-func (cfg config) updateOptions(rows []workbook.Row, log func(string)) workbook.UpdateOptions {
+func (cfg config) updateOptions(rows []workbook.Row, output string, log func(string)) workbook.UpdateOptions {
 	return workbook.UpdateOptions{
 		Password: cfg.Password,
 		Sheet:    cfg.Sheet,
@@ -735,6 +738,7 @@ func (cfg config) updateOptions(rows []workbook.Row, log func(string)) workbook.
 		Rows:     rows,
 		Set:      cfg.set,
 		Missing:  workbook.MissingMode(cfg.Missing),
+		Output:   output,
 		InPlace:  !cfg.Atomic,
 		DryRun:   cfg.DryRun,
 		Lock:     cfg.lockOptions(log),
@@ -805,7 +809,7 @@ var configSchema = &jsonschema.Schema{
 			"An address is a cell, Sheet!cell, or a defined name for one cell."},
 		"merge": {Description: "xlsx.write_cells: ranges to merge before the cells are written, such as [A1:D1]. " +
 			"A merged range keeps only its top-left value; a range covering a cell that holds something, or overlapping another merged region, fails the step."},
-		"output": {Type: "string", Description: "xlsx.write_cells: workbook to write the result to, leaving path as it was, so a template can be filled many times. " +
+		"output": {Type: "string", Description: "xlsx.write_cells, xlsx.update_rows, and xlsx.append: a different workbook to write the result to, leaving path as it was, so a template can be filled many times. " +
 			"xlsx.convert: the csv, json, or jsonl file to write."},
 		"operation": {Type: "string", Enum: []any{"add", "copy", "rename", "delete"},
 			Description: "What xlsx.sheet does: add a sheet named sheet, copy sheet to to, rename sheet to to, or delete sheet."},

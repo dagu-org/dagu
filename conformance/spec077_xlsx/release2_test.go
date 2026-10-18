@@ -132,6 +132,27 @@ func TestXlsxWriteCells(t *testing.T) {
 	require.Nil(t, preview.Rows[0]["B"], "a dry run writes nothing")
 }
 
+func TestXlsxUpdateRowsAndAppendOutput(t *testing.T) {
+	t.Parallel()
+	dagu := harness.NewRunner(t)
+	dagu.Run("start", "update_rows_output.yaml").ExpectExitCode(0)
+	var out struct {
+		Orders   []map[string]any `json:"orders"`
+		Marked   []map[string]any `json:"marked"`
+		Added    []map[string]any `json:"added"`
+		MarkPath string           `json:"mark_path"`
+		AddPath  string           `json:"add_path"`
+	}
+	readJSON(t, dagu, "out.json", &out)
+	require.Equal(t, dagu.ProjectPath("marked.xlsx"), out.MarkPath)
+	require.Equal(t, dagu.ProjectPath("added.xlsx"), out.AddPath)
+	require.Len(t, out.Orders, 1, "the workbook at path is untouched")
+	require.Nil(t, out.Orders[0]["Status"])
+	require.Equal(t, "Submitted", out.Marked[0]["Status"])
+	require.Len(t, out.Added, 2)
+	require.Equal(t, "INV-2", out.Added[1]["Invoice No"])
+}
+
 func TestXlsxSheetOperations(t *testing.T) {
 	t.Parallel()
 	dagu := harness.NewRunner(t)

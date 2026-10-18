@@ -1206,7 +1206,8 @@ empty. Appended fields are placed under the header cell of the same exact name:
 a loose match fails with `did you mean`, a name the header lacks adds a column
 at the right, and `header: false` writes rows by position onto a sheet with no
 header row. An append fails when a cell it would write, or the header cell of
-a new column, lies in a merged cell.
+a new column, lies in a merged cell. `output` on `xlsx.append` writes the
+result to another workbook and leaves `path` untouched.
 
 `xlsx.update_rows` `with` fields: `path`, `sheet`, `key` (the column that
 identifies a row, or `_row`), `rows`, `set` (`{Status: status}` takes a field of
@@ -1214,7 +1215,8 @@ each row, `{Reviewed: {value: yes}}` writes one literal, and a literal that is
 text in the canonical form of a number such as `"100"` is written as a number
 unless `type: string` pins it; omitted, every field
 other than the key and `_row` goes to the column of the same name), `missing`
-(`fail`, `skip`, or `append`), `atomic`, `dry_run`, `wait_for_unlock`,
+(`fail`, `skip`, or `append`), `output` (a different workbook to write the
+result to, leaving `path` untouched), `atomic`, `dry_run`, `wait_for_unlock`,
 `artifact`. Columns the sheet lacks are added at the right. Two checks run
 before any cell is written and cannot be turned off: the key column and every
 existing `set` column must still be in the header row by name, and a row

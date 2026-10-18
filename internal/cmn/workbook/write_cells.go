@@ -155,20 +155,8 @@ func writeCellsOnce(ctx context.Context, path string, opts WriteCellsOptions) (*
 		warn(warning)
 	}
 	if opts.Output != "" {
-		if err := CheckExtension(opts.Output); err != nil {
-			return nil, fmt.Errorf("output: %w", err)
-		}
-		if sameFile(path, opts.Output) {
-			return nil, fmt.Errorf("%s: output must be a different file from path; leave output out to fill the workbook in place", Base(path))
-		}
-		if _, statErr := os.Stat(opts.Output); statErr == nil {
-			warning, err := checkLockFile(opts.Output)
-			if err != nil {
-				return nil, err
-			}
-			if warning != "" {
-				warn(warning)
-			}
+		if err := checkOutput(path, opts.Output, "fill", warn); err != nil {
+			return nil, err
 		}
 		result.Path = opts.Output
 	}
