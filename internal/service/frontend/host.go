@@ -11,13 +11,15 @@ import (
 	"net/url"
 	"strings"
 
+	"golang.org/x/net/publicsuffix"
+
 	"github.com/dagucloud/dagu/v2/api/v1"
 	"github.com/dagucloud/dagu/v2/internal/cmn/config"
 	apiv1 "github.com/dagucloud/dagu/v2/internal/service/frontend/api/v1"
 )
 
-// hostPolicy rejects browser requests that address the server by a name it
-// does not answer to. A DNS-rebinding page points its own domain at the
+// hostPolicy rejects requests that address the server by a public domain it
+// was not configured with. A DNS-rebinding page points its own domain at the
 // server, so the browser sends that domain as both Host and Origin and the
 // cross-origin check sees a same-origin request. Browsers keep credentials per
 // site, so such a page gains nothing where authentication is required; the
@@ -43,12 +45,7 @@ func newHostPolicy(cfg *config.Config, setupPath, machineHostname string, runtim
 	if publicURL, err := url.Parse(cfg.Server.PublicURL); err == nil {
 		add(publicURL.Hostname())
 	}
-	if machine := hostName(machineHostname); machine != "" {
-		label, _, _ := strings.Cut(machine, ".")
-		add(machine)
-		add(label)
-		add(label + ".local")
-	}
+	add(machineHostname)
 	for _, entry := range cfg.Server.AllowedHosts {
 		add(entry)
 	}
@@ -62,7 +59,7 @@ func newHostPolicy(cfg *config.Config, setupPath, machineHostname string, runtim
 
 func (p hostPolicy) middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !p.guards(r) || !isBrowserRequest(r) {
+		if !p.guards(r) {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -87,12 +84,7 @@ func (p hostPolicy) allows(host string) bool {
 	if host == "" {
 		return false
 	}
-	// A rebinding page always uses a domain name, so an address is the
-	// server's own.
-	if _, err := netip.ParseAddr(host); err == nil {
-		return true
-	}
-	if host == "localhost" || strings.HasSuffix(host, ".localhost") {
+	if _, err := netip.ParseAddr(host); err == nil || isPrivateName(host) {
 		return true
 	}
 	if hostListMatches(p.allowedHosts, host) {
@@ -110,6 +102,17 @@ func (p hostPolicy) allows(host string) bool {
 	return hostListMatches(runtime, host)
 }
 
+// isPrivateName reports whether host sits under a top-level domain that
+// ICANN has not delegated, such as localhost, local, lan, internal, or a
+// single label. Only local DNS answers for such names, so a remote page
+// cannot rebind them; it can rebind any name under a delegated domain,
+// including the private suffixes of dynamic DNS services.
+func isPrivateName(host string) bool {
+	tld := host[strings.LastIndexByte(host, '.')+1:]
+	_, icann := publicsuffix.PublicSuffix(tld)
+	return !icann
+}
+
 // hostListMatches matches exact names, ".example.com" for a domain and its
 // subdomains, and "*" for any name.
 func hostListMatches(entries []string, host string) bool {
@@ -123,14 +126,6 @@ func hostListMatches(entries []string, host string) bool {
 		}
 	}
 	return false
-}
-
-// isBrowserRequest reports whether a browser sent r: browsers attach Fetch
-// Metadata or Origin to the requests a page makes. Other clients cannot be
-// driven by a rebinding page and may reach the server by any name their
-// network gives it.
-func isBrowserRequest(r *http.Request) bool {
-	return r.Header.Get("Sec-Fetch-Site") != "" || r.Header.Get("Origin") != ""
 }
 
 // hostName returns the lower-case name in a Host value or config entry,

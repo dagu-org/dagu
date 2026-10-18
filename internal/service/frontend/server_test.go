@@ -613,8 +613,7 @@ func TestServerRejectsRebindingHostWithoutAuth(t *testing.T) {
 
 	req, err := http.NewRequest(http.MethodGet, baseURL+"/api/v1/health", nil)
 	require.NoError(t, err)
-	req.Host = "rebind.example"
-	req.Header.Set("Sec-Fetch-Site", "same-origin")
+	req.Host = "rebind.example.com"
 	resp, err := client.Do(req)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)

@@ -16,68 +16,85 @@ import (
 
 const testSetupPath = "/api/v1/auth/setup"
 
-// A DNS-rebinding page sends its own domain as both Host and Origin, so the
-// request looks same-origin. Without authentication, only the host name tells
-// it apart from the real UI.
-func TestHostPolicyRejectsUnknownBrowserHostsWithoutAuth(t *testing.T) {
+// A DNS-rebinding page sends its own domain as Host. Over plain HTTP a
+// same-origin GET carries neither Origin nor Fetch Metadata, so the name is
+// the only thing that tells it apart from the real UI.
+func TestHostPolicyRejectsPublicDomainsWithoutAuth(t *testing.T) {
 	t.Parallel()
 
 	handler := newTestHostPolicy(t, config.AuthModeNone, nil, nil)
 
-	resp := serveHost(handler, browserRequest(http.MethodPost, "http://rebind.example:8080/api/v1/dag-runs"))
+	resp := serveHost(handler, httptest.NewRequest(http.MethodGet, "http://rebind.example.com:8080/api/v1/dags", nil))
 
 	assert.Equal(t, http.StatusBadRequest, resp.Code)
 	var body struct {
 		Message string `json:"message"`
 	}
 	require.NoError(t, json.Unmarshal(resp.Body.Bytes(), &body))
-	assert.Contains(t, body.Message, `"rebind.example"`)
+	assert.Contains(t, body.Message, `"rebind.example.com"`)
 	assert.Contains(t, body.Message, "allowed_hosts")
 }
 
-func TestHostPolicyAllowsLocalAndConfiguredHosts(t *testing.T) {
+// Names under a top-level domain ICANN has not delegated resolve only
+// through local DNS, so containers, clusters, and home networks keep working
+// without configuration.
+func TestHostPolicyAllowsAddressesAndPrivateNames(t *testing.T) {
 	t.Parallel()
 
-	handler := newTestHostPolicy(t, config.AuthModeNone, func(cfg *config.Config) {
-		cfg.Server.Host = "dagu.internal"
-		cfg.Server.PublicURL = "https://dagu.example.com/ui"
-		cfg.Server.AllowedHosts = []string{"Ops.Example.NET:8080", ".corp.example"}
-	}, func() []string { return []string{"dagu.tail1234.ts.net"} })
+	handler := newTestHostPolicy(t, config.AuthModeNone, nil, nil)
 
 	for _, host := range []string{
-		"localhost:8080",
-		"app.localhost",
 		"127.0.0.1:8080",
 		"192.0.2.10",
 		"[::1]:8080",
-		"dagu.internal:8080",
-		"dagu.example.com",
-		"ops.example.net",
-		"corp.example",
-		"build.corp.example.",
-		"dagu.tail1234.ts.net",
+		"localhost:8080",
+		"app.localhost",
+		"dagu",
+		"dagu-ui.dagu.svc.cluster.local",
+		"nas.lan",
+		"build.internal.",
 	} {
-		t.Run(host, func(t *testing.T) {
-			resp := serveHost(handler, browserRequest(http.MethodGet, "http://"+host+"/api/v1/dags"))
-			assert.Equal(t, http.StatusNoContent, resp.Code)
-		})
+		resp := serveHost(handler, httptest.NewRequest(http.MethodGet, "http://"+host+"/api/v1/dags", nil))
+		assert.Equal(t, http.StatusNoContent, resp.Code, host)
 	}
 
-	resp := serveHost(handler, browserRequest(http.MethodGet, "http://notcorp.example/api/v1/dags"))
+	resp := serveHost(handler, httptest.NewRequest(http.MethodGet, "http://rebind.duckdns.org/api/v1/dags", nil))
+	assert.Equal(t, http.StatusBadRequest, resp.Code, "a dynamic DNS name sits under a delegated domain")
+}
+
+func TestHostPolicyAllowsConfiguredHosts(t *testing.T) {
+	t.Parallel()
+
+	handler := newTestHostPolicy(t, config.AuthModeNone, func(cfg *config.Config) {
+		cfg.Server.Host = "dagu.example.org"
+		cfg.Server.PublicURL = "https://dagu.example.com/ui"
+		cfg.Server.AllowedHosts = []string{"Ops.Example.NET:8080", ".corp.example.com"}
+	}, func() []string { return []string{"dagu.tail1234.ts.net"} })
+
+	for _, host := range []string{
+		"dagu.example.org:8080",
+		"dagu.example.com",
+		"ops.example.net",
+		"corp.example.com",
+		"build.corp.example.com.",
+		"dagu.tail1234.ts.net",
+	} {
+		resp := serveHost(handler, httptest.NewRequest(http.MethodGet, "http://"+host+"/api/v1/dags", nil))
+		assert.Equal(t, http.StatusNoContent, resp.Code, host)
+	}
+
+	resp := serveHost(handler, httptest.NewRequest(http.MethodGet, "http://notcorp.example.com/api/v1/dags", nil))
 	assert.Equal(t, http.StatusBadRequest, resp.Code, "a suffix entry matches whole labels only")
 }
 
 func TestHostPolicyAllowsMachineHostname(t *testing.T) {
 	t.Parallel()
 
-	policy := newHostPolicy(&config.Config{Server: config.Server{Auth: config.Auth{Mode: config.AuthModeNone}}},
-		testSetupPath, "build-box.example.lan", nil)
-	handler := policy.middleware(noContentHandler())
+	cfg := &config.Config{Server: config.Server{Auth: config.Auth{Mode: config.AuthModeNone}}}
+	handler := newHostPolicy(cfg, testSetupPath, "build-box.example.com", nil).middleware(noContentHandler())
 
-	for _, host := range []string{"build-box.example.lan", "build-box", "build-box.local"} {
-		resp := serveHost(handler, browserRequest(http.MethodGet, "http://"+host+":8080/"))
-		assert.Equal(t, http.StatusNoContent, resp.Code, host)
-	}
+	resp := serveHost(handler, httptest.NewRequest(http.MethodGet, "http://build-box.example.com:8080/", nil))
+	assert.Equal(t, http.StatusNoContent, resp.Code)
 }
 
 func TestHostPolicyWildcardAllowsEveryHost(t *testing.T) {
@@ -87,19 +104,7 @@ func TestHostPolicyWildcardAllowsEveryHost(t *testing.T) {
 		cfg.Server.AllowedHosts = []string{"*"}
 	}, nil)
 
-	resp := serveHost(handler, browserRequest(http.MethodPost, "http://rebind.example/api/v1/dag-runs"))
-	assert.Equal(t, http.StatusNoContent, resp.Code)
-}
-
-// Non-browser clients cannot be driven by a rebinding page, and containers and
-// services often reach Dagu by a name only their network knows.
-func TestHostPolicyAllowsNonBrowserClients(t *testing.T) {
-	t.Parallel()
-
-	handler := newTestHostPolicy(t, config.AuthModeNone, nil, nil)
-
-	req := httptest.NewRequest(http.MethodPost, "http://dagu-ui.dagu.svc:8080/api/v1/dag-runs", nil)
-	resp := serveHost(handler, req)
+	resp := serveHost(handler, httptest.NewRequest(http.MethodPost, "http://rebind.example.com/api/v1/dag-runs", nil))
 	assert.Equal(t, http.StatusNoContent, resp.Code)
 }
 
@@ -110,13 +115,13 @@ func TestHostPolicyGuardsOnlySetupWithAuth(t *testing.T) {
 
 	handler := newTestHostPolicy(t, config.AuthModeBuiltin, nil, nil)
 
-	resp := serveHost(handler, browserRequest(http.MethodGet, "http://rebind.example/api/v1/dags"))
+	resp := serveHost(handler, httptest.NewRequest(http.MethodGet, "http://rebind.example.com/api/v1/dags", nil))
 	assert.Equal(t, http.StatusNoContent, resp.Code)
 
-	resp = serveHost(handler, browserRequest(http.MethodPost, "http://rebind.example"+testSetupPath+"/"))
+	resp = serveHost(handler, httptest.NewRequest(http.MethodPost, "http://rebind.example.com"+testSetupPath+"/", nil))
 	assert.Equal(t, http.StatusBadRequest, resp.Code)
 
-	resp = serveHost(handler, browserRequest(http.MethodPost, "http://localhost:8080"+testSetupPath))
+	resp = serveHost(handler, httptest.NewRequest(http.MethodPost, "http://localhost:8080"+testSetupPath, nil))
 	assert.Equal(t, http.StatusNoContent, resp.Code)
 }
 
@@ -133,17 +138,6 @@ func noContentHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	})
-}
-
-// browserRequest builds a same-origin request as a browser sends it, with
-// Fetch Metadata and, for unsafe methods, an Origin matching the URL.
-func browserRequest(method, target string) *http.Request {
-	req := httptest.NewRequest(method, target, nil)
-	req.Header.Set("Sec-Fetch-Site", "same-origin")
-	if method != http.MethodGet {
-		req.Header.Set("Origin", "http://"+req.Host)
-	}
-	return req
 }
 
 func serveHost(handler http.Handler, req *http.Request) *httptest.ResponseRecorder {

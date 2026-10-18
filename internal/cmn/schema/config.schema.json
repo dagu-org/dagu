@@ -50,7 +50,7 @@
     "allowed_hosts": {
       "type": "array",
       "items": { "type": "string" },
-      "description": "Extra host names browsers may use to reach the server where no credential is needed: every request with auth mode 'none', and first-admin setup. IP addresses, localhost names, the configured host, the public_url host, and this machine's hostname are always allowed. Entries are exact names, '.example.com' for a domain and its subdomains, or '*' to allow any name."
+      "description": "Public domain names the server answers to where no credential is needed: every request with auth mode 'none', and first-admin setup. IP addresses, names under top-level domains ICANN has not delegated (such as localhost, local, lan, internal, or a single label), the configured host, the public_url host, and this machine's hostname are always accepted. Entries are exact names, '.example.com' for a domain and its subdomains, or '*' to accept any name."
     },
     "ip_access": {
       "$ref": "#/definitions/IPAccessDef"

@@ -258,7 +258,7 @@ Set `config.corsAllowedOrigins: ["*"]` only when any website should be allowed t
 
 ### Allowed Host Names
 
-Where no credential is needed (every request with `auth.mode: none`, and first-admin setup), browsers may reach Dagu only by an IP address, a `localhost` name, the `config.publicUrl` host, or a listed name. This blocks DNS-rebinding pages. The chart adds `ingress.host` when the chart ingress is enabled. List other names the UI is opened under:
+Where no credential is needed (every request with `auth.mode: none`, and first-admin setup), Dagu answers to IP addresses, names under top-level domains ICANN has not delegated (such as `svc.cluster.local`, `local`, or `internal`), the `config.publicUrl` host, and listed names. This blocks DNS-rebinding pages, which can only use public domains. The chart adds `ingress.host` when the chart ingress is enabled. List other public domain names Dagu is reached under:
 
 ```yaml
 config:
