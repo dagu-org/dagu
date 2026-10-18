@@ -328,6 +328,14 @@ export function useCanManageWebhooks(): boolean {
   return roleAtLeast(user.role, UserRole.developer);
 }
 
+export function useCanManageCommandChannels(): boolean {
+  const isAdmin = useIsAdmin();
+  const { permissions } = useConfig();
+  // Command channels run shell commands on the server, so the server also
+  // requires that DAGs may be written and run.
+  return isAdmin && permissions.writeDags && permissions.runDags;
+}
+
 /**
  * Reports whether the current user may manage notification channels and
  * rules, which takes a server-wide developer role whatever the workspace

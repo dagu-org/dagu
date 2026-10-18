@@ -574,11 +574,15 @@ func NewServer(setup ServerConfig, opts ...ServerOption) (*Server, error) {
 
 	var notificationSvc *notificationservice.Service
 	if stores.Notification != nil && eventSvc != nil && stores.NotificationState != nil {
-		notificationSvc = notificationservice.New(
-			stores.Notification,
-			dr,
+		notificationOpts := []notificationservice.Option{
 			notificationservice.WithPublicURL(cfg.Server.PublicURL),
-		)
+		}
+		// Command channels run shell commands, so they need the same server
+		// permissions as writing and running DAGs.
+		if cfg.Server.Permissions[config.PermissionWriteDAGs] && cfg.Server.Permissions[config.PermissionRunDAGs] {
+			notificationOpts = append(notificationOpts, notificationservice.WithCommandChannels(cfg.Core.BaseEnv.WithoutCredentials(), dagRunRepository))
+		}
+		notificationSvc = notificationservice.New(stores.Notification, dr, notificationOpts...)
 		apiOpts = append(apiOpts, apiv1.WithNotificationService(notificationSvc))
 	} else if stores.Notification != nil {
 		slog.Default().Warn("Notification delivery is unavailable because the event or state store is disabled")

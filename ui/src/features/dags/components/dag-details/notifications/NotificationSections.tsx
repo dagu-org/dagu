@@ -52,6 +52,8 @@ import {
 } from '../../../../../api/v1/schema';
 import {
   blankChannel,
+  CHANNEL_PROVIDER_OPTIONS,
+  DEFAULT_COMMAND_PLACEHOLDER,
   DEFAULT_MESSAGE_TEMPLATE,
   DEFAULT_SUBJECT_TEMPLATE,
   DeliveryDraft,
@@ -74,6 +76,7 @@ import { I18nText } from '@/i18n/I18nText';
 import { I18nProps } from '@/i18n/I18nProps';
 import { useI18n } from '@/i18n/I18nProvider';
 import { I18nTemplate } from '@/i18n/I18nTemplate';
+import { useCanManageCommandChannels } from '@/contexts/AuthContext';
 
 type ProviderFieldsProps = {
   draft: DeliveryDraft;
@@ -463,6 +466,48 @@ function ProviderFields({ draft, onChange }: ProviderFieldsProps) {
             />
           </I18nProps>
         </label>
+      </div>
+    );
+  }
+
+  if (draft.type === NotificationProviderType.command) {
+    return (
+      <div className="space-y-2">
+        <Label htmlFor={`${fieldId}-command`}>
+          <I18nText text={'Command'} />
+        </Label>
+        <Textarea
+          id={`${fieldId}-command`}
+          className="min-h-24 py-1 font-mono text-xs"
+          spellCheck={false}
+          value={draft.command.command}
+          placeholder={DEFAULT_COMMAND_PLACEHOLDER}
+          onChange={(event) =>
+            update({
+              command: { command: event.target.value },
+            })
+          }
+        />
+        <p className="text-xs text-muted-foreground">
+          <I18nText
+            text={
+              'The Dagu server runs this command. Unix uses sh -c and Windows uses PowerShell. The server stops it after 30 seconds, and a non-zero exit fails delivery.'
+            }
+          />
+        </p>
+        <p className="text-xs text-muted-foreground">
+          <I18nTemplate
+            text="The command runs as written. Run values are environment variables, such as {dagEnv}, {statusEnv}, {errorEnv}, DAG_RUN_ID, and RUN_URL. Quote them, as in {quotedError}. {logEnv} is a temporary file with up to 1 MiB of the run log, including lifecycle-handler output, and is removed after the command exits. On Windows, PowerShell reads these as {windowsEnv} and so on."
+            values={{
+              dagEnv: <code>$DAG_NAME</code>,
+              statusEnv: <code>$STATUS</code>,
+              errorEnv: <code>$ERROR</code>,
+              quotedError: <code>"$ERROR"</code>,
+              logEnv: <code>$EXECUTION_LOG</code>,
+              windowsEnv: <code>$env:ERROR</code>,
+            }}
+          />
+        </p>
       </div>
     );
   }
@@ -987,6 +1032,8 @@ function channelDestination(channel: DraftChannel): string {
       } catch {
         return 'Webhook destination';
       }
+    case NotificationProviderType.command:
+      return 'Local command';
   }
 }
 
@@ -1148,6 +1195,15 @@ export function NotificationChannelsSection({
   const [deleting, setDeleting] = useState<DraftChannel | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const canManageCommandChannels = useCanManageCommandChannels();
+  // An existing command channel keeps its provider listed so the editor can
+  // show it; saving it still needs the server's permission.
+  const providerOptions = CHANNEL_PROVIDER_OPTIONS.filter(
+    (provider) =>
+      provider.value !== NotificationProviderType.command ||
+      canManageCommandChannels ||
+      editor?.type === NotificationProviderType.command
+  );
   const query = search.trim().toLocaleLowerCase();
   const filteredChannels = channels.filter((channel) =>
     [
@@ -1360,7 +1416,7 @@ export function NotificationChannelsSection({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {PROVIDER_OPTIONS.map((provider) => (
+                        {providerOptions.map((provider) => (
                           <SelectItem
                             key={provider.value}
                             value={provider.value}
