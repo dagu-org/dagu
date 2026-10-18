@@ -119,6 +119,11 @@ func TestBatchCommandLineRejectsUnpassableArguments(t *testing.T) {
 	_, err = batchCommandLine(`C:\npm\tool.cmd`, []string{strings.Repeat("a", maxBatchCommandLine)})
 	require.ErrorContains(t, err, "cmd.exe accepts at most")
 
+	// The limit counts UTF-16 code units, so a prompt longer in UTF-8 bytes
+	// than the limit still fits.
+	_, err = batchCommandLine(`C:\npm\tool.cmd`, []string{strings.Repeat("あ", 3000)})
+	require.NoError(t, err)
+
 	_, err = batchCommandLine(`C:\np"m\tool.cmd`, nil)
 	require.ErrorContains(t, err, "double quote")
 }

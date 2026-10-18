@@ -14,9 +14,11 @@ import (
 	"slices"
 	"strings"
 	"unicode"
+	"unicode/utf16"
 )
 
-// maxBatchCommandLine is the longest command line cmd.exe accepts.
+// maxBatchCommandLine is the longest command line cmd.exe accepts, in
+// UTF-16 code units.
 const maxBatchCommandLine = 8191
 
 var errBatchLineBreak = errors.New("cmd.exe cannot pass arguments that contain line breaks; " +
@@ -81,10 +83,21 @@ func batchCommandLine(script string, args []string) (string, error) {
 		appendBatchArg(&b, arg)
 	}
 	b.WriteByte('"')
-	if b.Len() > maxBatchCommandLine {
-		return "", fmt.Errorf("command line is %d characters; cmd.exe accepts at most %d", b.Len(), maxBatchCommandLine)
+	line := b.String()
+	if n := utf16Len(line); n > maxBatchCommandLine {
+		return "", fmt.Errorf("command line is %d characters; cmd.exe accepts at most %d", n, maxBatchCommandLine)
 	}
-	return b.String(), nil
+	return line, nil
+}
+
+// utf16Len counts s in UTF-16 code units, the characters a Windows command
+// line is measured in.
+func utf16Len(s string) int {
+	n := 0
+	for _, r := range s {
+		n += utf16.RuneLen(r)
+	}
+	return n
 }
 
 func appendBatchArg(b *strings.Builder, arg string) {
