@@ -117,6 +117,7 @@ jobs:
             --kube-version 1.19.0 >/tmp/dagu-default-render.yaml
 
           grep -Fq 'cors_allowed_origins: []' /tmp/dagu-default-render.yaml
+          grep -Fq 'allowed_hosts: []' /tmp/dagu-default-render.yaml
           grep -Fq -- '- start-all' /tmp/dagu-default-render.yaml
           grep -Fq 'type: ClusterIP' /tmp/dagu-default-render.yaml
           grep -Fq 'helm.sh/resource-policy: keep' /tmp/dagu-default-render.yaml
@@ -212,6 +213,7 @@ jobs:
           grep -Fq 'name: "dagu-license"' /tmp/dagu-optional-render.yaml
           grep -Fq 'name: "dagu-oidc"' /tmp/dagu-optional-render.yaml
           grep -Fq 'cors_allowed_origins: ["https://app.example.com"]' /tmp/dagu-optional-render.yaml
+          grep -Fq 'allowed_hosts: ["dagu.example.com"]' /tmp/dagu-optional-render.yaml
           grep -Fq 'engineering: developer' /tmp/dagu-optional-render.yaml
           grep -Fq 'workspace: platform' /tmp/dagu-optional-render.yaml
           grep -Fq 'secretName: "dagu-tls"' /tmp/dagu-optional-render.yaml

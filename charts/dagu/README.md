@@ -256,6 +256,17 @@ config:
 
 Set `config.corsAllowedOrigins: ["*"]` only when any website should be allowed to call the API. Wildcard CORS does not allow credentials and is especially risky with `auth.mode: none`.
 
+### Allowed Host Names
+
+Where no credential is needed (every request with `auth.mode: none`, and first-admin setup), browsers may reach Dagu only by an IP address, a `localhost` name, the `config.publicUrl` host, or a listed name. This blocks DNS-rebinding pages. The chart adds `ingress.host` when the chart ingress is enabled. List other names the UI is opened under:
+
+```yaml
+config:
+  allowedHosts:
+    - dagu.internal.example.com
+    - .corp.example.com # the domain and its subdomains
+```
+
 ### IP Access Allowlist
 
 Restrict every UI and API HTTP route to specific client addresses or networks:
