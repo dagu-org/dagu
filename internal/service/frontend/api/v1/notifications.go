@@ -380,9 +380,16 @@ func (a *API) TestDAGNotifications(ctx context.Context, request api.TestDAGNotif
 		targetID = valueOf(request.Body.TargetId)
 		eventType = eventstore.EventType(valueOf(request.Body.EventType))
 	}
-	results, err := a.notificationService.SendTest(ctx, request.FileName, targetID, eventType)
+	var opts []notificationservice.TestOption
+	commandErr := a.requireCommandChannelAccess(ctx)
+	if commandErr != nil {
+		opts = append(opts, notificationservice.DenyCommandChannels())
+	}
+	results, err := a.notificationService.SendTest(ctx, request.FileName, targetID, eventType, opts...)
 	if err != nil {
 		switch {
+		case errors.Is(err, notificationservice.ErrCommandTestDenied):
+			return nil, commandErr
 		case errors.Is(err, notificationmodel.ErrSettingsNotFound),
 			errors.Is(err, notificationmodel.ErrTargetNotFound):
 			return nil, &Error{

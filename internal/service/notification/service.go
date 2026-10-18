@@ -731,7 +731,27 @@ func (s *Service) SendChannelTest(ctx context.Context, channelID string) ([]Test
 	}}, event), nil
 }
 
-func (s *Service) SendTest(ctx context.Context, dagName, targetID string, eventType eventstore.EventType) ([]TestResult, error) {
+// ErrCommandTestDenied is returned by SendTest, before anything is sent, when
+// DenyCommandChannels is set and the test would run a command channel.
+var ErrCommandTestDenied = errors.New("test send would run a command channel")
+
+// TestOption configures SendTest.
+type TestOption func(*testOptions)
+
+type testOptions struct {
+	denyCommand bool
+}
+
+// DenyCommandChannels refuses a test send that would run a command channel.
+func DenyCommandChannels() TestOption {
+	return func(o *testOptions) { o.denyCommand = true }
+}
+
+func (s *Service) SendTest(ctx context.Context, dagName, targetID string, eventType eventstore.EventType, opts ...TestOption) ([]TestResult, error) {
+	var options testOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
 	if eventType == "" {
 		eventType = eventstore.TypeDAGRunFailed
 	}
@@ -755,6 +775,11 @@ func (s *Service) SendTest(ctx context.Context, dagName, targetID string, eventT
 			return nil, notificationmodel.ErrTargetNotFound
 		}
 		return []TestResult{}, nil
+	}
+	if options.denyCommand && slices.ContainsFunc(targets, func(target resolvedTarget) bool {
+		return target.Target.Type == notificationmodel.ProviderCommand
+	}) {
+		return nil, ErrCommandTestDenied
 	}
 
 	return s.deliverTestTargets(ctx, targets, event), nil

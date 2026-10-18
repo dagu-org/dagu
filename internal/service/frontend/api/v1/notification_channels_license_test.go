@@ -52,7 +52,7 @@ func TestNotificationChannels_CreateCommandChannel(t *testing.T) {
 }
 
 // Command channels run shell commands on the server, so saving or
-// test-sending one is limited to admins.
+// test-sending one, directly or through a DAG, is limited to admins.
 func TestNotificationChannels_CommandChannelRequiresAdmin(t *testing.T) {
 	t.Parallel()
 
@@ -72,6 +72,18 @@ func TestNotificationChannels_CommandChannelRequiresAdmin(t *testing.T) {
 		WithBearerToken(developerToken).ExpectStatus(http.StatusForbidden).Send(t)
 	server.Client().Post("/api/v1/notification-channels/"+channel.Id+"/test", nil).
 		WithBearerToken(developerToken).ExpectStatus(http.StatusForbidden).Send(t)
+
+	createTestDAG(t, server, adminToken, "daily-report")
+	server.Client().Put("/api/v1/dags/daily-report/notifications", api.UpdateDAGNotificationsRequest{
+		Enabled:       true,
+		Events:        []api.NotificationEventType{api.NotificationEventTypeDagRunFailed},
+		Targets:       []api.NotificationTargetInput{},
+		Subscriptions: &[]api.NotificationSubscriptionInput{{ChannelId: channel.Id, Enabled: true}},
+	}).WithBearerToken(developerToken).ExpectStatus(http.StatusOK).Send(t)
+	server.Client().Post("/api/v1/dags/daily-report/notifications/test", nil).
+		WithBearerToken(developerToken).ExpectStatus(http.StatusForbidden).Send(t)
+	server.Client().Post("/api/v1/dags/daily-report/notifications/test", nil).
+		WithBearerToken(adminToken).ExpectStatus(http.StatusOK).Send(t)
 }
 
 func TestNotificationChannels_CommandChannelRequiresDAGPermissions(t *testing.T) {
@@ -100,7 +112,7 @@ func commandChannelInput() api.NotificationChannelInput {
 		Name:    "Desktop",
 		Type:    api.NotificationProviderTypeCommand,
 		Enabled: true,
-		Command: &api.NotificationCommandTarget{Command: `notify-send "Dagu" "$DAG_NAME $STATUS"`},
+		Command: &api.NotificationCommandTarget{Command: "exit 0"},
 	}
 }
 
