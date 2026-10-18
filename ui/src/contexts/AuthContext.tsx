@@ -328,12 +328,17 @@ export function useCanManageWebhooks(): boolean {
   return roleAtLeast(user.role, UserRole.developer);
 }
 
+// Command channels run shell commands on the server, so the server delivers to
+// them only while DAGs may be written and run.
+export function useCommandChannelsEnabled(): boolean {
+  const { permissions } = useConfig();
+  return permissions.writeDags && permissions.runDags;
+}
+
 export function useCanManageCommandChannels(): boolean {
   const isAdmin = useIsAdmin();
-  const { permissions } = useConfig();
-  // Command channels run shell commands on the server, so the server also
-  // requires that DAGs may be written and run.
-  return isAdmin && permissions.writeDags && permissions.runDags;
+  const enabled = useCommandChannelsEnabled();
+  return isAdmin && enabled;
 }
 
 /**
