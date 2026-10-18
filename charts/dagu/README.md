@@ -258,7 +258,7 @@ Set `config.corsAllowedOrigins: ["*"]` only when any website should be allowed t
 
 ### Allowed Host Names
 
-Where no credential is needed (every request with `auth.mode: none`, and first-admin setup), Dagu answers to IP addresses, single-label names, names under `home.arpa` or `service.arpa`, names under top-level domains ICANN has not delegated (such as `svc.cluster.local`, `local`, or `internal`), the `config.publicUrl` host, and listed names. It also answers to its own hostname (in Kubernetes, the pod's single-label name) and to a connected Tailscale tunnel's name; [Allowed Host Names](https://docs.dagu.sh/server-admin/server#allowed-host-names) has the full rules. This blocks DNS-rebinding pages, which can only use public domains. The chart adds `ingress.host` when the chart ingress is enabled. List other public domain names Dagu is reached under:
+Where no credential is needed (every request with `auth.mode: none`, and first-admin setup), Dagu answers to IP addresses, single-label names, names under `home.arpa` or `service.arpa`, names under top-level domains ICANN has not delegated (such as `svc.cluster.local`, `local`, or `internal`), the `config.publicUrl` host, and listed names. It also answers to its own hostname (in Kubernetes, the pod's single-label name) and to a connected Tailscale tunnel's name. This blocks DNS-rebinding pages, which can only use public domains. The chart adds `ingress.host` when the chart ingress is enabled. List other public domain names Dagu is reached under:
 
 ```yaml
 config:
