@@ -209,6 +209,9 @@ type secretFile struct {
 	key   string
 	file  string
 	value *string
+	// set reports that the configuration gives the key, even with an
+	// empty value.
+	set bool
 }
 
 // loadSecretFiles replaces each secret that has a _file key with the content
@@ -218,39 +221,38 @@ func (l *ConfigLoader) loadSecretFiles(def *Definition) error {
 	var secrets []secretFile
 	if def.Secrets != nil && def.Secrets.Vault != nil {
 		vault := def.Secrets.Vault
-		secrets = append(secrets, secretFile{"secrets.vault.token", vault.TokenFile, &vault.Token})
+		secrets = append(secrets, l.secretFile("secrets.vault.token", vault.TokenFile, &vault.Token))
 	}
 	if l.requires(SectionServer) {
 		if auth := def.Auth; auth != nil {
 			if auth.Basic != nil {
-				secrets = append(secrets, secretFile{"auth.basic.password", auth.Basic.PasswordFile, &auth.Basic.Password})
+				secrets = append(secrets, l.secretFile("auth.basic.password", auth.Basic.PasswordFile, &auth.Basic.Password))
 			}
 			if auth.OIDC != nil {
-				secrets = append(secrets, secretFile{"auth.oidc.client_secret", auth.OIDC.ClientSecretFile, &auth.OIDC.ClientSecret})
+				secrets = append(secrets, l.secretFile("auth.oidc.client_secret", auth.OIDC.ClientSecretFile, &auth.OIDC.ClientSecret))
 			}
 			if auth.Builtin != nil && auth.Builtin.Token != nil {
 				token := auth.Builtin.Token
-				secrets = append(secrets, secretFile{"auth.builtin.token.secret", token.SecretFile, &token.Secret})
+				secrets = append(secrets, l.secretFile("auth.builtin.token.secret", token.SecretFile, &token.Secret))
 			}
 			if auth.Builtin != nil && auth.Builtin.InitialAdmin != nil {
 				admin := auth.Builtin.InitialAdmin
-				secrets = append(secrets, secretFile{"auth.builtin.initial_admin.password", admin.PasswordFile, &admin.Password})
+				secrets = append(secrets, l.secretFile("auth.builtin.initial_admin.password", admin.PasswordFile, &admin.Password))
 			}
 		}
 		for i := range def.RemoteNodes {
 			node := &def.RemoteNodes[i]
-			field := fmt.Sprintf("remote_nodes[%d].", i)
 			secrets = append(secrets,
-				secretFile{field + "basic_auth_password", node.BasicAuthPasswordFile, &node.BasicAuthPassword},
-				secretFile{field + "auth_token", node.AuthTokenFile, &node.AuthToken},
+				l.remoteNodeSecretFile(i, "basic_auth_password", node.BasicAuthPasswordFile, &node.BasicAuthPassword),
+				l.remoteNodeSecretFile(i, "auth_token", node.AuthTokenFile, &node.AuthToken),
 			)
 		}
 	}
 	if l.requires(SectionGitSync) && def.GitSync != nil && def.GitSync.Auth != nil {
 		auth := def.GitSync.Auth
 		secrets = append(secrets,
-			secretFile{"git_sync.auth.token", auth.TokenFile, &auth.Token},
-			secretFile{"git_sync.auth.ssh_passphrase", auth.SSHPassphraseFile, &auth.SSHPassphrase},
+			l.secretFile("git_sync.auth.token", auth.TokenFile, &auth.Token),
+			l.secretFile("git_sync.auth.ssh_passphrase", auth.SSHPassphraseFile, &auth.SSHPassphrase),
 		)
 	}
 	for _, secret := range secrets {
@@ -261,6 +263,26 @@ func (l *ConfigLoader) loadSecretFiles(def *Definition) error {
 	return nil
 }
 
+// secretFile describes a secret at a configuration key. The key counts as
+// set when the configuration gives it, even with an empty value. An empty
+// environment variable does not set the key.
+func (l *ConfigLoader) secretFile(key, file string, value *string) secretFile {
+	return secretFile{key: key, file: file, value: value, set: l.v.IsSet(key)}
+}
+
+// remoteNodeSecretFile describes a secret of the remote node at index i.
+// Viper cannot address list items by key, so the raw entry of the node tells
+// whether the configuration gives the key.
+func (l *ConfigLoader) remoteNodeSecretFile(i int, name, file string, value *string) secretFile {
+	secret := secretFile{key: fmt.Sprintf("remote_nodes[%d].%s", i, name), file: file, value: value}
+	if nodes, ok := l.v.Get("remote_nodes").([]any); ok && i < len(nodes) {
+		if node, ok := nodes[i].(map[string]any); ok {
+			secret.set = node[name] != nil
+		}
+	}
+	return secret
+}
+
 // readSecretFile sets the secret to the content of its file, without the
 // trailing line end. Setting both the key and its _file key is an error, as
 // is a file that cannot be read or holds nothing.
@@ -268,7 +290,7 @@ func (l *ConfigLoader) readSecretFile(secret secretFile) error {
 	if secret.file == "" {
 		return nil
 	}
-	if *secret.value != "" {
+	if secret.set || *secret.value != "" {
 		return fmt.Errorf("set either %s or %s_file, not both", secret.key, secret.key)
 	}
 	path, err := l.resolvePath(secret.key+"_file", secret.file)

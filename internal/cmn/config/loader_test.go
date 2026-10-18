@@ -2300,6 +2300,16 @@ func TestLoad_SecretFileFromEnv(t *testing.T) {
 	assert.Equal(t, "env-file-secret", cfg.Server.Auth.Builtin.Token.Secret)
 }
 
+func TestLoad_SecretFileWithEmptyEnv(t *testing.T) {
+	path := writeSecretFile(t, "env-file-secret\n")
+	cfg := loadWithEnv(t, "# empty", map[string]string{
+		"DAGU_AUTH_MODE":              "builtin",
+		"DAGU_AUTH_TOKEN_SECRET":      "",
+		"DAGU_AUTH_TOKEN_SECRET_FILE": path,
+	})
+	assert.Equal(t, "env-file-secret", cfg.Server.Auth.Builtin.Token.Secret)
+}
+
 func TestLoad_SecretFileErrors(t *testing.T) {
 	t.Run("BothSet", func(t *testing.T) {
 		path := writeSecretFile(t, "from-file")
@@ -2313,6 +2323,34 @@ auth:
 `, path))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "set either auth.builtin.token.secret or auth.builtin.token.secret_file, not both")
+	})
+
+	t.Run("BothSetWithEmptyInline", func(t *testing.T) {
+		path := writeSecretFile(t, "from-file")
+		err := loadWithErrorFromYAML(t, fmt.Sprintf(`
+auth:
+  mode: builtin
+  builtin:
+    token:
+      secret: ""
+      secret_file: %s
+`, path))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "set either auth.builtin.token.secret or auth.builtin.token.secret_file, not both")
+	})
+
+	t.Run("BothSetWithEmptyInlineRemoteNode", func(t *testing.T) {
+		path := writeSecretFile(t, "from-file")
+		err := loadWithErrorFromYAML(t, fmt.Sprintf(`
+remote_nodes:
+  - name: other
+    api_base_url: https://other.example.com/api/v1
+    auth_type: token
+    auth_token: ""
+    auth_token_file: %s
+`, path))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "set either remote_nodes[0].auth_token or remote_nodes[0].auth_token_file, not both")
 	})
 
 	t.Run("BothSetFromEnv", func(t *testing.T) {
