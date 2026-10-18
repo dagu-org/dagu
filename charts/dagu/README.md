@@ -267,6 +267,8 @@ config:
     - .corp.example.com # the domain and its subdomains
 ```
 
+`["*"]` accepts every host name and turns the check off for those requests, so any website can then reach a Dagu with `auth.mode: none`, or a fresh install's setup, through DNS rebinding. Use it only when Dagu is not reachable from users' browsers.
+
 ### IP Access Allowlist
 
 Restrict every UI and API HTTP route to specific client addresses or networks:
