@@ -159,7 +159,9 @@ Each row carries `_row`, its 1-based sheet row number. `types` pins columns
 to `string`, `number`, `integer`, `boolean`, `date`, or `datetime`; a cell
 that cannot convert fails the step naming the cell, or with
 `on_type_error: warn` (also spelled `"null"`, quoted so YAML keeps the
-word) becomes null with a warning.
+word) becomes null with a warning. With `on_type_error: keep` it keeps the
+value it was read as, with the same warning, for a reader that shows a
+person what to fix.
 
 #### Japanese text under a pinned type
 
@@ -506,9 +508,12 @@ prints what `xlsx.info` publishes plus up to N typed sample rows per sheet;
 `--sheet` describes one sheet, matched as `sheet` matches, and a name that
 is not in the workbook fails with `sheet "Nope" not found; sheets present:
 ...`. `dagu xlsx read <path>
-[--sheet] [--range] [--header] [--columns] [--max-rows] [--skip-hidden]
-[--password P] [--format]` prints what `xlsx.read` publishes, the flags
-taking the values the fields take.
+[--sheet] [--range] [--header] [--columns] [--types] [--on-type-error]
+[--max-rows] [--skip-hidden] [--password P] [--format]` prints what
+`xlsx.read` publishes, the flags taking the values the fields take.
+`--types` is comma-separated `name:type` pairs, split at each pair's last
+colon, or a JSON object when a name holds a comma; `--on-type-error` is
+`fail` (default), `warn`, or `keep`.
 For both commands, a path of `-` reads the workbook from standard input. The
 input is limited to 64 MiB; larger input fails before workbook parsing. The
 JSON inspect result uses `-` as its `path`.
@@ -855,7 +860,7 @@ Every one of these is rejected by `dagu validate`:
   of: [<the accepted values>]`, so `merged: join` gives `join does not equal
   any of: [fill first]`; the enums are `merged` (`fill`, `first`),
   `formulas` (`cached`, `text`, `calculate`), `on_type_error` (`fail`,
-  `warn`, `null`), `mode` (`replace`, `append`), `style` (`table`, `none`),
+  `warn`, `null`, `keep`), `mode` (`replace`, `append`), `style` (`table`, `none`),
   `format` (`json`, `jsonl`, `csv`), `missing` (`fail`, `skip`, `append`),
   `on_problem` (`warn`, `fail`), `operation` (`add`, `copy`, `rename`,
   `delete`), `if_exists` (`fail`, `skip`, `replace`), `encoding` (`utf-8`,

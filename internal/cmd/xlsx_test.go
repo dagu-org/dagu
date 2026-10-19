@@ -223,6 +223,37 @@ func TestXlsxReadJSONAndText(t *testing.T) {
 	assert.Contains(t, text, "Warning: stopped after 1 rows")
 }
 
+// --types reads Japanese forms under a pinned type. A cell that still does
+// not convert fails the read, or with --on-type-error reads as null or as it
+// was, with a warning either way.
+func TestXlsxReadPinsTypes(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "amounts.xlsx")
+	table := workbook.Table{Columns: []string{"金額", "期日"}, Rows: [][]any{{"１２３,４５６", "令和8年10月3日"}, {"未定", "R8.10.31"}}}
+	_, err := workbook.Write(context.Background(), path, table, workbook.WriteOptions{Header: true})
+	require.NoError(t, err)
+
+	_, err = runXlsx(t, "read", path, "--types", "金額:number,期日:date")
+	require.ErrorContains(t, err, `Sheet1!A3: expected number, found "未定"`)
+	for mode, want := range map[string]any{"warn": nil, "keep": "未定"} {
+		out, err := runXlsx(t, "read", path, "--types", `{"金額": "number", "期日": "date"}`, "--on-type-error", mode, "--format", "json")
+		require.NoError(t, err, mode)
+		var result workbook.ReadResult
+		require.NoError(t, json.Unmarshal([]byte(out), &result))
+		require.Len(t, result.Rows, 2)
+		assert.Equal(t, float64(123456), result.Rows[0]["金額"])
+		assert.Equal(t, "2026-10-03", result.Rows[0]["期日"])
+		assert.Equal(t, want, result.Rows[1]["金額"], mode)
+		assert.Equal(t, "2026-10-31", result.Rows[1]["期日"])
+		assert.Len(t, result.Warnings, 1, mode)
+	}
+
+	_, err = runXlsx(t, "read", path, "--types", "金額:money")
+	require.ErrorContains(t, err, `--types: types.金額: unknown column type "money"`)
+	_, err = runXlsx(t, "read", path, "--on-type-error", "skip")
+	require.ErrorContains(t, err, `--on-type-error: "skip" is not fail, warn, null, or keep`)
+}
+
 func TestXlsxReadTextEscapesDelimiters(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "notes.xlsx")

@@ -8497,8 +8497,8 @@
           "description": "Column types to enforce, such as {amount: number, due: date}. A cell that cannot convert fails the step naming the cell."
         },
         "on_type_error": {
-          "enum": ["fail", "warn", "null", null],
-          "description": "What a cell that fails its type does: fail (default) the step, or warn and read the cell as null."
+          "enum": ["fail", "warn", "null", "keep", null],
+          "description": "What a cell that fails its type does: fail (default) the step, warn and read the cell as null, or keep the cell's value as read with a warning."
         },
         "where": {
           "type": "object",
