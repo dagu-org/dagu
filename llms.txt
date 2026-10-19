@@ -24,9 +24,9 @@ Load only the reference file that matches the task.
 - Prefer `git.worktree.add` and `git.worktree.remove` when steps need isolated branches inside an existing local Git repository. Add an explicit remove step when the workflow should delete the worktree.
 - Prefer `stdout.artifact` / `stderr.artifact` when a command stream should become a DAG-run artifact, especially for large reports, JSON, Markdown, logs, or generated files.
 - Prefer `artifact.*` actions for explicit artifact reads/writes/lists. Use `DAG_RUN_ARTIFACTS_DIR` only when a tool truly needs a filesystem path inside the step.
-- Prefer string-form `output: VAR_NAME` for capturing small stdout values into flat variables.
+- Prefer declared step `outputs:` with `$DAGU_OUTPUT_FILE` to pass values to later steps as `${steps.<step_id>.outputs.<name>}`. Dagu does not read stdout for them, so the command can keep logging to stdout.
+- String-form `output: VAR_NAME` is another option when a command prints nothing but the value, such as `git rev-parse HEAD`. It captures the whole trimmed stdout, log lines included.
 - Prefer object-form `output:` when downstream steps need structured values via `${step_id.output.*}`.
-- Prefer declared step `outputs:` with `$DAGU_OUTPUT_FILE` when a step must publish explicit values for `${steps.<step_id>.outputs.<name>}`.
 - Use `action: human.task` when an operator must provide typed input before downstream steps continue. Human task form outputs use `${steps.<step_id>.outputs.<name>}` without an authored `outputs:` field.
 - Prefer `stdout.outputs` or `action: outputs.write` when a DAG or remote action needs to return caller-visible values via `${step_id.outputs.*}`.
 - Prefer `state.*` actions for small persistent JSON state across DAG runs, such as cursors, checkpoints, and previous-value comparisons.
@@ -40,7 +40,7 @@ Load only the reference file that matches the task.
 ## High-Signal Rules
 
 - `output:` has two modes:
-  - string form captures trimmed stdout into an env-scope variable such as `${env.VERSION}`
+  - string form captures trimmed stdout, including any log lines, into an env-scope variable such as `${env.VERSION}`
   - object form publishes structured step-scoped output for `${step_id.output.*}` access
 - Value declarations in step `outputs:` publish explicit values through `${steps.<step_id>.outputs.<name>}`. Write those values to `$DAGU_OUTPUT_FILE`; Dagu captures them only after the command succeeds. Build path declarations publish the final materialization path after commit or reuse.
 - `human.task` is a processless root-DAG step with an explicit `id`, a required `with.prompt`, and an optional flat scalar form. A root DAG containing one can run locally or on a distributed worker. Every declared form property is a step output, published when submitted or defaulted, and available as `${steps.<step_id>.outputs.<name>}`. Optional `with.push_back` (`rewind_to` plus an optional feedback `form`) lets the operator send the work back to an upstream step instead of completing it.
@@ -1922,7 +1922,9 @@ dagu human-task push-back --run-id=run-1 --step=review --input feedback="Add tes
 
 ### dagu dry
 
-Dry-run a DAG without executing commands: `dagu dry [--params/-p] [--name/-N] [--no-reuse] <dag> [-- params...]`
+Dry-run a DAG without executing commands: `dagu dry [--params/-p] [--name/-N] [--no-reuse] [--format/-f text|json] <dag> [-- params...]`
+
+`--format json` prints one JSON object on stdout, `{"checks":[...]}`, and omits the run summary. `text` is the default. A check does not change the exit status.
 
 For a build DAG, `--no-reuse` previews the decisions with manifest reuse disabled. Dry-run still creates no locks, staging files, manifests, or run history.
 
