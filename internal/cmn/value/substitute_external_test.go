@@ -24,6 +24,12 @@ func TestBuildShellCommandForPowerShellUsesStableInvocation(t *testing.T) {
 	assert.Equal(t, []string{"-NoProfile", "-NonInteractive", "-Command", psEchoHello}, cmd.Args[1:])
 }
 
+func TestBuildShellCommandForPowerShellKeepsUsingFirst(t *testing.T) {
+	cmd := value.BuildShellCommandForTest("pwsh", "using namespace System.Text; [StringBuilder]::new().Length")
+
+	assert.Equal(t, "using namespace System.Text; [StringBuilder]::new().Length", cmd.Args[len(cmd.Args)-1])
+}
+
 func TestBuildShellCommandParsesConfiguredShellArgs(t *testing.T) {
 	cmd := value.BuildShellCommandForTest("powershell -ExecutionPolicy Bypass", "echo hello")
 
