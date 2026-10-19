@@ -233,9 +233,9 @@ func validateConfig(operation string, cfg *config) error {
 		cfg.OnTypeError = string(workbook.TypeErrorWarn)
 	}
 	switch cfg.OnTypeError {
-	case "", string(workbook.TypeErrorFail), string(workbook.TypeErrorWarn), string(workbook.TypeErrorNull):
+	case "", string(workbook.TypeErrorFail), string(workbook.TypeErrorWarn), string(workbook.TypeErrorNull), string(workbook.TypeErrorKeep):
 	default:
-		return fmt.Errorf("%w: on_type_error must be fail, warn, or null", errConfig)
+		return fmt.Errorf("%w: on_type_error must be fail, warn, null, or keep", errConfig)
 	}
 	if cfg.MaxRows < 0 {
 		return fmt.Errorf("%w: max_rows must be >= 1", errConfig)
@@ -768,8 +768,8 @@ var configSchema = &jsonschema.Schema{
 			Description: "What formula cells yield: cached (default) the stored result, text the formula itself, calculate an evaluation."},
 		"types": {Type: "object", AdditionalProperties: &jsonschema.Schema{Type: "string", Enum: []any{"string", "number", "integer", "boolean", "date", "datetime"}},
 			Description: "Column types to enforce, such as {amount: number, due: date}. A cell that cannot convert fails the step naming the cell."},
-		"on_type_error": {Enum: []any{"fail", "warn", "null", nil},
-			Description: "What a cell that fails its type does: fail (default) the step, or warn and read the cell as null."},
+		"on_type_error": {Enum: []any{"fail", "warn", "null", "keep", nil},
+			Description: "What a cell that fails its type does: fail (default) the step, warn and read the cell as null, or keep the cell's value as read with a warning."},
 		"where":    {Type: "object", Description: "Rows to keep: {Status: \"\"} matches empty cells, {Status: {ne: Done}} excludes a value, {Status: {in: [A, B]}} matches a list."},
 		"max_rows": {Description: "Most rows to read, 1 or more. Defaults to 5000; truncated is true when more rows exist."},
 		"rows": {Description: "Rows to write: a list of objects or arrays, usually ${steps.<id>.outputs.rows}. " +

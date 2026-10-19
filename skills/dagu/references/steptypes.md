@@ -941,7 +941,7 @@ also reads Japanese forms: `￥123,000`, `12万3,500円`, `▲1,000`, `(1,000)`,
 `R8.10.3`, `2026年10月` as its first day, `10月3日` in the current year,
 `令和8年10月3日（金） 午後2時30分`, and under `boolean` `はい`/`いいえ`, `有`/`無`,
 `済`/`未`, `○`/`×`), `on_type_error`
-(`fail` or `warn`), `where` (`{Status: ""}`, `{Status: {ne: Done}}`,
+(`fail`, `warn` to read the cell as null, or `keep` to keep it as read), `where` (`{Status: ""}`, `{Status: {ne: Done}}`,
 `{Status: {in: [A, B]}}`), `max_rows` (default 5000), `skip_hidden` (`true`
 leaves out rows hidden by a filter or by hand; they are read by default). It
 publishes `rows` (objects keyed by header, each with `_row`), `count`, `headers`, `sheet`, `range`,
