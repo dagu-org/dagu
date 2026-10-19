@@ -1,5 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import {
+  Navigate,
+  useNavigate,
+  useLocation,
+  useSearchParams,
+} from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
 import { Button } from '@/components/ui/button';
@@ -99,6 +104,11 @@ export default function LoginPage() {
   };
 
   const externalLoginEnabled = config.oidcEnabled || config.proxyEnabled;
+
+  // Only built-in authentication has a sign-in page.
+  if (config.authMode !== 'builtin') {
+    return <Navigate to="/" replace />;
+  }
 
   return (
     <AuthLayout subtitle={t('auth.signInToAccount')}>
