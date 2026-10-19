@@ -72,7 +72,7 @@ func appendPowerShellCommandArgs(args []string, cmdStr string) []string {
 	if !hasShellArg(result, "-Command", "-C") {
 		result = append(result, "-Command")
 	}
-	return append(result, cmdStr)
+	return append(result, cmdutil.PowerShellImportCoreModules+"; "+cmdStr)
 }
 
 func appendShellCommandArgs(args []string, flag, cmdStr string) []string {
