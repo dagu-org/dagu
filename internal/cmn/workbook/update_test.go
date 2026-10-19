@@ -292,9 +292,12 @@ func TestUpdateRowsEmptyRowsChangesNothing(t *testing.T) {
 	t.Parallel()
 	set, err := ParseSet(map[string]any{"Status": "status"})
 	require.NoError(t, err)
+	newColumn, err := ParseSet(map[string]any{"Checked": "checked"})
+	require.NoError(t, err)
 	for name, opts := range map[string]UpdateOptions{
-		"with set":    {Key: "Invoice No", Rows: []Row{}, Set: set},
-		"default set": {Key: "Invoice No", Rows: []Row{}},
+		"with set":         {Key: "Invoice No", Rows: []Row{}, Set: set},
+		"default set":      {Key: "Invoice No", Rows: []Row{}},
+		"set a new column": {Key: "Invoice No", Rows: []Row{}, Set: newColumn},
 	} {
 		t.Run(name, func(t *testing.T) {
 			path := ordersBook(t)
