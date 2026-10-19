@@ -134,7 +134,7 @@ set.
 	cmd.Flags().String("header", "true", "Header: true, false, a row number, or rows such as 3,4")
 	cmd.Flags().String("columns", "", "Columns to keep, comma-separated, with optional name:alias renames")
 	cmd.Flags().String("types", "", "Column types to pin: name:type pairs, comma-separated, or a JSON object")
-	cmd.Flags().String("on-type-error", "fail", "What a cell that fails its type does: fail, warn (read as null), or keep")
+	cmd.Flags().String("on-type-error", "fail", "What a cell that fails its type does: fail, warn (read as null; also spelled null), or keep")
 	cmd.Flags().Int("max-rows", 0, "Most rows to print (default 5000)")
 	cmd.Flags().Bool("skip-hidden", false, "Leave out rows hidden by a filter or by hand")
 	cmd.Flags().String("password", "", "Password of a protected workbook; prefer DAGU_XLSX_PASSWORD, which keeps it out of the process list")
@@ -249,7 +249,7 @@ func runXlsxRead(cmd *cobra.Command, args []string) error {
 	case workbook.TypeErrorFail, workbook.TypeErrorWarn, workbook.TypeErrorNull, workbook.TypeErrorKeep:
 		opts.OnTypeError = mode
 	default:
-		return fmt.Errorf("--on-type-error: %q is not fail, warn, or keep", onTypeError)
+		return fmt.Errorf("--on-type-error: %q is not fail, warn, null, or keep", onTypeError)
 	}
 
 	var result *workbook.ReadResult

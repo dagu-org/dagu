@@ -251,7 +251,7 @@ func TestXlsxReadPinsTypes(t *testing.T) {
 	_, err = runXlsx(t, "read", path, "--types", "金額:money")
 	require.ErrorContains(t, err, `--types: types.金額: unknown column type "money"`)
 	_, err = runXlsx(t, "read", path, "--on-type-error", "skip")
-	require.ErrorContains(t, err, `--on-type-error: "skip" is not fail, warn, or keep`)
+	require.ErrorContains(t, err, `--on-type-error: "skip" is not fail, warn, null, or keep`)
 }
 
 func TestXlsxReadTextEscapesDelimiters(t *testing.T) {
