@@ -288,6 +288,25 @@ func TestUpdateRowsRejectsTwoInputsForOneRow(t *testing.T) {
 	require.ErrorContains(t, err, "rows[0] and rows[1] both address row 2")
 }
 
+func TestUpdateRowsEmptyRowsChangesNothing(t *testing.T) {
+	t.Parallel()
+	set, err := ParseSet(map[string]any{"Status": "status"})
+	require.NoError(t, err)
+	for name, opts := range map[string]UpdateOptions{
+		"with set":    {Key: "Invoice No", Rows: []Row{}, Set: set},
+		"default set": {Key: "Invoice No", Rows: []Row{}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			path := ordersBook(t)
+			before := fileHash(t, path)
+			result, err := UpdateRows(context.Background(), path, opts)
+			require.NoError(t, err)
+			assert.Equal(t, 0, result.Changes.RowsUpdated)
+			assert.Equal(t, before, fileHash(t, path), "the workbook is left as it was")
+		})
+	}
+}
+
 func TestUpdateRowsTypedLiteralReplacesTextThatReadsTheSame(t *testing.T) {
 	t.Parallel()
 	path := ordersBook(t)
