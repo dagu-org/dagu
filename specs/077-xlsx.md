@@ -751,6 +751,7 @@ the cell stores, so a date written over text is a change.
 The workbook must exist: a template fill needs a template, and `xlsx.write`
 creates workbooks. With `output`, the result is written there and the
 workbook at `path` is left as it was, so one template serves many fills;
+a missing parent folder of `output` is created as for `xlsx.write`;
 `output` must be a different file from `path`, a hard link included, else
 `output must be a different file from path; leave output out to fill the
 workbook in place`; the output path takes the saved file's place in `path`
