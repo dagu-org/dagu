@@ -239,7 +239,9 @@ test('connects a community server through Dagu Console', async ({
   });
   await expect(dialog).toBeVisible();
   await expect(
-    dialog.getByRole('radio', { name: 'Health and run status (recommended)' })
+    dialog.getByRole('radio', {
+      name: 'Health, run status, and error messages (recommended)',
+    })
   ).toBeChecked();
   await settled(page);
   await page.screenshot({
@@ -257,7 +259,7 @@ test('connects a community server through Dagu Console', async ({
   ).toHaveAttribute('href', 'https://console.dagu.test/servers?server=srv-123');
 
   const card = page.getByRole('region', { name: 'Monitoring' });
-  await expect(card).toContainText('Health and run status');
+  await expect(card).toContainText('Health, run status, and error messages');
   await expect(card).toContainText('Last report');
   await card.screenshot({ path: testInfo.outputPath('monitoring-card.png') });
   await card.getByRole('button', { name: 'View last report' }).click();
@@ -325,7 +327,9 @@ test('starts monitoring when a server connects from the free offer', async ({
     name: 'Monitor this server for free',
   });
   await expect(
-    offer.getByRole('radio', { name: 'Health and run status (recommended)' })
+    offer.getByRole('radio', {
+      name: 'Health, run status, and error messages (recommended)',
+    })
   ).toBeChecked();
   await offer.screenshot({
     path: testInfo.outputPath('monitoring-offer-desktop.png'),
@@ -346,7 +350,7 @@ test('starts monitoring when a server connects from the free offer', async ({
   const popup = page.waitForEvent('popup');
   await offer.getByRole('button', { name: 'Connect for free' }).click();
   await expect(await popup).toHaveURL(connectUrl);
-  expect(connectBody).toEqual({ report: 'runs' });
+  expect(connectBody).toEqual({ report: 'errors' });
   await expect(page.getByText('ABCD1234')).toBeVisible();
 
   license = {
@@ -363,7 +367,7 @@ test('starts monitoring when a server connects from the free offer', async ({
   approved = true;
   await expect(page.getByText('Connected to acme.')).toBeVisible();
   const card = page.getByRole('region', { name: 'Monitoring' });
-  await expect(card).toContainText('Health and run status');
+  await expect(card).toContainText('Health, run status, and error messages');
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 

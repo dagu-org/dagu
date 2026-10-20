@@ -530,11 +530,12 @@ func TestReportRunsSizeCap(t *testing.T) {
 	for i := range 45 {
 		failed := run("etl", fmt.Sprintf("run-%d", i), ir.Failed)
 		for j := range maxFailedSteps {
-			failed.Nodes = append(failed.Nodes, &ir.Node{
-				Step:   ir.Step{Name: fmt.Sprintf("%02d-%s", j, longName)},
-				Status: ir.NodeFailed,
-				Error:  longError,
-			})
+			node := &ir.Node{Step: ir.Step{Name: fmt.Sprintf("%02d-%s", j, longName)}, Status: ir.NodeFailed}
+			// One error more than a run carries, so the cap is reached.
+			if j <= maxRunErrors {
+				node.Error = longError
+			}
+			failed.Nodes = append(failed.Nodes, node)
 		}
 		dir.emit(eventstore.TypeDAGRunFailed, failed)
 		ids = append(ids, failed.DAGRunID)
