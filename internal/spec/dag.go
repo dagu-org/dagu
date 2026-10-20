@@ -2846,6 +2846,12 @@ func parseHarnessDefinition(name string, raw map[string]any) (*ir.HarnessDefinit
 				)
 			}
 			def.Binary = strings.TrimSpace(binary)
+		case "protocol":
+			protocol, ok := value.(string)
+			if !ok || (protocol != "cli" && protocol != "acp") {
+				return nil, ir.NewValidationError(fmt.Sprintf("harnesses.%s.protocol", name), value, fmt.Errorf("protocol must be cli or acp"))
+			}
+			def.Protocol = protocol
 		case "prefix_args":
 			prefixArgs, err := harnessStringSlice(value)
 			if err != nil {
@@ -2913,6 +2919,14 @@ func parseHarnessDefinition(name string, raw map[string]any) (*ir.HarnessDefinit
 			raw["binary"],
 			fmt.Errorf("binary is required"),
 		)
+	}
+
+	if def.Protocol == "acp" {
+		for _, key := range []string{"prompt_mode", "prompt_flag", "prompt_position"} {
+			if _, exists := raw[key]; exists {
+				return nil, ir.NewValidationError(fmt.Sprintf("harnesses.%s.%s", name, key), raw[key], fmt.Errorf("ACP sends prompts over the protocol; %s is not supported", key))
+			}
+		}
 	}
 
 	switch def.PromptMode {

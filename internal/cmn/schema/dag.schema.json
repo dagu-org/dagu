@@ -5177,6 +5177,21 @@
       "allOf": [
         {
           "if": {
+            "properties": {"protocol": {"const": "acp"}},
+            "required": ["protocol"]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {"required": ["prompt_mode"]},
+                {"required": ["prompt_flag"]},
+                {"required": ["prompt_position"]}
+              ]
+            }
+          }
+        },
+        {
+          "if": {
             "properties": {
               "prompt_mode": { "const": "flag" }
             },
@@ -5209,6 +5224,11 @@
             "type": "string"
           },
           "description": "Arguments that always appear before prompt placement and runtime flags."
+        },
+        "protocol": {
+          "type": "string",
+          "enum": ["cli", "acp"],
+          "description": "通信协议，默认 cli；acp 使用标准输入输出连接 ACP agent。"
         },
         "prompt_mode": {
           "type": "string",

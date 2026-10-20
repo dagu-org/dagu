@@ -267,3 +267,7 @@ steps:
       fallback:
         - provider: codex
 ```
+
+## ACP 协议扩展
+
+自定义 harness 支持 `protocol: acp`，配置和验收约定见 [ACP 扩展规范](067-harness-acp.md)。

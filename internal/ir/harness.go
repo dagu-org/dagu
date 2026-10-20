@@ -31,8 +31,9 @@ const (
 	HarnessFlagStyleSingleDash HarnessFlagStyle = "single_dash"
 )
 
-// HarnessDefinition describes how to invoke a named harness CLI.
+// HarnessDefinition 描述命名的 CLI 或 ACP agent 的启动方式。
 type HarnessDefinition struct {
+	Protocol       string                `json:"protocol,omitempty"`
 	Binary         string                `json:"binary,omitempty"`
 	PrefixArgs     []string              `json:"prefixArgs,omitempty"`
 	PromptMode     HarnessPromptMode     `json:"promptMode,omitempty"`

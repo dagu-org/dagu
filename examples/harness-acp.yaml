@@ -1,0 +1,13 @@
+# 先安装并完成 ACP adapter 的认证，例如 @agentclientprotocol/codex-acp。
+harnesses:
+  coding-agent:
+    protocol: acp
+    binary: codex-acp
+
+steps:
+  - id: review
+    action: harness.run
+    with:
+      provider: coding-agent
+      prompt: 检查当前目录的代码，概述主要模块，不修改文件。
+    output: REVIEW

@@ -64,6 +64,7 @@ type containerRunResult struct {
 type harnessExecutor struct {
 	mu                     sync.Mutex
 	process                *cmdutil.ManagedProcess
+	acpCancel              context.CancelFunc
 	stdout                 io.Writer
 	stderr                 io.Writer
 	exitCode               int
@@ -162,6 +163,7 @@ func (e *harnessExecutor) stop(req cmdutil.StopRequest) error {
 		sessionID = e.agentSession.SessionID
 	}
 	workDir := e.workDir
+	acpCancel := e.acpCancel
 	process := e.process
 	cli := e.containerClient
 	containerCancel := e.containerCancel
@@ -170,6 +172,10 @@ func (e *harnessExecutor) stop(req cmdutil.StopRequest) error {
 	e.sharedContainerCancel = nil
 	e.mu.Unlock()
 
+	if acpCancel != nil {
+		acpCancel()
+		return nil
+	}
 	var stopErr error
 	if host.URL != "" && sessionID != "" {
 		stopErr = abortManagedOpenCode(context.Background(), host, sessionID, workDir)
@@ -244,6 +250,9 @@ func (e *harnessExecutor) Run(ctx context.Context) error {
 		}
 
 		lastErr = err
+		if errors.Is(err, context.Canceled) {
+			return err
+		}
 		if ctx.Err() != nil {
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 				e.exitCode = 124 // Standard timeout exit code
@@ -276,6 +285,9 @@ func (e *harnessExecutor) Run(ctx context.Context) error {
 }
 
 func (e *harnessExecutor) runOnce(ctx context.Context, cfg providerConfig) (*os.File, error) {
+	if cfg.definition != nil && cfg.definition.Protocol == "acp" {
+		return e.runACP(ctx, cfg)
+	}
 	hasRootContainer := rootContainerConfigured(ctx)
 	if cfg.managed && e.step.Container == nil && !hasRootContainer {
 		host, available, err := opencodehost.ConfigFromContext(ctx)
@@ -1390,6 +1402,7 @@ func cloneDefinition(def *ir.HarnessDefinition) *ir.HarnessDefinition {
 		return nil
 	}
 	return &ir.HarnessDefinition{
+		Protocol:       def.Protocol,
 		Binary:         def.Binary,
 		PrefixArgs:     append([]string(nil), def.PrefixArgs...),
 		PromptMode:     def.PromptMode,

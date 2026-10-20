@@ -1149,6 +1149,7 @@ func (*mergeTransformer) Transformer(
 					return nil
 				}
 				return &ir.HarnessDefinition{
+					Protocol:       def.Protocol,
 					Binary:         def.Binary,
 					PrefixArgs:     append([]string(nil), def.PrefixArgs...),
 					PromptMode:     def.PromptMode,
