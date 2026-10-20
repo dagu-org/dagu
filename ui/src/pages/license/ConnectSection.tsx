@@ -67,7 +67,7 @@ export function ConnectSection({
     cancel,
   } = connect;
   const [report, setReport] = useState<ReportingLevel>(
-    LicenseMonitoringLevel.runs
+    LicenseMonitoringLevel.errors
   );
   const pending = status?.state === LicenseConnectStatusState.pending;
   const configured = monitoring?.configured ? monitoring.level : undefined;

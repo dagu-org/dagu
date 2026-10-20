@@ -7091,7 +7091,7 @@ export interface components {
             error?: string;
         };
         /**
-         * @description How much this server reports to Dagu Console: off sends nothing but one report saying so after health or runs, health sends its version and which services run, and runs also sends the status of finished DAG runs and the runs in progress
+         * @description How much this server reports to Dagu Console: off sends nothing but one report saying so after health, runs, or errors, health sends its version and which services run, runs also sends the status of finished DAG runs and the runs in progress, and errors also sends the error messages of failed runs
          * @enum {string}
          */
         LicenseMonitoringLevel: LicenseMonitoringLevel;
@@ -22404,7 +22404,8 @@ export enum LicenseConnectStatusState {
 export enum LicenseMonitoringLevel {
     off = "off",
     health = "health",
-    runs = "runs"
+    runs = "runs",
+    errors = "errors"
 }
 export enum APIKeyAllowedSurfaces {
     rest_api = "rest_api",

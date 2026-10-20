@@ -237,11 +237,19 @@ const (
 	ReportHealth ReportLevel = "health"
 	// ReportRuns also reports DAG-run status changes.
 	ReportRuns ReportLevel = "runs"
+	// ReportErrors also reports why DAG runs failed: each failed step's
+	// error message.
+	ReportErrors ReportLevel = "errors"
 )
 
 // Reports reports whether the level sends anything.
 func (l ReportLevel) Reports() bool {
-	return l == ReportHealth || l == ReportRuns
+	return l == ReportHealth || l.ReportsRuns()
+}
+
+// ReportsRuns reports whether the level sends DAG-run status.
+func (l ReportLevel) ReportsRuns() bool {
+	return l == ReportRuns || l == ReportErrors
 }
 
 // ExecutionMode represents the default execution mode for DAGs.
@@ -1347,10 +1355,10 @@ func (c *Config) validateExecutionMode() error {
 // validateCloudReport validates what the server reports to Dagu Console.
 func (c *Config) validateCloudReport() error {
 	switch c.Cloud.Report {
-	case "", ReportOff, ReportHealth, ReportRuns:
+	case "", ReportOff, ReportHealth, ReportRuns, ReportErrors:
 		return nil
 	default:
-		return fmt.Errorf("invalid cloud.report: %q (must be one of: off, health, runs)", c.Cloud.Report)
+		return fmt.Errorf("invalid cloud.report: %q (must be one of: off, health, runs, errors)", c.Cloud.Report)
 	}
 }
 

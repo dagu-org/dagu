@@ -183,7 +183,7 @@ func (r *Reporter) run(ctx context.Context) {
 	// Off fixed by configuration never changes.
 	for r.monitoring.configured != config.ReportOff || r.offDue() {
 		wait := until
-		if r.events != nil && r.level == config.ReportRuns {
+		if r.events != nil && r.level.ReportsRuns() {
 			wait = min(wait, eventCheckInterval)
 		}
 		live, turnedOn := r.sleep(ctx, wait)
@@ -243,7 +243,7 @@ func (r *Reporter) readLevel(ctx context.Context) config.ReportLevel {
 		r.levelWarned = false
 	}
 
-	if level != config.ReportRuns {
+	if !level.ReportsRuns() {
 		r.events.forget(ctx)
 	}
 	if level != r.level {
@@ -264,7 +264,7 @@ func (r *Reporter) readLevel(ctx context.Context) config.ReportLevel {
 // due or could be sent early, so that a console that fails or throttles
 // reports does not cause a read every few seconds.
 func (r *Reporter) pollEvents(ctx context.Context, level config.ReportLevel, due bool) bool {
-	if r.events == nil || level != config.ReportRuns {
+	if r.events == nil || !level.ReportsRuns() {
 		return false
 	}
 	creds, ok := r.credentials()
@@ -374,7 +374,7 @@ func (r *Reporter) report(ctx context.Context) time.Duration {
 		if r.changed(outcome{kind: outcomeAccepted}) {
 			logger.Info(ctx, "Reporting server health to Dagu Console", tag.URL(creds.CloudURL))
 		}
-		if r.events == nil && level == config.ReportRuns && !r.noEventsLogged {
+		if r.events == nil && level.ReportsRuns() && !r.noEventsLogged {
 			r.noEventsLogged = true
 			logger.Info(ctx, "Reports to Dagu Console carry no DAG runs because the event store is disabled")
 		}

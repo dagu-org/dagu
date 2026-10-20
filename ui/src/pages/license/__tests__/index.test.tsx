@@ -757,12 +757,14 @@ describe('LicensePage', () => {
 
       expect(put).toHaveBeenCalledWith('/license/monitoring', {
         params: { query: { remoteNode: 'local' } },
-        body: { level: 'runs' },
+        body: { level: 'errors' },
       });
       await waitFor(() =>
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
       );
-      expect(monitoringCard()).toHaveTextContent('Health and run status');
+      expect(monitoringCard()).toHaveTextContent(
+        'Health, run status, and error messages'
+      );
     });
 
     it('connects a free server and offers failure emails', async () => {
@@ -803,11 +805,11 @@ describe('LicensePage', () => {
         'Free for one server: reports every 5 minutes and keeps 7 days of run history. Paid features stay off.'
       );
       expect(offer()).toHaveTextContent(
-        'Never sent: logs, outputs, parameters, environment, step commands, DAG YAML, the values of workflow secrets, and error message text.'
+        'Never sent: full logs, outputs, parameters, environment, step commands, DAG YAML, and the values of workflow secrets.'
       );
       expect(
         within(offer()).getByRole('radio', {
-          name: 'Health and run status (recommended)',
+          name: 'Health, run status, and error messages (recommended)',
         })
       ).toBeChecked();
       await userEvent.click(
@@ -816,7 +818,7 @@ describe('LicensePage', () => {
 
       expect(post).toHaveBeenCalledWith('/license/connect', {
         params: { query: { remoteNode: 'local' } },
-        body: { report: 'runs' },
+        body: { report: 'errors' },
       });
       expect(await screen.findByText('ABCD1234')).toBeVisible();
       expect(
@@ -1195,9 +1197,15 @@ describe('LicensePage', () => {
       });
       const health = within(dialog).getByRole('radio', { name: 'Health only' });
       const runs = within(dialog).getByRole('radio', {
-        name: 'Health and run status (recommended)',
+        name: 'Health and run status',
       });
-      expect(runs).toBeChecked();
+      const errors = within(dialog).getByRole('radio', {
+        name: 'Health, run status, and error messages (recommended)',
+      });
+      expect(errors).toBeChecked();
+      expect(errors).toHaveAccessibleDescription(
+        "Sends everything Health and run status sends, plus why each failed run failed: the error messages of up to 5 failed steps, or the run's own, each up to 2 KB from its end. A step's error can end with the last lines of its stderr, with the values of workflow secrets masked."
+      );
       expect(health).toHaveAccessibleDescription(
         'Sends the Dagu version, OS, architecture, process start time, and service counts: schedulers holding the scheduler lock, and registered coordinators.'
       );
@@ -1205,7 +1213,7 @@ describe('LicensePage', () => {
         'Sends the health fields, plus the status of each top-level DAG run that finishes, with its failed step names (up to 50) and how it was triggered, and the list of runs queued, running, or waiting. Each run is sent as its DAG name, run ID, attempt ID, status, trigger, and queued, started, and finished times. No parameters, logs, or outputs.'
       );
       expect(dialog).toHaveTextContent(
-        'Never sent: logs, outputs, parameters, environment, step commands, DAG YAML, the values of workflow secrets, and error message text.'
+        'Never sent: full logs, outputs, parameters, environment, step commands, DAG YAML, and the values of workflow secrets.'
       );
       expect(dialog).toHaveTextContent(
         'the protocol version, license ID, server ID, and heartbeat secret'
