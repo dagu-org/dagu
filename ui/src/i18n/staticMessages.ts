@@ -2563,6 +2563,7 @@ const english = {
   "Sub-DAG": "Sub-DAG",
   "Catch-up": "Catch-up",
   "Restart": "Restart",
+  "Latest runs": "Latest runs",
   "Run log": "Run log",
   "Stream": "Stream",
   "Lines shown": "Lines shown",
@@ -2651,6 +2652,15 @@ const english = {
   "Update available: v{current} → {latest} {releaseLink}": "Update available: v{current} → {latest} {releaseLink}",
   "A new Dagu binary is installed. Run {command} to restart and use it.": "A new Dagu binary is installed. Run {command} to restart and use it.",
   "A new Dagu binary is installed. Restart Dagu to use it.": "A new Dagu binary is installed. Restart Dagu to use it.",
+  "Execution has not started": "Execution has not started",
+  "Execution completed": "Execution completed",
+  "Execution completed with some failures": "Execution completed with some failures",
+  "Execution failed": "Execution failed",
+  "Execution in progress": "Execution in progress",
+  "DAGRun is queued for execution": "DAGRun is queued for execution",
+  "Execution was aborted": "Execution was aborted",
+  "Waiting for manual action": "Waiting for manual action",
+  "Execution was rejected": "Execution was rejected",
 } as const;
 
 export type StaticMessage = keyof typeof english;
@@ -5160,6 +5170,7 @@ const chinese = {
   "Sub-DAG": "子工作流",
   "Catch-up": "补跑",
   "Restart": "重启",
+  "Latest runs": "最近的运行",
   "Run log": "运行日志",
   "Stream": "输出流",
   "Lines shown": "显示的行",
@@ -5248,6 +5259,15 @@ const chinese = {
   "Update available: v{current} → {latest} {releaseLink}": "有可用更新：v{current} → {latest} {releaseLink}",
   "A new Dagu binary is installed. Run {command} to restart and use it.": "已安装新的 Dagu 二进制文件。运行 {command} 重启后即可使用。",
   "A new Dagu binary is installed. Restart Dagu to use it.": "已安装新的 Dagu 二进制文件。重启 Dagu 后即可使用。",
+  "Execution has not started": "执行尚未开始",
+  "Execution completed": "执行已完成",
+  "Execution completed with some failures": "执行已完成，但有部分失败",
+  "Execution failed": "执行失败",
+  "Execution in progress": "正在执行",
+  "DAGRun is queued for execution": "DAG 运行已排队等待执行",
+  "Execution was aborted": "执行已中止",
+  "Waiting for manual action": "等待手动操作",
+  "Execution was rejected": "执行已被拒绝",
 } as const satisfies Record<StaticMessage, string>;
 
 const japanese = {
@@ -7833,6 +7853,7 @@ const japanese = {
   "Sub-DAG": "サブワークフロー",
   "Catch-up": "キャッチアップ",
   "Restart": "再起動",
+  "Latest runs": "直近の実行",
   "Run log": "実行ログ",
   "Stream": "出力ストリーム",
   "Lines shown": "表示する行",
@@ -7921,6 +7942,15 @@ const japanese = {
   "Update available: v{current} → {latest} {releaseLink}": "更新があります：v{current} → {latest} {releaseLink}",
   "A new Dagu binary is installed. Run {command} to restart and use it.": "新しい Dagu バイナリがインストールされました。{command} を実行して再起動すると使用できます。",
   "A new Dagu binary is installed. Restart Dagu to use it.": "新しい Dagu バイナリがインストールされました。Dagu を再起動すると使用できます。",
+  "Execution has not started": "実行はまだ開始されていません",
+  "Execution completed": "実行が完了しました",
+  "Execution completed with some failures": "一部の失敗を伴って実行が完了しました",
+  "Execution failed": "実行に失敗しました",
+  "Execution in progress": "実行中です",
+  "DAGRun is queued for execution": "DAG 実行は実行待ちのキューにあります",
+  "Execution was aborted": "実行は中止されました",
+  "Waiting for manual action": "手動操作を待っています",
+  "Execution was rejected": "実行は拒否されました",
 } as const satisfies Record<StaticMessage, string>;
 
 export const staticMessages = {
