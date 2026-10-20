@@ -70,6 +70,11 @@ func TestRuntimeRepeatDecisionUnix(t *testing.T) {
 			file:  "until_unconditional_succeeds.yaml",
 			ticks: "tick\ntick\n",
 		},
+		{
+			name:  "while without a condition repeats while the attempt succeeds",
+			file:  "while_unconditional_succeeds.yaml",
+			ticks: "tick\ntick\n",
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
