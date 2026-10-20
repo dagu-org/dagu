@@ -474,6 +474,9 @@ func (it *dagRunStatusIterator) toListItem(ctx context.Context, run *DAGRun) (da
 	if it.opts.DAGRunID != "" && !strings.Contains(run.dagRunID, it.opts.DAGRunID) {
 		return dagRunListItem{}, false
 	}
+	if run.summary != nil && slices.Contains(it.opts.ExcludeTriggerTypes, run.summary.TriggerType) {
+		return dagRunListItem{}, false
+	}
 	status := it.store.resolveStatus(ctx, run, it.labelFilters, it.opts.WorkspaceFilter, it.statusesFilter, it.hasStatusFilter)
 	if status == nil {
 		return dagRunListItem{}, false

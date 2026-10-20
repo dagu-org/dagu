@@ -31,7 +31,7 @@ This spec does not define:
 
 ## Goal
 
-A workflow author can declare that a DAG is a long-running service, kept
+A workflow author can declare that a DAG is always on, kept
 running by Dagu instead of a cron schedule, a supervisor DAG, or an external
 watchdog.
 
@@ -45,7 +45,7 @@ watchdog.
 
 ## Terms
 
-A service DAG is a DAG whose `restart_policy` is `always` or `unless-stopped`.
+An always-on DAG is a DAG whose `restart_policy` is `always` or `unless-stopped`.
 
 ## Behavior
 
@@ -65,11 +65,11 @@ Rules:
 - An empty value, or an absent field, means `no`.
 - A base configuration cannot set `restart_policy` to `always` or
   `unless-stopped`: it applies to every DAG, so it would turn them all into
-  services.
+  always-on DAGs.
 
 ### Restrictions
 
-A service DAG:
+An always-on DAG:
 
 - must have a `restart_wait_sec` of at least 1, set in its file or inherited
   from the base configuration
@@ -77,22 +77,22 @@ A service DAG:
   including `start`, `stop` and `restart`. An empty `schedule` defines none.
 - must not define a DAG-level `retry_policy` in its file
 
-A schedule or a DAG-level `retry_policy` that a service DAG would inherit from
+A schedule or a DAG-level `retry_policy` that an always-on DAG would inherit from
 the base configuration is ignored.
 
-A service DAG may set `queue`, `timeout_sec`, `max_clean_up_time_sec`, history
+An always-on DAG may set `queue`, `timeout_sec`, `max_clean_up_time_sec`, history
 retention, `handler_on`, `preconditions`, and any other field.
 
 ### History Retention
 
-A service DAG adds a run to its history each time it is restarted. Loading a
-service DAG that sets neither `hist_retention_runs` nor `hist_retention_days`,
+An always-on DAG adds a run to its history each time it is restarted. Loading an
+always-on DAG that sets neither `hist_retention_runs` nor `hist_retention_days`,
 in its file or in the base configuration, reports a warning. The DAG loads.
 
 ### Restart Command
 
-The `restart` command fails for a service DAG, without stopping or starting a
-run: the runs of a service DAG are started for it.
+The `restart` command fails for an always-on DAG, without stopping or starting a
+run: the runs of an always-on DAG are started for it.
 
 ### Scheduler Behavior
 
@@ -100,7 +100,7 @@ This section describes the implementation. The conformance suite does not
 check it. Integration tests in `internal/intg/queue` and `internal/intg/distr`
 cover it.
 
-The scheduler that holds the scheduler lock keeps the service DAGs alive. It
+The scheduler that holds the scheduler lock keeps the always-on DAGs alive. It
 checks them every second and starts a run through the queue, once
 `restart_wait_sec` has passed since the previous run ended. A scheduler that
 waits for the lock does nothing.
@@ -131,16 +131,16 @@ Rules:
 
 - A `restart_policy` that is not `no`, `always` or `unless-stopped` fails
   validation on the field `restart_policy`.
-- A service DAG with a missing or non-positive `restart_wait_sec` fails
+- An always-on DAG with a missing or non-positive `restart_wait_sec` fails
   validation on the field `restart_wait_sec`.
-- A service DAG that defines a schedule fails validation on the field
+- An always-on DAG that defines a schedule fails validation on the field
   `restart_policy`.
-- A service DAG that defines a DAG-level `retry_policy` fails validation on
+- An always-on DAG that defines a DAG-level `retry_policy` fails validation on
   the field `restart_policy`.
 - A base configuration that sets `restart_policy` to `always` or
   `unless-stopped` fails validation on the field `restart_policy`, and so does
   every DAG that uses it.
-- The `restart` command for a service DAG exits with a non-zero status and an
+- The `restart` command for an always-on DAG exits with a non-zero status and an
   error that names `restart_policy`.
 
 ## Examples
@@ -208,4 +208,4 @@ steps:
 ## Conformance
 
 `conformance/spec080_restart_policy/` checks the validation rules with static
-fixtures and the `restart` command for a service DAG.
+fixtures and the `restart` command for an always-on DAG.

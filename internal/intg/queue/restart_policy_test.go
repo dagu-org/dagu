@@ -24,9 +24,9 @@ import (
 // the one second restart wait of the fixtures has elapsed.
 const restartQuiet = 5 * time.Second
 
-// serviceDAGYAML returns a DAG that the scheduler keeps alive. Each test uses
+// alwaysOnDAGYAML returns a DAG that the scheduler keeps alive. Each test uses
 // its own DAG name because the socket of a run is named after its DAG.
-func serviceDAGYAML(name, policy, script string) string {
+func alwaysOnDAGYAML(name, policy, script string) string {
 	return fmt.Sprintf(`name: %s
 restart_policy: %s
 restart_wait_sec: 1
@@ -80,7 +80,7 @@ func TestRestartPolicyRestartsEndedRuns(t *testing.T) {
 		{"Failed", "exit 1", ir.Failed},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			f := newFixture(t, serviceDAGYAML("restart-ended-"+tt.name, "always", tt.script)).
+			f := newFixture(t, alwaysOnDAGYAML("restart-ended-"+tt.name, "always", tt.script)).
 				StartScheduler(60 * time.Second)
 			defer f.Stop()
 
@@ -107,7 +107,7 @@ func TestRestartPolicyRestartsEndedRuns(t *testing.T) {
 
 func TestRestartPolicyKeepsOneRun(t *testing.T) {
 	release := filepath.Join(t.TempDir(), "release")
-	f := newFixture(t, serviceDAGYAML("restart-one-run", "always", intgharness.PortableCommands().WaitForFile(release))).
+	f := newFixture(t, alwaysOnDAGYAML("restart-one-run", "always", intgharness.PortableCommands().WaitForFile(release))).
 		StartScheduler(60 * time.Second)
 	defer f.Stop()
 	defer func() { _ = os.WriteFile(release, nil, 0600) }()
@@ -134,7 +134,7 @@ func TestRestartPolicyStop(t *testing.T) {
 	} {
 		t.Run(tt.policy, func(t *testing.T) {
 			release := filepath.Join(t.TempDir(), "release")
-			f := newFixture(t, serviceDAGYAML("restart-stop-"+tt.policy, tt.policy, intgharness.PortableCommands().WaitForFile(release))).
+			f := newFixture(t, alwaysOnDAGYAML("restart-stop-"+tt.policy, tt.policy, intgharness.PortableCommands().WaitForFile(release))).
 				StartScheduler(60 * time.Second)
 			defer f.Stop()
 			defer func() { _ = os.WriteFile(release, nil, 0600) }()
@@ -165,7 +165,7 @@ func TestRestartPolicyStop(t *testing.T) {
 // A restart that is queued when the DAG is suspended is dropped as aborted. It
 // was not stopped by an operator, so the DAG restarts once it is resumed.
 func TestRestartPolicyResumesDroppedRestart(t *testing.T) {
-	f := newFixture(t, serviceDAGYAML("restart-dropped", "unless-stopped", "echo ok"))
+	f := newFixture(t, alwaysOnDAGYAML("restart-dropped", "unless-stopped", "echo ok"))
 	require.NoError(t, f.th.DAGRepository.SetSuspended(f.th.Context, f.dag.FileName(), true))
 
 	runID, err := ir.NewDAGRunID()
@@ -234,7 +234,7 @@ steps:
 func TestRestartPolicyRestartsAfterRunProcessIsKilled(t *testing.T) {
 	release := filepath.Join(t.TempDir(), "release")
 	f := newFixture(t,
-		serviceDAGYAML("restart-killed", "unless-stopped", intgharness.PortableCommands().WaitForFile(release)),
+		alwaysOnDAGYAML("restart-killed", "unless-stopped", intgharness.PortableCommands().WaitForFile(release)),
 		WithProcConfig(queueTestProcHeartbeatInterval, queueTestProcStaleThreshold),
 		WithZombieConfig(50*time.Millisecond, 1),
 	).StartScheduler(60 * time.Second)

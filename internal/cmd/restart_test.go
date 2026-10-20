@@ -69,7 +69,7 @@ steps:
 
 // The scheduler starts the runs of a DAG with a restart_policy, so the restart
 // command, which starts a run of its own, is refused.
-func TestRestartCommand_RejectsServiceDAG(t *testing.T) {
+func TestRestartCommand_RejectsAlwaysOnDAG(t *testing.T) {
 	t.Parallel()
 
 	th := test.SetupCommand(t)
