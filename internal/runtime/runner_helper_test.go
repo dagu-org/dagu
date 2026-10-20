@@ -93,6 +93,12 @@ func withStdout(stdout string) stepOption {
 	}
 }
 
+func withStderr(stderr string) stepOption {
+	return func(step *ir.Step) {
+		step.Stderr = stderr
+	}
+}
+
 func withStdin(stdin string) stepOption {
 	return func(step *ir.Step) {
 		step.Stdin = stdin
