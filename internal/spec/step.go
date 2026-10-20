@@ -1040,15 +1040,6 @@ func buildStepRepeatPolicy(_ stepBuildContext, s *step) (ir.RepeatPolicy, error)
 		return ir.RepeatPolicy{}, nil
 	}
 
-	// Validate that explicit string while/until modes have appropriate conditions
-	// (bool true is allowed without conditions for backward compatibility)
-	if rp.Repeat.IsSet() && !rp.Repeat.IsBool() {
-		m := rp.Repeat.String()
-		if (m == "while" || m == "until") && rp.Condition == "" && len(rp.ExitCode) == 0 {
-			return ir.RepeatPolicy{}, fmt.Errorf("repeat mode '%s' requires either 'condition' or 'exit_code' to be specified", m)
-		}
-	}
-
 	var result ir.RepeatPolicy
 	result.RepeatMode = mode
 
