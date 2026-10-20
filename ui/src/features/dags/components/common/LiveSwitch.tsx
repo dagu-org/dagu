@@ -16,7 +16,7 @@ import { useConfig } from '../../../../contexts/ConfigContext';
 import { useClient } from '../../../../hooks/api';
 import { I18nProps } from '@/i18n/I18nProps';
 import { useI18n } from '@/i18n/I18nProvider';
-import { isServiceDAG } from '@/lib/dagSchedule';
+import { isAlwaysOnDAG } from '@/lib/dagSchedule';
 
 /**
  * Props for the LiveSwitch component
@@ -49,7 +49,7 @@ function LiveSwitch({ dag, refresh, 'aria-label': ariaLabel }: Props) {
   const [showConfirm, setShowConfirm] = useState(false);
   const [pendingState, setPendingState] = useState<boolean | null>(null);
   const remoteNode = useRemoteNode();
-  const isService = isServiceDAG(dag.dag);
+  const isService = isAlwaysOnDAG(dag.dag);
 
   const onSubmit = useCallback(
     async (suspend: boolean) => {

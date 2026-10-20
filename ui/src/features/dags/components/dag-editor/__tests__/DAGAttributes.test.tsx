@@ -36,11 +36,11 @@ describe('DAGAttributes', () => {
     ).toBeInTheDocument();
   });
 
-  it('renders the restart policy of a service DAG', () => {
+  it('renders the restart policy of an always-on DAG', () => {
     render(
       <DAGAttributes
         dag={{
-          name: 'service-dag',
+          name: 'always-on-dag',
           restartPolicy: RestartPolicy.unless_stopped,
           restartWaitSec: 15,
         }}

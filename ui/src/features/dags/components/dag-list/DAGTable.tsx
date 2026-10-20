@@ -36,16 +36,17 @@ import React, {
 } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { DAGNameInputModal } from '@/components/DAGNameInputModal';
-import { components, Status } from '../../../../api/v1/schema';
+import { AlwaysOnDAGState, components, Status } from '../../../../api/v1/schema';
 import dayjs from '../../../../lib/dayjs';
 import {
   getRestartValue,
   getScheduleKey,
   getScheduleLabel,
-  isServiceDAG,
+  isAlwaysOnDAG,
   parseNextRun,
 } from '../../../../lib/dagSchedule';
 import RelativeTime from '@/components/ui/relative-time';
+import { useAlwaysOnDAGs } from '@/features/cockpit/hooks/useAlwaysOnDAGs';
 import StatusChip from '@/components/ui/status-chip';
 import Ticker from '@/components/ui/ticker';
 import VisuallyHidden from '@/components/ui/visually-hidden';
@@ -168,6 +169,17 @@ function DeleteDAGButton({
   );
 }
 
+/**
+ * The state of an always-on DAG that is not suspended: Enabled, or Stopped
+ * after an operator's stop. The server tells it from the abort request of the
+ * latest run, so a run that the scheduler restarts does not show as Stopped.
+ */
+function AlwaysOnEnabledLabel({ fileName }: { fileName: string }) {
+  const { alwaysOnDAGs } = useAlwaysOnDAGs();
+  const state = alwaysOnDAGs.find((dag) => dag.fileName === fileName)?.state;
+  return <I18nText text={state === AlwaysOnDAGState.stopped ? 'Stopped' : 'Enabled'} />;
+}
+
 function DAGCard({
   dag,
   isSelected,
@@ -193,7 +205,7 @@ function DAGCard({
   const description = dag.dag.description;
   const schedules = dag.dag.schedule || [];
   const hasSchedule = schedules.length > 0;
-  const isService = isServiceDAG(dag.dag);
+  const isService = isAlwaysOnDAG(dag.dag);
   const nextRun = parseNextRun(dag.nextRun);
 
   const handleCardClick = (e: React.MouseEvent) => {
@@ -347,7 +359,7 @@ function DAGCard({
             {dag.suspended ? (
               <I18nText text={'Suspended'} />
             ) : isService ? (
-              <I18nText text={'Enabled'} />
+              <AlwaysOnEnabledLabel fileName={dag.fileName} />
             ) : hasSchedule ? (
               <I18nText text={'Live'} />
             ) : (
@@ -907,7 +919,7 @@ const defaultColumns = [
       }
 
       const schedules = data.dag.dag.schedule || [];
-      const isService = isServiceDAG(data.dag.dag);
+      const isService = isAlwaysOnDAG(data.dag.dag);
       if (schedules.length === 0 && !isService) {
         return (
           <span className="text-xs text-muted-foreground">
@@ -937,7 +949,11 @@ const defaultColumns = [
                 <I18nText text={'Restart'} />: {getRestartValue(data.dag.dag)}
               </Badge>
               <span className="text-xs text-muted-foreground font-normal leading-tight">
-                <I18nText text={data.dag.suspended ? 'Suspended' : 'Enabled'} />
+                {data.dag.suspended ? (
+                  <I18nText text={'Suspended'} />
+                ) : (
+                  <AlwaysOnEnabledLabel fileName={data.dag.fileName} />
+                )}
               </span>
             </div>
           </div>
