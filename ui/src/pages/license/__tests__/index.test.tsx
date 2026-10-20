@@ -856,11 +856,12 @@ describe('LicensePage', () => {
         level: LicenseMonitoringLevel.runs,
         chosen: true,
       });
-      expect(
-        await within(offer()).findByRole('radio', {
-          name: 'Health and run status',
-        })
-      ).toBeChecked();
+      // The level chosen before is selected once the server's choice loads.
+      await waitFor(() =>
+        expect(
+          within(offer()).getByRole('radio', { name: 'Health and run status' })
+        ).toBeChecked()
+      );
       await approve(() =>
         within(offer()).getByRole('button', { name: 'Connect for free' })
       );
