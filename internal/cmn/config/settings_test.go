@@ -75,6 +75,22 @@ func TestSettingsEnvAlias(t *testing.T) {
 	})
 }
 
+// Viper's automatic DAGU_<KEY> lookup runs before the bound variables.
+func TestSettingsAutomaticEnv(t *testing.T) {
+	t.Setenv("DAGU_SERVER_METRICS", "private")
+	t.Setenv("DAGU_METRICS", "public")
+
+	settings := loadSettings(t, "")
+	assert.Equal(t, Setting{Key: "metrics", Value: "public", Source: "env:DAGU_METRICS"}, settings["metrics"])
+}
+
+func TestSettingsListsAPIBasePath(t *testing.T) {
+	t.Setenv("DAGU_API_BASE_PATH", "")
+
+	settings := loadSettings(t, "api_base_path: /custom/api\n")
+	assert.Equal(t, Setting{Key: "api_base_path", Value: "/custom/api", Source: SourceFile}, settings["api_base_path"])
+}
+
 func TestSettingsMasksSecrets(t *testing.T) {
 	t.Setenv("DAGU_AUTH_TOKEN_SECRET", "")
 	t.Setenv("DAGU_AUTH_BASIC_PASSWORD", "")

@@ -47,7 +47,8 @@ func (l *ConfigLoader) Settings() []Setting {
 		}
 		info, ok := infos[b.key]
 		if !ok {
-			info = &keyInfo{}
+			// AutomaticEnv reads DAGU_<KEY> before any bound variable.
+			info = &keyInfo{envs: []string{prefix + strings.ToUpper(b.key)}}
 			infos[b.key] = info
 			keys = append(keys, b.key)
 		}
@@ -71,8 +72,8 @@ func (l *ConfigLoader) Settings() []Setting {
 	return settings
 }
 
-// settingSource follows Viper's precedence: the first bound variable that is
-// set and non-empty, then the config file, then the default.
+// settingSource follows Viper's precedence: the first variable in envs that
+// is set and non-empty, then the config file, then the default.
 func (l *ConfigLoader) settingSource(key string, envs []string) string {
 	for _, env := range envs {
 		if os.Getenv(env) != "" {
