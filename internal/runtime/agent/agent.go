@@ -117,8 +117,17 @@ type Agent struct {
 	// runner is the runner instance to run the DAG.
 	runner *runtime.Runner
 
-	// plan is the execution plan for the DAG.
+	// plan is the execution plan for the DAG. A run that loops replaces it at
+	// each cycle, under lock.
 	plan *runtime.Plan
+
+	// cycles tracks a run that loops; it is nil for a run that does not.
+	cycles *cycleState
+
+	// stopped is closed when a stop is requested, so a run that waits between
+	// two cycles ends the wait.
+	stopped  chan struct{}
+	stopOnce sync.Once
 
 	// runnerDone includes startup and lifecycle handlers, before final status persistence.
 	runnerDone        chan struct{}
@@ -430,6 +439,7 @@ func New(
 
 	a := &Agent{
 		cleanupDone:              make(chan struct{}),
+		stopped:                  make(chan struct{}),
 		rootDAGRun:               opts.RootDAGRun,
 		parentDAGRun:             opts.ParentDAGRun,
 		dagRunID:                 dagRunID,
@@ -1215,7 +1225,7 @@ func (a *Agent) Run(ctx context.Context) (runErr error) {
 		return context.Canceled
 	}
 	executionStarted = true
-	lastErr := a.runner.Run(ctx, a.plan, progressCh)
+	lastErr := a.runCycles(ctx, attempt, progressCh)
 	finishRunner()
 
 	// Drain the progress goroutine before computing the final status.
@@ -1596,6 +1606,8 @@ func (a *Agent) Status(ctx context.Context) ir.DAGRunStatus {
 
 	runnerStatus := a.runner.Status(ctx, a.plan)
 	finishedAt := a.plan.FinishAt()
+	startedAt := a.plan.StartAt()
+	cycleOpts := a.cycleStatusOptions(&runnerStatus, &finishedAt, &startedAt)
 	if !a.startupFinishedAt.IsZero() {
 		runnerStatus = ir.Aborted
 		finishedAt = a.startupFinishedAt
@@ -1631,6 +1643,7 @@ func (a *Agent) Status(ctx context.Context) ir.DAGRunStatus {
 		ir.WithDAGDefinitionID(a.definitionID),
 		ir.WithNoReuse(a.noReuse),
 	}
+	opts = append(opts, cycleOpts...)
 
 	// If the current execution is based on a persisted target, copy timing data
 	// from that target. Otherwise, use the schedule time provided directly.
@@ -1654,7 +1667,7 @@ func (a *Agent) Status(ctx context.Context) ir.DAGRunStatus {
 			a.dagRunID,
 			runnerStatus,
 			os.Getpid(),
-			a.plan.StartAt(),
+			startedAt,
 			opts...,
 		)
 	a.maskStatusSecrets(&status)
@@ -2402,6 +2415,7 @@ func (a *Agent) requestStop(ctx context.Context, sig os.Signal, allowOverride bo
 
 	a.lock.Lock()
 	if intent.IsTermination() {
+		a.stopOnce.Do(func() { close(a.stopped) })
 		if a.stopRequest == nil {
 			a.stopRequest = &stopRequest{intent: intent, allowOverride: allowOverride, deadline: time.Now().Add(a.dag.MaxCleanUpTime)}
 		} else if intent.IsForce() {

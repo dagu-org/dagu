@@ -14600,6 +14600,11 @@ components:
         restartWaitSec:
           type: integer
           description: "Seconds the scheduler waits after a run ends before it starts the next one. Used with restartPolicy."
+        loopWaitSec:
+          type: integer
+          description: "With restartPolicy, the run loops: after its steps end it waits this many seconds and runs them again in the same run. Omitted when the DAG does not loop."
+        loopOnFailure:
+          $ref: "#/components/schemas/LoopOnFailure"
         description:
           type: string
           description: "Human-readable description of the DAG's purpose and behavior"
@@ -14715,6 +14720,11 @@ components:
         - "retry"
         - "catchup"
         - "restart"
+
+    LoopOnFailure:
+      type: string
+      description: "What a run that loops does when a cycle fails. restart: the run ends and the restart policy starts a new one. continue: the run goes on with the next cycle. Omitted when the DAG does not loop."
+      enum: ["restart", "continue"]
 
     RestartPolicy:
       type: string
@@ -14959,6 +14969,11 @@ components:
         restartWaitSec:
           type: integer
           description: "Seconds the scheduler waits after a run ends before it starts the next one. Used with restartPolicy."
+        loopWaitSec:
+          type: integer
+          description: "With restartPolicy, the run loops: after its steps end it waits this many seconds and runs them again in the same run. Omitted when the DAG does not loop."
+        loopOnFailure:
+          $ref: "#/components/schemas/LoopOnFailure"
         histRetentionDays:
           type: integer
           description: "Number of days to retain historical logs"
@@ -15389,6 +15404,12 @@ components:
         - type: object
           description: "Detailed status information for the steps within a DAG-run."
           properties:
+            cycle:
+              type: integer
+              description: "For a run that loops, the cycle it is in, counted from 1. Omitted for a run that does not loop."
+            failedCycles:
+              type: integer
+              description: "For a run that loops, how many cycles ended unsuccessfully"
             rootDAGRunName:
               type: string
               description: "Name of the root DAG-run"
