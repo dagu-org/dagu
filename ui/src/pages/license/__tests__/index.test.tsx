@@ -850,6 +850,27 @@ describe('LicensePage', () => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
 
+    it('keeps the level chosen before when the server connects again', async () => {
+      const { post, approve } = approveAndConnect({
+        ...unchosen,
+        level: LicenseMonitoringLevel.runs,
+        chosen: true,
+      });
+      expect(
+        await within(offer()).findByRole('radio', {
+          name: 'Health and run status',
+        })
+      ).toBeChecked();
+      await approve(() =>
+        within(offer()).getByRole('button', { name: 'Connect for free' })
+      );
+
+      expect(post).toHaveBeenCalledWith('/license/connect', {
+        params: { query: { remoteNode: 'local' } },
+        body: { report: 'runs' },
+      });
+    });
+
     it('promises failure emails only with run status', async () => {
       approveAndConnect(unchosen);
       const runsText =
@@ -1204,7 +1225,7 @@ describe('LicensePage', () => {
       });
       expect(errors).toBeChecked();
       expect(errors).toHaveAccessibleDescription(
-        "Sends everything Health and run status sends, plus why each failed run failed: the error messages of up to 5 failed steps, or the run's own, each up to 2 KB from its end. A step's error can end with the last lines of its stderr, with the values of workflow secrets masked."
+        "Sends everything Health and run status sends, plus why each failed run failed: the error messages of up to 5 failed steps and handlers, or the run's own, each up to 2 KB from its end. A step's error can end with the last lines of its stderr, with the values of workflow secrets masked."
       );
       expect(health).toHaveAccessibleDescription(
         'Sends the Dagu version, OS, architecture, process start time, and service counts: schedulers holding the scheduler lock, and registered coordinators.'

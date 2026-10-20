@@ -40,7 +40,7 @@ const choices: { level: ReportingLevel; title: string; sends: string }[] = [
     level: LicenseMonitoringLevel.errors,
     title: 'Health, run status, and error messages (recommended)',
     sends:
-      "Sends everything Health and run status sends, plus why each failed run failed: the error messages of up to 5 failed steps, or the run's own, each up to 2 KB from its end. A step's error can end with the last lines of its stderr, with the values of workflow secrets masked.",
+      "Sends everything Health and run status sends, plus why each failed run failed: the error messages of up to 5 failed steps and handlers, or the run's own, each up to 2 KB from its end. A step's error can end with the last lines of its stderr, with the values of workflow secrets masked.",
   },
 ];
 

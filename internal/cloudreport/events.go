@@ -193,7 +193,9 @@ func newReportedEvent(event *eventstore.Event) (reportedEvent, bool) {
 			StartedAt:   run.StartedAt,
 			FinishedAt:  finishedAt,
 			FailedSteps: failedSteps(status),
-			Errors:      runErrors(status),
+		}
+		if runFailed(status.Status) {
+			reported.finished.Errors = runErrors(status)
 		}
 	}
 	return reported, true
@@ -212,6 +214,12 @@ func failedSteps(status *ir.DAGRunStatus) []string {
 		}
 	}
 	return names
+}
+
+// runFailed reports whether a run ended without succeeding: failed,
+// aborted, or rejected. A run that partly succeeded did not fail.
+func runFailed(status ir.Status) bool {
+	return status == ir.Failed || status == ir.Aborted || status == ir.Rejected
 }
 
 // runErrors returns why status failed: the errors of its failed steps,

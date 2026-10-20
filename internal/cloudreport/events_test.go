@@ -123,6 +123,7 @@ func TestReportRuns(t *testing.T) {
 // At the errors level, a failed run also carries why it failed: the errors
 // of its failed steps without terminal escapes, each cut to its end, where
 // the error says what went wrong; or the run's own error when no step says.
+// A run that partly succeeded carries none.
 func TestReportRunsWithErrors(t *testing.T) {
 	t.Parallel()
 
@@ -141,11 +142,16 @@ func TestReportRunsWithErrors(t *testing.T) {
 	timedOut := etlRun(ir.Failed)
 	timedOut.DAGRunID, timedOut.AttemptID, timedOut.Error = "run-2", "attempt-2", "the run timed out"
 	dir.emit(eventstore.TypeDAGRunFailed, timedOut)
+	partly := etlRun(ir.PartiallySucceeded)
+	partly.DAGRunID, partly.AttemptID = "run-3", "attempt-3"
+	partly.Nodes = []*ir.Node{{Step: ir.Step{Name: "optional"}, Status: ir.NodeFailed, Error: "skipped data"}}
+	dir.emit(eventstore.TypeDAGRunPartiallySucceeded, partly)
 
 	report, _ := clock.nextReport(console)
 	var runs []finishedRun
 	require.NoError(t, json.Unmarshal(decodeFinished(t, report).Finished, &runs))
-	require.Len(t, runs, 2)
+	require.Len(t, runs, 3)
+	assert.Empty(t, runs[2].Errors, "a run that partly succeeded did not fail")
 	require.Len(t, runs[0].Errors, 2, "a step without an error says nothing, and the run's own error waits")
 	assert.Equal(t, stepError{Step: "load", Message: "exit status 1\nrecent stderr (tail):\nconnection refused"}, runs[0].Errors[0])
 	assert.Equal(t, "copy", runs[0].Errors[1].Step)
