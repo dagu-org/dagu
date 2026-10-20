@@ -541,6 +541,15 @@ function DAGStatusOverview({
             <Icon className={`h-3 w-3 ${config.iconClass}`} />
             <span>
               <I18nText text={config.message} />
+              {status.cycle ? (
+                <span className="text-muted-foreground">
+                  {' · '}
+                  {ts('Cycle {cycle}', { cycle: status.cycle })}
+                  {status.failedCycles
+                    ? ` · ${ts('{count} failed', { count: status.failedCycles })}`
+                    : ''}
+                </span>
+              ) : null}
             </span>
           </div>
         );

@@ -1,12 +1,12 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { components, RestartPolicy } from '../api/v1/schema';
+import { components, LoopOnFailure, RestartPolicy } from '../api/v1/schema';
 
 type Schedule = components['schemas']['Schedule'];
 type RestartPolicyFields = Pick<
   components['schemas']['DAG'],
-  'restartPolicy' | 'restartWaitSec'
+  'restartPolicy' | 'restartWaitSec' | 'loopWaitSec' | 'loopOnFailure'
 >;
 
 export function getScheduleLabel(schedule: Schedule): string {
@@ -54,4 +54,18 @@ export function isAlwaysOnDAG(dag: RestartPolicyFields): boolean {
 export function getRestartValue(dag: RestartPolicyFields): string {
   const wait = dag.restartWaitSec ? ` · ${dag.restartWaitSec}s` : '';
   return `${dag.restartPolicy}${wait}`;
+}
+
+/**
+ * For a DAG that loops inside one run, the wait between two cycles and whether
+ * a failed cycle ends the run: "loop 7s", "loop 7s · continue". Empty for a DAG
+ * that does not loop.
+ */
+export function getLoopValue(dag: RestartPolicyFields): string {
+  if (!dag.loopWaitSec) {
+    return '';
+  }
+  const onFailure =
+    dag.loopOnFailure === LoopOnFailure.continue ? ' · continue' : '';
+  return `loop ${dag.loopWaitSec}s${onFailure}`;
 }

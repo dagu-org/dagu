@@ -2661,6 +2661,7 @@ const english = {
   "Execution was aborted": "Execution was aborted",
   "Waiting for manual action": "Waiting for manual action",
   "Execution was rejected": "Execution was rejected",
+  "Cycle {cycle}": "Cycle {cycle}",
 } as const;
 
 export type StaticMessage = keyof typeof english;
@@ -5268,6 +5269,7 @@ const chinese = {
   "Execution was aborted": "执行已中止",
   "Waiting for manual action": "等待手动操作",
   "Execution was rejected": "执行已被拒绝",
+  "Cycle {cycle}": "第 {cycle} 轮",
 } as const satisfies Record<StaticMessage, string>;
 
 const japanese = {
@@ -7951,6 +7953,7 @@ const japanese = {
   "Execution was aborted": "実行は中止されました",
   "Waiting for manual action": "手動操作を待っています",
   "Execution was rejected": "実行は拒否されました",
+  "Cycle {cycle}": "サイクル {cycle}",
 } as const satisfies Record<StaticMessage, string>;
 
 export const staticMessages = {
