@@ -373,7 +373,7 @@ func (a *API) setReportLevel(ctx context.Context, level config.ReportLevel) erro
 
 func knownReportLevel(level config.ReportLevel) bool {
 	switch level {
-	case config.ReportOff, config.ReportHealth, config.ReportRuns:
+	case config.ReportOff, config.ReportHealth, config.ReportRuns, config.ReportErrors:
 		return true
 	}
 	return false
@@ -384,7 +384,7 @@ func knownReportLevel(level config.ReportLevel) bool {
 func unknownReportLevelError(field string) error {
 	return &Error{
 		Code:       api.ErrorCodeBadRequest,
-		Message:    field + " must be one of: off, health, runs",
+		Message:    field + " must be one of: off, health, runs, errors",
 		HTTPStatus: http.StatusBadRequest,
 	}
 }

@@ -683,6 +683,14 @@ cloud:
 		require.True(t, report.Reports())
 	})
 
+	t.Run("Errors", func(t *testing.T) {
+		t.Setenv("DAGU_CLOUD_REPORT", "errors")
+		report := testLoad(t).Cloud.Report
+		require.Equal(t, ReportErrors, report)
+		require.True(t, report.Reports())
+		require.True(t, report.ReportsRuns(), "the errors level reports runs too")
+	})
+
 	t.Run("Env", func(t *testing.T) {
 		t.Setenv("DAGU_CLOUD_REPORT", "Health")
 		require.Equal(t, ReportHealth, testLoad(t).Cloud.Report)

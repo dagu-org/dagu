@@ -137,7 +137,7 @@ describe('MonitoringNotice', () => {
 
     expect(client.PUT).toHaveBeenCalledWith('/license/monitoring', {
       params: { query: { remoteNode: 'local' } },
-      body: { level: 'runs' },
+      body: { level: 'errors' },
     });
     await waitFor(() =>
       expect(screen.queryByText(notice)).not.toBeInTheDocument()

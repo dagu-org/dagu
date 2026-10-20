@@ -1297,6 +1297,9 @@ func (a *Agent) Run(ctx context.Context) (runErr error) {
 		lastErr = errors.Join(lastErr, snapshotErr)
 	}
 
+	// The errors added since Status masked it are masked too.
+	a.maskStatusSecrets(&finishedStatus)
+
 	// Terminal status releases remote execution, so notification delivery must finish first.
 	if err := a.reporter.send(ctx, a.dag, finishedStatus, lastErr); err != nil {
 		logger.Error(ctx, "Mail notification failed", tag.Error(err))

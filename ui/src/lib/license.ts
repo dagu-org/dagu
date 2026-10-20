@@ -113,6 +113,7 @@ export const monitoringLevelLabels: Record<LicenseMonitoringLevel, string> = {
   [LicenseMonitoringLevel.off]: 'Off',
   [LicenseMonitoringLevel.health]: 'Health only',
   [LicenseMonitoringLevel.runs]: 'Health and run status',
+  [LicenseMonitoringLevel.errors]: 'Health, run status, and error messages',
 };
 
 /** Names the plan as a plan ("Team plan"), or "Community" without one. */

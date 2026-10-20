@@ -124,7 +124,7 @@ func (m *Monitoring) SetLevel(ctx context.Context, level config.ReportLevel) err
 		return ErrLevelConfigured
 	}
 	switch level {
-	case config.ReportOff, config.ReportHealth, config.ReportRuns:
+	case config.ReportOff, config.ReportHealth, config.ReportRuns, config.ReportErrors:
 	default:
 		return fmt.Errorf("%w: %q", ErrUnknownLevel, level)
 	}

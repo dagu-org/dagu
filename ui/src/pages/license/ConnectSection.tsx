@@ -67,8 +67,17 @@ export function ConnectSection({
     cancel,
   } = connect;
   const [report, setReport] = useState<ReportingLevel>(
-    LicenseMonitoringLevel.runs
+    LicenseMonitoringLevel.errors
   );
+  // A level an administrator chose before, as on a server that connected
+  // earlier, stays chosen.
+  const chosen =
+    monitoring?.chosen && monitoring.level !== LicenseMonitoringLevel.off
+      ? monitoring.level
+      : undefined;
+  useEffect(() => {
+    if (chosen) setReport(chosen);
+  }, [chosen]);
   const pending = status?.state === LicenseConnectStatusState.pending;
   const configured = monitoring?.configured ? monitoring.level : undefined;
 

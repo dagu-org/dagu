@@ -39,7 +39,8 @@ Today they:
 1. **One step.** Activating an online license connects the server.
 2. **Nothing without consent.** Upgrading or connecting sends nothing new.
    Reporting starts only when the server's admin chooses it, and then sends
-   metadata only: health, version, and run status. No logs, outputs,
+   metadata: health, version, and run status, and failed steps' error
+   messages only at the level that names them. No full logs, outputs,
    parameters, or secrets.
 3. **Outbound only.** Remote access rides a connection the server opens.
 4. **The server decides.** Remote access is opt-in per server, capped by a
@@ -143,13 +144,15 @@ runs. A field is listed here, under its level, before any release sends it.
 
 Every report also carries what identifies and authenticates the server, as
 its license check-in does: the protocol version, license ID, server ID, and
-heartbeat secret, and the level it was sent at. At `runs` it also carries the
-reporter's cursor and, after events were lost, the time they were lost from.
+heartbeat secret, and the level it was sent at. At `runs` and `errors` it also
+carries the reporter's cursor and, after events were lost, the time they were
+lost from.
 
 | Level | Fields | When |
 | --- | --- | --- |
 | `health` | Dagu version, OS, architecture, process start time, and service counts: schedulers holding the scheduler lock, and registered coordinators | Every report |
 | `runs` | The `health` fields, plus the status of each top-level DAG run that finishes, with its failed step names (up to 50) and how it was triggered, and the list of runs queued, running, or waiting. Each run is sent as its DAG name, run ID, attempt ID, status, trigger, and queued, started, and finished times | Each finished run once, at most 500 and 512 KiB of them per report; the runs in progress with every report, at most 200 of them and a count of all; within 5 seconds of a failed, aborted, or rejected run or a change to the runs in progress |
+| `errors` | The `runs` fields, plus why each finished run failed: the error messages of its failed steps and handlers, at most 5, or the run's own error when no step has one. Each is sent without terminal escapes, at most 2048 bytes from its end. A command step's error ends with the last 1 KiB of its stderr; the values of workflow secrets are masked in it as in logs | With the finished run it belongs to |
 
 A run is reported unless its event has no valid status snapshot, or it names
 a DAG longer than 512 bytes or a run or attempt ID longer than 256 bytes,
@@ -159,19 +162,24 @@ which Dagu Cloud would not keep. Those runs are left out.
 of DAGs, and the remote access level. Each joins the table above, under its
 level, before it is sent.
 
-**Never sent:** logs, outputs, parameters, environment, step commands, DAG YAML,
-the values of workflow secrets, and error message text.
+**Never sent:** full logs, outputs, parameters, environment, step commands, DAG
+YAML, and the values of workflow secrets. Error messages are sent only at
+`errors`.
 
-DAG names and step names are sent at `runs`. An administrator who considers
-them sensitive chooses `health`, which sends neither.
+DAG names and step names are sent at `runs` and `errors`. An administrator who
+considers them sensitive chooses `health`, which sends neither. Error messages
+often contain hosts, paths, or data the step printed; masking covers only the
+values of declared secrets. An administrator who would not send them chooses
+`runs`.
 
 ### Choosing what to report
 
 | `cloud.report` | Sends |
 | --- | --- |
-| unset or `off` (default) | Nothing beyond the license check-in, except one report that says so, carrying only what identifies the server, when the level becomes `off` after a report at `health` or `runs` |
+| unset or `off` (default) | Nothing beyond the license check-in, except one report that says so, carrying only what identifies the server, when the level becomes `off` after a report at `health`, `runs`, or `errors` |
 | `health` | Dagu version, OS, architecture, start time, and which services run |
 | `runs` | Also the status of finished runs and the runs in progress: DAG names, run IDs, status, triggers, times, failed step names |
+| `errors` | Also the error messages of failed steps, cut to their end |
 
 - **Upgrading changes nothing.** A server licensed before reporting existed
   keeps sending only its license check-in.
@@ -272,8 +280,8 @@ activation's credentials, as the heartbeat is.
 }
 ```
 
-`level` is the level the report was sent at, `health` or `runs`, or `off`
-for the report that says reporting stopped.
+`level` is the level the report was sent at, `health`, `runs`, or `errors`, or
+`off` for the report that says reporting stopped.
 
 A scheduler count of zero means no scheduler holds the lock; leaving
 `services` out means the count is unknown.
@@ -284,7 +292,10 @@ were aborted, or were rejected, oldest first. `workflow` is the DAG name.
 `rejected`; `trigger_type` is `scheduler`, `manual`, `webhook`, `retry`, or
 `catchup`, and empty when unknown. Times are RFC 3339; `queued_at` and
 `started_at` are null when unknown. `failed_steps` names failed steps and
-handlers, at most 50 of at most 512 bytes each.
+handlers, at most 50 of at most 512 bytes each. At `errors`, a failed run
+also carries `errors`: `[{"step": "load", "message": "exit status 1\n…"}]`, at
+most 5, with `step` empty for the run's own error; it is left out when the
+run has none and at every other level.
 
 `cursor`, at most 4096 bytes, identifies the position after `finished`; it
 comes with every `finished`, which is empty when the cursor moves only past
@@ -519,6 +530,4 @@ Older servers keep working as they do: they heartbeat and never report.
 
 ## Open questions
 
-1. Should error text ever be offered, as its own choice, for more useful
-   alerts? It often contains hosts, paths, or data.
-2. Should remote access ship in a v2 minor rather than wait for v3.0?
+1. Should remote access ship in a v2 minor rather than wait for v3.0?
