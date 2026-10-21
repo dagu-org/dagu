@@ -316,3 +316,20 @@ func TestRemoteDecisionNeedsApprovalsAndAttempt(t *testing.T) {
 	require.False(t, failed, output)
 	require.Equal(t, ir.NodeSucceeded, fixture.node(t, "gate_b").Status)
 }
+
+// A server without users of its own still holds a user Dagu Cloud vouches
+// for to their role.
+func TestRemoteViewerCannotDecide(t *testing.T) {
+	fixture := newDecisionFixture(t)
+	fixture.svc.remote = &remoteCalls{approvals: func(context.Context) bool { return true }}
+	viewer := auth.WithUser(context.Background(), &auth.User{ID: "cloud:user-1", Role: auth.RoleViewer, AuthProvider: auth.AuthProviderCloud})
+
+	failed, output := fixture.decide(t, viewer, map[string]any{
+		"action":    executeActionApprove,
+		"stepName":  "gate_b",
+		"attemptId": fixture.attemptID,
+	})
+	require.True(t, failed)
+	require.Equal(t, executeErrorUnauthorized, output["code"])
+	require.Equal(t, ir.NodeWaiting, fixture.node(t, "gate_b").Status)
+}
