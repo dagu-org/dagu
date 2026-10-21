@@ -62,12 +62,15 @@ type Reporter struct {
 	monitoring  *Monitoring
 	// events is nil when reports carry no runs.
 	events    *eventFeed
+	scheduler Scheduler
 	client    *http.Client
 	startedAt time.Time
 
-	// after and random decide when reports are sent; tests replace them.
+	// after and random decide when reports are sent, and now when they are
+	// built; tests replace them.
 	after  func(time.Duration) <-chan time.Time
 	random func() float64
+	now    func() time.Time
 
 	cancel context.CancelFunc
 	done   chan struct{}
@@ -97,10 +100,12 @@ type Reporter struct {
 // Reports authenticate with what credentials returns and are skipped while it
 // returns false. Services are counted in registry; a nil registry leaves them
 // out of reports. Each report sends what the level in monitoring allows at the
-// time: health at health, and also the finished and in-progress DAG runs that
-// events configures at runs. Choosing off stops a report in flight. Finished
-// runs are sent even while Dagu Console pauses storing them; monitoring shows
-// until when.
+// time: health at health, with the scheduler's last tick and pause from
+// scheduler, and also, at runs, the finished and in-progress DAG runs that
+// events configures and the scheduled DAGs with what came of their latest
+// slots. Schedules are sent by the process that reports the events. Choosing
+// off stops a report in flight. Finished runs are sent even while Dagu
+// Console pauses storing them; monitoring shows until when.
 //
 // Runs that finish below runs are never sent, even when runs is chosen again
 // after a restart.
@@ -116,10 +121,12 @@ func Start(
 	credentials func() (license.CloudCredentials, bool),
 	registry serviceregistry.ServiceRegistry,
 	events Events,
+	scheduler Scheduler,
 	monitoring *Monitoring,
 ) *Reporter {
 	r := newReporter(credentials, registry, monitoring)
 	r.events = newEventFeed(events)
+	r.scheduler = scheduler
 	r.start(ctx)
 	return r
 }
@@ -143,6 +150,7 @@ func newReporter(
 		startedAt:   processStartedAt,
 		after:       time.After,
 		random:      rand.Float64,
+		now:         time.Now,
 		changes:     make(chan struct{}, 1),
 		interval:    defaultInterval,
 	}
@@ -513,8 +521,10 @@ type reportRequest struct {
 	HeartbeatSecret string `json:"heartbeat_secret"`
 	// Level is the level the report was sent at. A report at off says that
 	// the server no longer reports, and carries nothing else.
-	Level  config.ReportLevel `json:"level"`
-	Health health             `json:"health,omitzero"`
+	Level config.ReportLevel `json:"level"`
+	// SentAt is when the report was built.
+	SentAt string `json:"sent_at,omitempty"`
+	Health health `json:"health,omitzero"`
 	// Finished is set whenever Cursor is; it is empty when the report moves
 	// past events that end no run.
 	Finished []finishedRun `json:"finished,omitzero"`
@@ -525,14 +535,19 @@ type reportRequest struct {
 	// Cursor identifies the position after Finished.
 	Cursor string     `json:"cursor,omitempty"`
 	Gap    *reportGap `json:"gap,omitempty"`
+	// Schedules lists the scheduled DAGs and SchedulesTotal counts them all.
+	// Both are left out while unknown; an empty list says none is scheduled.
+	Schedules      []schedule `json:"schedules,omitzero"`
+	SchedulesTotal *int       `json:"schedules_total,omitempty"`
 }
 
 type health struct {
-	Version   string    `json:"version"`
-	OS        string    `json:"os"`
-	Arch      string    `json:"arch"`
-	StartedAt string    `json:"started_at"`
-	Services  []service `json:"services,omitempty"`
+	Version   string           `json:"version"`
+	OS        string           `json:"os"`
+	Arch      string           `json:"arch"`
+	StartedAt string           `json:"started_at"`
+	Services  []service        `json:"services,omitempty"`
+	Scheduler *schedulerHealth `json:"scheduler,omitempty"`
 }
 
 type service struct {
@@ -573,14 +588,22 @@ func (r *Reporter) send(ctx context.Context, creds license.CloudCredentials, lev
 		Level:           level,
 	}
 	if level.Reports() {
+		now := r.now()
+		state, read := r.scheduler.load(ctx)
+		report.SentAt = formatTime(now)
 		report.Health = health{
 			Version:   config.Version,
 			OS:        runtime.GOOS,
 			Arch:      runtime.GOARCH,
 			StartedAt: r.startedAt.UTC().Format(time.RFC3339),
 			Services:  r.services(ctx),
+			Scheduler: r.scheduler.health(ctx, state, read),
 		}
 		r.events.fill(&report)
+		if read && level.ReportsRuns() && r.events.reports() {
+			schedules, total := schedulesOf(state, now)
+			report.Schedules, report.SchedulesTotal = schedules, &total
+		}
 	}
 	body, err := json.Marshal(report)
 	if err != nil {

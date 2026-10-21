@@ -318,7 +318,8 @@ func startCloudReport(ctx *Context, monitoring *cloudreport.Monitoring) *cloudre
 	if monitoring == nil {
 		return nil
 	}
-	return cloudreport.Start(ctx, ctx.LicenseManager.CloudCredentials, ctx.Persistence.ServiceRegistry, cloudReportEvents(ctx), monitoring)
+	scheduler := cloudreport.Scheduler{State: ctx.Persistence.SchedulerStateStore, Pause: ctx.Persistence.SchedulerPauseStore}
+	return cloudreport.Start(ctx, ctx.LicenseManager.CloudCredentials, ctx.Persistence.ServiceRegistry, cloudReportEvents(ctx), scheduler, monitoring)
 }
 
 // cloudReportLeaseStaleThreshold outlasts the longest pause between the
