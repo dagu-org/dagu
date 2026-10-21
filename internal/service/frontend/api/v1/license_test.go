@@ -268,7 +268,7 @@ func TestLicenseConnect_Report(t *testing.T) {
 			ExpectStatus(http.StatusOK).Send(t).Unmarshal(t, &started)
 
 		assert.Equal(t, "runs", reportParam(t, started))
-		assert.Equal(t, api.LicenseMonitoring{Level: api.LicenseMonitoringLevelRuns, Chosen: true}, monitoringOf(t, server))
+		assert.Equal(t, api.LicenseMonitoring{Level: api.LicenseMonitoringLevelRuns, Chosen: true, ErrorsOffered: true}, monitoringOf(t, server))
 		var current api.LicenseConnectStatus
 		server.Client().Get("/api/v1/license/connect").ExpectStatus(http.StatusOK).Send(t).Unmarshal(t, &current)
 		assert.Equal(t, started, current)
