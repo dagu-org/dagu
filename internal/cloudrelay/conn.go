@@ -14,10 +14,12 @@ import (
 	"math"
 	"net/http"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/google/uuid"
 )
 
 // Relay frame types, as the relay and the server agree on them.
@@ -28,7 +30,30 @@ const (
 	frameDelivery  = "delivery"
 	frameDelivered = "delivered"
 	frameMissed    = "missed"
+	frameRequest   = "req"
+	frameResponse  = "res"
+	frameEnd       = "end"
+	frameCancel    = "cancel"
 )
+
+// Binary chunks carry the bodies of calls: a version byte, the 16 bytes of
+// the call's UUID, then its bytes.
+const (
+	chunkVersion     = 1
+	chunkHeaderBytes = 17
+	// chunkBytes bounds the bytes of an answer one chunk carries.
+	chunkBytes = 64 << 10
+	// callBodyLimit bounds a call's body; the relay sends at most 512 KiB.
+	callBodyLimit = 1 << 20
+)
+
+// AssertionHeader carries, to Handler.Call, the assertion Dagu Cloud signed
+// for the call, which the relay passes on unread.
+const AssertionHeader = "Dagu-Assertion"
+
+// instanceHeader names which of the server's processes opens a connection
+// for calls.
+const instanceHeader = "Dagu-Instance"
 
 const (
 	relayPing = "ping"
@@ -83,6 +108,10 @@ var (
 type Hello struct {
 	Name    string
 	Version string
+	// Instance names the process opening a connection for calls, which the
+	// relay keeps beside the connections of the server's other processes. It
+	// is empty for the scheduler's connection.
+	Instance string
 }
 
 // Hook is one public webhook URL as the relay knows it: an ID the server
@@ -163,6 +192,10 @@ type Handler struct {
 	// Missed receives, for each hook, how many webhooks the relay dropped
 	// since it last told this server. Each count is told once.
 	Missed func(missed []Missed)
+	// Call serves the calls Dagu Cloud sends through the relay, each with its
+	// assertion in AssertionHeader. A call the relay cancels has its
+	// request's context canceled.
+	Call http.Handler
 }
 
 // Conn is a connection this server holds open to the relay.
@@ -177,6 +210,22 @@ type Conn struct {
 	silent atomic.Bool
 	// hookSets numbers the hook sets sent.
 	hookSets atomic.Int64
+	// calls are the calls being received or served, by ID.
+	calls sync.Map
+}
+
+// call is a call from the relay: its request frame and the body received so
+// far, until its end arrives and it is served.
+type call struct {
+	req    frame
+	ctx    context.Context
+	cancel context.CancelFunc
+	body   bytes.Buffer
+	// tooLarge is set once the body passes callBodyLimit.
+	tooLarge bool
+	// ended is set, on the Serve goroutine, once the call's end arrives;
+	// what arrives for the call after it is ignored.
+	ended bool
 }
 
 // frame is one JSON message between the relay and the server.
@@ -196,6 +245,11 @@ type frame struct {
 	Outcome  string       `json:"outcome,omitempty"`
 	// After is how many seconds a retried delivery waits.
 	After int `json:"after,omitempty"`
+	// Method, Path, and Assertion are a call's; Status is its answer's.
+	Method    string `json:"method,omitempty"`
+	Path      string `json:"path,omitempty"`
+	Assertion string `json:"assertion,omitempty"`
+	Status    int    `json:"status,omitempty"`
 }
 
 // relayHook is a hook as the relay stores it: the token only as a digest.
@@ -209,6 +263,9 @@ type relayHook struct {
 // server.
 func Dial(ctx context.Context, client *http.Client, ticket Ticket, hello Hello) (*Conn, error) {
 	header := http.Header{"Authorization": {"Bearer " + ticket.Token}, "User-Agent": {userAgent()}}
+	if hello.Instance != "" {
+		header.Set(instanceHeader, hello.Instance)
+	}
 	ws, res, err := websocket.Dial(ctx, ticket.URL, &websocket.DialOptions{HTTPClient: client, HTTPHeader: header})
 	if res != nil && res.Body != nil {
 		_ = res.Body.Close()
@@ -266,11 +323,28 @@ func (c *Conn) Serve(ctx context.Context, h Handler) error {
 		}
 		c.heard.Store(time.Now().UnixNano())
 		c.reads.Add(1)
+		if kind == websocket.MessageBinary {
+			c.receiveChunk(data)
+			continue
+		}
 		var f frame
-		if kind != websocket.MessageText || string(data) == relayPong || json.Unmarshal(data, &f) != nil {
+		if string(data) == relayPong || json.Unmarshal(data, &f) != nil {
 			continue
 		}
 		switch f.Type {
+		case frameRequest:
+			callCtx, cancel := context.WithCancel(ctx)
+			c.calls.Store(f.ID, &call{req: f, ctx: callCtx, cancel: cancel})
+		case frameEnd:
+			if value, ok := c.calls.Load(f.ID); ok && !value.(*call).ended {
+				cl := value.(*call)
+				cl.ended = true
+				go c.serveCall(h.Call, cl)
+			}
+		case frameCancel:
+			if value, ok := c.calls.LoadAndDelete(f.ID); ok {
+				value.(*call).cancel()
+			}
 		case frameDelivery:
 			go func() {
 				outcome := deliver(ctx, h.Delivery, f)
@@ -352,6 +426,142 @@ func (c *Conn) watch(ctx context.Context) {
 			_ = c.ws.CloseNow()
 			return
 		}
+	}
+}
+
+// receiveChunk adds a binary chunk to the body of the call it names.
+func (c *Conn) receiveChunk(data []byte) {
+	if len(data) < chunkHeaderBytes || data[0] != chunkVersion {
+		return
+	}
+	id, err := uuid.FromBytes(data[1:chunkHeaderBytes])
+	if err != nil {
+		return
+	}
+	value, ok := c.calls.Load(id.String())
+	if !ok {
+		return
+	}
+	cl := value.(*call)
+	if cl.ended {
+		return
+	}
+	if cl.tooLarge || cl.body.Len()+len(data)-chunkHeaderBytes > callBodyLimit {
+		cl.tooLarge = true
+		cl.body.Reset()
+		return
+	}
+	cl.body.Write(data[chunkHeaderBytes:])
+}
+
+// serveCall serves a call whose body arrived, and sends its answer: its
+// status and headers, its body in chunks, and an end. A call the relay
+// canceled gets no answer.
+func (c *Conn) serveCall(handler http.Handler, cl *call) {
+	defer c.calls.Delete(cl.req.ID)
+	defer cl.cancel()
+	w := &callWriter{conn: c, ctx: cl.ctx, id: cl.req.ID, header: http.Header{}}
+	switch {
+	case handler == nil:
+		w.WriteHeader(http.StatusNotFound)
+	case cl.tooLarge:
+		w.WriteHeader(http.StatusRequestEntityTooLarge)
+	default:
+		r, err := http.NewRequestWithContext(cl.ctx, cl.req.Method, "http://dagu-cloud-relay"+cl.req.Path,
+			bytes.NewReader(cl.body.Bytes()))
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			break
+		}
+		for name, value := range cl.req.Headers {
+			r.Header.Set(name, value)
+		}
+		r.Header.Set(AssertionHeader, cl.req.Assertion)
+		r.RemoteAddr = "dagu-cloud-relay"
+		handler.ServeHTTP(w, r)
+	}
+	w.finish()
+}
+
+// callWriter writes a call's answer to the relay as it comes.
+type callWriter struct {
+	conn    *Conn
+	ctx     context.Context
+	id      string
+	header  http.Header
+	started bool
+	pending []byte
+	err     error
+}
+
+func (w *callWriter) Header() http.Header { return w.header }
+
+func (w *callWriter) WriteHeader(status int) {
+	if w.started {
+		return
+	}
+	w.started = true
+	headers := make(map[string]string, len(w.header))
+	for name, values := range w.header {
+		if len(values) > 0 {
+			headers[name] = values[0]
+		}
+	}
+	w.fail(w.conn.send(w.ctx, frame{Type: frameResponse, ID: w.id, Status: status, Headers: headers}))
+}
+
+func (w *callWriter) Write(p []byte) (int, error) {
+	if !w.started {
+		w.WriteHeader(http.StatusOK)
+	}
+	if w.err != nil {
+		return 0, w.err
+	}
+	w.pending = append(w.pending, p...)
+	for len(w.pending) >= chunkBytes && w.err == nil {
+		w.sendChunk(w.pending[:chunkBytes])
+		w.pending = append([]byte(nil), w.pending[chunkBytes:]...)
+	}
+	return len(p), w.err
+}
+
+// Flush sends what the handler wrote so far.
+func (w *callWriter) Flush() {
+	if !w.started {
+		w.WriteHeader(http.StatusOK)
+	}
+	if len(w.pending) > 0 && w.err == nil {
+		w.sendChunk(w.pending)
+		w.pending = nil
+	}
+}
+
+// finish sends the rest of the answer and its end.
+func (w *callWriter) finish() {
+	w.Flush()
+	if w.err == nil {
+		w.fail(w.conn.send(w.ctx, frame{Type: frameEnd, ID: w.id}))
+	}
+}
+
+func (w *callWriter) sendChunk(bytes []byte) {
+	id, err := uuid.Parse(w.id)
+	if err != nil {
+		w.fail(err)
+		return
+	}
+	chunk := make([]byte, 0, chunkHeaderBytes+len(bytes))
+	chunk = append(chunk, chunkVersion)
+	chunk = append(chunk, id[:]...)
+	chunk = append(chunk, bytes...)
+	ctx, cancel := context.WithTimeout(w.ctx, w.conn.timing.writeTimeout)
+	defer cancel()
+	w.fail(w.conn.ws.Write(ctx, websocket.MessageBinary, chunk))
+}
+
+func (w *callWriter) fail(err error) {
+	if w.err == nil {
+		w.err = err
 	}
 }
 

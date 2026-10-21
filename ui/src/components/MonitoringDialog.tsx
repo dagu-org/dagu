@@ -28,7 +28,7 @@ const choices: { level: ReportingLevel; title: string; sends: string }[] = [
     level: LicenseMonitoringLevel.health,
     title: 'Health only',
     sends:
-      "Sends the Dagu version, OS, architecture, process start time, service counts (schedulers holding the scheduler lock, and registered coordinators), and the scheduler's last tick and whether it is paused.",
+      "Sends the Dagu version, OS, architecture, process start time, service counts (schedulers holding the scheduler lock, and registered coordinators), the scheduler's last tick and whether it is paused, and how far remote access lets calls from Dagu Cloud go.",
   },
   {
     level: LicenseMonitoringLevel.runs,

@@ -20,6 +20,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dagucloud/dagu/v2/internal/cloudaccess"
 	"github.com/dagucloud/dagu/v2/internal/cmn/config"
 	"github.com/dagucloud/dagu/v2/internal/cmn/logger"
 	"github.com/dagucloud/dagu/v2/internal/cmn/logger/tag"
@@ -63,6 +64,8 @@ type Reporter struct {
 	// events is nil when reports carry no runs.
 	events    *eventFeed
 	scheduler Scheduler
+	// remote is nil when reports leave remote access out.
+	remote    RemoteAccess
 	client    *http.Client
 	startedAt time.Time
 
@@ -101,7 +104,8 @@ type Reporter struct {
 // returns false. Services are counted in registry; a nil registry leaves them
 // out of reports. Each report sends what the level in monitoring allows at the
 // time: health at health, with the scheduler's last tick and pause from
-// scheduler, and also, at runs, the finished and in-progress DAG runs that
+// scheduler and, unless remote is nil, how far calls from Dagu Cloud may go,
+// and also, at runs, the finished and in-progress DAG runs that
 // events configures and the scheduled DAGs with what came of their latest
 // slots. Schedules are sent by the process that reports the events. Choosing
 // off stops a report in flight. Finished runs are sent even while Dagu
@@ -123,12 +127,19 @@ func Start(
 	events Events,
 	scheduler Scheduler,
 	monitoring *Monitoring,
+	remote RemoteAccess,
 ) *Reporter {
 	r := newReporter(credentials, registry, monitoring)
 	r.events = newEventFeed(events)
 	r.scheduler = scheduler
+	r.remote = remote
 	r.start(ctx)
 	return r
+}
+
+// RemoteAccess reads how far calls from Dagu Cloud may go on the server.
+type RemoteAccess interface {
+	Status(ctx context.Context) (cloudaccess.Status, error)
 }
 
 // Stop ends reporting and waits for a report in flight to finish.
@@ -548,6 +559,11 @@ type health struct {
 	StartedAt string           `json:"started_at"`
 	Services  []service        `json:"services,omitempty"`
 	Scheduler *schedulerHealth `json:"scheduler,omitempty"`
+	// RemoteAccess is the highest role calls from Dagu Cloud get, and
+	// RemoteApprovals whether they may decide waiting steps. Both are left
+	// out while unknown.
+	RemoteAccess    config.RemoteAccessLevel `json:"remote_access,omitempty"`
+	RemoteApprovals *bool                    `json:"remote_approvals,omitempty"`
 }
 
 type service struct {
@@ -598,6 +614,11 @@ func (r *Reporter) send(ctx context.Context, creds license.CloudCredentials, lev
 			StartedAt: r.startedAt.UTC().Format(time.RFC3339),
 			Services:  r.services(ctx),
 			Scheduler: r.scheduler.health(ctx, state, read),
+		}
+		if r.remote != nil {
+			if status, err := r.remote.Status(ctx); err == nil {
+				report.Health.RemoteAccess, report.Health.RemoteApprovals = status.Level, &status.Approvals
+			}
 		}
 		r.events.fill(&report)
 		if read && level.ReportsRuns() && r.events.reports() {

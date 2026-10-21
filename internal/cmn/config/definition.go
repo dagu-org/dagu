@@ -595,4 +595,8 @@ type LicenseDef struct {
 // CloudDef configures what a licensed server shares with Dagu Console.
 type CloudDef struct {
 	Report string `mapstructure:"report"` // off, health, or runs; unset reports nothing
+	// RemoteAccess is off, viewer, operator, or developer; unset is chosen in the UI.
+	RemoteAccess string `mapstructure:"remote_access"`
+	// RemoteApprovals is unset to choose in the UI.
+	RemoteApprovals *bool `mapstructure:"remote_approvals"`
 }

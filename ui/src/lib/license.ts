@@ -1,7 +1,11 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { LicenseMonitoringLevel, type components } from '@/api/v1/schema';
+import {
+  LicenseMonitoringLevel,
+  LicenseRemoteAccessLevel,
+  type components,
+} from '@/api/v1/schema';
 import type { LicenseStatus } from '@/contexts/ConfigContext';
 import type { StaticTranslationValues } from '@/i18n/staticMessages';
 import { LICENSE_CONSOLE_URL } from './constants';
@@ -107,6 +111,15 @@ export function licensePlanName(license: LicenseStatus): string {
   if (plan === 'minimum' || plan === 'team') return 'Team';
   return plan ? plan.charAt(0).toUpperCase() + plan.slice(1) : 'Licensed';
 }
+
+/** The highest role each remote access level gives calls from Dagu Cloud. */
+export const remoteAccessLevelLabels: Record<LicenseRemoteAccessLevel, string> =
+  {
+    [LicenseRemoteAccessLevel.off]: 'Off',
+    [LicenseRemoteAccessLevel.viewer]: 'Viewer',
+    [LicenseRemoteAccessLevel.operator]: 'Operator',
+    [LicenseRemoteAccessLevel.developer]: 'Developer',
+  };
 
 /** What each monitoring level reports, as a short label. */
 export const monitoringLevelLabels: Record<LicenseMonitoringLevel, string> = {

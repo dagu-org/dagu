@@ -22,9 +22,11 @@ import { SWRConfig } from 'swr';
 import { Link, MemoryRouter } from 'react-router-dom';
 import {
   LicenseMonitoringLevel,
+  LicenseRemoteAccessLevel,
   LicenseStatusResponseConnectedVia,
 } from '@/api/v1/schema';
 import type { LicenseMonitoring } from '@/hooks/useLicenseMonitoring';
+import type { LicenseRemoteAccess } from '@/hooks/useLicenseRemoteAccess';
 import dayjs from '@/lib/dayjs';
 
 vi.mock('@/hooks/api', async () => {
@@ -1231,7 +1233,7 @@ describe('LicensePage', () => {
         "Sends everything Health and run status sends, plus why each failed run failed: the error messages of up to 5 failed steps and handlers, or the run's own, each up to 2 KB from its end. A step's error can end with the last lines of its stderr, with the values of workflow secrets masked."
       );
       expect(health).toHaveAccessibleDescription(
-        "Sends the Dagu version, OS, architecture, process start time, service counts (schedulers holding the scheduler lock, and registered coordinators), and the scheduler's last tick and whether it is paused."
+        "Sends the Dagu version, OS, architecture, process start time, service counts (schedulers holding the scheduler lock, and registered coordinators), the scheduler's last tick and whether it is paused, and how far remote access lets calls from Dagu Cloud go."
       );
       expect(runs).toHaveAccessibleDescription(
         "Sends the health fields, plus the status of each top-level DAG run that finishes, with its failed step names (up to 50) and how it was triggered, and the list of runs queued, running, or waiting. Each run is sent as its DAG name, run ID, attempt ID, status, trigger, and queued, started, and finished times. Also each scheduled DAG's next run, and whether its latest scheduled run started. No parameters, logs, or outputs."
@@ -1436,6 +1438,188 @@ describe('LicensePage', () => {
       expect(get).not.toHaveBeenCalledWith(
         '/license/monitoring',
         expect.anything()
+      );
+    });
+  });
+
+  describe('remote access', () => {
+    const remoteOff: LicenseRemoteAccess = {
+      level: LicenseRemoteAccessLevel.off,
+      levelConfigured: false,
+      approvals: false,
+      approvalsConfigured: false,
+      connected: false,
+    };
+
+    // Serves an online license with audit logs, the given remote access,
+    // which PUT changes the way the server does, and the given audit entries.
+    function serveRemoteAccess(initial: LicenseRemoteAccess, entries = []) {
+      let access = initial;
+      const get = vi.fn((path: string) =>
+        Promise.resolve({
+          data:
+            path === '/license/remote-access'
+              ? access
+              : path === '/license/monitoring'
+                ? unchosen
+                : path === '/audit'
+                  ? { entries, total: entries.length }
+                  : makeConfig(online).license,
+        })
+      );
+      const put = vi.fn(
+        (
+          _path: string,
+          init: {
+            body: { level?: LicenseRemoteAccessLevel; approvals?: boolean };
+          }
+        ) => {
+          access = { ...access, ...init.body };
+          return Promise.resolve({ data: access });
+        }
+      );
+      useClientMock.mockReturnValue({
+        GET: get,
+        POST: vi.fn(),
+        PUT: put,
+      } as never);
+      renderPage(online);
+      return { get, put };
+    }
+
+    function findRemoteAccessCard() {
+      return screen.findByRole('region', { name: 'Remote access' });
+    }
+
+    it('turns remote access on with the chosen role', async () => {
+      const { put } = serveRemoteAccess(remoteOff);
+      const card = await findRemoteAccessCard();
+      await within(card).findByText('Off');
+      expect(within(card).queryByText('Connection')).not.toBeInTheDocument();
+
+      await userEvent.click(
+        within(card).getByRole('button', { name: 'Turn on' })
+      );
+      const dialog = await screen.findByRole('dialog', {
+        name: 'Choose remote access',
+      });
+      expect(
+        within(dialog).getByRole('radio', { name: 'Viewer' })
+      ).toBeChecked();
+      const operator = within(dialog).getByRole('radio', { name: 'Operator' });
+      expect(operator).toHaveAccessibleDescription(
+        'Also start, enqueue, retry, and stop runs of existing DAGs, with any parameters those DAGs take.'
+      );
+      await userEvent.click(operator);
+      await userEvent.click(
+        within(dialog).getByRole('button', { name: 'Turn on' })
+      );
+
+      expect(put).toHaveBeenCalledWith('/license/remote-access', {
+        params: { query: { remoteNode: 'local' } },
+        body: { level: 'operator' },
+      });
+      expect(await within(card).findByText('Operator')).toBeVisible();
+      expect(within(card).getByText('Connecting…')).toBeVisible();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('warns that developer runs any command on the machine', async () => {
+      serveRemoteAccess(remoteOff);
+      const card = await findRemoteAccessCard();
+      await userEvent.click(
+        await within(card).findByRole('button', { name: 'Turn on' })
+      );
+      const dialog = await screen.findByRole('dialog', {
+        name: 'Choose remote access',
+      });
+      expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument();
+      await userEvent.click(
+        within(dialog).getByRole('radio', { name: 'Developer' })
+      );
+      expect(within(dialog).getByRole('alert')).toHaveTextContent(
+        'run any command on this machine, as the user Dagu runs as'
+      );
+    });
+
+    it('lets approvals be turned on and shows the connection', async () => {
+      const { put } = serveRemoteAccess({
+        ...remoteOff,
+        level: LicenseRemoteAccessLevel.operator,
+        connected: true,
+      });
+      const card = await findRemoteAccessCard();
+      expect(await within(card).findByText('Connected')).toBeVisible();
+
+      const approvals = within(card).getByRole('switch', { name: 'Approvals' });
+      expect(approvals).not.toBeChecked();
+      await userEvent.click(approvals);
+      expect(put).toHaveBeenCalledWith('/license/remote-access', {
+        params: { query: { remoteNode: 'local' } },
+        body: { approvals: true },
+      });
+      await waitFor(() => expect(approvals).toBeChecked());
+    });
+
+    it('says why Dagu Cloud refused the connection', async () => {
+      serveRemoteAccess({
+        ...remoteOff,
+        level: LicenseRemoteAccessLevel.viewer,
+        error: 'Access from Dagu Cloud needs a plan or a trial.',
+      });
+      const card = await findRemoteAccessCard();
+      expect(
+        await within(card).findByText(
+          'Access from Dagu Cloud needs a plan or a trial.'
+        )
+      ).toBeVisible();
+    });
+
+    it('lists the calls agents made lately', async () => {
+      serveRemoteAccess(
+        { ...remoteOff, level: LicenseRemoteAccessLevel.operator },
+        [
+          {
+            id: '2',
+            timestamp: new Date().toISOString(),
+            category: 'mcp',
+            action: 'mcp.tool_call.denied',
+            mcpTool: 'dagu_change',
+            username: 'ana@example.com',
+            details: '{"mcp_action":"upsert_dag","resource_id":"etl"}',
+          },
+          {
+            id: '1',
+            timestamp: new Date().toISOString(),
+            category: 'mcp',
+            action: 'mcp.tool_call.started',
+            mcpTool: 'dagu_execute',
+            username: 'ana@example.com',
+          },
+        ] as never
+      );
+      const card = await findRemoteAccessCard();
+      const activity = await within(card).findByText(
+        'dagu_change upsert_dag etl'
+      );
+      expect(activity.closest('li')).toHaveTextContent('Denied');
+      expect(within(card).getAllByRole('listitem')).toHaveLength(1);
+    });
+
+    it('leaves configured settings read-only', async () => {
+      serveRemoteAccess({
+        ...remoteOff,
+        level: LicenseRemoteAccessLevel.viewer,
+        levelConfigured: true,
+        approvalsConfigured: true,
+        connected: true,
+      });
+      const card = await findRemoteAccessCard();
+      await within(card).findByText('Viewer');
+      expect(within(card).queryByRole('button', { name: 'Change' })).toBeNull();
+      expect(within(card).queryByRole('switch')).toBeNull();
+      expect(card).toHaveTextContent(
+        'cloud.remote_access and cloud.remote_approvals in the server configuration set these.'
       );
     });
   });

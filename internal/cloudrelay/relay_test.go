@@ -14,10 +14,12 @@ import (
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -50,6 +52,10 @@ func TestRequestTicket(t *testing.T) {
 	assert.Equal(t, Ticket{Token: "tok", URL: "wss://relay.example/server", MaxHooks: 1}, ticket)
 	assert.Equal(t, map[string]string{"license_id": "lic", "server_id": "srv", "heartbeat_secret": "secret"}, got)
 
+	_, err = RequestAccessTicket(context.Background(), console.Client(), creds)
+	require.NoError(t, err)
+	assert.Equal(t, "access", got["purpose"], "a connection for calls asks for its own ticket")
+
 	status = http.StatusUnauthorized
 	_, err = RequestTicket(context.Background(), console.Client(), creds)
 	refused, ok := errors.AsType[*TicketRefusedError](err)
@@ -70,6 +76,8 @@ type fakeRelay struct {
 	srv   *httptest.Server
 	conns chan *websocket.Conn
 	done  chan struct{}
+	// instance is the Dagu-Instance header of the last connection.
+	instance atomic.Value
 }
 
 func newFakeRelay(t *testing.T) *fakeRelay {
@@ -80,10 +88,12 @@ func newFakeRelay(t *testing.T) *fakeRelay {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
+		r.instance.Store(req.Header.Get("Dagu-Instance"))
 		ws, err := websocket.Accept(w, req, nil)
 		if err != nil {
 			return
 		}
+		ws.SetReadLimit(1 << 20)
 		r.conns <- ws
 		<-r.done
 	}))
@@ -263,4 +273,155 @@ func TestRelayNoticesSilence(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("a silent relay was not noticed")
 	}
+}
+
+// sendCall sends a call as the relay does: its frame, its body in one chunk,
+// and its end.
+func sendCall(t *testing.T, ws *websocket.Conn, id, body string) {
+	t.Helper()
+	writeFrame(t, ws, map[string]any{"t": "req", "id": id, "method": "POST", "path": "/mcp",
+		"headers": map[string]string{"Content-Type": "application/json"}, "assertion": "signed.assertion"})
+	require.NoError(t, ws.Write(context.Background(), websocket.MessageBinary, chunkFor(id, []byte(body))))
+	writeFrame(t, ws, map[string]any{"t": "end", "id": id})
+}
+
+func chunkFor(id string, body []byte) []byte {
+	u := uuid.MustParse(id)
+	return append(append([]byte{chunkVersion}, u[:]...), body...)
+}
+
+// readAnswer reads a call's answer: its frame, then its chunks until its end.
+func readAnswer(t *testing.T, ws *websocket.Conn) (map[string]any, []byte, int) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var res map[string]any
+	var body []byte
+	chunks := 0
+	for {
+		kind, data, err := ws.Read(ctx)
+		require.NoError(t, err)
+		if kind == websocket.MessageBinary {
+			body = append(body, data[chunkHeaderBytes:]...)
+			chunks++
+			continue
+		}
+		if string(data) == relayPing {
+			continue
+		}
+		var f map[string]any
+		require.NoError(t, json.Unmarshal(data, &f))
+		switch f["t"] {
+		case "res":
+			res = f
+		case "end":
+			return res, body, chunks
+		}
+	}
+}
+
+// A call reaches the handler with its body and assertion, and its answer
+// streams back in chunks.
+func TestRelayCalls(t *testing.T) {
+	relay := newFakeRelay(t)
+	conn, err := Dial(context.Background(), relay.srv.Client(), relay.ticket("ticket"),
+		Hello{Name: "etl-prod-1", Version: "2.21.0", Instance: "instance-1"})
+	require.NoError(t, err)
+	ws := <-relay.conns
+	assert.Equal(t, "instance-1", relay.instance.Load())
+	assert.Equal(t, map[string]any{"t": "hello", "name": "etl-prod-1", "version": "2.21.0"}, readFrame(t, ws))
+
+	large := strings.Repeat("x", 3*chunkBytes/2)
+	go func() {
+		_ = conn.Serve(context.Background(), Handler{Call: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			body, _ := io.ReadAll(r.Body)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+			if string(body) == "large" {
+				_, _ = w.Write([]byte(large))
+				return
+			}
+			_, _ = w.Write([]byte(r.Method + " " + r.URL.Path + " " + r.Header.Get(AssertionHeader) + " " + string(body)))
+		})})
+	}()
+
+	id := uuid.NewString()
+	sendCall(t, ws, id, `{"jsonrpc":"2.0"}`)
+	res, body, _ := readAnswer(t, ws)
+	assert.Equal(t, map[string]any{"t": "res", "id": id, "status": float64(201),
+		"headers": map[string]any{"Content-Type": "application/json"}}, res)
+	assert.Equal(t, `POST /mcp signed.assertion {"jsonrpc":"2.0"}`, string(body))
+
+	sendCall(t, ws, uuid.NewString(), "large")
+	_, body, chunks := readAnswer(t, ws)
+	assert.Equal(t, large, string(body))
+	assert.Equal(t, 2, chunks, "an answer goes back in chunks of at most 64 KiB")
+}
+
+// What arrives for a call after its end, a chunk or another end, changes
+// nothing: the handler runs once, with the body sent before the end.
+func TestRelayServesACallOnce(t *testing.T) {
+	relay := newFakeRelay(t)
+	conn, ws := relay.accept(t)
+	readFrame(t, ws)
+	release := make(chan struct{})
+	var calls atomic.Int32
+	go func() {
+		_ = conn.Serve(context.Background(), Handler{Call: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			calls.Add(1)
+			<-release
+			body, _ := io.ReadAll(r.Body)
+			_, _ = w.Write(body)
+		})})
+	}()
+
+	id := uuid.NewString()
+	sendCall(t, ws, id, "first")
+	require.NoError(t, ws.Write(context.Background(), websocket.MessageBinary, chunkFor(id, []byte(" late"))))
+	writeFrame(t, ws, map[string]any{"t": "end", "id": id})
+	close(release)
+	_, body, _ := readAnswer(t, ws)
+	assert.Equal(t, "first", string(body))
+	assert.Equal(t, int32(1), calls.Load())
+}
+
+// A call the relay cancels has its context canceled and gets no answer.
+func TestRelayCancelsACall(t *testing.T) {
+	relay := newFakeRelay(t)
+	conn, ws := relay.accept(t)
+	readFrame(t, ws)
+	canceled := make(chan struct{})
+	go func() {
+		_ = conn.Serve(context.Background(), Handler{Call: http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+			<-r.Context().Done()
+			close(canceled)
+		})})
+	}()
+	id := uuid.NewString()
+	sendCall(t, ws, id, "{}")
+	writeFrame(t, ws, map[string]any{"t": "cancel", "id": id})
+	select {
+	case <-canceled:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the call was not canceled")
+	}
+}
+
+func TestRelayRefusesALargeCallBody(t *testing.T) {
+	relay := newFakeRelay(t)
+	conn, ws := relay.accept(t)
+	readFrame(t, ws)
+	go func() {
+		_ = conn.Serve(context.Background(), Handler{Call: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})})
+	}()
+	id := uuid.NewString()
+	writeFrame(t, ws, map[string]any{"t": "req", "id": id, "method": "POST", "path": "/mcp"})
+	for range 3 {
+		require.NoError(t, ws.Write(context.Background(), websocket.MessageBinary, chunkFor(id, make([]byte, 512<<10))))
+	}
+	writeFrame(t, ws, map[string]any{"t": "end", "id": id})
+	res, _, _ := readAnswer(t, ws)
+	assert.Equal(t, float64(http.StatusRequestEntityTooLarge), res["status"])
 }

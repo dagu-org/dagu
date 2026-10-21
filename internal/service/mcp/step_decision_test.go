@@ -289,3 +289,47 @@ func TestApproveRequiresExecuteRole(t *testing.T) {
 	require.Equal(t, executeErrorUnauthorized, output["code"])
 	require.Equal(t, ir.NodeWaiting, fixture.node(t, "gate_b").Status)
 }
+
+// A decision from Dagu Cloud needs the server to allow remote approvals, and
+// the attempt the decision was read from.
+func TestRemoteDecisionNeedsApprovalsAndAttempt(t *testing.T) {
+	fixture := newDecisionFixture(t)
+	approvals := false
+	fixture.svc.remote = &remoteCalls{approvals: func(context.Context) bool { return approvals }}
+	approve := func(args map[string]any) (bool, map[string]any) {
+		args["action"], args["stepName"] = executeActionApprove, "gate_b"
+		return fixture.decide(t, context.Background(), args)
+	}
+
+	failed, output := approve(map[string]any{"attemptId": fixture.attemptID})
+	require.True(t, failed)
+	require.Equal(t, executeErrorUnauthorized, output["code"])
+	require.Contains(t, output["message"], "Remote approvals are off")
+
+	approvals = true
+	failed, output = approve(map[string]any{})
+	require.True(t, failed)
+	require.Equal(t, executeFieldAttemptID, output["field"])
+	require.Equal(t, ir.NodeWaiting, fixture.node(t, "gate_b").Status)
+
+	failed, output = approve(map[string]any{"attemptId": fixture.attemptID})
+	require.False(t, failed, output)
+	require.Equal(t, ir.NodeSucceeded, fixture.node(t, "gate_b").Status)
+}
+
+// A server without users of its own still holds a user Dagu Cloud vouches
+// for to their role.
+func TestRemoteViewerCannotDecide(t *testing.T) {
+	fixture := newDecisionFixture(t)
+	fixture.svc.remote = &remoteCalls{approvals: func(context.Context) bool { return true }}
+	viewer := auth.WithUser(context.Background(), &auth.User{ID: "cloud:user-1", Role: auth.RoleViewer, AuthProvider: auth.AuthProviderCloud})
+
+	failed, output := fixture.decide(t, viewer, map[string]any{
+		"action":    executeActionApprove,
+		"stepName":  "gate_b",
+		"attemptId": fixture.attemptID,
+	})
+	require.True(t, failed)
+	require.Equal(t, executeErrorUnauthorized, output["code"])
+	require.Equal(t, ir.NodeWaiting, fixture.node(t, "gate_b").Status)
+}

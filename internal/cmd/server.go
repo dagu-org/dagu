@@ -18,6 +18,8 @@ import (
 	"time"
 
 	"github.com/dagucloud/dagu/v2/internal/agentsession"
+	"github.com/dagucloud/dagu/v2/internal/cloudaccess"
+	"github.com/dagucloud/dagu/v2/internal/cloudrelay"
 	"github.com/dagucloud/dagu/v2/internal/cloudreport"
 	"github.com/dagucloud/dagu/v2/internal/cmn/config"
 	"github.com/dagucloud/dagu/v2/internal/cmn/dirlock"
@@ -115,8 +117,10 @@ func runServer(ctx *Context, _ []string, serverOpts ...frontend.ServerOption) er
 	var tunnelService *tunnel.Service
 	var resourceService *resource.Service
 	var cloudReporter *cloudreport.Reporter
+	stopCloudAccess := func() {}
 	defer func() {
 		stop()
+		stopCloudAccess()
 		if cloudReporter != nil {
 			cloudReporter.Stop()
 		}
@@ -171,6 +175,10 @@ func runServer(ctx *Context, _ []string, serverOpts ...frontend.ServerOption) er
 	if cloudMonitoring != nil {
 		serverOpts = append(serverOpts, frontend.WithAPIOption(apiv1.WithCloudReport(cloudMonitoring)))
 	}
+	cloudAccess := newCloudAccess(serviceCtx)
+	if cloudAccess != nil {
+		serverOpts = append(serverOpts, frontend.WithAPIOption(apiv1.WithCloudAccess(cloudAccess)))
+	}
 	serverOpts = append(serverOpts, frontend.WithOnReady(printStartupBanner(serviceCtx, stores.AuthSetupRequired)))
 
 	// Initialize server (includes auth setup). Use serviceCtx so auth providers can
@@ -199,7 +207,8 @@ func runServer(ctx *Context, _ []string, serverOpts ...frontend.ServerOption) er
 		}
 	}
 
-	cloudReporter = startCloudReport(serviceCtx, cloudMonitoring)
+	cloudReporter = startCloudReport(serviceCtx, cloudMonitoring, cloudAccess)
+	stopCloudAccess = startCloudAccess(serviceCtx, cloudAccess, server)
 
 	err = server.Serve(serviceCtx)
 	stop() // Let a second SIGINT end deferred cleanup; SIGTERM stays absorbed.
@@ -311,15 +320,67 @@ func newCloudReportMonitoring(ctx *Context) *cloudreport.Monitoring {
 }
 
 // startCloudReport reports to Dagu Console at the level monitoring sets while
-// the server holds an online license. When cloud.report is off, it only tells
-// Dagu Console that the server no longer reports, if it reported before. It
-// returns nil when monitoring is nil.
-func startCloudReport(ctx *Context, monitoring *cloudreport.Monitoring) *cloudreport.Reporter {
+// the server holds an online license, with how far access lets calls from
+// Dagu Cloud go. When cloud.report is off, it only tells Dagu Console that the
+// server no longer reports, if it reported before. It returns nil when
+// monitoring is nil.
+func startCloudReport(ctx *Context, monitoring *cloudreport.Monitoring, access *cloudaccess.Service) *cloudreport.Reporter {
 	if monitoring == nil {
 		return nil
 	}
+	var remote cloudreport.RemoteAccess
+	if access != nil {
+		remote = access
+	}
 	scheduler := cloudreport.Scheduler{State: ctx.Persistence.SchedulerStateStore, Pause: ctx.Persistence.SchedulerPauseStore}
-	return cloudreport.Start(ctx, ctx.LicenseManager.CloudCredentials, ctx.Persistence.ServiceRegistry, cloudReportEvents(ctx), scheduler, monitoring)
+	return cloudreport.Start(ctx, ctx.LicenseManager.CloudCredentials, ctx.Persistence.ServiceRegistry, cloudReportEvents(ctx), scheduler, monitoring, remote)
+}
+
+// newCloudAccess returns what takes calls from Dagu Cloud while remote access
+// is on: as cloud.remote_access and cloud.remote_approvals fix it, or else as
+// an administrator chooses. It returns nil when no license manager runs.
+func newCloudAccess(ctx *Context) *cloudaccess.Service {
+	if ctx.LicenseManager == nil {
+		return nil
+	}
+	key, err := license.PublicKey()
+	if err != nil {
+		logger.Warn(ctx, "Remote access is unavailable: the license public key could not be loaded", tag.Error(err))
+		return nil
+	}
+	settingsFile := filepath.Join(ctx.Config.Paths.DataDir, "cloud", "access-settings.json")
+	name := ctx.Config.License.ServerName
+	if name == "" {
+		name, _ = os.Hostname()
+	}
+	return cloudaccess.New(cloudaccess.Config{
+		Credentials: ctx.LicenseManager.CloudCredentials,
+		Settings:    cloudaccess.NewSettings(ctx.Config.Cloud, filemonitor.NewStateStore(settingsFile)),
+		Key:         key,
+		Hello:       cloudrelay.Hello{Name: name, Version: config.Version},
+	})
+}
+
+// startCloudAccess takes calls from Dagu Cloud through server's MCP tools
+// until the returned function stops it. It does nothing when access is nil.
+func startCloudAccess(ctx *Context, access *cloudaccess.Service, server *frontend.Server) (stop func()) {
+	if access == nil {
+		return func() {}
+	}
+	approvals := func(ctx context.Context) bool {
+		status, err := access.Status(ctx)
+		return err == nil && status.Approvals
+	}
+	runCtx, cancel := context.WithCancel(ctx)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		access.Run(runCtx, server.CloudMCPHandler(approvals))
+	}()
+	return func() {
+		cancel()
+		<-done
+	}
 }
 
 // cloudReportLeaseStaleThreshold outlasts the longest pause between the

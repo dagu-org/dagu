@@ -1728,6 +1728,15 @@
           "type": "string",
           "enum": ["off", "health", "runs", "errors"],
           "description": "What this server reports to Dagu Console beyond its license check-in. off (default) reports nothing but one report saying so after health, runs, or errors; health reports the Dagu version, OS, architecture, start time, and how many schedulers and coordinators run; runs also reports each reportable status change of a top-level DAG run (events without a valid status snapshot, or with names or IDs longer than Dagu Console keeps, are left out): DAG name, run and attempt IDs, status, times, and up to 50 failed step names; errors also reports why a run failed: the error messages of up to 5 failed steps, or the run's own, each up to 2 KB from its end. A step's error can end with the last lines of its stderr; the values of workflow secrets are masked in it. Full logs, outputs, parameters, commands, DAG files, and the values of workflow secrets are never sent. Every report also carries the license and server IDs and the heartbeat secret, as the license check-in does."
+        },
+        "remote_access": {
+          "type": "string",
+          "enum": ["off", "viewer", "operator", "developer"],
+          "description": "The highest role a Dagu Cloud user gets on calls Dagu Cloud carries to this server over the connection the server opens, which needs a paid plan or a trial. off refuses every call; viewer reads DAGs, runs, and logs; operator also starts, enqueues, retries, and stops runs of existing DAGs, with any parameters they take; developer also changes DAG definitions and runs inline specs, and since DAG steps run commands, it lets those users run any command on this host as the user Dagu runs as. Each user gets the lower of this role and the one Dagu Cloud grants them. Omit it to choose in the UI, where it starts off."
+        },
+        "remote_approvals": {
+          "type": "boolean",
+          "description": "Whether calls from Dagu Cloud may approve, reject, or push back steps waiting for a person, at operator or above. Omit it to choose in the UI, where it starts off."
         }
       }
     }

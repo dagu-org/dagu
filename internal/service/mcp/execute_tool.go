@@ -236,7 +236,9 @@ func (svc *Service) executeToolImpl(ctx context.Context, input executeInput) (*m
 		err = svc.stopDAGRun(ctx, input)
 		dagRunID = input.DAGRunID
 	case executeActionApprove, executeActionReject, executeActionPushBack:
-		err = svc.decideWaitingStep(ctx, input)
+		if err = svc.allowRemoteDecision(ctx, input); err == nil {
+			err = svc.decideWaitingStep(ctx, input)
+		}
 		dagRunID = input.DAGRunID
 	}
 	if err != nil {

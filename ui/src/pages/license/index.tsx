@@ -10,6 +10,7 @@ import { FeatureList } from './FeatureList';
 import { CalloutLink, LicenseAlerts, LicenseCallout } from './LicenseAlerts';
 import { LicenseOverview } from './LicenseOverview';
 import { MonitoringSection } from './MonitoringSection';
+import { RemoteAccessSection } from './RemoteAccessSection';
 import { useLicenseConnect } from './useLicenseConnect';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { LicenseContext } from '@/contexts/LicenseContext';
@@ -20,6 +21,7 @@ import {
   shouldAskMonitoring,
   useLicenseMonitoring,
 } from '@/hooks/useLicenseMonitoring';
+import { useLicenseRemoteAccess } from '@/hooks/useLicenseRemoteAccess';
 import {
   LicenseConnectStatusState,
   LicenseMonitoringLevel,
@@ -34,6 +36,9 @@ import {
 
 /** How often the time of the last report is refreshed. */
 const MONITORING_REFRESH_MS = 30_000;
+
+/** How often the state of the remote access connection is refreshed. */
+const REMOTE_ACCESS_REFRESH_MS = 10_000;
 
 /** Explains how to stop using a license that Dagu loads again on restart. */
 const restartNotes: Record<string, string> = {
@@ -81,6 +86,10 @@ export default function LicensePage() {
     refreshInterval: online ? MONITORING_REFRESH_MS : 0,
   });
   const { refresh: refreshMonitoring } = monitoring;
+  const remoteAccess = useLicenseRemoteAccess(remoteNode, {
+    enabled: online,
+    refreshInterval: online ? REMOTE_ACCESS_REFRESH_MS : 0,
+  });
   const [monitoringDialog, setMonitoringDialog] = useState<
     'choose' | 'prompt' | null
   >(null);
@@ -256,7 +265,7 @@ export default function LicensePage() {
           </h1>
           <p className="text-sm text-muted-foreground">
             {ts(
-              'License, Dagu Console connection, and monitoring for this server.'
+              'License, Dagu Console connection, monitoring, and remote access for this server.'
             )}
           </p>
         </div>
@@ -384,6 +393,16 @@ export default function LicensePage() {
           onRetry={() => void monitoring.refresh()}
           onChoose={() => setMonitoringDialog('choose')}
           onTurnOff={() => monitoring.setLevel(LicenseMonitoringLevel.off)}
+        />
+      )}
+      {online && (
+        <RemoteAccessSection
+          remoteAccess={remoteAccess.remoteAccess}
+          remoteNode={remoteNode}
+          showActivity={license.features.includes('audit')}
+          loadError={Boolean(remoteAccess.error)}
+          onRetry={() => void remoteAccess.refresh()}
+          onChange={remoteAccess.update}
         />
       )}
       {known && <FeatureList license={license} />}

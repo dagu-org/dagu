@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/dagucloud/dagu/v2/api/v1"
+	"github.com/dagucloud/dagu/v2/internal/cloudaccess"
 	"github.com/dagucloud/dagu/v2/internal/cloudreport"
 	"github.com/dagucloud/dagu/v2/internal/cmn/config"
 	"github.com/dagucloud/dagu/v2/internal/license"
@@ -511,6 +512,7 @@ func TestLicenseEndpoints_RequireAdmin(t *testing.T) {
 		test.WithServerOptions(
 			frontend.WithLicenseManager(defaultTestLicenseManager()),
 			frontend.WithAPIOption(apiv1.WithCloudReport(newMonitoring(t, ""))),
+			frontend.WithAPIOption(apiv1.WithCloudAccess(newRemoteAccess(t, config.CloudConfig{}))),
 		),
 	)
 	server.Client().Post("/api/v1/auth/setup", api.SetupRequest{Username: "admin", Password: "adminpass"}).
@@ -535,6 +537,8 @@ func TestLicenseEndpoints_RequireAdmin(t *testing.T) {
 		client.Get("/api/v1/license/monitoring"),
 		client.Put("/api/v1/license/monitoring", map[string]string{"level": "runs"}),
 		client.Post("/api/v1/license/monitoring/dismiss-notice", nil),
+		client.Get("/api/v1/license/remote-access"),
+		client.Put("/api/v1/license/remote-access", map[string]string{"level": "developer"}),
 	} {
 		req.WithBearerToken(viewer.Token).ExpectStatus(http.StatusForbidden).Send(t)
 	}
@@ -1029,4 +1033,55 @@ func TestLicenseMonitoring_Audit(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(*entry.Details), &details))
 	assert.Equal(t, "health", details["level"])
 	assert.Equal(t, "off", details["previous_level"])
+}
+
+func newRemoteAccess(t *testing.T, cloud config.CloudConfig) *cloudaccess.Service {
+	t.Helper()
+	return cloudaccess.New(cloudaccess.Config{
+		Credentials: func() (license.CloudCredentials, bool) { return license.CloudCredentials{}, false },
+		Settings:    cloudaccess.NewSettings(cloud, filemonitor.NewStateStore(filepath.Join(t.TempDir(), "access-settings.json"))),
+	})
+}
+
+func TestLicenseRemoteAccess(t *testing.T) {
+	t.Parallel()
+
+	server := test.SetupServer(t, test.WithServerOptions(frontend.WithAPIOption(apiv1.WithCloudAccess(
+		newRemoteAccess(t, config.CloudConfig{}),
+	))))
+
+	var access api.LicenseRemoteAccess
+	server.Client().Get("/api/v1/license/remote-access").ExpectStatus(http.StatusOK).Send(t).Unmarshal(t, &access)
+	assert.Equal(t, api.LicenseRemoteAccess{Level: api.LicenseRemoteAccessLevelOff}, access)
+
+	server.Client().Put("/api/v1/license/remote-access", map[string]any{"level": "operator", "approvals": true}).
+		ExpectStatus(http.StatusOK).Send(t).Unmarshal(t, &access)
+	assert.Equal(t, api.LicenseRemoteAccess{Level: api.LicenseRemoteAccessLevelOperator, Approvals: true}, access)
+
+	server.Client().Put("/api/v1/license/remote-access", map[string]any{"level": "admin"}).
+		ExpectStatus(http.StatusBadRequest).Send(t)
+	server.Client().Put("/api/v1/license/remote-access", map[string]any{}).
+		ExpectStatus(http.StatusBadRequest).Send(t)
+}
+
+// A change that configuration refuses in part changes nothing.
+func TestLicenseRemoteAccess_Configured(t *testing.T) {
+	t.Parallel()
+
+	server := test.SetupServer(t, test.WithServerOptions(frontend.WithAPIOption(apiv1.WithCloudAccess(
+		newRemoteAccess(t, config.CloudConfig{RemoteAccess: config.RemoteAccessViewer}),
+	))))
+
+	var errResp api.Error
+	server.Client().Put("/api/v1/license/remote-access", map[string]any{"level": "developer", "approvals": true}).
+		ExpectStatus(http.StatusConflict).Send(t).Unmarshal(t, &errResp)
+	assert.Equal(t, api.ErrorCodeConflict, errResp.Code)
+
+	var access api.LicenseRemoteAccess
+	server.Client().Get("/api/v1/license/remote-access").ExpectStatus(http.StatusOK).Send(t).Unmarshal(t, &access)
+	assert.Equal(t, api.LicenseRemoteAccess{Level: api.LicenseRemoteAccessLevelViewer, LevelConfigured: true}, access)
+
+	server.Client().Put("/api/v1/license/remote-access", map[string]any{"approvals": true}).
+		ExpectStatus(http.StatusOK).Send(t).Unmarshal(t, &access)
+	assert.True(t, access.Approvals)
 }
