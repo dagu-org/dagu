@@ -6,8 +6,14 @@ package aqua
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -119,4 +125,67 @@ func TestInstallerLatestRegistryIntegration(t *testing.T) {
 	require.NotNil(t, manifest)
 	require.NotEmpty(t, manifest.Commands["pi"].Path)
 	require.FileExists(t, manifest.Commands["pi"].Path)
+}
+
+// A registry edit at the same path must install and run the newly declared artifact.
+func TestInstallerLocalRegistryIntegration(t *testing.T) {
+	if os.Getenv("DAGU_AQUA_INTEGRATION") != "1" {
+		t.Skip("set DAGU_AQUA_INTEGRATION=1 to run aqua integration tests")
+	}
+	dir := t.TempDir()
+	source := filepath.Join(dir, "main.go")
+	require.NoError(t, os.WriteFile(source, []byte("package main\nimport \"fmt\"\nvar reply string\nfunc main(){fmt.Print(reply)}\n"), 0o600))
+	command := "tool"
+	if runtime.GOOS == "windows" {
+		command += ".exe"
+	}
+	artifacts := make(map[string][]byte)
+	for _, reply := range []string{"one", "two"} {
+		binary := filepath.Join(dir, reply+command)
+		output, err := exec.CommandContext(t.Context(), "go", "build", "-o", binary, "-ldflags=-X main.reply="+reply, source).CombinedOutput()
+		require.NoError(t, err, "%s", output)
+		artifacts["/"+reply+"/"+command], err = os.ReadFile(binary)
+		require.NoError(t, err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		data, ok := artifacts[r.URL.Path]
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write(data)
+	}))
+	defer server.Close()
+	path := filepath.Join(dir, "registry.yaml")
+	cfg := &ir.ToolConfig{Registry: &ir.ToolRegistry{Type: "local", Path: path},
+		Packages: []ir.ToolPackage{{Package: "example/tool", Version: "v1.0.0", Commands: []string{command}}}}
+	opts := tools.InstallOptions{ToolsDir: filepath.Join(dir, "tools"), WorkDir: dir}
+	var previous *tools.Manifest
+	for _, reply := range []string{"one", "two"} {
+		registry := fmt.Sprintf("packages:\n  - name: example/tool\n    type: http\n    url: http://registry.test/%s/%s\n    format: raw\n    files:\n      - name: %s\n", reply, command, command)
+		require.NoError(t, os.WriteFile(path, []byte(registry), 0o600))
+		client := &http.Client{Transport: localRegistryTransport{host: server.Listener.Addr().String()}}
+		manifest, err := New(WithHTTPClient(client), WithLogger(slog.New(slog.NewTextHandler(os.Stderr, nil)))).Install(t.Context(), cfg, opts)
+		require.NoError(t, err)
+		require.FileExists(t, manifest.Checksum)
+		output, err := exec.CommandContext(t.Context(), manifest.Commands[command].Path).CombinedOutput()
+		require.NoError(t, err, "%s", output)
+		require.Equal(t, reply, string(output))
+		if previous != nil {
+			require.NotEqual(t, previous.Hash, manifest.Hash)
+			require.NotEqual(t, previous.RootDir, manifest.RootDir)
+		}
+		previous = manifest
+	}
+}
+
+// Aqua includes the URL host in cache paths; a port would make them invalid on Windows.
+type localRegistryTransport struct{ host string }
+
+func (r localRegistryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req.URL.Host == "registry.test" {
+		req = req.Clone(req.Context())
+		req.URL.Host = r.host
+	}
+	return http.DefaultTransport.RoundTrip(req)
 }

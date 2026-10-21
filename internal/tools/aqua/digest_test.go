@@ -148,4 +148,7 @@ func TestApplyDigestIsolation(t *testing.T) {
 	}})
 	assert.Equal(t, filepath.Join(paths.EnvDir, "root"), isolated.RootDir)
 	assert.NotEqual(t, paths.RootDir, isolated.RootDir)
+
+	local := applyDigestIsolation(paths, &ir.ToolConfig{Registry: &ir.ToolRegistry{Type: "local"}})
+	assert.Equal(t, filepath.Join(paths.EnvDir, "root"), local.RootDir)
 }

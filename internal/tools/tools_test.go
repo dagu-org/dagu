@@ -62,6 +62,24 @@ func TestToolsetHashChangesWithPlatform(t *testing.T) {
 	assert.NotEqual(t, linuxHash, windowsHash)
 }
 
+func TestToolsetHashLocalRegistry(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "registry.yaml")
+	cfg := &ir.ToolConfig{Registry: &ir.ToolRegistry{Type: "local", Path: path}}
+	require.NoError(t, os.WriteFile(path, []byte("first"), 0o600))
+	first, err := ToolsetHash(cfg, "linux/amd64")
+	require.NoError(t, err)
+	again, err := ToolsetHash(cfg, "linux/amd64")
+	require.NoError(t, err)
+	require.Equal(t, first, again)
+	require.NoError(t, os.WriteFile(path, []byte("changed"), 0o600))
+	changed, err := ToolsetHash(cfg, "linux/amd64")
+	require.NoError(t, err)
+	require.NotEqual(t, first, changed)
+	require.NoError(t, os.Remove(path))
+	_, err = ToolsetHash(cfg, "linux/amd64")
+	require.Error(t, err)
+}
+
 func TestEnvVarsExposeAquaToolset(t *testing.T) {
 	t.Parallel()
 

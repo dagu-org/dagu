@@ -3229,14 +3229,8 @@ func buildToolRegistry(registry *toolRegistry) (*ir.ToolRegistry, error) {
 		}, nil
 	case "local":
 		path := strings.TrimSpace(registry.Path)
-		if path == "" {
-			return nil, fmt.Errorf("registry.path is required")
-		}
-		// Aqua resolves a local registry path relative to the generated aqua
-		// config inside the per-platform toolset cache dir, which callers do
-		// not control, so require an absolute path for stable resolution.
-		if !filepath.IsAbs(path) {
-			return nil, fmt.Errorf("registry.path must be an absolute path, got %q", path)
+		if err := (&ir.ToolRegistry{Path: path}).ValidateLocalPath(); err != nil {
+			return nil, err
 		}
 		return &ir.ToolRegistry{
 			Name: name,

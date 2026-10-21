@@ -3,6 +3,11 @@
 
 package ir
 
+import (
+	"fmt"
+	"strings"
+)
+
 const (
 	// DefaultAquaStandardRegistryRef is the last-resort aqua standard registry
 	// commit, used only when the latest registry release cannot be resolved
@@ -25,6 +30,20 @@ type ToolRegistry struct {
 	RepoName  string `json:"repoName,omitempty"`
 	Ref       string `json:"ref,omitempty"`
 	Path      string `json:"path,omitempty"`
+}
+
+// ValidateLocalPath accepts worker-absolute paths independently of the parser host OS.
+func (r *ToolRegistry) ValidateLocalPath() error {
+	p := strings.TrimSpace(r.Path)
+	if p == "" {
+		return fmt.Errorf("registry.path is required")
+	}
+	drive := len(p) >= 3 && ((p[0] >= 'A' && p[0] <= 'Z') || (p[0] >= 'a' && p[0] <= 'z')) && p[1] == ':' && (p[2] == '/' || p[2] == '\\')
+	server, share, unc := strings.Cut(strings.TrimPrefix(p, `\\`), `\`)
+	if strings.HasPrefix(p, "/") || drive || (strings.HasPrefix(p, `\\`) && unc && server != "" && share != "" && share[0] != '\\') {
+		return nil
+	}
+	return fmt.Errorf("registry.path must be an absolute path, got %q", p)
 }
 
 // ToolPackage declares one aqua package and optional command names Dagu should expose.

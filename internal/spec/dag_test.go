@@ -5,6 +5,7 @@ package spec
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -315,12 +316,13 @@ steps:
 
 func TestLoadDAGToolsAcceptsLocalRegistry(t *testing.T) {
 	t.Parallel()
-
-	dag, err := LoadYAML(context.Background(), []byte(`
+	for _, path := range []string{"/etc/dagu/aqua-registry.yaml", `C:\dagu\registry.yaml`, `C:/dagu/registry.yaml`, `\\server\share\registry.yaml`, filepath.Join(t.TempDir(), "registry.yaml")} {
+		t.Run(path, func(t *testing.T) {
+			dag, err := LoadYAML(context.Background(), []byte(fmt.Sprintf(`
 tools:
   registry:
     type: local
-    path: /etc/dagu/aqua-registry.yaml
+    path: %q
   packages:
     - package: example/tool
       version: v1.0.0
@@ -328,15 +330,17 @@ tools:
 steps:
   - id: check
     run: tool
-`))
+`, path)))
 
-	require.NoError(t, err)
-	require.NotNil(t, dag.Tools)
-	require.NotNil(t, dag.Tools.Registry)
-	assert.Equal(t, "local", dag.Tools.Registry.Name)
-	assert.Equal(t, "local", dag.Tools.Registry.Type)
-	assert.Equal(t, "/etc/dagu/aqua-registry.yaml", dag.Tools.Registry.Path)
-	assert.Empty(t, dag.Tools.Registry.Ref)
+			require.NoError(t, err)
+			require.NotNil(t, dag.Tools)
+			require.NotNil(t, dag.Tools.Registry)
+			assert.Equal(t, "local", dag.Tools.Registry.Name)
+			assert.Equal(t, "local", dag.Tools.Registry.Type)
+			assert.Equal(t, path, dag.Tools.Registry.Path)
+			assert.Empty(t, dag.Tools.Registry.Ref)
+		})
+	}
 }
 
 func TestLoadDAGToolsRejectsLocalRegistryWithoutPath(t *testing.T) {

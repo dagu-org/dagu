@@ -135,11 +135,23 @@ func ToolsetHash(cfg *ir.ToolConfig, platform string) (string, error) {
 		return "", fmt.Errorf("tools config is required")
 	}
 	payload := struct {
-		Platform string         `json:"platform"`
-		Tools    *ir.ToolConfig `json:"tools"`
+		Platform            string         `json:"platform"`
+		Tools               *ir.ToolConfig `json:"tools"`
+		LocalRegistryDigest string         `json:"localRegistryDigest,omitempty"`
 	}{
 		Platform: platform,
 		Tools:    cfg,
+	}
+	if cfg.Registry != nil && strings.TrimSpace(cfg.Registry.Type) == "local" {
+		if err := cfg.Registry.ValidateLocalPath(); err != nil {
+			return "", err
+		}
+		content, err := os.ReadFile(strings.TrimSpace(cfg.Registry.Path)) //nolint:gosec
+		if err != nil {
+			return "", fmt.Errorf("read local registry: %w", err)
+		}
+		digest := sha256.Sum256(content)
+		payload.LocalRegistryDigest = hex.EncodeToString(digest[:])
 	}
 	data, err := json.Marshal(payload)
 	if err != nil {

@@ -412,13 +412,15 @@ func (i *Installer) packageCommands(ctx context.Context, cfg *ir.ToolConfig, par
 	return commandSets, nil
 }
 
-// applyDigestIsolation moves the aqua root under the toolset env dir when any
-// package declares a digest. Digest verification compares against checksums
+// applyDigestIsolation moves the aqua root under the toolset env dir for local
+// registries or package digests. Registry edits must not reuse old package bytes.
+// Digest verification compares against checksums
 // recorded for this install, and aqua skips downloading packages that already
 // exist under the root; a shared root could therefore hold bytes the recorded
 // checksums do not describe.
 func applyDigestIsolation(paths tools.CacheLayout, cfg *ir.ToolConfig) tools.CacheLayout {
-	if !hasPackageDigests(cfg) {
+	local := cfg.Registry != nil && strings.TrimSpace(cfg.Registry.Type) == "local"
+	if !hasPackageDigests(cfg) && !local {
 		return paths
 	}
 	paths.RootDir = filepath.Join(paths.EnvDir, "root")
@@ -762,7 +764,7 @@ func describeRegistry(registry *ir.ToolRegistry) string {
 	case "github_content":
 		return fmt.Sprintf("%s/%s@%s", registry.RepoOwner, registry.RepoName, shortRef(registry.Ref))
 	case "local":
-		return "local:" + registry.Path
+		return "local:" + strings.TrimSpace(registry.Path)
 	}
 	return "standard@" + shortRef(registry.Ref)
 }

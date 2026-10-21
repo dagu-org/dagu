@@ -233,3 +233,21 @@ func TestRenderConfigDefaultsPackageRegistry(t *testing.T) {
 	require.Len(t, parsed.Packages, 1)
 	assert.Equal(t, "custom", parsed.Packages[0].Registry)
 }
+
+func TestRenderLocalRegistryPaths(t *testing.T) {
+	for path, valid := range map[string]bool{
+		"/etc/registry.yaml": true, `C:\dagu\registry.yaml`: true,
+		`\\server\share\registry.yaml`: true,
+		"registry.yaml":                false, `C:registry.yaml`: false, `\registry.yaml`: false,
+	} {
+		t.Run(path, func(t *testing.T) {
+			_, err := RenderConfig(&ir.ToolConfig{Registry: &ir.ToolRegistry{Type: "local", Path: path},
+				Packages: []ir.ToolPackage{{Package: "example/tool", Version: "v1.0.0"}}})
+			if valid {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, "absolute path")
+			}
+		})
+	}
+}
