@@ -114,7 +114,7 @@ func TestStartCloudReport(t *testing.T) {
 	for _, level := range []config.ReportLevel{"", config.ReportOff, config.ReportHealth, config.ReportRuns} {
 		t.Run("level "+string(level), func(t *testing.T) {
 			ctx := newContext(level)
-			reporter := startCloudReport(ctx, newCloudReportMonitoring(ctx))
+			reporter := startCloudReport(ctx, newCloudReportMonitoring(ctx), newCloudAccess(ctx))
 			require.NotNil(t, reporter)
 			reporter.Stop()
 		})
@@ -125,7 +125,8 @@ func TestStartCloudReport(t *testing.T) {
 		ctx.LicenseManager = nil
 		monitoring := newCloudReportMonitoring(ctx)
 		require.Nil(t, monitoring)
-		require.Nil(t, startCloudReport(ctx, monitoring))
+		require.Nil(t, newCloudAccess(ctx))
+		require.Nil(t, startCloudReport(ctx, monitoring, nil))
 	})
 }
 

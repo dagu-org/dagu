@@ -18,6 +18,7 @@ import (
 	"github.com/dagucloud/dagu/v2/api/v1"
 	"github.com/dagucloud/dagu/v2/internal/audit"
 	"github.com/dagucloud/dagu/v2/internal/auth"
+	"github.com/dagucloud/dagu/v2/internal/cloudaccess"
 	"github.com/dagucloud/dagu/v2/internal/cloudreport"
 	"github.com/dagucloud/dagu/v2/internal/cmn/config"
 	"github.com/dagucloud/dagu/v2/internal/cmn/logger"
@@ -105,6 +106,7 @@ type API struct {
 	licenseManager       *license.Manager
 	publicWebhookStore   publicwebhook.Store
 	cloudReport          CloudReportService
+	cloudAccess          CloudAccessService
 	apiKeyCreateMu       sync.Mutex
 	workspaceStore       workspace.Store
 	leaseStaleThreshold  time.Duration
@@ -167,6 +169,15 @@ type CloudReportService interface {
 	SetLevel(ctx context.Context, level config.ReportLevel) error
 	DismissNotice(ctx context.Context) error
 	DismissErrorsNotice(ctx context.Context) error
+}
+
+// CloudAccessService lets administrators see and choose how far calls from
+// Dagu Cloud may go on the server, and see whether they reach it.
+type CloudAccessService interface {
+	Status(ctx context.Context) (cloudaccess.Status, error)
+	SetLevel(ctx context.Context, level config.RemoteAccessLevel) error
+	SetApprovals(ctx context.Context, on bool) error
+	State() cloudaccess.State
 }
 
 // AuthService defines the interface for authentication operations.
@@ -334,6 +345,13 @@ func WithPublicWebhookStore(store publicwebhook.Store) APIOption {
 func WithLicenseManager(m *license.Manager) APIOption {
 	return func(a *API) {
 		a.licenseManager = m
+	}
+}
+
+// WithCloudAccess sets how far calls from Dagu Cloud may go on the server.
+func WithCloudAccess(s CloudAccessService) APIOption {
+	return func(a *API) {
+		a.cloudAccess = s
 	}
 }
 
@@ -1157,6 +1175,7 @@ func mergeAuditSourceDetails(details map[string]any, source *audit.SourceContext
 	put("subject_type", source.SubjectType)
 	put("subject_id", source.SubjectID)
 	put("subject_name", source.SubjectName)
+	put("cloud_workspace", source.CloudWorkspace)
 	put("mcp_tool", source.MCPTool)
 	put("mcp_action", source.MCPAction)
 	if len(source.CredentialAllowedSurfaces) > 0 {

@@ -193,6 +193,10 @@ func runStartAll(ctx *Context, _ []string) error {
 	if cloudMonitoring != nil {
 		serverOpts = append(serverOpts, frontend.WithAPIOption(apiv1.WithCloudReport(cloudMonitoring)))
 	}
+	cloudAccess := newCloudAccess(serviceCtx)
+	if cloudAccess != nil {
+		serverOpts = append(serverOpts, frontend.WithAPIOption(apiv1.WithCloudAccess(cloudAccess)))
+	}
 	serverOpts = append(serverOpts, frontend.WithOnReady(printStartupBanner(serviceCtx, stores.AuthSetupRequired)))
 
 	// Use serviceCtx so auth initialization can respond to termination signals
@@ -224,9 +228,10 @@ func runStartAll(ctx *Context, _ []string) error {
 		return fmt.Errorf("failed to start resource service: %w", err)
 	}
 
-	if cloudReporter := startCloudReport(serviceCtx, cloudMonitoring); cloudReporter != nil {
+	if cloudReporter := startCloudReport(serviceCtx, cloudMonitoring, cloudAccess); cloudReporter != nil {
 		defer cloudReporter.Stop()
 	}
+	defer startCloudAccess(serviceCtx, cloudAccess, server)()
 
 	// WaitGroup to track all services
 	var wg sync.WaitGroup

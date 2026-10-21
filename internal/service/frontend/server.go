@@ -1473,6 +1473,13 @@ func (srv *Server) setupMCPRoute(ctx context.Context, r *chi.Mux) {
 	logger.Info(ctx, "MCP route configured", slog.String("path", mcpPath))
 }
 
+// CloudMCPHandler returns the MCP handler for the calls Dagu Cloud carries to
+// this server. approvals reports whether those calls may decide steps waiting
+// for a person.
+func (srv *Server) CloudMCPHandler(approvals func(context.Context) bool) http.Handler {
+	return dagumcp.NewCloudHandler(srv.apiV1, approvals)
+}
+
 func clearWriteDeadlineMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := http.NewResponseController(w).SetWriteDeadline(time.Time{}); err != nil {

@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagucloud/dagu/v2/internal/cloudaccess"
 	"github.com/dagucloud/dagu/v2/internal/cmn/config"
 	"github.com/dagucloud/dagu/v2/internal/cmn/logger"
 	"github.com/dagucloud/dagu/v2/internal/license"
@@ -73,6 +74,32 @@ func TestReportPayload(t *testing.T) {
 			]
 		}
 	}`, config.Version, runtime.GOOS, runtime.GOARCH), report.body)
+}
+
+// stubRemoteAccess lets calls from Dagu Cloud operate and decide waiting
+// steps.
+type stubRemoteAccess struct{}
+
+func (stubRemoteAccess) Status(context.Context) (cloudaccess.Status, error) {
+	return cloudaccess.Status{Level: config.RemoteAccessOperator, Approvals: true}, nil
+}
+
+func TestReportCarriesRemoteAccess(t *testing.T) {
+	t.Parallel()
+
+	console := newFakeConsole(t)
+	r := newReporter(console.credentials, nil, fixedLevel(config.ReportHealth))
+	r.remote = stubRemoteAccess{}
+	clock := startReporter(t.Context(), t, r, noJitter)
+
+	clock.wait()
+	clock.elapse()
+	var body struct {
+		Health map[string]any `json:"health"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(console.next(t).body), &body))
+	assert.Equal(t, "operator", body.Health["remote_access"])
+	assert.Equal(t, true, body.Health["remote_approvals"])
 }
 
 func TestReportWithoutServices(t *testing.T) {

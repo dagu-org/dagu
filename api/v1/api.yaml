@@ -8961,6 +8961,92 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /license/remote-access:
+    get:
+      summary: "Get how far calls from Dagu Cloud may go on this server"
+      description: "Returns the highest role calls from Dagu Cloud get on this server, whether they may decide steps waiting for a person, whether configuration fixes either, and whether this server process holds its connection for those calls. Admin only."
+      operationId: "getLicenseRemoteAccess"
+      tags:
+        - "system"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "Remote access on this server"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LicenseRemoteAccess"
+        "400":
+          description: "License management is not available"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Insufficient permissions"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    put:
+      summary: "Choose how far calls from Dagu Cloud may go on this server"
+      description: "Sets the highest role calls from Dagu Cloud get on this server, whether they may decide steps waiting for a person, or both. Changes apply at once; off closes the connection and ends the calls in flight. Admin only."
+      operationId: "updateLicenseRemoteAccess"
+      tags:
+        - "system"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                level:
+                  $ref: "#/components/schemas/LicenseRemoteAccessLevel"
+                approvals:
+                  type: boolean
+                  description: "Whether calls from Dagu Cloud may approve, reject, or push back steps waiting for a person"
+      responses:
+        "200":
+          description: "Remote access on this server after the change"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LicenseRemoteAccess"
+        "400":
+          description: "Unknown level, nothing to change, or license management is not available"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Insufficient permissions"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "cloud.remote_access or cloud.remote_approvals in the configuration fixes the setting"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /wiki:
     get:
       summary: "List Wiki pages"
@@ -17403,6 +17489,39 @@ components:
         - chosen
         - noticeDismissed
         - errorsOffered
+
+    LicenseRemoteAccessLevel:
+      type: string
+      enum: ["off", "viewer", "operator", "developer"]
+      description: "The highest role calls from Dagu Cloud get on this server: off refuses them, viewer reads DAGs, runs, and logs, operator also starts, enqueues, retries, and stops runs of existing DAGs, and developer also changes DAG definitions and runs inline specs"
+
+    LicenseRemoteAccess:
+      type: object
+      description: "How far calls from Dagu Cloud may go on this server, and whether they reach it"
+      properties:
+        level:
+          $ref: "#/components/schemas/LicenseRemoteAccessLevel"
+        levelConfigured:
+          type: boolean
+          description: "Whether cloud.remote_access in the configuration fixes the level"
+        approvals:
+          type: boolean
+          description: "Whether calls from Dagu Cloud may approve, reject, or push back steps waiting for a person"
+        approvalsConfigured:
+          type: boolean
+          description: "Whether cloud.remote_approvals in the configuration fixes approvals"
+        connected:
+          type: boolean
+          description: "Whether this server process holds its connection to the relay, so calls from Dagu Cloud reach it"
+        error:
+          type: string
+          description: "Why the last connection failed or Dagu Cloud refused it, such as a workspace without a plan or a trial"
+      required:
+        - level
+        - levelConfigured
+        - approvals
+        - approvalsConfigured
+        - connected
 
     ChangePasswordRequest:
       type: object
