@@ -1,6 +1,6 @@
 module github.com/dagucloud/dagu/v2
 
-go 1.27.2
+go 1.27.3
 
 require (
 	cloud.google.com/go/secretmanager v1.20.0
@@ -87,7 +87,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.46.0
 	go.opentelemetry.io/otel/trace v1.46.0
 	golang.org/x/crypto v0.58.0
-	golang.org/x/crypto/x509roots/fallback v0.0.0-20261014201258-cf169cd0986f
+	golang.org/x/crypto/x509roots/fallback v0.0.0-20261020153306-9f2b28d4331a
 	golang.org/x/net v0.61.0
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.24.0
