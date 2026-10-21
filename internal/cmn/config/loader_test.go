@@ -712,6 +712,44 @@ cloud:
 	})
 }
 
+func TestLoad_CloudRemoteAccess(t *testing.T) {
+	t.Run("DefaultIsChosenInTheUI", func(t *testing.T) {
+		t.Setenv("DAGU_CLOUD_REMOTE_ACCESS", "")
+		t.Setenv("DAGU_CLOUD_REMOTE_APPROVALS", "")
+		cloud := testLoad(t).Cloud
+		require.Equal(t, RemoteAccessLevel(""), cloud.RemoteAccess)
+		require.Nil(t, cloud.RemoteApprovals)
+	})
+
+	t.Run("YAML", func(t *testing.T) {
+		t.Setenv("DAGU_CLOUD_REMOTE_ACCESS", "")
+		t.Setenv("DAGU_CLOUD_REMOTE_APPROVALS", "")
+		cfg := loadFromYAML(t, `
+cloud:
+  remote_access: Operator
+  remote_approvals: false
+`)
+		require.Equal(t, RemoteAccessOperator, cfg.Cloud.RemoteAccess)
+		require.Equal(t, new(false), cfg.Cloud.RemoteApprovals)
+	})
+
+	t.Run("Env", func(t *testing.T) {
+		t.Setenv("DAGU_CLOUD_REMOTE_ACCESS", "developer")
+		t.Setenv("DAGU_CLOUD_REMOTE_APPROVALS", "true")
+		cloud := testLoad(t).Cloud
+		require.Equal(t, RemoteAccessDeveloper, cloud.RemoteAccess)
+		require.Equal(t, new(true), cloud.RemoteApprovals)
+	})
+
+	t.Run("Invalid", func(t *testing.T) {
+		t.Setenv("DAGU_CLOUD_REMOTE_ACCESS", "")
+		for _, value := range []string{"admin", "manager", "true"} {
+			err := loadWithErrorFromYAML(t, "cloud:\n  remote_access: "+value+"\n")
+			require.ErrorContains(t, err, "invalid cloud.remote_access", value)
+		}
+	})
+}
+
 func TestLoad_OpenCodeConfigFromEnv(t *testing.T) {
 	t.Setenv("DAGU_OPENCODE_EXECUTABLE", "/opt/opencode")
 	t.Setenv("DAGU_OPENCODE_ENV_PASSTHROUGH", "OPENAI_API_KEY,ANTHROPIC_API_KEY")

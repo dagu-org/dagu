@@ -223,7 +223,31 @@ type CloudConfig struct {
 	// Report is how much the server reports to Dagu Console. Empty means it
 	// is not set, and the server reports nothing.
 	Report ReportLevel
+	// RemoteAccess is the highest role a Dagu Cloud user gets on calls Dagu
+	// Cloud carries to this server. Empty means it is not set, and an
+	// administrator chooses it; until then it is off.
+	RemoteAccess RemoteAccessLevel
+	// RemoteApprovals lets those calls approve, reject, or push back steps
+	// waiting for a person. Nil means it is not set, and an administrator
+	// chooses it; until then they cannot.
+	RemoteApprovals *bool
 }
+
+// RemoteAccessLevel is the highest role a Dagu Cloud user gets on a server.
+type RemoteAccessLevel string
+
+const (
+	// RemoteAccessOff refuses every call from Dagu Cloud.
+	RemoteAccessOff RemoteAccessLevel = "off"
+	// RemoteAccessViewer lets calls read DAGs, runs, and logs.
+	RemoteAccessViewer RemoteAccessLevel = "viewer"
+	// RemoteAccessOperator also lets calls start, enqueue, retry, and stop
+	// runs of existing DAGs.
+	RemoteAccessOperator RemoteAccessLevel = "operator"
+	// RemoteAccessDeveloper also lets calls change DAG definitions and run
+	// inline specs.
+	RemoteAccessDeveloper RemoteAccessLevel = "developer"
+)
 
 // ReportLevel is how much a server reports to Dagu Console, beyond the
 // license check-in every licensed server makes.
@@ -789,6 +813,9 @@ func (c *Config) Validate() error {
 		return err
 	}
 	if err := c.validateExecutionMode(); err != nil {
+		return err
+	}
+	if err := c.validateCloudRemoteAccess(); err != nil {
 		return err
 	}
 	if err := c.validateCloudReport(); err != nil {
@@ -1367,6 +1394,16 @@ func (c *Config) validateCloudReport() error {
 		return nil
 	default:
 		return fmt.Errorf("invalid cloud.report: %q (must be one of: off, health, runs, errors)", c.Cloud.Report)
+	}
+}
+
+// validateCloudRemoteAccess validates the role cap on calls from Dagu Cloud.
+func (c *Config) validateCloudRemoteAccess() error {
+	switch c.Cloud.RemoteAccess {
+	case "", RemoteAccessOff, RemoteAccessViewer, RemoteAccessOperator, RemoteAccessDeveloper:
+		return nil
+	default:
+		return fmt.Errorf("invalid cloud.remote_access: %q (must be one of: off, viewer, operator, developer)", c.Cloud.RemoteAccess)
 	}
 }
 
