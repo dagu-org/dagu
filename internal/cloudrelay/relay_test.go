@@ -358,6 +358,33 @@ func TestRelayCalls(t *testing.T) {
 	assert.Equal(t, 2, chunks, "an answer goes back in chunks of at most 64 KiB")
 }
 
+// What arrives for a call after its end, a chunk or another end, changes
+// nothing: the handler runs once, with the body sent before the end.
+func TestRelayServesACallOnce(t *testing.T) {
+	relay := newFakeRelay(t)
+	conn, ws := relay.accept(t)
+	readFrame(t, ws)
+	release := make(chan struct{})
+	var calls atomic.Int32
+	go func() {
+		_ = conn.Serve(context.Background(), Handler{Call: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			calls.Add(1)
+			<-release
+			body, _ := io.ReadAll(r.Body)
+			_, _ = w.Write(body)
+		})})
+	}()
+
+	id := uuid.NewString()
+	sendCall(t, ws, id, "first")
+	require.NoError(t, ws.Write(context.Background(), websocket.MessageBinary, chunkFor(id, []byte(" late"))))
+	writeFrame(t, ws, map[string]any{"t": "end", "id": id})
+	close(release)
+	_, body, _ := readAnswer(t, ws)
+	assert.Equal(t, "first", string(body))
+	assert.Equal(t, int32(1), calls.Load())
+}
+
 // A call the relay cancels has its context canceled and gets no answer.
 func TestRelayCancelsACall(t *testing.T) {
 	relay := newFakeRelay(t)

@@ -223,6 +223,9 @@ type call struct {
 	body   bytes.Buffer
 	// tooLarge is set once the body passes callBodyLimit.
 	tooLarge bool
+	// ended is set, on the Serve goroutine, once the call's end arrives;
+	// what arrives for the call after it is ignored.
+	ended bool
 }
 
 // frame is one JSON message between the relay and the server.
@@ -333,8 +336,10 @@ func (c *Conn) Serve(ctx context.Context, h Handler) error {
 			callCtx, cancel := context.WithCancel(ctx)
 			c.calls.Store(f.ID, &call{req: f, ctx: callCtx, cancel: cancel})
 		case frameEnd:
-			if value, ok := c.calls.Load(f.ID); ok {
-				go c.serveCall(h.Call, value.(*call))
+			if value, ok := c.calls.Load(f.ID); ok && !value.(*call).ended {
+				cl := value.(*call)
+				cl.ended = true
+				go c.serveCall(h.Call, cl)
 			}
 		case frameCancel:
 			if value, ok := c.calls.LoadAndDelete(f.ID); ok {
@@ -438,6 +443,9 @@ func (c *Conn) receiveChunk(data []byte) {
 		return
 	}
 	cl := value.(*call)
+	if cl.ended {
+		return
+	}
 	if cl.tooLarge || cl.body.Len()+len(data)-chunkHeaderBytes > callBodyLimit {
 		cl.tooLarge = true
 		cl.body.Reset()
