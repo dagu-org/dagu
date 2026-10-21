@@ -86,15 +86,43 @@ func newStreamableHandler(server *mcpsdk.Server) http.Handler {
 // step waiting for a person only while approvals reports true, and only for
 // the attempt the call names.
 func NewCloudHandler(api *frontendapi.API, approvals func(context.Context) bool) http.Handler {
-	server := newServer(api, &remoteCalls{approvals: approvals})
+	return newCloudHandler(newServer(api, &remoteCalls{approvals: approvals}))
+}
+
+// newCloudHandler serves server to calls from Dagu Cloud, each in a session
+// of its own, and ends the work of a call when its request ends.
+func newCloudHandler(server *mcpsdk.Server) http.Handler {
+	server.AddReceivingMiddleware(endWithRequest)
 	handler := mcpsdk.NewStreamableHTTPHandler(
 		func(*http.Request) *mcpsdk.Server { return server },
 		&mcpsdk.StreamableHTTPOptions{Stateless: true, JSONResponse: true, PropagateRequestCancellation: true},
 	)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := audit.WithSourceContext(r.Context(), ensureMCPSourceContext(r.Context()))
+		ctx = context.WithValue(ctx, requestContextKey{}, r.Context())
 		handler.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+// requestContextKey carries the context of the HTTP request a call came in.
+type requestContextKey struct{}
+
+// endWithRequest cancels a method's context when the request it came in ends.
+// The SDK does this itself only for protocol versions from 2026-07-28, and
+// turning remote access off must end the calls in flight whatever version a
+// call uses.
+func endWithRequest(next mcpsdk.MethodHandler) mcpsdk.MethodHandler {
+	return func(ctx context.Context, method string, req mcpsdk.Request) (mcpsdk.Result, error) {
+		request, ok := ctx.Value(requestContextKey{}).(context.Context)
+		if !ok {
+			return next(ctx, method, req)
+		}
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+		stop := context.AfterFunc(request, cancel)
+		defer stop()
+		return next(ctx, method, req)
+	}
 }
 
 // NewServer builds the MCP server used by the Streamable HTTP transport.

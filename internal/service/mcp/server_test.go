@@ -729,6 +729,44 @@ func TestCloudHandlerIsStateless(t *testing.T) {
 	require.Equal(t, http.StatusMethodNotAllowed, res.StatusCode)
 }
 
+// Turning remote access off ends the calls in flight, so a tool's work must
+// end with its request even in protocol versions where the SDK keeps it going.
+func TestCloudHandlerEndsAToolWithItsRequest(t *testing.T) {
+	server := mcpsdk.NewServer(&mcpsdk.Implementation{Name: "test", Version: "v0.0.0"}, nil)
+	started, ended := make(chan struct{}), make(chan struct{})
+	mcpsdk.AddTool(server, &mcpsdk.Tool{Name: "block"},
+		func(ctx context.Context, _ *mcpsdk.CallToolRequest, _ struct{}) (*mcpsdk.CallToolResult, any, error) {
+			close(started)
+			<-ctx.Done()
+			close(ended)
+			return &mcpsdk.CallToolResult{}, nil, nil
+		})
+	ctx, cancel := context.WithCancel(context.Background())
+	req := httptest.NewRequestWithContext(ctx, http.MethodPost, "/mcp",
+		strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"block","arguments":{}}}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json, text/event-stream")
+	req.Header.Set("Mcp-Protocol-Version", "2025-06-18")
+	served := make(chan struct{})
+	go func() {
+		defer close(served)
+		newCloudHandler(server).ServeHTTP(httptest.NewRecorder(), req)
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(testConnectTimeout):
+		t.Fatal("the tool did not start")
+	}
+	cancel()
+	select {
+	case <-ended:
+	case <-time.After(testConnectTimeout):
+		t.Fatal("the tool kept running after its request ended")
+	}
+	<-served
+}
+
 func TestServerExposesReferenceResourcesAndPrompts(t *testing.T) {
 	ctx := context.Background()
 	session := connectTestClient(t, ctx, NewServer(nil))
