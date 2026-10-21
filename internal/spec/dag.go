@@ -3187,7 +3187,11 @@ func buildToolRegistry(registry *toolRegistry) (*ir.ToolRegistry, error) {
 		typ = "standard"
 	}
 	if name == "" {
-		name = "standard"
+		if typ == "local" {
+			name = "local"
+		} else {
+			name = "standard"
+		}
 	}
 
 	switch typ {
@@ -3222,6 +3226,22 @@ func buildToolRegistry(registry *toolRegistry) (*ir.ToolRegistry, error) {
 			RepoName:  repoName,
 			Ref:       ref,
 			Path:      path,
+		}, nil
+	case "local":
+		path := strings.TrimSpace(registry.Path)
+		if path == "" {
+			return nil, fmt.Errorf("registry.path is required")
+		}
+		// Aqua resolves a local registry path relative to the generated aqua
+		// config inside the per-platform toolset cache dir, which callers do
+		// not control, so require an absolute path for stable resolution.
+		if !filepath.IsAbs(path) {
+			return nil, fmt.Errorf("registry.path must be an absolute path, got %q", path)
+		}
+		return &ir.ToolRegistry{
+			Name: name,
+			Type: typ,
+			Path: path,
 		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported tools registry type %q", typ)

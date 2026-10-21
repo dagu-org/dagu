@@ -758,8 +758,11 @@ func describeRegistry(registry *ir.ToolRegistry) string {
 	if registry == nil {
 		return "standard"
 	}
-	if strings.TrimSpace(registry.Type) == "github_content" {
+	switch strings.TrimSpace(registry.Type) {
+	case "github_content":
 		return fmt.Sprintf("%s/%s@%s", registry.RepoOwner, registry.RepoName, shortRef(registry.Ref))
+	case "local":
+		return "local:" + registry.Path
 	}
 	return "standard@" + shortRef(registry.Ref)
 }

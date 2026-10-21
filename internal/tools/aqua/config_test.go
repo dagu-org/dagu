@@ -73,6 +73,47 @@ func TestRenderConfigDefaultsStandardRegistry(t *testing.T) {
 	assert.Equal(t, "standard", parsed.Packages[0].Registry)
 }
 
+func TestRenderConfigLocalRegistry(t *testing.T) {
+	t.Parallel()
+
+	data, err := RenderConfigForPlatform(&ir.ToolConfig{
+		Provider: "aqua",
+		Registry: &ir.ToolRegistry{
+			Type: "local",
+			Path: "/etc/dagu/aqua-registry.yaml",
+		},
+		Packages: []ir.ToolPackage{{
+			Package: "example/tool",
+			Version: "v1.0.0",
+		}},
+	}, "linux/amd64")
+
+	require.NoError(t, err)
+	var parsed aquaconfig.Config
+	require.NoError(t, yaml.Unmarshal(data, &parsed))
+	require.Contains(t, parsed.Registries, "local")
+	assert.Equal(t, "local", parsed.Registries["local"].Type)
+	assert.Equal(t, "/etc/dagu/aqua-registry.yaml", parsed.Registries["local"].Path)
+	require.Len(t, parsed.Packages, 1)
+	assert.Equal(t, "local", parsed.Packages[0].Registry)
+}
+
+func TestRenderConfigRejectsLocalRegistryWithoutPath(t *testing.T) {
+	t.Parallel()
+
+	_, err := RenderConfigForPlatform(&ir.ToolConfig{
+		Provider: "aqua",
+		Registry: &ir.ToolRegistry{Type: "local"},
+		Packages: []ir.ToolPackage{{
+			Package: "example/tool",
+			Version: "v1.0.0",
+		}},
+	}, "linux/amd64")
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "registry.path is required")
+}
+
 func TestEffectiveToolConfigDeepCopiesPackageCommands(t *testing.T) {
 	t.Parallel()
 

@@ -313,6 +313,71 @@ steps:
 	assert.Contains(t, err.Error(), "registry.ref is required")
 }
 
+func TestLoadDAGToolsAcceptsLocalRegistry(t *testing.T) {
+	t.Parallel()
+
+	dag, err := LoadYAML(context.Background(), []byte(`
+tools:
+  registry:
+    type: local
+    path: /etc/dagu/aqua-registry.yaml
+  packages:
+    - package: example/tool
+      version: v1.0.0
+      commands: [tool]
+steps:
+  - id: check
+    run: tool
+`))
+
+	require.NoError(t, err)
+	require.NotNil(t, dag.Tools)
+	require.NotNil(t, dag.Tools.Registry)
+	assert.Equal(t, "local", dag.Tools.Registry.Name)
+	assert.Equal(t, "local", dag.Tools.Registry.Type)
+	assert.Equal(t, "/etc/dagu/aqua-registry.yaml", dag.Tools.Registry.Path)
+	assert.Empty(t, dag.Tools.Registry.Ref)
+}
+
+func TestLoadDAGToolsRejectsLocalRegistryWithoutPath(t *testing.T) {
+	t.Parallel()
+
+	_, err := LoadYAML(context.Background(), []byte(`
+tools:
+  registry:
+    type: local
+  packages:
+    - package: example/tool
+      version: v1.0.0
+steps:
+  - id: check
+    run: tool
+`))
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "registry.path is required")
+}
+
+func TestLoadDAGToolsRejectsLocalRegistryRelativePath(t *testing.T) {
+	t.Parallel()
+
+	_, err := LoadYAML(context.Background(), []byte(`
+tools:
+  registry:
+    type: local
+    path: registry.yaml
+  packages:
+    - package: example/tool
+      version: v1.0.0
+steps:
+  - id: check
+    run: tool
+`))
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "registry.path must be an absolute path")
+}
+
 func TestLoadDAGToolsRejectsFloatingLatestVersion(t *testing.T) {
 	t.Parallel()
 
