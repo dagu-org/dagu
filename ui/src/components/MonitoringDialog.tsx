@@ -28,13 +28,13 @@ const choices: { level: ReportingLevel; title: string; sends: string }[] = [
     level: LicenseMonitoringLevel.health,
     title: 'Health only',
     sends:
-      'Sends the Dagu version, OS, architecture, process start time, and service counts: schedulers holding the scheduler lock, and registered coordinators.',
+      "Sends the Dagu version, OS, architecture, process start time, service counts (schedulers holding the scheduler lock, and registered coordinators), and the scheduler's last tick and whether it is paused.",
   },
   {
     level: LicenseMonitoringLevel.runs,
     title: 'Health and run status',
     sends:
-      'Sends the health fields, plus the status of each top-level DAG run that finishes, with its failed step names (up to 50) and how it was triggered, and the list of runs queued, running, or waiting. Each run is sent as its DAG name, run ID, attempt ID, status, trigger, and queued, started, and finished times. No parameters, logs, or outputs.',
+      "Sends the health fields, plus the status of each top-level DAG run that finishes, with its failed step names (up to 50) and how it was triggered, and the list of runs queued, running, or waiting. Each run is sent as its DAG name, run ID, attempt ID, status, trigger, and queued, started, and finished times. Also each scheduled DAG's next run, and whether its latest scheduled run started. No parameters, logs, or outputs.",
   },
   {
     level: LicenseMonitoringLevel.errors,
@@ -46,7 +46,7 @@ const choices: { level: ReportingLevel; title: string; sends: string }[] = [
 
 /** What no report sends, at any level. */
 export const neverSent =
-  'Never sent: full logs, outputs, parameters, environment, step commands, DAG YAML, and the values of workflow secrets.';
+  'Never sent: full logs, outputs, parameters, environment, step commands, DAG YAML, schedule expressions, and the values of workflow secrets.';
 
 /** Lets an administrator pick a level, listing what each one sends. */
 export function ReportingChoices({

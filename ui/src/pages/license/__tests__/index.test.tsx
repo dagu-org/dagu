@@ -806,7 +806,7 @@ describe('LicensePage', () => {
         'Free for one server: reports every 5 minutes and keeps 7 days of run history. Paid features stay off.'
       );
       expect(offer()).toHaveTextContent(
-        'Never sent: full logs, outputs, parameters, environment, step commands, DAG YAML, and the values of workflow secrets.'
+        'Never sent: full logs, outputs, parameters, environment, step commands, DAG YAML, schedule expressions, and the values of workflow secrets.'
       );
       expect(
         within(offer()).getByRole('radio', {
@@ -1231,13 +1231,13 @@ describe('LicensePage', () => {
         "Sends everything Health and run status sends, plus why each failed run failed: the error messages of up to 5 failed steps and handlers, or the run's own, each up to 2 KB from its end. A step's error can end with the last lines of its stderr, with the values of workflow secrets masked."
       );
       expect(health).toHaveAccessibleDescription(
-        'Sends the Dagu version, OS, architecture, process start time, and service counts: schedulers holding the scheduler lock, and registered coordinators.'
+        "Sends the Dagu version, OS, architecture, process start time, service counts (schedulers holding the scheduler lock, and registered coordinators), and the scheduler's last tick and whether it is paused."
       );
       expect(runs).toHaveAccessibleDescription(
-        'Sends the health fields, plus the status of each top-level DAG run that finishes, with its failed step names (up to 50) and how it was triggered, and the list of runs queued, running, or waiting. Each run is sent as its DAG name, run ID, attempt ID, status, trigger, and queued, started, and finished times. No parameters, logs, or outputs.'
+        "Sends the health fields, plus the status of each top-level DAG run that finishes, with its failed step names (up to 50) and how it was triggered, and the list of runs queued, running, or waiting. Each run is sent as its DAG name, run ID, attempt ID, status, trigger, and queued, started, and finished times. Also each scheduled DAG's next run, and whether its latest scheduled run started. No parameters, logs, or outputs."
       );
       expect(dialog).toHaveTextContent(
-        'Never sent: full logs, outputs, parameters, environment, step commands, DAG YAML, and the values of workflow secrets.'
+        'Never sent: full logs, outputs, parameters, environment, step commands, DAG YAML, schedule expressions, and the values of workflow secrets.'
       );
       expect(dialog).toHaveTextContent(
         'the protocol version, license ID, server ID, and heartbeat secret'
