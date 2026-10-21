@@ -11,7 +11,7 @@ import (
 	"slices"
 )
 
-// backwardChunkSize is how much ReadLinesBackward reads at a time.
+// backwardChunkSize is how many bytes backward file scans read per step.
 const backwardChunkSize = 64 * 1024
 
 // ReadLinesBackward calls fn with the lines in the first size bytes of r,
