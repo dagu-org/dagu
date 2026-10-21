@@ -2601,9 +2601,10 @@ const english = {
   "Choose remote access": "Choose remote access",
   "The highest role a Dagu Cloud user gets on this server. Dagu Cloud may grant less, never more.": "The highest role a Dagu Cloud user gets on this server. Dagu Cloud may grant less, never more.",
   "Read DAGs, runs, and logs.": "Read DAGs, runs, and logs.",
-  "Also start, enqueue, retry, and stop runs of existing DAGs.": "Also start, enqueue, retry, and stop runs of existing DAGs.",
-  "Also change DAG definitions and run inline specs.": "Also change DAG definitions and run inline specs.",
+  "Also start, enqueue, retry, and stop runs of existing DAGs, with any parameters those DAGs take.": "Also start, enqueue, retry, and stop runs of existing DAGs, with any parameters those DAGs take.",
+  "Also change DAG definitions and run inline specs. DAG steps run commands, so this runs any command on this machine.": "Also change DAG definitions and run inline specs. DAG steps run commands, so this runs any command on this machine.",
   "Calls never reach the terminal, users, API keys, the license, or these settings. Each carries a short-lived assertion that Dagu Cloud signs for that call alone. Turning remote access off closes the connection and ends the calls in flight.": "Calls never reach the terminal, users, API keys, the license, or these settings. Each carries a short-lived assertion that Dagu Cloud signs for that call alone. Turning remote access off closes the connection and ends the calls in flight.",
+  "Developer lets the Dagu Cloud users this reaches run any command on this machine, as the user Dagu runs as. Choose it only where you would give them a shell here.": "Developer lets the Dagu Cloud users this reaches run any command on this machine, as the user Dagu runs as. Choose it only where you would give them a shell here.",
 } as const;
 
 export type StaticMessage = keyof typeof english;
@@ -5151,9 +5152,10 @@ const chinese = {
   "Choose remote access": "选择远程访问",
   "The highest role a Dagu Cloud user gets on this server. Dagu Cloud may grant less, never more.": "Dagu Cloud 用户在此服务器上获得的最高角色。Dagu Cloud 可以授予更低的角色，但绝不会更高。",
   "Read DAGs, runs, and logs.": "读取 DAG、运行记录和日志。",
-  "Also start, enqueue, retry, and stop runs of existing DAGs.": "还可以启动、排队、重试和停止现有 DAG 的运行。",
-  "Also change DAG definitions and run inline specs.": "还可以更改 DAG 定义并运行内联规范。",
+  "Also start, enqueue, retry, and stop runs of existing DAGs, with any parameters those DAGs take.": "还可以启动、排队、重试和停止现有 DAG 的运行，并传入这些 DAG 接受的任意参数。",
+  "Also change DAG definitions and run inline specs. DAG steps run commands, so this runs any command on this machine.": "还可以更改 DAG 定义并运行内联规范。DAG 步骤会运行命令，因此这意味着可以在此机器上运行任意命令。",
   "Calls never reach the terminal, users, API keys, the license, or these settings. Each carries a short-lived assertion that Dagu Cloud signs for that call alone. Turning remote access off closes the connection and ends the calls in flight.": "调用永远无法访问终端、用户、API 密钥、许可证或这些设置。每次调用都携带 Dagu Cloud 仅为该调用签发的短期断言。关闭远程访问会断开连接并终止正在进行的调用。",
+  "Developer lets the Dagu Cloud users this reaches run any command on this machine, as the user Dagu runs as. Choose it only where you would give them a shell here.": "开发者角色允许可访问此服务器的 Dagu Cloud 用户以运行 Dagu 的用户身份在此机器上运行任意命令。仅在你愿意给予他们此机器的 shell 时才选择它。",
 } as const satisfies Record<StaticMessage, string>;
 
 const japanese = {
@@ -7777,9 +7779,10 @@ const japanese = {
   "Choose remote access": "リモートアクセスを選択",
   "The highest role a Dagu Cloud user gets on this server. Dagu Cloud may grant less, never more.": "Dagu Cloud のユーザーがこのサーバーで得る最も高いロールです。Dagu Cloud はこれより低いロールを付与することはあっても、高いロールは付与しません。",
   "Read DAGs, runs, and logs.": "DAG、実行、ログを読み取ります。",
-  "Also start, enqueue, retry, and stop runs of existing DAGs.": "既存の DAG の実行の開始、キュー投入、再試行、停止もできます。",
-  "Also change DAG definitions and run inline specs.": "DAG 定義の変更とインライン仕様の実行もできます。",
+  "Also start, enqueue, retry, and stop runs of existing DAGs, with any parameters those DAGs take.": "既存の DAG の実行の開始、キュー投入、再試行、停止もでき、その DAG が受け取る任意のパラメーターを渡せます。",
+  "Also change DAG definitions and run inline specs. DAG steps run commands, so this runs any command on this machine.": "DAG 定義の変更とインライン仕様の実行もできます。DAG のステップはコマンドを実行するため、このマシンで任意のコマンドを実行できることになります。",
   "Calls never reach the terminal, users, API keys, the license, or these settings. Each carries a short-lived assertion that Dagu Cloud signs for that call alone. Turning remote access off closes the connection and ends the calls in flight.": "呼び出しがターミナル、ユーザー、API キー、ライセンス、これらの設定に届くことはありません。各呼び出しには、Dagu Cloud がその呼び出しのためだけに署名した有効期間の短いアサーションが付きます。リモートアクセスをオフにすると接続が閉じ、実行中の呼び出しは終了します。",
+  "Developer lets the Dagu Cloud users this reaches run any command on this machine, as the user Dagu runs as. Choose it only where you would give them a shell here.": "開発者を選ぶと、ここに届く Dagu Cloud のユーザーが、Dagu を実行しているユーザーとしてこのマシンで任意のコマンドを実行できます。このマシンのシェルを渡してよい場合にだけ選んでください。",
 } as const satisfies Record<StaticMessage, string>;
 
 export const staticMessages = {

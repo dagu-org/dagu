@@ -1732,7 +1732,7 @@
         "remote_access": {
           "type": "string",
           "enum": ["off", "viewer", "operator", "developer"],
-          "description": "The highest role a Dagu Cloud user gets on calls Dagu Cloud carries to this server over the connection the server opens, which needs a paid plan or a trial. off refuses every call; viewer reads DAGs, runs, and logs; operator also starts, enqueues, retries, and stops runs of existing DAGs; developer also changes DAG definitions and runs inline specs. Each user gets the lower of this role and the one Dagu Cloud grants them. Omit it to choose in the UI, where it starts off."
+          "description": "The highest role a Dagu Cloud user gets on calls Dagu Cloud carries to this server over the connection the server opens, which needs a paid plan or a trial. off refuses every call; viewer reads DAGs, runs, and logs; operator also starts, enqueues, retries, and stops runs of existing DAGs, with any parameters they take; developer also changes DAG definitions and runs inline specs, and since DAG steps run commands, it lets those users run any command on this host as the user Dagu runs as. Each user gets the lower of this role and the one Dagu Cloud grants them. Omit it to choose in the UI, where it starts off."
         },
         "remote_approvals": {
           "type": "boolean",

@@ -1508,7 +1508,7 @@ describe('LicensePage', () => {
       ).toBeChecked();
       const operator = within(dialog).getByRole('radio', { name: 'Operator' });
       expect(operator).toHaveAccessibleDescription(
-        'Also start, enqueue, retry, and stop runs of existing DAGs.'
+        'Also start, enqueue, retry, and stop runs of existing DAGs, with any parameters those DAGs take.'
       );
       await userEvent.click(operator);
       await userEvent.click(
@@ -1522,6 +1522,24 @@ describe('LicensePage', () => {
       expect(await within(card).findByText('Operator')).toBeVisible();
       expect(within(card).getByText('Connecting…')).toBeVisible();
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('warns that developer runs any command on the machine', async () => {
+      serveRemoteAccess(remoteOff);
+      const card = await findRemoteAccessCard();
+      await userEvent.click(
+        await within(card).findByRole('button', { name: 'Turn on' })
+      );
+      const dialog = await screen.findByRole('dialog', {
+        name: 'Choose remote access',
+      });
+      expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument();
+      await userEvent.click(
+        within(dialog).getByRole('radio', { name: 'Developer' })
+      );
+      expect(within(dialog).getByRole('alert')).toHaveTextContent(
+        'run any command on this machine, as the user Dagu runs as'
+      );
     });
 
     it('lets approvals be turned on and shows the connection', async () => {

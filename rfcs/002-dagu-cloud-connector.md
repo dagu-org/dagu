@@ -399,7 +399,8 @@ highest role any remote user gets.
 
 - **UI.** The license settings page has a **Remote access** section for the
   server's admins: off, viewer, operator, or developer, chosen from a dialog
-  that says what each allows, and a switch for **approvals**, which lets
+  that says what each allows, and warns that developer runs any command on
+  the host, and a switch for **approvals**, which lets
   calls approve, reject, or push back steps waiting for a person. Both start
   off. A change applies at once and is persisted in the data directory; other
   processes sharing it apply it within 6 seconds. Turning remote access off
@@ -418,8 +419,8 @@ cloud:
 | --- | --- |
 | `off` | Nothing; every call answers `403` |
 | `viewer` | Read DAGs, runs, and logs |
-| `operator` | Also start, enqueue, retry, and stop runs of existing DAGs, and, with approvals on, decide waiting steps |
-| `developer` | Also change DAG definitions and run inline specs |
+| `operator` | Also start, enqueue, retry, and stop runs of existing DAGs, with any parameters they take, and, with approvals on, decide waiting steps |
+| `developer` | Also change DAG definitions and run inline specs; since DAG steps run commands, any command on the host, as the user Dagu runs as |
 
 A `cloud:` identity can never change these settings (see below).
 

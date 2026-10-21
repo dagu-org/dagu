@@ -245,7 +245,8 @@ const (
 	// runs of existing DAGs.
 	RemoteAccessOperator RemoteAccessLevel = "operator"
 	// RemoteAccessDeveloper also lets calls change DAG definitions and run
-	// inline specs.
+	// inline specs. DAG steps run commands, so it lets Dagu Cloud users run
+	// any command on the host as the user Dagu runs as.
 	RemoteAccessDeveloper RemoteAccessLevel = "developer"
 )
 

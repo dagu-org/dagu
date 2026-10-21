@@ -32,11 +32,13 @@ const choices: { level: OnLevel; allows: string }[] = [
   },
   {
     level: LicenseRemoteAccessLevel.operator,
-    allows: 'Also start, enqueue, retry, and stop runs of existing DAGs.',
+    allows:
+      'Also start, enqueue, retry, and stop runs of existing DAGs, with any parameters those DAGs take.',
   },
   {
     level: LicenseRemoteAccessLevel.developer,
-    allows: 'Also change DAG definitions and run inline specs.',
+    allows:
+      'Also change DAG definitions and run inline specs. DAG steps run commands, so this runs any command on this machine.',
   },
 ];
 
@@ -449,6 +451,20 @@ function RemoteAccessDialog({
             );
           })}
         </fieldset>
+        {selected === LicenseRemoteAccessLevel.developer && (
+          <p
+            role="alert"
+            className="flex items-start gap-2 text-sm text-warning"
+          >
+            <AlertTriangle
+              className="h-4 w-4 shrink-0 mt-0.5"
+              aria-hidden="true"
+            />
+            {ts(
+              'Developer lets the Dagu Cloud users this reaches run any command on this machine, as the user Dagu runs as. Choose it only where you would give them a shell here.'
+            )}
+          </p>
+        )}
         <p className="text-sm text-muted-foreground">
           {ts(
             'Calls never reach the terminal, users, API keys, the license, or these settings. Each carries a short-lived assertion that Dagu Cloud signs for that call alone. Turning remote access off closes the connection and ends the calls in flight.'
