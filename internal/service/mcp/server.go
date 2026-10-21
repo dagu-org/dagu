@@ -149,13 +149,13 @@ func registerTools(server *mcpsdk.Server, svc *Service) {
 	server.AddTool(&mcpsdk.Tool{
 		Meta:        runInspectorToolMeta(),
 		Name:        toolExecute,
-		Title:       "Execute, enqueue, retry, or stop DAG-runs",
-		Description: "Run control entry point. action=start or enqueue launches a DAG or inline spec; action=retry retries a DAG-run; action=stop terminates a DAG-run. Set wait=true to wait for the run result.",
+		Title:       "Execute DAG-runs and decide waiting steps",
+		Description: "Run control entry point. action=start or enqueue launches a DAG or inline spec; action=retry retries a DAG-run; action=stop terminates a DAG-run. When dagu_read target=run shows a step waiting for a person (approval or humanTask), action=approve, reject, or push_back decides that step; pass the run's attemptId from that read so a decision based on a stale read is refused. Set wait=true to wait for the run result.",
 		InputSchema: executeToolInputSchema(),
 		Annotations: &mcpsdk.ToolAnnotations{
 			DestructiveHint: truePtr,
 			OpenWorldHint:   falsePtr,
-			Title:           "Execute, enqueue, retry, or stop DAG-runs",
+			Title:           "Execute DAG-runs and decide waiting steps",
 		},
 	}, svc.executeTool)
 }
