@@ -293,6 +293,7 @@ func requireRunData(t *testing.T, data map[string]any, dagName, dagRunID string)
 	require.Equal(t, dagRunID, data["dagRunId"])
 	require.Equal(t, runURI(dagName, dagRunID), data["uri"])
 	require.Equal(t, runLogsURI(dagName, dagRunID, ""), data["logsUri"])
+	require.NotEmpty(t, requireString(t, data, "attemptId"))
 	requireNumber(t, data, "status")
 	require.NotEmpty(t, requireString(t, data, "statusLabel"))
 	// The fixture run is finished, so both run timestamps must be present.
