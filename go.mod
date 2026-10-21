@@ -58,7 +58,7 @@ require (
 	github.com/mholt/archives v0.1.5
 	github.com/moby/moby/api v1.54.2
 	github.com/moby/moby/client v0.3.0
-	github.com/modelcontextprotocol/go-sdk v1.6.1
+	github.com/modelcontextprotocol/go-sdk v1.7.0
 	github.com/oapi-codegen/nethttp-middleware v1.1.2
 	github.com/oapi-codegen/oapi-codegen/v2 v2.7.2
 	github.com/oapi-codegen/runtime v1.7.0
