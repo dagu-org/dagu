@@ -614,25 +614,40 @@ func createTestStatus(st ir.Status) ir.DAGRunStatus {
 	}
 }
 
-// BenchmarkReadLatestStatus reads the latest status of a running DAG whose
-// file holds many snapshots, each carrying a large step output.
+// BenchmarkReadLatestStatus reads the latest status from a running DAG's file,
+// which holds many snapshots with a large step output, and from a finished
+// run's file, which compaction leaves with one small snapshot.
 func BenchmarkReadLatestStatus(b *testing.B) {
-	file := filepath.Join(b.TempDir(), "status.jsonl")
-	var data []byte
-	for i := range 12 {
-		st := createTestStatus(ir.Running)
-		st.PID = ir.PID(i)
-		st.Log = strings.Repeat("x", 512*1024)
-		line, err := json.Marshal(st)
-		require.NoError(b, err)
-		data = append(append(data, line...), '\n')
+	cases := []struct {
+		name      string
+		status    ir.Status
+		snapshots int
+		logSize   int
+	}{
+		{name: "Running", status: ir.Running, snapshots: 12, logSize: 512 * 1024},
+		{name: "Compacted", status: ir.Succeeded, snapshots: 1},
 	}
-	require.NoError(b, os.WriteFile(file, data, 0600))
+	for _, tc := range cases {
+		b.Run(tc.name, func(b *testing.B) {
+			file := filepath.Join(b.TempDir(), "status.jsonl")
+			var data []byte
+			for i := range tc.snapshots {
+				st := createTestStatus(tc.status)
+				st.PID = ir.PID(i)
+				st.Log = strings.Repeat("x", tc.logSize)
+				line, err := json.Marshal(st)
+				require.NoError(b, err)
+				data = append(append(data, line...), '\n')
+			}
+			require.NoError(b, os.WriteFile(file, data, 0600))
 
-	for b.Loop() {
-		if _, err := ParseStatusFile(file); err != nil {
-			b.Fatal(err)
-		}
+			b.ReportAllocs()
+			for b.Loop() {
+				if _, err := ParseStatusFile(file); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
 	}
 }
 

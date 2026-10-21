@@ -25,7 +25,7 @@ const backwardChunkSize = 64 * 1024
 // slice is valid only until fn returns. If r holds fewer than size bytes, the
 // read fails with io.ErrUnexpectedEOF.
 func ReadLinesBackward(ctx context.Context, r io.ReaderAt, size int64, fn func(line []byte, terminated bool) (done bool, err error)) error {
-	buf := make([]byte, backwardChunkSize)
+	buf := make([]byte, min(backwardChunkSize, size))
 	// parts holds, last first, the pieces of a line that spans chunks.
 	var parts [][]byte
 	terminated := false
