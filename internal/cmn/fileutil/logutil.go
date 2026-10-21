@@ -525,14 +525,11 @@ func readLastLines(filePath string, n int, totalLines int, decoder lineDecoder) 
 	}, nil
 }
 
-// tailChunkSize is how many bytes tailStart reads per step backward.
-const tailChunkSize = 64 * 1024
-
 // tailStart returns the offset where the last n lines of a file of the given
 // size begin. A newline that ends the file closes the last line rather than
 // starting an empty one, matching bufio.ScanLines.
 func tailStart(file *os.File, size int64, n int) (int64, error) {
-	buf := make([]byte, tailChunkSize)
+	buf := make([]byte, backwardChunkSize)
 	end := size
 	if end > 0 {
 		if _, err := file.ReadAt(buf[:1], end-1); err != nil {

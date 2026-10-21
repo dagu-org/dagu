@@ -728,26 +728,39 @@ func parseTimeToUnix(s string) int64 {
 
 // parseStatusFile reads the status file. This is a local wrapper to avoid
 // importing the parent dagrun package (which would create a circular dependency).
-// It reads the file and finds the last valid JSON line.
+// It finds the last valid JSON line, reading the file from its end.
 // Keep in sync with internal/dagrun/runstatus.go:StatusFromJSON if the format changes.
 func parseStatusFile(filePath string) (*ir.DAGRunStatus, error) {
-	data, err := fileutil.ReadFile(filePath)
+	f, err := fileutil.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = f.Close()
+	}()
+	info, err := f.Stat()
 	if err != nil {
 		return nil, err
 	}
 
-	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
-	// Walk backwards to find the last valid status line.
-	for _, line := range slices.Backward(lines) {
-		line := strings.TrimSpace(line)
-		if line == "" {
-			continue
+	var result *ir.DAGRunStatus
+	err = fileutil.ReadLinesBackward(context.Background(), f, info.Size(), func(line []byte, _ bool) (bool, error) {
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 {
+			return false, nil
 		}
-		status, err := ir.StatusFromJSON(line)
-		if err == nil {
-			return status, nil
+		status, err := ir.StatusFromJSON(string(line))
+		if err != nil {
+			return false, nil
 		}
+		result = status
+		return true, nil
+	})
+	if err != nil {
+		return nil, err
 	}
-
-	return nil, fmt.Errorf("no valid status found in %s", filePath)
+	if result == nil {
+		return nil, fmt.Errorf("no valid status found in %s", filePath)
+	}
+	return result, nil
 }
