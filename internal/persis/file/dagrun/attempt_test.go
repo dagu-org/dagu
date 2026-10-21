@@ -628,47 +628,10 @@ func BenchmarkReadLatestStatus(b *testing.B) {
 		data = append(append(data, line...), '\n')
 	}
 	require.NoError(b, os.WriteFile(file, data, 0600))
-	b.SetBytes(int64(len(data)))
 
-	b.Run("FromTheEnd", func(b *testing.B) {
-		for b.Loop() {
-			if _, err := ParseStatusFile(file); err != nil {
-				b.Fatal(err)
-			}
-		}
-	})
-	b.Run("EveryLine", func(b *testing.B) {
-		for b.Loop() {
-			if _, err := parseEveryStatusLine(file); err != nil {
-				b.Fatal(err)
-			}
-		}
-	})
-}
-
-// parseEveryStatusLine decodes every line to find the last valid status, as
-// the latest status was read before it was read from the end.
-func parseEveryStatusLine(file string) (*ir.DAGRunStatus, error) {
-	f, err := os.Open(file)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = f.Close() }()
-	var (
-		offset int64
-		result *ir.DAGRunStatus
-	)
-	for {
-		line, next, err := readLineFrom(f, offset)
-		if err == io.EOF {
-			return result, nil
-		}
-		if err != nil {
-			return nil, err
-		}
-		offset = next
-		if status, err := ir.StatusFromJSON(string(line)); err == nil {
-			result = status
+	for b.Loop() {
+		if _, err := ParseStatusFile(file); err != nil {
+			b.Fatal(err)
 		}
 	}
 }
