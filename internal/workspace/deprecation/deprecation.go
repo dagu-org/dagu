@@ -190,7 +190,7 @@ func baseConfigs(dagsDir string) ([]Item, error) {
 		if !entry.IsDir() || path == "" {
 			continue
 		}
-		data, err := os.ReadFile(path)
+		data, err := os.ReadFile(path) //nolint:gosec // a base config under the configured DAGs directory
 		if errors.Is(err, fs.ErrNotExist) {
 			continue
 		}
