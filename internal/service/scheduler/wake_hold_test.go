@@ -16,7 +16,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// memPauseStore is a pause store in memory, written as the API would.
+// memPauseStore is a pause store in memory, written as the API and the
+// scheduler would.
 type memPauseStore struct {
 	mu    sync.Mutex
 	pause schedulerstate.Pause
@@ -43,6 +44,22 @@ func (s *memPauseStore) Set(_ context.Context, paused bool, actor, reason string
 	return nil
 }
 
+func (s *memPauseStore) SetHold(_ context.Context, hold bool, reason string) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	switch {
+	case hold && s.pause.Paused:
+		return false, nil
+	case hold:
+		s.pause = schedulerstate.Pause{Paused: true, Hold: true, PausedAt: time.Now(), PausedBy: schedulerstate.PausedByScheduler, Reason: reason}
+	case !s.pause.WakeHold():
+		return false, nil
+	default:
+		s.pause = schedulerstate.Pause{}
+	}
+	return true, nil
+}
+
 func (s *memPauseStore) state() schedulerstate.Pause {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -52,7 +69,7 @@ func (s *memPauseStore) state() schedulerstate.Pause {
 // wakeLoop runs a cron loop whose clock jumps from noon to five past after
 // its first tick, as a host asleep for five minutes would see; the DAG has no
 // catch-up window and fires at the minutes given. It returns the runs
-// dispatched, the clock to move, and the pause store.
+// dispatched and the clock to move.
 func wakeLoop(t *testing.T, limit time.Duration, pause *memPauseStore, minutes string) (chan PlannedRun, func(time.Time)) {
 	t.Helper()
 	base := time.Date(2026, 1, 2, 12, 0, 0, 0, time.UTC)
@@ -110,12 +127,12 @@ func nextRun(t *testing.T, runs chan PlannedRun) PlannedRun {
 	}
 }
 
-func noRun(t *testing.T, runs chan PlannedRun, for_ time.Duration) {
+func noRun(t *testing.T, runs chan PlannedRun, within time.Duration) {
 	t.Helper()
 	select {
 	case run := <-runs:
 		t.Fatalf("a run came while the scheduler held: %s", run.ScheduledTime)
-	case <-time.After(for_):
+	case <-time.After(within):
 	}
 }
 
@@ -149,7 +166,7 @@ func TestWakeHoldEndsAfterItsDuration(t *testing.T) {
 	awaitHold(t, pause)
 	noRun(t, runs, 100*time.Millisecond)
 	// Nobody comes to release it; past its duration the scheduler lets
-	// itself go and clears the pause it placed.
+	// itself go and lifts the hold it placed.
 	wake := time.Date(2026, 1, 2, 12, 5, 0, 0, time.UTC)
 	setClock(wake.Add(2*time.Minute + 30*time.Second))
 	for _, want := range []time.Time{wake, wake.Add(time.Minute)} {
@@ -170,6 +187,7 @@ func TestWakeHoldDefersToAnOperatorsPause(t *testing.T) {
 	state := pause.state()
 	require.Equal(t, "alice", state.PausedBy)
 	require.Equal(t, "maintenance", state.Reason)
+	require.False(t, state.Hold)
 }
 
 func TestWakeHoldIsOffByDefault(t *testing.T) {
@@ -185,7 +203,9 @@ func TestASuspensionCheckerLetsAWakeHoldThrough(t *testing.T) {
 	perDAG := func(context.Context, string) (bool, error) { return false, nil }
 	check := newSuspensionChecker(pause, perDAG)
 
-	require.NoError(t, pause.Set(t.Context(), true, schedulerstate.PausedByScheduler, wakeHoldReason))
+	held, err := pause.SetHold(t.Context(), true, wakeHoldReason)
+	require.NoError(t, err)
+	require.True(t, held)
 	suspended, err := check(t.Context(), "dag")
 	require.NoError(t, err)
 	require.False(t, suspended, "a wake hold keeps the scheduler's ticks back, not the queue")
@@ -194,12 +214,20 @@ func TestASuspensionCheckerLetsAWakeHoldThrough(t *testing.T) {
 	suspended, err = check(t.Context(), "dag")
 	require.NoError(t, err)
 	require.True(t, suspended, "an operator's pause suspends every DAG")
+
+	// A user who happens to bear the scheduler's name pauses like any other.
+	require.NoError(t, pause.Set(t.Context(), true, schedulerstate.PausedByScheduler, "maintenance"))
+	suspended, err = check(t.Context(), "dag")
+	require.NoError(t, err)
+	require.True(t, suspended, "only the store marks a hold")
 }
 
 func TestAStaleWakeHoldIsClearedAtStart(t *testing.T) {
 	pause := &memPauseStore{}
 	hold := newWakeHold(time.Minute, pause)
-	require.NoError(t, pause.Set(t.Context(), true, schedulerstate.PausedByScheduler, wakeHoldReason))
+	held, err := pause.SetHold(t.Context(), true, wakeHoldReason)
+	require.NoError(t, err)
+	require.True(t, held)
 	hold.clearStale(t.Context())
 	require.False(t, pause.state().Paused)
 

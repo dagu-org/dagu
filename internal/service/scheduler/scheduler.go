@@ -871,7 +871,7 @@ func (s *Scheduler) cronLoop(ctx context.Context, sig chan os.Signal) {
 			continue
 		case tickHeld:
 			tickTime = s.runHeldTicks(ctx, since)
-		default:
+		case tickNow:
 			tickTime = s.runTickSafely(ctx, tickTime)
 		}
 		tickTime = s.NextTick(tickTime)

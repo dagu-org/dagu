@@ -19,12 +19,12 @@ import (
 // up to date; a schedule moved to another host meanwhile would fire here too.
 //
 // With scheduler.wake_hold set, a tick that comes more than wakeGap late
-// holds the scheduler instead: it pauses itself, as PausedByScheduler, and
-// runs no tick until the pause is cleared through the API or the hold's
-// duration passes. The ticks it held then run, the wake's minute first, each
-// dispatched before the next so a run is seen by the tick after it. A wake
-// hold is not an operator's pause: queued runs go on, and nothing is dequeued
-// or discarded (suspension.go).
+// holds the scheduler instead: it pauses itself, a pause the store marks as
+// its hold (PauseStore.SetHold), and runs no tick until the pause is cleared
+// through the API or the hold's duration passes. The ticks it held then run,
+// the wake's minute first, each dispatched before the next so a run is seen
+// by the tick after it. A wake hold is not an operator's pause: queued runs
+// go on, and nothing is dequeued or discarded (suspension.go).
 const (
 	// wakeGap is how late a tick must come before the time in between counts
 	// as the host asleep: a whole minute, so a slow tick is not taken for a
@@ -91,16 +91,12 @@ func (h *wakeHold) begin(ctx context.Context, tickTime, now time.Time) bool {
 	if !h.enabled() || now.Sub(tickTime) <= wakeGap {
 		return false
 	}
-	pause, err := h.store.Get(ctx)
+	held, err := h.store.SetHold(ctx, true, wakeHoldReason)
 	if err != nil {
-		logger.Warn(ctx, "Could not read the scheduler pause state; not holding after the wake", tag.Error(err))
-		return false
-	}
-	if pause.Paused {
-		return false
-	}
-	if err := h.store.Set(ctx, true, schedulerstate.PausedByScheduler, wakeHoldReason); err != nil {
 		logger.Warn(ctx, "Could not hold the scheduler after the wake", tag.Error(err))
+		return false
+	}
+	if !held {
 		return false
 	}
 	h.since = now
@@ -126,7 +122,7 @@ func (h *wakeHold) holding(ctx context.Context, now time.Time) (time.Duration, b
 	if remaining := h.since.Add(h.limit).Sub(now); remaining > 0 {
 		return min(h.poll, remaining), true
 	}
-	if err := h.store.Set(ctx, false, "", ""); err != nil {
+	if _, err := h.store.SetHold(ctx, false, ""); err != nil {
 		logger.Error(ctx, "Could not clear the wake hold", tag.Error(err))
 	}
 	logger.Info(ctx, "Wake hold ended after its duration", slog.Duration("limit", h.limit))
@@ -139,11 +135,10 @@ func (h *wakeHold) clearStale(ctx context.Context) {
 	if h.store == nil {
 		return
 	}
-	pause, err := h.store.Get(ctx)
-	if err != nil || !pause.WakeHold() {
-		return
-	}
-	if err := h.store.Set(ctx, false, "", ""); err != nil {
+	lifted, err := h.store.SetHold(ctx, false, "")
+	if err != nil {
 		logger.Warn(ctx, "Could not clear a stale wake hold", tag.Error(err))
+	} else if lifted {
+		logger.Info(ctx, "Cleared a wake hold a previous scheduler left behind")
 	}
 }

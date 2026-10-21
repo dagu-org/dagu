@@ -41,6 +41,8 @@ func (p fakePause) Get(context.Context) (schedulerstate.Pause, error) {
 
 func (fakePause) Set(context.Context, bool, string, string) error { return nil }
 
+func (fakePause) SetHold(context.Context, bool, string) (bool, error) { return false, nil }
+
 // scheduled is a DAG's watermark with its next run and, unless outcome is
 // empty, its latest slot.
 func scheduled(next time.Time, slot time.Time, outcome schedulerstate.SlotOutcome) schedulerstate.DAGWatermark {
