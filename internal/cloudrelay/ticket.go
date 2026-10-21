@@ -3,7 +3,7 @@
 
 // Package cloudrelay connects a Dagu server to the Dagu Cloud relay, which
 // holds the server's public webhook URLs and hands over what senders post to
-// them.
+// them, and carries calls from Dagu Cloud to the server.
 package cloudrelay
 
 import (
@@ -51,14 +51,33 @@ func (e *TicketRefusedError) Error() string {
 	return fmt.Sprintf("Dagu Cloud refused a relay ticket (%d)", e.StatusCode)
 }
 
+// purposeAccess asks for the ticket of a connection that takes calls from Dagu
+// Cloud.
+const purposeAccess = "access"
+
 // RequestTicket asks Dagu Cloud for a relay ticket with the server's license
-// credentials.
+// credentials: the scheduler's, which takes webhooks.
 func RequestTicket(ctx context.Context, client *http.Client, creds license.CloudCredentials) (Ticket, error) {
-	body, err := json.Marshal(map[string]string{
+	return requestTicket(ctx, client, creds, "")
+}
+
+// RequestAccessTicket asks Dagu Cloud for the ticket of a connection that takes
+// calls from Dagu Cloud. Dagu Cloud refuses it while the server's workspace has
+// neither a plan nor a trial.
+func RequestAccessTicket(ctx context.Context, client *http.Client, creds license.CloudCredentials) (Ticket, error) {
+	return requestTicket(ctx, client, creds, purposeAccess)
+}
+
+func requestTicket(ctx context.Context, client *http.Client, creds license.CloudCredentials, purpose string) (Ticket, error) {
+	fields := map[string]string{
 		"license_id":       creds.LicenseID,
 		"server_id":        creds.ServerID,
 		"heartbeat_secret": creds.HeartbeatSecret,
-	})
+	}
+	if purpose != "" {
+		fields["purpose"] = purpose
+	}
+	body, err := json.Marshal(fields)
 	if err != nil {
 		return Ticket{}, err
 	}
