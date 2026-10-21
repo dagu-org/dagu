@@ -64,6 +64,8 @@ func (o SlotOutcome) Settled() bool {
 	switch o {
 	case SlotFailed, SlotPlanned, SlotMissed:
 		return false
+	case SlotDispatched, SlotRunning, SlotQueued, SlotDone, SlotSucceeded, SlotOverlap:
+		return true
 	default:
 		return true
 	}
