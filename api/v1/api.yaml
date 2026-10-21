@@ -15294,6 +15294,9 @@ components:
             approvalResumePending:
               type: boolean
               description: "Whether a root run has a saved approval and ready work whose resume still needs to be accepted"
+            attemptId:
+              type: string
+              description: "Identifier of the attempt this status belongs to. Each retry of the DAG-run, including a resume after manual action, records a new attempt."
           required:
             - rootDAGRunName
             - rootDAGRunId

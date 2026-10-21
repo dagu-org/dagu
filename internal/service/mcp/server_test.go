@@ -1079,10 +1079,12 @@ func TestNormalizeRunDetailsIncludesStepsAndFailureDetails(t *testing.T) {
 	stepError := "exit status 1"
 	queuedAt := "2026-08-23T01:00:00Z"
 	params := `{"TARGET":"orders"}`
+	attemptID := "attempt-1"
 	raw := daguapi.GetDAGRunDetails200JSONResponse{
 		DagRunDetails: daguapi.DAGRunDetails{
 			Name:        "etl",
 			DagRunId:    "run-1",
+			AttemptId:   &attemptID,
 			Status:      2,
 			StatusLabel: "failed",
 			StartedAt:   "2026-08-23T01:00:05Z",
@@ -1118,6 +1120,7 @@ func TestNormalizeRunDetailsIncludesStepsAndFailureDetails(t *testing.T) {
 	require.Equal(t, "run-1", data["dagRunId"])
 	require.Equal(t, "dagu://runs/etl/run-1", data["uri"])
 	require.Equal(t, "dagu://runs/etl/run-1/logs", data["logsUri"])
+	require.Equal(t, attemptID, data["attemptId"])
 	require.Equal(t, "2026-08-23T01:00:05Z", data["startedAt"])
 	require.Equal(t, "2026-08-23T01:00:09Z", data["finishedAt"])
 	require.Equal(t, queuedAt, data["queuedAt"])
