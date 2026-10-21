@@ -3510,6 +3510,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/license/remote-access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get how far calls from Dagu Cloud may go on this server
+         * @description Returns the highest role calls from Dagu Cloud get on this server, whether they may decide steps waiting for a person, whether configuration fixes either, and whether this server process holds its connection for those calls. Admin only.
+         */
+        get: operations["getLicenseRemoteAccess"];
+        /**
+         * Choose how far calls from Dagu Cloud may go on this server
+         * @description Sets the highest role calls from Dagu Cloud get on this server, whether they may decide steps waiting for a person, or both. Changes apply at once; off closes the connection and ends the calls in flight. Admin only.
+         */
+        put: operations["updateLicenseRemoteAccess"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/wiki": {
         parameters: {
             query?: never;
@@ -7137,6 +7161,25 @@ export interface components {
              * @description When Dagu Console stores this server's finished runs again, after its workspace reached the daily limit; absent when the last accepted report was not told of a pause
              */
             runsPausedUntil?: string;
+        };
+        /**
+         * @description The highest role calls from Dagu Cloud get on this server: off refuses them, viewer reads DAGs, runs, and logs, operator also starts, enqueues, retries, and stops runs of existing DAGs, and developer also changes DAG definitions and runs inline specs
+         * @enum {string}
+         */
+        LicenseRemoteAccessLevel: LicenseRemoteAccessLevel;
+        /** @description How far calls from Dagu Cloud may go on this server, and whether they reach it */
+        LicenseRemoteAccess: {
+            level: components["schemas"]["LicenseRemoteAccessLevel"];
+            /** @description Whether cloud.remote_access in the configuration fixes the level */
+            levelConfigured: boolean;
+            /** @description Whether calls from Dagu Cloud may approve, reject, or push back steps waiting for a person */
+            approvals: boolean;
+            /** @description Whether cloud.remote_approvals in the configuration fixes approvals */
+            approvalsConfigured: boolean;
+            /** @description Whether this server process holds its connection to the relay, so calls from Dagu Cloud reach it */
+            connected: boolean;
+            /** @description Why the last connection failed or Dagu Cloud refused it, such as a workspace without a plan or a trial */
+            error?: string;
         };
         /** @description Request body for changing password */
         ChangePasswordRequest: {
@@ -19028,6 +19071,123 @@ export interface operations {
             };
         };
     };
+    getLicenseRemoteAccess: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Remote access on this server */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LicenseRemoteAccess"];
+                };
+            };
+            /** @description License management is not available */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    updateLicenseRemoteAccess: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    level?: components["schemas"]["LicenseRemoteAccessLevel"];
+                    /** @description Whether calls from Dagu Cloud may approve, reject, or push back steps waiting for a person */
+                    approvals?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Remote access on this server after the change */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LicenseRemoteAccess"];
+                };
+            };
+            /** @description Unknown level, nothing to change, or license management is not available */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description cloud.remote_access or cloud.remote_approvals in the configuration fixes the setting */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     listWikiPages: {
         parameters: {
             query?: {
@@ -22480,6 +22640,12 @@ export enum LicenseMonitoringLevel {
     health = "health",
     runs = "runs",
     errors = "errors"
+}
+export enum LicenseRemoteAccessLevel {
+    off = "off",
+    viewer = "viewer",
+    operator = "operator",
+    developer = "developer"
 }
 export enum APIKeyAllowedSurfaces {
     rest_api = "rest_api",
