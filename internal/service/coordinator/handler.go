@@ -2886,14 +2886,8 @@ func (h *Handler) StartZombieDetector(ctx context.Context, interval time.Duratio
 
 	go func() {
 		defer close(h.zombieDetectorDone)
-		if h.dagRunLeaseStore != nil {
-			timer := time.NewTimer(h.staleLeaseThreshold)
-			select {
-			case <-ctx.Done():
-				timer.Stop()
-				return
-			case <-timer.C:
-			}
+		if h.dagRunLeaseStore != nil && !h.awaitLeaseGrace(ctx, interval) {
+			return
 		}
 		h.detectAndCleanupZombies(ctx)
 		h.cleanupWorkspaceBundles(ctx, time.Now().UTC())
@@ -2914,6 +2908,28 @@ func (h *Handler) StartZombieDetector(ctx context.Context, interval time.Duratio
 			}
 		}
 	}()
+}
+
+// awaitLeaseGrace waits one lease period before the first stale-run pass, so
+// a replacement coordinator does not fail runs whose workers have not yet
+// reported to it. Held dispatches carry their own deadline and keep expiring
+// meanwhile. It reports false when ctx ends first.
+func (h *Handler) awaitLeaseGrace(ctx context.Context, interval time.Duration) bool {
+	grace := time.NewTimer(h.staleLeaseThreshold)
+	defer grace.Stop()
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return false
+		case <-grace.C:
+			return true
+		case now := <-ticker.C:
+			h.expireHeldDispatches(ctx, now.UTC())
+		}
+	}
 }
 
 // WaitZombieDetector waits for the zombie detector goroutine to finish.
