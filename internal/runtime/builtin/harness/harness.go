@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 
 	"github.com/dagucloud/dagu/v2/internal/cmn/runenv"
 
@@ -65,6 +66,7 @@ type harnessExecutor struct {
 	mu                     sync.Mutex
 	process                *cmdutil.ManagedProcess
 	acpCancel              context.CancelFunc
+	acpStopCode            int
 	stdout                 io.Writer
 	stderr                 io.Writer
 	exitCode               int
@@ -165,6 +167,15 @@ func (e *harnessExecutor) stop(req cmdutil.StopRequest) error {
 	}
 	workDir := e.workDir
 	acpCancel := e.acpCancel
+	if acpCancel != nil {
+		e.acpStopCode = 143
+		if req.Intent.IsForce() {
+			e.acpStopCode = 137
+		}
+		if sig, ok := req.Intent.Signal.(syscall.Signal); ok && sig > 0 {
+			e.acpStopCode = 128 + int(sig)
+		}
+	}
 	process := e.process
 	cli := e.containerClient
 	containerCancel := e.containerCancel
@@ -252,7 +263,12 @@ func (e *harnessExecutor) Run(ctx context.Context) error {
 		}
 
 		lastErr = err
-		if errors.Is(err, context.Canceled) {
+		if cfg.definition != nil && cfg.definition.Protocol == "acp" && errors.Is(err, context.Canceled) {
+			e.mu.Lock()
+			if e.acpStopCode != 0 {
+				e.exitCode = e.acpStopCode
+			}
+			e.mu.Unlock()
 			return err
 		}
 		if ctx.Err() != nil {
@@ -1402,23 +1418,7 @@ func knownProviders(defs ir.HarnessDefinitions) []string {
 
 // cloneDefinition copies a reusable harness definition without sharing mutable options.
 func cloneDefinition(def *ir.HarnessDefinition) *ir.HarnessDefinition {
-	if def == nil {
-		return nil
-	}
-	return &ir.HarnessDefinition{
-		Protocol:       def.Protocol,
-		Transport:      def.Transport,
-		URL:            def.URL,
-		Headers:        maps.Clone(def.Headers),
-		Cwd:            def.Cwd,
-		Binary:         def.Binary,
-		PrefixArgs:     append([]string(nil), def.PrefixArgs...),
-		PromptMode:     def.PromptMode,
-		PromptFlag:     def.PromptFlag,
-		PromptPosition: def.PromptPosition,
-		FlagStyle:      def.FlagStyle,
-		OptionFlags:    maps.Clone(def.OptionFlags),
-	}
+	return ir.CloneHarnessDefinition(def)
 }
 
 func isTemplatedValue(value string) bool {

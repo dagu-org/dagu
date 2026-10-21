@@ -17,6 +17,7 @@ import (
 	"github.com/coder/websocket"
 	"github.com/dagucloud/dagu/v2/internal/ir"
 	"github.com/dagucloud/dagu/v2/internal/runtime"
+	"golang.org/x/net/http/httpguts"
 )
 
 var acpRemoteDefaultHTTPClient = &http.Client{
@@ -39,20 +40,16 @@ func (e *harnessExecutor) runACPRemote(parent context.Context, cfg providerConfi
 		e.mu.Unlock()
 	}()
 	for key := range cfg.flags {
-		if !reservedKeys[key] && key != "acp_permission" && key != "ca_file" {
+		if !reservedKeys[key] && key != "acp_permission" {
 			return fmt.Errorf("harness: remote ACP does not accept CLI option %q", key)
 		}
-	}
-	caFile, ok := cfg.flags["ca_file"].(string)
-	if cfg.flags["ca_file"] != nil && !ok {
-		return errors.New("harness: ca_file must be a string")
 	}
 	settings, err := runtime.EvalObject(ctx, struct {
 		URL     string
 		CAFile  string
 		Cwd     string
 		Headers map[string]string
-	}{cfg.definition.URL, caFile, cfg.definition.Cwd, cfg.definition.Headers})
+	}{cfg.definition.URL, cfg.definition.CAFile, cfg.definition.Cwd, cfg.definition.Headers})
 	if err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -61,6 +58,7 @@ func (e *harnessExecutor) runACPRemote(parent context.Context, cfg providerConfi
 	}
 	def := cloneDefinition(cfg.definition)
 	def.URL, def.Cwd, def.Headers = settings.URL, settings.Cwd, settings.Headers
+	def.CAFile = settings.CAFile
 	if err := def.ValidateConnection(); err != nil {
 		return fmt.Errorf("harness: remote ACP: %w", err)
 	}
@@ -70,6 +68,9 @@ func (e *harnessExecutor) runACPRemote(parent context.Context, cfg providerConfi
 	httpClient, err := acpRemoteHTTPClient(settings.CAFile, e.workDir)
 	if err != nil {
 		return err
+	}
+	if def.CAFile != "" {
+		defer httpClient.CloseIdleConnections()
 	}
 	wireCtx, closeWire := context.WithCancel(context.Background())
 	defer closeWire()
@@ -82,9 +83,9 @@ func (e *harnessExecutor) runACPRemote(parent context.Context, cfg providerConfi
 			return dialErr
 		}
 		stream = &acpWebSocketStream{ctx: wireCtx, conn: socket}
-		go keepACPWebSocketAlive(wireCtx, socket)
+		go keepACPWebSocketAlive(wireCtx, socket, 25*time.Second)
 	}
-	client := &acpHarnessClient{out: out, allow: allow}
+	client := &acpHarnessClient{out: out, allow: allow, progress: e.progressCallback}
 	conn := acp.NewClientSideConnection(client, stream, stream)
 	defer func() {
 		closeWire()
@@ -109,8 +110,11 @@ func dialACPWebSocket(ctx context.Context, def *ir.HarnessDefinition, client *ht
 		headers.Set(key, value)
 	}
 	protocols := []string{"acp.v1"}
-	if auth := strings.Fields(headers.Get("Authorization")); len(auth) == 2 && strings.EqualFold(auth[0], "Bearer") {
-		// ACP UI bridges can authenticate the browser-compatible subprotocol.
+	if def.BearerSubprotocol {
+		auth := strings.Fields(headers.Get("Authorization"))
+		if len(auth) != 2 || !strings.EqualFold(auth[0], "Bearer") || !httpguts.ValidHeaderFieldName("bearer."+auth[1]) {
+			return nil, errors.New("harness: bearer_subprotocol requires a Bearer token valid as an HTTP token")
+		}
 		protocols = append(protocols, "bearer."+auth[1])
 	}
 	dialCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
@@ -175,9 +179,9 @@ func (s *acpWebSocketStream) Write(p []byte) (int, error) {
 // Close interrupts blocked reads and writes without waiting for a peer handshake.
 func (s *acpWebSocketStream) Close() error { return s.conn.CloseNow() }
 
-// keepACPWebSocketAlive uses ACP UI's notification heartbeat across idle proxies.
-func keepACPWebSocketAlive(ctx context.Context, socket *websocket.Conn) {
-	ticker := time.NewTicker(25 * time.Second)
+// keepACPWebSocketAlive uses protocol-level ping frames across idle proxies.
+func keepACPWebSocketAlive(ctx context.Context, socket *websocket.Conn, interval time.Duration) {
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
 		select {
@@ -185,7 +189,7 @@ func keepACPWebSocketAlive(ctx context.Context, socket *websocket.Conn) {
 			return
 		case <-ticker.C:
 			pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-			err := socket.Write(pingCtx, websocket.MessageText, []byte("{\"jsonrpc\":\"2.0\",\"method\":\"$/ping\"}\n"))
+			err := socket.Ping(pingCtx)
 			cancel()
 			if err != nil {
 				_ = socket.CloseNow()

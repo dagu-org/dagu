@@ -36,18 +36,20 @@ const (
 
 // HarnessDefinition describes how to invoke a CLI or connect to an ACP agent.
 type HarnessDefinition struct {
-	Protocol       string                `json:"protocol,omitempty"`
-	Transport      string                `json:"transport,omitempty"`
-	URL            string                `json:"url,omitempty"`
-	Headers        map[string]string     `json:"headers,omitempty"`
-	Cwd            string                `json:"cwd,omitempty"`
-	Binary         string                `json:"binary,omitempty"`
-	PrefixArgs     []string              `json:"prefixArgs,omitempty"`
-	PromptMode     HarnessPromptMode     `json:"promptMode,omitempty"`
-	PromptFlag     string                `json:"promptFlag,omitempty"`
-	PromptPosition HarnessPromptPosition `json:"promptPosition,omitempty"`
-	FlagStyle      HarnessFlagStyle      `json:"flagStyle,omitempty"`
-	OptionFlags    map[string]string     `json:"optionFlags,omitempty"`
+	Protocol          string                `json:"protocol,omitempty"`
+	Transport         string                `json:"transport,omitempty"`
+	URL               string                `json:"url,omitempty"`
+	CAFile            string                `json:"caFile,omitempty"`
+	BearerSubprotocol bool                  `json:"bearerSubprotocol,omitempty"`
+	Headers           map[string]string     `json:"headers,omitempty"`
+	Cwd               string                `json:"cwd,omitempty"`
+	Binary            string                `json:"binary,omitempty"`
+	PrefixArgs        []string              `json:"prefixArgs,omitempty"`
+	PromptMode        HarnessPromptMode     `json:"promptMode,omitempty"`
+	PromptFlag        string                `json:"promptFlag,omitempty"`
+	PromptPosition    HarnessPromptPosition `json:"promptPosition,omitempty"`
+	FlagStyle         HarnessFlagStyle      `json:"flagStyle,omitempty"`
+	OptionFlags       map[string]string     `json:"optionFlags,omitempty"`
 }
 
 // ValidateConnection checks the mutually exclusive local and remote launch settings.
@@ -59,9 +61,12 @@ func (d *HarnessDefinition) ValidateConnection() error {
 	if d.Transport != "" && d.Protocol != "acp" {
 		return errors.New("transport requires protocol: acp")
 	}
+	if d.BearerSubprotocol && d.Transport != "websocket" {
+		return errors.New("bearer_subprotocol requires transport: websocket")
+	}
 	if d.Transport != "websocket" && d.Transport != "http" {
-		if d.URL != "" || len(d.Headers) != 0 || d.Cwd != "" {
-			return errors.New("url, headers, and cwd require a remote transport")
+		if d.URL != "" || len(d.Headers) != 0 || d.Cwd != "" || d.CAFile != "" {
+			return errors.New("url, headers, cwd, and ca_file require a remote transport")
 		}
 		if d.Binary == "" {
 			return errors.New("binary is required")
@@ -194,7 +199,8 @@ func preferBuiltinHarnessKeyVariant(candidate, current string) bool {
 	return false
 }
 
-func cloneHarnessDefinition(def *HarnessDefinition) *HarnessDefinition {
+// CloneHarnessDefinition copies a definition without sharing mutable slices or maps.
+func CloneHarnessDefinition(def *HarnessDefinition) *HarnessDefinition {
 	if def == nil {
 		return nil
 	}
@@ -211,7 +217,7 @@ func cloneHarnessDefinitions(defs HarnessDefinitions) HarnessDefinitions {
 	}
 	cloned := make(HarnessDefinitions, len(defs))
 	for name, def := range defs {
-		cloned[name] = cloneHarnessDefinition(def)
+		cloned[name] = CloneHarnessDefinition(def)
 	}
 	return cloned
 }

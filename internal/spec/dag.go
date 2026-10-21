@@ -2848,10 +2848,10 @@ func parseHarnessDefinition(name string, raw map[string]any) (*ir.HarnessDefinit
 			}
 			def.Binary = strings.TrimSpace(binary)
 
-		case "transport", "url", "cwd":
+		case "transport", "url", "cwd", "ca_file":
 			text, ok := value.(string)
 			if !ok || strings.TrimSpace(text) == "" {
-				return nil, ir.NewValidationError(fmt.Sprintf("harnesses.%s.%s", name, key), nil, fmt.Errorf("%s must be a non-empty string", key))
+				return nil, ir.NewValidationError(fmt.Sprintf("harnesses.%s.%s", name, key), value, fmt.Errorf("%s must be a non-empty string", key))
 			}
 			switch key {
 			case "transport":
@@ -2860,11 +2860,19 @@ func parseHarnessDefinition(name string, raw map[string]any) (*ir.HarnessDefinit
 				def.URL = text
 			case "cwd":
 				def.Cwd = text
+			case "ca_file":
+				def.CAFile = text
 			}
+		case "bearer_subprotocol":
+			enabled, ok := value.(bool)
+			if !ok {
+				return nil, ir.NewValidationError(fmt.Sprintf("harnesses.%s.%s", name, key), value, fmt.Errorf("bearer_subprotocol must be a boolean"))
+			}
+			def.BearerSubprotocol = enabled
 		case "headers":
 			headers, err := harnessStringMap(value)
 			if err != nil {
-				return nil, ir.NewValidationError(fmt.Sprintf("harnesses.%s.headers", name), nil, fmt.Errorf("headers must map names to strings"))
+				return nil, ir.NewValidationError(fmt.Sprintf("harnesses.%s.headers", name), value, fmt.Errorf("headers must map names to strings"))
 			}
 			def.Headers = headers
 		case "protocol":
@@ -2937,17 +2945,20 @@ func parseHarnessDefinition(name string, raw map[string]any) (*ir.HarnessDefinit
 	if def.Transport == "websocket" || def.Transport == "http" {
 		for _, key := range []string{"binary", "prefix_args", "option_flags", "flag_style"} {
 			if _, exists := raw[key]; exists {
-				return nil, ir.NewValidationError(fmt.Sprintf("harnesses.%s.%s", name, key), nil, fmt.Errorf("%s is not supported with remote transport", key))
+				return nil, ir.NewValidationError(fmt.Sprintf("harnesses.%s.%s", name, key), raw[key], fmt.Errorf("%s is not supported with remote transport", key))
 			}
 		}
 	} else {
-		for _, key := range []string{"url", "headers", "cwd"} {
+		for _, key := range []string{"url", "headers", "cwd", "ca_file"} {
 			if _, exists := raw[key]; exists {
-				return nil, ir.NewValidationError(fmt.Sprintf("harnesses.%s.%s", name, key), nil, fmt.Errorf("%s requires a remote transport", key))
+				return nil, ir.NewValidationError(fmt.Sprintf("harnesses.%s.%s", name, key), raw[key], fmt.Errorf("%s requires a remote transport", key))
 			}
 		}
 	}
 
+	if _, exists := raw["bearer_subprotocol"]; exists && def.Transport != "websocket" {
+		return nil, ir.NewValidationError(fmt.Sprintf("harnesses.%s.bearer_subprotocol", name), raw["bearer_subprotocol"], fmt.Errorf("bearer_subprotocol requires transport: websocket"))
+	}
 	if def.Transport != "websocket" && def.Transport != "http" && def.Binary == "" {
 		return nil, ir.NewValidationError(fmt.Sprintf("harnesses.%s.binary", name), raw["binary"], fmt.Errorf("binary is required"))
 	}

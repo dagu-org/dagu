@@ -5200,9 +5200,14 @@
             "not": {"anyOf": [
               {"required": ["url"]},
               {"required": ["headers"]},
-              {"required": ["cwd"]}
+              {"required": ["cwd"]},
+              {"required": ["ca_file"]}
             ]}
           }
+        },
+        {
+          "if": {"required": ["bearer_subprotocol"]},
+          "then": {"properties": {"transport": {"const": "websocket"}}, "required": ["transport"]}
         },
         {
           "if": {
@@ -5262,6 +5267,16 @@
           "type": "object",
           "additionalProperties": {"type": "string"},
           "description": "Remote request headers, such as Authorization. Values support workflow variable references."
+        },
+        "ca_file": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional PEM CA roots for this remote connection, in addition to system roots. Relative paths use the local step working directory."
+        },
+        "bearer_subprotocol": {
+          "type": "boolean",
+          "default": false,
+          "description": "Opt in to bearer.<token> WebSocket subprotocol authentication for compatible bridges. Tokens must be valid HTTP tokens; keep disabled when Authorization headers suffice."
         },
         "binary": {
           "type": "string",

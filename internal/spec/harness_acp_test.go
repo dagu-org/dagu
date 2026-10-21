@@ -36,6 +36,12 @@ func TestACPRemoteDefinition(t *testing.T) {
 	require.Empty(t, def.Binary)
 	require.Equal(t, "websocket", def.Transport)
 	require.Equal(t, "Bearer ${ACP_TOKEN}", def.Headers["Authorization"])
+	for key, value := range map[string]any{"ca_file": "/private/ca.pem", "bearer_subprotocol": true} {
+		withConnectionOption := maps.Clone(raw)
+		withConnectionOption[key] = value
+		_, err := parseHarnessDefinition("remote", withConnectionOption)
+		require.NoError(t, err)
+	}
 	httpConfig := maps.Clone(raw)
 	httpConfig["transport"], httpConfig["url"] = "http", "https://agent.example/acp"
 	_, err = parseHarnessDefinition("remote", httpConfig)
@@ -49,6 +55,7 @@ func TestACPRemoteDefinition(t *testing.T) {
 		{"url", ""}, {"cwd", ""}, {"cwd", "relative/path"},
 		{"binary", "adapter"}, {"prefix_args", []any{}}, {"flag_style", "gnu_long"},
 		{"headers", map[string]any{"Authorization": true}},
+		{"ca_file", false}, {"ca_file", ""}, {"bearer_subprotocol", "true"},
 	} {
 		t.Run(tc.key, func(t *testing.T) {
 			invalid := make(map[string]any, len(raw))

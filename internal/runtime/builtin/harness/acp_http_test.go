@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -222,8 +223,8 @@ func TestACPWSS(t *testing.T) {
 	server, _, _ := newACPWebSocketPeer(t, true)
 	caFile := filepath.Join(t.TempDir(), "ca.pem")
 	require.NoError(t, os.WriteFile(caFile, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.TLS.Certificates[0].Certificate[0]}), 0o600))
-	def := &ir.HarnessDefinition{Protocol: "acp", Transport: "websocket", URL: strings.Replace(server.URL, "https", "wss", 1), Cwd: "/remote/workspace"}
-	step := ir.Step{ExecutorConfig: ir.ExecutorConfig{Config: map[string]any{"provider": "remote", "ca_file": caFile}}, Commands: []ir.CommandEntry{{Command: "hello"}}}
+	def := &ir.HarnessDefinition{Protocol: "acp", Transport: "websocket", URL: strings.Replace(server.URL, "https", "wss", 1), Cwd: "/remote/workspace", CAFile: caFile}
+	step := ir.Step{ExecutorConfig: ir.ExecutorConfig{Config: map[string]any{"provider": "remote"}}, Commands: []ir.CommandEntry{{Command: "hello"}}}
 	ctx := newHarnessTestContext(t, &ir.DAG{Harnesses: ir.HarnessDefinitions{"remote": def}}, step)
 	exec, err := newHarness(ctx, step)
 	require.NoError(t, err)
@@ -241,12 +242,21 @@ func TestACPHTTPS(t *testing.T) {
 		peer.Config.Handler.ServeHTTP(w, r)
 	}))
 	server.EnableHTTP2 = true
+	var connections atomic.Int32
+	server.Config.ConnState = func(_ net.Conn, state http.ConnState) {
+		if state == http.StateNew {
+			connections.Add(1)
+		}
+		if state == http.StateClosed {
+			connections.Add(-1)
+		}
+	}
 	server.StartTLS()
 	defer server.Close()
 	caFile := filepath.Join(t.TempDir(), "ca.pem")
 	require.NoError(t, os.WriteFile(caFile, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.TLS.Certificates[0].Certificate[0]}), 0o600))
-	def := &ir.HarnessDefinition{Protocol: "acp", Transport: "http", URL: server.URL, Cwd: "/remote/workspace", Headers: map[string]string{"Authorization": "Bearer test-token"}}
-	step := ir.Step{ExecutorConfig: ir.ExecutorConfig{Config: map[string]any{"provider": "remote", "ca_file": caFile}}, Commands: []ir.CommandEntry{{Command: "hello"}}}
+	def := &ir.HarnessDefinition{Protocol: "acp", Transport: "http", URL: server.URL, Cwd: "/remote/workspace", Headers: map[string]string{"Authorization": "Bearer test-token"}, CAFile: caFile}
+	step := ir.Step{ExecutorConfig: ir.ExecutorConfig{Config: map[string]any{"provider": "remote"}}, Commands: []ir.CommandEntry{{Command: "hello"}}}
 	ctx := newHarnessTestContext(t, &ir.DAG{Harnesses: ir.HarnessDefinitions{"remote": def}}, step)
 	exec, err := newHarness(ctx, step)
 	require.NoError(t, err)
@@ -255,4 +265,5 @@ func TestACPHTTPS(t *testing.T) {
 	require.NoError(t, exec.Run(ctx))
 	require.Equal(t, "http:hello", out.String())
 	require.EqualValues(t, 1, deleted.Load())
+	require.Eventually(t, func() bool { return connections.Load() == 0 }, time.Second, 10*time.Millisecond, "private CA transport left an idle connection open")
 }

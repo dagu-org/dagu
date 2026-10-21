@@ -177,6 +177,10 @@ func runHarnessACPRemote(t *testing.T, secure bool) {
 	dagu := harness.NewRunner(t)
 	binary, err := os.Executable()
 	require.NoError(t, err)
+	caConfig := ""
+	if secure {
+		caConfig = fmt.Sprintf("    ca_file: %q\n", caFile)
+	}
 	dagu.WriteFile("remote.yaml", fmt.Sprintf(`env:
   ACP_ENDPOINT: %q
   ACP_TOKEN: test-token
@@ -186,7 +190,7 @@ harnesses:
     protocol: acp
     transport: websocket
     url: ${ACP_ENDPOINT}
-    cwd: ${AGENT_CWD}
+%s    cwd: ${AGENT_CWD}
     headers:
       Authorization: Bearer ${ACP_TOKEN}
   local:
@@ -198,7 +202,6 @@ steps:
     action: harness.run
     with:
       provider: remote
-      ca_file: %q
       prompt: hello
       stdin: context
     output: ANSWER
@@ -208,7 +211,7 @@ steps:
     with:
       provider: local
       prompt: "${ANSWER}"
-`, strings.Replace(server.URL, "http", "ws", 1), binary, caFile))
+`, strings.Replace(server.URL, "http", "ws", 1), caConfig, binary))
 	dagu.Run("validate", "remote.yaml").ExpectExitCode(0)
 	result := dagu.Run("start", "remote.yaml")
 	result.ExpectExitCode(0)

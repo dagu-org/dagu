@@ -49,6 +49,10 @@ steps:
 	require.NoError(t, resolved.Validate(mustParseYAMLDocument(t, source)))
 	httpSource := strings.ReplaceAll(strings.ReplaceAll(source, "websocket", "http"), "wss://", "https://")
 	require.NoError(t, resolved.Validate(mustParseYAMLDocument(t, httpSource)))
+	for _, option := range []string{"ca_file: /private/ca.pem", "bearer_subprotocol: true"} {
+		withOption := strings.Replace(source, "transport: websocket", "transport: websocket\n    "+option, 1)
+		require.NoError(t, resolved.Validate(mustParseYAMLDocument(t, withOption)))
+	}
 	for _, tc := range []struct{ from, to string }{
 		{"protocol: acp", "protocol: cli"},
 		{"transport: websocket", "transport: grpc"},
@@ -58,6 +62,9 @@ steps:
 		{"transport: websocket", "transport: websocket\n    prefix_args: []"},
 		{"transport: websocket", "transport: websocket\n    flag_style: gnu_long"},
 		{"transport: websocket", "transport: stdio\n    binary: adapter"},
+		{"transport: websocket", "transport: websocket\n    ca_file: false"},
+		{"transport: websocket", "transport: websocket\n    bearer_subprotocol: enabled"},
+		{"transport: websocket", "transport: http\n    bearer_subprotocol: true"},
 	} {
 		require.Error(t, resolved.Validate(mustParseYAMLDocument(t, strings.Replace(source, tc.from, tc.to, 1))))
 	}

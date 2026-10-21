@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -30,7 +31,7 @@ func newACPWebSocketPeer(t *testing.T, tls bool) (*httptest.Server, <-chan struc
 		if r.URL.Query().Has("authenticate") {
 			assert.Equal(t, "Bearer test-token", r.Header.Get("Authorization"))
 			assert.Equal(t, "test-value", r.Header.Get("X-Agent"))
-			assert.Contains(t, r.Header.Get("Sec-WebSocket-Protocol"), "bearer.test-token")
+			assert.NotContains(t, r.Header.Get("Sec-WebSocket-Protocol"), "bearer.test-token")
 		}
 		socket, err := websocket.Accept(w, r, &websocket.AcceptOptions{Subprotocols: []string{"acp.v1"}})
 		if !assert.NoError(t, err) {
@@ -105,7 +106,6 @@ func newACPWebSocketPeer(t *testing.T, tls bool) (*httptest.Server, <-chan struc
 				send(update("remote:"), update(msg.Params.Prompt[0].Text), result(msg.ID, map[string]any{"stopReason": "end_turn"}))
 			case "session/cancel":
 				cancelled <- struct{}{}
-			case "$/ping":
 			default:
 				if msg.ID == "permission" {
 					assert.True(t, strings.Contains(string(msg.Result), "selected") || strings.Contains(string(msg.Result), "cancelled"))
@@ -122,6 +122,79 @@ func newACPWebSocketPeer(t *testing.T, tls bool) (*httptest.Server, <-chan struc
 	}
 	t.Cleanup(server.Close)
 	return server, prompted, cancelled
+}
+
+// Heartbeats must be WebSocket control frames, not invented ACP methods.
+func TestACPHeartbeat(t *testing.T) {
+	pinged, text := make(chan struct{}, 1), make(chan struct{}, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{OnPingReceived: func(context.Context, []byte) bool {
+			select {
+			case pinged <- struct{}{}:
+			default:
+			}
+			return true
+		}})
+		if !assert.NoError(t, err) {
+			return
+		}
+		defer func() { _ = conn.CloseNow() }()
+		if _, _, err := conn.Read(r.Context()); err == nil {
+			text <- struct{}{}
+		}
+	}))
+	defer server.Close()
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+	defer cancel()
+	conn, _, err := websocket.Dial(ctx, strings.Replace(server.URL, "http", "ws", 1), nil)
+	require.NoError(t, err)
+	defer func() { _ = conn.CloseNow() }()
+	readerDone := make(chan struct{})
+	go func() { defer close(readerDone); _, _, _ = conn.Read(ctx) }()
+	beatDone := make(chan struct{})
+	go func() { defer close(beatDone); keepACPWebSocketAlive(ctx, conn, 10*time.Millisecond) }()
+	defer func() { cancel(); _ = conn.CloseNow(); <-readerDone; <-beatDone }()
+	select {
+	case <-pinged:
+	case <-text:
+		t.Fatal("heartbeat sent an ACP application message")
+	case <-ctx.Done():
+		t.Fatal("no WebSocket ping received")
+	}
+}
+
+func TestACPBearerSubprotocol(t *testing.T) {
+	for _, token := range []string{"test.jwt.signature", "base64-secret==", "slash/secret"} {
+		for _, enabled := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/%t", token, enabled), func(t *testing.T) {
+				var requests atomic.Int32
+				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					requests.Add(1)
+					assert.Equal(t, "Bearer "+token, r.Header.Get("Authorization"))
+					if enabled {
+						assert.Contains(t, r.Header.Get("Sec-WebSocket-Protocol"), "bearer."+token)
+					} else {
+						assert.NotContains(t, r.Header.Get("Sec-WebSocket-Protocol"), token)
+					}
+					conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{Subprotocols: []string{"acp.v1"}})
+					if assert.NoError(t, err) {
+						_ = conn.CloseNow()
+					}
+				}))
+				defer server.Close()
+				def := &ir.HarnessDefinition{URL: strings.Replace(server.URL, "http", "ws", 1), BearerSubprotocol: enabled, Headers: map[string]string{"Authorization": "Bearer " + token}}
+				conn, err := dialACPWebSocket(t.Context(), def, acpRemoteDefaultHTTPClient)
+				if enabled && token != "test.jwt.signature" {
+					require.Error(t, err)
+					require.NotContains(t, err.Error(), token)
+					require.Zero(t, requests.Load())
+					return
+				}
+				require.NoError(t, err)
+				_ = conn.CloseNow()
+			})
+		}
+	}
 }
 
 // TestACPWebSocket checks remote framing, authentication, permissions, and failures.

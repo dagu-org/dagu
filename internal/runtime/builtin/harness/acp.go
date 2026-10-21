@@ -23,6 +23,9 @@ import (
 // runACP executes one prompt over the configured ACP transport and spools its text output.
 func (e *harnessExecutor) runACP(parent context.Context, cfg providerConfig) (stdout *os.File, err error) {
 	e.exitCode = 1
+	e.mu.Lock()
+	e.acpStopCode = 0
+	e.mu.Unlock()
 	if e.step.Container != nil || rootContainerConfigured(parent) {
 		return nil, errors.New("harness: ACP is not supported inside containers")
 	}
@@ -94,7 +97,7 @@ func (e *harnessExecutor) runACP(parent context.Context, cfg providerConfig) (st
 	}
 	e.process, e.acpCancel = process, cancel
 	e.mu.Unlock()
-	client := &acpHarnessClient{out: spool, allow: policy == "allow"}
+	client := &acpHarnessClient{out: spool, allow: policy == "allow", progress: e.progressCallback}
 	conn := acp.NewClientSideConnection(client, input, output)
 	defer func() {
 		_ = input.Close()
@@ -166,7 +169,7 @@ func (e *harnessExecutor) acpTurn(ctx context.Context, conn *acp.ClientSideConne
 	if err != nil {
 		return fmt.Errorf("initialize: %w", err)
 	}
-	if init.ProtocolVersion != acp.ProtocolVersionNumber {
+	if init.ProtocolVersion < 1 || init.ProtocolVersion > acp.ProtocolVersionNumber {
 		return fmt.Errorf("unsupported protocol version %d", init.ProtocolVersion)
 	}
 	session, err := conn.NewSession(ctx, acp.NewSessionRequest{Cwd: directory, McpServers: []acp.McpServer{}})
@@ -196,11 +199,12 @@ func (e *harnessExecutor) acpTurn(ctx context.Context, conn *acp.ClientSideConne
 }
 
 type acpHarnessClient struct {
-	mu      sync.Mutex
-	out     io.Writer
-	allow   bool
-	session acp.SessionId
-	err     error
+	mu       sync.Mutex
+	out      io.Writer
+	allow    bool
+	session  acp.SessionId
+	err      error
+	progress func()
 }
 
 var _ acp.Client = (*acpHarnessClient)(nil)
@@ -211,6 +215,9 @@ func (c *acpHarnessClient) SessionUpdate(_ context.Context, params acp.SessionNo
 	defer c.mu.Unlock()
 	if params.SessionId != c.session {
 		return nil
+	}
+	if c.progress != nil {
+		c.progress()
 	}
 	if chunk := params.Update.AgentMessageChunk; chunk != nil && chunk.Content.Text != nil {
 		_, err := io.WriteString(c.out, chunk.Content.Text.Text)

@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -208,7 +209,22 @@ func TestACPStop(t *testing.T) {
 	select {
 	case err := <-done:
 		require.ErrorIs(t, err, context.Canceled)
+		require.Equal(t, 137, e.ExitCode())
 	case <-time.After(5 * time.Second):
 		t.Fatal("ACP process did not stop")
 	}
+}
+
+func TestACPProgress(t *testing.T) {
+	binary, err := os.Executable()
+	require.NoError(t, err)
+	dag := &ir.DAG{Harnesses: ir.HarnessDefinitions{"agent": {Protocol: "acp", Binary: binary, PrefixArgs: []string{"-test.run=^TestACPAgent$", "--", "--acp-test-agent", "echo"}}}}
+	step := ir.Step{ExecutorConfig: ir.ExecutorConfig{Config: map[string]any{"provider": "agent"}}, Commands: []ir.CommandEntry{{Command: "hello"}}}
+	ctx := newHarnessTestContext(t, dag, step)
+	exec, err := newHarness(ctx, step)
+	require.NoError(t, err)
+	var progress atomic.Int32
+	exec.(*harnessExecutor).SetProgressCallback(func() { progress.Add(1) })
+	require.NoError(t, exec.Run(ctx))
+	require.Positive(t, progress.Load())
 }
