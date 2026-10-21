@@ -98,28 +98,29 @@ func (s *Settings) Status(ctx context.Context) (Status, error) {
 	return status, nil
 }
 
-// SetLevel chooses the highest role calls get. It fails with ErrConfigured
-// when configuration fixes the level, and with ErrUnknownLevel for an
-// unknown one.
-func (s *Settings) SetLevel(ctx context.Context, level config.RemoteAccessLevel) error {
-	if s.configured.RemoteAccess != "" {
+// Set chooses the highest role calls get, whether they may decide steps
+// waiting for a person, or both, in one change; nil leaves either as it is.
+// It fails, changing nothing, with ErrConfigured when configuration fixes a
+// setting it was given, and with ErrUnknownLevel for an unknown level.
+func (s *Settings) Set(ctx context.Context, level *config.RemoteAccessLevel, approvals *bool) error {
+	if level != nil && s.configured.RemoteAccess != "" || approvals != nil && s.configured.RemoteApprovals != nil {
 		return ErrConfigured
 	}
-	switch level {
-	case config.RemoteAccessOff, config.RemoteAccessViewer, config.RemoteAccessOperator, config.RemoteAccessDeveloper:
-	default:
-		return fmt.Errorf("%w: %q", ErrUnknownLevel, level)
+	if level != nil {
+		switch *level {
+		case config.RemoteAccessOff, config.RemoteAccessViewer, config.RemoteAccessOperator, config.RemoteAccessDeveloper:
+		default:
+			return fmt.Errorf("%w: %q", ErrUnknownLevel, *level)
+		}
 	}
-	return s.update(ctx, func(c *choice) { c.Level = level })
-}
-
-// SetApprovals chooses whether calls may decide steps waiting for a person.
-// It fails with ErrConfigured when configuration fixes it.
-func (s *Settings) SetApprovals(ctx context.Context, on bool) error {
-	if s.configured.RemoteApprovals != nil {
-		return ErrConfigured
-	}
-	return s.update(ctx, func(c *choice) { c.Approvals = on })
+	return s.update(ctx, func(c *choice) {
+		if level != nil {
+			c.Level = *level
+		}
+		if approvals != nil {
+			c.Approvals = *approvals
+		}
+	})
 }
 
 // changes signals each choice made in this process.

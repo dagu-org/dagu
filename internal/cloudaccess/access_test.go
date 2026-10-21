@@ -86,7 +86,7 @@ func (f *fakeCloud) accept(t *testing.T) *websocket.Conn {
 func startAccess(t *testing.T, cloud *fakeCloud, key cloudKey, level config.RemoteAccessLevel, mcp http.Handler) (*Service, *Settings) {
 	t.Helper()
 	settings := NewSettings(config.CloudConfig{}, filemonitor.NewStateStore(filepath.Join(t.TempDir(), "access-settings.json")))
-	require.NoError(t, settings.SetLevel(context.Background(), level))
+	require.NoError(t, settings.Set(context.Background(), new(level), nil))
 	creds := testCreds
 	creds.CloudURL = cloud.console.URL
 	service := New(Config{
@@ -124,7 +124,7 @@ func TestRemoteAccessHoldsAConnectionWhileOn(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	assert.Zero(t, cloud.tickets.Load(), "nothing connects while remote access is off")
 
-	require.NoError(t, settings.SetLevel(ctx, config.RemoteAccessViewer))
+	require.NoError(t, settings.Set(ctx, new(config.RemoteAccessViewer), nil))
 	ws := cloud.accept(t)
 	assert.Regexp(t, `^[A-Za-z0-9_-]{22}$`, cloud.instance.Load())
 	require.Eventually(t, func() bool { return service.State().Connected }, waitFor, 10*time.Millisecond)
@@ -141,7 +141,7 @@ func TestRemoteAccessHoldsAConnectionWhileOn(t *testing.T) {
 		t.Fatal("the call was not served")
 	}
 
-	require.NoError(t, settings.SetLevel(ctx, config.RemoteAccessOff))
+	require.NoError(t, settings.Set(ctx, new(config.RemoteAccessOff), nil))
 	select {
 	case <-ended:
 	case <-time.After(waitFor):
@@ -170,7 +170,7 @@ func TestRemoteAccessWaitsAfterARefusal(t *testing.T) {
 	assert.Equal(t, int32(1), cloud.tickets.Load())
 
 	cloud.refusal.Store("")
-	require.NoError(t, settings.SetLevel(context.Background(), config.RemoteAccessDeveloper))
+	require.NoError(t, settings.Set(context.Background(), new(config.RemoteAccessDeveloper), nil))
 	cloud.accept(t)
 	require.Eventually(t, func() bool { return service.State().Connected }, waitFor, 10*time.Millisecond)
 }

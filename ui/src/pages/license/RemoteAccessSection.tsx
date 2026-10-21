@@ -168,6 +168,7 @@ export function RemoteAccessSection({
                     <Button
                       size="xs"
                       variant="outline"
+                      disabled={saving}
                       onClick={() => setChoosing(true)}
                     >
                       {ts('Turn on')}

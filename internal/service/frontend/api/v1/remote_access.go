@@ -48,19 +48,17 @@ func (a *API) UpdateLicenseRemoteAccess(ctx context.Context, request api.UpdateL
 		return nil, configuredError("cloud.remote_approvals in the configuration sets whether remote calls may decide waiting steps.")
 	}
 
+	var level *config.RemoteAccessLevel
 	details := map[string]any{}
 	if body.Level != nil {
-		level := config.RemoteAccessLevel(*body.Level)
-		if err := a.cloudAccess.SetLevel(ctx, level); err != nil {
-			return nil, internalError(err)
-		}
-		details["level"], details["previous_level"] = level, previous.Level
+		level = new(config.RemoteAccessLevel(*body.Level))
+		details["level"], details["previous_level"] = *level, previous.Level
 	}
 	if body.Approvals != nil {
-		if err := a.cloudAccess.SetApprovals(ctx, *body.Approvals); err != nil {
-			return nil, internalError(err)
-		}
 		details["approvals"], details["previous_approvals"] = *body.Approvals, previous.Approvals
+	}
+	if err := a.cloudAccess.Set(ctx, level, body.Approvals); err != nil {
+		return nil, internalError(err)
 	}
 	a.logAudit(ctx, audit.CategorySystem, "cloud_remote_access_update", details)
 

@@ -175,8 +175,7 @@ type CloudReportService interface {
 // Dagu Cloud may go on the server, and see whether they reach it.
 type CloudAccessService interface {
 	Status(ctx context.Context) (cloudaccess.Status, error)
-	SetLevel(ctx context.Context, level config.RemoteAccessLevel) error
-	SetApprovals(ctx context.Context, on bool) error
+	Set(ctx context.Context, level *config.RemoteAccessLevel, approvals *bool) error
 	State() cloudaccess.State
 }
 
