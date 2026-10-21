@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -412,7 +413,7 @@ func (att *Attempt) compactLocked(ctx context.Context) (retErr error) {
 // statusForCompactionLocked reads the current file and reports whether a
 // replacement would change its compacted contents.
 func (att *Attempt) statusForCompactionLocked(ctx context.Context) (*ir.DAGRunStatus, bool, error) {
-	f, err := fileutil.Open(att.file)
+	f, err := openStatusFileWithRetry(att.file)
 	if err != nil {
 		return nil, false, fmt.Errorf("%w: %w", ErrReadFailed, err)
 	}
@@ -515,7 +516,7 @@ func ParseStatusFile(file string) (*ir.DAGRunStatus, error) {
 }
 
 func parseStatusFileWithContext(ctx context.Context, file string) (*ir.DAGRunStatus, error) {
-	f, err := fileutil.Open(file)
+	f, err := openStatusFileWithRetry(file)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrReadFailed, err)
 	}
@@ -550,6 +551,59 @@ func parseStatusFileWithContext(ctx context.Context, file string) (*ir.DAGRunSta
 		return nil, io.EOF
 	}
 	return result, nil
+}
+
+func openStatusFileWithRetry(path string) (*os.File, error) {
+	var file *os.File
+	err := retryTransientStatusRead(func() error {
+		opened, err := os.Open(path) //nolint:gosec
+		if err != nil {
+			return err
+		}
+		file = opened
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return file, nil
+}
+
+func retryTransientStatusRead(op func() error) error {
+	err := op()
+	if err == nil || !isTransientStatusReadError(err) {
+		return err
+	}
+
+	wait := 10 * time.Millisecond
+	for range 12 {
+		time.Sleep(wait)
+		err = op()
+		if err == nil || !isTransientStatusReadError(err) {
+			return err
+		}
+		wait *= 2
+		if wait > 100*time.Millisecond {
+			wait = 100 * time.Millisecond
+		}
+	}
+
+	return err
+}
+
+func isTransientStatusReadError(err error) bool {
+	if runtime.GOOS != "windows" || err == nil {
+		return false
+	}
+	if errors.Is(err, os.ErrNotExist) {
+		return false
+	}
+
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "used by another process") ||
+		strings.Contains(msg, "cannot access the file") ||
+		strings.Contains(msg, "access is denied") ||
+		strings.Contains(msg, "sharing violation")
 }
 
 // Abort implements models.Attempt.
