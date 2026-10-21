@@ -863,7 +863,9 @@ Every one of these is rejected by `dagu validate`:
   `update_rows needs a header row; header: false is not supported`.
 - An `output` of `xlsx.update_rows` or `xlsx.append` that is not a
   workbook: `output: out.csv: only .xlsx and .xlsm workbooks are
-  supported; save as .xlsx`.
+  supported; save as .xlsx`. `xlsx.write` takes no `output`, also with
+  `mode: append`: `with.output is not valid for xlsx.write`; use
+  `xlsx.append` to append to a copy.
 - A field of another operation, such as `range` on `xlsx.info`:
   `with.range is not valid for xlsx.info`.
 - An unknown field: `unexpected additional properties ["strip"]`. A value

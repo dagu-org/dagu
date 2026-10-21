@@ -454,6 +454,15 @@ func TestUpdateRowsOutputLeavesTheWorkbookAlone(t *testing.T) {
 	assert.Equal(t, "Submitted", back.Rows[0]["Status"])
 	assert.Equal(t, "Done", back.Rows[1]["Status"], "the output carries the rest of the workbook")
 
+	nested := filepath.Join(filepath.Dir(path), "copies", "updated.xlsx")
+	result, err = UpdateRows(context.Background(), path, UpdateOptions{Key: "Invoice No", Rows: rows, Output: nested})
+	require.NoError(t, err, "the output's parent directory is created, as for write_cells and append")
+	assert.Equal(t, nested, result.Path)
+	back, err = Read(context.Background(), nested, ReadOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, "Submitted", back.Rows[0]["Status"])
+	assert.Equal(t, before, fileHash(t, path))
+
 	dry, err := UpdateRows(context.Background(), path, UpdateOptions{Key: "Invoice No", Rows: rows, Output: filepath.Join(filepath.Dir(path), "dry.xlsx"), DryRun: true})
 	require.NoError(t, err)
 	assert.Equal(t, filepath.Join(filepath.Dir(path), "dry.xlsx"), dry.Path)

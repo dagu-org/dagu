@@ -297,6 +297,9 @@ func updateOnce(ctx context.Context, path string, opts UpdateOptions) (*WriteRes
 		return result, nil
 	}
 	if opts.Output != "" {
+		if err := ensureParentDir(opts.Output); err != nil {
+			return nil, err
+		}
 		w.path, w.base = opts.Output, Base(opts.Output)
 	}
 	if err := w.save(opts.InPlace); err != nil {

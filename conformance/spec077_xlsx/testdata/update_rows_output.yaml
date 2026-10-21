@@ -41,4 +41,16 @@ steps:
     action: file.write
     with:
       path: out.json
-      content: '{"orders": ${steps.read_orders.outputs.rows}, "marked": ${steps.read_marked.outputs.rows}, "added": ${steps.read_added.outputs.rows}, "mark_path": "${steps.mark.outputs.path}", "add_path": "${steps.add.outputs.path}"}'
+      content: '{"orders": ${steps.read_orders.outputs.rows}, "marked": ${steps.read_marked.outputs.rows}, "added": ${steps.read_added.outputs.rows}}'
+  - id: mark_path
+    depends: mark
+    action: file.write
+    with:
+      path: mark_path.txt
+      content: ${steps.mark.outputs.path}
+  - id: add_path
+    depends: add
+    action: file.write
+    with:
+      path: add_path.txt
+      content: ${steps.add.outputs.path}

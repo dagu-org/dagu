@@ -112,11 +112,8 @@ func writeOnce(ctx context.Context, path string, table Table, opts WriteOptions)
 		warn(warning)
 	}
 	if opts.Output != "" {
-		inPlace := "write"
-		if opts.Mode == WriteAppend {
-			inPlace = "append to"
-		}
-		if err := checkOutput(path, opts.Output, inPlace, warn); err != nil {
+		// Only append reaches here: validation refuses output for xlsx.write.
+		if err := checkOutput(path, opts.Output, "append to", warn); err != nil {
 			return nil, err
 		}
 		result.Path = opts.Output

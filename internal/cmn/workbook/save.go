@@ -113,14 +113,14 @@ func replaceAtomically(path, ext string, fill func(tmp string) error) error {
 
 // checkOutput checks the separate workbook a writer saves to instead of
 // path: it must be a workbook, a different file from path, and not held
-// open by another program. inPlace names what leaving output out does, for
+// open by another program. verb names what leaving output out does, for
 // the error that refuses path itself.
-func checkOutput(path, output, inPlace string, warn func(string)) error {
+func checkOutput(path, output, verb string, warn func(string)) error {
 	if err := CheckExtension(output); err != nil {
 		return fmt.Errorf("output: %w", err)
 	}
 	if sameFile(path, output) {
-		return fmt.Errorf("%s: output must be a different file from path; leave output out to %s the workbook in place", Base(path), inPlace)
+		return fmt.Errorf("%s: output must be a different file from path; leave output out to %s the workbook in place", Base(path), verb)
 	}
 	if _, err := os.Stat(output); err == nil {
 		warning, err := checkLockFile(output)

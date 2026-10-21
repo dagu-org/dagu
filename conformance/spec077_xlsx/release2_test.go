@@ -137,15 +137,13 @@ func TestXlsxUpdateRowsAndAppendOutput(t *testing.T) {
 	dagu := harness.NewRunner(t)
 	dagu.Run("start", "update_rows_output.yaml").ExpectExitCode(0)
 	var out struct {
-		Orders   []map[string]any `json:"orders"`
-		Marked   []map[string]any `json:"marked"`
-		Added    []map[string]any `json:"added"`
-		MarkPath string           `json:"mark_path"`
-		AddPath  string           `json:"add_path"`
+		Orders []map[string]any `json:"orders"`
+		Marked []map[string]any `json:"marked"`
+		Added  []map[string]any `json:"added"`
 	}
 	readJSON(t, dagu, "out.json", &out)
-	require.Equal(t, dagu.ProjectPath("marked.xlsx"), out.MarkPath)
-	require.Equal(t, dagu.ProjectPath("added.xlsx"), out.AddPath)
+	require.Equal(t, dagu.ProjectPath("marked.xlsx"), strings.TrimSpace(readFile(t, dagu, "mark_path.txt")))
+	require.Equal(t, dagu.ProjectPath("added.xlsx"), strings.TrimSpace(readFile(t, dagu, "add_path.txt")))
 	require.Len(t, out.Orders, 1, "the workbook at path is untouched")
 	require.Nil(t, out.Orders[0]["Status"])
 	require.Equal(t, "Submitted", out.Marked[0]["Status"])
