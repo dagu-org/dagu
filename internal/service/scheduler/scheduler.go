@@ -91,7 +91,8 @@ type Scheduler struct {
 	lifecycleMu         sync.Mutex
 	startupCancel       context.CancelFunc
 	lockHeld            atomic.Bool
-	clock               Clock // Clock function for getting current time
+	clock               Clock    // Clock function for getting current time
+	wakeHold            wakeHold // The hold on the ticks after the host wakes (wake_hold.go)
 	eventCollector      func(context.Context)
 	notificationMonitor *chatbridge.NotificationMonitor
 	incidentMonitor     *chatbridge.NotificationMonitor
@@ -362,6 +363,7 @@ func newScheduler(
 		retryScanner:     retryScanner,
 		planner:          planner,
 		clock:            defaultClock,
+		wakeHold:         newWakeHold(cfg.Scheduler.WakeHold, pauseStore),
 	}, nil
 }
 
@@ -700,6 +702,9 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		s.entryReader.Start(ctx)
 	})
 
+	// A hold a previous process left behind would pause this one for nobody.
+	s.wakeHold.clearStale(ctx)
+
 	logger.Info(ctx, "Scheduler started")
 	cleanupOnFailure = false
 
@@ -860,7 +865,15 @@ func (s *Scheduler) cronLoop(ctx context.Context, sig chan os.Signal) {
 			timer.Reset(tickTime.Sub(now))
 			continue
 		}
-		tickTime = s.runTickSafely(ctx, tickTime)
+		switch outcome, wait, since := s.wakeHold.check(ctx, tickTime, now); outcome {
+		case tickLater:
+			timer.Reset(wait)
+			continue
+		case tickHeld:
+			tickTime = s.runHeldTicks(ctx, since)
+		case tickNow:
+			tickTime = s.runTickSafely(ctx, tickTime)
+		}
 		tickTime = s.NextTick(tickTime)
 		timer.Reset(tickTime.Sub(s.clock()))
 	}
@@ -914,6 +927,33 @@ func (s *Scheduler) runTick(ctx context.Context, tickTime time.Time) {
 	}
 	s.planner.Advance(tickTime)
 	s.planner.Flush(ctx)
+}
+
+// runHeldTicks runs the ticks a wake hold kept back, from the minute the
+// host woke in through the minute under way, each run dispatched before the
+// next tick so that tick sees it. What the host slept through is recovered
+// first, as a late tick recovers it. It returns the last tick run.
+func (s *Scheduler) runHeldTicks(ctx context.Context, since time.Time) (processed time.Time) {
+	processed = since.Truncate(time.Minute)
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Error(ctx, "Scheduler tick panicked",
+				slog.Time("tick_time", processed),
+				tag.Error(panicToError(r)),
+			)
+		}
+	}()
+	s.planner.resume(ctx, processed)
+	last := s.clock().Truncate(time.Minute)
+	for tick := processed; !tick.After(last); tick = tick.Add(time.Minute) {
+		processed = tick
+		for _, run := range s.planner.Plan(ctx, tick) {
+			s.dispatchPlannedRun(ctx, run)
+		}
+		s.planner.Advance(tick)
+		s.planner.Flush(ctx)
+	}
+	return processed
 }
 
 // NextTick returns the next tick time for the scheduler.
