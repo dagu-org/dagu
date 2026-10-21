@@ -43,7 +43,6 @@ import {
   getScheduleKey,
   getScheduleLabel,
   isServiceDAG,
-  isStoppedService,
   parseNextRun,
 } from '../../../../lib/dagSchedule';
 import RelativeTime from '@/components/ui/relative-time';
@@ -347,8 +346,6 @@ function DAGCard({
           <span className="text-xs text-muted-foreground truncate">
             {dag.suspended ? (
               <I18nText text={'Suspended'} />
-            ) : isStoppedService(dag.dag, dag.suspended, status) ? (
-              <I18nText text={'Stopped'} />
             ) : hasSchedule || isService ? (
               <I18nText text={'Live'} />
             ) : (
@@ -938,19 +935,7 @@ const defaultColumns = [
                 {getRestartLabel(data.dag.dag)}
               </Badge>
               <span className="text-xs text-muted-foreground font-normal leading-tight">
-                <I18nText
-                  text={
-                    data.dag.suspended
-                      ? 'Suspended'
-                      : isStoppedService(
-                            data.dag.dag,
-                            data.dag.suspended,
-                            data.dag.latestDAGRun?.status
-                          )
-                        ? 'Stopped'
-                        : 'Live'
-                  }
-                />
+                <I18nText text={data.dag.suspended ? 'Suspended' : 'Live'} />
               </span>
             </div>
           </div>
