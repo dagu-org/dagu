@@ -29,17 +29,16 @@ func TestWarnWorkspaceDeprecation(t *testing.T) {
 		lines := strings.Split(strings.TrimSpace(output.String()), "\n")
 		require.Len(t, lines, 1)
 		var entry struct {
-			Level    string   `json:"level"`
-			Msg      string   `json:"msg"`
-			Settings []string `json:"settings"`
+			Level    string `json:"level"`
+			Msg      string `json:"msg"`
+			Settings string `json:"settings"`
 		}
 		require.NoError(t, json.Unmarshal([]byte(lines[0]), &entry))
 		assert.Equal(t, "WARN", entry.Level)
 		assert.Equal(t, deprecation.Warning, entry.Msg)
-		assert.Equal(t, []string{
-			"config key auth.oidc.role_mapping.workspace_mappings",
-			"config key auth.proxy.role_mapping.default_workspace_access",
-		}, entry.Settings)
+		assert.Equal(t,
+			"config key auth.oidc.role_mapping.workspace_mappings; config key auth.proxy.role_mapping.default_workspace_access",
+			entry.Settings)
 	})
 
 	t.Run("SilentWithoutSettings", func(t *testing.T) {

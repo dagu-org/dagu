@@ -6,6 +6,7 @@ package frontend
 import (
 	"context"
 	"log/slog"
+	"strings"
 
 	"github.com/dagucloud/dagu/v2/internal/cmn/config"
 	"github.com/dagucloud/dagu/v2/internal/cmn/logger"
@@ -29,7 +30,7 @@ func (srv *Server) warnWorkspaceDeprecation(ctx context.Context) {
 	for _, item := range items {
 		settings = append(settings, item.String())
 	}
-	logger.Warn(ctx, deprecation.Warning, slog.Any("settings", settings))
+	logger.Warn(ctx, deprecation.Warning, slog.String("settings", strings.Join(settings, "; ")))
 }
 
 // workspaceDeprecationSources returns where the workspace settings that v3.0
