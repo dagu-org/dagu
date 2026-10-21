@@ -929,7 +929,18 @@ func TestBuildStepRepeatPolicy(t *testing.T) {
 			repeatPolicy: &repeatPolicy{
 				Repeat: types.RepeatModeFromString("while"),
 			},
-			wantErr: true,
+			expected: ir.RepeatPolicy{
+				RepeatMode: ir.RepeatModeWhile,
+			},
+		},
+		{
+			name: "UntilWithoutConditionOrExitCode",
+			repeatPolicy: &repeatPolicy{
+				Repeat: types.RepeatModeFromString("until"),
+			},
+			expected: ir.RepeatPolicy{
+				RepeatMode: ir.RepeatModeUntil,
+			},
 		},
 		{
 			name: "NumericExpected",
