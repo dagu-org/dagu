@@ -748,6 +748,14 @@ cloud:
 			require.ErrorContains(t, err, "invalid cloud.remote_access", value)
 		}
 	})
+
+	// A typo in the environment must not lock approvals off.
+	t.Run("InvalidApprovals", func(t *testing.T) {
+		t.Setenv("DAGU_CLOUD_REMOTE_ACCESS", "")
+		t.Setenv("DAGU_CLOUD_REMOTE_APPROVALS", "yes please")
+		err := loadWithErrorFromYAML(t, "cloud:\n  report: off\n")
+		require.ErrorContains(t, err, "cloud.remote_approvals")
+	})
 }
 
 func TestLoad_OpenCodeConfigFromEnv(t *testing.T) {
