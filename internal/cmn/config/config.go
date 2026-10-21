@@ -732,6 +732,11 @@ type Scheduler struct {
 	ZombieDetectionInterval time.Duration // Default: 45s; 0 disables
 	RetryFailureWindow      time.Duration // Default: 24h; 0 disables DAG-level retry scanning. Current limitation: the window is evaluated from the original DAG-run timestamp/day bucket, not the latest failed attempt timestamp.
 	FailureThreshold        int           // Default: 3
+	// WakeHold is how long at most the scheduler holds its ticks after the
+	// host wakes from sleep, pausing itself until the pause is cleared through
+	// the API, so definitions can be refreshed before the first tick. 0 (the
+	// default) never holds.
+	WakeHold time.Duration
 }
 
 // PostgresPoolConfig holds PostgreSQL connection pool settings for workers.
@@ -848,6 +853,9 @@ func (c *Config) validateScheduler() error {
 	}
 	if c.Scheduler.LockRetryInterval < 0 {
 		return fmt.Errorf("scheduler.lock_retry_interval must be >= 0")
+	}
+	if c.Scheduler.WakeHold < 0 {
+		return fmt.Errorf("scheduler.wake_hold must be >= 0")
 	}
 	if c.Scheduler.ZombieDetectionInterval < 0 {
 		return fmt.Errorf("scheduler.zombie_detection_interval must be >= 0")

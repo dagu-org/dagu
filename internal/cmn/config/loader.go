@@ -1557,6 +1557,7 @@ func (l *ConfigLoader) loadSchedulerConfig(cfg *Config, def Definition) {
 		cfg.Scheduler.ZombieDetectionInterval = l.parseDuration("scheduler.zombie_detection_interval", def.Scheduler.ZombieDetectionInterval)
 		cfg.Scheduler.RetryFailureWindow = l.parseDuration("scheduler.retry_failure_window", def.Scheduler.RetryFailureWindow)
 		cfg.Scheduler.FailureThreshold = def.Scheduler.FailureThreshold
+		cfg.Scheduler.WakeHold = l.parseDuration("scheduler.wake_hold", def.Scheduler.WakeHold)
 	}
 
 	l.setSchedulerDefaults(cfg)
@@ -2286,6 +2287,7 @@ var envBindings = []envBinding{
 	{key: "scheduler.zombie_detection_interval", env: "SCHEDULER_ZOMBIE_DETECTION_INTERVAL"},
 	{key: "scheduler.retry_failure_window", env: "SCHEDULER_RETRY_FAILURE_WINDOW"},
 	{key: "scheduler.failure_threshold", env: "SCHEDULER_FAILURE_THRESHOLD"},
+	{key: "scheduler.wake_hold", env: "SCHEDULER_WAKE_HOLD"},
 
 	// Proc
 	{key: "proc.heartbeat_interval", env: "PROC_HEARTBEAT_INTERVAL"},

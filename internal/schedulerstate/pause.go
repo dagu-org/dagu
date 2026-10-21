@@ -19,6 +19,18 @@ type Pause struct {
 	Reason   string
 }
 
+// PausedByScheduler is the actor of a pause the scheduler places on itself
+// after the host wakes from sleep, a wake hold (see scheduler.wake_hold).
+// Such a pause keeps only the scheduler's own ticks back: queued runs go on,
+// and nothing is discarded. Clearing the pause through the API ends the hold.
+const PausedByScheduler = "scheduler"
+
+// WakeHold reports whether this pause is one the scheduler placed on itself
+// after the host woke, rather than an operator's.
+func (p Pause) WakeHold() bool {
+	return p.Paused && p.PausedBy == PausedByScheduler
+}
+
 // PauseStore persists the scheduler pause state. Implementations must be safe
 // for concurrent use. Get returns an independent snapshot that callers may
 // mutate.
