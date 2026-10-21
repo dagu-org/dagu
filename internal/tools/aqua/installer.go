@@ -838,5 +838,13 @@ func aquaParam(paths tools.CacheLayout, workDir string) *aquaparam.Param {
 		RequireChecksum:        true,
 		EnforceChecksum:        true,
 		EnforceRequireChecksum: true,
+		// Aqua's implicit default policy allows only the standard registry
+		// (github_content resolving to aquaproj/aqua-registry). Every registry
+		// a DAG declares beyond that — a pinned standard registry is fine, but
+		// any github_content registry pointing elsewhere — would be rejected
+		// with "this package isn't allowed", and per-worker "aqua policy
+		// allow" approvals do not fit DAG-driven installs. The DAG file is the
+		// trust boundary; checksum enforcement still guards artifact integrity.
+		DisablePolicy: true,
 	}
 }
