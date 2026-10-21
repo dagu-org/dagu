@@ -5,7 +5,7 @@ package wait
 
 import (
 	"fmt"
-	"maps"
+	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
@@ -45,7 +45,6 @@ func defaultConfig() config {
 	return config{
 		State:          stateExists,
 		Method:         "GET",
-		Status:         200,
 		PollInterval:   "1s",
 		RequestTimeout: "10s",
 	}
@@ -54,15 +53,6 @@ func defaultConfig() config {
 func decodeConfig(raw map[string]any, cfg *config) error {
 	if raw == nil {
 		raw = map[string]any{}
-	}
-	// A status holding a value reference must reach parseConfig as text;
-	// weakly-typed decoding would otherwise reject it as a non-integer.
-	var statusRef string
-	var hasStatusRef bool
-	if s, ok := raw["status"].(string); ok {
-		statusRef, hasStatusRef = s, true
-		raw = maps.Clone(raw)
-		delete(raw, "status")
 	}
 	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		Result:           cfg,
@@ -73,13 +63,7 @@ func decodeConfig(raw map[string]any, cfg *config) error {
 	if err != nil {
 		return err
 	}
-	if err := decoder.Decode(raw); err != nil {
-		return err
-	}
-	if hasStatusRef {
-		cfg.Status = statusRef
-	}
-	return nil
+	return decoder.Decode(raw)
 }
 
 func parseConfig(operation string, cfg config, deferReferences bool) (parsedConfig, error) {
@@ -151,9 +135,11 @@ func parseConfig(operation string, cfg config, deferReferences bool) (parsedConf
 		if strings.TrimSpace(cfg.Method) == "" {
 			return parsed, fmt.Errorf("wait: method must not be empty")
 		}
-		if err := parseStatus(cfg.Status, deferReferences, &parsed); err != nil {
+		status, err := parseStatus(cfg.Status, deferReferences)
+		if err != nil {
 			return parsed, err
 		}
+		parsed.status = status
 	default:
 		return parsed, fmt.Errorf("wait: unsupported operation %q", operation)
 	}
@@ -168,36 +154,40 @@ func isValueReference(text string) bool {
 	return value.IsWholeReference(text) || value.HasValueReference(text)
 }
 
-func parseStatus(raw any, deferReferences bool, parsed *parsedConfig) error {
+func parseStatus(raw any, deferReferences bool) (int, error) {
+	invalid := fmt.Errorf("wait: status must be between 100 and 599")
+	if raw == nil {
+		return http.StatusOK, nil
+	}
+	var n int
 	switch v := raw.(type) {
-	case nil:
-		return fmt.Errorf("wait: status must be between 100 and 599")
 	case string:
 		if deferReferences && isValueReference(v) {
-			return nil
+			return 0, nil
 		}
-		n, err := strconv.Atoi(strings.TrimSpace(v))
-		if err != nil || n < 100 || n > 599 {
-			return fmt.Errorf("wait: status must be between 100 and 599")
+		parsed, err := strconv.Atoi(strings.TrimSpace(v))
+		if err != nil {
+			return 0, invalid
 		}
-		parsed.status = n
-		parsed.Status = n
-		return nil
+		n = parsed
 	case int:
-		if v < 100 || v > 599 {
-			return fmt.Errorf("wait: status must be between 100 and 599")
+		n = v
+	case int64:
+		n = int(v)
+	case uint64:
+		n = int(v)
+	case float64:
+		if v != float64(int(v)) {
+			return 0, invalid
 		}
-		parsed.status = v
-		return nil
+		n = int(v)
 	default:
-		n, err := strconv.Atoi(fmt.Sprintf("%v", v))
-		if err != nil || n < 100 || n > 599 {
-			return fmt.Errorf("wait: status must be between 100 and 599")
-		}
-		parsed.status = n
-		parsed.Status = n
-		return nil
+		return 0, invalid
 	}
+	if n < 100 || n > 599 {
+		return 0, invalid
+	}
+	return n, nil
 }
 
 func parsePositiveDuration(field, value string) (time.Duration, error) {
