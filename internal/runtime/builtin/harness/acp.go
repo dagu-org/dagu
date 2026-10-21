@@ -17,6 +17,9 @@ import (
 	"github.com/dagucloud/dagu/v2/internal/cmn/cmdutil"
 	"github.com/dagucloud/dagu/v2/internal/cmn/logger"
 	"github.com/dagucloud/dagu/v2/internal/cmn/logger/tag"
+	"github.com/dagucloud/dagu/v2/internal/ir"
+	"github.com/dagucloud/dagu/v2/internal/runtime"
+	"github.com/dagucloud/dagu/v2/internal/runtime/executor"
 	"github.com/dagucloud/dagu/v2/internal/runtime/resourcelimit"
 )
 
@@ -49,7 +52,8 @@ func (e *harnessExecutor) runACP(parent context.Context, cfg providerConfig) (st
 			_ = cleanupStdoutSpool(spool)
 		}
 	}()
-	if cfg.definition.Transport == "websocket" || cfg.definition.Transport == "http" {
+	switch cfg.definition.Transport {
+	case ir.HarnessTransportWebSocket, ir.HarnessTransportHTTP:
 		if err = e.runACPRemote(ctx, cfg, spool, policy == "allow"); err != nil {
 			return nil, err
 		}
@@ -57,10 +61,16 @@ func (e *harnessExecutor) runACP(parent context.Context, cfg providerConfig) (st
 			return nil, err
 		}
 		return spool, nil
+	case "", ir.HarnessTransportStdio:
+	default:
+		return nil, fmt.Errorf("harness: unsupported ACP transport %q", cfg.definition.Transport)
 	}
+	env := runtime.GetEnv(ctx)
+	tw := executor.NewTailWriterWithEncoding(e.stderrWriter(), 0, env.LogEncodingCharset)
+	e.stderrTail = tw
 	args := append([]string(nil), cfg.definition.PrefixArgs...)
 	args = append(args, configToFlags(flags, cfg.definition)...)
-	cmd, err := e.invocationCommand(ctx, cfg, args, nil, nil, e.stderrWriter())
+	cmd, err := e.invocationCommand(ctx, cfg, args, nil, nil, tw)
 	if err != nil {
 		return nil, err
 	}
@@ -103,6 +113,9 @@ func (e *harnessExecutor) runACP(parent context.Context, cfg providerConfig) (st
 		_ = input.Close()
 		_, _ = process.Stop(cmdutil.StopRequest{Intent: cmdutil.ForceTermination()})
 		_ = process.Wait()
+		if err != nil && ctx.Err() == nil {
+			err = formatProcessFailure(err, tw.Tail(), "")
+		}
 		_ = output.Close()
 		<-conn.Done()
 		_ = process.Release()

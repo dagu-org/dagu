@@ -7,6 +7,8 @@ import (
 	"maps"
 	"testing"
 
+	"github.com/dagucloud/dagu/v2/internal/ir"
+
 	"github.com/stretchr/testify/require"
 )
 
@@ -14,7 +16,7 @@ import (
 func TestACPDefinition(t *testing.T) {
 	def, err := parseHarnessDefinition("agent", map[string]any{"binary": "adapter", "protocol": "acp", "prefix_args": []any{"--acp"}})
 	require.NoError(t, err)
-	require.Equal(t, "acp", def.Protocol)
+	require.Equal(t, ir.HarnessProtocolACP, def.Protocol)
 	require.Equal(t, []string{"--acp"}, def.PrefixArgs)
 	for _, raw := range []map[string]any{
 		{"binary": "adapter", "protocol": "http"},
@@ -34,7 +36,7 @@ func TestACPRemoteDefinition(t *testing.T) {
 	def, err := parseHarnessDefinition("remote", raw)
 	require.NoError(t, err)
 	require.Empty(t, def.Binary)
-	require.Equal(t, "websocket", def.Transport)
+	require.Equal(t, ir.HarnessTransportWebSocket, def.Transport)
 	require.Equal(t, "Bearer ${ACP_TOKEN}", def.Headers["Authorization"])
 	for key, value := range map[string]any{"ca_file": "/private/ca.pem", "bearer_subprotocol": true} {
 		withConnectionOption := maps.Clone(raw)

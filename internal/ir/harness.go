@@ -34,10 +34,27 @@ const (
 	HarnessFlagStyleSingleDash HarnessFlagStyle = "single_dash"
 )
 
+// HarnessProtocol selects CLI invocation or an ACP connection.
+type HarnessProtocol string
+
+const (
+	HarnessProtocolCLI HarnessProtocol = "cli"
+	HarnessProtocolACP HarnessProtocol = "acp"
+)
+
+// HarnessTransport selects the wire transport for an ACP connection.
+type HarnessTransport string
+
+const (
+	HarnessTransportStdio     HarnessTransport = "stdio"
+	HarnessTransportWebSocket HarnessTransport = "websocket"
+	HarnessTransportHTTP      HarnessTransport = "http"
+)
+
 // HarnessDefinition describes how to invoke a CLI or connect to an ACP agent.
 type HarnessDefinition struct {
-	Protocol          string                `json:"protocol,omitempty"`
-	Transport         string                `json:"transport,omitempty"`
+	Protocol          HarnessProtocol       `json:"protocol,omitempty"`
+	Transport         HarnessTransport      `json:"transport,omitempty"`
 	URL               string                `json:"url,omitempty"`
 	CAFile            string                `json:"caFile,omitempty"`
 	BearerSubprotocol bool                  `json:"bearerSubprotocol,omitempty"`
@@ -55,16 +72,16 @@ type HarnessDefinition struct {
 // ValidateConnection checks the mutually exclusive local and remote launch settings.
 // URL and cwd templates are checked again after runtime variable resolution.
 func (d *HarnessDefinition) ValidateConnection() error {
-	if d.Transport != "" && d.Transport != "stdio" && d.Transport != "websocket" && d.Transport != "http" {
+	if d.Transport != "" && d.Transport != HarnessTransportStdio && d.Transport != HarnessTransportWebSocket && d.Transport != HarnessTransportHTTP {
 		return errors.New("transport must be stdio, websocket, or http")
 	}
-	if d.Transport != "" && d.Protocol != "acp" {
+	if d.Transport != "" && d.Protocol != HarnessProtocolACP {
 		return errors.New("transport requires protocol: acp")
 	}
-	if d.BearerSubprotocol && d.Transport != "websocket" {
+	if d.BearerSubprotocol && d.Transport != HarnessTransportWebSocket {
 		return errors.New("bearer_subprotocol requires transport: websocket")
 	}
-	if d.Transport != "websocket" && d.Transport != "http" {
+	if d.Transport != HarnessTransportWebSocket && d.Transport != HarnessTransportHTTP {
 		if d.URL != "" || len(d.Headers) != 0 || d.Cwd != "" || d.CAFile != "" {
 			return errors.New("url, headers, cwd, and ca_file require a remote transport")
 		}
@@ -81,7 +98,7 @@ func (d *HarnessDefinition) ValidateConnection() error {
 	}
 	if !strings.Contains(d.URL, "${") {
 		u, err := url.Parse(d.URL)
-		validScheme := err == nil && ((d.Transport == "websocket" && (u.Scheme == "ws" || u.Scheme == "wss")) || (d.Transport == "http" && (u.Scheme == "http" || u.Scheme == "https")))
+		validScheme := err == nil && ((d.Transport == HarnessTransportWebSocket && (u.Scheme == "ws" || u.Scheme == "wss")) || (d.Transport == HarnessTransportHTTP && (u.Scheme == "http" || u.Scheme == "https")))
 		if !validScheme || u.Hostname() == "" || u.User != nil || u.Fragment != "" {
 			return errors.New("url must match the transport (ws/wss or http/https), without user info or a fragment")
 		}

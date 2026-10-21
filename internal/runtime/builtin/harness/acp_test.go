@@ -70,6 +70,7 @@ func TestACPAgent(_ *testing.T) {
 		case "session/prompt":
 			promptID = msg.ID
 			if mode == "crash" {
+				_, _ = os.Stderr.WriteString("adapter authentication failed\n")
 				os.Exit(7)
 			}
 			if mode == "wait" {
@@ -123,7 +124,7 @@ func TestACPRun(t *testing.T) {
 		{mode: "permission", policy: "allow"},
 		{mode: "echo", policy: "invalid", wantError: "acp_permission"},
 		{mode: "version", wantError: "unsupported protocol version"},
-		{mode: "crash", wantError: "ACP"},
+		{mode: "crash", wantError: "recent stderr:\nadapter authentication failed"},
 		{mode: "refuse", wantError: "refusal"},
 		{mode: "wait", wantError: "deadline exceeded"},
 		{mode: "blocked", wantError: "deadline exceeded"},
@@ -227,4 +228,11 @@ func TestACPProgress(t *testing.T) {
 	exec.(*harnessExecutor).SetProgressCallback(func() { progress.Add(1) })
 	require.NoError(t, exec.Run(ctx))
 	require.Positive(t, progress.Load())
+}
+
+// Unknown transports must fail instead of silently starting a stdio agent.
+func TestACPTransport(t *testing.T) {
+	e := &harnessExecutor{}
+	_, err := e.runACP(t.Context(), providerConfig{definition: &ir.HarnessDefinition{Protocol: ir.HarnessProtocolACP, Transport: "unknown"}})
+	require.ErrorContains(t, err, "unsupported ACP transport")
 }

@@ -263,7 +263,7 @@ func (e *harnessExecutor) Run(ctx context.Context) error {
 		}
 
 		lastErr = err
-		if cfg.definition != nil && cfg.definition.Protocol == "acp" && errors.Is(err, context.Canceled) {
+		if cfg.definition != nil && cfg.definition.Protocol == ir.HarnessProtocolACP && errors.Is(err, context.Canceled) {
 			e.mu.Lock()
 			if e.acpStopCode != 0 {
 				e.exitCode = e.acpStopCode
@@ -304,7 +304,7 @@ func (e *harnessExecutor) Run(ctx context.Context) error {
 
 // runOnce dispatches one provider attempt to its protocol and execution backend.
 func (e *harnessExecutor) runOnce(ctx context.Context, cfg providerConfig) (*os.File, error) {
-	if cfg.definition != nil && cfg.definition.Protocol == "acp" {
+	if cfg.definition != nil && cfg.definition.Protocol == ir.HarnessProtocolACP {
 		return e.runACP(ctx, cfg)
 	}
 	hasRootContainer := rootContainerConfigured(ctx)

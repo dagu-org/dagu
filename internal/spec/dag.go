@@ -2855,7 +2855,7 @@ func parseHarnessDefinition(name string, raw map[string]any) (*ir.HarnessDefinit
 			}
 			switch key {
 			case "transport":
-				def.Transport = text
+				def.Transport = ir.HarnessTransport(text)
 			case "url":
 				def.URL = text
 			case "cwd":
@@ -2877,10 +2877,10 @@ func parseHarnessDefinition(name string, raw map[string]any) (*ir.HarnessDefinit
 			def.Headers = headers
 		case "protocol":
 			protocol, ok := value.(string)
-			if !ok || (protocol != "cli" && protocol != "acp") {
+			if !ok || (ir.HarnessProtocol(protocol) != ir.HarnessProtocolCLI && ir.HarnessProtocol(protocol) != ir.HarnessProtocolACP) {
 				return nil, ir.NewValidationError(fmt.Sprintf("harnesses.%s.protocol", name), value, fmt.Errorf("protocol must be cli or acp"))
 			}
-			def.Protocol = protocol
+			def.Protocol = ir.HarnessProtocol(protocol)
 		case "prefix_args":
 			prefixArgs, err := harnessStringSlice(value)
 			if err != nil {
@@ -2942,7 +2942,7 @@ func parseHarnessDefinition(name string, raw map[string]any) (*ir.HarnessDefinit
 		}
 	}
 
-	if def.Transport == "websocket" || def.Transport == "http" {
+	if def.Transport == ir.HarnessTransportWebSocket || def.Transport == ir.HarnessTransportHTTP {
 		for _, key := range []string{"binary", "prefix_args", "option_flags", "flag_style"} {
 			if _, exists := raw[key]; exists {
 				return nil, ir.NewValidationError(fmt.Sprintf("harnesses.%s.%s", name, key), raw[key], fmt.Errorf("%s is not supported with remote transport", key))
@@ -2956,17 +2956,17 @@ func parseHarnessDefinition(name string, raw map[string]any) (*ir.HarnessDefinit
 		}
 	}
 
-	if _, exists := raw["bearer_subprotocol"]; exists && def.Transport != "websocket" {
+	if _, exists := raw["bearer_subprotocol"]; exists && def.Transport != ir.HarnessTransportWebSocket {
 		return nil, ir.NewValidationError(fmt.Sprintf("harnesses.%s.bearer_subprotocol", name), raw["bearer_subprotocol"], fmt.Errorf("bearer_subprotocol requires transport: websocket"))
 	}
-	if def.Transport != "websocket" && def.Transport != "http" && def.Binary == "" {
+	if def.Transport != ir.HarnessTransportWebSocket && def.Transport != ir.HarnessTransportHTTP && def.Binary == "" {
 		return nil, ir.NewValidationError(fmt.Sprintf("harnesses.%s.binary", name), raw["binary"], fmt.Errorf("binary is required"))
 	}
 	if err := def.ValidateConnection(); err != nil {
 		return nil, ir.NewValidationError(fmt.Sprintf("harnesses.%s", name), nil, err)
 	}
 
-	if def.Protocol == "acp" {
+	if def.Protocol == ir.HarnessProtocolACP {
 		for _, key := range []string{"prompt_mode", "prompt_flag", "prompt_position"} {
 			if _, exists := raw[key]; exists {
 				return nil, ir.NewValidationError(fmt.Sprintf("harnesses.%s.%s", name, key), raw[key], fmt.Errorf("ACP sends prompts over the protocol; %s is not supported", key))

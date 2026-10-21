@@ -7,6 +7,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/dagucloud/dagu/v2/internal/ir"
+
 	"github.com/dagucloud/dagu/v2/internal/spec"
 	"github.com/stretchr/testify/require"
 )
@@ -32,11 +34,11 @@ func TestACPLoad(t *testing.T) {
 `)
 	dag, err := spec.Load(context.Background(), child, spec.WithBaseConfig(base))
 	require.NoError(t, err)
-	require.Equal(t, "acp", dag.Harnesses["adapter"].Protocol)
+	require.Equal(t, ir.HarnessProtocolACP, dag.Harnesses["adapter"].Protocol)
 	require.Equal(t, "adapter", dag.Steps[0].ExecutorConfig.Config["provider"])
 	cloned := dag.Clone()
-	require.Equal(t, "acp", cloned.Harnesses["adapter"].Protocol)
-	require.Equal(t, "websocket", cloned.Harnesses["adapter"].Transport)
+	require.Equal(t, ir.HarnessProtocolACP, cloned.Harnesses["adapter"].Protocol)
+	require.Equal(t, ir.HarnessTransportWebSocket, cloned.Harnesses["adapter"].Transport)
 	require.Equal(t, "wss://agent.example/acp", cloned.Harnesses["adapter"].URL)
 	require.Equal(t, "/remote/workspace", cloned.Harnesses["adapter"].Cwd)
 	require.Equal(t, "/private/ca.pem", cloned.Harnesses["adapter"].CAFile)

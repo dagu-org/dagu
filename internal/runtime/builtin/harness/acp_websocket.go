@@ -75,7 +75,7 @@ func (e *harnessExecutor) runACPRemote(parent context.Context, cfg providerConfi
 	wireCtx, closeWire := context.WithCancel(context.Background())
 	defer closeWire()
 	var stream io.ReadWriteCloser
-	if def.Transport == "http" {
+	if def.Transport == ir.HarnessTransportHTTP {
 		stream = newACPHTTPStream(wireCtx, def, httpClient)
 	} else {
 		socket, dialErr := dialACPWebSocket(ctx, def, httpClient)
