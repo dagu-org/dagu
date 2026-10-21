@@ -660,9 +660,9 @@ func inProcessLoadOptions(
 	if cfg != nil {
 		loadOpts = append(loadOpts, spec.WithWorkspaceBaseConfigDir(workspace.BaseConfigDir(cfg.Paths.DAGsDir)))
 	}
-	if req.Params != "" {
-		loadOpts = append(loadOpts, spec.WithParams(req.Params))
-	}
+	// Params are always applied so that a child started without params still
+	// enforces its required params.
+	loadOpts = append(loadOpts, spec.WithParams(req.Params))
 	if req.Workspace != nil && workDir != "" {
 		loadOpts = append(loadOpts, spec.WithDefaultWorkingDir(workDir))
 	}
