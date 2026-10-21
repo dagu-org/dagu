@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { useCallback } from 'react';
-import type { components, LicenseMonitoringLevel } from '@/api/v1/schema';
+import { type components, LicenseMonitoringLevel } from '@/api/v1/schema';
 import { useI18n } from '@/i18n/I18nProvider';
 import { useClient, useQuery } from './api';
 
@@ -51,12 +51,24 @@ export function useLicenseMonitoring(
     await mutate(next, { revalidate: false });
   }, [client, mutate, remoteNode, ts]);
 
+  const dismissErrorsNotice = useCallback(async () => {
+    const { data: next, error: apiError } = await client.POST(
+      '/license/monitoring/dismiss-errors-notice',
+      { params: { query: { remoteNode } } }
+    );
+    if (apiError || !next) {
+      throw new Error(apiError?.message || ts('Could not dismiss the notice.'));
+    }
+    await mutate(next, { revalidate: false });
+  }, [client, mutate, remoteNode, ts]);
+
   return {
     monitoring: data,
     error,
     refresh: mutate,
     setLevel,
     dismissNotice,
+    dismissErrorsNotice,
   };
 }
 
@@ -66,4 +78,18 @@ export function useLicenseMonitoring(
  */
 export function shouldAskMonitoring(monitoring?: LicenseMonitoring): boolean {
   return Boolean(monitoring && !monitoring.configured && !monitoring.chosen);
+}
+
+/**
+ * Reports whether an administrator should be offered to also send error
+ * messages: they chose run status, and have not dismissed the offer.
+ */
+export function shouldOfferErrors(monitoring?: LicenseMonitoring): boolean {
+  return Boolean(
+    monitoring &&
+      !monitoring.configured &&
+      monitoring.chosen &&
+      monitoring.level === LicenseMonitoringLevel.runs &&
+      !monitoring.errorsOffered
+  );
 }

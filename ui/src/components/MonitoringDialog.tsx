@@ -114,6 +114,7 @@ export function ReportingChoices({
 export function MonitoringDialog({
   open,
   level,
+  suggested,
   prompt = false,
   onSave,
   onCancel,
@@ -121,6 +122,8 @@ export function MonitoringDialog({
   open: boolean;
   /** The level in effect; its choice starts selected when it reports. */
   level?: LicenseMonitoringLevel;
+  /** The choice that starts selected instead of the level in effect. */
+  suggested?: ReportingLevel;
   /** Offers failure emails instead of presenting a setting. */
   prompt?: boolean;
   onSave: (level: ReportingLevel) => Promise<void>;
@@ -137,12 +140,13 @@ export function MonitoringDialog({
   useEffect(() => {
     if (!open) return;
     setSelected(
-      level === undefined || level === LicenseMonitoringLevel.off
-        ? LicenseMonitoringLevel.errors
-        : level
+      suggested ??
+        (level === undefined || level === LicenseMonitoringLevel.off
+          ? LicenseMonitoringLevel.errors
+          : level)
     );
     setError(null);
-  }, [open, level]);
+  }, [open, level, suggested]);
 
   async function save() {
     setSaving(true);

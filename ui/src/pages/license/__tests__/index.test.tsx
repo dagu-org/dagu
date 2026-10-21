@@ -168,6 +168,7 @@ const unchosen: LicenseMonitoring = {
   configured: false,
   chosen: false,
   noticeDismissed: false,
+  errorsOffered: false,
 };
 
 function overview() {
@@ -1181,6 +1182,7 @@ describe('LicensePage', () => {
         configured: false,
         chosen: true,
         noticeDismissed: false,
+        errorsOffered: false,
         lastReportAt: new Date().toISOString(),
         lastReport: '{"protocol":2,"heartbeat_secret":"[redacted]"}',
       });
@@ -1356,6 +1358,7 @@ describe('LicensePage', () => {
         configured: false,
         chosen: true,
         noticeDismissed: false,
+        errorsOffered: false,
         lastReportAt: new Date(Date.now() - 11 * 60_000).toISOString(),
       });
       const card = await findMonitoringCard();
@@ -1373,6 +1376,7 @@ describe('LicensePage', () => {
         configured: false,
         chosen: true,
         noticeDismissed: false,
+        errorsOffered: false,
         lastReportAt: new Date(Date.now() - 9 * 60_000).toISOString(),
       });
       const card = await findMonitoringCard();
@@ -1388,6 +1392,7 @@ describe('LicensePage', () => {
         configured: false,
         chosen: true,
         noticeDismissed: false,
+        errorsOffered: false,
         lastReportAt: new Date().toISOString(),
         runsPausedUntil: until.toISOString(),
       });
@@ -1406,6 +1411,7 @@ describe('LicensePage', () => {
         configured: false,
         chosen: true,
         noticeDismissed: false,
+        errorsOffered: false,
         lastReportAt: new Date().toISOString(),
         runsPausedUntil: new Date(Date.now() - 60_000).toISOString(),
       });

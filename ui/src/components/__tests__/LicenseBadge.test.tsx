@@ -67,6 +67,7 @@ const reporting = (lastReportAt?: string): LicenseMonitoring => ({
   configured: false,
   chosen: true,
   noticeDismissed: false,
+  errorsOffered: false,
   lastReportAt,
 });
 
