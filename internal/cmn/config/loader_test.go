@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -2391,6 +2392,42 @@ secrets:
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "secrets.vault.token_file "+path+" is empty")
 	})
+}
+
+// loadServerRemoteNodes copies the fields one by one, so a field added to
+// RemoteNodeDef and RemoteNode but not to the copy would be dropped without a
+// compile error. Each field of the definition, except the _file keys that
+// loadSecretFiles consumes, must arrive in the runtime node.
+func TestLoadServerRemoteNodesCopiesEveryField(t *testing.T) {
+	var def RemoteNodeDef
+	defValue := reflect.ValueOf(&def).Elem()
+	for i := range defValue.NumField() {
+		switch field := defValue.Field(i); field.Kind() {
+		case reflect.String:
+			field.SetString("value-" + defValue.Type().Field(i).Name)
+		case reflect.Bool:
+			field.SetBool(true)
+		case reflect.Int:
+			field.SetInt(7)
+		default:
+			t.Fatalf("RemoteNodeDef.%s has the kind %s: teach this test to fill it", defValue.Type().Field(i).Name, field.Kind())
+		}
+	}
+
+	var cfg Config
+	(&ConfigLoader{}).loadServerRemoteNodes(&cfg, Definition{RemoteNodes: []RemoteNodeDef{def}})
+	require.Len(t, cfg.Server.RemoteNodes, 1)
+
+	node := reflect.ValueOf(cfg.Server.RemoteNodes[0])
+	for i := range defValue.NumField() {
+		name := defValue.Type().Field(i).Name
+		if strings.HasSuffix(name, "File") {
+			continue
+		}
+		got := node.FieldByName(name)
+		require.True(t, got.IsValid(), "RemoteNode has no field %s", name)
+		assert.Equal(t, defValue.Field(i).Interface(), got.Interface(), "RemoteNode.%s", name)
+	}
 }
 
 func TestLoad_SecretFileSkippedForOtherServices(t *testing.T) {
