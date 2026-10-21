@@ -10,7 +10,7 @@
 
 Remove workspaces in v3.0. The `workspace` label becomes an ordinary label.
 
-v2.19 warns wherever workspaces are in use. v3.0 refuses to start while
+v2.22 warns wherever workspaces are in use. v3.0 refuses to start while
 workspace-scoped settings exist that would change how a workflow runs, and
 turns workspace-restricted users and API keys into viewers. There is no
 migration tool.
@@ -71,7 +71,7 @@ Move them into the DAG files or the global settings, then delete them.
 
 The message lists every item, not the first one found.
 
-## v2.19 deprecation
+## v2.22 deprecation
 
 - A startup warning listing each item from the table that is in use.
 - An admin banner with the same list.
@@ -82,7 +82,7 @@ The message lists every item, not the first one found.
 
 | Release | Ships |
 | --- | --- |
-| v2.19 | Warnings and banner. |
+| v2.22 | Warnings and banner. |
 | v3.0 | Removal with the guards above. |
 
 ## Verification and acceptance criteria
