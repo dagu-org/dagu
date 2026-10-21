@@ -48,7 +48,10 @@ func TestReadLinesBackward(t *testing.T) {
 		{name: "carriage returns kept", data: "a\r\nb\r\n", want: []backwardLine{{"b\r", true}, {"a\r", true}}},
 		{name: "line longer than a chunk", data: "first\n" + long + "\nlast\n", want: []backwardLine{{"last", true}, {long, true}, {"first", true}}},
 		{name: "unterminated line longer than a chunk", data: "first\n" + long, want: []backwardLine{{long, false}, {"first", true}}},
-		{name: "newline on a chunk boundary", data: strings.Repeat("y", backwardChunkSize-1) + "\nz\n", want: []backwardLine{{"z", true}, {strings.Repeat("y", backwardChunkSize-1), true}}},
+		// The last chunk starts right after the first newline.
+		{name: "newline ending a chunk", data: "x\n" + strings.Repeat("y", backwardChunkSize-1) + "\n", want: []backwardLine{{strings.Repeat("y", backwardChunkSize-1), true}, {"x", true}}},
+		// The last chunk starts with the first newline.
+		{name: "newline starting a chunk", data: "x\n" + strings.Repeat("y", backwardChunkSize-2) + "\n", want: []backwardLine{{strings.Repeat("y", backwardChunkSize-2), true}, {"x", true}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

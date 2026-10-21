@@ -20,9 +20,10 @@ const backwardChunkSize = 64 * 1024
 // only the last line can lack one. A file that ends with a newline has no
 // unterminated line.
 //
-// Bytes before the line where fn stops are never read, so finding a file's
-// last record costs that record rather than the whole file. The line slice is
-// valid only until fn returns.
+// Reading ends near the start of the line where fn stops, so finding a file's
+// last record costs about that record rather than the whole file. The line
+// slice is valid only until fn returns. If r holds fewer than size bytes, the
+// read fails with io.ErrUnexpectedEOF.
 func ReadLinesBackward(ctx context.Context, r io.ReaderAt, size int64, fn func(line []byte, terminated bool) (done bool, err error)) error {
 	buf := make([]byte, backwardChunkSize)
 	// parts holds, last first, the pieces of a line that spans chunks.
