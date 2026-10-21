@@ -6069,6 +6069,8 @@ export interface components {
             humanTaskResumePending?: boolean;
             /** @description Whether a root run has a saved approval and ready work whose resume still needs to be accepted */
             approvalResumePending?: boolean;
+            /** @description Identifier of the attempt this status belongs to. Each retry of the DAG-run, including a resume after manual action, records a new attempt. */
+            attemptId?: string;
         };
         /** @description One file within a DAG-run's artifact directory */
         ArtifactListFile: {

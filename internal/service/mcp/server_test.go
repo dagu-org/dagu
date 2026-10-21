@@ -441,6 +441,15 @@ func TestExecuteInputValidation(t *testing.T) {
 		{name: "wait timeout rejects zero", input: `{"action":"start","name":"etl","wait":true,"waitTimeoutSeconds":0}`, wantField: executeFieldWaitTimeoutSeconds},
 		{name: "wait timeout range", input: `{"action":"start","name":"etl","wait":true,"waitTimeoutSeconds":301}`, wantField: executeFieldWaitTimeoutSeconds},
 		{name: "params must be string or object", input: `{"action":"start","name":"etl","params":[1]}`, wantField: executeFieldParams},
+		{name: "approve requires step name", input: `{"action":"approve","name":"etl","dagRunId":"run-1"}`, wantField: executeFieldStepName},
+		{name: "reject requires dagRunId", input: `{"action":"reject","name":"etl","stepName":"gate"}`, wantField: executeFieldDAGRunID},
+		{name: "push back requires run target", input: `{"action":"push_back","targetType":"dag","name":"etl","dagRunId":"run-1","stepName":"gate"}`, wantField: executeFieldTargetType},
+		{name: "inputs must be object", input: `{"action":"approve","name":"etl","dagRunId":"run-1","stepName":"gate","inputs":"ticket=1"}`, wantField: executeFieldInputs},
+		{name: "reject rejects inputs", input: `{"action":"reject","name":"etl","dagRunId":"run-1","stepName":"gate","inputs":{}}`, wantField: executeFieldInputs},
+		{name: "approve rejects reason", input: `{"action":"approve","name":"etl","dagRunId":"run-1","stepName":"gate","reason":"no"}`, wantField: executeFieldReason},
+		{name: "approve rejects downstream", input: `{"action":"approve","name":"etl","dagRunId":"run-1","stepName":"gate","includeDownstream":true}`, wantField: executeFieldIncludeDownstream},
+		{name: "retry rejects attempt ID", input: `{"action":"retry","name":"etl","dagRunId":"run-1","attemptId":"a-1"}`, wantField: executeFieldAttemptID},
+		{name: "stop rejects sub-DAG run ID", input: `{"action":"stop","name":"etl","dagRunId":"run-1","subDAGRunId":"child-1"}`, wantField: executeFieldSubDAGRunID},
 	}
 
 	for _, test := range tests {
@@ -1079,10 +1088,12 @@ func TestNormalizeRunDetailsIncludesStepsAndFailureDetails(t *testing.T) {
 	stepError := "exit status 1"
 	queuedAt := "2026-08-23T01:00:00Z"
 	params := `{"TARGET":"orders"}`
+	attemptID := "attempt-1"
 	raw := daguapi.GetDAGRunDetails200JSONResponse{
 		DagRunDetails: daguapi.DAGRunDetails{
 			Name:        "etl",
 			DagRunId:    "run-1",
+			AttemptId:   &attemptID,
 			Status:      2,
 			StatusLabel: "failed",
 			StartedAt:   "2026-08-23T01:00:05Z",
@@ -1118,6 +1129,7 @@ func TestNormalizeRunDetailsIncludesStepsAndFailureDetails(t *testing.T) {
 	require.Equal(t, "run-1", data["dagRunId"])
 	require.Equal(t, "dagu://runs/etl/run-1", data["uri"])
 	require.Equal(t, "dagu://runs/etl/run-1/logs", data["logsUri"])
+	require.Equal(t, attemptID, data["attemptId"])
 	require.Equal(t, "2026-08-23T01:00:05Z", data["startedAt"])
 	require.Equal(t, "2026-08-23T01:00:09Z", data["finishedAt"])
 	require.Equal(t, queuedAt, data["queuedAt"])

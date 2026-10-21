@@ -15,6 +15,7 @@ const instructions = `Dagu exposes a compact MCP surface for DAG workflow operat
 Use dagu_read for current state, Wiki pages, and trusted reference resources.
 Use dagu_change with mode=preview before mode=apply when editing DAG YAML, DAG default profiles, or Wiki pages.
 Use dagu_execute for start, enqueue, retry, and stop. retry and stop are actions inside dagu_execute.
+When a run waits for a person, dagu_execute action=approve, reject, or push_back decides the waiting step that dagu_read target=run lists.
 MCP Apps hosts can render run-related dagu_read and dagu_execute results in Dagu's interactive run inspector.
 To follow a run to completion, pass wait=true to dagu_execute, or read the returned dagu://runs/... resource, or subscribe to it to receive a resource update notification when the run reaches a terminal state or stops at a waiting checkpoint.`
 
@@ -65,7 +66,7 @@ Authoring rules:
 - human.task defines a processless root-DAG operator step with an explicit id, required with.prompt, and optional flat scalar with.form JSON Schema. Omit form for acknowledgement-only tasks.
 - Human task form properties that are required or have defaults become ${steps.step_id.outputs.name} values after completion. Do not declare outputs on a human.task step; additionalProperties defaults to false.
 - Optional with.push_back lets the operator send a human task back instead of completing it: rewind_to names a step the task depends on, and optional form is a flat feedback schema whose additionalProperties must stay false. A push-back re-runs that step and every step that depends on it, directly or transitively, with the feedback as push-back context (DAG_PUSHBACK, DAG_PUSHBACK_ITERATION, and one environment variable per feedback property), then opens the task again. Feedback is limited to 16 KiB as JSON. Human tasks have no reject operation.
-- Human tasks cannot run in sub-DAGs, lifecycle handlers, or foreach.steps. Root DAGs containing human tasks may run locally or on distributed workers selected by DAG-level worker_selector. The MCP tool surface does not expose human-task completion or push-back; they use the local dagu human-task complete and dagu human-task push-back commands.
+- Human tasks cannot run in sub-DAGs, lifecycle handlers, or foreach.steps. Root DAGs containing human tasks may run locally or on distributed workers selected by DAG-level worker_selector. Over MCP, dagu_execute action=approve completes a waiting human task with inputs as its form values and action=push_back pushes it back with inputs as its feedback; locally, dagu human-task complete and dagu human-task push-back do the same.
 - type: agent lets the configured llm pick which step runs next instead of a dependency graph. It requires llm and a non-empty tasks list, where each task has a name and a description stating when it is finished. depends and router steps are rejected, and the reserved names __agent__ and ask_user cannot be used for steps.
 - Use context references for run metadata, such as ${context.dag.name}, ${context.run.id}, and ${context.paths.artifacts_dir}.
 - git.worktree.add creates or reuses a linked worktree in the local repository containing the step working_dir. Omit branch for a Dagu-generated branch, or set branch with create_branch: true and optional base to create a named branch.
@@ -107,16 +108,16 @@ The server intentionally exposes three tools.
 
 - dagu_read: read DAGs, DAG specs, DAG default profiles, Wiki pages, DAG-runs, logs, list views, and reference resources.
 - dagu_change: preview or apply DAG YAML, DAG default profile, and workspace-aware Wiki changes.
-- dagu_execute: start, enqueue, retry, or stop a DAG-run.
+- dagu_execute: start, enqueue, retry, or stop a DAG-run, or approve, reject, or push back a step that waits for a person.
 
 Detailed tool references:
 
 - dagu://reference/read-tool: dagu_read inputs, targets, URI mode, query parameters, outputs, and errors.
 - dagu://reference/change-tool: dagu_change preview and apply contract for DAG YAML, DAG profiles, and Wiki changes.
-- dagu://reference/execute-tool: dagu_execute start, enqueue, retry, and stop contract.
+- dagu://reference/execute-tool: dagu_execute start, enqueue, retry, stop, approve, reject, and push_back contract.
 - dagu://reference/apps: interactive run inspector behavior for MCP Apps hosts.
 
-Use dagu_execute action=retry with name and dagRunId for retry. Use action=stop with name and dagRunId for stop. Use action=start or action=enqueue with targetType=dag for a stored DAG, or targetType=inline_spec with spec for an ad hoc run.`,
+Use dagu_execute action=retry with name and dagRunId for retry. Use action=stop with name and dagRunId for stop. Use action=start or action=enqueue with targetType=dag for a stored DAG, or targetType=inline_spec with spec for an ad hoc run. Use action=approve, reject, or push_back with name, dagRunId, stepName, and the attemptId read from the run to decide a step waiting for a person.`,
 		},
 		{
 			topic:       "apps",
@@ -270,22 +271,26 @@ Errors:
 			description: "Detailed dagu_execute input, output, and error reference.",
 			text: `# dagu_execute reference
 
-Purpose: control DAG execution through start, enqueue, retry, and stop actions.
+Purpose: control DAG execution through start, enqueue, retry, and stop actions, and decide steps that wait for a person through approve, reject, and push_back.
 
 Fields:
 
-- action: required. Values are start, enqueue, retry, and stop.
-- targetType: dag, inline_spec, or run. Defaults to run for retry and stop, inline_spec when spec is present, otherwise dag.
+- action: required. Values are start, enqueue, retry, stop, approve, reject, and push_back.
+- targetType: dag, inline_spec, or run. Defaults to run for retry, stop, approve, reject, and push_back, inline_spec when spec is present, otherwise dag.
 - name: DAG name. Required for every action, including inline runs.
 - spec: inline DAG YAML for start or enqueue with targetType=inline_spec; otherwise invalid.
-- dagRunId: DAG-run identifier. Required for retry and stop. Optional override for start and enqueue.
+- dagRunId: DAG-run identifier. Required for retry, stop, approve, reject, and push_back. Optional override for start and enqueue.
 - params: run parameters for start and enqueue, as a JSON object or a JSON-encoded string.
 - queue: queue name for enqueue.
 - singleton: singleton run flag for start and enqueue.
 - noReuse: when true for start or enqueue, execute eligible build steps instead of reusing prior materializations.
 - labels: labels for start and enqueue.
-- stepName: optional step name for retry.
+- stepName: optional step name for retry. Required for approve, reject, and push_back: the waiting step to decide.
 - includeDownstream: when true, retry the selected step and every reachable descendant. Requires stepName.
+- subDAGRunId: for approve, reject, and push_back, the sub-DAG run that owns the waiting step when it runs inside a sub-DAG run of dagRunId.
+- inputs: object for approve and push_back. An approval gate takes string values for the names its input list declares; a human task takes its form values on approve and its push-back feedback on push_back.
+- reason: optional reason for reject.
+- attemptId: for approve, reject, and push_back, the attemptId from the run details the decision is based on. When the run has moved to another attempt, the decision is refused with conflict.
 - wait: when true, wait for the identified run to reach a terminal state or a waiting checkpoint before returning. Requires a name that identifies the run.
 - waitTimeoutSeconds: maximum seconds to wait, from 1 to 300. Defaults to 60.
 
@@ -295,7 +300,8 @@ Action behavior:
 - enqueue enqueues a stored DAG or inline spec.
 - retry retries an existing DAG-run and may target a step with stepName, optionally including downstream steps.
 - stop stops an existing DAG-run.
-- Fields unsupported by an action are invalid. params, singleton, noReuse, and labels apply only to start and enqueue; queue only to enqueue; stepName and includeDownstream only to retry.
+- approve, reject, and push_back decide a step that dagu_read target=run reports as waiting with approval or humanTask. For an approval gate, approve lets the step continue with inputs, reject rejects it with reason, and push_back sends it back for re-execution with inputs as feedback. For a human task, approve completes it and push_back pushes it back; human tasks cannot be rejected.
+- Fields unsupported by an action are invalid. params, singleton, noReuse, and labels apply only to start and enqueue; queue only to enqueue; includeDownstream only to retry; stepName only to retry, approve, reject, and push_back; subDAGRunId and attemptId only to approve, reject, and push_back; inputs only to approve and push_back; reason only to reject.
 - With wait=true, the call returns once the run reaches a terminal state, stops at a waiting checkpoint, or the timeout elapses. A run stopped at a checkpoint has completed=false and reports each waiting step under run.steps as humanTask or approval with its prompt; resolve them to resume the run. On timeout the run keeps executing and the output has completed=false.
 
 Output:
@@ -303,14 +309,15 @@ Output:
 - Successful result text begins with Dagu execute action completed.
 - Structured output has action, targetType, dagName, dagRunId, and references.
 - When a run is identified, output includes runUri and logsUri. Without wait, it also includes subscribe guidance.
+- approve, reject, and push_back output also has stepName, subDAGRunId when given, and, without wait, the run status and statusLabel observed after the decision.
 - With wait=true, output has completed plus the last observed status and statusLabel, and a completed run includes the run detail summary under run with per-step statuses and errors.
 
 Errors:
 
-- invalid_tool_input for missing fields, unknown action, unsupported targetType, or malformed input.
+- invalid_tool_input for missing fields, unknown action, unsupported targetType, or malformed input, when reject targets a human task, or when inputs do not fit the waiting step.
 - unauthorized when the caller cannot perform the requested execution operation.
-- resource_not_found when the named DAG or DAG-run does not exist. A misspelled stored-DAG name carries close existing names under details.didYouMean.
-- conflict when a singleton run is already running or queued.
+- resource_not_found when the named DAG, DAG-run, or step does not exist. A misspelled stored-DAG name carries close existing names under details.didYouMean.
+- conflict when a singleton run is already running or queued, when the step to decide is not waiting for a person, or when attemptId differs from the run's current attempt, which details.attemptId reports.
 - resource_unavailable or internal_error for runtime failures.`,
 		},
 		{

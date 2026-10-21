@@ -460,6 +460,7 @@ func ToDAGRunDetails(s ir.DAGRunStatus) api.DAGRunDetails {
 		Process:                toDAGRunProcess(s),
 		HumanTaskResumePending: humanTaskResumePending,
 		ApprovalResumePending:  approvalPending,
+		AttemptId:              ptrOf(s.AttemptID),
 		TriggerType:            toTriggerType(s.TriggerType),
 		TriggerActor:           ptrOf(s.TriggerActor),
 		Preconditions:          ptrOf(preconditions),

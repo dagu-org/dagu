@@ -106,6 +106,12 @@ func TestToDAGRunDetailsIncludesScheduleTime(t *testing.T) {
 	assert.Equal(t, "alice", *details.TriggerActor)
 }
 
+func TestToDAGRunDetailsIncludesAttemptID(t *testing.T) {
+	details := ToDAGRunDetails(ir.DAGRunStatus{Name: "test-dag", DAGRunID: "run-1", AttemptID: "attempt-2"})
+	require.NotNil(t, details.AttemptId)
+	assert.Equal(t, "attempt-2", *details.AttemptId)
+}
+
 func TestTriggerActorFromContext(t *testing.T) {
 	t.Parallel()
 
