@@ -35,6 +35,25 @@ func TestWaitDurationBlocks(t *testing.T) {
 		"expected at least the configured 300ms to elapse, took %s", elapsed)
 }
 
+// TestWaitDurationReference proves a with.duration holding a reference passes
+// build-time validation, resolves at run time, and the step runs.
+func TestWaitDurationReference(t *testing.T) {
+	t.Parallel()
+
+	dagu := harness.NewRunner(t)
+	dagu.WriteFile("duration_reference.yaml", `params:
+  - name: DELAY
+    default: 10ms
+steps:
+  - action: wait.duration
+    with:
+      duration: ${params.DELAY}
+`)
+
+	result := dagu.Run("start", "duration_reference.yaml")
+	result.ExpectExitCode(0)
+}
+
 func TestWaitDurationMissing(t *testing.T) {
 	t.Parallel()
 
@@ -255,6 +274,42 @@ steps:
 	result := dagu.Run("start", "http_reference_url.yaml")
 	result.ExpectNonZeroExitCode()
 	result.ExpectStderrContains("must be an absolute HTTP URL")
+}
+
+// TestWaitHTTPReferenceStatus proves a with.status reference resolving to a
+// numeric string at run time is parsed and compared against the response.
+func TestWaitHTTPReferenceStatus(t *testing.T) {
+	t.Parallel()
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	server := &http.Server{Handler: mux}
+	go func() { _ = server.Serve(listener) }()
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = server.Shutdown(ctx)
+	})
+
+	dagu := harness.NewRunner(t)
+	dagu.WriteFile("http_reference_status.yaml", fmt.Sprintf(`params:
+  - name: CODE
+    default: "204"
+steps:
+  - action: wait.http
+    with:
+      url: http://127.0.0.1:%d/
+      status: ${params.CODE}
+      poll_interval: 100ms
+`, listener.Addr().(*net.TCPAddr).Port))
+
+	result := dagu.Run("start", "http_reference_status.yaml")
+	result.ExpectExitCode(0)
 }
 
 func TestWaitHTTPNoURL(t *testing.T) {
