@@ -12,6 +12,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -401,6 +402,62 @@ func TestAttempt_CorruptedStatusFile(t *testing.T) {
 	})
 }
 
+func TestAttempt_ReadStatusFromTheEnd(t *testing.T) {
+	// snapshots writes one status line per PID, the way the writer appends them.
+	snapshots := func(t *testing.T, pids ...int) []byte {
+		t.Helper()
+		var data []byte
+		for _, pid := range pids {
+			st := createTestStatus(ir.Running)
+			st.PID = ir.PID(pid)
+			line, err := json.Marshal(st)
+			require.NoError(t, err)
+			data = append(append(data, line...), '\n')
+		}
+		return data
+	}
+	read := func(t *testing.T, data []byte) (*ir.DAGRunStatus, error) {
+		t.Helper()
+		file := filepath.Join(createTempDir(t), "status.jsonl")
+		require.NoError(t, os.WriteFile(file, data, 0600))
+		att, err := NewAttempt(file, nil)
+		require.NoError(t, err)
+		return att.ReadStatus(context.Background())
+	}
+
+	t.Run("LatestSnapshot", func(t *testing.T) {
+		status, err := read(t, snapshots(t, 1, 2, 3))
+		require.NoError(t, err)
+		assert.Equal(t, ir.PID(3), status.PID)
+	})
+
+	t.Run("LineStillBeingWritten", func(t *testing.T) {
+		data := snapshots(t, 1, 2)
+		partial := snapshots(t, 3)
+		status, err := read(t, append(data, partial[:len(partial)/2]...))
+		require.NoError(t, err)
+		assert.Equal(t, ir.PID(2), status.PID)
+	})
+
+	t.Run("InvalidLastLine", func(t *testing.T) {
+		status, err := read(t, append(snapshots(t, 1, 2), []byte("{not json\n")...))
+		require.NoError(t, err)
+		assert.Equal(t, ir.PID(2), status.PID)
+	})
+
+	t.Run("SnapshotLargerThanAReadChunk", func(t *testing.T) {
+		st := createTestStatus(ir.Running)
+		st.PID = ir.PID(4)
+		st.Log = strings.Repeat("x", 300*1024)
+		line, err := json.Marshal(st)
+		require.NoError(t, err)
+		status, err := read(t, append(append(snapshots(t, 1, 2), line...), '\n'))
+		require.NoError(t, err)
+		assert.Equal(t, ir.PID(4), status.PID)
+		assert.Len(t, status.Log, 300*1024)
+	})
+}
+
 func TestReadLineFrom(t *testing.T) {
 	dir := createTempDir(t)
 	file := filepath.Join(dir, "lines.txt")
@@ -554,6 +611,65 @@ func createTestStatus(st ir.Status) ir.DAGRunStatus {
 		PID:       ir.PID(12345),
 		StartedAt: stringutil.FormatTime(time.Now()),
 		Nodes:     ir.NewNodesFromSteps(dag.Steps),
+	}
+}
+
+// BenchmarkReadLatestStatus reads the latest status of a running DAG whose
+// file holds many snapshots, each carrying a large step output.
+func BenchmarkReadLatestStatus(b *testing.B) {
+	file := filepath.Join(b.TempDir(), "status.jsonl")
+	var data []byte
+	for i := range 12 {
+		st := createTestStatus(ir.Running)
+		st.PID = ir.PID(i)
+		st.Log = strings.Repeat("x", 512*1024)
+		line, err := json.Marshal(st)
+		require.NoError(b, err)
+		data = append(append(data, line...), '\n')
+	}
+	require.NoError(b, os.WriteFile(file, data, 0600))
+	b.SetBytes(int64(len(data)))
+
+	b.Run("FromTheEnd", func(b *testing.B) {
+		for b.Loop() {
+			if _, err := ParseStatusFile(file); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+	b.Run("EveryLine", func(b *testing.B) {
+		for b.Loop() {
+			if _, err := parseEveryStatusLine(file); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+}
+
+// parseEveryStatusLine decodes every line to find the last valid status, as
+// the latest status was read before it was read from the end.
+func parseEveryStatusLine(file string) (*ir.DAGRunStatus, error) {
+	f, err := os.Open(file)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = f.Close() }()
+	var (
+		offset int64
+		result *ir.DAGRunStatus
+	)
+	for {
+		line, next, err := readLineFrom(f, offset)
+		if err == io.EOF {
+			return result, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		offset = next
+		if status, err := ir.StatusFromJSON(string(line)); err == nil {
+			result = status
+		}
 	}
 }
 
