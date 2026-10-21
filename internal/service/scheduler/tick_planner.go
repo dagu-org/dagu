@@ -468,8 +468,8 @@ func latestCronSlot(schedules []ir.Schedule, from, to time.Time) (time.Time, boo
 }
 
 // recordSlot keeps what came of a start slot as the DAG's latest, unless a
-// later slot is kept, or the same slot is only planned again. It reports
-// whether the state changed.
+// later slot is kept, the same slot was dispatched, or it is only planned
+// again. It reports whether the state changed.
 func (tp *TickPlanner) recordSlot(dagName string, at time.Time, outcome schedulerstate.SlotOutcome) bool {
 	tp.mu.Lock()
 	defer tp.mu.Unlock()
@@ -479,7 +479,9 @@ func (tp *TickPlanner) recordSlot(dagName string, at time.Time, outcome schedule
 	}
 	dagState := schedulerstate.CloneDAGWatermark(tp.watermarkState.DAGs[dagName])
 	if last := dagState.LastSlot; last != nil {
-		if at.Before(last.At) || (at.Equal(last.At) && (last.Outcome == outcome || outcome == schedulerstate.SlotPlanned)) {
+		same := at.Equal(last.At) && (last.Outcome == outcome || last.Outcome == schedulerstate.SlotDispatched ||
+			outcome == schedulerstate.SlotPlanned)
+		if at.Before(last.At) || same {
 			return false
 		}
 	}

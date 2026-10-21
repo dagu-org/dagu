@@ -2850,6 +2850,20 @@ func TestTickPlanner_SlotNeverMovesBack(t *testing.T) {
 	assert.Equal(t, &schedulerstate.ScheduleSlot{At: later, Outcome: schedulerstate.SlotMissed}, lastSlot(tp, "dag"))
 }
 
+// A slot that was dispatched stays so when it is looked at again, as by a
+// scheduler restarted within the slot's minute.
+func TestTickPlanner_DispatchedSlotStays(t *testing.T) {
+	t.Parallel()
+
+	slot := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+	tp, _ := newTestTickPlanner(&mockStateStore{})
+	require.NoError(t, tp.Init(t.Context(), nil))
+
+	require.True(t, tp.recordSlot("dag", slot, schedulerstate.SlotDispatched))
+	assert.False(t, tp.recordSlot("dag", slot, schedulerstate.SlotRunning))
+	assert.Equal(t, schedulerstate.SlotDispatched, lastSlot(tp, "dag").Outcome)
+}
+
 // A catch-up slot records its dispatch, and one its overlap policy drops
 // records the overlap.
 func TestTickPlanner_CatchupSlots(t *testing.T) {
