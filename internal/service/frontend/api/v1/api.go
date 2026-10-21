@@ -877,10 +877,20 @@ func (a *API) isAllowed(perm config.Permission) error {
 	return nil
 }
 
+// rolesApply reports whether the caller's role limits the request: on a
+// server with users of its own, and always for a user Dagu Cloud vouches for.
+func (a *API) rolesApply(ctx context.Context) bool {
+	if a.authService != nil {
+		return true
+	}
+	user, ok := auth.UserFromContext(ctx)
+	return ok && user.AuthProvider == auth.AuthProviderCloud
+}
+
 // requireAdmin checks if the current user has admin role.
-// Returns nil if auth is not enabled (authService is nil).
+// Returns nil when roles do not apply to the caller (see rolesApply).
 func (a *API) requireAdmin(ctx context.Context) error {
-	if a.authService == nil {
+	if !a.rolesApply(ctx) {
 		return nil
 	}
 	user, ok := auth.UserFromContext(ctx)
@@ -894,9 +904,9 @@ func (a *API) requireAdmin(ctx context.Context) error {
 }
 
 // requireManagerOrAbove checks if the current user has manager or admin role.
-// Returns nil if auth is not enabled (authService is nil).
+// Returns nil when roles do not apply to the caller (see rolesApply).
 func (a *API) requireManagerOrAbove(ctx context.Context) error {
-	if a.authService == nil {
+	if !a.rolesApply(ctx) {
 		return nil
 	}
 	user, ok := auth.UserFromContext(ctx)
@@ -910,9 +920,9 @@ func (a *API) requireManagerOrAbove(ctx context.Context) error {
 }
 
 // requireDeveloperOrAbove checks if the current user has developer, manager, or admin role.
-// Returns nil if auth is not enabled (authService is nil).
+// Returns nil when roles do not apply to the caller (see rolesApply).
 func (a *API) requireDeveloperOrAbove(ctx context.Context) error {
-	if a.authService == nil {
+	if !a.rolesApply(ctx) {
 		return nil
 	}
 	user, ok := auth.UserFromContext(ctx)
@@ -977,7 +987,7 @@ func (a *API) requireDAGWrite(ctx context.Context) error {
 	if !a.config.Server.Permissions[config.PermissionWriteDAGs] {
 		return errPermissionDenied
 	}
-	if a.authService != nil {
+	if a.rolesApply(ctx) {
 		user, ok := auth.UserFromContext(ctx)
 		if !ok {
 			return errAuthRequired
