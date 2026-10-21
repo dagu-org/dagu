@@ -85,7 +85,7 @@ func decodeConfig(raw map[string]any, cfg *config) error {
 func parseConfig(operation string, cfg config, deferReferences bool) (parsedConfig, error) {
 	parsed := parsedConfig{config: cfg}
 
-	if !deferReferences || !value.HasValueReference(cfg.PollInterval) {
+	if !deferReferences || !isValueReference(cfg.PollInterval) {
 		pollInterval, err := parsePositiveDuration("poll_interval", cfg.PollInterval)
 		if err != nil {
 			return parsed, err
@@ -93,7 +93,7 @@ func parseConfig(operation string, cfg config, deferReferences bool) (parsedConf
 		parsed.pollInterval = pollInterval
 	}
 
-	if !deferReferences || !value.HasValueReference(cfg.RequestTimeout) {
+	if !deferReferences || !isValueReference(cfg.RequestTimeout) {
 		requestTimeout, err := parsePositiveDuration("request_timeout", cfg.RequestTimeout)
 		if err != nil {
 			return parsed, err
@@ -106,7 +106,7 @@ func parseConfig(operation string, cfg config, deferReferences bool) (parsedConf
 		if strings.TrimSpace(cfg.Duration) == "" {
 			return parsed, fmt.Errorf("wait: duration is required for %s", operation)
 		}
-		if !deferReferences || !value.HasValueReference(cfg.Duration) {
+		if !deferReferences || !isValueReference(cfg.Duration) {
 			duration, err := parsePositiveDuration("duration", cfg.Duration)
 			if err != nil {
 				return parsed, err
@@ -117,7 +117,7 @@ func parseConfig(operation string, cfg config, deferReferences bool) (parsedConf
 		if strings.TrimSpace(cfg.Until) == "" {
 			return parsed, fmt.Errorf("wait: until is required for %s", operation)
 		}
-		if !deferReferences || !value.HasValueReference(cfg.Until) {
+		if !deferReferences || !isValueReference(cfg.Until) {
 			until, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(cfg.Until))
 			if err != nil {
 				return parsed, fmt.Errorf("wait: until must be RFC3339 timestamp: %w", err)
@@ -128,7 +128,7 @@ func parseConfig(operation string, cfg config, deferReferences bool) (parsedConf
 		if strings.TrimSpace(cfg.Path) == "" {
 			return parsed, fmt.Errorf("wait: path is required for %s", operation)
 		}
-		if !deferReferences || !value.HasValueReference(cfg.State) {
+		if !deferReferences || !isValueReference(cfg.State) {
 			switch cfg.State {
 			case stateExists, stateMissing:
 			default:
@@ -139,7 +139,7 @@ func parseConfig(operation string, cfg config, deferReferences bool) (parsedConf
 		if strings.TrimSpace(cfg.URL) == "" {
 			return parsed, fmt.Errorf("wait: url is required for %s", operation)
 		}
-		if !deferReferences || !value.HasValueReference(cfg.URL) {
+		if !deferReferences || !isValueReference(cfg.URL) {
 			parsedURL, err := url.ParseRequestURI(strings.TrimSpace(cfg.URL))
 			if err != nil || parsedURL.Scheme == "" || parsedURL.Host == "" {
 				return parsed, fmt.Errorf("wait: url must be an absolute HTTP URL")
@@ -161,12 +161,19 @@ func parseConfig(operation string, cfg config, deferReferences bool) (parsedConf
 	return parsed, nil
 }
 
+// isValueReference reports whether text holds a value reference, including the
+// bare ${NAME} and $NAME environment forms, so it resolves only at run time.
+func isValueReference(text string) bool {
+	text = strings.TrimSpace(text)
+	return value.IsWholeReference(text) || value.HasValueReference(text)
+}
+
 func parseStatus(raw any, deferReferences bool, parsed *parsedConfig) error {
 	switch v := raw.(type) {
 	case nil:
 		return fmt.Errorf("wait: status must be between 100 and 599")
 	case string:
-		if deferReferences && value.HasValueReference(v) {
+		if deferReferences && isValueReference(v) {
 			return nil
 		}
 		n, err := strconv.Atoi(strings.TrimSpace(v))

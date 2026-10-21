@@ -113,6 +113,8 @@ func TestValidateStepDefersReferenceFields(t *testing.T) {
 			config: map[string]any{"url": "${steps.plan.outputs.url}", "status": "${steps.plan.outputs.code}"},
 		},
 		{name: "pollInterval", op: opDuration, config: map[string]any{"duration": "5ms", "poll_interval": "${params.interval}"}},
+		{name: "braceEnvDuration", op: opDuration, config: map[string]any{"duration": "${DELAY}"}},
+		{name: "bareEnvURL", op: opHTTP, config: map[string]any{"url": "$SERVICE_URL", "status": "${STATUS_CODE}"}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
