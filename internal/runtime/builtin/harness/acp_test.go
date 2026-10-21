@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// 使用独立的 JSON-RPC 对端验证线协议，避免 SDK 两端掩盖同一个错误。
+// TestACPAgent provides an independent JSON-RPC peer to check SDK wire behavior.
 func TestACPAgent(_ *testing.T) {
 	marker := -1
 	for i, arg := range os.Args {
@@ -85,6 +85,9 @@ func TestACPAgent(_ *testing.T) {
 				Prompt []struct{ Text string }
 			}
 			_ = json.Unmarshal(msg.Params, &params)
+			if len(params.Prompt) == 0 {
+				os.Exit(4)
+			}
 			for _, part := range []string{"reply:", params.Prompt[0].Text} {
 				send(map[string]any{"jsonrpc": "2.0", "method": "session/update", "params": map[string]any{
 					"sessionId": "test-session", "update": map[string]any{"sessionUpdate": "agent_message_chunk", "content": map[string]any{"type": "text", "text": part}},
@@ -109,6 +112,7 @@ func TestACPAgent(_ *testing.T) {
 	os.Exit(0)
 }
 
+// TestACPRun checks ACP output, permission decisions, failures, and cancellation.
 func TestACPRun(t *testing.T) {
 	for _, tc := range []struct {
 		mode, policy, wantError string
@@ -157,12 +161,14 @@ func TestACPRun(t *testing.T) {
 	}
 }
 
+// TestACPContainer verifies that unsupported container execution fails explicitly.
 func TestACPContainer(t *testing.T) {
 	e := &harnessExecutor{step: ir.Step{Container: &ir.Container{}}}
 	_, err := e.runACP(t.Context(), providerConfig{})
 	require.ErrorContains(t, err, "not supported inside containers")
 }
 
+// TestACPFallback ensures failed attempts do not leak text into successful output.
 func TestACPFallback(t *testing.T) {
 	binary, err := os.Executable()
 	require.NoError(t, err)
@@ -181,6 +187,7 @@ func TestACPFallback(t *testing.T) {
 	require.Contains(t, stderr.String(), "trying fallback")
 }
 
+// TestACPStop verifies that an explicit stop cancels the turn without trying a fallback.
 func TestACPStop(t *testing.T) {
 	binary, err := os.Executable()
 	require.NoError(t, err)

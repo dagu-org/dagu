@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestACPLoad verifies that base configuration inheritance and cloning preserve ACP.
 func TestACPLoad(t *testing.T) {
 	base := createTempYAMLFile(t, `harnesses:
   adapter:

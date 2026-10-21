@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestDAGSchemaACP keeps schema protocol validation aligned with the YAML parser.
 func TestDAGSchemaACP(t *testing.T) {
 	const source = `harnesses:
   adapter:

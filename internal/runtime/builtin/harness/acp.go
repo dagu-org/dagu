@@ -20,7 +20,8 @@ import (
 	"github.com/dagucloud/dagu/v2/internal/runtime/resourcelimit"
 )
 
-// ACP 使用独立的双向 stdio 通道，不能复用只接收 CLI 文本的容器路径。
+// runACP executes one prompt against a local ACP agent and returns its spooled text output.
+// ACP requires bidirectional stdio, which the container CLI paths do not provide.
 func (e *harnessExecutor) runACP(parent context.Context, cfg providerConfig) (stdout *os.File, err error) {
 	e.exitCode = 1
 	if e.step.Container != nil || rootContainerConfigured(parent) {
@@ -70,7 +71,7 @@ func (e *harnessExecutor) runACP(parent context.Context, cfg providerConfig) (st
 		return nil, err
 	}
 	defer func() { _ = output.Close() }()
-	// WaitDelay 同时限制 agent 子进程持有 stderr 管道时的清理时间。
+	// Bound cleanup when agent descendants keep the stderr pipe open.
 	cmd.WaitDelay = time.Second
 	e.mu.Lock()
 	process, err := cmdutil.StartManagedProcess(cmd)
@@ -98,7 +99,7 @@ func (e *harnessExecutor) runACP(parent context.Context, cfg providerConfig) (st
 		e.process, e.acpCancel = nil, nil
 		e.mu.Unlock()
 	}()
-	// 即使 agent 忽略取消通知，也必须结束整个进程树。
+	// Stop the process tree even if the agent ignores the cancellation notification.
 	watchDone := make(chan struct{})
 	stopWatch := context.AfterFunc(ctx, func() {
 		defer close(watchDone)
@@ -117,7 +118,7 @@ func (e *harnessExecutor) runACP(parent context.Context, cfg providerConfig) (st
 			case <-sent:
 			case <-cancelCtx.Done():
 			}
-			// SDK 的管道写入不一定响应 context；关闭管道可解除阻塞。
+			// SDK pipe writes may ignore context cancellation; closing stdin unblocks them.
 			_ = input.Close()
 			<-sent
 		}
@@ -144,6 +145,7 @@ func (e *harnessExecutor) runACP(parent context.Context, cfg providerConfig) (st
 	return spool, nil
 }
 
+// acpTurn negotiates ACP v1, creates a session, and checks the prompt result.
 func (e *harnessExecutor) acpTurn(ctx context.Context, conn *acp.ClientSideConnection, client *acpHarnessClient, directory string) error {
 	init, err := conn.Initialize(ctx, acp.InitializeRequest{ProtocolVersion: acp.ProtocolVersionNumber})
 	if err != nil {
@@ -188,6 +190,7 @@ type acpHarnessClient struct {
 
 var _ acp.Client = (*acpHarnessClient)(nil)
 
+// SessionUpdate captures ordered assistant text for the active session.
 func (c *acpHarnessClient) SessionUpdate(_ context.Context, params acp.SessionNotification) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -204,6 +207,8 @@ func (c *acpHarnessClient) SessionUpdate(_ context.Context, params acp.SessionNo
 	return nil
 }
 
+// RequestPermission accepts allow_once options only when explicitly enabled.
+// Denials fail the attempt even if the agent subsequently returns end_turn.
 func (c *acpHarnessClient) RequestPermission(_ context.Context, params acp.RequestPermissionRequest) (acp.RequestPermissionResponse, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -218,31 +223,37 @@ func (c *acpHarnessClient) RequestPermission(_ context.Context, params acp.Reque
 	return acp.RequestPermissionResponse{Outcome: acp.RequestPermissionOutcome{Cancelled: &acp.RequestPermissionOutcomeCancelled{}}}, nil
 }
 
-// 不声明客户端文件系统和终端能力；agent 可使用自己的工具实现。
+// ReadTextFile rejects client filesystem access, which is not advertised.
 func (*acpHarnessClient) ReadTextFile(context.Context, acp.ReadTextFileRequest) (acp.ReadTextFileResponse, error) {
 	return acp.ReadTextFileResponse{}, acp.NewMethodNotFound("fs/read_text_file")
 }
 
+// WriteTextFile rejects client filesystem writes, which are not advertised.
 func (*acpHarnessClient) WriteTextFile(context.Context, acp.WriteTextFileRequest) (acp.WriteTextFileResponse, error) {
 	return acp.WriteTextFileResponse{}, acp.NewMethodNotFound("fs/write_text_file")
 }
 
+// CreateTerminal rejects terminal creation, which is not advertised.
 func (*acpHarnessClient) CreateTerminal(context.Context, acp.CreateTerminalRequest) (acp.CreateTerminalResponse, error) {
 	return acp.CreateTerminalResponse{}, acp.NewMethodNotFound("terminal")
 }
 
+// TerminalOutput rejects terminal output requests because no client terminals exist.
 func (*acpHarnessClient) TerminalOutput(context.Context, acp.TerminalOutputRequest) (acp.TerminalOutputResponse, error) {
 	return acp.TerminalOutputResponse{}, acp.NewMethodNotFound("terminal")
 }
 
+// ReleaseTerminal rejects terminal release because no client terminals exist.
 func (*acpHarnessClient) ReleaseTerminal(context.Context, acp.ReleaseTerminalRequest) (acp.ReleaseTerminalResponse, error) {
 	return acp.ReleaseTerminalResponse{}, acp.NewMethodNotFound("terminal")
 }
 
+// WaitForTerminalExit rejects terminal waits because no client terminals exist.
 func (*acpHarnessClient) WaitForTerminalExit(context.Context, acp.WaitForTerminalExitRequest) (acp.WaitForTerminalExitResponse, error) {
 	return acp.WaitForTerminalExitResponse{}, acp.NewMethodNotFound("terminal")
 }
 
+// KillTerminal rejects terminal termination because no client terminals exist.
 func (*acpHarnessClient) KillTerminal(context.Context, acp.KillTerminalRequest) (acp.KillTerminalResponse, error) {
 	return acp.KillTerminalResponse{}, acp.NewMethodNotFound("terminal")
 }

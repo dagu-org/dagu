@@ -5228,7 +5228,7 @@
         "protocol": {
           "type": "string",
           "enum": ["cli", "acp"],
-          "description": "通信协议，默认 cli；acp 使用标准输入输出连接 ACP agent。"
+          "description": "Communication protocol. Defaults to cli; acp connects to an ACP agent over stdio."
         },
         "prompt_mode": {
           "type": "string",

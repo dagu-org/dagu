@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestACPDefinition checks protocol selection and incompatible CLI prompt options.
 func TestACPDefinition(t *testing.T) {
 	def, err := parseHarnessDefinition("agent", map[string]any{"binary": "adapter", "protocol": "acp", "prefix_args": []any{"--acp"}})
 	require.NoError(t, err)

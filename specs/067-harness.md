@@ -268,6 +268,6 @@ steps:
         - provider: codex
 ```
 
-## ACP 协议扩展
+## ACP protocol extension
 
-自定义 harness 支持 `protocol: acp`，配置和验收约定见 [ACP 扩展规范](067-harness-acp.md)。
+Custom harness providers support `protocol: acp`. See the [ACP extension specification](067-harness-acp.md) for configuration and acceptance criteria.

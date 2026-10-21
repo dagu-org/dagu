@@ -155,6 +155,7 @@ func (e *harnessExecutor) Stop(intent cmdutil.TerminationIntent) error {
 	return e.stop(cmdutil.StopRequest{Intent: intent})
 }
 
+// stop cancels an ACP turn or forwards the stop request to the active execution backend.
 func (e *harnessExecutor) stop(req cmdutil.StopRequest) error {
 	e.mu.Lock()
 	host := e.managedHost
@@ -235,6 +236,7 @@ func (e *harnessExecutor) effectivePrompt() string {
 	return strings.TrimRight(sb.String(), "\n")
 }
 
+// Run tries providers in order and publishes only the successful attempt's output.
 func (e *harnessExecutor) Run(ctx context.Context) error {
 	var lastErr error
 
@@ -284,6 +286,7 @@ func (e *harnessExecutor) Run(ctx context.Context) error {
 	return nil
 }
 
+// runOnce dispatches one provider attempt to its protocol and execution backend.
 func (e *harnessExecutor) runOnce(ctx context.Context, cfg providerConfig) (*os.File, error) {
 	if cfg.definition != nil && cfg.definition.Protocol == "acp" {
 		return e.runACP(ctx, cfg)
@@ -1397,6 +1400,7 @@ func knownProviders(defs ir.HarnessDefinitions) []string {
 	return names
 }
 
+// cloneDefinition copies a reusable harness definition without sharing mutable options.
 func cloneDefinition(def *ir.HarnessDefinition) *ir.HarnessDefinition {
 	if def == nil {
 		return nil

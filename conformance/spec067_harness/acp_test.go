@@ -8,14 +8,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/dagucloud/dagu/v2/conformance/harness"
 	"github.com/stretchr/testify/require"
 )
 
+// TestACPFixture serves the independent ACP peer used by binary conformance tests.
 func TestACPFixture(_ *testing.T) {
 	if !slices.Contains(os.Args, "--acp-fixture") {
 		return
@@ -44,6 +47,9 @@ func TestACPFixture(_ *testing.T) {
 			}
 			result["sessionId"] = "fixture"
 		case "session/prompt":
+			if len(msg.Params.Prompt) == 0 {
+				os.Exit(4)
+			}
 			for _, part := range []string{"ACP:", msg.Params.Prompt[0].Text} {
 				send(map[string]any{"jsonrpc": "2.0", "method": "session/update", "params": map[string]any{
 					"sessionId": "fixture", "update": map[string]any{"sessionUpdate": "agent_message_chunk", "content": map[string]any{"type": "text", "text": part}},
@@ -56,6 +62,7 @@ func TestACPFixture(_ *testing.T) {
 	os.Exit(0)
 }
 
+// TestHarnessACP verifies that ACP text output reaches a dependent workflow step.
 func TestHarnessACP(t *testing.T) {
 	dagu := harness.NewRunner(t)
 	binary, err := os.Executable()
@@ -85,4 +92,16 @@ steps:
 	result.ExpectExitCode(0)
 	require.Equal(t, "ACP:hello\n\ncontext", stepStdout(t, result.Stdout(), 0))
 	require.Equal(t, "ACP:ACP:hello\n\ncontext", stepStdout(t, result.Stdout(), 1))
+}
+
+// An empty prompt must produce an explicit fixture failure instead of a panic.
+func TestACPFixtureEmptyPrompt(t *testing.T) {
+	binary, err := os.Executable()
+	require.NoError(t, err)
+	cmd := exec.CommandContext(t.Context(), binary, "-test.run=^TestACPFixture$", "--", "--acp-fixture")
+	cmd.Stdin = strings.NewReader("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"session/prompt\",\"params\":{\"prompt\":[]}}\n")
+	output, err := cmd.CombinedOutput()
+	var exitErr *exec.ExitError
+	require.ErrorAs(t, err, &exitErr, string(output))
+	require.Equal(t, 4, exitErr.ExitCode(), string(output))
 }

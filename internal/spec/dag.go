@@ -2827,6 +2827,7 @@ func parseHarnessDefinitions(raw map[string]any) (ir.HarnessDefinitions, error) 
 	return defs, nil
 }
 
+// parseHarnessDefinition validates a named CLI or ACP harness and applies CLI defaults.
 func parseHarnessDefinition(name string, raw map[string]any) (*ir.HarnessDefinition, error) {
 	def := &ir.HarnessDefinition{
 		PromptMode:     ir.HarnessPromptModeArg,

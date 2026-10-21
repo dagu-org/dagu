@@ -1,4 +1,4 @@
-# 先安装并完成 ACP adapter 的认证，例如 @agentclientprotocol/codex-acp。
+# Install and authenticate an ACP adapter, such as @agentclientprotocol/codex-acp.
 harnesses:
   coding-agent:
     protocol: acp
@@ -9,5 +9,5 @@ steps:
     action: harness.run
     with:
       provider: coding-agent
-      prompt: 检查当前目录的代码，概述主要模块，不修改文件。
+      prompt: Review the code in this directory and summarize its modules without modifying files.
     output: REVIEW
