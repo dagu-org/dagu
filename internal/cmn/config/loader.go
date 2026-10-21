@@ -273,7 +273,11 @@ func (l *ConfigLoader) secretFile(key, file string, value *string) secretFile {
 
 // remoteNodeSecretFile describes a secret of the remote node at index i.
 // Viper cannot address list items by key, so the raw entry of the node tells
-// whether the configuration gives the key.
+// whether the configuration gives the key. The entry is a []any of
+// map[string]any, which is what viper builds from YAML. For any other shape the
+// type assertions fail, set stays false, and the check for an empty inline key
+// beside its _file key does not run. A non-empty inline value still conflicts
+// with the _file key in readSecretFile.
 func (l *ConfigLoader) remoteNodeSecretFile(i int, name, file string, value *string) secretFile {
 	secret := secretFile{key: fmt.Sprintf("remote_nodes[%d].%s", i, name), file: file, value: value}
 	if nodes, ok := l.v.Get("remote_nodes").([]any); ok && i < len(nodes) {
