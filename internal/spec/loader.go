@@ -1150,6 +1150,10 @@ func (*mergeTransformer) Transformer(
 				}
 				return &ir.HarnessDefinition{
 					Protocol:       def.Protocol,
+					Transport:      def.Transport,
+					URL:            def.URL,
+					Headers:        maps.Clone(def.Headers),
+					Cwd:            def.Cwd,
 					Binary:         def.Binary,
 					PrefixArgs:     append([]string(nil), def.PrefixArgs...),
 					PromptMode:     def.PromptMode,

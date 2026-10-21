@@ -28,3 +28,35 @@ steps:
 		require.Error(t, resolved.Validate(mustParseYAMLDocument(t, strings.Replace(source, "protocol: acp", replacement, 1))))
 	}
 }
+
+// TestDAGSchemaACPRemote validates mutually exclusive stdio and WebSocket settings.
+func TestDAGSchemaACPRemote(t *testing.T) {
+	const source = `harnesses:
+  adapter:
+    protocol: acp
+    transport: websocket
+    url: wss://agent.example/acp
+    cwd: /remote/workspace
+    headers:
+      Authorization: Bearer ${ACP_TOKEN}
+steps:
+  - action: harness.run
+    with:
+      provider: adapter
+      prompt: hello
+`
+	resolved := mustResolveDAGSchema(t)
+	require.NoError(t, resolved.Validate(mustParseYAMLDocument(t, source)))
+	for _, tc := range []struct{ from, to string }{
+		{"protocol: acp", "protocol: cli"},
+		{"transport: websocket", "transport: http"},
+		{"    cwd: /remote/workspace\n", ""},
+		{"    url: wss://agent.example/acp\n", ""},
+		{"transport: websocket", "transport: websocket\n    binary: adapter"},
+		{"transport: websocket", "transport: websocket\n    prefix_args: []"},
+		{"transport: websocket", "transport: websocket\n    flag_style: gnu_long"},
+		{"transport: websocket", "transport: stdio\n    binary: adapter"},
+	} {
+		require.Error(t, resolved.Validate(mustParseYAMLDocument(t, strings.Replace(source, tc.from, tc.to, 1))))
+	}
+}

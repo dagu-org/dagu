@@ -20,8 +20,7 @@ import (
 	"github.com/dagucloud/dagu/v2/internal/runtime/resourcelimit"
 )
 
-// runACP executes one prompt against a local ACP agent and returns its spooled text output.
-// ACP requires bidirectional stdio, which the container CLI paths do not provide.
+// runACP executes one prompt over the configured ACP transport and spools its text output.
 func (e *harnessExecutor) runACP(parent context.Context, cfg providerConfig) (stdout *os.File, err error) {
 	e.exitCode = 1
 	if e.step.Container != nil || rootContainerConfigured(parent) {
@@ -47,6 +46,15 @@ func (e *harnessExecutor) runACP(parent context.Context, cfg providerConfig) (st
 			_ = cleanupStdoutSpool(spool)
 		}
 	}()
+	if cfg.definition.Transport == "websocket" {
+		if err = e.runACPWebSocket(ctx, cfg, spool, policy == "allow"); err != nil {
+			return nil, err
+		}
+		if _, err = spool.Seek(0, io.SeekStart); err != nil {
+			return nil, err
+		}
+		return spool, nil
+	}
 	args := append([]string(nil), cfg.definition.PrefixArgs...)
 	args = append(args, configToFlags(flags, cfg.definition)...)
 	cmd, err := e.invocationCommand(ctx, cfg, args, nil, nil, e.stderrWriter())

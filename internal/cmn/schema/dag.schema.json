@@ -5173,8 +5173,37 @@
     "harnessNamedDefinition": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["binary"],
       "allOf": [
+        {
+          "if": {"required": ["transport"]},
+          "then": {
+            "required": ["protocol"],
+            "properties": {"protocol": {"const": "acp"}}
+          }
+        },
+        {
+          "if": {
+            "required": ["transport"],
+            "properties": {"transport": {"const": "websocket"}}
+          },
+          "then": {
+            "required": ["url", "cwd"],
+            "not": {"anyOf": [
+              {"required": ["binary"]},
+              {"required": ["prefix_args"]},
+              {"required": ["option_flags"]},
+              {"required": ["flag_style"]}
+            ]}
+          },
+          "else": {
+            "required": ["binary"],
+            "not": {"anyOf": [
+              {"required": ["url"]},
+              {"required": ["headers"]},
+              {"required": ["cwd"]}
+            ]}
+          }
+        },
         {
           "if": {
             "properties": {"protocol": {"const": "acp"}},
@@ -5214,6 +5243,26 @@
         }
       ],
       "properties": {
+        "transport": {
+          "type": "string",
+          "enum": ["stdio", "websocket"],
+          "description": "ACP transport. Defaults to stdio; websocket connects to a remote ACP agent."
+        },
+        "url": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Remote ws:// or wss:// endpoint. Supports workflow variable references."
+        },
+        "cwd": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Absolute working directory on the remote agent host."
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {"type": "string"},
+          "description": "WebSocket handshake headers, such as Authorization. Values support workflow variable references."
+        },
         "binary": {
           "type": "string",
           "description": "CLI binary name or path for the custom harness."

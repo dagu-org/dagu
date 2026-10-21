@@ -1,0 +1,259 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package harness
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	acp "github.com/coder/acp-go-sdk"
+	"github.com/coder/websocket"
+	"github.com/dagucloud/dagu/v2/internal/cmn/cmdutil"
+	"github.com/dagucloud/dagu/v2/internal/ir"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// newACPWebSocketPeer serves independent JSON-RPC messages, including batched frames.
+func newACPWebSocketPeer(t *testing.T, tls bool) (*httptest.Server, <-chan struct{}, <-chan struct{}) {
+	t.Helper()
+	prompted, cancelled := make(chan struct{}, 10), make(chan struct{}, 10)
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Has("authenticate") {
+			assert.Equal(t, "Bearer test-token", r.Header.Get("Authorization"))
+			assert.Equal(t, "test-value", r.Header.Get("X-Agent"))
+			assert.Contains(t, r.Header.Get("Sec-WebSocket-Protocol"), "bearer.test-token")
+		}
+		socket, err := websocket.Accept(w, r, &websocket.AcceptOptions{Subprotocols: []string{"acp.v1"}})
+		if !assert.NoError(t, err) {
+			return
+		}
+		defer func() { _ = socket.CloseNow() }()
+		ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
+		defer cancel()
+		var promptID any
+		send := func(messages ...any) {
+			var frame bytes.Buffer
+			for _, message := range messages {
+				_ = json.NewEncoder(&frame).Encode(message)
+			}
+			assert.NoError(t, socket.Write(ctx, websocket.MessageText, bytes.TrimSuffix(frame.Bytes(), []byte("\n"))))
+		}
+		result := func(id, value any) any {
+			return map[string]any{"jsonrpc": "2.0", "id": id, "result": value}
+		}
+		for {
+			kind, data, err := socket.Read(ctx)
+			if err != nil {
+				return
+			}
+			assert.Equal(t, websocket.MessageText, kind)
+			assert.True(t, bytes.HasSuffix(data, []byte("\n")), "stdio bridges need the NDJSON delimiter in outgoing frames")
+			var msg struct {
+				ID     any
+				Method string
+				Params struct {
+					Cwd    string
+					Prompt []struct{ Text string }
+				}
+				Result json.RawMessage
+			}
+			if !assert.NoError(t, json.Unmarshal(data, &msg)) {
+				return
+			}
+			switch msg.Method {
+			case "initialize":
+				send(result(msg.ID, map[string]any{"protocolVersion": 1, "agentCapabilities": map[string]any{}}))
+			case "session/new":
+				assert.Equal(t, "/remote/workspace", msg.Params.Cwd)
+				send(result(msg.ID, map[string]any{"sessionId": "remote"}))
+			case "session/prompt":
+				prompted <- struct{}{}
+				promptID = msg.ID
+				switch r.URL.Path {
+				case "/wait":
+					continue
+				case "/drop":
+					return
+				case "/binary":
+					_ = socket.Write(ctx, websocket.MessageBinary, []byte(`{}`))
+					continue
+				case "/permission":
+					send(map[string]any{"jsonrpc": "2.0", "id": "permission", "method": "session/request_permission", "params": map[string]any{
+						"sessionId": "remote", "toolCall": map[string]any{"toolCallId": "tool"},
+						"options": []any{map[string]any{"optionId": "once", "name": "Allow", "kind": "allow_once"}},
+					}})
+					continue
+				}
+				if len(msg.Params.Prompt) == 0 {
+					t.Error("missing prompt")
+					return
+				}
+				update := func(text string) any {
+					return map[string]any{"jsonrpc": "2.0", "method": "session/update", "params": map[string]any{
+						"sessionId": "remote", "update": map[string]any{"sessionUpdate": "agent_message_chunk", "content": map[string]any{"type": "text", "text": text}},
+					}}
+				}
+				send(update("remote:"), update(msg.Params.Prompt[0].Text), result(msg.ID, map[string]any{"stopReason": "end_turn"}))
+			case "session/cancel":
+				cancelled <- struct{}{}
+			case "$/ping":
+			default:
+				if msg.ID == "permission" {
+					assert.True(t, strings.Contains(string(msg.Result), "selected") || strings.Contains(string(msg.Result), "cancelled"))
+					send(result(promptID, map[string]any{"stopReason": "end_turn"}))
+				}
+			}
+		}
+	})
+	var server *httptest.Server
+	if tls {
+		server = httptest.NewTLSServer(handler)
+	} else {
+		server = httptest.NewServer(handler)
+	}
+	t.Cleanup(server.Close)
+	return server, prompted, cancelled
+}
+
+// TestACPWebSocket checks remote framing, authentication, permissions, and failures.
+func TestACPWebSocket(t *testing.T) {
+	server, _, cancelled := newACPWebSocketPeer(t, false)
+	for _, tc := range []struct{ path, policy, wantError string }{
+		{path: "/echo?authenticate=1"},
+		{path: "/permission", policy: "allow"},
+		{path: "/permission", wantError: "permission request denied"},
+		{path: "/drop", wantError: "remote ACP"},
+		{path: "/binary", wantError: "remote ACP"},
+		{path: "/wait", wantError: "deadline exceeded"},
+	} {
+		t.Run(tc.path+tc.policy, func(t *testing.T) {
+			def := &ir.HarnessDefinition{Protocol: "acp", Transport: "websocket", URL: strings.Replace(server.URL, "http", "ws", 1) + tc.path, Cwd: "/remote/workspace",
+				Headers: map[string]string{"Authorization": "Bearer ${ACP_TOKEN}", "X-Agent": "test-value"}}
+			cfg := map[string]any{"provider": "remote"}
+			if tc.policy != "" {
+				cfg["acp_permission"] = tc.policy
+			}
+			step := ir.Step{ExecutorConfig: ir.ExecutorConfig{Config: cfg}, Commands: []ir.CommandEntry{{Command: "hello"}}, Script: "context"}
+			ctx := newHarnessTestContext(t, &ir.DAG{Harnesses: ir.HarnessDefinitions{"remote": def}}, step, "ACP_TOKEN=test-token")
+			ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+			defer cancel()
+			exec, err := newHarness(ctx, step)
+			require.NoError(t, err)
+			var out, stderr bytes.Buffer
+			exec.SetStdout(&out)
+			exec.SetStderr(&stderr)
+			err = exec.Run(ctx)
+			if tc.wantError != "" {
+				require.ErrorContains(t, err, tc.wantError)
+				require.Empty(t, out.String())
+			} else {
+				require.NoError(t, err)
+				if strings.HasPrefix(tc.path, "/echo") {
+					require.Equal(t, "remote:hello\n\ncontext", out.String())
+				}
+			}
+			require.Equal(t, "Bearer ${ACP_TOKEN}", def.Headers["Authorization"])
+			if tc.path == "/wait" {
+				select {
+				case <-cancelled:
+				case <-time.After(time.Second):
+					t.Fatal("agent did not receive session/cancel")
+				}
+			}
+		})
+	}
+}
+
+// TestACPWebSocketTLS checks certificate verification and trusted wss connections.
+func TestACPWebSocketTLS(t *testing.T) {
+	server, _, _ := newACPWebSocketPeer(t, true)
+	def := &ir.HarnessDefinition{Protocol: "acp", Transport: "websocket", URL: strings.Replace(server.URL, "https", "wss", 1), Cwd: "/remote/workspace"}
+	_, err := dialACPWebSocket(t.Context(), def, acpWebSocketHTTPClient)
+	require.ErrorContains(t, err, "connection failed")
+	socket, err := dialACPWebSocket(t.Context(), def, server.Client())
+	require.NoError(t, err)
+	defer func() { _ = socket.CloseNow() }()
+	var out bytes.Buffer
+	stream := &acpWebSocketStream{ctx: t.Context(), conn: socket}
+	client := &acpHarnessClient{out: &out}
+	conn := acp.NewClientSideConnection(client, stream, stream)
+	defer func() { _ = socket.CloseNow(); <-conn.Done() }()
+	e := &harnessExecutor{prompt: "hello"}
+	require.NoError(t, e.acpTurn(t.Context(), conn, client, def.Cwd))
+	require.Equal(t, "remote:hello", out.String())
+}
+
+// TestACPWebSocketStop verifies explicit cancellation without remote fallback.
+func TestACPWebSocketStop(t *testing.T) {
+	server, prompted, cancelled := newACPWebSocketPeer(t, false)
+	def := &ir.HarnessDefinition{Protocol: "acp", Transport: "websocket", URL: strings.Replace(server.URL, "http", "ws", 1) + "/wait", Cwd: "/remote/workspace"}
+	step := ir.Step{ExecutorConfig: ir.ExecutorConfig{Config: map[string]any{"provider": "remote", "fallback": []any{map[string]any{"provider": "remote"}}}}, Commands: []ir.CommandEntry{{Command: "hello"}}}
+	ctx := newHarnessTestContext(t, &ir.DAG{Harnesses: ir.HarnessDefinitions{"remote": def}}, step)
+	exec, err := newHarness(ctx, step)
+	require.NoError(t, err)
+	e := exec.(*harnessExecutor)
+	done := make(chan error, 1)
+	go func() { done <- e.Run(ctx) }()
+	select {
+	case <-prompted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("agent did not receive prompt")
+	}
+	require.NoError(t, e.Stop(cmdutil.ForceTermination()))
+	select {
+	case err := <-done:
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(5 * time.Second):
+		t.Fatal("remote ACP did not stop")
+	}
+	require.Empty(t, prompted)
+	select {
+	case <-cancelled:
+	case <-time.After(time.Second):
+		t.Fatal("agent did not receive session/cancel")
+	}
+}
+
+// TestACPWebSocketDialFailure protects credentials and rejects handshake redirects.
+func TestACPWebSocketDialFailure(t *testing.T) {
+	var redirected atomic.Bool
+	target := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { redirected.Store(true) }))
+	defer target.Close()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, target.URL, http.StatusFound)
+	}))
+	defer server.Close()
+	def := &ir.HarnessDefinition{URL: strings.Replace(server.URL, "http", "ws", 1) + "?token=secret", Headers: map[string]string{"Authorization": "Bearer secret"}}
+	_, err := dialACPWebSocket(t.Context(), def, acpWebSocketHTTPClient)
+	require.ErrorContains(t, err, "HTTP 302")
+	require.NotContains(t, err.Error(), "secret")
+	require.False(t, redirected.Load())
+}
+
+// TestACPWebSocketFallback verifies that a disconnected remote can use another provider.
+func TestACPWebSocketFallback(t *testing.T) {
+	server, _, _ := newACPWebSocketPeer(t, false)
+	dag := &ir.DAG{Harnesses: ir.HarnessDefinitions{}}
+	for _, name := range []string{"drop", "echo"} {
+		dag.Harnesses[name] = &ir.HarnessDefinition{Protocol: "acp", Transport: "websocket", URL: strings.Replace(server.URL, "http", "ws", 1) + "/" + name, Cwd: "/remote/workspace"}
+	}
+	step := ir.Step{ExecutorConfig: ir.ExecutorConfig{Config: map[string]any{"provider": "drop", "fallback": []any{map[string]any{"provider": "echo"}}}}, Commands: []ir.CommandEntry{{Command: "hello"}}}
+	ctx := newHarnessTestContext(t, dag, step)
+	exec, err := newHarness(ctx, step)
+	require.NoError(t, err)
+	var out, stderr bytes.Buffer
+	exec.SetStdout(&out)
+	exec.SetStderr(&stderr)
+	require.NoError(t, exec.Run(ctx))
+	require.Equal(t, "remote:hello", out.String())
+	require.Contains(t, stderr.String(), "trying fallback")
+}

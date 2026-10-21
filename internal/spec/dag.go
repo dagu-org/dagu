@@ -2847,6 +2847,26 @@ func parseHarnessDefinition(name string, raw map[string]any) (*ir.HarnessDefinit
 				)
 			}
 			def.Binary = strings.TrimSpace(binary)
+
+		case "transport", "url", "cwd":
+			text, ok := value.(string)
+			if !ok || strings.TrimSpace(text) == "" {
+				return nil, ir.NewValidationError(fmt.Sprintf("harnesses.%s.%s", name, key), nil, fmt.Errorf("%s must be a non-empty string", key))
+			}
+			switch key {
+			case "transport":
+				def.Transport = text
+			case "url":
+				def.URL = text
+			case "cwd":
+				def.Cwd = text
+			}
+		case "headers":
+			headers, err := harnessStringMap(value)
+			if err != nil {
+				return nil, ir.NewValidationError(fmt.Sprintf("harnesses.%s.headers", name), nil, fmt.Errorf("headers must map names to strings"))
+			}
+			def.Headers = headers
 		case "protocol":
 			protocol, ok := value.(string)
 			if !ok || (protocol != "cli" && protocol != "acp") {
@@ -2914,12 +2934,25 @@ func parseHarnessDefinition(name string, raw map[string]any) (*ir.HarnessDefinit
 		}
 	}
 
-	if def.Binary == "" {
-		return nil, ir.NewValidationError(
-			fmt.Sprintf("harnesses.%s.binary", name),
-			raw["binary"],
-			fmt.Errorf("binary is required"),
-		)
+	if def.Transport == "websocket" {
+		for _, key := range []string{"binary", "prefix_args", "option_flags", "flag_style"} {
+			if _, exists := raw[key]; exists {
+				return nil, ir.NewValidationError(fmt.Sprintf("harnesses.%s.%s", name, key), nil, fmt.Errorf("%s is not supported with websocket transport", key))
+			}
+		}
+	} else {
+		for _, key := range []string{"url", "headers", "cwd"} {
+			if _, exists := raw[key]; exists {
+				return nil, ir.NewValidationError(fmt.Sprintf("harnesses.%s.%s", name, key), nil, fmt.Errorf("%s requires transport: websocket", key))
+			}
+		}
+	}
+
+	if def.Transport != "websocket" && def.Binary == "" {
+		return nil, ir.NewValidationError(fmt.Sprintf("harnesses.%s.binary", name), raw["binary"], fmt.Errorf("binary is required"))
+	}
+	if err := def.ValidateConnection(); err != nil {
+		return nil, ir.NewValidationError(fmt.Sprintf("harnesses.%s", name), nil, err)
 	}
 
 	if def.Protocol == "acp" {

@@ -1,0 +1,19 @@
+# Connect to an ACP UI-compatible remote WebSocket agent or stdio-to-ws bridge.
+# Supply ACP_TOKEN through workflow environment/secrets configuration.
+harnesses:
+  remote-agent:
+    protocol: acp
+    transport: websocket
+    url: wss://acp.example.com/v1
+    cwd: /srv/project
+    headers:
+      Authorization: Bearer ${ACP_TOKEN}
+
+steps:
+  - id: review
+    action: harness.run
+    timeout_sec: 120
+    with:
+      provider: remote-agent
+      prompt: Review the project without modifying files.
+    output: REVIEW
