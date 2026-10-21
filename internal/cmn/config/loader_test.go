@@ -2383,6 +2383,17 @@ remote_nodes:
 		assert.Contains(t, err.Error(), path)
 	})
 
+	t.Run("BlankFile", func(t *testing.T) {
+		path := writeSecretFile(t, " \t\n")
+		err := loadWithErrorFromYAML(t, fmt.Sprintf(`
+secrets:
+  vault:
+    token_file: %s
+`, path))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "secrets.vault.token_file "+path+" is empty")
+	})
+
 	t.Run("EmptyFile", func(t *testing.T) {
 		path := writeSecretFile(t, "\n")
 		err := loadWithErrorFromYAML(t, fmt.Sprintf(`

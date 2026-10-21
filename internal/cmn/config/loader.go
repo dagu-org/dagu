@@ -305,9 +305,12 @@ func (l *ConfigLoader) remoteNodeSecretFile(i int, name, file string, value *str
 	return secret
 }
 
-// readSecretFile sets the secret to the content of its file, without the
-// trailing line end. Setting both the key and its _file key is an error, as
-// is a file that cannot be read or holds nothing.
+// readSecretFile sets the secret to the content of its file, without its
+// trailing line ends: every trailing \r and \n is removed, so a secret cannot
+// end with one. Setting both the key and its _file key is an error, as is a file
+// that cannot be read or holds only blanks. A file with no content is an error
+// here, unlike the passphrase_file of a TLS certificate, because an empty
+// credential is a configuration mistake and not a key without a passphrase.
 func (l *ConfigLoader) readSecretFile(secret secretFile) error {
 	if secret.file == "" {
 		return nil
@@ -330,7 +333,7 @@ func (l *ConfigLoader) readSecretFile(secret secretFile) error {
 		return fmt.Errorf("read %s_file: %w", secret.key, err)
 	}
 	value := strings.TrimRight(string(data), "\r\n")
-	if value == "" {
+	if strings.TrimSpace(value) == "" {
 		return fmt.Errorf("%s_file %s is empty", secret.key, path)
 	}
 	*secret.value = value
