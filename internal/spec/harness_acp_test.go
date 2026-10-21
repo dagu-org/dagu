@@ -36,11 +36,15 @@ func TestACPRemoteDefinition(t *testing.T) {
 	require.Empty(t, def.Binary)
 	require.Equal(t, "websocket", def.Transport)
 	require.Equal(t, "Bearer ${ACP_TOKEN}", def.Headers["Authorization"])
+	httpConfig := maps.Clone(raw)
+	httpConfig["transport"], httpConfig["url"] = "http", "https://agent.example/acp"
+	_, err = parseHarnessDefinition("remote", httpConfig)
+	require.NoError(t, err)
 	for _, tc := range []struct {
 		key   string
 		value any
 	}{
-		{"transport", "http"}, {"transport", true}, {"protocol", "cli"},
+		{"transport", "grpc"}, {"transport", true}, {"protocol", "cli"},
 		{"url", "https://agent.example/acp"}, {"url", "ws:///missing-host"}, {"url", "wss://user:password@agent.example/acp"},
 		{"url", ""}, {"cwd", ""}, {"cwd", "relative/path"},
 		{"binary", "adapter"}, {"prefix_args", []any{}}, {"flag_style", "gnu_long"},

@@ -1,0 +1,18 @@
+# Streamable HTTP ACP endpoint, authenticated before session creation.
+harnesses:
+  remote-agent:
+    protocol: acp
+    transport: http
+    url: https://acp.example.com/acp
+    cwd: /srv/project
+    headers:
+      Authorization: Bearer ${ACP_TOKEN}
+steps:
+  - id: review
+    action: harness.run
+    timeout_sec: 120
+    with:
+      provider: remote-agent
+      prompt: Review the project without modifying files.
+      # ca_file: /path/to/private-ca.pem
+    output: REVIEW

@@ -19,15 +19,15 @@ import (
 	"github.com/dagucloud/dagu/v2/internal/runtime"
 )
 
-var acpWebSocketHTTPClient = &http.Client{
+var acpRemoteDefaultHTTPClient = &http.Client{
 	Transport: newOpenCodeTransport(),
 	// Remote endpoints must not forward credentials through redirects.
 	CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 }
 
-// runACPWebSocket executes a turn over an ACP UI-compatible remote connection.
+// runACPRemote shares session, permission, output, and cancellation handling across remote transports.
 // The working directory is passed to the agent unchanged, never created locally.
-func (e *harnessExecutor) runACPWebSocket(parent context.Context, cfg providerConfig, out io.Writer, allow bool) error {
+func (e *harnessExecutor) runACPRemote(parent context.Context, cfg providerConfig, out io.Writer, allow bool) error {
 	ctx, cancel := context.WithCancel(parent)
 	defer cancel()
 	e.mu.Lock()
@@ -39,15 +39,20 @@ func (e *harnessExecutor) runACPWebSocket(parent context.Context, cfg providerCo
 		e.mu.Unlock()
 	}()
 	for key := range cfg.flags {
-		if !reservedKeys[key] && key != "acp_permission" {
+		if !reservedKeys[key] && key != "acp_permission" && key != "ca_file" {
 			return fmt.Errorf("harness: remote ACP does not accept CLI option %q", key)
 		}
 	}
+	caFile, ok := cfg.flags["ca_file"].(string)
+	if cfg.flags["ca_file"] != nil && !ok {
+		return errors.New("harness: ca_file must be a string")
+	}
 	settings, err := runtime.EvalObject(ctx, struct {
 		URL     string
+		CAFile  string
 		Cwd     string
 		Headers map[string]string
-	}{cfg.definition.URL, cfg.definition.Cwd, cfg.definition.Headers})
+	}{cfg.definition.URL, caFile, cfg.definition.Cwd, cfg.definition.Headers})
 	if err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -62,56 +67,31 @@ func (e *harnessExecutor) runACPWebSocket(parent context.Context, cfg providerCo
 	if strings.Contains(def.URL, "${") || strings.Contains(def.Cwd, "${") {
 		return errors.New("harness: unresolved remote ACP connection settings")
 	}
-	socket, err := dialACPWebSocket(ctx, def, acpWebSocketHTTPClient)
+	httpClient, err := acpRemoteHTTPClient(settings.CAFile, e.workDir)
 	if err != nil {
 		return err
 	}
-	// Keep the transport alive until session/cancel has had a chance to be sent.
 	wireCtx, closeWire := context.WithCancel(context.Background())
 	defer closeWire()
-	stream := &acpWebSocketStream{ctx: wireCtx, conn: socket}
+	var stream io.ReadWriteCloser
+	if def.Transport == "http" {
+		stream = newACPHTTPStream(wireCtx, def, httpClient)
+	} else {
+		socket, dialErr := dialACPWebSocket(ctx, def, httpClient)
+		if dialErr != nil {
+			return dialErr
+		}
+		stream = &acpWebSocketStream{ctx: wireCtx, conn: socket}
+		go keepACPWebSocketAlive(wireCtx, socket)
+	}
 	client := &acpHarnessClient{out: out, allow: allow}
 	conn := acp.NewClientSideConnection(client, stream, stream)
-	heartbeatDone := make(chan struct{})
-	go func() {
-		defer close(heartbeatDone)
-		keepACPWebSocketAlive(wireCtx, socket)
-	}()
 	defer func() {
 		closeWire()
-		_ = socket.CloseNow()
-		<-heartbeatDone
+		_ = stream.Close()
 		<-conn.Done()
 	}()
-	watchDone := make(chan struct{})
-	stopWatch := context.AfterFunc(ctx, func() {
-		defer close(watchDone)
-		client.mu.Lock()
-		session := client.session
-		client.mu.Unlock()
-		if session != "" {
-			cancelCtx, stop := context.WithTimeout(context.Background(), time.Second)
-			defer stop()
-			sent := make(chan struct{})
-			go func() {
-				defer close(sent)
-				_ = conn.Cancel(cancelCtx, acp.CancelNotification{SessionId: session})
-			}()
-			select {
-			case <-sent:
-			case <-cancelCtx.Done():
-			}
-			_ = socket.CloseNow()
-			<-sent
-		} else {
-			_ = socket.CloseNow()
-		}
-	})
-	defer func() {
-		if !stopWatch() {
-			<-watchDone
-		}
-	}()
+	defer watchACPCancellation(ctx, conn, client, func() { _ = stream.Close() })()
 	err = e.acpTurn(ctx, conn, client, def.Cwd)
 	if ctx.Err() != nil {
 		return ctx.Err()
@@ -148,7 +128,7 @@ func dialACPWebSocket(ctx context.Context, def *ir.HarnessDefinition, client *ht
 		}
 		return nil, errors.New("harness: ACP WebSocket connection failed")
 	}
-	socket.SetReadLimit(10 * 1024 * 1024)
+	socket.SetReadLimit(acpMessageLimit)
 	return socket, nil
 }
 
@@ -191,6 +171,9 @@ func (s *acpWebSocketStream) Write(p []byte) (int, error) {
 	}
 	return len(p), nil
 }
+
+// Close interrupts blocked reads and writes without waiting for a peer handshake.
+func (s *acpWebSocketStream) Close() error { return s.conn.CloseNow() }
 
 // keepACPWebSocketAlive uses ACP UI's notification heartbeat across idle proxies.
 func keepACPWebSocketAlive(ctx context.Context, socket *websocket.Conn) {

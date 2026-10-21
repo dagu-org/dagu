@@ -53,15 +53,15 @@ type HarnessDefinition struct {
 // ValidateConnection checks the mutually exclusive local and remote launch settings.
 // URL and cwd templates are checked again after runtime variable resolution.
 func (d *HarnessDefinition) ValidateConnection() error {
-	if d.Transport != "" && d.Transport != "stdio" && d.Transport != "websocket" {
-		return errors.New("transport must be stdio or websocket")
+	if d.Transport != "" && d.Transport != "stdio" && d.Transport != "websocket" && d.Transport != "http" {
+		return errors.New("transport must be stdio, websocket, or http")
 	}
 	if d.Transport != "" && d.Protocol != "acp" {
 		return errors.New("transport requires protocol: acp")
 	}
-	if d.Transport != "websocket" {
+	if d.Transport != "websocket" && d.Transport != "http" {
 		if d.URL != "" || len(d.Headers) != 0 || d.Cwd != "" {
-			return errors.New("url, headers, and cwd require transport: websocket")
+			return errors.New("url, headers, and cwd require a remote transport")
 		}
 		if d.Binary == "" {
 			return errors.New("binary is required")
@@ -69,15 +69,16 @@ func (d *HarnessDefinition) ValidateConnection() error {
 		return nil
 	}
 	if d.Binary != "" || len(d.PrefixArgs) != 0 || len(d.OptionFlags) != 0 {
-		return errors.New("websocket transport does not support binary, prefix_args, or option_flags")
+		return errors.New("remote transport does not support binary, prefix_args, or option_flags")
 	}
 	if d.URL == "" || d.Cwd == "" {
-		return errors.New("websocket transport requires url and cwd")
+		return errors.New("remote transport requires url and cwd")
 	}
 	if !strings.Contains(d.URL, "${") {
 		u, err := url.Parse(d.URL)
-		if err != nil || (u.Scheme != "ws" && u.Scheme != "wss") || u.Hostname() == "" || u.User != nil || u.Fragment != "" {
-			return errors.New("url must be an absolute ws:// or wss:// URL without user info or a fragment")
+		validScheme := err == nil && ((d.Transport == "websocket" && (u.Scheme == "ws" || u.Scheme == "wss")) || (d.Transport == "http" && (u.Scheme == "http" || u.Scheme == "https")))
+		if !validScheme || u.Hostname() == "" || u.User != nil || u.Fragment != "" {
+			return errors.New("url must match the transport (ws/wss or http/https), without user info or a fragment")
 		}
 	}
 	// The path belongs to the agent host, which may use a different OS.

@@ -46,8 +46,8 @@ func (e *harnessExecutor) runACP(parent context.Context, cfg providerConfig) (st
 			_ = cleanupStdoutSpool(spool)
 		}
 	}()
-	if cfg.definition.Transport == "websocket" {
-		if err = e.runACPWebSocket(ctx, cfg, spool, policy == "allow"); err != nil {
+	if cfg.definition.Transport == "websocket" || cfg.definition.Transport == "http" {
+		if err = e.runACPRemote(ctx, cfg, spool, policy == "allow"); err != nil {
 			return nil, err
 		}
 		if _, err = spool.Seek(0, io.SeekStart); err != nil {
@@ -107,37 +107,10 @@ func (e *harnessExecutor) runACP(parent context.Context, cfg providerConfig) (st
 		e.process, e.acpCancel = nil, nil
 		e.mu.Unlock()
 	}()
-	// Stop the process tree even if the agent ignores the cancellation notification.
-	watchDone := make(chan struct{})
-	stopWatch := context.AfterFunc(ctx, func() {
-		defer close(watchDone)
-		cancelCtx, stop := context.WithTimeout(context.Background(), time.Second)
-		defer stop()
-		client.mu.Lock()
-		session := client.session
-		client.mu.Unlock()
-		if session != "" {
-			sent := make(chan struct{})
-			go func() {
-				defer close(sent)
-				_ = conn.Cancel(cancelCtx, acp.CancelNotification{SessionId: session})
-			}()
-			select {
-			case <-sent:
-			case <-cancelCtx.Done():
-			}
-			// SDK pipe writes may ignore context cancellation; closing stdin unblocks them.
-			_ = input.Close()
-			<-sent
-		}
-		_, _ = process.Stop(cmdutil.StopRequest{Intent: cmdutil.ForceTermination()})
+	defer watchACPCancellation(ctx, conn, client, func() {
 		_ = input.Close()
-	})
-	defer func() {
-		if !stopWatch() {
-			<-watchDone
-		}
-	}()
+		_, _ = process.Stop(cmdutil.StopRequest{Intent: cmdutil.ForceTermination()})
+	})()
 	if err = e.acpTurn(ctx, conn, client, cmd.Dir); err != nil {
 		if ctx.Err() != nil {
 			err = ctx.Err()
@@ -151,6 +124,40 @@ func (e *harnessExecutor) runACP(parent context.Context, cfg providerConfig) (st
 		return nil, err
 	}
 	return spool, nil
+}
+
+// watchACPCancellation sends session/cancel before interrupting a blocked transport.
+// Its cleanup waits for the callback, so process and stream resources are not released early.
+func watchACPCancellation(ctx context.Context, conn *acp.ClientSideConnection, client *acpHarnessClient, interrupt func()) func() {
+	done := make(chan struct{})
+	stop := context.AfterFunc(ctx, func() {
+		defer close(done)
+		client.mu.Lock()
+		session := client.session
+		client.mu.Unlock()
+		if session == "" {
+			interrupt()
+			return
+		}
+		cancelCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		sent := make(chan struct{})
+		go func() {
+			defer close(sent)
+			_ = conn.Cancel(cancelCtx, acp.CancelNotification{SessionId: session})
+		}()
+		select {
+		case <-sent:
+		case <-cancelCtx.Done():
+		}
+		interrupt()
+		<-sent
+	})
+	return func() {
+		if !stop() {
+			<-done
+		}
+	}
 }
 
 // acpTurn negotiates ACP v1, creates a session, and checks the prompt result.

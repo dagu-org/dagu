@@ -5184,7 +5184,7 @@
         {
           "if": {
             "required": ["transport"],
-            "properties": {"transport": {"const": "websocket"}}
+            "properties": {"transport": {"enum": ["websocket", "http"]}}
           },
           "then": {
             "required": ["url", "cwd"],
@@ -5245,13 +5245,13 @@
       "properties": {
         "transport": {
           "type": "string",
-          "enum": ["stdio", "websocket"],
-          "description": "ACP transport. Defaults to stdio; websocket connects to a remote ACP agent."
+          "enum": ["stdio", "websocket", "http"],
+          "description": "ACP transport: stdio (default), websocket (ws/wss), or http (Streamable HTTP)."
         },
         "url": {
           "type": "string",
           "minLength": 1,
-          "description": "Remote ws:// or wss:// endpoint. Supports workflow variable references."
+          "description": "Remote endpoint matching the transport: ws/wss or http/https. Supports workflow variable references."
         },
         "cwd": {
           "type": "string",
@@ -5261,7 +5261,7 @@
         "headers": {
           "type": "object",
           "additionalProperties": {"type": "string"},
-          "description": "WebSocket handshake headers, such as Authorization. Values support workflow variable references."
+          "description": "Remote request headers, such as Authorization. Values support workflow variable references."
         },
         "binary": {
           "type": "string",
@@ -5277,7 +5277,7 @@
         "protocol": {
           "type": "string",
           "enum": ["cli", "acp"],
-          "description": "Communication protocol. Defaults to cli; acp connects to an ACP agent over stdio."
+          "description": "Communication protocol. Defaults to cli; acp connects to an ACP agent using the selected transport."
         },
         "prompt_mode": {
           "type": "string",

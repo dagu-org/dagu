@@ -1,138 +1,102 @@
-# ACP support for harness providers
+# ACP harness providers
 
-## Configuration
+## Local stdio
 
-Set `protocol: acp` in a custom `harnesses` definition to connect to a local
-Agent Client Protocol v1 agent or adapter. Omitting `protocol`, or setting it to
-`cli`, preserves the existing CLI invocation behavior.
+Custom harness definitions select ACP with `protocol: acp`. Omitting `transport`
+defaults to stdio. Omitting `protocol`, or setting it to `cli`, retains CLI behavior.
+Install and authenticate the adapter before running the workflow.
 
 ```yaml
 harnesses:
   coding-agent:
     protocol: acp
     binary: codex-acp
-    # Set prefix_args if the adapter requires additional startup arguments.
-
 steps:
-  - id: review
-    action: harness.run
+  - action: harness.run
     with:
       provider: coding-agent
-      prompt: Review the code in this directory and summarize its modules without modifying files.
+      prompt: Review the project without modifying files.
     output: REVIEW
 ```
 
-Install and authenticate the adapter before running the workflow. For example,
-install the Codex adapter with `npm install -g @agentclientprotocol/codex-acp`.
-Other agents can expose their own ACP mode or use a separate adapter. Dagu does
-not require a predefined agent name and does not install adapters automatically.
+`binary`, `prefix_args`, `flag_style`, and `option_flags` configure local startup.
+Other `with` options become adapter CLI flags. ACP definitions reject CLI prompt
+placement options (`prompt_mode`, `prompt_flag`, `prompt_position`); `with.stdin`
+is appended to the prompt after a blank line instead of sent to the protocol pipe.
 
-### Remote WebSocket agents
+## Remote WSS and Streamable HTTP
 
-Use `transport: websocket` to connect to the same type of `ws://` or `wss://`
-endpoint supported by [ACP UI](https://github.com/formulahendry/acp-ui#remote-agents-over-websocket):
+Remote definitions require `url` and an absolute `cwd` on the **agent host**.
+They do not accept local startup settings (`binary`, `prefix_args`, `flag_style`,
+`option_flags`). URL, cwd, and header values support workflow variables.
 
 ```yaml
 harnesses:
   remote-agent:
     protocol: acp
-    transport: websocket
-    url: wss://acp.example.com/v1
+    transport: http                 # websocket for ws:// or wss:// endpoints
+    url: https://acp.example.com/acp # wss://acp.example.com/acp for secure WebSocket
     cwd: /srv/project
     headers:
       Authorization: Bearer ${ACP_TOKEN}
-
 steps:
-  - id: review
-    action: harness.run
+  - action: harness.run
     timeout_sec: 120
     with:
       provider: remote-agent
-      prompt: Review the project without changing files.
+      prompt: Review the project without modifying files.
+      # ca_file: /path/to/private-ca.pem
     output: REVIEW
 ```
 
-Provide `ACP_TOKEN` through the workflow environment or secrets configuration.
-`url`, header values, and `cwd` support workflow variable references. `cwd` is
-required and must be an absolute path on the **agent host**. It is forwarded
-unchanged: Dagu does not create that directory or translate it to the client OS.
-Remote definitions must not contain `binary`, `prefix_args`, `option_flags`, or
-`flag_style`. Adapter startup options belong on the remote server; remote steps
-accept `provider`, `fallback`, and `acp_permission`, not local CLI flags.
+Supply tokens through workflow environment/secrets settings. Remote steps accept
+`provider`, `fallback`, `acp_permission`, and optional `ca_file`, not adapter CLI flags.
+`ca_file` adds PEM roots alongside system certificates for this connection only;
+relative paths resolve from the local step working directory. Certificate and
+hostname verification remain enabled. Dagu never creates or translates remote cwd.
 
-The connection advertises the `acp.v1` WebSocket subprotocol. Headers are sent in
-the HTTP upgrade request; a Bearer authorization value is also offered as the
-`bearer.<token>` subprotocol for browser-compatible bridges. TLS certificates are
-verified using the system trust store. Handshake redirects are rejected so
-credentials are not forwarded to another endpoint. Connection errors omit the
-URL, response body, and header values, which may contain credentials.
+- **WebSocket:** accepts `ws://` and `wss://`, advertises `acp.v1`, and sends headers
+  in the upgrade request. Bearer credentials are also offered as `bearer.<token>`
+  for ACP UI-compatible bridges. Text frames may contain individual or newline-
+  batched messages; outbound NDJSON delimiters are preserved for stdio bridges.
+  Binary frames are rejected. A `$/ping` notification keeps idle connections alive.
+- **HTTP:** accepts `http://` and `https://`, following the ACP SDK's experimental
+  Streamable HTTP profile. Initialize returns JSON and `Acp-Connection-Id`.
+  Subsequent POSTs return 202; responses, notifications, and permission requests
+  arrive on connection/session SSE GETs. `Acp-Session-Id` routes session traffic,
+  including callback responses. Cookies preserve affinity; DELETE releases the
+  connection. This is ACP HTTP, not MCP's POST response-stream transport.
 
-One text frame carries one JSON-RPC message, or a batch of newline-delimited
-messages from a stdio bridge. Outgoing frames preserve the NDJSON trailing newline
-so bridges can forward them directly to agent stdin. Binary frames are rejected. A `$/ping` notification
-every 25 seconds keeps idle proxy connections alive. The handshake has a
-15-second deadline; use `timeout_sec` to limit the full turn. Connections are not
-automatically reconnected or prompts replayed after disconnects, since an agent
-may already have performed work. Use the normal workflow retry or fallback policy.
+Remote requests reject redirects and omit credentials/response bodies from network
+errors. Connection setup and POSTs have bounded deadlines. Use `timeout_sec` for
+an overall turn deadline. Disconnects do not automatically reconnect or replay work.
 
-To expose a local adapter, ACP UI recommends a stdio-to-WebSocket bridge such as
-`@rebornix/stdio-to-ws`. For example, run the bridge on the agent host:
+## Shared behavior
 
-```sh
-npx @rebornix/stdio-to-ws "codex-acp" --port 3000
-```
+All three transports use the same Go ACP SDK, protocol negotiation, session setup,
+prompt handling, permissions, output capture, cancellation, and provider fallback.
+Each execution creates a fresh session. Local processes inherit step environment,
+working directory, and resource limits; remote agent processes remain server-owned.
 
-Then connect Dagu to `ws://<agent-host>:3000` with the agent's working directory.
-Configure authentication and TLS on the bridge or its reverse proxy as appropriate.
-WebSocket is an additional transport, not ACP's draft Streamable HTTP protocol.
+Assistant text chunks become step stdout and can feed downstream output variables.
+Protocol JSON, thoughts, and tool events are excluded. Only `end_turn` succeeds.
+Failed attempts do not contribute text to successful fallback output.
 
-### Local stdio invocation
+`with.acp_permission` defaults to `deny`. `allow` selects only an offered `allow_once`
+option; it never grants persistent permission. This policy governs ACP callbacks,
+not a sandbox around the agent's own tools. Denials fail the attempt.
 
-`binary`, `prefix_args`, `flag_style`, and `option_flags` configure the startup
-command. Other `with` options remain adapter CLI flags, except for the reserved
-options described below. ACP carries prompts over the protocol, so ACP definitions
-reject `prompt_mode`, `prompt_flag`, and `prompt_position`. `with.stdin` is appended
-to the prompt after a blank line rather than written directly to the protocol pipe.
+Timeout or stop sends `session/cancel` before interrupting the transport. Local
+process trees are terminated; remote connections are closed and HTTP connections
+are deleted. Remote agents must honor cancellation. Cancellation skips fallback.
 
-## Execution contract
+Client filesystem/terminal callbacks, containerized ACP, session resume, interactive
+authentication, and MCP injection are not included. Adapters authenticate beforehand.
 
-- Each execution opens its configured transport, negotiates ACP v1, creates a new
-  session, and sends one prompt. Stdio subprocesses inherit the step working
-  directory, environment, and resource limits. WebSocket sessions use the configured
-  remote `cwd`; local environment variables are not copied to the remote process.
-- The implementation uses `github.com/coder/acp-go-sdk`, a community Go SDK listed
-  in the ACP documentation.
-- Text from `agent_message_chunk` updates is concatenated in order into step
-  stdout, which can be captured with `output` for downstream steps. Thoughts,
-  tool calls, and protocol JSON are excluded. Agent stderr remains in the step log.
-- Only `end_turn` succeeds. Protocol errors, disconnects, refusals, length limits,
-  and denied permissions fail the attempt and follow the existing `fallback`
-  ordering. Failed attempts do not contribute to successful step output.
-- `with.acp_permission` defaults to `deny`. Setting it to `allow` selects an offered
-  `allow_once` option; requests without that option remain denied. This policy
-  governs ACP permission callbacks, not the subprocess sandbox or its own tools.
-- Timeout or stop sends `session/cancel`, then terminates the local process tree
-  or closes the remote connection. Pipes and temporary output are reclaimed.
-  Cancellation does not trigger fallback. Remote agents must implement cancellation;
-  Dagu cannot forcibly terminate a process on another host.
+## Verification
 
-## Limitations
-
-This version supports local stdio and remote WebSocket. Containerized ACP,
-Streamable HTTP, session resume, interactive authentication, MCP server injection,
-and an interactive permission UI are not supported. Authenticate adapters before running them.
-
-The client advertises neither filesystem nor terminal callbacks. Agents can use
-their own file and command tools. Agents that require client-provided filesystem
-or terminal tools need additional client capabilities.
-
-## Acceptance coverage
-
-- `internal/runtime/builtin/harness/acp_test.go` uses an independent JSON-RPC peer
-  to verify chunked output, permissions, negotiation, errors, cancellation, and fallback.
-- `conformance/spec067_harness/acp_test.go` exercises the Dagu binary to verify YAML
-  loading, the ACP subprocess, `with.stdin`, output capture, and downstream steps.
-
-- `internal/runtime/builtin/harness/acp_websocket_test.go` verifies text framing,
-  authentication, trusted and untrusted TLS, permissions, disconnects, cancellation,
-  fallback, and credential-safe handshake failures.
+Package tests cover stdio, WSS certificate verification, HTTP cookies and scoped
+SSE/callback routing, permission decisions, disconnects, cancellation, and cleanup.
+Binary conformance tests exercise all three transports and downstream output use.
+Interoperability acceptance also runs the real Dagu binary against Codex via stdio,
+WSS, and the official TypeScript SDK's Streamable HTTP server profile.

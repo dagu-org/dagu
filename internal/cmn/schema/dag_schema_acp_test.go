@@ -29,7 +29,7 @@ steps:
 	}
 }
 
-// TestDAGSchemaACPRemote validates mutually exclusive stdio and WebSocket settings.
+// TestDAGSchemaACPRemote validates mutually exclusive local and remote settings.
 func TestDAGSchemaACPRemote(t *testing.T) {
 	const source = `harnesses:
   adapter:
@@ -47,9 +47,11 @@ steps:
 `
 	resolved := mustResolveDAGSchema(t)
 	require.NoError(t, resolved.Validate(mustParseYAMLDocument(t, source)))
+	httpSource := strings.ReplaceAll(strings.ReplaceAll(source, "websocket", "http"), "wss://", "https://")
+	require.NoError(t, resolved.Validate(mustParseYAMLDocument(t, httpSource)))
 	for _, tc := range []struct{ from, to string }{
 		{"protocol: acp", "protocol: cli"},
-		{"transport: websocket", "transport: http"},
+		{"transport: websocket", "transport: grpc"},
 		{"    cwd: /remote/workspace\n", ""},
 		{"    url: wss://agent.example/acp\n", ""},
 		{"transport: websocket", "transport: websocket\n    binary: adapter"},

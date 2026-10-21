@@ -6,6 +6,7 @@ package spec067_harness_test
 import (
 	"bufio"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -112,7 +113,15 @@ func TestACPFixtureEmptyPrompt(t *testing.T) {
 
 // TestHarnessACPRemote verifies remote configuration and remote-to-stdio output propagation.
 func TestHarnessACPRemote(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	for _, secure := range []bool{false, true} {
+		t.Run(fmt.Sprintf("TLS=%t", secure), func(t *testing.T) { runHarnessACPRemote(t, secure) })
+	}
+}
+
+// runHarnessACPRemote verifies the same workflow with cleartext or trusted TLS.
+func runHarnessACPRemote(t *testing.T, secure bool) {
+	t.Helper()
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "Bearer test-token", r.Header.Get("Authorization"))
 		socket, err := websocket.Accept(w, r, &websocket.AcceptOptions{Subprotocols: []string{"acp.v1"}})
 		if !assert.NoError(t, err) {
@@ -156,6 +165,14 @@ func TestHarnessACPRemote(t *testing.T) {
 			assert.NoError(t, socket.Write(t.Context(), websocket.MessageText, response))
 		}
 	}))
+	caFile := ""
+	if secure {
+		server.StartTLS()
+		caFile = filepath.Join(t.TempDir(), "ca.pem")
+		require.NoError(t, os.WriteFile(caFile, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.TLS.Certificates[0].Certificate[0]}), 0o600))
+	} else {
+		server.Start()
+	}
 	defer server.Close()
 	dagu := harness.NewRunner(t)
 	binary, err := os.Executable()
@@ -181,6 +198,7 @@ steps:
     action: harness.run
     with:
       provider: remote
+      ca_file: %q
       prompt: hello
       stdin: context
     output: ANSWER
@@ -190,7 +208,7 @@ steps:
     with:
       provider: local
       prompt: "${ANSWER}"
-`, strings.Replace(server.URL, "http", "ws", 1), binary))
+`, strings.Replace(server.URL, "http", "ws", 1), binary, caFile))
 	dagu.Run("validate", "remote.yaml").ExpectExitCode(0)
 	result := dagu.Run("start", "remote.yaml")
 	result.ExpectExitCode(0)

@@ -177,7 +177,7 @@ func TestACPWebSocket(t *testing.T) {
 func TestACPWebSocketTLS(t *testing.T) {
 	server, _, _ := newACPWebSocketPeer(t, true)
 	def := &ir.HarnessDefinition{Protocol: "acp", Transport: "websocket", URL: strings.Replace(server.URL, "https", "wss", 1), Cwd: "/remote/workspace"}
-	_, err := dialACPWebSocket(t.Context(), def, acpWebSocketHTTPClient)
+	_, err := dialACPWebSocket(t.Context(), def, acpRemoteDefaultHTTPClient)
 	require.ErrorContains(t, err, "connection failed")
 	socket, err := dialACPWebSocket(t.Context(), def, server.Client())
 	require.NoError(t, err)
@@ -233,7 +233,7 @@ func TestACPWebSocketDialFailure(t *testing.T) {
 	}))
 	defer server.Close()
 	def := &ir.HarnessDefinition{URL: strings.Replace(server.URL, "http", "ws", 1) + "?token=secret", Headers: map[string]string{"Authorization": "Bearer secret"}}
-	_, err := dialACPWebSocket(t.Context(), def, acpWebSocketHTTPClient)
+	_, err := dialACPWebSocket(t.Context(), def, acpRemoteDefaultHTTPClient)
 	require.ErrorContains(t, err, "HTTP 302")
 	require.NotContains(t, err.Error(), "secret")
 	require.False(t, redirected.Load())
