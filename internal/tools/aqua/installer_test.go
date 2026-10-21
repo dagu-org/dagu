@@ -246,3 +246,18 @@ func testCacheLayout(dir string) tools.CacheLayout {
 		ManifestFile: filepath.Join(dir, "env", "manifest.json"),
 	}
 }
+
+func TestAquaParamDisablesPolicyAndKeepsChecksumEnforcement(t *testing.T) {
+	t.Parallel()
+
+	param := aquaParam(testCacheLayout("/tmp/dagu-aqua-param"), "/work")
+
+	// Aqua's implicit default policy rejects every registry the DAG declares
+	// beyond the standard one, so installs from custom registries would fail.
+	assert.True(t, param.DisablePolicy)
+	// Artifact integrity must not rely on the policy layer.
+	assert.True(t, param.Checksum)
+	assert.True(t, param.RequireChecksum)
+	assert.True(t, param.EnforceChecksum)
+	assert.True(t, param.EnforceRequireChecksum)
+}
