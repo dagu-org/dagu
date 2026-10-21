@@ -729,6 +729,12 @@ func (f *eventFeed) stopRebuild() {
 	f.rebuild = nil
 }
 
+// reports reports whether this process reports the events, holding their
+// lease.
+func (f *eventFeed) reports() bool {
+	return f != nil && f.loaded
+}
+
 // fill adds the prepared finished runs, the runs in progress, and any gap to
 // req.
 func (f *eventFeed) fill(req *reportRequest) {

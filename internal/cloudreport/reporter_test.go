@@ -61,6 +61,7 @@ func TestReportPayload(t *testing.T) {
 		"server_id": "srv-1",
 		"heartbeat_secret": "hb-secret",
 		"level": "runs",
+		"sent_at": "2026-10-10T09:30:30Z",
 		"health": {
 			"version": %q,
 			"os": %q,
@@ -398,6 +399,7 @@ func startReporterSpawning(
 	clock := &fakeClock{t: t, waits: make(chan time.Duration, 16), fire: make(chan time.Time), at: start}
 	r.after = clock.after
 	r.random = random
+	r.now = clock.now
 	r.startedAt = testStartedAt
 	if r.events != nil {
 		r.events.now = clock.now
