@@ -118,7 +118,7 @@ func hasShebang(script string) bool {
 // and costs a few milliseconds in both Windows PowerShell and pwsh, where the
 // modules are already loaded.
 var powerShellPreambleStatements = []string{
-	"Import-Module Microsoft.PowerShell.Utility, Microsoft.PowerShell.Management",
+	cmdutil.PowerShellImportCoreModules,
 	"$ErrorActionPreference = 'Stop'",
 	"$utf8NoBom = New-Object -TypeName System.Text.UTF8Encoding -ArgumentList $false",
 	"[Console]::InputEncoding = $utf8NoBom",
