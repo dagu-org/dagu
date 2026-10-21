@@ -2365,7 +2365,8 @@ git_sync:
     token_file: %s
 `, path))
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "set either git_sync.auth.token or git_sync.auth.token_file, not both")
+		// The inline value is in the environment, so the message names it.
+		assert.Contains(t, err.Error(), "set either DAGU_GITSYNC_AUTH_TOKEN or git_sync.auth.token_file, not both")
 	})
 
 	t.Run("MissingFile", func(t *testing.T) {

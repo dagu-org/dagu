@@ -213,6 +213,8 @@ type secretFile struct {
 	// set reports that the configuration gives the key, even with an
 	// empty value.
 	set bool
+	// env names the environment variable that gives the key, when one is set.
+	env string
 }
 
 // loadSecretFiles replaces each secret that has a _file key with the content
@@ -268,7 +270,22 @@ func (l *ConfigLoader) loadSecretFiles(def *Definition) error {
 // set when the configuration gives it, even with an empty value. An empty
 // environment variable does not set the key.
 func (l *ConfigLoader) secretFile(key, file string, value *string) secretFile {
-	return secretFile{key: key, file: file, value: value, set: l.v.IsSet(key)}
+	return secretFile{key: key, file: file, value: value, set: l.v.IsSet(key), env: inlineEnvName(key)}
+}
+
+// inlineEnvName returns the environment variable that gives the configuration
+// key, when it is set and not empty.
+func inlineEnvName(key string) string {
+	for _, b := range envBindings {
+		if b.key != key {
+			continue
+		}
+		name := strings.ToUpper(AppSlug) + "_" + b.env
+		if os.Getenv(name) != "" {
+			return name
+		}
+	}
+	return ""
 }
 
 // remoteNodeSecretFile describes a secret of the remote node at index i.
@@ -296,7 +313,13 @@ func (l *ConfigLoader) readSecretFile(secret secretFile) error {
 		return nil
 	}
 	if secret.set || *secret.value != "" {
-		return fmt.Errorf("set either %s or %s_file, not both", secret.key, secret.key)
+		// The inline value may come from the environment, where the operator
+		// looks for the variable and not for the key.
+		inline := secret.key
+		if secret.env != "" {
+			inline = secret.env
+		}
+		return fmt.Errorf("set either %s or %s_file, not both", inline, secret.key)
 	}
 	path, err := l.resolvePath(secret.key+"_file", secret.file)
 	if err != nil {
