@@ -6,6 +6,7 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -698,6 +699,34 @@ func TestHTTPHandlerServesStreamableMCP(t *testing.T) {
 	resource, err := session.ReadResource(ctx, &mcpsdk.ReadResourceParams{URI: runInspectorURI})
 	require.NoError(t, err)
 	require.Len(t, resource.Contents, 1)
+}
+
+// Each call from Dagu Cloud stands alone, so the handler keeps no sessions
+// and offers no subscriptions.
+func TestCloudHandlerIsStateless(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), testConnectTimeout)
+	defer cancel()
+	httpServer := httptest.NewServer(NewCloudHandler(nil, func(context.Context) bool { return false }))
+	t.Cleanup(httpServer.Close)
+
+	client := mcpsdk.NewClient(&mcpsdk.Implementation{Name: "dagu-cloud-test", Version: "v0.0.0"}, nil)
+	session, err := client.Connect(ctx, &mcpsdk.StreamableClientTransport{
+		Endpoint:             httpServer.URL,
+		DisableStandaloneSSE: true,
+	}, nil)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = session.Close() })
+	require.Empty(t, session.ID())
+	require.False(t, session.InitializeResult().Capabilities.Resources.Subscribe)
+
+	result, err := session.ListTools(ctx, nil)
+	require.NoError(t, err)
+	require.Len(t, result.Tools, 3)
+
+	res, err := http.Get(httpServer.URL)
+	require.NoError(t, err)
+	_ = res.Body.Close()
+	require.Equal(t, http.StatusMethodNotAllowed, res.StatusCode)
 }
 
 func TestServerExposesReferenceResourcesAndPrompts(t *testing.T) {

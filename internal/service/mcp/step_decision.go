@@ -36,6 +36,25 @@ func stepDecisionMessage(input executeInput) string {
 	return "Dagu execute action completed. Step " + input.StepName + " was " + verb + "."
 }
 
+// allowRemoteDecision refuses a decision from Dagu Cloud unless this server
+// allows remote approvals, and one not tied to the attempt it was read from.
+func (svc *Service) allowRemoteDecision(ctx context.Context, input executeInput) error {
+	if svc.remote == nil {
+		return nil
+	}
+	if !svc.remote.approvals(ctx) {
+		return &frontendapi.Error{
+			HTTPStatus: http.StatusForbidden,
+			Code:       daguapi.ErrorCodeForbidden,
+			Message:    "Remote approvals are off on this server. A Dagu administrator turns them on under Plan & features.",
+		}
+	}
+	if input.AttemptID == "" {
+		return executeInputError("The attemptId field is required for "+input.Action+" from Dagu Cloud.", executeFieldAttemptID)
+	}
+	return nil
+}
+
 // decideWaitingStep applies an approve, reject, or push_back decision to the
 // named step through the REST handler that owns the step's kind of wait: its
 // approval gate or its human task.

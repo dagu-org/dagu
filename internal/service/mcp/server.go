@@ -15,6 +15,7 @@ import (
 	"time"
 
 	daguapi "github.com/dagucloud/dagu/v2/api/v1"
+	"github.com/dagucloud/dagu/v2/internal/audit"
 	"github.com/dagucloud/dagu/v2/internal/cmn/config"
 	"github.com/dagucloud/dagu/v2/internal/ir"
 	"github.com/dagucloud/dagu/v2/internal/persis"
@@ -47,6 +48,15 @@ type Service struct {
 
 	watchPollInterval time.Duration
 	watchMaxErrors    int
+
+	// remote is set on the server that takes calls from Dagu Cloud.
+	remote *remoteCalls
+}
+
+// remoteCalls is what the server that takes calls from Dagu Cloud checks.
+type remoteCalls struct {
+	// approvals reports whether calls may decide steps waiting for a person.
+	approvals func(context.Context) bool
 }
 
 type resourceWatcher struct {
@@ -71,18 +81,36 @@ func newStreamableHandler(server *mcpsdk.Server) http.Handler {
 	)
 }
 
+// NewCloudHandler returns the stateless MCP handler for the calls Dagu Cloud
+// carries to this server. It offers no resource subscriptions. It decides a
+// step waiting for a person only while approvals reports true, and only for
+// the attempt the call names.
+func NewCloudHandler(api *frontendapi.API, approvals func(context.Context) bool) http.Handler {
+	server := newServer(api, &remoteCalls{approvals: approvals})
+	handler := mcpsdk.NewStreamableHTTPHandler(
+		func(*http.Request) *mcpsdk.Server { return server },
+		&mcpsdk.StreamableHTTPOptions{Stateless: true, JSONResponse: true, PropagateRequestCancellation: true},
+	)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := audit.WithSourceContext(r.Context(), ensureMCPSourceContext(r.Context()))
+		handler.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
 // NewServer builds the MCP server used by the Streamable HTTP transport.
 func NewServer(api *frontendapi.API) *mcpsdk.Server {
+	return newServer(api, nil)
+}
+
+func newServer(api *frontendapi.API, remote *remoteCalls) *mcpsdk.Server {
 	svc := &Service{
 		api:               api,
 		watchers:          make(map[string]*resourceWatcher),
 		watchPollInterval: defaultRunWatchPollInterval,
 		watchMaxErrors:    defaultRunWatchMaxErrors,
+		remote:            remote,
 	}
-	server := mcpsdk.NewServer(&mcpsdk.Implementation{
-		Name:    "dagu",
-		Version: config.Version,
-	}, &mcpsdk.ServerOptions{
+	options := &mcpsdk.ServerOptions{
 		Capabilities: &mcpsdk.ServerCapabilities{
 			Extensions: map[string]any{
 				mcpAppsExtensionURI: mcpAppsCapability(),
@@ -94,7 +122,17 @@ func NewServer(api *frontendapi.API) *mcpsdk.Server {
 		Instructions:       instructions,
 		SubscribeHandler:   svc.subscribe,
 		UnsubscribeHandler: svc.unsubscribe,
-	})
+	}
+	if remote != nil {
+		// A stateless call ends with its response, so nothing could carry
+		// an update.
+		options.Capabilities.Resources = &mcpsdk.ResourceCapabilities{}
+		options.SubscribeHandler, options.UnsubscribeHandler = nil, nil
+	}
+	server := mcpsdk.NewServer(&mcpsdk.Implementation{
+		Name:    "dagu",
+		Version: config.Version,
+	}, options)
 	svc.server = server
 
 	registerTools(server, svc)
