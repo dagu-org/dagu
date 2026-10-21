@@ -50,7 +50,10 @@ func ReadLinesBackward(ctx context.Context, r io.ReaderAt, size int64, fn func(l
 		n := min(int64(len(buf)), pos)
 		pos -= n
 		chunk := buf[:n]
-		if _, err := r.ReadAt(chunk, pos); err != nil && !errors.Is(err, io.EOF) {
+		if read, err := r.ReadAt(chunk, pos); read < len(chunk) {
+			if err == nil || errors.Is(err, io.EOF) {
+				err = io.ErrUnexpectedEOF
+			}
 			return err
 		}
 		if first {

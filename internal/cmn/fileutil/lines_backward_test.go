@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"strings"
 	"testing"
 
@@ -100,4 +101,11 @@ func TestReadLinesBackwardReportsErrors(t *testing.T) {
 		return false, nil
 	})
 	require.ErrorIs(t, err, context.Canceled)
+
+	// A size past the end of r, as when a file shrinks after its size is taken.
+	err = ReadLinesBackward(context.Background(), strings.NewReader(data), int64(len(data))+8, func([]byte, bool) (bool, error) {
+		t.Fatal("a short read reported a line")
+		return false, nil
+	})
+	require.ErrorIs(t, err, io.ErrUnexpectedEOF)
 }
