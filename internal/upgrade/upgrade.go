@@ -70,12 +70,26 @@ var installMethodNames = map[InstallMethod]string{
 	InstallMethodGoInstall: "go install",
 }
 
+var installMethodUpgradeCommands = map[InstallMethod]string{
+	InstallMethodUnknown:   "dagu upgrade",
+	InstallMethodBinary:    "dagu upgrade",
+	InstallMethodHomebrew:  "brew upgrade dagu",
+	InstallMethodSnap:      "snap refresh dagu",
+	InstallMethodGoInstall: "go install github.com/dagucloud/dagu/v2/cmd@latest",
+}
+
 // String returns a human-readable name for the install method.
 func (m InstallMethod) String() string {
 	if name, ok := installMethodNames[m]; ok {
 		return name
 	}
 	return "unknown"
+}
+
+// UpgradeCommand returns the shell command that updates an installation made
+// this way, or "" when no single command applies.
+func (m InstallMethod) UpgradeCommand() string {
+	return installMethodUpgradeCommands[m]
 }
 
 // DetectInstallMethod checks how dagu was installed.
@@ -118,13 +132,13 @@ func CanSelfUpgrade() (bool, string) {
 	method := DetectInstallMethod()
 	switch method {
 	case InstallMethodHomebrew:
-		return false, "Installed via Homebrew. Use 'brew upgrade dagu' instead."
+		return false, fmt.Sprintf("Installed via Homebrew. Use '%s' instead.", method.UpgradeCommand())
 	case InstallMethodSnap:
-		return false, "Installed via Snap. Use 'snap refresh dagu' instead."
+		return false, fmt.Sprintf("Installed via Snap. Use '%s' instead.", method.UpgradeCommand())
 	case InstallMethodDocker:
 		return false, "Running in Docker. Pull the latest image instead."
 	case InstallMethodGoInstall:
-		return false, "Installed via go install. Use 'go install github.com/dagucloud/dagu/v2/cmd@latest' instead."
+		return false, fmt.Sprintf("Installed via go install. Use '%s' instead.", method.UpgradeCommand())
 	case InstallMethodUnknown, InstallMethodBinary:
 		return true, ""
 	}

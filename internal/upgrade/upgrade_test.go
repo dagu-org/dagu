@@ -521,6 +521,27 @@ func TestInstallMethodString(t *testing.T) {
 	}
 }
 
+func TestInstallMethodUpgradeCommand(t *testing.T) {
+	tests := []struct {
+		method InstallMethod
+		want   string
+	}{
+		{InstallMethodUnknown, "dagu upgrade"},
+		{InstallMethodBinary, "dagu upgrade"},
+		{InstallMethodHomebrew, "brew upgrade dagu"},
+		{InstallMethodSnap, "snap refresh dagu"},
+		{InstallMethodGoInstall, "go install github.com/dagucloud/dagu/v2/cmd@latest"},
+		// Updating a container means pulling an image and recreating it.
+		{InstallMethodDocker, ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.method.String(), func(t *testing.T) {
+			require.Equal(t, tt.want, tt.method.UpgradeCommand())
+		})
+	}
+}
+
 func TestFormatBytes(t *testing.T) {
 	tests := []struct {
 		bytes int64
@@ -798,6 +819,12 @@ func TestCheckWritePermission(t *testing.T) {
 			t.Error("CheckWritePermission() should error for non-existent directory")
 		}
 	})
+}
+
+func TestPermissionHint(t *testing.T) {
+	require.Equal(t, "try running as Administrator", permissionHint("windows"))
+	require.Equal(t, "try running with sudo", permissionHint("linux"))
+	require.Equal(t, "try running with sudo", permissionHint("darwin"))
 }
 
 func TestFindBinary(t *testing.T) {
