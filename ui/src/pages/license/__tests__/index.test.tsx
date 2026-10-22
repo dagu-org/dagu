@@ -763,6 +763,14 @@ describe('LicensePage', () => {
       return {
         post,
         put,
+        // The server's first report reaches Dagu Console.
+        report: () => {
+          monitoring = {
+            ...monitoring,
+            lastReportAt: new Date().toISOString(),
+            lastReport: '{"protocol":2}',
+          };
+        },
         approve: async (button = connectButton) => {
           await userEvent.click(button());
           await screen.findByText('ABCD1234');
@@ -789,6 +797,27 @@ describe('LicensePage', () => {
       ).toBeVisible();
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
+
+    // The first report shows within seconds of connecting, not at the next
+    // regular refresh half a minute later.
+    it('shows the first report soon after connecting', async () => {
+      const { approve, report } = approveAndConnect(unchosen);
+      await approve();
+      const card = await screen.findByRole(
+        'region',
+        { name: 'Monitoring' },
+        { timeout: 5000 }
+      );
+      report();
+
+      expect(
+        await within(card).findByRole(
+          'button',
+          { name: 'View last report' },
+          { timeout: 5000 }
+        )
+      ).toBeVisible();
+    }, 15_000);
 
     // The trial starts in the same approval: the approval page offers it
     // first, as it does when another page asked for the trial.
