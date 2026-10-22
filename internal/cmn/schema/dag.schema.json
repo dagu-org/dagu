@@ -8638,7 +8638,7 @@
         "output": {
           "type": "string",
           "minLength": 1,
-          "description": "xlsx.write_cells: workbook to write the result to, leaving path as it was. xlsx.convert: the csv, json, or jsonl file to write."
+          "description": "xlsx.write_cells, xlsx.update_rows, and xlsx.append: workbook to write the result to, leaving path as it was. xlsx.convert: the csv, json, or jsonl file to write."
         },
         "operation": {
           "type": "string",

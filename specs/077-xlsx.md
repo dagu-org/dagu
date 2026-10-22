@@ -355,7 +355,14 @@ header so the first run creates a table. A cell to append that lies in a
 merged cell, such as an empty notes box below the rows, fails the step with
 `Sheet1!A3: cannot append into merged cell A3:B4; unmerge it to write this
 cell`, since every value written inside it would land in its top-left
-cell.
+cell. With `output`, `xlsx.append` writes the result there and leaves the
+workbook at `path` as it was, by the rules `xlsx.write_cells` follows (see
+Writing cells), with `leave output out to append to the workbook in place`
+ending the message for an output that is the workbook itself; a `path`
+that does not exist starts a new workbook at `output`. An existing `output`
+is replaced, not appended to: `path` is read, the rows are appended in
+memory, and the result overwrites `output`, so an `xlsx.append` with a fixed
+`output` inside a `foreach` keeps only the last iteration's rows.
 
 Fields are placed by name. Object rows, rows from a CSV header, and rows
 given `columns` are matched to the sheet's header row, its first row, by
@@ -425,6 +432,17 @@ write it the same value, which is written once and counted once in
 write different values to merged cell Sheet1!C2:C3`, a row that leaves the
 cell as it already is included.
 
+With `output`, the updated workbook is written there and the workbook at
+`path` is left as it was, so one workbook serves many updates; on Windows a
+workbook another program holds still fails the step, as for
+`xlsx.write_cells`. A missing parent folder of `output` is created as for
+`xlsx.write`.
+`output` must be a workbook and a different file from `path`, a hard link
+included, else `orders.xlsx: output must be a different file from path;
+leave output out to update the workbook in place`; the output path takes
+the saved file's place in `path` and `artifact`. An existing output is
+replaced.
+
 ### Shape checks
 
 Three checks run before anything is saved, and any failure aborts the step
@@ -485,9 +503,10 @@ and starts when that write ends; the wait is not limited by
 `wait_for_unlock`, and a step stopped while it waits leaves the workbook
 untouched. Paths that reach one file through a symbolic link, or that
 differ only in case on a filesystem that ignores case, are one workbook,
-and `xlsx.write_cells` with `output` holds both the template and the
-output. Writes from another process, such as another `dagu start` or a
-distributed worker, are not coordinated: the last save wins.
+and a writer with `output` (`xlsx.write_cells`, `xlsx.update_rows`, or
+`xlsx.append`) holds both the workbook at `path` and the output. Writes
+from another process, such as another `dagu start` or a distributed
+worker, are not coordinated: the last save wins.
 
 ### Artifacts
 
@@ -854,6 +873,11 @@ Every one of these is rejected by `dagu validate`:
 - `xlsx.update_rows` without `key`: `key is required for update_rows`;
   without `rows`: `update_rows requires with.rows`; with `header: false`:
   `update_rows needs a header row; header: false is not supported`.
+- An `output` of `xlsx.update_rows` or `xlsx.append` that is not a
+  workbook: `output: out.csv: only .xlsx and .xlsm workbooks are
+  supported; save as .xlsx`. `xlsx.write` takes no `output`, also with
+  `mode: append`: `with.output is not valid for xlsx.write`; use
+  `xlsx.append` to append to a copy.
 - A field of another operation, such as `range` on `xlsx.info`:
   `with.range is not valid for xlsx.info`.
 - An unknown field: `unexpected additional properties ["strip"]`. A value
@@ -971,6 +995,10 @@ Every one of these is rejected by `dagu validate`:
   it to write this cell`; a new column whose header cell is inside a merged
   cell: `Sheet1!C1: merged cell B1:C1 covers the header cell of new column
   "note"; unmerge it to add the column`.
+- An `output` of `xlsx.update_rows` or `xlsx.append` that is the workbook
+  itself: `orders.xlsx: output must be a different file from path; leave
+  output out to update the workbook in place`, or `to append to the
+  workbook in place`.
 - A workbook another program holds, on Windows:
   `orders.xlsx is open in another program; close it and retry`.
 - `artifact: true` in a DAG whose artifacts are disabled:
