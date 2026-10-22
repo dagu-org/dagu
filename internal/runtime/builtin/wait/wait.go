@@ -211,9 +211,9 @@ func logicalDay(ctx context.Context, loc *time.Location) time.Time {
 func (e *executorImpl) logDeadline(deadline time.Time) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	zone, offset := deadline.Zone()
-	_, _ = fmt.Fprintf(e.stderr, "wait: deadline %s (zone %s offset %+d, if_past %s)\n",
-		deadline.Format(time.RFC3339Nano), zone, offset, e.cfg.ifPast)
+	zone, _ := deadline.Zone()
+	_, _ = fmt.Fprintf(e.stderr, "wait: deadline %s (zone %s, if_past %s)\n",
+		deadline.Format(time.RFC3339Nano), zone, e.cfg.ifPast)
 }
 
 // configuredLocation returns the run-configured zone (core.tz) when the
