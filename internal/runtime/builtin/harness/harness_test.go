@@ -602,6 +602,8 @@ func TestConfigToFlags(t *testing.T) {
 			"fallback": []any{
 				map[string]any{"provider": "codex"},
 			},
+			// DAG defaults pass the ACP policy to every step, including CLI ones.
+			"acp_permission": "allow",
 		}, nil)
 		assert.Empty(t, flags)
 	})
@@ -879,6 +881,19 @@ func TestBuildProviderConfigs(t *testing.T) {
 		require.Len(t, configs, 2)
 		assert.Equal(t, primary, configs[0].binaryName())
 		assert.Equal(t, fallback, configs[1].binaryName())
+	})
+
+	// DAG defaults give every step the ACP permission policy; a CLI provider
+	// must not receive it as an unknown flag.
+	t.Run("acp_permission_not_a_cli_flag", func(t *testing.T) {
+		configs, err := buildProviderConfigs(ir.NormalizeBuiltinHarnessFlagKeys(map[string]any{
+			"provider":       "codex",
+			"acp_permission": "allow",
+		}), nil)
+		require.NoError(t, err)
+		args, _, err := configs[0].buildInvocation("hello", "")
+		require.NoError(t, err)
+		assert.NotContains(t, strings.Join(args, " "), "acp")
 	})
 
 	t.Run("reject_nested_fallback", func(t *testing.T) {
