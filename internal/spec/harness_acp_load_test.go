@@ -73,3 +73,34 @@ steps:
 	require.Equal(t, "allow", config["acp_permission"])
 	require.NotContains(t, config, "model")
 }
+
+// TestACPRemoteWorkspace verifies that remote-only harness steps, whose agent
+// works in the definition's remote cwd, get no local working_dir warning.
+func TestACPRemoteWorkspace(t *testing.T) {
+	dag, err := spec.LoadYAML(context.Background(), []byte(`harnesses:
+  remote:
+    protocol: acp
+    transport: http
+    url: https://agent.example/acp
+    cwd: /remote/workspace
+  local:
+    protocol: acp
+    binary: adapter
+steps:
+  - name: remote-only
+    action: harness.run
+    with:
+      provider: remote
+      prompt: hello
+  - name: local-fallback
+    action: harness.run
+    with:
+      provider: remote
+      prompt: hello
+      fallback:
+        - provider: local
+`))
+	require.NoError(t, err)
+	require.Len(t, dag.BuildWarnings, 1)
+	require.Contains(t, dag.BuildWarnings[0], `"steps.local-fallback" has no explicit working_dir`)
+}

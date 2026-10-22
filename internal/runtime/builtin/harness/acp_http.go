@@ -15,6 +15,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/cookiejar"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,6 +29,11 @@ const (
 	acpMessageLimit = 10 * 1024 * 1024
 	// acpHTTPQueueDepth bounds buffered SSE messages; the SDK reads continuously.
 	acpHTTPQueueDepth = 4
+	// acpRequestTimeout bounds connection setup and individual remote requests.
+	acpRequestTimeout = 15 * time.Second
+
+	acpConnectionHeader = "Acp-Connection-Id"
+	acpSessionHeader    = "Acp-Session-Id"
 )
 
 // acpRemoteHTTPClient keeps TLS verification enabled, optionally adding private CA roots.
@@ -40,7 +46,7 @@ func acpRemoteHTTPClient(caFile, workDir string) (*http.Client, error) {
 	}
 	pem, err := os.ReadFile(caFile) // #nosec G304 -- explicitly configured local CA file.
 	if err != nil {
-		return nil, errors.New("harness: cannot read ACP ca_file")
+		return nil, fmt.Errorf("harness: cannot read ACP ca_file: %w", err)
 	}
 	roots, err := x509.SystemCertPool()
 	if err != nil {
@@ -57,6 +63,15 @@ func acpRemoteHTTPClient(caFile, workDir string) (*http.Client, error) {
 	client := *acpRemoteDefaultHTTPClient
 	client.Transport = transport
 	return &client, nil
+}
+
+// acpTransportError reports the network cause of a failed request without the
+// URL, whose query may carry credentials.
+func acpTransportError(message string, err error) error {
+	if urlErr, ok := errors.AsType[*url.Error](err); ok {
+		return fmt.Errorf("%s: %w", message, urlErr.Err)
+	}
+	return errors.New(message)
 }
 
 // acpHTTPStream implements ACP's POST/GET/DELETE profile, not MCP's POST response stream.
@@ -161,7 +176,7 @@ func (s *acpHTTPStream) Write(p []byte) (n int, err error) {
 			return 0, err
 		}
 	}
-	ctx, cancel := context.WithTimeout(s.ctx, 15*time.Second)
+	ctx, cancel := context.WithTimeout(s.ctx, acpRequestTimeout)
 	defer cancel()
 	response, err := s.request(ctx, http.MethodPost, session, p)
 	if err != nil {
@@ -172,7 +187,7 @@ func (s *acpHTTPStream) Write(p []byte) (n int, err error) {
 		if msg.Method != "initialize" || response.StatusCode != http.StatusOK {
 			return 0, errors.New("ACP HTTP requires a successful initialize response")
 		}
-		id := response.Header.Get("Acp-Connection-Id")
+		id := response.Header.Get(acpConnectionHeader)
 		if id == "" || len(id) > 1024 {
 			return 0, errors.New("ACP HTTP initialize missing valid Acp-Connection-Id")
 		}
@@ -210,16 +225,16 @@ func (s *acpHTTPStream) request(ctx context.Context, method, session string, bod
 	for key, value := range s.def.Headers {
 		req.Header.Set(key, value)
 	}
-	req.Header.Del("Acp-Connection-Id")
-	req.Header.Del("Acp-Session-Id")
+	req.Header.Del(acpConnectionHeader)
+	req.Header.Del(acpSessionHeader)
 	s.mu.Lock()
 	connection := s.connection
 	s.mu.Unlock()
 	if connection != "" {
-		req.Header.Set("Acp-Connection-Id", connection)
+		req.Header.Set(acpConnectionHeader, connection)
 	}
 	if session != "" {
-		req.Header.Set("Acp-Session-Id", session)
+		req.Header.Set(acpSessionHeader, session)
 	}
 	if method == http.MethodGet {
 		req.Header.Set("Accept", "text/event-stream")
@@ -228,7 +243,7 @@ func (s *acpHTTPStream) request(ctx context.Context, method, session string, bod
 	}
 	response, err := s.client.Do(req)
 	if err != nil {
-		return nil, errors.New("ACP HTTP request failed")
+		return nil, acpTransportError("ACP HTTP request failed", err)
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		_ = response.Body.Close()
@@ -251,7 +266,7 @@ func (s *acpHTTPStream) openSSE(session string) error {
 	s.sessions[session] = true
 	s.mu.Unlock()
 	ctx, cancel := context.WithCancel(s.ctx)
-	timer := time.AfterFunc(15*time.Second, cancel)
+	timer := time.AfterFunc(acpRequestTimeout, cancel)
 	response, err := s.request(ctx, http.MethodGet, session, nil)
 	timer.Stop()
 	if err != nil {

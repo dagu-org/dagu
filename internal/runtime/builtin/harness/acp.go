@@ -31,6 +31,9 @@ const (
 	acpCancelTimeout = time.Second
 	// acpExitGrace lets a local adapter exit on its own after a failed turn.
 	acpExitGrace = time.Second
+
+	// acpPermissionKey is the reserved option selecting the ACP permission policy.
+	acpPermissionKey = "acp_permission"
 )
 
 // runACP executes one prompt over the configured ACP transport and spools its text output.
@@ -43,9 +46,9 @@ func (e *harnessExecutor) runACP(parent context.Context, cfg providerConfig) (st
 	}
 	policy := "deny"
 	flags := cloneConfigMap(cfg.flags)
-	if raw, ok := flags["acp_permission"]; ok {
+	if raw, ok := flags[acpPermissionKey]; ok {
 		policy, _ = raw.(string)
-		delete(flags, "acp_permission")
+		delete(flags, acpPermissionKey)
 	}
 	if policy != "deny" && policy != "allow" {
 		return nil, errors.New("harness: acp_permission must be deny or allow")

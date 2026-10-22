@@ -32,7 +32,7 @@ var acpRemoteDefaultHTTPClient = &http.Client{
 // The working directory is passed to the agent unchanged, never created locally.
 func (e *harnessExecutor) runACPRemote(ctx context.Context, cfg providerConfig, client *acpHarnessClient) error {
 	for key := range cfg.flags {
-		if !reservedKeys[key] && key != "acp_permission" {
+		if !reservedKeys[key] && key != acpPermissionKey {
 			return fmt.Errorf("harness: remote ACP does not accept CLI option %q", key)
 		}
 	}
@@ -127,7 +127,7 @@ func dialACPWebSocket(ctx context.Context, def *ir.HarnessDefinition, client *ht
 		}
 		protocols = append(protocols, "bearer."+auth[1])
 	}
-	dialCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	dialCtx, cancel := context.WithTimeout(ctx, acpRequestTimeout)
 	defer cancel()
 	socket, response, err := websocket.Dial(dialCtx, def.URL, &websocket.DialOptions{
 		HTTPClient: client, HTTPHeader: headers, Subprotocols: protocols,
@@ -140,7 +140,7 @@ func dialACPWebSocket(ctx context.Context, def *ir.HarnessDefinition, client *ht
 		if response != nil {
 			return nil, fmt.Errorf("harness: ACP WebSocket connection failed (HTTP %d)", response.StatusCode)
 		}
-		return nil, errors.New("harness: ACP WebSocket connection failed")
+		return nil, acpTransportError("harness: ACP WebSocket connection failed", err)
 	}
 	socket.SetReadLimit(acpMessageLimit)
 	return socket, nil

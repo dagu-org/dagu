@@ -842,7 +842,7 @@ func (s *dagBuildState) collectWarnings() {
 func harnessWorkingDirWarnings(dag *ir.DAG) []string {
 	var warnings []string
 	walkSteps(dag, func(step ir.Step, path string) {
-		if step.ExecutorConfig.Type == "harness" {
+		if step.ExecutorConfig.Type == "harness" && !harnessRunsRemotely(step.ExecutorConfig.Config, dag.Harnesses) {
 			container := step.Container
 			if container == nil {
 				container = dag.Container
@@ -861,6 +861,27 @@ func harnessWorkingDirWarnings(dag *ir.DAG) []string {
 		}
 	})
 	return warnings
+}
+
+// harnessRunsRemotely reports whether every provider attempt of a harness step
+// connects to a remote ACP agent, which has no local workspace.
+func harnessRunsRemotely(config map[string]any, defs ir.HarnessDefinitions) bool {
+	attempts := []map[string]any{config}
+	switch fallback := config["fallback"].(type) {
+	case []map[string]any:
+		attempts = append(attempts, fallback...)
+	case []any:
+		for _, item := range fallback {
+			attempt, _ := item.(map[string]any)
+			attempts = append(attempts, attempt)
+		}
+	}
+	for _, attempt := range attempts {
+		if def := defs[harnessProviderName(attempt)]; def == nil || !def.IsRemote() {
+			return false
+		}
+	}
+	return true
 }
 
 // executorConfigWarnings returns the warnings each step's executor reports

@@ -266,6 +266,7 @@ func TestACPWebSocketTLS(t *testing.T) {
 	def := &ir.HarnessDefinition{Protocol: "acp", Transport: "websocket", URL: strings.Replace(server.URL, "https", "wss", 1), Cwd: "/remote/workspace"}
 	_, err := dialACPWebSocket(t.Context(), def, acpRemoteDefaultHTTPClient)
 	require.ErrorContains(t, err, "connection failed")
+	require.ErrorContains(t, err, "x509", "the certificate failure should be reported")
 	socket, err := dialACPWebSocket(t.Context(), def, server.Client())
 	require.NoError(t, err)
 	defer func() { _ = socket.CloseNow() }()
