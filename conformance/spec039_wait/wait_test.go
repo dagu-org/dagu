@@ -239,27 +239,33 @@ func TestWaitHTTPPolls(t *testing.T) {
 		"expected at least 3 requests (2 failing + 1 succeeding), got %d", requests.Load())
 }
 
-// TestWaitHTTPReferenceURL proves a with.url holding a reference passes
-// build-time validation and resolves at run time: the step fails with a
-// runtime URL error when the reference resolves to a bad URL, rather than
-// being rejected before the DAG runs.
+// TestWaitHTTPReferenceURL proves a with.url that embeds an env reference
+// passes build-time validation and polls the URL it resolves to. The server
+// only answers on /ready, so the step succeeds only if the reference resolved.
 func TestWaitHTTPReferenceURL(t *testing.T) {
 	t.Parallel()
 
+	port := serveHTTP(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/ready" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+
 	dagu := harness.NewRunner(t)
-	dagu.WriteFile("http_reference_url.yaml", `params:
-  - name: TARGET
-    default: ftp://example.com/ready
+	dagu.WriteFile("http_reference_url.yaml", fmt.Sprintf(`env:
+  BASE_URL: http://127.0.0.1:%d
 steps:
   - action: wait.http
+    timeout_sec: 10
     with:
-      url: ${params.TARGET}
+      url: ${BASE_URL}/ready
       poll_interval: 100ms
-`)
+`, port))
 
 	result := dagu.Run("start", "http_reference_url.yaml")
-	result.ExpectNonZeroExitCode()
-	result.ExpectStderrContains("must be an absolute HTTP URL")
+	result.ExpectExitCode(0)
 }
 
 // TestWaitHTTPReferenceStatus proves a with.status reference resolving to a

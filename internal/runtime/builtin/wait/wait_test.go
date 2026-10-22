@@ -115,6 +115,9 @@ func TestValidateStepDefersReferenceFields(t *testing.T) {
 		{name: "pollInterval", op: opDuration, config: map[string]any{"duration": "5ms", "poll_interval": "${params.interval}"}},
 		{name: "braceEnvDuration", op: opDuration, config: map[string]any{"duration": "${DELAY}"}},
 		{name: "bareEnvURL", op: opHTTP, config: map[string]any{"url": "$SERVICE_URL", "status": "${STATUS_CODE}"}},
+		{name: "embeddedBraceEnvURL", op: opHTTP, config: map[string]any{"url": "${BASE_URL}/health"}},
+		{name: "embeddedBareEnvURL", op: opHTTP, config: map[string]any{"url": "$BASE_URL/health"}},
+		{name: "embeddedEnvDuration", op: opDuration, config: map[string]any{"duration": "${SECS}s"}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -158,7 +161,6 @@ func TestParseStatus(t *testing.T) {
 	for _, tt := range []struct {
 		name          string
 		raw           any
-		deferRefs     bool
 		want          int
 		wantErrSubstr string
 	}{
@@ -168,13 +170,12 @@ func TestParseStatus(t *testing.T) {
 		{name: "negativeInteger", raw: int64(99), wantErrSubstr: "status must be between 100 and 599"},
 		{name: "fractional", raw: 204.5, wantErrSubstr: "status must be between 100 and 599"},
 		{name: "numericString", raw: "204", want: http.StatusNoContent},
-		{name: "reference", raw: "${params.code}", deferRefs: true},
 		{name: "badString", raw: "soon", wantErrSubstr: "status must be between 100 and 599"},
 		{name: "outOfRange", raw: 99, wantErrSubstr: "status must be between 100 and 599"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := parseStatus(tt.raw, tt.deferRefs)
+			got, err := parseStatus(tt.raw)
 			if tt.wantErrSubstr != "" {
 				require.ErrorContains(t, err, tt.wantErrSubstr)
 				return
@@ -198,6 +199,24 @@ func TestNewExecutorRejectsNonHTTPURL(t *testing.T) {
 		},
 	})
 	require.ErrorContains(t, err, "url must be an absolute HTTP URL")
+}
+
+// A reference that survives run-time resolution means it did not resolve, so
+// the error says so instead of only reporting the field as malformed.
+func TestNewExecutorRejectsUnresolvedReference(t *testing.T) {
+	t.Parallel()
+
+	_, err := newExecutor(context.Background(), ir.Step{
+		Commands: []ir.CommandEntry{{Command: opHTTP}},
+		ExecutorConfig: ir.ExecutorConfig{
+			Type: "wait",
+			Config: map[string]any{
+				"url": "${BASE_URL}/health",
+			},
+		},
+	})
+	require.ErrorContains(t, err, "url must be an absolute HTTP URL")
+	require.ErrorContains(t, err, "unresolved reference")
 }
 
 func TestExecutorRunStopsWhenContextIsCanceled(t *testing.T) {

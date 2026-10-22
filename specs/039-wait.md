@@ -75,9 +75,10 @@ error and is retried on the next interval. The step succeeds once a
 response's status code equals `with.status` (default `200`).
 
 Config-schema validation for `with.url` (and `with.status`) accepts a value
-that still holds a `${...}` or `$VAR` reference at build time and leaves its
-strict check to run time, once the reference has resolved; a literal
-(non-reference) value is still validated strictly at build time.
+that holds a `${...}` or `$VAR` reference anywhere in it, such as
+`${BASE_URL}/health`, and leaves its strict check to run time, once the
+reference has resolved; a literal (non-reference) value is still validated
+strictly at build time.
 
 `with.headers` and `with.body` are sent exactly as given, with no scheme
 enforcement: a `with.url` using `http://` sends them in cleartext the same
@@ -95,9 +96,11 @@ way it cancels any other step.
 ### Validation
 
 All of the following are rejected by DAG-build-time validation, before the
-DAG starts running. A `with` value that still holds a `${...}` or `$VAR`
-reference at build time defers its strict check to run time, once the
-reference has resolved; only literal (non-reference) values are rejected here:
+DAG starts running. A `with` value that holds an unescaped `${...}` or `$VAR`
+reference anywhere in it defers its strict check to run time, once the
+reference has resolved; only literal values, including those whose `$` is
+escaped as `\$`, are rejected here. A value that still holds a reference at
+run time and fails its check is reported as holding an unresolved reference:
 
 - `wait.duration`: `with.duration` is empty, is not a parseable duration, or
   is not greater than zero.

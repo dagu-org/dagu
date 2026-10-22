@@ -8966,7 +8966,7 @@
           "type": ["integer", "string"],
           "minimum": 100,
           "maximum": 599,
-          "description": "Expected HTTP status for wait.http. Defaults to 200. A string is a ${...} or $VAR reference resolved when the step runs; the resolved value must be an integer between 100 and 599."
+          "description": "Expected HTTP status for wait.http. Defaults to 200. A string must be an integer or hold a ${...} or $VAR reference that resolves to one between 100 and 599 when the step runs."
         },
         "headers": {
           "type": "object",
