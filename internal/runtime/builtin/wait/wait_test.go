@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	cmnconfig "github.com/dagucloud/dagu/v2/internal/cmn/config"
 	"github.com/dagucloud/dagu/v2/internal/ir"
 	"github.com/dagucloud/dagu/v2/internal/runtime"
 	"github.com/stretchr/testify/require"
@@ -232,16 +233,6 @@ func TestParseStatus(t *testing.T) {
 	}
 }
 
-func TestParseUntilClockTimeDefersResolution(t *testing.T) {
-	t.Parallel()
-
-	cfg := defaultConfig()
-	cfg.Until = "23:59"
-	parsed, err := parseConfig(opUntil, cfg, false)
-	require.NoError(t, err)
-	require.True(t, parsed.until.IsZero())
-}
-
 func TestClockDeadlineAppliesOffsetBeforeRoll(t *testing.T) {
 	t.Parallel()
 
@@ -249,8 +240,7 @@ func TestClockDeadlineAppliesOffsetBeforeRoll(t *testing.T) {
 	base := time.Date(2026, 1, 2, 0, 0, 0, 0, loc)
 	now := time.Date(2026, 1, 2, 9, 5, 0, 0, loc)
 
-	got, err := clockDeadline(base, "09:00", loc, 10*time.Minute, ifPastContinue, now)
-	require.NoError(t, err)
+	got := clockDeadline(base, clockTime{hour: 9}, loc, 10*time.Minute, ifPastContinue, now)
 	require.Equal(t, time.Date(2026, 1, 2, 9, 10, 0, 0, loc), got)
 }
 
@@ -272,8 +262,7 @@ func TestClockDeadlineHonoursIfPast(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := clockDeadline(base, "09:00", loc, 0, tt.ifPast, now)
-			require.NoError(t, err)
+			got := clockDeadline(base, clockTime{hour: 9}, loc, 0, tt.ifPast, now)
 			require.Equal(t, tt.want, got)
 		})
 	}
@@ -315,32 +304,40 @@ func TestExecutorIfPastAppliesToClockTime(t *testing.T) {
 	require.NoError(t, exec.Run(ctx))
 }
 
-func TestClockDeadlineUsesLogicalDayAndTimezone(t *testing.T) {
+// A clock time resolves on the logical day in with.timezone, else in the
+// run-configured zone. The deadline is past, so if_past: fail reports it.
+func TestExecutorResolvesClockTimeZone(t *testing.T) {
 	t.Parallel()
 
-	loc, err := time.LoadLocation("Europe/London")
+	newYork, err := time.LoadLocation("America/New_York")
 	require.NoError(t, err)
-	base := time.Date(2026, 1, 2, 0, 0, 0, 0, loc)
-	now := time.Date(2026, 1, 2, 8, 0, 0, 0, loc)
+	ctx := cmnconfig.WithConfig(context.Background(), &cmnconfig.Config{Core: cmnconfig.Core{Location: newYork}})
+	// 20:00 UTC is still January 2 in New York but already January 3 in Tokyo.
+	ctx = runtime.NewContext(ctx, &ir.DAG{Name: "test"}, "run-1", "",
+		runtime.WithScheduleTime("2026-01-02T20:00:00Z"))
 
-	got, err := clockDeadline(base, "09:00", loc, 0, ifPastContinue, now)
-	require.NoError(t, err)
-	require.Equal(t, time.Date(2026, 1, 2, 9, 0, 0, 0, loc), got)
-}
-
-func TestLogicalDayUsesScheduleTime(t *testing.T) {
-	t.Parallel()
-
-	loc, err := time.LoadLocation("Europe/London")
-	require.NoError(t, err)
-	ctx := runtime.NewContext(context.Background(), &ir.DAG{Name: "test"}, "run-1", "",
-		runtime.WithScheduleTime("2026-01-02T23:30:00Z"))
-
-	base := logicalDay(ctx, loc)
-	require.Equal(t, 2026, base.Year())
-	require.Equal(t, time.January, base.Month())
-	require.Equal(t, 2, base.Day())
-	require.Equal(t, 23, base.Hour())
+	for _, tt := range []struct {
+		name     string
+		timezone string
+		want     string
+	}{
+		{name: "configuredZone", want: "2026-01-02T09:00:00-05:00"},
+		{name: "stepTimezone", timezone: "Asia/Tokyo", want: "2026-01-03T09:00:00+09:00"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			config := map[string]any{"until": "09:00", "if_past": "fail"}
+			if tt.timezone != "" {
+				config["timezone"] = tt.timezone
+			}
+			exec, err := newExecutor(ctx, ir.Step{
+				Commands:       []ir.CommandEntry{{Command: opUntil}},
+				ExecutorConfig: ir.ExecutorConfig{Type: "wait", Config: config},
+			})
+			require.NoError(t, err)
+			require.ErrorContains(t, exec.Run(ctx), tt.want)
+		})
+	}
 }
 
 func TestExecutorRFC3339OffsetAppliedOnce(t *testing.T) {

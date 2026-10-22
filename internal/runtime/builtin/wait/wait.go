@@ -152,18 +152,7 @@ func waitFor(ctx context.Context, duration time.Duration) error {
 }
 
 func (e *executorImpl) waitUntil(ctx context.Context) error {
-	deadline := e.cfg.until.Add(e.cfg.offset)
-	if isClockTime(e.cfg.Until) {
-		loc := untilLocation(e.cfg.Timezone)
-		if strings.TrimSpace(e.cfg.Timezone) == "" {
-			loc = configuredLocation(ctx)
-		}
-		resolved, err := resolveClockTime(ctx, strings.TrimSpace(e.cfg.Until), loc, e.cfg.offset, e.cfg.ifPast)
-		if err != nil {
-			return fmt.Errorf("wait: until %q: %w", e.cfg.Until, err)
-		}
-		deadline = resolved
-	}
+	deadline := e.deadline(ctx)
 	e.logDeadline(deadline)
 	switch e.cfg.ifPast {
 	case ifPastFail:
@@ -189,29 +178,28 @@ func waitUntil(ctx context.Context, until time.Time) error {
 	return waitFor(ctx, duration)
 }
 
-func isClockTime(raw string) bool {
-	_, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(raw))
-	return err != nil
-}
-
-// resolveClockTime maps an HH:MM[:SS] value onto the run's logical day in
-// loc, applies offset, and rolls to the next day when the shifted deadline
-// already passed. A passed clock time is kept as-is for if_past fail/window
-// so those policies can decide instead of blocking until tomorrow.
-func resolveClockTime(ctx context.Context, raw string, loc *time.Location, offset time.Duration, ifPast string) (time.Time, error) {
-	return clockDeadline(logicalDay(ctx, loc), raw, loc, offset, ifPast, time.Now().In(loc))
-}
-
-func clockDeadline(base time.Time, raw string, loc *time.Location, offset time.Duration, ifPast string, now time.Time) (time.Time, error) {
-	hour, minute, second, err := parseClock(raw)
-	if err != nil {
-		return time.Time{}, err
+// deadline returns the instant with.until and with.offset resolve to.
+func (e *executorImpl) deadline(ctx context.Context) time.Time {
+	if e.cfg.clock == nil {
+		return e.cfg.until.Add(e.cfg.offset)
 	}
-	deadline := time.Date(base.Year(), base.Month(), base.Day(), hour, minute, second, 0, loc).Add(offset)
+	loc := e.cfg.location
+	if loc == nil {
+		loc = configuredLocation(ctx)
+	}
+	return clockDeadline(logicalDay(ctx, loc), *e.cfg.clock, loc, e.cfg.offset, e.cfg.ifPast, time.Now().In(loc))
+}
+
+// clockDeadline maps clock onto base's day in loc, applies offset, and rolls
+// to the next day when the shifted deadline already passed. A passed clock
+// time is kept as-is for if_past fail/window so those policies can decide
+// instead of blocking until tomorrow.
+func clockDeadline(base time.Time, clock clockTime, loc *time.Location, offset time.Duration, ifPast string, now time.Time) time.Time {
+	deadline := time.Date(base.Year(), base.Month(), base.Day(), clock.hour, clock.minute, clock.second, 0, loc).Add(offset)
 	if ifPast != ifPastFail && ifPast != ifPastWindow && !deadline.After(now) {
 		deadline = deadline.AddDate(0, 0, 1)
 	}
-	return deadline, nil
+	return deadline
 }
 
 // logicalDay returns the run's logical day in loc: the schedule time when

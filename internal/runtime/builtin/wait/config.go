@@ -46,12 +46,19 @@ type parsedConfig struct {
 	config
 	duration       time.Duration
 	until          time.Time
+	clock          *clockTime     // set when with.until is HH:MM[:SS]
+	location       *time.Location // with.timezone; nil means the run-configured zone
 	expectedStatus int
 	offset         time.Duration
 	ifPast         string
 	window         time.Duration
 	pollInterval   time.Duration
 	requestTimeout time.Duration
+}
+
+// clockTime is a with.until time of day, resolved against a date at run time.
+type clockTime struct {
+	hour, minute, second int
 }
 
 func defaultConfig() config {
@@ -202,14 +209,16 @@ func parseStatus(raw any) (int, error) {
 }
 
 // parseUntilFields validates the wait.until options and records the literal
-// values. Clock times stay unresolved for the executor. The signed offset is
+// values. Clock times are resolved to a date by the executor. The signed offset is
 // stored separately and applied once by the executor, so both RFC3339 and
 // clock-time deadlines shift exactly once.
 func parseUntilFields(cfg config, deferred func(string) bool, parsed *parsedConfig) error {
 	if tz := strings.TrimSpace(cfg.Timezone); tz != "" && !deferred(cfg.Timezone) {
-		if _, err := time.LoadLocation(tz); err != nil {
+		loc, err := time.LoadLocation(tz)
+		if err != nil {
 			return withUnresolvedHint(fmt.Errorf("wait: timezone must be an IANA name: %w", err), cfg.Timezone)
 		}
+		parsed.location = loc
 	}
 	if raw := strings.TrimSpace(cfg.Offset); raw != "" && !deferred(cfg.Offset) {
 		offset, err := time.ParseDuration(raw)
@@ -248,45 +257,40 @@ func parseUntilFields(cfg config, deferred func(string) bool, parsed *parsedConf
 		raw := strings.TrimSpace(cfg.Until)
 		if until, err := time.Parse(time.RFC3339Nano, raw); err == nil {
 			parsed.until = until
-		} else if _, _, _, err := parseClock(raw); err != nil {
-			return withUnresolvedHint(err, cfg.Until)
+		} else {
+			clock, err := parseClock(raw)
+			if err != nil {
+				return withUnresolvedHint(err, cfg.Until)
+			}
+			parsed.clock = &clock
 		}
 	}
 	return nil
 }
 
-func untilLocation(tz string) *time.Location {
-	if strings.TrimSpace(tz) == "" {
-		return time.Local
-	}
-	loc, err := time.LoadLocation(strings.TrimSpace(tz))
-	if err != nil {
-		return time.Local
-	}
-	return loc
-}
+var errInvalidUntil = fmt.Errorf("wait: until must be RFC3339 timestamp or HH:MM[:SS]")
 
-func parseClock(raw string) (int, int, int, error) {
+func parseClock(raw string) (clockTime, error) {
 	parts := strings.Split(raw, ":")
 	if len(parts) < 2 || len(parts) > 3 {
-		return 0, 0, 0, fmt.Errorf("wait: until must be RFC3339 timestamp or HH:MM[:SS]")
+		return clockTime{}, errInvalidUntil
 	}
 	nums := make([]int, len(parts))
 	for i, p := range parts {
 		n, err := strconv.Atoi(strings.TrimSpace(p))
 		if err != nil {
-			return 0, 0, 0, fmt.Errorf("wait: until must be RFC3339 timestamp or HH:MM[:SS]")
+			return clockTime{}, errInvalidUntil
 		}
 		nums[i] = n
 	}
-	second := 0
+	clock := clockTime{hour: nums[0], minute: nums[1]}
 	if len(nums) == 3 {
-		second = nums[2]
+		clock.second = nums[2]
 	}
-	if nums[0] < 0 || nums[0] > 23 || nums[1] < 0 || nums[1] > 59 || second < 0 || second > 59 {
-		return 0, 0, 0, fmt.Errorf("wait: until must be RFC3339 timestamp or HH:MM[:SS]")
+	if clock.hour < 0 || clock.hour > 23 || clock.minute < 0 || clock.minute > 59 || clock.second < 0 || clock.second > 59 {
+		return clockTime{}, errInvalidUntil
 	}
-	return nums[0], nums[1], second, nil
+	return clock, nil
 }
 
 func rejectUntilOnlyFields(cfg config, operation string) error {
