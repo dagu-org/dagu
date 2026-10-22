@@ -838,6 +838,11 @@ describe('LicensePage', () => {
           name: /Also try paid features free for 14 days/,
         })
       );
+      // The card no longer promises that paid features stay off.
+      expect(offer()).toHaveTextContent(
+        'Free for one server, with 14 days of paid features. After the trial: reports every 5 minutes and keeps 7 days of run history.'
+      );
+      expect(offer()).not.toHaveTextContent('Paid features stay off.');
       await userEvent.click(
         within(offer()).getByRole('button', { name: 'Connect and start trial' })
       );

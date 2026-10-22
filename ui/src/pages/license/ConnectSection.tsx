@@ -135,7 +135,9 @@ export function ConnectSection({
           </p>
           <p className="text-xs text-muted-foreground">
             {ts(
-              'Free for one server: reports every 5 minutes and keeps 7 days of run history. Paid features stay off.'
+              trial
+                ? 'Free for one server, with 14 days of paid features. After the trial: reports every 5 minutes and keeps 7 days of run history.'
+                : 'Free for one server: reports every 5 minutes and keeps 7 days of run history. Paid features stay off.'
             )}
           </p>
         </div>
