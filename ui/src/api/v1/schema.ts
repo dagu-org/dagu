@@ -7957,7 +7957,7 @@ export interface components {
         WorkspaceDeprecationItem: {
             /** @enum {string} */
             kind: WorkspaceDeprecationItemKind;
-            /** @description The setting, such as a file path, a secret and its workspace, or a username */
+            /** @description The setting, such as a workspace, a secret and its workspace, or a username */
             name: string;
         };
     };

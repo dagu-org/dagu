@@ -76,7 +76,7 @@ func TestFind(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, []deprecation.Item{
-		{Kind: deprecation.KindBaseConfig, Name: filepath.Join(dagsDir, "workspaces", "billing", "base.yaml")},
+		{Kind: deprecation.KindBaseConfig, Name: "billing", Path: filepath.Join(dagsDir, "workspaces", "billing", "base.yaml")},
 		{Kind: deprecation.KindSecret, Name: "DB_PASSWORD (workspace billing)"},
 		{Kind: deprecation.KindProfileEntry, Name: "API_URL (workspace billing)"},
 		{Kind: deprecation.KindNotificationRoute, Name: "workspace billing"},
@@ -84,7 +84,7 @@ func TestFind(t *testing.T) {
 		{Kind: deprecation.KindConfigKey, Name: "auth.oidc.role_mapping.workspace_mappings"},
 		{Kind: deprecation.KindUser, Name: "alice"},
 		{Kind: deprecation.KindAPIKey, Name: "ci"},
-		{Kind: deprecation.KindWikiDirectory, Name: filepath.Join(wikiDir, "billing", "invoices")},
+		{Kind: deprecation.KindWikiDirectory, Name: "billing/invoices", Path: filepath.Join(wikiDir, "billing", "invoices")},
 	}, items)
 }
 

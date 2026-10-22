@@ -43,7 +43,7 @@ func TestGetWorkspaceDeprecation(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, apigen.GetWorkspaceDeprecation200JSONResponse{
 			Items: []apigen.WorkspaceDeprecationItem{
-				{Kind: apigen.WorkspaceDeprecationItemKindBaseConfig, Name: baseConfig},
+				{Kind: apigen.WorkspaceDeprecationItemKindBaseConfig, Name: "billing"},
 				{Kind: apigen.WorkspaceDeprecationItemKindConfigKey, Name: "auth.oidc.role_mapping.workspace_mappings"},
 			},
 		}, resp)

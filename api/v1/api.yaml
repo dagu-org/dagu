@@ -19075,7 +19075,7 @@ components:
             - wikiDirectory
         name:
           type: string
-          description: "The setting, such as a file path, a secret and its workspace, or a username"
+          description: "The setting, such as a workspace, a secret and its workspace, or a username"
 
 # Apply security requirements globally
 security:

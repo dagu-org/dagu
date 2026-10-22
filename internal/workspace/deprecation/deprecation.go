@@ -61,14 +61,17 @@ var kindOrder = []Kind{
 // Item is one workspace setting in use.
 type Item struct {
 	Kind Kind
-	// Name identifies the setting, such as a file path, a secret and its
+	// Name identifies the setting, such as a workspace, a secret and its
 	// workspace, or a username.
 	Name string
+	// Path is the file or directory that holds the setting, if any.
+	Path string
 }
 
-// String returns the kind followed by the name.
+// String returns the kind followed by the path, or by the name when the
+// setting has no path.
 func (i Item) String() string {
-	return string(i.Kind) + " " + i.Name
+	return string(i.Kind) + " " + cmp.Or(i.Path, i.Name)
 }
 
 // Sources are where Find reads workspace settings. Find skips an empty
@@ -199,7 +202,7 @@ func baseConfigs(dagsDir string) ([]Item, error) {
 			continue
 		}
 		if len(bytes.TrimSpace(data)) > 0 {
-			items = append(items, Item{Kind: KindBaseConfig, Name: path})
+			items = append(items, Item{Kind: KindBaseConfig, Name: entry.Name(), Path: path})
 		}
 	}
 	return items, errors.Join(errs...)
@@ -314,7 +317,7 @@ func wikiDirectories(ctx context.Context, lister DAGLister, wikiDir string) ([]I
 		}
 		dir := filepath.Join(wikiDir, name, dag.Name)
 		if info, err := os.Stat(dir); err == nil && info.IsDir() {
-			items = append(items, Item{Kind: KindWikiDirectory, Name: dir})
+			items = append(items, Item{Kind: KindWikiDirectory, Name: name + "/" + dag.Name, Path: dir})
 		}
 	}
 	return items, nil
