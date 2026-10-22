@@ -36,8 +36,9 @@ const (
 
 const (
 	connectPollInterval = 3 * time.Second
-	// connectTTL matches how long Dagu Console keeps an approval.
-	connectTTL = 15 * time.Minute
+	// connectTTL is how long a request waits for approval: long enough for
+	// an owner to sign up, verify an email, or choose a plan first.
+	connectTTL = time.Hour
 	// connectCodeLength is how much of the code both sides display.
 	connectCodeLength = 8
 

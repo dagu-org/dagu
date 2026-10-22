@@ -1,6 +1,6 @@
 import { useContext, useEffect, useRef, useState } from 'react';
-import { useLocation } from 'react-router-dom';
-import { ExternalLink, Loader2 } from 'lucide-react';
+import { useLocation, useSearchParams } from 'react-router-dom';
+import { ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import ConfirmModal from '@/components/ui/confirm-dialog';
@@ -17,10 +17,7 @@ import { LicenseContext } from '@/contexts/LicenseContext';
 import type { LicenseStatus } from '@/contexts/ConfigContext';
 import { useClient } from '@/hooks/api';
 import { useLicenseState } from '@/hooks/useLicense';
-import {
-  shouldAskMonitoring,
-  useLicenseMonitoring,
-} from '@/hooks/useLicenseMonitoring';
+import { useLicenseMonitoring } from '@/hooks/useLicenseMonitoring';
 import { useLicenseRemoteAccess } from '@/hooks/useLicenseRemoteAccess';
 import {
   LicenseConnectStatusState,
@@ -55,6 +52,8 @@ export default function LicensePage() {
   const client = useClient();
   const { ts } = useI18n();
   const { hash, key: locationKey } = useLocation();
+  const [searchParams] = useSearchParams();
+  const trialRequested = searchParams.get('trial') === '1';
   const [key, setKey] = useState('');
   const [keyOpen, setKeyOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<
@@ -69,9 +68,6 @@ export default function LicensePage() {
   } | null>(null);
   const connect = useLicenseConnect(remoteNode);
   const granted = connect.status?.state === LicenseConnectStatusState.granted;
-  const connecting =
-    connect.status?.state === LicenseConnectStatusState.pending ||
-    Boolean(connect.failure);
   const { clear: clearConnect } = connect;
   // Only a license that checks in with Dagu Console can report to it.
   const online = !loading && !statusError && Boolean(license.serverId);
@@ -90,9 +86,9 @@ export default function LicensePage() {
     enabled: online,
     refreshInterval: online ? REMOTE_ACCESS_REFRESH_MS : 0,
   });
-  const [monitoringDialog, setMonitoringDialog] = useState<
-    'choose' | 'prompt' | null
-  >(null);
+  const [choosingLevel, setChoosingLevel] = useState(false);
+  // Set while a Dagu Console page opened from here may change the plan.
+  const consoleOpened = useRef(false);
 
   useEffect(() => {
     setTitle(ts('Plan & features'));
@@ -127,17 +123,15 @@ export default function LicensePage() {
             : ts('License status updated.'),
       });
       if (!next?.serverId) return;
-      // A server just connected is the moment to offer failure emails.
       try {
         const { data } = await client.GET('/license/monitoring', {
           params: { query: { remoteNode } },
         });
-        // Replaces the status read before connecting, which a level chosen
+        // Replaces the status read before connecting, which the level chosen
         // when connecting has changed.
         if (data) void refreshMonitoring(data, { revalidate: false });
-        if (shouldAskMonitoring(data)) setMonitoringDialog('prompt');
       } catch {
-        // The notice asks later instead.
+        // The next refresh reads it.
       }
     });
   }, [
@@ -149,6 +143,29 @@ export default function LicensePage() {
     remoteNode,
     refreshMonitoring,
   ]);
+
+  // A plan changed in Dagu Console, as when a trial started there, shows as
+  // soon as the person comes back from it: to this tab, or to this window
+  // from Console in another.
+  useEffect(() => {
+    if (!online) return;
+    const onReturn = () => {
+      if (document.hidden || !consoleOpened.current) return;
+      consoleOpened.current = false;
+      client
+        .POST('/license/refresh', { params: { query: { remoteNode } } })
+        .then(({ data }) => {
+          if (data) void mutate(data, { revalidate: false });
+        })
+        .catch(() => undefined);
+    };
+    document.addEventListener('visibilitychange', onReturn);
+    window.addEventListener('focus', onReturn);
+    return () => {
+      document.removeEventListener('visibilitychange', onReturn);
+      window.removeEventListener('focus', onReturn);
+    };
+  }, [online, client, remoteNode, mutate]);
 
   async function handleActivate(e: React.FormEvent) {
     e.preventDefault();
@@ -269,61 +286,31 @@ export default function LicensePage() {
             )}
           </p>
         </div>
-        {known && (
+        {known && !license.community && (
           <div className="flex flex-wrap items-center gap-2">
-            {license.community ? (
-              !managedByEnv &&
-              !connecting && (
-                <>
-                  <Button asChild size="sm" variant="outline">
-                    <a
-                      href={licenseLink('trial', 'plan-page')}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {ts('Start free trial')}
-                    </a>
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={busy || connect.starting}
-                    onClick={() => void connect.start()}
-                  >
-                    {connect.starting ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    )}
-                    {ts('Connect to Dagu Console')}
-                  </Button>
-                </>
-              )
-            ) : (
-              <>
-                {free && (
-                  <Button asChild size="sm" variant="outline">
-                    <a
-                      href={licenseLink('plans', 'plan-page')}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {ts('View plans')}
-                    </a>
-                  </Button>
-                )}
-                <Button asChild size="sm" variant="outline">
-                  <a
-                    href={consoleHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5" />
-                    {ts('Manage in Dagu Console')}
-                  </a>
-                </Button>
-              </>
+            {free && (
+              <Button asChild size="sm" variant="outline">
+                <a
+                  href={consoleHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => (consoleOpened.current = true)}
+                >
+                  {ts('Start free trial')}
+                </a>
+              </Button>
             )}
+            <Button asChild size="sm" variant="outline">
+              <a
+                href={consoleHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => (consoleOpened.current = true)}
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                {ts('Manage in Dagu Console')}
+              </a>
+            </Button>
           </div>
         )}
       </div>
@@ -370,6 +357,7 @@ export default function LicensePage() {
           connect={connect}
           monitoring={monitoring.monitoring}
           disabled={busy}
+          trialRequested={trialRequested}
         />
       )}
 
@@ -391,7 +379,7 @@ export default function LicensePage() {
           now={now}
           loadError={Boolean(monitoring.error)}
           onRetry={() => void monitoring.refresh()}
-          onChoose={() => setMonitoringDialog('choose')}
+          onChoose={() => setChoosingLevel(true)}
           onTurnOff={() => monitoring.setLevel(LicenseMonitoringLevel.off)}
         />
       )}
@@ -551,20 +539,13 @@ export default function LicensePage() {
       )}
 
       <MonitoringDialog
-        open={monitoringDialog !== null}
+        open={choosingLevel}
         level={monitoring.monitoring?.level}
-        prompt={monitoringDialog === 'prompt'}
         onSave={async (level) => {
           await monitoring.setLevel(level);
-          setMonitoringDialog(null);
+          setChoosingLevel(false);
         }}
-        onCancel={() => {
-          // Declining the offer also stops the notice that repeats it.
-          if (monitoringDialog === 'prompt') {
-            void monitoring.dismissNotice().catch(() => undefined);
-          }
-          setMonitoringDialog(null);
-        }}
+        onCancel={() => setChoosingLevel(false)}
       />
       <ConfirmModal
         title={ts(

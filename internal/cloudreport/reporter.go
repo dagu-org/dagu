@@ -42,6 +42,9 @@ const (
 	defaultRetryAfter = time.Minute
 	initialBackoff    = time.Minute
 	maxBackoff        = 5 * time.Minute
+	// refreshEvery is the least time between two license check-ins that
+	// Dagu Console asks for.
+	refreshEvery = 5 * time.Minute
 	// credentialsCheckInterval is how often a server that is to report
 	// checks for a license, so that its first report follows an approval in
 	// Dagu Console within seconds rather than an interval later.
@@ -65,7 +68,10 @@ type Reporter struct {
 	events    *eventFeed
 	scheduler Scheduler
 	// remote is nil when reports leave remote access out.
-	remote    RemoteAccess
+	remote RemoteAccess
+	// refresh checks in for the license now; nil leaves a license change to
+	// the license manager's own check-ins.
+	refresh   func(context.Context) error
 	client    *http.Client
 	startedAt time.Time
 
@@ -97,6 +103,10 @@ type Reporter struct {
 	levelWarned bool
 	// noEventsLogged records that reports were said to carry no runs.
 	noEventsLogged bool
+	// refreshedAt is when the license was last checked in for at Dagu
+	// Console's request, and refreshWarned records that it failed.
+	refreshedAt   time.Time
+	refreshWarned bool
 }
 
 // Start reports in the background until Stop is called or ctx is done.
@@ -112,7 +122,8 @@ type Reporter struct {
 // Console pauses storing them; monitoring shows until when.
 //
 // Runs that finish below runs are never sent, even when runs is chosen again
-// after a restart.
+// after a restart. When Dagu Console answers that the server's license
+// changed, refresh checks in for it, at most every five minutes.
 //
 // When the level is off, while running or at a later start, and the last
 // report sent was at a level that reports, one report tells Dagu Console that
@@ -128,11 +139,13 @@ func Start(
 	scheduler Scheduler,
 	monitoring *Monitoring,
 	remote RemoteAccess,
+	refresh func(context.Context) error,
 ) *Reporter {
 	r := newReporter(credentials, registry, monitoring)
 	r.events = newEventFeed(events)
 	r.scheduler = scheduler
 	r.remote = remote
+	r.refresh = refresh
 	r.start(ctx)
 	return r
 }
@@ -389,6 +402,9 @@ func (r *Reporter) report(ctx context.Context) time.Duration {
 		_ = json.Unmarshal(res.body, &accepted)
 		r.interval = accepted.interval()
 		r.monitoring.recordPause(accepted.runsPausedUntil())
+		if accepted.LicenseRefresh {
+			r.refreshLicense(ctx)
+		}
 		more := r.events.acknowledge(ctx, accepted.Ack)
 		if r.changed(outcome{kind: outcomeAccepted}) {
 			logger.Info(ctx, "Reporting server health to Dagu Console", tag.URL(creds.CloudURL))
@@ -402,6 +418,24 @@ func (r *Reporter) report(ctx context.Context) time.Duration {
 		}
 		return r.jitter(r.interval)
 	}
+}
+
+// refreshLicense checks in for the license, unless it did within
+// refreshEvery.
+func (r *Reporter) refreshLicense(ctx context.Context) {
+	if r.refresh == nil || (!r.refreshedAt.IsZero() && r.now().Sub(r.refreshedAt) < refreshEvery) {
+		return
+	}
+	r.refreshedAt = r.now()
+	if err := r.refresh(ctx); err != nil {
+		if !r.refreshWarned {
+			r.refreshWarned = true
+			logger.Warn(ctx, "Failed to check in for the license Dagu Console changed", tag.Error(err))
+		}
+		return
+	}
+	r.refreshWarned = false
+	logger.Info(ctx, "Checked in for the license Dagu Console changed")
 }
 
 // offDue reports whether Dagu Console is still to be told that this server
@@ -492,6 +526,9 @@ type acceptance struct {
 	// RunsPausedUntil is when Dagu Console stores finished runs again after
 	// the workspace reached its daily limit; it is empty when not paused.
 	RunsPausedUntil string `json:"runs_paused_until"`
+	// LicenseRefresh asks the server to check in for its license now, as
+	// after the workspace started a trial.
+	LicenseRefresh bool `json:"license_refresh"`
 }
 
 // runsPausedUntil returns when storing finished runs resumes, or zero when

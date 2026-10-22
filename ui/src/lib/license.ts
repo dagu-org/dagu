@@ -210,7 +210,7 @@ export function licenseDaysLeft(
 }
 
 export function licenseLink(
-  action: 'trial' | 'plans' | 'manage',
+  action: 'plans' | 'manage',
   content: string
 ): string {
   const url = new URL(
@@ -220,10 +220,5 @@ export function licenseLink(
   url.searchParams.set('medium', 'product');
   url.searchParams.set('content', content);
   url.searchParams.set('deployment', 'self-hosted');
-  if (action === 'trial') {
-    url.pathname = '/signup';
-    url.searchParams.set('intent', 'license-trial');
-    url.searchParams.set('plan', 'trial');
-  }
   return url.toString();
 }
