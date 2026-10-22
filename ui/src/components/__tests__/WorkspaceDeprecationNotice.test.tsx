@@ -8,7 +8,7 @@ import { WorkspaceDeprecationItemKind } from '@/api/v1/schema';
 import { useIsAdmin } from '@/contexts/AuthContext';
 import { UserPreferencesProvider } from '@/contexts/UserPreference';
 import { I18nProvider } from '@/i18n/I18nProvider';
-import { WorkspaceDeprecationBanner } from '../WorkspaceDeprecationBanner';
+import { WorkspaceDeprecationNotice } from '../WorkspaceDeprecationNotice';
 
 // The generated query hook's type is too deep to mock through vi.mocked.
 const { useQueryMock } = vi.hoisted(() => ({ useQueryMock: vi.fn() }));
@@ -32,23 +32,23 @@ function respondWith(
   useQueryMock.mockReturnValue({ data: { items } });
 }
 
-function renderBanner() {
+function renderNotice() {
   return render(
     <UserPreferencesProvider>
       <I18nProvider>
-        <WorkspaceDeprecationBanner />
+        <WorkspaceDeprecationNotice />
       </I18nProvider>
     </UserPreferencesProvider>
   );
 }
 
-describe('WorkspaceDeprecationBanner', () => {
+describe('WorkspaceDeprecationNotice', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useIsAdminMock.mockReturnValue(true);
   });
 
-  it('lists each workspace setting for an admin', async () => {
+  it('lists each workspace setting once an admin opens it', async () => {
     respondWith([
       {
         kind: WorkspaceDeprecationItemKind.baseConfig,
@@ -57,26 +57,30 @@ describe('WorkspaceDeprecationBanner', () => {
       { kind: WorkspaceDeprecationItemKind.user, name: 'alice' },
     ]);
 
-    renderBanner();
+    renderNotice();
 
-    const banner = screen.getByRole('status');
-    expect(banner).toHaveTextContent('Workspaces are removed in v3.0.');
-    expect(banner).not.toHaveTextContent('alice');
+    expect(screen.queryByText('alice')).not.toBeInTheDocument();
 
     await userEvent.click(
-      screen.getByRole('button', { name: 'Show 2 settings' })
+      screen.getByRole('button', { name: 'Workspaces are removed in v3.0' })
     );
 
-    expect(banner).toHaveTextContent(
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveTextContent(
       'Base config /dags/workspaces/billing/base.yaml'
     );
-    expect(banner).toHaveTextContent('User alice');
+    expect(dialog).toHaveTextContent('User alice');
+    expect(
+      screen.getByRole('link', {
+        name: 'Have feedback? Comment on the GitHub issue.',
+      })
+    ).toHaveAttribute('href', 'https://github.com/dagucloud/dagu/issues/3288');
   });
 
   it('renders nothing when no workspace setting is in use', () => {
     respondWith([]);
 
-    const { container } = renderBanner();
+    const { container } = renderNotice();
 
     expect(container).toBeEmptyDOMElement();
   });
@@ -85,7 +89,7 @@ describe('WorkspaceDeprecationBanner', () => {
     useIsAdminMock.mockReturnValue(false);
     respondWith([]);
 
-    const { container } = renderBanner();
+    const { container } = renderNotice();
 
     expect(container).toBeEmptyDOMElement();
     expect(useQueryMock).toHaveBeenCalledWith('/workspaces/deprecation', null);

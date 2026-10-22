@@ -7,7 +7,6 @@ import { LicenseBanner } from '@/components/LicenseBanner';
 import { MonitoringNotice } from '@/components/MonitoringNotice';
 import { SchedulerPauseBanner } from '@/components/SchedulerPauseBanner';
 import { UpdateBanner } from '@/components/UpdateBanner';
-import { WorkspaceDeprecationBanner } from '@/components/WorkspaceDeprecationBanner';
 import { useConfig } from '@/contexts/ConfigContext';
 import { cn } from '@/lib/utils';
 import { getResponsiveTitleClass } from '@/lib/text-utils';
@@ -272,7 +271,6 @@ function Content({ navbarColor, children }: LayoutProps) {
             </>
           )}
           <SchedulerPauseBanner />
-          <WorkspaceDeprecationBanner />
           <div className="min-h-0 flex-1 overflow-auto p-4 md:p-6 w-full">
             {children}
           </div>

@@ -35,10 +35,6 @@ vi.mock('@/components/SchedulerPauseBanner', () => ({
   SchedulerPauseBanner: () => null,
 }));
 
-vi.mock('@/components/WorkspaceDeprecationBanner', () => ({
-  WorkspaceDeprecationBanner: () => null,
-}));
-
 vi.mock('../../menu', () => ({
   mainListItems: () => <div data-testid="sidebar-menu" />,
 }));

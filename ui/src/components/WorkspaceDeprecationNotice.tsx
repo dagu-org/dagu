@@ -3,18 +3,26 @@
 
 /**
  * Admin notice listing the workspace settings that stop applying when
- * workspaces are removed in v3.0.
+ * workspaces are removed in v3.0. It stays a small icon until opened.
  *
  * @module components
  */
 import { WorkspaceDeprecationItemKind } from '@/api/v1/schema';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { useIsAdmin } from '@/contexts/AuthContext';
 import { useRemoteNode } from '@/contexts/RemoteNodeContext';
 import { useQuery } from '@/hooks/api';
-import { I18nText } from '@/i18n/I18nText';
 import { useI18n } from '@/i18n/I18nProvider';
 import { AlertTriangle } from 'lucide-react';
-import * as React from 'react';
+
+const feedbackIssueURL = 'https://github.com/dagucloud/dagu/issues/3288';
 
 const kindLabels: Record<WorkspaceDeprecationItemKind, string> = {
   [WorkspaceDeprecationItemKind.baseConfig]: 'Base config',
@@ -28,11 +36,10 @@ const kindLabels: Record<WorkspaceDeprecationItemKind, string> = {
   [WorkspaceDeprecationItemKind.wikiDirectory]: 'Wiki directory',
 };
 
-export function WorkspaceDeprecationBanner() {
+export function WorkspaceDeprecationNotice() {
   const { ts } = useI18n();
   const isAdmin = useIsAdmin();
   const remoteNode = useRemoteNode();
-  const [expanded, setExpanded] = React.useState(false);
   const { data } = useQuery(
     '/workspaces/deprecation',
     isAdmin ? { params: { query: { remoteNode } } } : null
@@ -43,37 +50,42 @@ export function WorkspaceDeprecationBanner() {
     return null;
   }
 
+  const title = ts('Workspaces are removed in v3.0');
   return (
-    <div
-      role="status"
-      className="bg-amber-50 dark:bg-amber-950 border-b border-amber-200 dark:border-amber-800 px-4 py-1.5 text-sm text-amber-800 dark:text-amber-200"
-    >
-      <div className="flex items-center justify-between gap-3">
-        <span className="flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 shrink-0" />
-          <I18nText text="Workspaces are removed in v3.0. These workspace settings will stop applying, and users and API keys limited to workspaces will become viewers." />
-        </span>
-        <button
-          type="button"
-          onClick={() => setExpanded((value) => !value)}
-          aria-expanded={expanded}
-          className="shrink-0 underline hover:no-underline text-amber-900 dark:text-amber-100"
-        >
-          {expanded
-            ? ts('Hide settings')
-            : ts('Show {count} settings', { count: items.length })}
-        </button>
-      </div>
-      {expanded ? (
-        <ul className="mt-1 ml-6 space-y-0.5">
+    <Dialog>
+      <DialogTrigger
+        aria-label={title}
+        title={title}
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-amber-600 hover:bg-sidebar-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring dark:text-amber-400"
+      >
+        <AlertTriangle className="h-4 w-4" />
+      </DialogTrigger>
+      <DialogContent className="max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>
+            {ts(
+              'These workspace settings will stop applying, and users and API keys limited to workspaces will become viewers.'
+            )}
+          </DialogDescription>
+        </DialogHeader>
+        <ul className="space-y-1 text-sm">
           {items.map((item) => (
             <li key={`${item.kind}:${item.name}`}>
               <span className="font-medium">{ts(kindLabels[item.kind])}</span>{' '}
-              <code className="font-mono text-xs">{item.name}</code>
+              <code className="break-all font-mono text-xs">{item.name}</code>
             </li>
           ))}
         </ul>
-      ) : null}
-    </div>
+        <a
+          href={feedbackIssueURL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-sm text-muted-foreground underline hover:no-underline"
+        >
+          {ts('Have feedback? Comment on the GitHub issue.')}
+        </a>
+      </DialogContent>
+    </Dialog>
   );
 }
