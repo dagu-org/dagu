@@ -85,6 +85,9 @@ const config: Config = {
   gitSyncEnabled: true,
   updateAvailable: false,
   latestVersion: '',
+  upgradeCommand: '',
+  restartRequired: false,
+  restartCommand: '',
   permissions: {
     writeDags: true,
     runDags: true,

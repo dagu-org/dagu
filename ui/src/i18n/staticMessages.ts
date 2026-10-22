@@ -2618,6 +2618,9 @@ const english = {
   "Config key": "Config key",
   "API key": "API key",
   "Wiki directory": "Wiki directory",
+  "Update available: v{current} → {latest} {releaseLink}": "Update available: v{current} → {latest} {releaseLink}",
+  "A new Dagu binary is installed. Run {command} to restart and use it.": "A new Dagu binary is installed. Run {command} to restart and use it.",
+  "A new Dagu binary is installed. Restart Dagu to use it.": "A new Dagu binary is installed. Restart Dagu to use it.",
 } as const;
 
 export type StaticMessage = keyof typeof english;
@@ -5182,6 +5185,9 @@ const chinese = {
   "Config key": "配置键",
   "API key": "API 密钥",
   "Wiki directory": "百科目录",
+  "Update available: v{current} → {latest} {releaseLink}": "有可用更新：v{current} → {latest} {releaseLink}",
+  "A new Dagu binary is installed. Run {command} to restart and use it.": "已安装新的 Dagu 二进制文件。运行 {command} 重启后即可使用。",
+  "A new Dagu binary is installed. Restart Dagu to use it.": "已安装新的 Dagu 二进制文件。重启 Dagu 后即可使用。",
 } as const satisfies Record<StaticMessage, string>;
 
 const japanese = {
@@ -7822,6 +7828,9 @@ const japanese = {
   "Config key": "設定キー",
   "API key": "API キー",
   "Wiki directory": "Wiki ディレクトリ",
+  "Update available: v{current} → {latest} {releaseLink}": "更新があります：v{current} → {latest} {releaseLink}",
+  "A new Dagu binary is installed. Run {command} to restart and use it.": "新しい Dagu バイナリがインストールされました。{command} を実行して再起動すると使用できます。",
+  "A new Dagu binary is installed. Restart Dagu to use it.": "新しい Dagu バイナリがインストールされました。Dagu を再起動すると使用できます。",
 } as const satisfies Record<StaticMessage, string>;
 
 export const staticMessages = {
