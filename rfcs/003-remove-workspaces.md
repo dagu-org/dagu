@@ -74,7 +74,8 @@ The message lists every item, not the first one found.
 ## v2.22 deprecation
 
 - A startup warning listing each item from the table that is in use.
-- An admin banner with the same list.
+- An admin notice with the same list, behind a sidebar icon, that links to
+  the feedback issue [#3288](https://github.com/dagucloud/dagu/issues/3288).
 - Release notes that point to the table above.
 - No new workspace features.
 
@@ -82,7 +83,7 @@ The message lists every item, not the first one found.
 
 | Release | Ships |
 | --- | --- |
-| v2.22 | Warnings and banner. |
+| v2.22 | Warnings and admin notice. |
 | v3.0 | Removal with the guards above. |
 
 ## Verification and acceptance criteria
