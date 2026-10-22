@@ -2596,8 +2596,10 @@ harnesses:
     # ca_file: /path/to/private-ca.pem
 ```
 
-Remote definitions reject local startup fields and adapter CLI flags. URL, cwd,
-CA path, and header values support workflow variables. Relative CA paths resolve
+Remote definitions reject local startup fields and adapter CLI flags, and remote
+steps inherit only `acp_permission` from DAG-level `harness:` defaults. URL, cwd,
+CA path, and header values support workflow variables. Dagu warns when headers
+go over `ws://` or `http://` to a non-loopback host. Relative CA paths resolve
 from the local step working directory; remote cwd belongs to the agent host.
 TLS certificate and hostname verification stay enabled. WebSocket uses control
 Ping frames and offers `acp.v1`. Bearer tokens stay in the Authorization header
@@ -2609,10 +2611,13 @@ session SSE streams; endpoints must implement that profile.
 All transports capture assistant text as stdout and support ordered fallback.
 `with.stdin` is appended to the prompt after a blank line. `with.acp_permission`
 defaults to `deny`; `allow` selects only an offered `allow_once` permission and
-never grants persistent approval. A denial fails the attempt. Only `end_turn`
-succeeds. ACP cancellation sends `session/cancel`, closes the connection, and
-skips fallback. Use `timeout_sec` to bound a turn. Client filesystem/terminal
-callbacks, interactive authentication, session resume, and containers are unsupported.
+never grants persistent approval. A denial selects the agent's reject option and
+fails the attempt. Only `end_turn` succeeds. A graceful Stop sends
+`session/cancel` and waits for the agent to end its turn; a forced Stop (after
+`max_clean_up_time_sec`) or a timeout also closes the connection. Stop skips
+fallback. Use `timeout_sec` to bound a turn. Client filesystem/terminal
+callbacks, interactive authentication, session resume, and local adapters inside
+containers are unsupported; remote steps ignore a DAG-level `container:`.
 
 ## DAG-Level Defaults and Fallback
 

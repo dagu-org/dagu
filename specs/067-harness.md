@@ -320,7 +320,11 @@ steps:
 ```
 
 Supply tokens through workflow environment/secrets settings. Remote steps accept
-`provider`, `fallback`, and `acp_permission`, not adapter CLI flags.
+`provider`, `fallback`, and `acp_permission`, not adapter CLI flags. Of the
+DAG-level `harness:` options, remote steps inherit only `acp_permission`.
+`url` and `cwd` values that reference variables are validated after resolution.
+Headers sent over `ws://` or `http://` to a non-loopback host produce a warning
+in the step log.
 The harness definition's `ca_file` adds PEM roots alongside system certificates for this connection only;
 relative paths resolve from the local step working directory. Certificate and
 hostname verification remain enabled. Dagu never creates or translates remote cwd.
@@ -356,16 +360,22 @@ Failed attempts do not contribute text to successful fallback output.
 
 `with.acp_permission` defaults to `deny`. `allow` selects only an offered `allow_once`
 option; it never grants persistent permission. This policy governs ACP callbacks,
-not a sandbox around the agent's own tools. Denials fail the attempt.
+not a sandbox around the agent's own tools. A denial selects an offered reject
+option and fails the attempt.
 
-Timeout or stop sends `session/cancel` before interrupting the transport. Local
-process trees are terminated; remote connections are closed and HTTP connections
-are deleted. Remote agents must honor cancellation. ACP cancellation skips fallback. Explicit Stop reports the signal exit code
-(143 for graceful termination, 137 for forced termination); timeouts report 124.
-Session updates report progress to the executor during long turns.
+A graceful Stop sends `session/cancel` and waits for the agent to end the turn.
+A forced Stop, issued once `max_clean_up_time_sec` elapses, and a timeout send
+`session/cancel` and then interrupt the transport. Local process trees are
+terminated; remote connections are closed and HTTP connections are deleted.
+Remote agents must honor cancellation. ACP cancellation skips fallback, including
+a Stop that arrives before the agent starts. Explicit Stop reports the signal exit
+code (143 for graceful termination, 137 for forced termination); timeouts report
+124. A local adapter that exits on its own after a failed turn keeps its exit code.
+Session updates report progress at most once per second during long turns.
 
-Client filesystem/terminal callbacks, containerized ACP, session resume, interactive
-authentication, and MCP injection are not included. Adapters authenticate beforehand.
+Client filesystem/terminal callbacks, local ACP adapters in containers, session
+resume, interactive authentication, and MCP injection are not included. Remote
+steps ignore a DAG-level `container:`. Adapters authenticate beforehand.
 
 ### Verification
 
