@@ -160,11 +160,8 @@ func (e *executorImpl) waitUntil(ctx context.Context) error {
 			return fmt.Errorf("wait: until %q resolved to %s which is in the past", e.cfg.Until, deadline.Format(time.RFC3339Nano))
 		}
 	case ifPastWindow:
-		if ago := time.Since(deadline); ago > 0 {
-			if ago > e.cfg.window {
-				return fmt.Errorf("wait: until %q resolved to %s outside window %s", e.cfg.Until, deadline.Format(time.RFC3339Nano), e.cfg.Window)
-			}
-			return nil
+		if time.Since(deadline) > e.cfg.window {
+			return fmt.Errorf("wait: until %q resolved to %s outside window %s", e.cfg.Until, deadline.Format(time.RFC3339Nano), e.cfg.Window)
 		}
 	}
 	return waitUntil(ctx, deadline)

@@ -387,6 +387,30 @@ func TestExecutorIfPastWindow(t *testing.T) {
 	require.NoError(t, exec.Run(context.Background()))
 }
 
+// A canceled step reports the cancellation even when a past deadline is
+// inside the window, as the other past-deadline paths do.
+func TestExecutorIfPastWindowStopsWhenCanceled(t *testing.T) {
+	t.Parallel()
+
+	recent := time.Now().Add(-time.Minute).UTC().Format(time.RFC3339Nano)
+	exec, err := newExecutor(context.Background(), ir.Step{
+		Commands: []ir.CommandEntry{{Command: opUntil}},
+		ExecutorConfig: ir.ExecutorConfig{
+			Type: "wait",
+			Config: map[string]any{
+				"until":   recent,
+				"if_past": "window",
+				"window":  "5m",
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	require.ErrorIs(t, exec.Run(ctx), context.Canceled)
+}
+
 func TestNewExecutorRejectsNonHTTPURL(t *testing.T) {
 	t.Parallel()
 
