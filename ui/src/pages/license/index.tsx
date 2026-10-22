@@ -145,7 +145,8 @@ export default function LicensePage() {
   ]);
 
   // A plan changed in Dagu Console, as when a trial started there, shows as
-  // soon as the person comes back from it.
+  // soon as the person comes back from it: to this tab, or to this window
+  // from Console in another.
   useEffect(() => {
     if (!online) return;
     const onReturn = () => {
@@ -159,7 +160,11 @@ export default function LicensePage() {
         .catch(() => undefined);
     };
     document.addEventListener('visibilitychange', onReturn);
-    return () => document.removeEventListener('visibilitychange', onReturn);
+    window.addEventListener('focus', onReturn);
+    return () => {
+      document.removeEventListener('visibilitychange', onReturn);
+      window.removeEventListener('focus', onReturn);
+    };
   }, [online, client, remoteNode, mutate]);
 
   async function handleActivate(e: React.FormEvent) {

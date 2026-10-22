@@ -514,8 +514,9 @@ describe('LicensePage', () => {
     });
   });
 
-  // A trial started in Dagu Console shows as soon as the person comes back:
-  // the page checks in once on return, and not on later returns.
+  // A trial started in Dagu Console shows as soon as the person comes back,
+  // to the tab or the window: the page checks in once on return, and not on
+  // later returns.
   it('checks in on coming back from Dagu Console', async () => {
     const trial = makeConfig({ ...online, plan: 'trial' }).license;
     const post = vi.fn().mockResolvedValue({ data: trial });
@@ -534,7 +535,9 @@ describe('LicensePage', () => {
     await userEvent.click(
       screen.getByRole('link', { name: 'Start free trial' })
     );
-    document.dispatchEvent(new Event('visibilitychange'));
+    // Back from Console in another window.
+    window.dispatchEvent(new Event('focus'));
+    expect(post).toHaveBeenCalledTimes(1);
     document.dispatchEvent(new Event('visibilitychange'));
 
     expect(post).toHaveBeenCalledTimes(1);
