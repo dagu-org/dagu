@@ -85,7 +85,8 @@ func (e *harnessExecutor) runACPRemote(parent context.Context, cfg providerConfi
 		stream = &acpWebSocketStream{ctx: wireCtx, conn: socket}
 		go keepACPWebSocketAlive(wireCtx, socket, 25*time.Second)
 	}
-	client := &acpHarnessClient{out: out, allow: allow, progress: e.progressCallback}
+	client, releaseClient := e.newACPClient(out, allow)
+	defer releaseClient()
 	conn := acp.NewClientSideConnection(client, stream, stream)
 	defer func() {
 		closeWire()

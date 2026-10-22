@@ -23,6 +23,9 @@ import (
 	"github.com/dagucloud/dagu/v2/internal/runtime/resourcelimit"
 )
 
+// acpProgressInterval bounds run-status writes caused by streamed session updates.
+const acpProgressInterval = time.Second
+
 // runACP executes one prompt over the configured ACP transport and spools its text output.
 func (e *harnessExecutor) runACP(parent context.Context, cfg providerConfig) (stdout *os.File, err error) {
 	e.exitCode = 1
@@ -107,7 +110,8 @@ func (e *harnessExecutor) runACP(parent context.Context, cfg providerConfig) (st
 	}
 	e.process, e.acpCancel = process, cancel
 	e.mu.Unlock()
-	client := &acpHarnessClient{out: spool, allow: policy == "allow", progress: e.progressCallback}
+	client, releaseClient := e.newACPClient(spool, policy == "allow")
+	defer releaseClient()
 	conn := acp.NewClientSideConnection(client, input, output)
 	defer func() {
 		_ = input.Close()
@@ -197,11 +201,14 @@ func (e *harnessExecutor) acpTurn(ctx context.Context, conn *acp.ClientSideConne
 	client.mu.Unlock()
 	prompt := promptAndScript(e.effectivePrompt(), e.script)
 	response, err := conn.Prompt(ctx, acp.PromptRequest{SessionId: session.SessionId, Prompt: []acp.ContentBlock{acp.TextBlock(prompt)}})
+	client.mu.Lock()
+	defer client.mu.Unlock()
+	// The SDK can still deliver queued updates after the response; they must not
+	// reach the stdout spool once the caller rewinds it.
+	client.finished = true
 	if err != nil {
 		return fmt.Errorf("prompt: %w", err)
 	}
-	client.mu.Lock()
-	defer client.mu.Unlock()
 	if client.err != nil {
 		return client.err
 	}
@@ -217,20 +224,50 @@ type acpHarnessClient struct {
 	allow    bool
 	session  acp.SessionId
 	err      error
-	progress func()
+	finished bool
+	progress chan struct{}
 }
 
 var _ acp.Client = (*acpHarnessClient)(nil)
+
+// newACPClient returns a client for one attempt and a release func.
+// Session updates report progress at most once per acpProgressInterval, and
+// none are reported after release returns.
+func (e *harnessExecutor) newACPClient(out io.Writer, allow bool) (*acpHarnessClient, func()) {
+	client := &acpHarnessClient{out: out, allow: allow, progress: make(chan struct{}, 1)}
+	quit, done := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(done)
+		for {
+			select {
+			case <-quit:
+				return
+			case <-client.progress:
+			}
+			e.notifyProgress()
+			select {
+			case <-quit:
+				return
+			case <-time.After(acpProgressInterval):
+			}
+		}
+	}()
+	return client, func() {
+		close(quit)
+		<-done
+	}
+}
 
 // SessionUpdate captures ordered assistant text for the active session.
 func (c *acpHarnessClient) SessionUpdate(_ context.Context, params acp.SessionNotification) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if params.SessionId != c.session {
+	if params.SessionId != c.session || c.finished {
 		return nil
 	}
-	if c.progress != nil {
-		c.progress()
+	select {
+	case c.progress <- struct{}{}:
+	default:
 	}
 	if chunk := params.Update.AgentMessageChunk; chunk != nil && chunk.Content.Text != nil {
 		_, err := io.WriteString(c.out, chunk.Content.Text.Text)

@@ -15,10 +15,14 @@ import (
 	"testing"
 	"time"
 
+	acp "github.com/coder/acp-go-sdk"
 	"github.com/dagucloud/dagu/v2/internal/cmn/cmdutil"
 	"github.com/dagucloud/dagu/v2/internal/ir"
 	"github.com/stretchr/testify/require"
 )
+
+// acpTestStreamChunks is how many text chunks the stream fixture mode emits.
+const acpTestStreamChunks = 500
 
 // TestACPAgent provides an independent JSON-RPC peer to check SDK wire behavior.
 func TestACPAgent(_ *testing.T) {
@@ -49,6 +53,11 @@ func TestACPAgent(_ *testing.T) {
 		respond := func(result any) { send(map[string]any{"jsonrpc": "2.0", "id": msg.ID, "result": result}) }
 		finish := func(reason string) {
 			send(map[string]any{"jsonrpc": "2.0", "id": promptID, "result": map[string]any{"stopReason": reason}})
+		}
+		chunk := func(text string) {
+			send(map[string]any{"jsonrpc": "2.0", "method": "session/update", "params": map[string]any{
+				"sessionId": "test-session", "update": map[string]any{"sessionUpdate": "agent_message_chunk", "content": map[string]any{"type": "text", "text": text}},
+			}})
 		}
 		switch msg.Method {
 		case "initialize":
@@ -90,10 +99,15 @@ func TestACPAgent(_ *testing.T) {
 			if len(params.Prompt) == 0 {
 				os.Exit(4)
 			}
+			if mode == "stream" {
+				for range acpTestStreamChunks {
+					chunk("x")
+				}
+				finish("end_turn")
+				continue
+			}
 			for _, part := range []string{"reply:", params.Prompt[0].Text} {
-				send(map[string]any{"jsonrpc": "2.0", "method": "session/update", "params": map[string]any{
-					"sessionId": "test-session", "update": map[string]any{"sessionUpdate": "agent_message_chunk", "content": map[string]any{"type": "text", "text": part}},
-				}})
+				chunk(part)
 			}
 			reason := "end_turn"
 			if mode == "refuse" {
@@ -216,18 +230,46 @@ func TestACPStop(t *testing.T) {
 	}
 }
 
+// TestACPProgress checks that streamed chunks report progress without one
+// run-status write per chunk.
 func TestACPProgress(t *testing.T) {
 	binary, err := os.Executable()
 	require.NoError(t, err)
-	dag := &ir.DAG{Harnesses: ir.HarnessDefinitions{"agent": {Protocol: "acp", Binary: binary, PrefixArgs: []string{"-test.run=^TestACPAgent$", "--", "--acp-test-agent", "echo"}}}}
+	dag := &ir.DAG{Harnesses: ir.HarnessDefinitions{"agent": {Protocol: "acp", Binary: binary, PrefixArgs: []string{"-test.run=^TestACPAgent$", "--", "--acp-test-agent", "stream"}}}}
 	step := ir.Step{ExecutorConfig: ir.ExecutorConfig{Config: map[string]any{"provider": "agent"}}, Commands: []ir.CommandEntry{{Command: "hello"}}}
 	ctx := newHarnessTestContext(t, dag, step)
 	exec, err := newHarness(ctx, step)
 	require.NoError(t, err)
+	var out bytes.Buffer
+	exec.SetStdout(&out)
 	var progress atomic.Int32
 	exec.(*harnessExecutor).SetProgressCallback(func() { progress.Add(1) })
 	require.NoError(t, exec.Run(ctx))
+	require.Equal(t, strings.Repeat("x", acpTestStreamChunks), out.String())
 	require.Positive(t, progress.Load())
+	require.Less(t, progress.Load(), int32(acpTestStreamChunks/10))
+}
+
+// TestACPClientAfterTurn covers updates the SDK delivers after its connection is
+// done: they must not touch the rewound stdout spool or report progress once the
+// attempt has returned.
+func TestACPClientAfterTurn(t *testing.T) {
+	var progress atomic.Int32
+	e := &harnessExecutor{}
+	e.SetProgressCallback(func() { progress.Add(1) })
+	var out bytes.Buffer
+	client, release := e.newACPClient(&out, false)
+	client.session = "test-session"
+	update := acp.SessionNotification{SessionId: "test-session", Update: acp.UpdateAgentMessageText("late")}
+
+	client.finished = true
+	require.NoError(t, client.SessionUpdate(t.Context(), update))
+	require.Empty(t, out.String())
+
+	release()
+	client.finished = false
+	require.NoError(t, client.SessionUpdate(t.Context(), update))
+	require.Zero(t, progress.Load())
 }
 
 // Unknown transports must fail instead of silently starting a stdio agent.
