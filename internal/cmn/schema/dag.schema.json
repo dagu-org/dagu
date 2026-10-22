@@ -8939,7 +8939,23 @@
         },
         "until": {
           "type": "string",
-          "description": "RFC3339 timestamp for wait.until."
+          "description": "RFC3339 timestamp or HH:MM[:SS] clock time for wait.until."
+        },
+        "offset": {
+          "type": "string",
+          "description": "Duration added to with.until, such as 5m. Only valid for wait.until."
+        },
+        "timezone": {
+          "type": "string",
+          "description": "IANA timezone for HH:MM[:SS] with.until values. Ignored when with.until is RFC3339. Only valid for wait.until."
+        },
+        "if_past": {
+          "type": "string",
+          "description": "Behavior when with.until is in the past: continue, fail, or window. Accepts a ${...} reference. Only valid for wait.until. Defaults to continue."
+        },
+        "window": {
+          "type": "string",
+          "description": "How long after with.until still counts as on time when if_past is window. Only valid for wait.until."
         },
         "path": {
           "type": "string",

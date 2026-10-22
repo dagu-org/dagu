@@ -710,6 +710,10 @@ steps:
   - action: wait.until
     with:
       until: "2026-01-02T03:04:05Z"
+      offset: 5m
+      timezone: Europe/London
+      if_past: window
+      window: 10m
   - action: wait.file
     with:
       path: out/ready.flag
@@ -720,6 +724,19 @@ steps:
       url: https://example.com/health
       status: 204
       request_timeout: 10s
+`,
+		},
+		{
+			name: "WaitActionsReferenceIfPast",
+			spec: `
+steps:
+  - action: wait.until
+    with:
+      until: "09:00"
+      offset: ${params.offset}
+      timezone: ${params.zone}
+      if_past: ${params.on_past}
+      window: ${params.grace}
 `,
 		},
 		{

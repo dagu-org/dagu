@@ -47,10 +47,20 @@ then succeeds.
 
 ### wait.until
 
-`with.until` (required) is an RFC3339 timestamp. The step blocks until that
-point in time, then succeeds. If the timestamp is already in the past when
-the step starts, the step succeeds immediately rather than failing or
-blocking.
+`with.until` (required) is either an RFC3339 timestamp or a `HH:MM[:SS]`
+clock time. A clock time resolves on the run's logical day (the schedule
+time when present, otherwise when the run started) in `with.timezone` when
+set, otherwise in the run-configured zone; `with.timezone` applies only to
+clock times and is ignored for RFC3339 timestamps. `with.offset` (a
+duration, may be negative) shifts the resolved deadline.
+
+`with.if_past` selects behavior when the resolved deadline is already past:
+`fail` errors, `window` succeeds when the deadline passed no more than
+`with.window` ago and otherwise errors, and `continue` (default) succeeds
+immediately. For clock times, `continue` instead rolls the passed time to
+the same time tomorrow, so use `fail` or `window` to act on a gate that
+already passed today. `with.offset`, `with.timezone`, `with.if_past`, and
+`with.window` are only valid on `wait.until`.
 
 ### wait.file
 
@@ -104,7 +114,12 @@ run time and fails its check is reported as holding an unresolved reference:
 
 - `wait.duration`: `with.duration` is empty, is not a parseable duration, or
   is not greater than zero.
-- `wait.until`: `with.until` is empty or is not a valid RFC3339 timestamp.
+- `wait.until`: `with.until` is empty or is neither a valid RFC3339 timestamp
+  nor a valid `HH:MM[:SS]` clock time; `with.timezone` is not an IANA name;
+  `with.offset` is not a duration; `with.if_past` is not `continue`, `fail`,
+  or `window`; `with.window` is set without `if_past: window`, or missing
+  with `if_past: window`. `with.offset`, `with.timezone`, `with.if_past`, or
+  `with.window` set on any other action.
 - `wait.file`: `with.path` is empty, or `with.state` is a value other than
   `exists` or `missing`.
 - `wait.http`: `with.url` is empty or is not an absolute `http://`/`https://`

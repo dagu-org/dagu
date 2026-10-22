@@ -120,7 +120,34 @@ func TestWaitUntilBadFormat(t *testing.T) {
 	dagu := harness.NewRunner(t)
 	result := dagu.Run("start", "until_bad_format.yaml")
 	result.ExpectNonZeroExitCode()
-	result.ExpectStderrContains("until must be RFC3339 timestamp")
+	result.ExpectStderrContains("until must be RFC3339 timestamp or HH:MM")
+}
+
+func TestWaitUntilPastFail(t *testing.T) {
+	t.Parallel()
+
+	dagu := harness.NewRunner(t)
+	result := dagu.Run("start", "until_past_fail.yaml")
+	result.ExpectNonZeroExitCode()
+	result.ExpectStderrContains("in the past")
+}
+
+func TestWaitUntilBadClock(t *testing.T) {
+	t.Parallel()
+
+	dagu := harness.NewRunner(t)
+	result := dagu.Run("start", "until_bad_clock.yaml")
+	result.ExpectNonZeroExitCode()
+	result.ExpectStderrContains("until must be RFC3339 timestamp or HH:MM")
+}
+
+func TestWaitOffsetOnlyValidOnUntil(t *testing.T) {
+	t.Parallel()
+
+	dagu := harness.NewRunner(t)
+	result := dagu.Run("start", "offset_wrong_op.yaml")
+	result.ExpectNonZeroExitCode()
+	result.ExpectStderrContains("only valid for until")
 }
 
 // TestWaitFileExists proves wait.file (default state:

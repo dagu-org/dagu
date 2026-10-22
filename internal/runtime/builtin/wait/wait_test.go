@@ -4,6 +4,7 @@
 package wait
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	"github.com/dagucloud/dagu/v2/internal/ir"
+	"github.com/dagucloud/dagu/v2/internal/runtime"
 	"github.com/stretchr/testify/require"
 )
 
@@ -191,6 +193,229 @@ func TestParseStatus(t *testing.T) {
 	}
 }
 
+func TestValidateStepDefersUntilReferences(t *testing.T) {
+	t.Parallel()
+
+	require.NoError(t, validateStep(ir.Step{
+		Commands: []ir.CommandEntry{{Command: opUntil}},
+		ExecutorConfig: ir.ExecutorConfig{Type: "wait", Config: map[string]any{
+			"until":    "${params.release_at}",
+			"offset":   "${params.shift}",
+			"timezone": "${params.zone}",
+			"if_past":  "${params.on_past}",
+			"window":   "${params.grace}",
+		}},
+	}))
+}
+
+func TestParseUntilClockTimeDefersResolution(t *testing.T) {
+	t.Parallel()
+
+	cfg := defaultConfig()
+	cfg.Until = "23:59"
+	parsed, err := parseConfig(opUntil, cfg, false)
+	require.NoError(t, err)
+	require.True(t, parsed.until.IsZero())
+}
+
+func TestParseUntilRejectsBadFields(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name   string
+		config config
+		op     string
+		want   string
+	}{
+		{name: "until", config: config{Until: "tomorrow"}, op: opUntil, want: "until must be RFC3339 timestamp or HH:MM"},
+		{name: "timezone", config: config{Until: "2026-01-02T03:04:05Z", Timezone: "Mars/Olympus"}, op: opUntil, want: "timezone must be an IANA name"},
+		{name: "offset", config: config{Until: "2026-01-02T03:04:05Z", Offset: "bogus"}, op: opUntil, want: "offset must be a duration"},
+		{name: "ifPast", config: config{Until: "2026-01-02T03:04:05Z", IfPast: "retry"}, op: opUntil, want: "if_past must be"},
+		{name: "windowMissing", config: config{Until: "2026-01-02T03:04:05Z", IfPast: "window"}, op: opUntil, want: "window is required"},
+		{name: "windowMismatch", config: config{Until: "2026-01-02T03:04:05Z", Window: "5m"}, op: opUntil, want: "window requires if_past"},
+		{name: "windowBad", config: config{Until: "2026-01-02T03:04:05Z", IfPast: "window", Window: "bogus"}, op: opUntil, want: "window must be a duration"},
+		{name: "offsetOnDuration", config: config{Duration: "5s", Offset: "1m"}, op: opDuration, want: "only valid for until"},
+		{
+			name:   "untilFieldsReportedInOrder",
+			config: config{Duration: "5s", Offset: "1m", Timezone: "UTC", IfPast: "fail", Window: "1m"},
+			op:     opDuration,
+			want:   "offset is only valid for until",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			cfg := defaultConfig()
+			cfg.Until = tt.config.Until
+			cfg.Offset = tt.config.Offset
+			cfg.Timezone = tt.config.Timezone
+			cfg.IfPast = tt.config.IfPast
+			cfg.Window = tt.config.Window
+			cfg.Duration = tt.config.Duration
+			_, err := parseConfig(tt.op, cfg, false)
+			require.ErrorContains(t, err, tt.want)
+		})
+	}
+}
+
+func TestClockDeadlineAppliesOffsetBeforeRoll(t *testing.T) {
+	t.Parallel()
+
+	loc := time.UTC
+	base := time.Date(2026, 1, 2, 0, 0, 0, 0, loc)
+	now := time.Date(2026, 1, 2, 9, 5, 0, 0, loc)
+
+	got, err := clockDeadline(base, "09:00", loc, 10*time.Minute, ifPastContinue, now)
+	require.NoError(t, err)
+	require.Equal(t, time.Date(2026, 1, 2, 9, 10, 0, 0, loc), got)
+}
+
+func TestClockDeadlineHonoursIfPast(t *testing.T) {
+	t.Parallel()
+
+	loc := time.UTC
+	base := time.Date(2026, 1, 2, 0, 0, 0, 0, loc)
+	now := time.Date(2026, 1, 2, 9, 5, 0, 0, loc)
+
+	for _, tt := range []struct {
+		name   string
+		ifPast string
+		want   time.Time
+	}{
+		{name: "continueRollsForward", ifPast: ifPastContinue, want: time.Date(2026, 1, 3, 9, 0, 0, 0, loc)},
+		{name: "failKeepsLogicalDay", ifPast: ifPastFail, want: time.Date(2026, 1, 2, 9, 0, 0, 0, loc)},
+		{name: "windowKeepsLogicalDay", ifPast: ifPastWindow, want: time.Date(2026, 1, 2, 9, 0, 0, 0, loc)},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := clockDeadline(base, "09:00", loc, 0, tt.ifPast, now)
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestExecutorIfPastAppliesToClockTime(t *testing.T) {
+	t.Parallel()
+
+	loc := time.Local
+	scheduled := time.Now().In(loc).AddDate(0, 0, -1).Format(time.RFC3339Nano)
+	ctx := runtime.NewContext(context.Background(), &ir.DAG{Name: "test"}, "run-1", "",
+		runtime.WithScheduleTime(scheduled))
+
+	exec, err := newExecutor(ctx, ir.Step{
+		Commands: []ir.CommandEntry{{Command: opUntil}},
+		ExecutorConfig: ir.ExecutorConfig{
+			Type: "wait",
+			Config: map[string]any{
+				"until":   "00:00",
+				"if_past": "fail",
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.ErrorContains(t, exec.Run(ctx), "in the past")
+
+	exec, err = newExecutor(ctx, ir.Step{
+		Commands: []ir.CommandEntry{{Command: opUntil}},
+		ExecutorConfig: ir.ExecutorConfig{
+			Type: "wait",
+			Config: map[string]any{
+				"until":   "00:00",
+				"if_past": "window",
+				"window":  "72h",
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.NoError(t, exec.Run(ctx))
+}
+
+func TestClockDeadlineUsesLogicalDayAndTimezone(t *testing.T) {
+	t.Parallel()
+
+	loc, err := time.LoadLocation("Europe/London")
+	require.NoError(t, err)
+	base := time.Date(2026, 1, 2, 0, 0, 0, 0, loc)
+	now := time.Date(2026, 1, 2, 8, 0, 0, 0, loc)
+
+	got, err := clockDeadline(base, "09:00", loc, 0, ifPastContinue, now)
+	require.NoError(t, err)
+	require.Equal(t, time.Date(2026, 1, 2, 9, 0, 0, 0, loc), got)
+}
+
+func TestLogicalDayUsesScheduleTime(t *testing.T) {
+	t.Parallel()
+
+	loc, err := time.LoadLocation("Europe/London")
+	require.NoError(t, err)
+	ctx := runtime.NewContext(context.Background(), &ir.DAG{Name: "test"}, "run-1", "",
+		runtime.WithScheduleTime("2026-01-02T23:30:00Z"))
+
+	base := logicalDay(ctx, loc)
+	require.Equal(t, 2026, base.Year())
+	require.Equal(t, time.January, base.Month())
+	require.Equal(t, 2, base.Day())
+	require.Equal(t, 23, base.Hour())
+}
+
+func TestExecutorRFC3339OffsetAppliedOnce(t *testing.T) {
+	t.Parallel()
+
+	// Deadline lands 1m in the past after a single +2m shift; a doubled
+	// offset would land 1m in the future and block instead of succeeding.
+	until := time.Now().Add(-3 * time.Minute).UTC().Format(time.RFC3339Nano)
+	exec, err := newExecutor(context.Background(), ir.Step{
+		Commands: []ir.CommandEntry{{Command: opUntil}},
+		ExecutorConfig: ir.ExecutorConfig{
+			Type: "wait",
+			Config: map[string]any{
+				"until":   until,
+				"offset":  "2m",
+				"if_past": "window",
+				"window":  "2m",
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.NoError(t, exec.Run(context.Background()))
+}
+
+func TestExecutorIfPastFail(t *testing.T) {
+	t.Parallel()
+
+	exec, err := newExecutor(context.Background(), ir.Step{
+		Commands: []ir.CommandEntry{{Command: opUntil}},
+		ExecutorConfig: ir.ExecutorConfig{
+			Type: "wait",
+			Config: map[string]any{
+				"until":   "2000-01-01T00:00:00Z",
+				"if_past": "fail",
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.ErrorContains(t, exec.Run(context.Background()), "in the past")
+}
+
+func TestExecutorIfPastWindow(t *testing.T) {
+	t.Parallel()
+
+	recent := time.Now().Add(-time.Minute).UTC().Format(time.RFC3339Nano)
+	exec, err := newExecutor(context.Background(), ir.Step{
+		Commands: []ir.CommandEntry{{Command: opUntil}},
+		ExecutorConfig: ir.ExecutorConfig{
+			Type: "wait",
+			Config: map[string]any{
+				"until":   recent,
+				"if_past": "window",
+				"window":  "5m",
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.NoError(t, exec.Run(context.Background()))
+}
+
 func TestNewExecutorRejectsNonHTTPURL(t *testing.T) {
 	t.Parallel()
 
@@ -222,6 +447,28 @@ func TestNewExecutorRejectsUnresolvedReference(t *testing.T) {
 	})
 	require.ErrorContains(t, err, "url must be an absolute HTTP URL")
 	require.ErrorContains(t, err, "unresolved reference")
+}
+
+func TestDeadlineLoggedToStderr(t *testing.T) {
+	t.Parallel()
+
+	var stdout, stderr bytes.Buffer
+	exec, err := newExecutor(context.Background(), ir.Step{
+		Commands: []ir.CommandEntry{{Command: opUntil}},
+		ExecutorConfig: ir.ExecutorConfig{
+			Type: "wait",
+			Config: map[string]any{
+				"until": "2000-01-01T00:00:00Z",
+			},
+		},
+	})
+	require.NoError(t, err)
+	exec.SetStdout(&stdout)
+	exec.SetStderr(&stderr)
+
+	require.NoError(t, exec.Run(context.Background()))
+	require.Empty(t, stdout.String())
+	require.Contains(t, stderr.String(), "wait: deadline")
 }
 
 func TestExecutorRunStopsWhenContextIsCanceled(t *testing.T) {

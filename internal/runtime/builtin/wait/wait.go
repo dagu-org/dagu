@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	cmnconfig "github.com/dagucloud/dagu/v2/internal/cmn/config"
 	"github.com/dagucloud/dagu/v2/internal/executor/registry"
 
 	"github.com/dagucloud/dagu/v2/internal/ir"
@@ -116,7 +117,7 @@ func (e *executorImpl) Run(ctx context.Context) error {
 	case opDuration:
 		return waitFor(ctx, e.cfg.duration)
 	case opUntil:
-		return waitUntil(ctx, e.cfg.until)
+		return e.waitUntil(ctx)
 	case opFile:
 		return e.waitFile(ctx)
 	case opHTTP:
@@ -150,12 +151,96 @@ func waitFor(ctx context.Context, duration time.Duration) error {
 	}
 }
 
+func (e *executorImpl) waitUntil(ctx context.Context) error {
+	deadline := e.cfg.until.Add(e.cfg.offset)
+	if isClockTime(e.cfg.Until) {
+		loc := untilLocation(e.cfg.Timezone)
+		if strings.TrimSpace(e.cfg.Timezone) == "" {
+			loc = configuredLocation(ctx)
+		}
+		resolved, err := resolveClockTime(ctx, strings.TrimSpace(e.cfg.Until), loc, e.cfg.offset, e.cfg.ifPast)
+		if err != nil {
+			return fmt.Errorf("wait: until %q: %w", e.cfg.Until, err)
+		}
+		deadline = resolved
+	}
+	e.logDeadline(deadline)
+	switch e.cfg.ifPast {
+	case ifPastFail:
+		if !time.Now().Before(deadline) {
+			return fmt.Errorf("wait: until %q resolved to %s which is in the past", e.cfg.Until, deadline.Format(time.RFC3339Nano))
+		}
+	case ifPastWindow:
+		if ago := time.Since(deadline); ago > 0 {
+			if ago > e.cfg.window {
+				return fmt.Errorf("wait: until %q resolved to %s outside window %s", e.cfg.Until, deadline.Format(time.RFC3339Nano), e.cfg.Window)
+			}
+			return nil
+		}
+	}
+	return waitUntil(ctx, deadline)
+}
+
 func waitUntil(ctx context.Context, until time.Time) error {
 	duration := time.Until(until)
 	if duration <= 0 {
 		return ctx.Err()
 	}
 	return waitFor(ctx, duration)
+}
+
+func isClockTime(raw string) bool {
+	_, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(raw))
+	return err != nil
+}
+
+// resolveClockTime maps an HH:MM[:SS] value onto the run's logical day in
+// loc, applies offset, and rolls to the next day when the shifted deadline
+// already passed. A passed clock time is kept as-is for if_past fail/window
+// so those policies can decide instead of blocking until tomorrow.
+func resolveClockTime(ctx context.Context, raw string, loc *time.Location, offset time.Duration, ifPast string) (time.Time, error) {
+	return clockDeadline(logicalDay(ctx, loc), raw, loc, offset, ifPast, time.Now().In(loc))
+}
+
+func clockDeadline(base time.Time, raw string, loc *time.Location, offset time.Duration, ifPast string, now time.Time) (time.Time, error) {
+	hour, minute, second, err := parseClock(raw)
+	if err != nil {
+		return time.Time{}, err
+	}
+	deadline := time.Date(base.Year(), base.Month(), base.Day(), hour, minute, second, 0, loc).Add(offset)
+	if ifPast != ifPastFail && ifPast != ifPastWindow && !deadline.After(now) {
+		deadline = deadline.AddDate(0, 0, 1)
+	}
+	return deadline, nil
+}
+
+// logicalDay returns the run's logical day in loc: the schedule time when
+// present, otherwise when the run started, otherwise now.
+func logicalDay(ctx context.Context, loc *time.Location) time.Time {
+	rCtx := runtime.GetDAGContext(ctx)
+	for _, raw := range []string{rCtx.ScheduleTime, rCtx.RunStartedAt} {
+		if t, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(raw)); err == nil {
+			return t.In(loc)
+		}
+	}
+	return time.Now().In(loc)
+}
+
+func (e *executorImpl) logDeadline(deadline time.Time) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	zone, offset := deadline.Zone()
+	_, _ = fmt.Fprintf(e.stderr, "wait: deadline %s (zone %s offset %+d, if_past %s)\n",
+		deadline.Format(time.RFC3339Nano), zone, offset, e.cfg.ifPast)
+}
+
+// configuredLocation returns the run-configured zone (core.tz) when the
+// executor context carries it, falling back to the process local zone.
+func configuredLocation(ctx context.Context) *time.Location {
+	if loc := cmnconfig.GetConfig(ctx).Core.Location; loc != nil {
+		return loc
+	}
+	return time.Local
 }
 
 func (e *executorImpl) waitFile(ctx context.Context) error {
