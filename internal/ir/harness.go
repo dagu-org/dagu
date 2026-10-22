@@ -51,6 +51,11 @@ const (
 	HarnessTransportHTTP      HarnessTransport = "http"
 )
 
+// HarnessInheritedOptionsKey is the executor metadata key listing the DAG-level
+// harness options merged into a step whose provider is chosen by a variable.
+// Options the resolved provider cannot accept are dropped at run time.
+const HarnessInheritedOptionsKey = "harness_inherited_options"
+
 // HarnessDefinition describes how to invoke a CLI or connect to an ACP agent.
 type HarnessDefinition struct {
 	Protocol          HarnessProtocol       `json:"protocol,omitempty"`

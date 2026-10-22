@@ -165,7 +165,8 @@ harnesses:
 ```
 
 Remote definitions reject local startup fields and adapter CLI flags, and remote
-steps inherit only `acp_permission` from DAG-level `harness:` defaults. URL, cwd,
+steps inherit only `acp_permission` from DAG-level `harness:` defaults, also when
+a variable selects the provider. URL, cwd,
 CA path, and header values support workflow variables. Dagu warns when headers
 go over `ws://` or `http://` to a non-loopback host. Relative CA paths resolve
 from the local step working directory; remote cwd belongs to the agent host.

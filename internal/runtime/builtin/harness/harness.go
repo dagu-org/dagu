@@ -998,6 +998,7 @@ func newHarness(ctx context.Context, step ir.Step) (executor.Executor, error) {
 	if err != nil {
 		return nil, err
 	}
+	dropInheritedRemoteOptions(&configs[0], step.ExecutorConfig.Metadata)
 
 	prompt := extractPrompt(step)
 
@@ -1010,6 +1011,31 @@ func newHarness(ctx context.Context, step ir.Step) (executor.Executor, error) {
 		script:  step.Script,
 		workDir: env.WorkingDir,
 	}, nil
+}
+
+// dropInheritedRemoteOptions removes DAG-level options that a step inherited
+// before its provider resolved to a remote ACP agent, which accepts none.
+// Options set on the step itself remain, so the attempt still rejects them.
+func dropInheritedRemoteOptions(cfg *providerConfig, metadata map[string]any) {
+	if cfg.definition == nil || !cfg.definition.IsRemote() {
+		return
+	}
+	var keys []string
+	switch inherited := metadata[ir.HarnessInheritedOptionsKey].(type) {
+	case []string:
+		keys = inherited
+	case []any: // decoded from a persisted step
+		for _, key := range inherited {
+			if name, ok := key.(string); ok {
+				keys = append(keys, name)
+			}
+		}
+	}
+	for _, key := range keys {
+		if !reservedKeys[key] {
+			delete(cfg.flags, key)
+		}
+	}
 }
 
 func buildProviderConfigs(cfg map[string]any, defs ir.HarnessDefinitions) ([]providerConfig, error) {

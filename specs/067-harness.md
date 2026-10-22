@@ -321,7 +321,8 @@ steps:
 
 Supply tokens through workflow environment/secrets settings. Remote steps accept
 `provider`, `fallback`, and `acp_permission`, not adapter CLI flags. Of the
-DAG-level `harness:` options, remote steps inherit only `acp_permission`.
+DAG-level `harness:` options, remote steps inherit only `acp_permission`, also
+when a variable selects the provider; options set on the step are still rejected.
 `url` and `cwd` values that reference variables are validated after resolution.
 Headers sent over `ws://` or `http://` to a non-loopback host produce a warning
 in the step log.

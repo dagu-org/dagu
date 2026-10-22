@@ -181,10 +181,16 @@ func runHarnessACPRemote(t *testing.T, secure bool) {
 	if secure {
 		caConfig = fmt.Sprintf("    ca_file: %q\n", caFile)
 	}
+	// The remote provider is chosen by a variable, so the DAG-level model default
+	// is filtered only after it resolves.
 	dagu.WriteFile("remote.yaml", fmt.Sprintf(`env:
   ACP_ENDPOINT: %q
   ACP_TOKEN: test-token
   AGENT_CWD: /srv/remote-project
+  SELECTED_PROVIDER: remote
+harness:
+  provider: local
+  model: sonnet
 harnesses:
   remote:
     protocol: acp
@@ -201,7 +207,7 @@ steps:
   - id: ask
     action: harness.run
     with:
-      provider: remote
+      provider: ${SELECTED_PROVIDER}
       prompt: hello
       stdin: context
     output: ANSWER

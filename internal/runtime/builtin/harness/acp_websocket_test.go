@@ -324,6 +324,44 @@ func TestACPWebSocketStop(t *testing.T) {
 	}
 }
 
+// TestACPRemoteInheritedOptions covers a provider chosen by a variable that
+// resolves to a remote agent: DAG-level options it inherited are dropped, while
+// options set on the step itself are still rejected.
+func TestACPRemoteInheritedOptions(t *testing.T) {
+	server, _, _ := newACPWebSocketPeer(t, false)
+	def := &ir.HarnessDefinition{Protocol: "acp", Transport: "websocket", URL: strings.Replace(server.URL, "http", "ws", 1) + "/echo", Cwd: "/remote/workspace"}
+	for _, tc := range []struct {
+		name      string
+		inherited any
+		wantError string
+	}{
+		{name: "inherited", inherited: []string{"model"}},
+		{name: "persisted", inherited: []any{"model"}},
+		{name: "explicit", wantError: `does not accept CLI option "model"`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			step := ir.Step{ExecutorConfig: ir.ExecutorConfig{Config: map[string]any{"provider": "remote", "model": "sonnet"}}, Commands: []ir.CommandEntry{{Command: "hello"}}}
+			if tc.inherited != nil {
+				step.ExecutorConfig.Metadata = map[string]any{ir.HarnessInheritedOptionsKey: tc.inherited}
+			}
+			ctx := newHarnessTestContext(t, &ir.DAG{Harnesses: ir.HarnessDefinitions{"remote": def}}, step)
+			ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+			defer cancel()
+			exec, err := newHarness(ctx, step)
+			require.NoError(t, err)
+			var out bytes.Buffer
+			exec.SetStdout(&out)
+			err = exec.Run(ctx)
+			if tc.wantError != "" {
+				require.ErrorContains(t, err, tc.wantError)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, "remote:hello", out.String())
+		})
+	}
+}
+
 // TestACPCleartextWarning flags credentials sent unencrypted beyond the local host.
 func TestACPCleartextWarning(t *testing.T) {
 	for _, tc := range []struct {

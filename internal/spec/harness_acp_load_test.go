@@ -49,7 +49,8 @@ func TestACPLoad(t *testing.T) {
 
 // TestACPRemoteDefaults verifies that remote ACP steps take the DAG-level
 // permission policy but no CLI options. A provider chosen by a variable is
-// unknown at load time, so it keeps the policy for the runtime to apply.
+// unknown at load time, so its step keeps every default and records which ones
+// it inherited for the runtime to filter.
 func TestACPRemoteDefaults(t *testing.T) {
 	file := createTempYAMLFile(t, `harnesses:
   remote:
@@ -77,9 +78,11 @@ steps:
 	require.Equal(t, "remote", remote["provider"])
 	require.Equal(t, "allow", remote["acp_permission"])
 	require.NotContains(t, remote, "model")
-	templated := dag.Steps[1].ExecutorConfig.Config
-	require.Equal(t, "${PROVIDER}", templated["provider"])
-	require.Equal(t, "allow", templated["acp_permission"])
+	templated := dag.Steps[1].ExecutorConfig
+	require.Equal(t, "${PROVIDER}", templated.Config["provider"])
+	require.Equal(t, "allow", templated.Config["acp_permission"])
+	require.Equal(t, []string{"acp_permission", "model"}, templated.Metadata[ir.HarnessInheritedOptionsKey])
+	require.NotContains(t, dag.Steps[0].ExecutorConfig.Metadata, ir.HarnessInheritedOptionsKey)
 }
 
 // TestACPRemoteWorkspace verifies that remote-only harness steps, whose agent
