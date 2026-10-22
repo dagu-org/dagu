@@ -217,8 +217,7 @@ func TestWaitHTTPPolls(t *testing.T) {
 	t.Parallel()
 
 	var requests atomic.Int32
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
+	port := serveHTTP(t, func(w http.ResponseWriter, _ *http.Request) {
 		if requests.Add(1) <= 2 {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			return
@@ -226,26 +225,13 @@ func TestWaitHTTPPolls(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	server := &http.Server{Handler: mux}
-	go func() { _ = server.Serve(listener) }()
-	t.Cleanup(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		_ = server.Shutdown(ctx)
-	})
-
-	// with.url accepts a reference at build time and validates the resolved
-	// value at run time, so the fixture is generated with the test server's
-	// ephemeral port rather than kept as static testdata with a fixed port.
 	dagu := harness.NewRunner(t)
 	dagu.WriteFile("http_wait_ready.yaml", fmt.Sprintf(`steps:
   - action: wait.http
     with:
       url: http://127.0.0.1:%d/
       poll_interval: 100ms
-`, listener.Addr().(*net.TCPAddr).Port))
+`, port))
 
 	result := dagu.Run("start", "http_wait_ready.yaml")
 	result.ExpectExitCode(0)
@@ -281,19 +267,8 @@ steps:
 func TestWaitHTTPReferenceStatus(t *testing.T) {
 	t.Parallel()
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
+	port := serveHTTP(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
-	})
-
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	server := &http.Server{Handler: mux}
-	go func() { _ = server.Serve(listener) }()
-	t.Cleanup(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		_ = server.Shutdown(ctx)
 	})
 
 	dagu := harness.NewRunner(t)
@@ -302,11 +277,12 @@ func TestWaitHTTPReferenceStatus(t *testing.T) {
     default: "204"
 steps:
   - action: wait.http
+    timeout_sec: 10
     with:
       url: http://127.0.0.1:%d/
       status: ${params.CODE}
       poll_interval: 100ms
-`, listener.Addr().(*net.TCPAddr).Port))
+`, port))
 
 	result := dagu.Run("start", "http_reference_status.yaml")
 	result.ExpectExitCode(0)
@@ -337,4 +313,21 @@ func TestWaitHTTPBadStatus(t *testing.T) {
 	result := dagu.Run("start", "http_bad_status.yaml")
 	result.ExpectNonZeroExitCode()
 	result.ExpectStderrContains("status")
+}
+
+// serveHTTP serves handler on an ephemeral loopback port for the life of the
+// test and returns the port.
+func serveHTTP(t *testing.T, handler http.HandlerFunc) int {
+	t.Helper()
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	server := &http.Server{Handler: handler}
+	go func() { _ = server.Serve(listener) }()
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = server.Shutdown(ctx)
+	})
+	return listener.Addr().(*net.TCPAddr).Port
 }
