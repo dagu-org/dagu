@@ -1820,6 +1820,49 @@ func TestLoad_OIDCWorkspaceAccessDefaultsToAll(t *testing.T) {
 	require.False(t, cfg.Server.Auth.OIDC.RoleMapping.WorkspaceAccessPolicyActive())
 }
 
+func TestLoad_WorkspaceAccessKeys(t *testing.T) {
+	t.Run("None", func(t *testing.T) {
+		cfg := loadFromYAML(t, "# minimal config")
+
+		require.Empty(t, cfg.WorkspaceAccessKeys)
+	})
+
+	t.Run("FromYAML", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+auth:
+  mode: builtin
+  oidc:
+    role_mapping:
+      default_workspace_access: all
+  proxy:
+    role_mapping:
+      workspace_mappings:
+        sre-team:
+          - workspace: payments
+            role: viewer
+      default_workspace_access: none
+`)
+
+		require.Equal(t, []string{
+			"auth.oidc.role_mapping.default_workspace_access",
+			"auth.proxy.role_mapping.workspace_mappings",
+			"auth.proxy.role_mapping.default_workspace_access",
+		}, cfg.WorkspaceAccessKeys)
+	})
+
+	t.Run("FromEnvironment", func(t *testing.T) {
+		cfg := loadWithEnv(t, "# minimal config", map[string]string{
+			"DAGU_AUTH_OIDC_WORKSPACE_MAPPINGS":       `{"sre-team":[{"workspace":"payments","role":"viewer"}]}`,
+			"DAGU_AUTH_OIDC_DEFAULT_WORKSPACE_ACCESS": "none",
+		})
+
+		require.Equal(t, []string{
+			"auth.oidc.role_mapping.workspace_mappings",
+			"auth.oidc.role_mapping.default_workspace_access",
+		}, cfg.WorkspaceAccessKeys)
+	})
+}
+
 func TestLoad_OIDCWorkspaceMappingCamelCaseKeyHints(t *testing.T) {
 	tests := []struct {
 		legacy string

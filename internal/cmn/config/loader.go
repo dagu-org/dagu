@@ -320,8 +320,27 @@ func (l *ConfigLoader) Load() (*Config, error) {
 	l.finalizeBaseEnv(cfg)
 	cfg.Notices = l.notices
 	cfg.Warnings = l.warnings
+	cfg.WorkspaceAccessKeys = l.workspaceAccessKeys()
 
 	return cfg, nil
+}
+
+// workspaceAccessKeys returns the workspace access keys set by a config
+// file or the environment.
+func (l *ConfigLoader) workspaceAccessKeys() []string {
+	const proxyWorkspaceMappings = "auth.proxy.role_mapping.workspace_mappings"
+	var keys []string
+	for _, key := range []string{
+		"auth.oidc.role_mapping.workspace_mappings",
+		"auth.oidc.role_mapping.default_workspace_access",
+		proxyWorkspaceMappings,
+		"auth.proxy.role_mapping.default_workspace_access",
+	} {
+		if l.v.IsSet(key) || key == proxyWorkspaceMappings && l.trustedProxyWorkspaceMappingsSet {
+			keys = append(keys, key)
+		}
+	}
+	return keys
 }
 
 // buildConfig transforms the Definition into a validated Config structure,

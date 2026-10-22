@@ -34,6 +34,7 @@ import { useUserPreferences } from './contexts/UserPreference';
 import { ThemeSelector } from './components/ThemeSelector';
 import { WorkspaceSelector } from './components/workspace/WorkspaceSelector';
 import { LanguageSelector } from './components/LanguageSelector';
+import { WorkspaceDeprecationNotice } from './components/WorkspaceDeprecationNotice';
 import { useI18n } from './i18n/I18nProvider';
 import { useNavigationSections } from './hooks/useNavigationSections';
 import { useScrollFade } from './hooks/useScrollFade';
@@ -721,6 +722,7 @@ export const mainListItems = React.forwardRef<
           </div>
           <ThemeSelector compact />
           <LanguageSelector variant="sidebar" compact />
+          <WorkspaceDeprecationNotice />
         </div>
         <div
           className={cn(

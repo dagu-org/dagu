@@ -31,6 +31,9 @@ const useHasFeatureMock = vi.fn();
 const useViewsMock = vi.fn();
 
 vi.mock('@/components/LicenseBadge', () => ({ LicenseBadge: () => null }));
+vi.mock('@/components/WorkspaceDeprecationNotice', () => ({
+  WorkspaceDeprecationNotice: () => null,
+}));
 
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => useAuthMock(),
