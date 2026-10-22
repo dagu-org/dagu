@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/dagucloud/dagu/v2/internal/cmn/cmdutil"
+	"github.com/dagucloud/dagu/v2/internal/cmn/config"
 	"github.com/dagucloud/dagu/v2/internal/ir"
 	"github.com/dagucloud/dagu/v2/internal/runtime"
 	"github.com/dagucloud/dagu/v2/internal/runtime/executor"
@@ -569,6 +570,10 @@ func setupTestContext(t *testing.T, dag *ir.DAG, step ir.Step) context.Context {
 			Env:  []string{},
 		}
 	}
+	// Steps only see variables passed through BaseEnv, so pass the host PATH.
+	ctx = config.WithConfig(ctx, &config.Config{
+		Core: config.Core{BaseEnv: config.NewBaseEnv([]string{"PATH=" + os.Getenv("PATH")})},
+	})
 	ctx = runtime.NewContext(ctx, dag, "test-run", "")
 	env := runtime.NewEnv(ctx, step)
 	env.WorkingDir = t.TempDir()
@@ -684,9 +689,8 @@ func TestCommandExecutor_Stdin(t *testing.T) {
 			Commands: []ir.CommandEntry{{Command: "cat", CmdWithArgs: "cat"}},
 			Stdin:    "data.txt",
 		}
-		ctx := context.Background()
-		ctx = runtime.NewContext(ctx, &ir.DAG{Name: "test-dag"}, "test-run", "")
-		env := runtime.NewEnv(ctx, step)
+		ctx := setupTestContext(t, nil, step)
+		env := runtime.GetEnv(ctx)
 		env.WorkingDir = workDir
 		ctx = runtime.WithEnv(ctx, env)
 

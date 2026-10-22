@@ -184,6 +184,28 @@ func TestDispatchHoldDeadlineFailsAttempt(t *testing.T) {
 	f.pollNone(t, "worker-cpu", map[string]string{"type": "cpu"})
 }
 
+// The lease grace a starting coordinator gives running workers does not
+// postpone a held dispatch's own deadline.
+func TestDispatchHoldDeadlineEnforcedDuringLeaseGrace(t *testing.T) {
+	f := newHoldFixture(t, 50*time.Millisecond)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer func() {
+		cancel()
+		f.h.WaitZombieDetector()
+	}()
+
+	_, err := f.h.Dispatch(ctx, &coordinatorv1.DispatchRequest{Task: cpuTask("run-grace")})
+	require.NoError(t, err)
+	attempt := f.runs.attempts["run-grace"]
+	require.NotNil(t, attempt)
+
+	f.h.StartZombieDetector(ctx, 20*time.Millisecond)
+	require.Eventually(t, func() bool {
+		runStatus, err := attempt.ReadStatus(ctx)
+		return err == nil && runStatus.Status == ir.Failed
+	}, coordinatorTestTimeout(5*time.Second), 20*time.Millisecond)
+}
+
 // A held task that a worker claims before the deadline is not touched by the
 // reaper afterwards.
 func TestDispatchHoldClaimedInTimeIsLeftAlone(t *testing.T) {

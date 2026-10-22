@@ -54,7 +54,7 @@ func newExecutor(ctx context.Context, step ir.Step) (executor.Executor, error) {
 	}
 
 	op := stepOperation(step)
-	parsed, err := parseConfig(op, cfg)
+	parsed, err := parseConfig(op, cfg, false)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +80,7 @@ func validateStep(step ir.Step) error {
 	if err := decodeConfig(step.ExecutorConfig.Config, &cfg); err != nil {
 		return err
 	}
-	_, err := parseConfig(stepOperation(step), cfg)
+	_, err := parseConfig(stepOperation(step), cfg, true)
 	return err
 }
 
@@ -202,7 +202,7 @@ func (e *executorImpl) waitHTTP(ctx context.Context) error {
 		}
 		defer func() { _ = resp.Body.Close() }()
 		_, _ = io.Copy(io.Discard, resp.Body)
-		return resp.StatusCode == e.cfg.Status, nil
+		return resp.StatusCode == e.cfg.expectedStatus, nil
 	})
 }
 

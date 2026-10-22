@@ -315,8 +315,13 @@ func newCloudReportMonitoring(ctx *Context) *cloudreport.Monitoring {
 	if ctx.LicenseManager == nil {
 		return nil
 	}
-	settingsFile := filepath.Join(ctx.Config.Paths.DataDir, "cloud", "report-settings.json")
-	return cloudreport.NewMonitoring(ctx.Config.Cloud.Report, filemonitor.NewStateStore(settingsFile))
+	return cloudreport.NewMonitoring(ctx.Config.Cloud.Report, filemonitor.NewStateStore(cloudReportSettingsFile(ctx.Config)))
+}
+
+// cloudReportSettingsFile is where an administrator's choice of what the
+// server reports to Dagu Console is kept.
+func cloudReportSettingsFile(cfg *config.Config) string {
+	return filepath.Join(cfg.Paths.DataDir, "cloud", "report-settings.json")
 }
 
 // startCloudReport reports to Dagu Console at the level monitoring sets while
@@ -333,7 +338,7 @@ func startCloudReport(ctx *Context, monitoring *cloudreport.Monitoring, access *
 		remote = access
 	}
 	scheduler := cloudreport.Scheduler{State: ctx.Persistence.SchedulerStateStore, Pause: ctx.Persistence.SchedulerPauseStore}
-	return cloudreport.Start(ctx, ctx.LicenseManager.CloudCredentials, ctx.Persistence.ServiceRegistry, cloudReportEvents(ctx), scheduler, monitoring, remote)
+	return cloudreport.Start(ctx, ctx.LicenseManager.CloudCredentials, ctx.Persistence.ServiceRegistry, cloudReportEvents(ctx), scheduler, monitoring, remote, ctx.LicenseManager.Refresh)
 }
 
 // newCloudAccess returns what takes calls from Dagu Cloud while remote access
@@ -418,11 +423,23 @@ type startupBanner struct {
 }
 
 // printStartupBanner returns a frontend.WithOnReady hook that prints the
-// startup banner to stdout. It returns nil in quiet mode, when stdout is not a
-// terminal, or when the server has no web UI.
+// startup banner to stdout. When stdout is not a terminal, as in a container,
+// the hook logs the free monitoring offer instead. It returns nil in quiet
+// mode or when the server has no web UI.
 func printStartupBanner(ctx *Context, setupRequired bool) func(url string) {
-	if ctx.Quiet || ctx.Config.Server.Headless || !isTerminal(os.Stdout) {
+	if ctx.Quiet || ctx.Config.Server.Headless {
 		return nil
+	}
+	if !isTerminal(os.Stdout) {
+		return func(url string) {
+			if ctx.LicenseManager == nil {
+				return
+			}
+			status := ctx.LicenseManager.Status()
+			if link, ok := monitoringOffer(url, &status); ok {
+				logger.Info(ctx, "Free monitoring: Dagu Console emails you when a workflow fails or this server stops", tag.URL(link))
+			}
+		}
 	}
 	return func(url string) {
 		banner := startupBanner{
@@ -439,6 +456,17 @@ func printStartupBanner(ctx *Context, setupRequired bool) func(url string) {
 	}
 }
 
+// monitoringOffer returns the page that connects the server at url to Dagu
+// Console for free monitoring, and whether to offer it: only on a Community
+// server whose license is not managed by the environment. A nil status
+// offers nothing.
+func monitoringOffer(url string, status *license.Status) (string, bool) {
+	if status == nil || !status.Community || status.Source.IsEnv() {
+		return "", false
+	}
+	return url + "/license#monitoring", true
+}
+
 // write prints the banner in plain ASCII. It offers free monitoring only on
 // Community servers whose license is not managed by the environment.
 func (b startupBanner) write(w io.Writer) {
@@ -449,8 +477,8 @@ func (b startupBanner) write(w io.Writer) {
 		fmt.Fprintf(&out, "  Setup:   create the admin account at %s/setup\n", b.url)
 	}
 	fmt.Fprintf(&out, "  DAGs:    %s\n", b.dagsDir)
-	if b.license != nil && b.license.Community && !b.license.Source.IsEnv() {
-		fmt.Fprintf(&out, "  Alerts:  get an email if a workflow fails or this server stops, free: %s/license#monitoring\n", b.url)
+	if link, ok := monitoringOffer(b.url, b.license); ok {
+		fmt.Fprintf(&out, "  Alerts:  get an email if a workflow fails or this server stops, free: %s\n", link)
 	}
 	out.WriteString("\n")
 	_, _ = io.WriteString(w, out.String())

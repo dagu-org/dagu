@@ -28,6 +28,7 @@ import (
 	"github.com/dagucloud/dagu/v2/internal/cmn/logger/tag"
 	cmnvalue "github.com/dagucloud/dagu/v2/internal/cmn/value"
 	"github.com/dagucloud/dagu/v2/internal/ir"
+	"github.com/dagucloud/dagu/v2/internal/telemetry"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -570,6 +571,7 @@ func (r *Runner) runNodeExecution(ctx context.Context, plan *Plan, node *Node, p
 	}
 
 	ctx = spanCtx
+	ctx = withStepTraceContext(ctx)
 	ctx = r.setupNodeExecutionEnv(ctx, node)
 	preparedNodeTornDown := false
 	teardownPreparedNode := func() {
@@ -772,6 +774,64 @@ func (r *Runner) setupNodeExecutionEnv(ctx context.Context, node *Node) context.
 	}
 
 	return WithEnv(ctx, env)
+}
+
+// withStepTraceContext gives the step process the W3C trace context of the
+// step span as TRACEPARENT and TRACESTATE. It adds nothing when the context has
+// no valid span, which is the case when tracing is off for the DAG.
+//
+// The names act like initial current-step values (spec 006): a step-local
+// source that sets either name keeps its value, and Dagu adds neither name.
+// The two names form one trace context, so a root-scope value of the other
+// name is replaced with an empty value.
+func withStepTraceContext(ctx context.Context) context.Context {
+	if !trace.SpanContextFromContext(ctx).IsValid() {
+		return ctx
+	}
+	env := GetEnv(ctx)
+	parentLocal := hasStepLocalEntry(env.Scope, runenv.EnvKeyTraceParent)
+	stateLocal := hasStepLocalEntry(env.Scope, runenv.EnvKeyTraceState)
+	if parentLocal && stateLocal {
+		return ctx
+	}
+	if parentLocal || stateLocal {
+		other := runenv.EnvKeyTraceState
+		if stateLocal {
+			other = runenv.EnvKeyTraceParent
+		}
+		if _, inherited := env.Scope.Get(other); !inherited {
+			return ctx
+		}
+		env.Scope = env.Scope.WithEntry(other, "", cmnvalue.EnvSourceStepEnv)
+		return WithEnv(ctx, env)
+	}
+	values := make(map[string]string, 2)
+	for _, entry := range telemetry.InjectTraceContext(ctx) {
+		if key, value, ok := strings.Cut(entry, "="); ok {
+			values[key] = value
+		}
+	}
+	traceParent := values[runenv.EnvKeyTraceParent]
+	if traceParent == "" {
+		return ctx
+	}
+	scope := env.Scope.WithEntry(runenv.EnvKeyTraceParent, traceParent, cmnvalue.EnvSourceStepEnv)
+	// A TRACESTATE from the run scope belongs to another span, so replace it
+	// even when the step span has no trace state.
+	traceState := values[runenv.EnvKeyTraceState]
+	if _, inherited := scope.Get(runenv.EnvKeyTraceState); traceState != "" || inherited {
+		scope = scope.WithEntry(runenv.EnvKeyTraceState, traceState, cmnvalue.EnvSourceStepEnv)
+	}
+	env.Scope = scope
+	return WithEnv(ctx, env)
+}
+
+// hasStepLocalEntry reports whether key comes from the step's own env, its
+// container env, or a predecessor output. Run-level sources never use these
+// source kinds.
+func hasStepLocalEntry(scope *cmnvalue.EnvScope, key string) bool {
+	entry, ok := scope.GetEntry(key)
+	return ok && (entry.Source == cmnvalue.EnvSourceStepEnv || entry.Source == cmnvalue.EnvSourceOutput)
 }
 
 func (r *Runner) setLastError(err error) {

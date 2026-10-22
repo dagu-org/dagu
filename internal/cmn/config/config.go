@@ -46,6 +46,9 @@ type Config struct {
 	Cloud           CloudConfig
 	Notices         []string
 	Warnings        []string
+	// WorkspaceAccessKeys lists the workspace access keys the configuration
+	// sets. Workspaces are removed in v3.0, which makes these keys unknown.
+	WorkspaceAccessKeys []string
 }
 
 // OpenCodeConfig configures the process-local managed OpenCode service.

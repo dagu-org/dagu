@@ -5,6 +5,7 @@ package wait
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -96,6 +97,100 @@ func TestExecutorRunWaitsForHTTPStatus(t *testing.T) {
 	require.GreaterOrEqual(t, calls.Load(), int32(3))
 }
 
+func TestValidateStepDefersReferenceFields(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name   string
+		op     string
+		config map[string]any
+	}{
+		{name: "duration", op: opDuration, config: map[string]any{"duration": "${params.delay}"}},
+		{name: "until", op: opUntil, config: map[string]any{"until": "${steps.plan.outputs.deadline}"}},
+		{name: "state", op: opFile, config: map[string]any{"path": "ready.flag", "state": "${params.state}"}},
+		{
+			name:   "http",
+			op:     opHTTP,
+			config: map[string]any{"url": "${steps.plan.outputs.url}", "status": "${steps.plan.outputs.code}"},
+		},
+		{name: "pollInterval", op: opDuration, config: map[string]any{"duration": "5ms", "poll_interval": "${params.interval}"}},
+		{name: "braceEnvDuration", op: opDuration, config: map[string]any{"duration": "${DELAY}"}},
+		{name: "bareEnvURL", op: opHTTP, config: map[string]any{"url": "$SERVICE_URL", "status": "${STATUS_CODE}"}},
+		{name: "embeddedBraceEnvURL", op: opHTTP, config: map[string]any{"url": "${BASE_URL}/health"}},
+		{name: "embeddedBareEnvURL", op: opHTTP, config: map[string]any{"url": "$BASE_URL/health"}},
+		{name: "embeddedEnvDuration", op: opDuration, config: map[string]any{"duration": "${SECS}s"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			require.NoError(t, validateStep(ir.Step{
+				Commands:       []ir.CommandEntry{{Command: tt.op}},
+				ExecutorConfig: ir.ExecutorConfig{Type: "wait", Config: tt.config},
+			}))
+		})
+	}
+}
+
+func TestValidateStepStillRejectsLiteralValues(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name   string
+		op     string
+		config map[string]any
+		want   string
+	}{
+		{name: "duration", op: opDuration, config: map[string]any{"duration": "bogus"}, want: "duration must be a duration"},
+		{name: "until", op: opUntil, config: map[string]any{"until": "tomorrow"}, want: "until must be RFC3339 timestamp"},
+		{name: "state", op: opFile, config: map[string]any{"path": "ready.flag", "state": "soon"}, want: `state must be "exists" or "missing"`},
+		{name: "url", op: opHTTP, config: map[string]any{"url": "ftp://example.com/ready"}, want: "url must be an absolute HTTP URL"},
+		{name: "status", op: opHTTP, config: map[string]any{"url": "http://example.com/", "status": 99}, want: "status must be between 100 and 599"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := validateStep(ir.Step{
+				Commands:       []ir.CommandEntry{{Command: tt.op}},
+				ExecutorConfig: ir.ExecutorConfig{Type: "wait", Config: tt.config},
+			})
+			require.ErrorContains(t, err, tt.want)
+		})
+	}
+}
+
+func TestParseStatus(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name          string
+		raw           any
+		want          int
+		wantErrSubstr string
+	}{
+		{name: "unset", raw: nil, want: http.StatusOK},
+		{name: "integer", raw: http.StatusNoContent, want: http.StatusNoContent},
+		{name: "yamlInteger", raw: uint64(http.StatusNoContent), want: http.StatusNoContent},
+		{name: "int32", raw: int32(http.StatusNoContent), want: http.StatusNoContent},
+		{name: "jsonNumber", raw: json.Number("204"), want: http.StatusNoContent},
+		{name: "wholeFloat", raw: float64(http.StatusNoContent), want: http.StatusNoContent},
+		{name: "negativeInteger", raw: int64(-1), wantErrSubstr: "status must be between 100 and 599"},
+		{name: "overflowingUint", raw: uint64(1<<32 + http.StatusOK), wantErrSubstr: "status must be between 100 and 599"},
+		{name: "fractional", raw: 204.5, wantErrSubstr: "status must be between 100 and 599"},
+		{name: "numericString", raw: "204", want: http.StatusNoContent},
+		{name: "badString", raw: "soon", wantErrSubstr: "status must be between 100 and 599"},
+		{name: "outOfRange", raw: 99, wantErrSubstr: "status must be between 100 and 599"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := parseStatus(tt.raw)
+			if tt.wantErrSubstr != "" {
+				require.ErrorContains(t, err, tt.wantErrSubstr)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestNewExecutorRejectsNonHTTPURL(t *testing.T) {
 	t.Parallel()
 
@@ -109,6 +204,24 @@ func TestNewExecutorRejectsNonHTTPURL(t *testing.T) {
 		},
 	})
 	require.ErrorContains(t, err, "url must be an absolute HTTP URL")
+}
+
+// A reference that survives run-time resolution means it did not resolve, so
+// the error says so instead of only reporting the field as malformed.
+func TestNewExecutorRejectsUnresolvedReference(t *testing.T) {
+	t.Parallel()
+
+	_, err := newExecutor(context.Background(), ir.Step{
+		Commands: []ir.CommandEntry{{Command: opHTTP}},
+		ExecutorConfig: ir.ExecutorConfig{
+			Type: "wait",
+			Config: map[string]any{
+				"url": "${BASE_URL}/health",
+			},
+		},
+	})
+	require.ErrorContains(t, err, "url must be an absolute HTTP URL")
+	require.ErrorContains(t, err, "unresolved reference")
 }
 
 func TestExecutorRunStopsWhenContextIsCanceled(t *testing.T) {

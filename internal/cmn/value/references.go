@@ -92,6 +92,17 @@ func HasValueReference(raw string) bool {
 	return false
 }
 
+// HasAnyReference reports whether raw contains an unescaped ${...}, $NAME, or
+// $N reference anywhere in the text, in any form value resolution may expand.
+func HasAnyReference(raw string) bool {
+	for _, loc := range reVarSubstitution.FindAllStringIndex(raw, -1) {
+		if !isEscapedDollar(raw, loc[0]) {
+			return true
+		}
+	}
+	return false
+}
+
 // HasReferenceToNamespace reports whether raw references one of the named scopes.
 func HasReferenceToNamespace(raw string, namespaces ...string) bool {
 	for _, ref := range scanReferences(raw) {

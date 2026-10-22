@@ -155,6 +155,32 @@ func TestReportNextInterval(t *testing.T) {
 	}
 }
 
+// A report that Dagu Console answers with license_refresh, as when the
+// workspace started a trial, checks in for the license at once; within
+// refreshEvery, further answers ask for nothing more.
+func TestReportRefreshesTheLicenseWhenAsked(t *testing.T) {
+	t.Parallel()
+
+	refresh := `{"next_report_seconds": 60, "license_refresh": true}`
+	console := newFakeConsole(t,
+		consoleResponse{status: http.StatusOK, body: refresh},
+		consoleResponse{status: http.StatusOK, body: refresh},
+		consoleResponse{status: http.StatusOK, body: `{"next_report_seconds": 60}`})
+	r := newReporter(console.credentials, nil, fixedLevel(config.ReportRuns))
+	var refreshed atomic.Int32
+	r.refresh = func(context.Context) error {
+		refreshed.Add(1)
+		return errors.New("console unreachable")
+	}
+	clock := startReporter(t.Context(), t, r, noJitter)
+
+	clock.wait()
+	clock.next()
+	assert.Equal(t, int32(1), refreshed.Load())
+	clock.next()
+	assert.Equal(t, int32(1), refreshed.Load(), "a failed refresh is not retried within refreshEvery")
+}
+
 func TestReportJitter(t *testing.T) {
 	t.Parallel()
 
