@@ -32,18 +32,30 @@ type ToolRegistry struct {
 	Path      string `json:"path,omitempty"`
 }
 
-// ValidateLocalPath accepts worker-absolute paths independently of the parser host OS.
-func (r *ToolRegistry) ValidateLocalPath() error {
-	p := strings.TrimSpace(r.Path)
+// ValidateWorkerAbsPath accepts POSIX, Windows drive, and UNC absolute paths.
+// The DAG parser's host OS may differ from the worker's, so filepath.IsAbs cannot be used.
+func ValidateWorkerAbsPath(path string) error {
+	p := strings.TrimSpace(path)
 	if p == "" {
-		return fmt.Errorf("registry.path is required")
+		return fmt.Errorf("path is required")
 	}
-	drive := len(p) >= 3 && ((p[0] >= 'A' && p[0] <= 'Z') || (p[0] >= 'a' && p[0] <= 'z')) && p[1] == ':' && (p[2] == '/' || p[2] == '\\')
-	server, share, unc := strings.Cut(strings.TrimPrefix(p, `\\`), `\`)
-	if strings.HasPrefix(p, "/") || drive || (strings.HasPrefix(p, `\\`) && unc && server != "" && share != "" && share[0] != '\\') {
+	if strings.HasPrefix(p, "/") {
 		return nil
 	}
-	return fmt.Errorf("registry.path must be an absolute path, got %q", p)
+	if len(p) >= 3 && p[1] == ':' && (p[2] == '/' || p[2] == '\\') {
+		if drive := p[0]; (drive >= 'A' && drive <= 'Z') || (drive >= 'a' && drive <= 'z') {
+			return nil
+		}
+	}
+	if strings.HasPrefix(p, `\\`) {
+		server, rest, found := strings.Cut(p[2:], `\`)
+		share, _, _ := strings.Cut(rest, `\`)
+		// Both components must be nonempty, including the share in \\server\\share.
+		if found && server != "" && share != "" {
+			return nil
+		}
+	}
+	return fmt.Errorf("path must be an absolute path, got %q", p)
 }
 
 // ToolPackage declares one aqua package and optional command names Dagu should expose.

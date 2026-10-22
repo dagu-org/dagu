@@ -235,6 +235,7 @@ func TestRenderConfigDefaultsPackageRegistry(t *testing.T) {
 }
 
 func TestRenderLocalRegistryPaths(t *testing.T) {
+	t.Parallel()
 	for path, valid := range map[string]bool{
 		"/etc/registry.yaml": true, `C:\dagu\registry.yaml`: true,
 		`\\server\share\registry.yaml`: true,

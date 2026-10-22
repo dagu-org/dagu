@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/dagucloud/dagu/v2/internal/ir"
@@ -127,7 +128,7 @@ func TestInstallerLatestRegistryIntegration(t *testing.T) {
 	require.FileExists(t, manifest.Commands["pi"].Path)
 }
 
-// A registry edit at the same path must install and run the newly declared artifact.
+// A registry edit must install new bytes even when the package version and URL stay the same.
 func TestInstallerLocalRegistryIntegration(t *testing.T) {
 	if os.Getenv("DAGU_AQUA_INTEGRATION") != "1" {
 		t.Skip("set DAGU_AQUA_INTEGRATION=1 to run aqua integration tests")
@@ -141,19 +142,19 @@ func TestInstallerLocalRegistryIntegration(t *testing.T) {
 	}
 	artifacts := make(map[string][]byte)
 	for _, reply := range []string{"one", "two"} {
-		binary := filepath.Join(dir, reply+command)
+		binary := filepath.Join(dir, command)
 		output, err := exec.CommandContext(t.Context(), "go", "build", "-o", binary, "-ldflags=-X main.reply="+reply, source).CombinedOutput()
 		require.NoError(t, err, "%s", output)
-		artifacts["/"+reply+"/"+command], err = os.ReadFile(binary)
+		artifacts[reply], err = os.ReadFile(binary)
 		require.NoError(t, err)
 	}
+	var artifact atomic.Value
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		data, ok := artifacts[r.URL.Path]
-		if !ok {
+		if r.URL.Path != "/"+command {
 			http.NotFound(w, r)
 			return
 		}
-		_, _ = w.Write(data)
+		_, _ = w.Write(artifact.Load().([]byte))
 	}))
 	defer server.Close()
 	path := filepath.Join(dir, "registry.yaml")
@@ -162,7 +163,8 @@ func TestInstallerLocalRegistryIntegration(t *testing.T) {
 	opts := tools.InstallOptions{ToolsDir: filepath.Join(dir, "tools"), WorkDir: dir}
 	var previous *tools.Manifest
 	for _, reply := range []string{"one", "two"} {
-		registry := fmt.Sprintf("packages:\n  - name: example/tool\n    type: http\n    url: http://registry.test/%s/%s\n    format: raw\n    files:\n      - name: %s\n", reply, command, command)
+		artifact.Store(artifacts[reply])
+		registry := fmt.Sprintf("# revision: %s\npackages:\n  - name: example/tool\n    type: http\n    url: http://registry.test/%s\n    format: raw\n    files:\n      - name: %s\n", reply, command, command)
 		require.NoError(t, os.WriteFile(path, []byte(registry), 0o600))
 		client := &http.Client{Transport: localRegistryTransport{host: server.Listener.Addr().String()}}
 		manifest, err := New(WithHTTPClient(client), WithLogger(slog.New(slog.NewTextHandler(os.Stderr, nil)))).Install(t.Context(), cfg, opts)

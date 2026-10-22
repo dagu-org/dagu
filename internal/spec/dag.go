@@ -3229,8 +3229,8 @@ func buildToolRegistry(registry *toolRegistry) (*ir.ToolRegistry, error) {
 		}, nil
 	case "local":
 		path := strings.TrimSpace(registry.Path)
-		if err := (&ir.ToolRegistry{Path: path}).ValidateLocalPath(); err != nil {
-			return nil, err
+		if err := ir.ValidateWorkerAbsPath(path); err != nil {
+			return nil, fmt.Errorf("registry.%w", err)
 		}
 		return &ir.ToolRegistry{
 			Name: name,
