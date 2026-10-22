@@ -315,8 +315,13 @@ func newCloudReportMonitoring(ctx *Context) *cloudreport.Monitoring {
 	if ctx.LicenseManager == nil {
 		return nil
 	}
-	settingsFile := filepath.Join(ctx.Config.Paths.DataDir, "cloud", "report-settings.json")
-	return cloudreport.NewMonitoring(ctx.Config.Cloud.Report, filemonitor.NewStateStore(settingsFile))
+	return cloudreport.NewMonitoring(ctx.Config.Cloud.Report, filemonitor.NewStateStore(cloudReportSettingsFile(ctx.Config)))
+}
+
+// cloudReportSettingsFile is where an administrator's choice of what the
+// server reports to Dagu Console is kept.
+func cloudReportSettingsFile(cfg *config.Config) string {
+	return filepath.Join(cfg.Paths.DataDir, "cloud", "report-settings.json")
 }
 
 // startCloudReport reports to Dagu Console at the level monitoring sets while
