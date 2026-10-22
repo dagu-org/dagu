@@ -243,10 +243,9 @@ func updateOnce(ctx context.Context, path string, opts UpdateOptions) (*WriteRes
 		return nil, err
 	}
 
-	// Add missing columns at the right of the header row, unless there are
-	// no rows to write into them.
+	// Add missing columns at the right of the header row.
 	for i := range plan.set {
-		if !plan.set[i].added || len(opts.Rows) == 0 {
+		if !plan.set[i].added {
 			continue
 		}
 		plan.reg.C2++

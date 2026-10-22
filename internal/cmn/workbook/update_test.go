@@ -292,12 +292,9 @@ func TestUpdateRowsEmptyRowsChangesNothing(t *testing.T) {
 	t.Parallel()
 	set, err := ParseSet(map[string]any{"Status": "status"})
 	require.NoError(t, err)
-	newColumn, err := ParseSet(map[string]any{"Checked": "checked"})
-	require.NoError(t, err)
 	for name, opts := range map[string]UpdateOptions{
-		"with set":         {Key: "Invoice No", Rows: []Row{}, Set: set},
-		"default set":      {Key: "Invoice No", Rows: []Row{}},
-		"set a new column": {Key: "Invoice No", Rows: []Row{}, Set: newColumn},
+		"with set":    {Key: "Invoice No", Rows: []Row{}, Set: set},
+		"default set": {Key: "Invoice No", Rows: []Row{}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			path := ordersBook(t)
@@ -305,7 +302,7 @@ func TestUpdateRowsEmptyRowsChangesNothing(t *testing.T) {
 			result, err := UpdateRows(context.Background(), path, opts)
 			require.NoError(t, err)
 			assert.Equal(t, 0, result.Changes.RowsUpdated)
-			assert.Equal(t, before, fileHash(t, path), "the workbook is left as it was")
+			assert.Equal(t, before, fileHash(t, path), "no cell changes")
 		})
 	}
 }

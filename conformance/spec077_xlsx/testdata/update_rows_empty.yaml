@@ -1,0 +1,34 @@
+working_dir: .
+steps:
+  - id: write
+    action: xlsx.write
+    with:
+      path: orders.xlsx
+      columns: [Invoice No, Status]
+      rows: [{"Invoice No": "INV-1", "Status": "Open"}]
+  - id: by_row
+    depends: write
+    action: xlsx.update_rows
+    with:
+      path: orders.xlsx
+      key: _row
+      rows: '[]'
+      set: {Status: status}
+  - id: default_set
+    depends: by_row
+    action: xlsx.update_rows
+    with:
+      path: orders.xlsx
+      key: Invoice No
+      rows: '[]'
+  - id: read
+    depends: default_set
+    action: xlsx.read
+    with:
+      path: orders.xlsx
+  - id: out
+    depends: read
+    action: file.write
+    with:
+      path: out.json
+      content: '{"by_row": ${steps.by_row.outputs.changes}, "default_set": ${steps.default_set.outputs.changes}, "headers": ${steps.read.outputs.headers}, "rows": ${steps.read.outputs.rows}}'
