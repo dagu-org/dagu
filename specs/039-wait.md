@@ -48,19 +48,23 @@ then succeeds.
 ### wait.until
 
 `with.until` (required) is either an RFC3339 timestamp or a `HH:MM[:SS]`
-clock time. A clock time resolves on the run's logical day (the schedule
-time when present, otherwise when the run started) in `with.timezone` when
-set, otherwise in the run-configured zone; `with.timezone` applies only to
-clock times and is ignored for RFC3339 timestamps. `with.offset` (a
+clock time. The step blocks until the resolved deadline, then succeeds.
+
+A clock time resolves on the run's logical day, in `with.timezone` when
+set, otherwise in the run-configured zone. The logical day is the date of
+`context.run.scheduled_at` when the run has one, and retries of that run
+keep it; otherwise it is the date of `context.attempt.started_at`, so a
+retry of a manual run that starts on a later day resolves on that day. A
+clock time never rolls over to the next day. `with.timezone` applies only
+to clock times and is ignored for RFC3339 timestamps. `with.offset` (a
 duration, may be negative) shifts the resolved deadline.
 
-`with.if_past` selects behavior when the resolved deadline is already past:
-`fail` errors, `window` succeeds when the deadline passed no more than
-`with.window` ago and otherwise errors, and `continue` (default) succeeds
-immediately. For clock times, `continue` instead rolls the passed time to
-the same time tomorrow, so use `fail` or `window` to act on a gate that
-already passed today. `with.offset`, `with.timezone`, `with.if_past`, and
-`with.window` are only valid on `wait.until`.
+`with.if_past` selects behavior, for both forms, when the deadline is
+already past as the step starts: `continue` (default) succeeds
+immediately, `fail` errors, and `window` succeeds when the deadline passed
+no more than `with.window` ago and otherwise errors. `with.offset`,
+`with.timezone`, `with.if_past`, and `with.window` are only valid on
+`wait.until`.
 
 ### wait.file
 
@@ -117,9 +121,10 @@ run time and fails its check is reported as holding an unresolved reference:
 - `wait.until`: `with.until` is empty or is neither a valid RFC3339 timestamp
   nor a valid `HH:MM[:SS]` clock time; `with.timezone` is not an IANA name;
   `with.offset` is not a duration; `with.if_past` is not `continue`, `fail`,
-  or `window`; `with.window` is set without `if_past: window`, or missing
-  with `if_past: window`. `with.offset`, `with.timezone`, `with.if_past`, or
-  `with.window` set on any other action.
+  or `window`; `with.window` is not a duration greater than zero, is set
+  without `if_past: window`, or is missing with `if_past: window`.
+  `with.offset`, `with.timezone`, `with.if_past`, or `with.window` set on
+  any other action.
 - `wait.file`: `with.path` is empty, or `with.state` is a value other than
   `exists` or `missing`.
 - `wait.http`: `with.url` is empty or is not an absolute `http://`/`https://`

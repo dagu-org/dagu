@@ -105,6 +105,29 @@ func TestWaitUntilFuture(t *testing.T) {
 	result.ExpectStderrContains("step timed out")
 }
 
+// TestWaitUntilClockPast proves a with.until
+// clock time that already passed on the logical day succeeds right away
+// under the default if_past instead of rolling over to the next day.
+// 00:00 minus 1s is always past on the day the run starts.
+func TestWaitUntilClockPast(t *testing.T) {
+	t.Parallel()
+
+	dagu := harness.NewRunner(t)
+	result := dagu.Run("start", "until_clock_past.yaml")
+	result.ExpectExitCode(0)
+}
+
+// TestWaitUntilClockPastFail proves if_past: fail
+// rejects a clock time that already passed on the logical day.
+func TestWaitUntilClockPastFail(t *testing.T) {
+	t.Parallel()
+
+	dagu := harness.NewRunner(t)
+	result := dagu.Run("start", "until_clock_past_fail.yaml")
+	result.ExpectNonZeroExitCode()
+	result.ExpectStderrContains("in the past")
+}
+
 func TestWaitUntilMissing(t *testing.T) {
 	t.Parallel()
 

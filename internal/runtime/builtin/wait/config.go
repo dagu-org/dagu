@@ -209,9 +209,9 @@ func parseStatus(raw any) (int, error) {
 }
 
 // parseUntilFields validates the wait.until options and records the literal
-// values. Clock times are resolved to a date by the executor. The signed offset is
-// stored separately and applied once by the executor, so both RFC3339 and
-// clock-time deadlines shift exactly once.
+// values. The executor resolves clock times on the run's logical day. The
+// signed offset is stored separately and applied once by the executor, so
+// both RFC3339 and clock-time deadlines shift exactly once.
 func parseUntilFields(cfg config, deferred func(string) bool, parsed *parsedConfig) error {
 	if tz := strings.TrimSpace(cfg.Timezone); tz != "" && !deferred(cfg.Timezone) {
 		loc, err := time.LoadLocation(tz)

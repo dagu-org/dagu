@@ -187,23 +187,17 @@ func (e *executorImpl) deadline(ctx context.Context) time.Time {
 	if loc == nil {
 		loc = configuredLocation(ctx)
 	}
-	return clockDeadline(logicalDay(ctx, loc), *e.cfg.clock, loc, e.cfg.offset, e.cfg.ifPast, time.Now().In(loc))
+	return clockDeadline(logicalDay(ctx, loc), *e.cfg.clock, loc, e.cfg.offset)
 }
 
-// clockDeadline maps clock onto base's day in loc, applies offset, and rolls
-// to the next day when the shifted deadline already passed. A passed clock
-// time is kept as-is for if_past fail/window so those policies can decide
-// instead of blocking until tomorrow.
-func clockDeadline(base time.Time, clock clockTime, loc *time.Location, offset time.Duration, ifPast string, now time.Time) time.Time {
-	deadline := time.Date(base.Year(), base.Month(), base.Day(), clock.hour, clock.minute, clock.second, 0, loc).Add(offset)
-	if ifPast != ifPastFail && ifPast != ifPastWindow && !deadline.After(now) {
-		deadline = deadline.AddDate(0, 0, 1)
-	}
-	return deadline
+// clockDeadline maps clock onto base's day in loc and applies offset. A
+// deadline that already passed stays on that day for if_past to handle.
+func clockDeadline(base time.Time, clock clockTime, loc *time.Location, offset time.Duration) time.Time {
+	return time.Date(base.Year(), base.Month(), base.Day(), clock.hour, clock.minute, clock.second, 0, loc).Add(offset)
 }
 
 // logicalDay returns the run's logical day in loc: the schedule time when
-// present, otherwise when the run started, otherwise now.
+// present, otherwise when the current attempt started, otherwise now.
 func logicalDay(ctx context.Context, loc *time.Location) time.Time {
 	rCtx := runtime.GetDAGContext(ctx)
 	for _, raw := range []string{rCtx.ScheduleTime, rCtx.RunStartedAt} {

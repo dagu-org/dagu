@@ -233,75 +233,64 @@ func TestParseStatus(t *testing.T) {
 	}
 }
 
-func TestClockDeadlineAppliesOffsetBeforeRoll(t *testing.T) {
+func TestClockDeadlineAppliesOffset(t *testing.T) {
 	t.Parallel()
 
 	loc := time.UTC
 	base := time.Date(2026, 1, 2, 0, 0, 0, 0, loc)
-	now := time.Date(2026, 1, 2, 9, 5, 0, 0, loc)
-
-	got := clockDeadline(base, clockTime{hour: 9}, loc, 10*time.Minute, ifPastContinue, now)
-	require.Equal(t, time.Date(2026, 1, 2, 9, 10, 0, 0, loc), got)
-}
-
-func TestClockDeadlineHonoursIfPast(t *testing.T) {
-	t.Parallel()
-
-	loc := time.UTC
-	base := time.Date(2026, 1, 2, 0, 0, 0, 0, loc)
-	now := time.Date(2026, 1, 2, 9, 5, 0, 0, loc)
-
 	for _, tt := range []struct {
 		name   string
-		ifPast string
+		clock  clockTime
+		offset time.Duration
 		want   time.Time
 	}{
-		{name: "continueRollsForward", ifPast: ifPastContinue, want: time.Date(2026, 1, 3, 9, 0, 0, 0, loc)},
-		{name: "failKeepsLogicalDay", ifPast: ifPastFail, want: time.Date(2026, 1, 2, 9, 0, 0, 0, loc)},
-		{name: "windowKeepsLogicalDay", ifPast: ifPastWindow, want: time.Date(2026, 1, 2, 9, 0, 0, 0, loc)},
+		{name: "positive", clock: clockTime{hour: 9}, offset: 10 * time.Minute, want: time.Date(2026, 1, 2, 9, 10, 0, 0, loc)},
+		{name: "negative", clock: clockTime{hour: 9}, offset: -3 * time.Hour, want: time.Date(2026, 1, 2, 6, 0, 0, 0, loc)},
+		{name: "crossesMidnight", clock: clockTime{minute: 30}, offset: -time.Hour, want: time.Date(2026, 1, 1, 23, 30, 0, 0, loc)},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := clockDeadline(base, clockTime{hour: 9}, loc, 0, tt.ifPast, now)
-			require.Equal(t, tt.want, got)
+			require.Equal(t, tt.want, clockDeadline(base, tt.clock, loc, tt.offset))
 		})
 	}
 }
 
+// A clock time that already passed on the logical day follows if_past rather
+// than rolling over to the next day. 00:00 minus 1s on today's logical day is
+// always past, while the same time a day later is always ahead.
 func TestExecutorIfPastAppliesToClockTime(t *testing.T) {
 	t.Parallel()
 
-	loc := time.Local
-	scheduled := time.Now().In(loc).AddDate(0, 0, -1).Format(time.RFC3339Nano)
 	ctx := runtime.NewContext(context.Background(), &ir.DAG{Name: "test"}, "run-1", "",
-		runtime.WithScheduleTime(scheduled))
+		runtime.WithScheduleTime(time.Now().UTC().Format(time.RFC3339)))
 
-	exec, err := newExecutor(ctx, ir.Step{
-		Commands: []ir.CommandEntry{{Command: opUntil}},
-		ExecutorConfig: ir.ExecutorConfig{
-			Type: "wait",
-			Config: map[string]any{
-				"until":   "00:00",
-				"if_past": "fail",
-			},
-		},
-	})
-	require.NoError(t, err)
-	require.ErrorContains(t, exec.Run(ctx), "in the past")
+	for _, tt := range []struct {
+		name    string
+		config  map[string]any
+		wantErr string
+	}{
+		{name: "continue", config: map[string]any{"until": "00:00", "offset": "-1s"}},
+		{name: "fail", config: map[string]any{"until": "00:00", "offset": "-1s", "if_past": "fail"}, wantErr: "in the past"},
+		{name: "window", config: map[string]any{"until": "00:00", "offset": "-1s", "if_past": "window", "window": "25h"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			exec, err := newExecutor(ctx, ir.Step{
+				Commands:       []ir.CommandEntry{{Command: opUntil}},
+				ExecutorConfig: ir.ExecutorConfig{Type: "wait", Config: tt.config},
+			})
+			require.NoError(t, err)
 
-	exec, err = newExecutor(ctx, ir.Step{
-		Commands: []ir.CommandEntry{{Command: opUntil}},
-		ExecutorConfig: ir.ExecutorConfig{
-			Type: "wait",
-			Config: map[string]any{
-				"until":   "00:00",
-				"if_past": "window",
-				"window":  "72h",
-			},
-		},
-	})
-	require.NoError(t, err)
-	require.NoError(t, exec.Run(ctx))
+			runCtx, cancel := context.WithTimeout(ctx, time.Second)
+			defer cancel()
+			err = exec.Run(runCtx)
+			if tt.wantErr != "" {
+				require.ErrorContains(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
 }
 
 // A clock time resolves on the logical day in with.timezone, else in the
