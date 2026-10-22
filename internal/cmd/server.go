@@ -333,7 +333,7 @@ func startCloudReport(ctx *Context, monitoring *cloudreport.Monitoring, access *
 		remote = access
 	}
 	scheduler := cloudreport.Scheduler{State: ctx.Persistence.SchedulerStateStore, Pause: ctx.Persistence.SchedulerPauseStore}
-	return cloudreport.Start(ctx, ctx.LicenseManager.CloudCredentials, ctx.Persistence.ServiceRegistry, cloudReportEvents(ctx), scheduler, monitoring, remote)
+	return cloudreport.Start(ctx, ctx.LicenseManager.CloudCredentials, ctx.Persistence.ServiceRegistry, cloudReportEvents(ctx), scheduler, monitoring, remote, ctx.LicenseManager.Refresh)
 }
 
 // newCloudAccess returns what takes calls from Dagu Cloud while remote access
