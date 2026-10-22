@@ -30,6 +30,15 @@ func TestACPDefinition(t *testing.T) {
 	}
 }
 
+// TestACPRemoteVariables accepts $VAR references that resolve only at run time.
+func TestACPRemoteVariables(t *testing.T) {
+	raw := map[string]any{"protocol": "acp", "transport": "websocket", "url": "$ACP_URL", "cwd": "$AGENT_ROOT/work"}
+	def, err := parseHarnessDefinition("remote", raw)
+	require.NoError(t, err)
+	require.Equal(t, "$ACP_URL", def.URL)
+	require.Equal(t, "$AGENT_ROOT/work", def.Cwd)
+}
+
 // TestACPRemoteDefinition checks remote endpoints without requiring a local binary.
 func TestACPRemoteDefinition(t *testing.T) {
 	raw := map[string]any{"protocol": "acp", "transport": "websocket", "url": "wss://agent.example/acp", "cwd": "/remote/workspace", "headers": map[string]any{"Authorization": "Bearer ${ACP_TOKEN}"}}

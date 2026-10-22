@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
@@ -28,12 +29,16 @@ const (
 	acpProgressInterval = time.Second
 	// acpCancelTimeout bounds delivery of a session/cancel notification.
 	acpCancelTimeout = time.Second
+	// acpExitGrace lets a local adapter exit on its own after a failed turn.
+	acpExitGrace = time.Second
 )
 
 // runACP executes one prompt over the configured ACP transport and spools its text output.
 func (e *harnessExecutor) runACP(parent context.Context, cfg providerConfig) (stdout *os.File, err error) {
 	e.exitCode = 1
-	if e.step.Container != nil || rootContainerConfigured(parent) {
+	// A DAG-level container does not apply to agents reached over the network.
+	remote := cfg.definition != nil && cfg.definition.IsRemote()
+	if e.step.Container != nil || (!remote && rootContainerConfigured(parent)) {
 		return nil, errors.New("harness: ACP is not supported inside containers")
 	}
 	policy := "deny"
@@ -127,11 +132,19 @@ func (e *harnessExecutor) runACP(parent context.Context, cfg providerConfig) (st
 	e.process = process
 	e.mu.Unlock()
 	conn := acp.NewClientSideConnection(client, input, output)
+	conn.SetLogger(acpLogger(tw))
 	defer func() {
 		_ = input.Close()
-		_, _ = process.Stop(cmdutil.StopRequest{Intent: cmdutil.ForceTermination()})
-		_ = process.Wait()
-		if err != nil && ctx.Err() == nil {
+		failed := err != nil && ctx.Err() == nil
+		var grace time.Duration
+		if failed {
+			grace = acpExitGrace
+		}
+		waitErr := stopACPAgent(process, grace)
+		if failed {
+			if code := exitCodeFromError(waitErr); code > 0 {
+				e.exitCode = code
+			}
 			err = formatProcessFailure(err, tw.Tail(), "")
 		}
 		_ = output.Close()
@@ -158,6 +171,27 @@ func (e *harnessExecutor) runACP(parent context.Context, cfg providerConfig) (st
 		return nil, err
 	}
 	return spool, nil
+}
+
+// stopACPAgent ends a local adapter and returns its wait result. A positive
+// grace lets the adapter exit on its own first, so its exit code survives.
+func stopACPAgent(process *cmdutil.ManagedProcess, grace time.Duration) error {
+	waited := make(chan error, 1)
+	go func() { waited <- process.Wait() }()
+	if grace > 0 {
+		select {
+		case err := <-waited:
+			return err
+		case <-time.After(grace):
+		}
+	}
+	_, _ = process.Stop(cmdutil.StopRequest{Intent: cmdutil.ForceTermination()})
+	return <-waited
+}
+
+// acpLogger keeps SDK diagnostics in the step log and drops routine notices.
+func acpLogger(w io.Writer) *slog.Logger {
+	return slog.New(slog.NewTextHandler(w, &slog.HandlerOptions{Level: slog.LevelWarn}))
 }
 
 // watchACPCancellation sends session/cancel before interrupting a blocked transport.
@@ -318,24 +352,41 @@ func (c *acpHarnessClient) SessionUpdate(_ context.Context, params acp.SessionNo
 	return nil
 }
 
-// RequestPermission accepts allow_once options only when explicitly enabled.
-// Denials fail the attempt even if the agent subsequently returns end_turn.
+// RequestPermission accepts allow_once options only when explicitly enabled and
+// otherwise rejects the tool call. Denials fail the attempt even if the agent
+// subsequently returns end_turn.
 func (c *acpHarnessClient) RequestPermission(_ context.Context, params acp.RequestPermissionRequest) (acp.RequestPermissionResponse, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	cancelled := acp.RequestPermissionResponse{Outcome: acp.RequestPermissionOutcome{Cancelled: &acp.RequestPermissionOutcomeCancelled{}}}
 	// ACP requires cancelled outcomes for requests pending after session/cancel.
 	if c.cancelled {
-		return acp.RequestPermissionResponse{Outcome: acp.RequestPermissionOutcome{Cancelled: &acp.RequestPermissionOutcomeCancelled{}}}, nil
+		return cancelled, nil
 	}
 	if params.SessionId == c.session && c.allow {
-		for _, option := range params.Options {
-			if option.Kind == acp.PermissionOptionKindAllowOnce {
-				return acp.RequestPermissionResponse{Outcome: acp.RequestPermissionOutcome{Selected: &acp.RequestPermissionOutcomeSelected{OptionId: option.OptionId}}}, nil
-			}
+		if response, ok := selectPermission(params.Options, acp.PermissionOptionKindAllowOnce); ok {
+			return response, nil
+		}
+		c.err = errors.New("ACP permission request denied; the agent offered no allow_once option")
+	} else {
+		c.err = errors.New("ACP permission request denied; set acp_permission: allow to accept allow_once requests")
+	}
+	for _, kind := range []acp.PermissionOptionKind{acp.PermissionOptionKindRejectOnce, acp.PermissionOptionKindRejectAlways} {
+		if response, ok := selectPermission(params.Options, kind); ok {
+			return response, nil
 		}
 	}
-	c.err = errors.New("ACP permission request denied; set acp_permission: allow to accept allow_once requests")
-	return acp.RequestPermissionResponse{Outcome: acp.RequestPermissionOutcome{Cancelled: &acp.RequestPermissionOutcomeCancelled{}}}, nil
+	return cancelled, nil
+}
+
+// selectPermission chooses the first offered option of the given kind.
+func selectPermission(options []acp.PermissionOption, kind acp.PermissionOptionKind) (acp.RequestPermissionResponse, bool) {
+	for _, option := range options {
+		if option.Kind == kind {
+			return acp.RequestPermissionResponse{Outcome: acp.RequestPermissionOutcome{Selected: &acp.RequestPermissionOutcomeSelected{OptionId: option.OptionId}}}, true
+		}
+	}
+	return acp.RequestPermissionResponse{}, false
 }
 
 // ReadTextFile rejects client filesystem access, which is not advertised.

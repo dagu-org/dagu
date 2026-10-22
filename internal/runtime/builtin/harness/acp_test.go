@@ -66,6 +66,9 @@ func TestACPAgent(_ *testing.T) {
 			if mode == "version" {
 				version = 999
 			}
+			if mode == "noise" {
+				_, _ = os.Stdout.WriteString("adapter banner\n")
+			}
 			respond(map[string]any{"protocolVersion": version, "agentCapabilities": map[string]any{}})
 		case "session/new":
 			var params struct{ Cwd string }
@@ -91,7 +94,10 @@ func TestACPAgent(_ *testing.T) {
 			if mode == "permission" {
 				send(map[string]any{"jsonrpc": "2.0", "id": "permission-1", "method": "session/request_permission", "params": map[string]any{
 					"sessionId": "test-session", "toolCall": map[string]any{"toolCallId": "tool-1"},
-					"options": []any{map[string]any{"optionId": "once", "name": "Allow", "kind": "allow_once"}},
+					"options": []any{
+						map[string]any{"optionId": "once", "name": "Allow", "kind": "allow_once"},
+						map[string]any{"optionId": "reject", "name": "Reject", "kind": "reject_once"},
+					},
 				}})
 				continue
 			}
@@ -126,7 +132,8 @@ func TestACPAgent(_ *testing.T) {
 			finish("cancelled")
 		default:
 			if msg.ID == "permission-1" {
-				if !strings.Contains(string(msg.Result), "selected") && !strings.Contains(string(msg.Result), "cancelled") {
+				// Without a session/cancel, every answer must select an offered option.
+				if !strings.Contains(string(msg.Result), "selected") {
 					os.Exit(4)
 				}
 				finish("end_turn")
@@ -139,9 +146,11 @@ func TestACPAgent(_ *testing.T) {
 // TestACPRun checks ACP output, permission decisions, failures, and cancellation.
 func TestACPRun(t *testing.T) {
 	for _, tc := range []struct {
-		mode, policy, wantError string
+		mode, policy, wantError, wantStderr string
 	}{
 		{mode: "echo"},
+		// SDK diagnostics about adapter stdout belong in the step log.
+		{mode: "noise", wantStderr: "failed to parse incoming message"},
 		{mode: "permission", wantError: "permission request denied"},
 		{mode: "permission", policy: "allow"},
 		{mode: "echo", policy: "invalid", wantError: "acp_permission"},
@@ -175,9 +184,13 @@ func TestACPRun(t *testing.T) {
 			if tc.wantError != "" {
 				require.ErrorContains(t, err, tc.wantError, stderr.String())
 				require.Empty(t, out.String())
+				if tc.mode == "crash" {
+					require.Equal(t, 7, exec.(*harnessExecutor).ExitCode())
+				}
 				return
 			}
 			require.NoError(t, err, stderr.String())
+			require.Contains(t, stderr.String(), tc.wantStderr)
 			if tc.mode == "echo" {
 				require.Equal(t, "reply:hello\n\ncontext", out.String())
 			}

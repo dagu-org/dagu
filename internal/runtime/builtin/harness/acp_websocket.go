@@ -9,7 +9,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -49,11 +51,16 @@ func (e *harnessExecutor) runACPRemote(ctx context.Context, cfg providerConfig, 
 	def := cloneDefinition(cfg.definition)
 	def.URL, def.Cwd, def.Headers = settings.URL, settings.Cwd, settings.Headers
 	def.CAFile = settings.CAFile
+	// Load-time validation skips values with variable references, so any left
+	// after evaluation are unresolved.
+	if strings.Contains(def.URL, "$") || strings.Contains(def.Cwd, "$") {
+		return errors.New("harness: unresolved remote ACP connection settings")
+	}
 	if err := def.ValidateConnection(); err != nil {
 		return fmt.Errorf("harness: remote ACP: %w", err)
 	}
-	if strings.Contains(def.URL, "${") || strings.Contains(def.Cwd, "${") {
-		return errors.New("harness: unresolved remote ACP connection settings")
+	if len(def.Headers) != 0 && sendsCleartext(def.URL) {
+		_, _ = fmt.Fprintln(e.stderrWriter(), "harness: warning: remote ACP headers are sent unencrypted; use wss:// or https:// for non-loopback hosts")
 	}
 	httpClient, err := acpRemoteHTTPClient(settings.CAFile, e.workDir)
 	if err != nil {
@@ -76,6 +83,7 @@ func (e *harnessExecutor) runACPRemote(ctx context.Context, cfg providerConfig, 
 		go keepACPWebSocketAlive(wireCtx, socket, 25*time.Second)
 	}
 	conn := acp.NewClientSideConnection(client, stream, stream)
+	conn.SetLogger(acpLogger(e.stderrWriter()))
 	defer func() {
 		closeWire()
 		_ = stream.Close()
@@ -90,6 +98,19 @@ func (e *harnessExecutor) runACPRemote(ctx context.Context, cfg providerConfig, 
 		return fmt.Errorf("harness: remote ACP: %w", err)
 	}
 	return nil
+}
+
+// sendsCleartext reports whether a ws:// or http:// URL leaves the local host.
+func sendsCleartext(raw string) bool {
+	u, err := url.Parse(raw)
+	if err != nil || (u.Scheme != "ws" && u.Scheme != "http") {
+		return false
+	}
+	if host := u.Hostname(); host != "localhost" {
+		ip := net.ParseIP(host)
+		return ip == nil || !ip.IsLoopback()
+	}
+	return false
 }
 
 // dialACPWebSocket authenticates the handshake without exposing credentials in errors.

@@ -24,7 +24,11 @@ import (
 	"github.com/dagucloud/dagu/v2/internal/ir"
 )
 
-const acpMessageLimit = 10 * 1024 * 1024
+const (
+	acpMessageLimit = 10 * 1024 * 1024
+	// acpHTTPQueueDepth bounds buffered SSE messages; the SDK reads continuously.
+	acpHTTPQueueDepth = 4
+)
 
 // acpRemoteHTTPClient keeps TLS verification enabled, optionally adding private CA roots.
 func acpRemoteHTTPClient(caFile, workDir string) (*http.Client, error) {
@@ -80,7 +84,7 @@ func newACPHTTPStream(ctx context.Context, def *ir.HarnessDefinition, base *http
 	client := *base
 	client.Jar, _ = cookiejar.New(nil)
 	return &acpHTTPStream{ctx: ctx, cancel: cancel, def: def, client: &client,
-		incoming: make(chan []byte, 64), sessions: make(map[string]bool), routes: make(map[string]string)}
+		incoming: make(chan []byte, acpHTTPQueueDepth), sessions: make(map[string]bool), routes: make(map[string]string)}
 }
 
 type acpHTTPMessage struct {

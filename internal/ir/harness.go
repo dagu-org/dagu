@@ -75,7 +75,8 @@ func (d *HarnessDefinition) IsRemote() bool {
 }
 
 // ValidateConnection checks the mutually exclusive local and remote launch settings.
-// URL and cwd templates are checked again after runtime variable resolution.
+// URL and cwd values with variable references are checked again after runtime
+// variable resolution.
 func (d *HarnessDefinition) ValidateConnection() error {
 	if d.Transport != "" && d.Transport != HarnessTransportStdio && d.Transport != HarnessTransportWebSocket && d.Transport != HarnessTransportHTTP {
 		return errors.New("transport must be stdio, websocket, or http")
@@ -101,7 +102,7 @@ func (d *HarnessDefinition) ValidateConnection() error {
 	if d.URL == "" || d.Cwd == "" {
 		return errors.New("remote transport requires url and cwd")
 	}
-	if !strings.Contains(d.URL, "${") {
+	if !strings.Contains(d.URL, "$") {
 		u, err := url.Parse(d.URL)
 		validScheme := err == nil && ((d.Transport == HarnessTransportWebSocket && (u.Scheme == "ws" || u.Scheme == "wss")) || (d.Transport == HarnessTransportHTTP && (u.Scheme == "http" || u.Scheme == "https")))
 		if !validScheme || u.Hostname() == "" || u.User != nil || u.Fragment != "" {
@@ -113,7 +114,7 @@ func (d *HarnessDefinition) ValidateConnection() error {
 		((d.Cwd[0] >= 'A' && d.Cwd[0] <= 'Z') || (d.Cwd[0] >= 'a' && d.Cwd[0] <= 'z')) &&
 		d.Cwd[1] == ':' && (d.Cwd[2] == '/' || d.Cwd[2] == '\\')
 	absolute := path.IsAbs(d.Cwd) || driveAbsolute || strings.HasPrefix(d.Cwd, `\\`)
-	if !strings.Contains(d.Cwd, "${") && !absolute {
+	if !strings.Contains(d.Cwd, "$") && !absolute {
 		return errors.New("cwd must be an absolute path on the remote agent host")
 	}
 	return nil

@@ -204,8 +204,13 @@ func TestACPBearerSubprotocol(t *testing.T) {
 // TestACPWebSocket checks remote framing, authentication, permissions, and failures.
 func TestACPWebSocket(t *testing.T) {
 	server, _, cancelled := newACPWebSocketPeer(t, false)
-	for _, tc := range []struct{ path, policy, wantError string }{
+	for _, tc := range []struct {
+		path, policy, wantError string
+		container               bool
+	}{
 		{path: "/echo?authenticate=1"},
+		// A DAG-level container applies to local steps, not to remote agents.
+		{path: "/echo?container=1", container: true},
 		{path: "/permission", policy: "allow"},
 		{path: "/permission", wantError: "permission request denied"},
 		{path: "/drop", wantError: "remote ACP"},
@@ -220,7 +225,11 @@ func TestACPWebSocket(t *testing.T) {
 				cfg["acp_permission"] = tc.policy
 			}
 			step := ir.Step{ExecutorConfig: ir.ExecutorConfig{Config: cfg}, Commands: []ir.CommandEntry{{Command: "hello"}}, Script: "context"}
-			ctx := newHarnessTestContext(t, &ir.DAG{Harnesses: ir.HarnessDefinitions{"remote": def}}, step, "ACP_TOKEN=test-token")
+			dag := &ir.DAG{Harnesses: ir.HarnessDefinitions{"remote": def}}
+			if tc.container {
+				dag.Container = &ir.Container{Image: "alpine"}
+			}
+			ctx := newHarnessTestContext(t, dag, step, "ACP_TOKEN=test-token")
 			ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 			defer cancel()
 			exec, err := newHarness(ctx, step)
@@ -239,6 +248,7 @@ func TestACPWebSocket(t *testing.T) {
 				}
 			}
 			require.Equal(t, "Bearer ${ACP_TOKEN}", def.Headers["Authorization"])
+			require.NotContains(t, stderr.String(), "unencrypted", "loopback endpoints need no cleartext warning")
 			if tc.path == "/wait" {
 				select {
 				case <-cancelled:
@@ -309,6 +319,32 @@ func TestACPWebSocketStop(t *testing.T) {
 			case <-time.After(time.Second):
 				t.Fatal("agent did not receive session/cancel")
 			}
+		})
+	}
+}
+
+// TestACPCleartextWarning flags credentials sent unencrypted beyond the local host.
+func TestACPCleartextWarning(t *testing.T) {
+	for _, tc := range []struct {
+		url  string
+		warn bool
+	}{
+		{url: "ws://192.0.2.1:9/acp", warn: true},
+		{url: "wss://192.0.2.1:9/acp"},
+		{url: "ws://127.0.0.1:9/acp"},
+	} {
+		t.Run(tc.url, func(t *testing.T) {
+			def := &ir.HarnessDefinition{Protocol: "acp", Transport: "websocket", URL: tc.url, Cwd: "/remote/workspace", Headers: map[string]string{"Authorization": "Bearer token"}}
+			step := ir.Step{ExecutorConfig: ir.ExecutorConfig{Config: map[string]any{"provider": "remote"}}, Commands: []ir.CommandEntry{{Command: "hello"}}}
+			ctx := newHarnessTestContext(t, &ir.DAG{Harnesses: ir.HarnessDefinitions{"remote": def}}, step)
+			ctx, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
+			defer cancel()
+			exec, err := newHarness(ctx, step)
+			require.NoError(t, err)
+			var stderr bytes.Buffer
+			exec.SetStderr(&stderr)
+			require.Error(t, exec.Run(ctx))
+			require.Equal(t, tc.warn, strings.Contains(stderr.String(), "unencrypted"), stderr.String())
 		})
 	}
 }
