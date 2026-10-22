@@ -357,7 +357,10 @@ cell. With `output`, `xlsx.append` writes the result there and leaves the
 workbook at `path` as it was, by the rules `xlsx.write_cells` follows (see
 Writing cells), with `leave output out to append to the workbook in place`
 ending the message for an output that is the workbook itself; a `path`
-that does not exist starts a new workbook at `output`.
+that does not exist starts a new workbook at `output`. An existing `output`
+is replaced, not appended to: `path` is read, the rows are appended in
+memory, and the result overwrites `output`, so an `xlsx.append` with a fixed
+`output` inside a `foreach` keeps only the last iteration's rows.
 
 Fields are placed by name. Object rows, rows from a CSV header, and rows
 given `columns` are matched to the sheet's header row, its first row, by
@@ -428,7 +431,10 @@ write different values to merged cell Sheet1!C2:C3`, a row that leaves the
 cell as it already is included.
 
 With `output`, the updated workbook is written there and the workbook at
-`path` is left as it was, for a workbook that is open elsewhere or shared.
+`path` is left as it was, so one workbook serves many updates; on Windows a
+workbook another program holds still fails the step, as for
+`xlsx.write_cells`. A missing parent folder of `output` is created as for
+`xlsx.write`.
 `output` must be a workbook and a different file from `path`, a hard link
 included, else `orders.xlsx: output must be a different file from path;
 leave output out to update the workbook in place`; the output path takes
