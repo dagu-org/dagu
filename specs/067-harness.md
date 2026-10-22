@@ -359,7 +359,8 @@ Protocol JSON, thoughts, and tool events are excluded. Only `end_turn` succeeds.
 Failed attempts do not contribute text to successful fallback output.
 
 `with.acp_permission` defaults to `deny`. `allow` selects only an offered `allow_once`
-option; it never grants persistent permission. This policy governs ACP callbacks,
+option; it never grants persistent permission. A DAG-level `harness.acp_permission`
+applies only to steps whose provider uses ACP; CLI steps never receive it as a flag. This policy governs ACP callbacks,
 not a sandbox around the agent's own tools. A denial selects an offered reject
 option and fails the attempt.
 

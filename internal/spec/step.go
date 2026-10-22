@@ -2258,16 +2258,20 @@ func mergeHarnessConfig(dagHarness *ir.HarnessConfig, defs ir.HarnessDefinitions
 		return merged
 	}
 
+	def := defs[effectiveProvider]
 	dagConfig := dagHarness.Config
+	if def == nil || def.Protocol != ir.HarnessProtocolACP {
+		// Only ACP providers consume acp_permission; CLI providers would receive
+		// it as an unknown flag.
+		dagConfig = maps.Clone(dagConfig)
+		delete(dagConfig, "acp_permission")
+	}
 	if ir.IsEffectiveBuiltinCLIHarnessProvider(effectiveProvider, defs) {
 		dagConfig = ir.NormalizeBuiltinHarnessFlagKeys(dagConfig)
 	}
 	// Remote ACP agents accept no CLI options, so DAG-level options meant for
 	// other providers are not inherited.
-	remoteACP := false
-	if def := defs[effectiveProvider]; def != nil {
-		remoteACP = def.IsRemote()
-	}
+	remoteACP := def != nil && def.IsRemote()
 
 	for key, value := range dagConfig {
 		if remoteACP && key != "provider" && key != "acp_permission" {

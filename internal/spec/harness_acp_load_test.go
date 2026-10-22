@@ -47,8 +47,9 @@ func TestACPLoad(t *testing.T) {
 	require.Equal(t, "Bearer ${ACP_TOKEN}", dag.Harnesses["adapter"].Headers["Authorization"])
 }
 
-// TestACPRemoteDefaults verifies that DAG-level options a remote agent cannot
-// accept stay off remote ACP steps while the permission policy is inherited.
+// TestACPRemoteDefaults verifies that DAG-level harness options reach only the
+// providers that accept them: remote ACP steps take the permission policy but
+// no CLI options, and CLI steps take CLI options but no permission policy.
 func TestACPRemoteDefaults(t *testing.T) {
 	file := createTempYAMLFile(t, `harnesses:
   remote:
@@ -65,13 +66,22 @@ steps:
     with:
       provider: remote
       prompt: hello
+  - action: harness.run
+    with:
+      provider: codex
+      prompt: hello
 `)
 	dag, err := spec.Load(context.Background(), file)
 	require.NoError(t, err)
-	config := dag.Steps[0].ExecutorConfig.Config
-	require.Equal(t, "remote", config["provider"])
-	require.Equal(t, "allow", config["acp_permission"])
-	require.NotContains(t, config, "model")
+	remote := dag.Steps[0].ExecutorConfig.Config
+	require.Equal(t, "remote", remote["provider"])
+	require.Equal(t, "allow", remote["acp_permission"])
+	require.NotContains(t, remote, "model")
+	cli := dag.Steps[1].ExecutorConfig.Config
+	require.Equal(t, "codex", cli["provider"])
+	require.Equal(t, "sonnet", cli["model"])
+	require.NotContains(t, cli, "acp_permission")
+	require.NotContains(t, cli, "acp-permission")
 }
 
 // TestACPRemoteWorkspace verifies that remote-only harness steps, whose agent
