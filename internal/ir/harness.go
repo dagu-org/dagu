@@ -69,6 +69,11 @@ type HarnessDefinition struct {
 	OptionFlags       map[string]string     `json:"optionFlags,omitempty"`
 }
 
+// IsRemote reports whether the definition connects to an ACP agent over the network.
+func (d *HarnessDefinition) IsRemote() bool {
+	return d.Transport == HarnessTransportWebSocket || d.Transport == HarnessTransportHTTP
+}
+
 // ValidateConnection checks the mutually exclusive local and remote launch settings.
 // URL and cwd templates are checked again after runtime variable resolution.
 func (d *HarnessDefinition) ValidateConnection() error {
@@ -81,7 +86,7 @@ func (d *HarnessDefinition) ValidateConnection() error {
 	if d.BearerSubprotocol && d.Transport != HarnessTransportWebSocket {
 		return errors.New("bearer_subprotocol requires transport: websocket")
 	}
-	if d.Transport != HarnessTransportWebSocket && d.Transport != HarnessTransportHTTP {
+	if !d.IsRemote() {
 		if d.URL != "" || len(d.Headers) != 0 || d.Cwd != "" || d.CAFile != "" {
 			return errors.New("url, headers, cwd, and ca_file require a remote transport")
 		}

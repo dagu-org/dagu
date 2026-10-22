@@ -2942,7 +2942,7 @@ func parseHarnessDefinition(name string, raw map[string]any) (*ir.HarnessDefinit
 		}
 	}
 
-	if def.Transport == ir.HarnessTransportWebSocket || def.Transport == ir.HarnessTransportHTTP {
+	if def.IsRemote() {
 		for _, key := range []string{"binary", "prefix_args", "option_flags", "flag_style"} {
 			if _, exists := raw[key]; exists {
 				return nil, ir.NewValidationError(fmt.Sprintf("harnesses.%s.%s", name, key), raw[key], fmt.Errorf("%s is not supported with remote transport", key))
@@ -2959,7 +2959,7 @@ func parseHarnessDefinition(name string, raw map[string]any) (*ir.HarnessDefinit
 	if _, exists := raw["bearer_subprotocol"]; exists && def.Transport != ir.HarnessTransportWebSocket {
 		return nil, ir.NewValidationError(fmt.Sprintf("harnesses.%s.bearer_subprotocol", name), raw["bearer_subprotocol"], fmt.Errorf("bearer_subprotocol requires transport: websocket"))
 	}
-	if def.Transport != ir.HarnessTransportWebSocket && def.Transport != ir.HarnessTransportHTTP && def.Binary == "" {
+	if !def.IsRemote() && def.Binary == "" {
 		return nil, ir.NewValidationError(fmt.Sprintf("harnesses.%s.binary", name), raw["binary"], fmt.Errorf("binary is required"))
 	}
 	if err := def.ValidateConnection(); err != nil {

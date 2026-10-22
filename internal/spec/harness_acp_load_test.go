@@ -46,3 +46,30 @@ func TestACPLoad(t *testing.T) {
 	cloned.Harnesses["adapter"].Headers["Authorization"] = "changed"
 	require.Equal(t, "Bearer ${ACP_TOKEN}", dag.Harnesses["adapter"].Headers["Authorization"])
 }
+
+// TestACPRemoteDefaults verifies that DAG-level options a remote agent cannot
+// accept stay off remote ACP steps while the permission policy is inherited.
+func TestACPRemoteDefaults(t *testing.T) {
+	file := createTempYAMLFile(t, `harnesses:
+  remote:
+    protocol: acp
+    transport: websocket
+    url: wss://agent.example/acp
+    cwd: /remote/workspace
+harness:
+  provider: claude
+  model: sonnet
+  acp_permission: allow
+steps:
+  - action: harness.run
+    with:
+      provider: remote
+      prompt: hello
+`)
+	dag, err := spec.Load(context.Background(), file)
+	require.NoError(t, err)
+	config := dag.Steps[0].ExecutorConfig.Config
+	require.Equal(t, "remote", config["provider"])
+	require.Equal(t, "allow", config["acp_permission"])
+	require.NotContains(t, config, "model")
+}
