@@ -751,6 +751,17 @@ steps:
 			wantErr: "did not validate",
 		},
 		{
+			name: "RejectWaitUntilUnknownIfPast",
+			spec: `
+steps:
+  - action: wait.until
+    with:
+      until: "09:00"
+      if_past: retry
+`,
+			wantErr: "did not validate",
+		},
+		{
 			name: "RejectFileActionUnknownConfigField",
 			spec: `
 steps:

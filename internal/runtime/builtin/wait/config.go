@@ -122,7 +122,7 @@ func parseConfig(operation string, cfg config, deferReferences bool) (parsedConf
 		if strings.TrimSpace(cfg.Until) == "" {
 			return parsed, fmt.Errorf("wait: until is required for %s", operation)
 		}
-		if err := parseUntilFields(cfg, deferReferences, &parsed); err != nil {
+		if err := parseUntilFields(cfg, deferred, &parsed); err != nil {
 			return parsed, err
 		}
 	case opFile:
@@ -201,64 +201,55 @@ func parseStatus(raw any) (int, error) {
 	return status, nil
 }
 
-// parseUntilFields validates the until-only options and parses a literal
-// RFC3339 deadline. Clock times stay unresolved for the executor. The signed
-// offset is stored separately and applied once by the executor, so both
-// RFC3339 and clock-time deadlines shift exactly once.
-func parseUntilFields(cfg config, deferReferences bool, parsed *parsedConfig) error {
-	if strings.TrimSpace(cfg.Timezone) != "" {
-		if !deferReferences || !value.HasValueReference(cfg.Timezone) {
-			if _, err := time.LoadLocation(strings.TrimSpace(cfg.Timezone)); err != nil {
-				return fmt.Errorf("wait: timezone must be an IANA name: %w", err)
-			}
+// parseUntilFields validates the wait.until options and records the literal
+// values. Clock times stay unresolved for the executor. The signed offset is
+// stored separately and applied once by the executor, so both RFC3339 and
+// clock-time deadlines shift exactly once.
+func parseUntilFields(cfg config, deferred func(string) bool, parsed *parsedConfig) error {
+	if tz := strings.TrimSpace(cfg.Timezone); tz != "" && !deferred(cfg.Timezone) {
+		if _, err := time.LoadLocation(tz); err != nil {
+			return withUnresolvedHint(fmt.Errorf("wait: timezone must be an IANA name: %w", err), cfg.Timezone)
 		}
 	}
-	if strings.TrimSpace(cfg.Offset) != "" {
-		if !deferReferences || !value.HasValueReference(cfg.Offset) {
-			offset, err := time.ParseDuration(strings.TrimSpace(cfg.Offset))
-			if err != nil {
-				return fmt.Errorf("wait: offset must be a duration: %w", err)
-			}
-			parsed.offset = offset
+	if raw := strings.TrimSpace(cfg.Offset); raw != "" && !deferred(cfg.Offset) {
+		offset, err := time.ParseDuration(raw)
+		if err != nil {
+			return withUnresolvedHint(fmt.Errorf("wait: offset must be a duration: %w", err), cfg.Offset)
+		}
+		parsed.offset = offset
+	}
+	// Whether with.window is set is known even when its value is deferred, so
+	// the pairing with if_past only waits on if_past itself.
+	if !deferred(cfg.IfPast) {
+		switch cfg.IfPast {
+		case "":
+			parsed.ifPast = ifPastContinue
+		case ifPastContinue, ifPastFail, ifPastWindow:
+			parsed.ifPast = cfg.IfPast
+		default:
+			return withUnresolvedHint(fmt.Errorf("wait: if_past must be %q, %q, or %q", ifPastContinue, ifPastFail, ifPastWindow), cfg.IfPast)
+		}
+		hasWindow := strings.TrimSpace(cfg.Window) != ""
+		if parsed.ifPast == ifPastWindow && !hasWindow {
+			return fmt.Errorf("wait: window is required when if_past is %q", ifPastWindow)
+		}
+		if parsed.ifPast != ifPastWindow && hasWindow {
+			return fmt.Errorf("wait: window requires if_past %q", ifPastWindow)
 		}
 	}
-	ifPast := strings.ToLower(strings.TrimSpace(cfg.IfPast))
-	if ifPast == "" {
-		ifPast = ifPastContinue
-	}
-	switch ifPast {
-	case ifPastContinue, ifPastFail, ifPastWindow:
-		parsed.ifPast = ifPast
-	default:
-		if !deferReferences || !value.HasValueReference(cfg.IfPast) {
-			return fmt.Errorf("wait: if_past must be %q, %q, or %q", ifPastContinue, ifPastFail, ifPastWindow)
+	if strings.TrimSpace(cfg.Window) != "" && !deferred(cfg.Window) {
+		window, err := parsePositiveDuration("window", cfg.Window)
+		if err != nil {
+			return withUnresolvedHint(err, cfg.Window)
 		}
+		parsed.window = window
 	}
-	if strings.TrimSpace(cfg.Window) != "" {
-		if !deferReferences || !value.HasValueReference(cfg.Window) {
-			window, err := time.ParseDuration(strings.TrimSpace(cfg.Window))
-			if err != nil {
-				return fmt.Errorf("wait: window must be a duration: %w", err)
-			}
-			if window <= 0 {
-				return fmt.Errorf("wait: window must be greater than 0")
-			}
-			parsed.window = window
-		}
-	}
-	if ifPast == ifPastWindow && strings.TrimSpace(cfg.Window) == "" {
-		return fmt.Errorf("wait: window is required when if_past is %q", ifPastWindow)
-	}
-	if strings.TrimSpace(cfg.Window) != "" && ifPast != ifPastWindow &&
-		(!deferReferences || (!value.HasValueReference(cfg.Window) && !value.HasValueReference(cfg.IfPast))) {
-		return fmt.Errorf("wait: window requires if_past %q", ifPastWindow)
-	}
-	if !deferReferences || !value.HasValueReference(cfg.Until) {
+	if !deferred(cfg.Until) {
 		raw := strings.TrimSpace(cfg.Until)
 		if until, err := time.Parse(time.RFC3339Nano, raw); err == nil {
 			parsed.until = until
 		} else if _, _, _, err := parseClock(raw); err != nil {
-			return err
+			return withUnresolvedHint(err, cfg.Until)
 		}
 	}
 	return nil
@@ -338,7 +329,7 @@ var configSchema = &jsonschema.Schema{
 		"until":           {Type: "string", Description: "RFC3339 timestamp or HH:MM[:SS] clock time for action: wait.until."},
 		"offset":          {Type: "string", Description: "Duration added to with.until, such as 5m. Only valid for action: wait.until."},
 		"timezone":        {Type: "string", Description: "IANA timezone for HH:MM[:SS] with.until values. Ignored when with.until is RFC3339. Only valid for action: wait.until."},
-		"if_past":         {Type: "string", Description: "Behavior when with.until is in the past: continue, fail, or window. Accepts a ${...} reference. Only valid for action: wait.until. Defaults to continue."},
+		"if_past":         {Type: "string", Description: "Behavior when with.until is already past: continue, fail, or window. Only valid for action: wait.until. Defaults to continue."},
 		"window":          {Type: "string", Description: "How long after with.until still counts as on time when if_past is window. Only valid for action: wait.until."},
 		"path":            {Type: "string", Description: "File or directory path for action: wait.file."},
 		"state":           {Type: "string", Description: "File state to wait for: exists or missing. Defaults to exists."},

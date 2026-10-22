@@ -8951,7 +8951,11 @@
         },
         "if_past": {
           "type": "string",
-          "description": "Behavior when with.until is in the past: continue, fail, or window. Accepts a ${...} reference. Only valid for wait.until. Defaults to continue."
+          "anyOf": [
+            { "enum": ["continue", "fail", "window"] },
+            { "pattern": "\\$\\{[^}]+\\}|\\$[A-Za-z_][A-Za-z0-9_]*", "description": "Value reference resolved at runtime." }
+          ],
+          "description": "Behavior when with.until is already past: continue, fail, or window. Only valid for wait.until. Defaults to continue."
         },
         "window": {
           "type": "string",

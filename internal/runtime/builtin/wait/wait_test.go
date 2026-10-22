@@ -121,6 +121,18 @@ func TestValidateStepDefersReferenceFields(t *testing.T) {
 		{name: "embeddedBraceEnvURL", op: opHTTP, config: map[string]any{"url": "${BASE_URL}/health"}},
 		{name: "embeddedBareEnvURL", op: opHTTP, config: map[string]any{"url": "$BASE_URL/health"}},
 		{name: "embeddedEnvDuration", op: opDuration, config: map[string]any{"duration": "${SECS}s"}},
+		{
+			name: "untilOptions",
+			op:   opUntil,
+			config: map[string]any{
+				"until":    "${params.release_at}",
+				"offset":   "${params.shift}",
+				"timezone": "${params.zone}",
+				"if_past":  "${params.on_past}",
+				"window":   "${params.grace}",
+			},
+		},
+		{name: "bareEnvOffset", op: opUntil, config: map[string]any{"until": "09:00", "offset": "$SHIFT"}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -146,6 +158,33 @@ func TestValidateStepStillRejectsLiteralValues(t *testing.T) {
 		{name: "state", op: opFile, config: map[string]any{"path": "ready.flag", "state": "soon"}, want: `state must be "exists" or "missing"`},
 		{name: "url", op: opHTTP, config: map[string]any{"url": "ftp://example.com/ready"}, want: "url must be an absolute HTTP URL"},
 		{name: "status", op: opHTTP, config: map[string]any{"url": "http://example.com/", "status": 99}, want: "status must be between 100 and 599"},
+		{name: "clock", op: opUntil, config: map[string]any{"until": "25:00"}, want: "until must be RFC3339 timestamp or HH:MM"},
+		{name: "timezone", op: opUntil, config: map[string]any{"until": "09:00", "timezone": "Mars/Olympus"}, want: "timezone must be an IANA name"},
+		{name: "offset", op: opUntil, config: map[string]any{"until": "09:00", "offset": "bogus"}, want: "offset must be a duration"},
+		{name: "ifPast", op: opUntil, config: map[string]any{"until": "09:00", "if_past": "retry"}, want: "if_past must be"},
+		{name: "ifPastCase", op: opUntil, config: map[string]any{"until": "09:00", "if_past": "Fail"}, want: "if_past must be"},
+		{name: "windowMissing", op: opUntil, config: map[string]any{"until": "09:00", "if_past": "window"}, want: "window is required"},
+		{name: "windowWithoutIfPast", op: opUntil, config: map[string]any{"until": "09:00", "window": "5m"}, want: "window requires if_past"},
+		{
+			name:   "deferredWindowWithLiteralIfPast",
+			op:     opUntil,
+			config: map[string]any{"until": "09:00", "if_past": "fail", "window": "${params.grace}"},
+			want:   "window requires if_past",
+		},
+		{name: "windowBad", op: opUntil, config: map[string]any{"until": "09:00", "if_past": "window", "window": "bogus"}, want: "window must be a duration"},
+		{name: "offsetOnDuration", op: opDuration, config: map[string]any{"duration": "5s", "offset": "1m"}, want: "offset is only valid for until"},
+		{
+			name: "untilOptionsReportedInOrder",
+			op:   opDuration,
+			config: map[string]any{
+				"duration": "5s",
+				"offset":   "1m",
+				"timezone": "UTC",
+				"if_past":  "fail",
+				"window":   "1m",
+			},
+			want: "offset is only valid for until",
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -193,21 +232,6 @@ func TestParseStatus(t *testing.T) {
 	}
 }
 
-func TestValidateStepDefersUntilReferences(t *testing.T) {
-	t.Parallel()
-
-	require.NoError(t, validateStep(ir.Step{
-		Commands: []ir.CommandEntry{{Command: opUntil}},
-		ExecutorConfig: ir.ExecutorConfig{Type: "wait", Config: map[string]any{
-			"until":    "${params.release_at}",
-			"offset":   "${params.shift}",
-			"timezone": "${params.zone}",
-			"if_past":  "${params.on_past}",
-			"window":   "${params.grace}",
-		}},
-	}))
-}
-
 func TestParseUntilClockTimeDefersResolution(t *testing.T) {
 	t.Parallel()
 
@@ -216,45 +240,6 @@ func TestParseUntilClockTimeDefersResolution(t *testing.T) {
 	parsed, err := parseConfig(opUntil, cfg, false)
 	require.NoError(t, err)
 	require.True(t, parsed.until.IsZero())
-}
-
-func TestParseUntilRejectsBadFields(t *testing.T) {
-	t.Parallel()
-
-	for _, tt := range []struct {
-		name   string
-		config config
-		op     string
-		want   string
-	}{
-		{name: "until", config: config{Until: "tomorrow"}, op: opUntil, want: "until must be RFC3339 timestamp or HH:MM"},
-		{name: "timezone", config: config{Until: "2026-01-02T03:04:05Z", Timezone: "Mars/Olympus"}, op: opUntil, want: "timezone must be an IANA name"},
-		{name: "offset", config: config{Until: "2026-01-02T03:04:05Z", Offset: "bogus"}, op: opUntil, want: "offset must be a duration"},
-		{name: "ifPast", config: config{Until: "2026-01-02T03:04:05Z", IfPast: "retry"}, op: opUntil, want: "if_past must be"},
-		{name: "windowMissing", config: config{Until: "2026-01-02T03:04:05Z", IfPast: "window"}, op: opUntil, want: "window is required"},
-		{name: "windowMismatch", config: config{Until: "2026-01-02T03:04:05Z", Window: "5m"}, op: opUntil, want: "window requires if_past"},
-		{name: "windowBad", config: config{Until: "2026-01-02T03:04:05Z", IfPast: "window", Window: "bogus"}, op: opUntil, want: "window must be a duration"},
-		{name: "offsetOnDuration", config: config{Duration: "5s", Offset: "1m"}, op: opDuration, want: "only valid for until"},
-		{
-			name:   "untilFieldsReportedInOrder",
-			config: config{Duration: "5s", Offset: "1m", Timezone: "UTC", IfPast: "fail", Window: "1m"},
-			op:     opDuration,
-			want:   "offset is only valid for until",
-		},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			cfg := defaultConfig()
-			cfg.Until = tt.config.Until
-			cfg.Offset = tt.config.Offset
-			cfg.Timezone = tt.config.Timezone
-			cfg.IfPast = tt.config.IfPast
-			cfg.Window = tt.config.Window
-			cfg.Duration = tt.config.Duration
-			_, err := parseConfig(tt.op, cfg, false)
-			require.ErrorContains(t, err, tt.want)
-		})
-	}
 }
 
 func TestClockDeadlineAppliesOffsetBeforeRoll(t *testing.T) {
