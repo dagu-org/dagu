@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
@@ -80,7 +81,7 @@ func newACPWebSocketPeer(t *testing.T, tls bool) (*httptest.Server, <-chan struc
 				prompted <- struct{}{}
 				promptID = msg.ID
 				switch r.URL.Path {
-				case "/wait":
+				case "/wait", "/cancel":
 					continue
 				case "/drop":
 					return
@@ -106,6 +107,9 @@ func newACPWebSocketPeer(t *testing.T, tls bool) (*httptest.Server, <-chan struc
 				send(update("remote:"), update(msg.Params.Prompt[0].Text), result(msg.ID, map[string]any{"stopReason": "end_turn"}))
 			case "session/cancel":
 				cancelled <- struct{}{}
+				if r.URL.Path == "/cancel" {
+					send(result(promptID, map[string]any{"stopReason": "cancelled"}))
+				}
 			default:
 				if msg.ID == "permission" {
 					assert.True(t, strings.Contains(string(msg.Result), "selected") || strings.Contains(string(msg.Result), "cancelled"))
@@ -267,32 +271,45 @@ func TestACPWebSocketTLS(t *testing.T) {
 
 // TestACPWebSocketStop verifies explicit cancellation without remote fallback.
 func TestACPWebSocketStop(t *testing.T) {
-	server, prompted, cancelled := newACPWebSocketPeer(t, false)
-	def := &ir.HarnessDefinition{Protocol: "acp", Transport: "websocket", URL: strings.Replace(server.URL, "http", "ws", 1) + "/wait", Cwd: "/remote/workspace"}
-	step := ir.Step{ExecutorConfig: ir.ExecutorConfig{Config: map[string]any{"provider": "remote", "fallback": []any{map[string]any{"provider": "remote"}}}}, Commands: []ir.CommandEntry{{Command: "hello"}}}
-	ctx := newHarnessTestContext(t, &ir.DAG{Harnesses: ir.HarnessDefinitions{"remote": def}}, step)
-	exec, err := newHarness(ctx, step)
-	require.NoError(t, err)
-	e := exec.(*harnessExecutor)
-	done := make(chan error, 1)
-	go func() { done <- e.Run(ctx) }()
-	select {
-	case <-prompted:
-	case <-time.After(5 * time.Second):
-		t.Fatal("agent did not receive prompt")
-	}
-	require.NoError(t, e.Stop(cmdutil.ForceTermination()))
-	select {
-	case err := <-done:
-		require.ErrorIs(t, err, context.Canceled)
-	case <-time.After(5 * time.Second):
-		t.Fatal("remote ACP did not stop")
-	}
-	require.Empty(t, prompted)
-	select {
-	case <-cancelled:
-	case <-time.After(time.Second):
-		t.Fatal("agent did not receive session/cancel")
+	for _, tc := range []struct {
+		name, path string
+		intent     cmdutil.TerminationIntent
+		exitCode   int
+	}{
+		// The /cancel peer ends the turn itself after session/cancel.
+		{name: "graceful", path: "/cancel", intent: cmdutil.TerminationFromSignal(syscall.SIGTERM), exitCode: 143},
+		{name: "force", path: "/wait", intent: cmdutil.ForceTermination(), exitCode: 137},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			server, prompted, cancelled := newACPWebSocketPeer(t, false)
+			def := &ir.HarnessDefinition{Protocol: "acp", Transport: "websocket", URL: strings.Replace(server.URL, "http", "ws", 1) + tc.path, Cwd: "/remote/workspace"}
+			step := ir.Step{ExecutorConfig: ir.ExecutorConfig{Config: map[string]any{"provider": "remote", "fallback": []any{map[string]any{"provider": "remote"}}}}, Commands: []ir.CommandEntry{{Command: "hello"}}}
+			ctx := newHarnessTestContext(t, &ir.DAG{Harnesses: ir.HarnessDefinitions{"remote": def}}, step)
+			exec, err := newHarness(ctx, step)
+			require.NoError(t, err)
+			e := exec.(*harnessExecutor)
+			done := make(chan error, 1)
+			go func() { done <- e.Run(ctx) }()
+			select {
+			case <-prompted:
+			case <-time.After(5 * time.Second):
+				t.Fatal("agent did not receive prompt")
+			}
+			require.NoError(t, e.Stop(tc.intent))
+			select {
+			case err := <-done:
+				require.ErrorIs(t, err, context.Canceled)
+				require.Equal(t, tc.exitCode, e.ExitCode())
+			case <-time.After(5 * time.Second):
+				t.Fatal("remote ACP did not stop")
+			}
+			require.Empty(t, prompted)
+			select {
+			case <-cancelled:
+			case <-time.After(time.Second):
+				t.Fatal("agent did not receive session/cancel")
+			}
+		})
 	}
 }
 

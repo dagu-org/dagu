@@ -28,17 +28,7 @@ var acpRemoteDefaultHTTPClient = &http.Client{
 
 // runACPRemote shares session, permission, output, and cancellation handling across remote transports.
 // The working directory is passed to the agent unchanged, never created locally.
-func (e *harnessExecutor) runACPRemote(parent context.Context, cfg providerConfig, out io.Writer, allow bool) error {
-	ctx, cancel := context.WithCancel(parent)
-	defer cancel()
-	e.mu.Lock()
-	e.acpCancel = cancel
-	e.mu.Unlock()
-	defer func() {
-		e.mu.Lock()
-		e.acpCancel = nil
-		e.mu.Unlock()
-	}()
+func (e *harnessExecutor) runACPRemote(ctx context.Context, cfg providerConfig, client *acpHarnessClient) error {
 	for key := range cfg.flags {
 		if !reservedKeys[key] && key != "acp_permission" {
 			return fmt.Errorf("harness: remote ACP does not accept CLI option %q", key)
@@ -85,8 +75,6 @@ func (e *harnessExecutor) runACPRemote(parent context.Context, cfg providerConfi
 		stream = &acpWebSocketStream{ctx: wireCtx, conn: socket}
 		go keepACPWebSocketAlive(wireCtx, socket, 25*time.Second)
 	}
-	client, releaseClient := e.newACPClient(out, allow)
-	defer releaseClient()
 	conn := acp.NewClientSideConnection(client, stream, stream)
 	defer func() {
 		closeWire()

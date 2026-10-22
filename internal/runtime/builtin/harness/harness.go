@@ -66,7 +66,9 @@ type harnessExecutor struct {
 	mu                     sync.Mutex
 	process                *cmdutil.ManagedProcess
 	acpCancel              context.CancelFunc
+	acpClient              *acpHarnessClient
 	acpStopCode            int
+	stopRequested          bool
 	stdout                 io.Writer
 	stderr                 io.Writer
 	exitCode               int
@@ -166,8 +168,8 @@ func (e *harnessExecutor) stop(req cmdutil.StopRequest) error {
 		sessionID = e.agentSession.SessionID
 	}
 	workDir := e.workDir
-	acpCancel := e.acpCancel
-	if acpCancel != nil {
+	if req.Intent.IsTermination() {
+		e.stopRequested = true
 		e.acpStopCode = 143
 		if req.Intent.IsForce() {
 			e.acpStopCode = 137
@@ -176,6 +178,7 @@ func (e *harnessExecutor) stop(req cmdutil.StopRequest) error {
 			e.acpStopCode = 128 + int(sig)
 		}
 	}
+	acpCancel, acpClient := e.acpCancel, e.acpClient
 	process := e.process
 	cli := e.containerClient
 	containerCancel := e.containerCancel
@@ -184,8 +187,12 @@ func (e *harnessExecutor) stop(req cmdutil.StopRequest) error {
 	e.sharedContainerCancel = nil
 	e.mu.Unlock()
 
-	if acpCancel != nil {
-		acpCancel()
+	if acpCancel != nil && req.Intent.IsTermination() {
+		// A graceful stop lets the agent end its turn; the run escalates to a
+		// forced stop once max_clean_up_time_sec elapses.
+		if req.Intent.IsForce() || !acpClient.cancelTurn() {
+			acpCancel()
+		}
 		return nil
 	}
 	var stopErr error
@@ -263,13 +270,16 @@ func (e *harnessExecutor) Run(ctx context.Context) error {
 		}
 
 		lastErr = err
-		if cfg.definition != nil && cfg.definition.Protocol == ir.HarnessProtocolACP && errors.Is(err, context.Canceled) {
+		if cfg.definition != nil && cfg.definition.Protocol == ir.HarnessProtocolACP {
 			e.mu.Lock()
-			if e.acpStopCode != 0 {
-				e.exitCode = e.acpStopCode
-			}
+			stopped, stopCode := e.stopRequested, e.acpStopCode
 			e.mu.Unlock()
-			return err
+			if stopped || errors.Is(err, context.Canceled) {
+				if stopCode != 0 {
+					e.exitCode = stopCode
+				}
+				return err
+			}
 		}
 		if ctx.Err() != nil {
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {

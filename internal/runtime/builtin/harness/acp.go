@@ -23,15 +23,16 @@ import (
 	"github.com/dagucloud/dagu/v2/internal/runtime/resourcelimit"
 )
 
-// acpProgressInterval bounds run-status writes caused by streamed session updates.
-const acpProgressInterval = time.Second
+const (
+	// acpProgressInterval bounds run-status writes caused by streamed session updates.
+	acpProgressInterval = time.Second
+	// acpCancelTimeout bounds delivery of a session/cancel notification.
+	acpCancelTimeout = time.Second
+)
 
 // runACP executes one prompt over the configured ACP transport and spools its text output.
 func (e *harnessExecutor) runACP(parent context.Context, cfg providerConfig) (stdout *os.File, err error) {
 	e.exitCode = 1
-	e.mu.Lock()
-	e.acpStopCode = 0
-	e.mu.Unlock()
 	if e.step.Container != nil || rootContainerConfigured(parent) {
 		return nil, errors.New("harness: ACP is not supported inside containers")
 	}
@@ -55,9 +56,24 @@ func (e *harnessExecutor) runACP(parent context.Context, cfg providerConfig) (st
 			_ = cleanupStdoutSpool(spool)
 		}
 	}()
+	client, releaseClient := e.newACPClient(spool, policy == "allow")
+	defer releaseClient()
+	// Register before setup so a Stop that arrives while the agent starts is not lost.
+	e.mu.Lock()
+	if e.stopRequested {
+		e.mu.Unlock()
+		return nil, context.Canceled
+	}
+	e.acpCancel, e.acpClient = cancel, client
+	e.mu.Unlock()
+	defer func() {
+		e.mu.Lock()
+		e.acpCancel, e.acpClient = nil, nil
+		e.mu.Unlock()
+	}()
 	switch cfg.definition.Transport {
 	case ir.HarnessTransportWebSocket, ir.HarnessTransportHTTP:
-		if err = e.runACPRemote(ctx, cfg, spool, policy == "allow"); err != nil {
+		if err = e.runACPRemote(ctx, cfg, client); err != nil {
 			return nil, err
 		}
 		if _, err = spool.Seek(0, io.SeekStart); err != nil {
@@ -108,10 +124,8 @@ func (e *harnessExecutor) runACP(parent context.Context, cfg providerConfig) (st
 			logger.Warn(ctx, "Resource limits requested but process assignment failed", tag.Error(assignErr))
 		}
 	}
-	e.process, e.acpCancel = process, cancel
+	e.process = process
 	e.mu.Unlock()
-	client, releaseClient := e.newACPClient(spool, policy == "allow")
-	defer releaseClient()
 	conn := acp.NewClientSideConnection(client, input, output)
 	defer func() {
 		_ = input.Close()
@@ -124,7 +138,7 @@ func (e *harnessExecutor) runACP(parent context.Context, cfg providerConfig) (st
 		<-conn.Done()
 		_ = process.Release()
 		e.mu.Lock()
-		e.process, e.acpCancel = nil, nil
+		e.process = nil
 		e.mu.Unlock()
 	}()
 	defer watchACPCancellation(ctx, conn, client, func() {
@@ -159,7 +173,7 @@ func watchACPCancellation(ctx context.Context, conn *acp.ClientSideConnection, c
 			interrupt()
 			return
 		}
-		cancelCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+		cancelCtx, cancel := context.WithTimeout(context.Background(), acpCancelTimeout)
 		defer cancel()
 		sent := make(chan struct{})
 		go func() {
@@ -197,7 +211,7 @@ func (e *harnessExecutor) acpTurn(ctx context.Context, conn *acp.ClientSideConne
 		return errors.New("agent returned an empty session ID")
 	}
 	client.mu.Lock()
-	client.session = session.SessionId
+	client.conn, client.session = conn, session.SessionId
 	client.mu.Unlock()
 	prompt := promptAndScript(e.effectivePrompt(), e.script)
 	response, err := conn.Prompt(ctx, acp.PromptRequest{SessionId: session.SessionId, Prompt: []acp.ContentBlock{acp.TextBlock(prompt)}})
@@ -209,6 +223,9 @@ func (e *harnessExecutor) acpTurn(ctx context.Context, conn *acp.ClientSideConne
 	if err != nil {
 		return fmt.Errorf("prompt: %w", err)
 	}
+	if client.cancelled && response.StopReason == acp.StopReasonCancelled {
+		return context.Canceled
+	}
 	if client.err != nil {
 		return client.err
 	}
@@ -219,13 +236,15 @@ func (e *harnessExecutor) acpTurn(ctx context.Context, conn *acp.ClientSideConne
 }
 
 type acpHarnessClient struct {
-	mu       sync.Mutex
-	out      io.Writer
-	allow    bool
-	session  acp.SessionId
-	err      error
-	finished bool
-	progress chan struct{}
+	mu        sync.Mutex
+	out       io.Writer
+	allow     bool
+	conn      *acp.ClientSideConnection
+	session   acp.SessionId
+	err       error
+	cancelled bool
+	finished  bool
+	progress  chan struct{}
 }
 
 var _ acp.Client = (*acpHarnessClient)(nil)
@@ -258,6 +277,26 @@ func (e *harnessExecutor) newACPClient(out io.Writer, allow bool) (*acpHarnessCl
 	}
 }
 
+// cancelTurn asks the agent to end the active prompt with session/cancel.
+// It reports false when no prompt is in flight to cancel.
+func (c *acpHarnessClient) cancelTurn() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.conn == nil || c.finished {
+		return false
+	}
+	if !c.cancelled {
+		c.cancelled = true
+		conn, session := c.conn, c.session
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), acpCancelTimeout)
+			defer cancel()
+			_ = conn.Cancel(ctx, acp.CancelNotification{SessionId: session})
+		}()
+	}
+	return true
+}
+
 // SessionUpdate captures ordered assistant text for the active session.
 func (c *acpHarnessClient) SessionUpdate(_ context.Context, params acp.SessionNotification) error {
 	c.mu.Lock()
@@ -284,6 +323,10 @@ func (c *acpHarnessClient) SessionUpdate(_ context.Context, params acp.SessionNo
 func (c *acpHarnessClient) RequestPermission(_ context.Context, params acp.RequestPermissionRequest) (acp.RequestPermissionResponse, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	// ACP requires cancelled outcomes for requests pending after session/cancel.
+	if c.cancelled {
+		return acp.RequestPermissionResponse{Outcome: acp.RequestPermissionOutcome{Cancelled: &acp.RequestPermissionOutcomeCancelled{}}}, nil
+	}
 	if params.SessionId == c.session && c.allow {
 		for _, option := range params.Options {
 			if option.Kind == acp.PermissionOptionKindAllowOnce {

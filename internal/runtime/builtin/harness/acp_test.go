@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
@@ -83,6 +84,8 @@ func TestACPAgent(_ *testing.T) {
 				os.Exit(7)
 			}
 			if mode == "wait" {
+				// Marks the turn as in flight for stop tests.
+				_ = os.WriteFile("prompted", nil, 0o600)
 				continue
 			}
 			if mode == "permission" {
@@ -115,6 +118,11 @@ func TestACPAgent(_ *testing.T) {
 			}
 			finish(reason)
 		case "session/cancel":
+			if mode == "wait" {
+				// Cleanup that a forced kill would cut short.
+				time.Sleep(100 * time.Millisecond)
+				_ = os.WriteFile("cancelled", nil, 0o600)
+			}
 			finish("cancelled")
 		default:
 			if msg.ID == "permission-1" {
@@ -203,31 +211,65 @@ func TestACPFallback(t *testing.T) {
 	require.Contains(t, stderr.String(), "trying fallback")
 }
 
-// TestACPStop verifies that an explicit stop cancels the turn without trying a fallback.
+// TestACPStop verifies that an explicit stop ends the turn without trying a
+// fallback. A graceful stop leaves the agent time to answer session/cancel.
 func TestACPStop(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		intent   cmdutil.TerminationIntent
+		exitCode int
+		graceful bool
+	}{
+		{name: "graceful", intent: cmdutil.TerminationFromSignal(syscall.SIGTERM), exitCode: 143, graceful: true},
+		{name: "force", intent: cmdutil.ForceTermination(), exitCode: 137},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			binary, err := os.Executable()
+			require.NoError(t, err)
+			dag := &ir.DAG{Harnesses: ir.HarnessDefinitions{"agent": {Protocol: "acp", Binary: binary, PrefixArgs: []string{"-test.run=^TestACPAgent$", "--", "--acp-test-agent", "wait"}}}}
+			step := ir.Step{ExecutorConfig: ir.ExecutorConfig{Config: map[string]any{"provider": "agent", "fallback": []any{map[string]any{"provider": "agent"}}}}, Commands: []ir.CommandEntry{{Command: "hello"}}}
+			ctx := newHarnessTestContext(t, dag, step)
+			exec, err := newHarness(ctx, step)
+			require.NoError(t, err)
+			e := exec.(*harnessExecutor)
+			done := make(chan error, 1)
+			go func() { done <- e.Run(ctx) }()
+			require.Eventually(t, func() bool {
+				_, err := os.Stat(filepath.Join(e.workDir, "prompted"))
+				return err == nil
+			}, 5*time.Second, 10*time.Millisecond)
+			require.NoError(t, e.Stop(tc.intent))
+			select {
+			case err := <-done:
+				require.ErrorIs(t, err, context.Canceled)
+				require.Equal(t, tc.exitCode, e.ExitCode())
+			case <-time.After(5 * time.Second):
+				t.Fatal("ACP process did not stop")
+			}
+			if tc.graceful {
+				require.FileExists(t, filepath.Join(e.workDir, "cancelled"))
+			}
+		})
+	}
+}
+
+// TestACPStopEarly verifies that a stop requested before the agent starts is
+// not lost and no attempt runs.
+func TestACPStopEarly(t *testing.T) {
 	binary, err := os.Executable()
 	require.NoError(t, err)
-	dag := &ir.DAG{Harnesses: ir.HarnessDefinitions{"agent": {Protocol: "acp", Binary: binary, PrefixArgs: []string{"-test.run=^TestACPAgent$", "--", "--acp-test-agent", "wait"}}}}
+	dag := &ir.DAG{Harnesses: ir.HarnessDefinitions{"agent": {Protocol: "acp", Binary: binary, PrefixArgs: []string{"-test.run=^TestACPAgent$", "--", "--acp-test-agent", "echo"}}}}
 	step := ir.Step{ExecutorConfig: ir.ExecutorConfig{Config: map[string]any{"provider": "agent", "fallback": []any{map[string]any{"provider": "agent"}}}}, Commands: []ir.CommandEntry{{Command: "hello"}}}
 	ctx := newHarnessTestContext(t, dag, step)
 	exec, err := newHarness(ctx, step)
 	require.NoError(t, err)
 	e := exec.(*harnessExecutor)
-	done := make(chan error, 1)
-	go func() { done <- e.Run(ctx) }()
-	require.Eventually(t, func() bool {
-		e.mu.Lock()
-		defer e.mu.Unlock()
-		return e.acpCancel != nil
-	}, 5*time.Second, 10*time.Millisecond)
-	require.NoError(t, e.Stop(cmdutil.ForceTermination()))
-	select {
-	case err := <-done:
-		require.ErrorIs(t, err, context.Canceled)
-		require.Equal(t, 137, e.ExitCode())
-	case <-time.After(5 * time.Second):
-		t.Fatal("ACP process did not stop")
-	}
+	var out bytes.Buffer
+	e.SetStdout(&out)
+	require.NoError(t, e.Stop(cmdutil.TerminationFromSignal(syscall.SIGTERM)))
+	require.ErrorIs(t, e.Run(ctx), context.Canceled)
+	require.Equal(t, 143, e.ExitCode())
+	require.Empty(t, out.String())
 }
 
 // TestACPProgress checks that streamed chunks report progress without one
