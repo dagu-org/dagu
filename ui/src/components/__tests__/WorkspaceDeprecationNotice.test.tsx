@@ -26,6 +26,17 @@ vi.mock('@/contexts/RemoteNodeContext', () => ({
 
 const useIsAdminMock = vi.mocked(useIsAdmin);
 
+const iconName = 'Workspaces are removed in v3.0';
+const billing = {
+  kind: WorkspaceDeprecationItemKind.baseConfig,
+  name: 'billing',
+};
+const payments = {
+  kind: WorkspaceDeprecationItemKind.baseConfig,
+  name: 'payments',
+};
+const alice = { kind: WorkspaceDeprecationItemKind.user, name: 'alice' };
+
 function respondWith(
   items: { kind: WorkspaceDeprecationItemKind; name: string }[]
 ) {
@@ -45,36 +56,51 @@ function renderNotice() {
 describe('WorkspaceDeprecationNotice', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
     useIsAdminMock.mockReturnValue(true);
   });
 
-  it('lists each workspace setting once an admin opens it', async () => {
-    respondWith([
-      {
-        kind: WorkspaceDeprecationItemKind.baseConfig,
-        name: '/dags/workspaces/billing/base.yaml',
-      },
-      { kind: WorkspaceDeprecationItemKind.user, name: 'alice' },
-    ]);
+  it('lists the settings by kind once an admin opens it', async () => {
+    respondWith([billing, payments, alice]);
 
     renderNotice();
 
     expect(screen.queryByText('alice')).not.toBeInTheDocument();
 
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Workspaces are removed in v3.0' })
-    );
+    await userEvent.click(screen.getByRole('button', { name: iconName }));
 
     const dialog = screen.getByRole('dialog');
-    expect(dialog).toHaveTextContent(
-      'Base config /dags/workspaces/billing/base.yaml'
-    );
-    expect(dialog).toHaveTextContent('User alice');
+    expect(dialog).toHaveTextContent('Base configbilling, payments');
+    expect(dialog).toHaveTextContent('Useralice');
     expect(
       screen.getByRole('link', {
         name: 'Have feedback? Comment on the GitHub issue.',
       })
     ).toHaveAttribute('href', 'https://github.com/dagucloud/dagu/issues/3288');
+  });
+
+  it('stays hidden after a dismissal until another setting appears', async () => {
+    respondWith([billing]);
+    const first = renderNotice();
+
+    await userEvent.click(screen.getByRole('button', { name: iconName }));
+    await userEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+
+    expect(
+      screen.queryByRole('button', { name: iconName })
+    ).not.toBeInTheDocument();
+
+    // A later visit reads the dismissal back from the browser.
+    first.unmount();
+    const second = renderNotice();
+    expect(
+      screen.queryByRole('button', { name: iconName })
+    ).not.toBeInTheDocument();
+
+    second.unmount();
+    respondWith([billing, payments]);
+    renderNotice();
+    expect(screen.getByRole('button', { name: iconName })).toBeInTheDocument();
   });
 
   it('renders nothing when no workspace setting is in use', () => {

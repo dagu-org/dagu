@@ -76,6 +76,7 @@ The message lists every item, not the first one found.
 - A startup warning listing each item from the table that is in use.
 - An admin notice with the same list, behind a sidebar icon, that links to
   the feedback issue [#3288](https://github.com/dagucloud/dagu/issues/3288).
+  A dismissal hides it until another setting comes into use.
 - Release notes that point to the table above.
 - No new workspace features.
 

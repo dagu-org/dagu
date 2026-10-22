@@ -3,11 +3,13 @@
 
 /**
  * Admin notice listing the workspace settings that stop applying when
- * workspaces are removed in v3.0. It stays a small icon until opened.
+ * workspaces are removed in v3.0. It stays a small icon until opened, and a
+ * dismissal hides it until another setting comes into use.
  *
  * @module components
  */
-import { WorkspaceDeprecationItemKind } from '@/api/v1/schema';
+import { WorkspaceDeprecationItemKind, type components } from '@/api/v1/schema';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -20,7 +22,11 @@ import { useIsAdmin } from '@/contexts/AuthContext';
 import { useRemoteNode } from '@/contexts/RemoteNodeContext';
 import { useQuery } from '@/hooks/api';
 import { useI18n } from '@/i18n/I18nProvider';
+import { writeLocalStorage } from '@/lib/local-storage-migration';
 import { AlertTriangle } from 'lucide-react';
+import * as React from 'react';
+
+type Item = components['schemas']['WorkspaceDeprecationItem'];
 
 const feedbackIssueURL = 'https://github.com/dagucloud/dagu/issues/3288';
 
@@ -36,6 +42,30 @@ const kindLabels: Record<WorkspaceDeprecationItemKind, string> = {
   [WorkspaceDeprecationItemKind.wikiDirectory]: 'Wiki directory',
 };
 
+function itemKey(item: Item): string {
+  return `${item.kind}:${item.name}`;
+}
+
+function readDismissed(storageKey: string): string[] {
+  try {
+    const value: unknown = JSON.parse(localStorage.getItem(storageKey) ?? '[]');
+    return Array.isArray(value) ? value : [];
+  } catch {
+    return [];
+  }
+}
+
+// Groups names by kind, keeping the order the server returns.
+function groupByKind(
+  items: Item[]
+): [WorkspaceDeprecationItemKind, string[]][] {
+  const groups = new Map<WorkspaceDeprecationItemKind, string[]>();
+  for (const item of items) {
+    groups.set(item.kind, [...(groups.get(item.kind) ?? []), item.name]);
+  }
+  return [...groups];
+}
+
 export function WorkspaceDeprecationNotice() {
   const { ts } = useI18n();
   const isAdmin = useIsAdmin();
@@ -44,11 +74,25 @@ export function WorkspaceDeprecationNotice() {
     '/workspaces/deprecation',
     isAdmin ? { params: { query: { remoteNode } } } : null
   );
+  const storageKey = `workspace-deprecation-dismissed-${remoteNode}`;
+  const [dismissed, setDismissed] = React.useState<Record<string, string[]>>(
+    {}
+  );
 
   const items = data?.items ?? [];
-  if (!isAdmin || items.length === 0) {
+  const dismissedKeys = dismissed[storageKey] ?? readDismissed(storageKey);
+  if (
+    !isAdmin ||
+    items.every((item) => dismissedKeys.includes(itemKey(item)))
+  ) {
     return null;
   }
+
+  const dismiss = () => {
+    const keys = items.map(itemKey);
+    writeLocalStorage(storageKey, JSON.stringify(keys));
+    setDismissed((prev) => ({ ...prev, [storageKey]: keys }));
+  };
 
   const title = ts('Workspaces are removed in v3.0');
   return (
@@ -69,22 +113,29 @@ export function WorkspaceDeprecationNotice() {
             )}
           </DialogDescription>
         </DialogHeader>
-        <ul className="space-y-1 text-sm">
-          {items.map((item) => (
-            <li key={`${item.kind}:${item.name}`}>
-              <span className="font-medium">{ts(kindLabels[item.kind])}</span>{' '}
-              <code className="break-all font-mono text-xs">{item.name}</code>
-            </li>
+        <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
+          {groupByKind(items).map(([kind, names]) => (
+            <React.Fragment key={kind}>
+              <dt className="font-medium">{ts(kindLabels[kind])}</dt>
+              <dd className="break-words font-mono text-xs leading-5">
+                {names.join(', ')}
+              </dd>
+            </React.Fragment>
           ))}
-        </ul>
-        <a
-          href={feedbackIssueURL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-sm text-muted-foreground underline hover:no-underline"
-        >
-          {ts('Have feedback? Comment on the GitHub issue.')}
-        </a>
+        </dl>
+        <div className="flex items-center justify-between gap-3">
+          <a
+            href={feedbackIssueURL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-muted-foreground underline hover:no-underline"
+          >
+            {ts('Have feedback? Comment on the GitHub issue.')}
+          </a>
+          <Button variant="outline" size="sm" onClick={dismiss}>
+            {ts('Dismiss')}
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );
