@@ -57,16 +57,19 @@ const (
 	InstallMethodBinary
 	InstallMethodHomebrew
 	InstallMethodSnap
-	InstallMethodDocker
+	InstallMethodContainer
 	InstallMethodGoInstall
 )
+
+// containerMarkerFiles are created inside containers by Docker and Podman.
+var containerMarkerFiles = []string{"/.dockerenv", "/run/.containerenv"}
 
 var installMethodNames = map[InstallMethod]string{
 	InstallMethodUnknown:   "unknown",
 	InstallMethodBinary:    "binary",
 	InstallMethodHomebrew:  "homebrew",
 	InstallMethodSnap:      "snap",
-	InstallMethodDocker:    "docker",
+	InstallMethodContainer: "container",
 	InstallMethodGoInstall: "go install",
 }
 
@@ -109,9 +112,8 @@ func DetectInstallMethod() InstallMethod {
 		return InstallMethodSnap
 	}
 
-	// Docker: /.dockerenv exists
-	if _, err := os.Stat("/.dockerenv"); err == nil {
-		return InstallMethodDocker
+	if runningInContainer() {
+		return InstallMethodContainer
 	}
 
 	// Go install: path in GOPATH/bin or GOBIN
@@ -127,6 +129,21 @@ func DetectInstallMethod() InstallMethod {
 	return InstallMethodBinary
 }
 
+// runningInContainer reports whether dagu runs in an application container,
+// which is updated by pulling a new image rather than replacing its binary.
+func runningInContainer() bool {
+	// Kubernetes sets this in every pod, whichever container runtime runs it.
+	if os.Getenv("KUBERNETES_SERVICE_HOST") != "" {
+		return true
+	}
+	for _, marker := range containerMarkerFiles {
+		if _, err := os.Stat(marker); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
 // CanSelfUpgrade returns true if dagu can perform a self-upgrade.
 func CanSelfUpgrade() (bool, string) {
 	method := DetectInstallMethod()
@@ -135,8 +152,8 @@ func CanSelfUpgrade() (bool, string) {
 		return false, fmt.Sprintf("Installed via Homebrew. Use '%s' instead.", method.UpgradeCommand())
 	case InstallMethodSnap:
 		return false, fmt.Sprintf("Installed via Snap. Use '%s' instead.", method.UpgradeCommand())
-	case InstallMethodDocker:
-		return false, "Running in Docker. Pull the latest image instead."
+	case InstallMethodContainer:
+		return false, "Running in a container. Pull the latest image instead."
 	case InstallMethodGoInstall:
 		return false, fmt.Sprintf("Installed via go install. Use '%s' instead.", method.UpgradeCommand())
 	case InstallMethodUnknown, InstallMethodBinary:

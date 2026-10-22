@@ -484,17 +484,25 @@ func TestDetectInstallMethod(t *testing.T) {
 		InstallMethodGoInstall: true,
 		InstallMethodHomebrew:  true,
 		InstallMethodSnap:      true,
-		InstallMethodDocker:    true,
+		InstallMethodContainer: true,
 		InstallMethodUnknown:   true,
 	}
 	if !validMethods[method] {
 		t.Errorf("DetectInstallMethod() returned unknown method: %v", method)
 	}
 
-	knownStrings := []string{"binary", "go install", "homebrew", "snap", "docker", "unknown"}
+	knownStrings := []string{"binary", "go install", "homebrew", "snap", "container", "unknown"}
 	if !slices.Contains(knownStrings, method.String()) {
 		t.Errorf("DetectInstallMethod().String() returned unexpected value: %q", method.String())
 	}
+}
+
+// Kubernetes runtimes such as containerd and CRI-O do not create /.dockerenv.
+func TestDetectInstallMethodInKubernetes(t *testing.T) {
+	t.Setenv("SNAP", "")
+	t.Setenv("KUBERNETES_SERVICE_HOST", "10.96.0.1")
+
+	require.Equal(t, InstallMethodContainer, DetectInstallMethod())
 }
 
 func TestInstallMethodString(t *testing.T) {
@@ -506,7 +514,7 @@ func TestInstallMethodString(t *testing.T) {
 		{InstallMethodBinary, "binary"},
 		{InstallMethodHomebrew, "homebrew"},
 		{InstallMethodSnap, "snap"},
-		{InstallMethodDocker, "docker"},
+		{InstallMethodContainer, "container"},
 		{InstallMethodGoInstall, "go install"},
 		{InstallMethod(99), "unknown"},
 	}
@@ -532,7 +540,7 @@ func TestInstallMethodUpgradeCommand(t *testing.T) {
 		{InstallMethodSnap, "snap refresh dagu"},
 		{InstallMethodGoInstall, "go install github.com/dagucloud/dagu/v2/cmd@latest"},
 		// Updating a container means pulling an image and recreating it.
-		{InstallMethodDocker, ""},
+		{InstallMethodContainer, ""},
 	}
 
 	for _, tt := range tests {
