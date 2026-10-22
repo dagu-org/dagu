@@ -206,7 +206,7 @@ func canonicalBuiltinHarnessFlagKey(key string) string {
 
 func isBuiltinHarnessReservedKey(key string) bool {
 	switch key {
-	case "provider", "fallback":
+	case "provider", "fallback", "acp_permission":
 		return true
 	default:
 		return false

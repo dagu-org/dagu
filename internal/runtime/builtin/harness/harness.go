@@ -905,9 +905,10 @@ func (e *harnessExecutor) stderrWriter() io.Writer {
 
 // reservedKeys are config keys consumed by the harness executor itself, not passed as CLI flags.
 var reservedKeys = map[string]bool{
-	"provider": true,
-	"fallback": true,
-	"managed":  true,
+	"provider":       true,
+	"fallback":       true,
+	"managed":        true,
+	acpPermissionKey: true,
 }
 
 // configToFlags converts config map entries into CLI flags.

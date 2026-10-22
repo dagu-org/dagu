@@ -179,8 +179,8 @@ session SSE streams; endpoints must implement that profile.
 All transports capture assistant text as stdout and support ordered fallback.
 `with.stdin` is appended to the prompt after a blank line. `with.acp_permission`
 defaults to `deny`; `allow` selects only an offered `allow_once` permission and
-never grants persistent approval. A DAG-level `acp_permission` reaches only ACP
-steps, never CLI providers. A denial selects the agent's reject option and
+never grants persistent approval. A DAG-level `acp_permission` applies only to
+ACP steps; CLI providers never receive it as a flag. A denial selects the agent's reject option and
 fails the attempt. Only `end_turn` succeeds. A graceful Stop sends
 `session/cancel` and waits for the agent to end its turn; a forced Stop (after
 `max_clean_up_time_sec`) or a timeout also closes the connection. Stop skips

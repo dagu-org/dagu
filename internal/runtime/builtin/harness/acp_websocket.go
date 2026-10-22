@@ -32,7 +32,7 @@ var acpRemoteDefaultHTTPClient = &http.Client{
 // The working directory is passed to the agent unchanged, never created locally.
 func (e *harnessExecutor) runACPRemote(ctx context.Context, cfg providerConfig, client *acpHarnessClient) error {
 	for key := range cfg.flags {
-		if !reservedKeys[key] && key != acpPermissionKey {
+		if !reservedKeys[key] {
 			return fmt.Errorf("harness: remote ACP does not accept CLI option %q", key)
 		}
 	}

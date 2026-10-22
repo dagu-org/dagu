@@ -2260,12 +2260,6 @@ func mergeHarnessConfig(dagHarness *ir.HarnessConfig, defs ir.HarnessDefinitions
 
 	def := defs[effectiveProvider]
 	dagConfig := dagHarness.Config
-	if def == nil || def.Protocol != ir.HarnessProtocolACP {
-		// Only ACP providers consume acp_permission; CLI providers would receive
-		// it as an unknown flag.
-		dagConfig = maps.Clone(dagConfig)
-		delete(dagConfig, "acp_permission")
-	}
 	if ir.IsEffectiveBuiltinCLIHarnessProvider(effectiveProvider, defs) {
 		dagConfig = ir.NormalizeBuiltinHarnessFlagKeys(dagConfig)
 	}
