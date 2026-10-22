@@ -6,6 +6,7 @@ package upgrade
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"time"
@@ -32,17 +33,45 @@ type RunningBinary struct {
 
 // CaptureRunningBinary records the executable file the current process started from.
 func CaptureRunningBinary() (*RunningBinary, error) {
-	// The path stays unresolved so that a package manager repointing a
-	// symlink to a new release also counts as a replacement.
-	path, err := os.Executable()
+	executable, err := os.Executable()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get executable path: %w", err)
 	}
-	return newRunningBinary(path)
+	var arg0 string
+	if len(os.Args) > 0 {
+		arg0 = os.Args[0]
+	}
+	return newRunningBinary(launchPath(arg0, executable))
+}
+
+// launchPath returns the absolute path that arg0 resolves to when it reaches
+// the running executable, and executable otherwise. os.Executable may resolve
+// symlinks (Linux reads /proc/self/exe), while package managers upgrade by
+// repointing the symlink the process was launched through.
+func launchPath(arg0, executable string) string {
+	if arg0 == "" {
+		return executable
+	}
+	path, err := exec.LookPath(arg0)
+	if err != nil {
+		return executable
+	}
+	if path, err = filepath.Abs(path); err != nil {
+		return executable
+	}
+	launched, err := os.Stat(path)
+	if err != nil {
+		return executable
+	}
+	running, err := os.Stat(executable)
+	if err != nil || !os.SameFile(launched, running) {
+		return executable
+	}
+	return path
 }
 
 func newRunningBinary(path string) (*RunningBinary, error) {
-	info, err := os.Stat(path)
+	info, err := os.Stat(path) //nolint:gosec // path is this process's own executable
 	if err != nil {
 		return nil, fmt.Errorf("failed to stat executable: %w", err)
 	}
