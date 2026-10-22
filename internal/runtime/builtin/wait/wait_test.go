@@ -5,6 +5,7 @@ package wait
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -167,7 +168,11 @@ func TestParseStatus(t *testing.T) {
 		{name: "unset", raw: nil, want: http.StatusOK},
 		{name: "integer", raw: http.StatusNoContent, want: http.StatusNoContent},
 		{name: "yamlInteger", raw: uint64(http.StatusNoContent), want: http.StatusNoContent},
-		{name: "negativeInteger", raw: int64(99), wantErrSubstr: "status must be between 100 and 599"},
+		{name: "int32", raw: int32(http.StatusNoContent), want: http.StatusNoContent},
+		{name: "jsonNumber", raw: json.Number("204"), want: http.StatusNoContent},
+		{name: "wholeFloat", raw: float64(http.StatusNoContent), want: http.StatusNoContent},
+		{name: "negativeInteger", raw: int64(-1), wantErrSubstr: "status must be between 100 and 599"},
+		{name: "overflowingUint", raw: uint64(1<<32 + http.StatusOK), wantErrSubstr: "status must be between 100 and 599"},
 		{name: "fractional", raw: 204.5, wantErrSubstr: "status must be between 100 and 599"},
 		{name: "numericString", raw: "204", want: http.StatusNoContent},
 		{name: "badString", raw: "soon", wantErrSubstr: "status must be between 100 and 599"},

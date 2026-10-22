@@ -202,7 +202,7 @@ func (e *executorImpl) waitHTTP(ctx context.Context) error {
 		}
 		defer func() { _ = resp.Body.Close() }()
 		_, _ = io.Copy(io.Discard, resp.Body)
-		return resp.StatusCode == e.cfg.status, nil
+		return resp.StatusCode == e.cfg.expectedStatus, nil
 	})
 }
 

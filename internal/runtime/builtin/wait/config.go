@@ -36,7 +36,7 @@ type parsedConfig struct {
 	config
 	duration       time.Duration
 	until          time.Time
-	status         int
+	expectedStatus int
 	pollInterval   time.Duration
 	requestTimeout time.Duration
 }
@@ -143,7 +143,7 @@ func parseConfig(operation string, cfg config, deferReferences bool) (parsedConf
 			if err != nil {
 				return parsed, withUnresolvedHint(err, statusText)
 			}
-			parsed.status = status
+			parsed.expectedStatus = status
 		}
 	default:
 		return parsed, fmt.Errorf("wait: unsupported operation %q", operation)
@@ -162,37 +162,25 @@ func withUnresolvedHint(err error, raw string) error {
 	return fmt.Errorf("%w (value holds an unresolved reference)", err)
 }
 
+// Bounds of a valid with.status.
+const (
+	minHTTPStatus = 100
+	maxHTTPStatus = 599
+)
+
+var errInvalidStatus = fmt.Errorf("wait: status must be between %d and %d", minHTTPStatus, maxHTTPStatus)
+
+// parseStatus reads with.status from any scalar whose text is an integer, such
+// as 204 or "204", and defaults to 200 when it is unset.
 func parseStatus(raw any) (int, error) {
-	invalid := fmt.Errorf("wait: status must be between 100 and 599")
 	if raw == nil {
 		return http.StatusOK, nil
 	}
-	var n int
-	switch v := raw.(type) {
-	case string:
-		parsed, err := strconv.Atoi(strings.TrimSpace(v))
-		if err != nil {
-			return 0, invalid
-		}
-		n = parsed
-	case int:
-		n = v
-	case int64:
-		n = int(v)
-	case uint64:
-		n = int(v)
-	case float64:
-		if v != float64(int(v)) {
-			return 0, invalid
-		}
-		n = int(v)
-	default:
-		return 0, invalid
+	status, err := strconv.Atoi(strings.TrimSpace(fmt.Sprint(raw)))
+	if err != nil || status < minHTTPStatus || status > maxHTTPStatus {
+		return 0, errInvalidStatus
 	}
-	if n < 100 || n > 599 {
-		return 0, invalid
-	}
-	return n, nil
+	return status, nil
 }
 
 func parsePositiveDuration(field, value string) (time.Duration, error) {
@@ -220,7 +208,7 @@ var configSchema = &jsonschema.Schema{
 		"state":           {Type: "string", Description: "File state to wait for: exists or missing. Defaults to exists."},
 		"url":             {Type: "string", Description: "Absolute URL for action: wait.http."},
 		"method":          {Type: "string", Description: "HTTP method for action: wait.http. Defaults to GET."},
-		"status":          {Types: []string{"integer", "string"}, Minimum: new(float64(100)), Maximum: new(float64(599)), Description: "Expected HTTP status for action: wait.http. Defaults to 200."},
+		"status":          {Types: []string{"integer", "string"}, Minimum: new(float64(minHTTPStatus)), Maximum: new(float64(maxHTTPStatus)), Description: "Expected HTTP status for action: wait.http. Defaults to 200."},
 		"headers":         {Type: "object", AdditionalProperties: &jsonschema.Schema{Type: "string"}, Description: "HTTP headers for action: wait.http."},
 		"body":            {Type: "string", Description: "HTTP request body for action: wait.http."},
 		"poll_interval":   {Type: "string", Description: "Polling interval for wait.file and wait.http. Defaults to 1s."},
