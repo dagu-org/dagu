@@ -15,12 +15,21 @@ export type LicenseConnectStatus =
 
 const POLL_INTERVAL_MS = 2000;
 
+/** Asks the approval page to offer the trial of paid features first. */
+function withTrial(url: string | undefined, trial: boolean) {
+  if (!url || !trial) return url;
+  const next = new URL(url);
+  next.searchParams.set('trial', '1');
+  return next.toString();
+}
+
 /**
  * Drives a request to connect the selected server to Dagu Console: starts it,
  * opens the approval page, and follows it until it is approved, fails, or
  * expires. `start` takes what the server reports once connected, if chosen,
- * and `retry` starts again with the same choice. `failure` says why the last
- * request failed, if it did.
+ * and whether to start the trial of paid features; `retry` starts again with
+ * the same choices. `connectUrl` opens the approval page of the pending
+ * request. `failure` says why the last request failed, if it did.
  */
 export function useLicenseConnect(remoteNode: string) {
   const client = useClient();
@@ -30,6 +39,7 @@ export function useLicenseConnect(remoteNode: string) {
   const [error, setError] = useState<string | null>(null);
   const [popupBlocked, setPopupBlocked] = useState(false);
   const lastReport = useRef<LicenseMonitoringLevel | undefined>(undefined);
+  const [trial, setTrial] = useState(false);
 
   const pending = status?.state === LicenseConnectStatusState.pending;
   useEffect(() => {
@@ -52,11 +62,12 @@ export function useLicenseConnect(remoteNode: string) {
   }, [pending, client, remoteNode]);
 
   const start = useCallback(
-    async (report?: LicenseMonitoringLevel) => {
+    async (report?: LicenseMonitoringLevel, withTrialOffer = false) => {
       // Opened before any await so the browser treats it as a user action.
       const tab = window.open('about:blank', '_blank');
       if (tab) tab.opener = null;
       lastReport.current = report;
+      setTrial(withTrialOffer);
       setStarting(true);
       setError(null);
       setPopupBlocked(false);
@@ -76,7 +87,7 @@ export function useLicenseConnect(remoteNode: string) {
         }
         setStatus(data);
         if (tab && data.connectUrl) {
-          tab.location.href = data.connectUrl;
+          tab.location.href = withTrial(data.connectUrl, withTrialOffer)!;
         } else {
           tab?.close();
           setPopupBlocked(true);
@@ -95,7 +106,10 @@ export function useLicenseConnect(remoteNode: string) {
     [client, remoteNode, ts]
   );
 
-  const retry = useCallback(() => start(lastReport.current), [start]);
+  const retry = useCallback(
+    () => start(lastReport.current, trial),
+    [start, trial]
+  );
 
   // The request stays pending here until the server confirms the cancel;
   // otherwise an approval could still install a license after "Cancel".
@@ -128,6 +142,7 @@ export function useLicenseConnect(remoteNode: string) {
 
   return {
     status,
+    connectUrl: withTrial(status?.connectUrl, trial),
     starting,
     error,
     failure,

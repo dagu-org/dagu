@@ -13,6 +13,7 @@ import {
   type ReportingLevel,
 } from '@/components/MonitoringDialog';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import type { LicenseMonitoring } from '@/hooks/useLicenseMonitoring';
 import { useI18n } from '@/i18n/I18nProvider';
 import dayjs from '@/lib/dayjs';
@@ -42,22 +43,26 @@ function Countdown({ expiresAt }: { expiresAt?: string }) {
  * waits for approval, or why the last request failed with a way to retry.
  * Otherwise it offers to connect the server so that Dagu Console monitors it
  * for free, reporting from the moment it connects at the level chosen here,
- * or at the level the configuration sets. The page header starts the same
- * request without choosing a level.
+ * or at the level the configuration sets, and optionally to start the trial
+ * of paid features in the same approval.
  */
 export function ConnectSection({
   connect,
   monitoring,
   disabled,
+  trialRequested = false,
 }: {
   connect: ReturnType<typeof useLicenseConnect>;
   /** What the server reports; unknown while loading or unavailable. */
   monitoring?: LicenseMonitoring;
   disabled: boolean;
+  /** Whether the trial starts out chosen, as when a page asked for it. */
+  trialRequested?: boolean;
 }) {
   const { ts } = useI18n();
   const {
     status,
+    connectUrl,
     starting,
     error,
     failure,
@@ -69,6 +74,10 @@ export function ConnectSection({
   const [report, setReport] = useState<ReportingLevel>(
     LicenseMonitoringLevel.errors
   );
+  const [trial, setTrial] = useState(trialRequested);
+  useEffect(() => {
+    if (trialRequested) setTrial(true);
+  }, [trialRequested]);
   // A level an administrator chose before, as on a server that connected
   // earlier, stays chosen.
   const chosen =
@@ -153,19 +162,37 @@ export function ConnectSection({
             <p className="text-xs text-muted-foreground">{ts(neverSent)}</p>
           </>
         )}
+        <label className="flex items-start gap-2 text-sm">
+          <Checkbox
+            className="mt-0.5"
+            checked={trial}
+            disabled={disabled || starting}
+            onCheckedChange={(checked) => setTrial(checked === true)}
+          />
+          <span className="space-y-0.5">
+            <span className="block">
+              {ts('Also try paid features free for 14 days')}
+            </span>
+            <span className="block text-xs text-muted-foreground">
+              {ts(
+                'Audit logs, role-based access, single sign-on, and chat and webhook alerts. No card needed; free monitoring stays when the trial ends.'
+              )}
+            </span>
+          </span>
+        </label>
         <div className="flex justify-end">
           <Button
             size="sm"
             variant="primary"
             disabled={disabled || starting}
-            onClick={() => void start(configured ? undefined : report)}
+            onClick={() => void start(configured ? undefined : report, trial)}
           >
             {starting ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : (
               <ExternalLink className="h-3.5 w-3.5" />
             )}
-            {ts('Connect for free')}
+            {ts(trial ? 'Connect and start trial' : 'Connect for free')}
           </Button>
         </div>
       </section>
@@ -198,7 +225,7 @@ export function ConnectSection({
       )}
       <div className="flex flex-wrap items-center gap-2">
         <Button asChild size="sm" variant="primary">
-          <a href={status.connectUrl} target="_blank" rel="noopener noreferrer">
+          <a href={connectUrl} target="_blank" rel="noopener noreferrer">
             <ExternalLink className="h-3.5 w-3.5" />
             {ts('Open Dagu Console')}
           </a>
