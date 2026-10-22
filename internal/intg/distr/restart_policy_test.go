@@ -24,22 +24,36 @@ import (
 // alwaysOnRuns returns the runs of the fixture DAG, newest first.
 func (f *testFixture) alwaysOnRuns() []ir.DAGRunStatus {
 	f.t.Helper()
-	runs, err := f.coord.DAGRunRepository.RecentStatuses(f.coord.Context, f.dagWrapper.Name, 100)
+	runs, err := f.readAlwaysOnRuns()
 	require.NoError(f.t, err)
-	slices.SortStableFunc(runs, func(a, b ir.DAGRunStatus) int {
-		return cmp.Compare(b.CreatedAt, a.CreatedAt)
-	})
 	return runs
 }
 
+func (f *testFixture) readAlwaysOnRuns() ([]ir.DAGRunStatus, error) {
+	runs, err := f.coord.DAGRunRepository.RecentStatuses(f.coord.Context, f.dagWrapper.Name, 100)
+	if err != nil {
+		return nil, err
+	}
+	slices.SortStableFunc(runs, func(a, b ir.DAGRunStatus) int {
+		return cmp.Compare(b.CreatedAt, a.CreatedAt)
+	})
+	return runs, nil
+}
+
 // waitForAlwaysOnRuns waits until the runs of the fixture DAG satisfy cond.
+// The condition runs on another goroutine, where a failing require would only
+// stop that goroutine, so a read error ends the wait and fails the test after it.
 func (f *testFixture) waitForAlwaysOnRuns(label string, timeout time.Duration, cond func([]ir.DAGRunStatus) bool) []ir.DAGRunStatus {
 	f.t.Helper()
-	var runs []ir.DAGRunStatus
+	var (
+		runs    []ir.DAGRunStatus
+		readErr error
+	)
 	f.requireEventuallyNoSchedulerError(label, timeout, 100*time.Millisecond, func() bool {
-		runs = f.alwaysOnRuns()
-		return cond(runs)
+		runs, readErr = f.readAlwaysOnRuns()
+		return readErr != nil || cond(runs)
 	})
+	require.NoError(f.t, readErr)
 	return runs
 }
 
@@ -120,10 +134,11 @@ func TestDistributedRun_AlwaysOnDAGRestartsOnAnotherWorkerAfterCrash(t *testing.
 	}
 	require.NoError(t, cmdutil.TerminateProcessGroup(workers[first.WorkerID], cmdutil.ForceTermination()))
 
+	// An overlap ends the wait at once, to be reported after it.
 	runs = f.waitForAlwaysOnRuns("the crashed run failed and a restart running", failureTimeout, func(runs []ir.DAGRunStatus) bool {
-		require.LessOrEqual(t, activeRunCount(runs), 1, "two runs of an always-on DAG overlap")
-		return len(runs) >= 2 && runs[0].Status == ir.Running && runs[0].DAGRunID != first.DAGRunID
+		return activeRunCount(runs) > 1 || len(runs) >= 2 && runs[0].Status == ir.Running && runs[0].DAGRunID != first.DAGRunID
 	})
+	require.LessOrEqual(t, activeRunCount(runs), 1, "two runs of an always-on DAG overlap")
 
 	restarted := runs[0]
 	assert.Equal(t, ir.TriggerTypeRestart, restarted.TriggerType)

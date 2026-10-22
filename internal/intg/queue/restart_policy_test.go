@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagucloud/dagu/v2/internal/cmd"
 	"github.com/dagucloud/dagu/v2/internal/ir"
-	"github.com/dagucloud/dagu/v2/internal/service/scheduler"
 	"github.com/dagucloud/dagu/v2/internal/test"
 	"github.com/dagucloud/dagu/v2/internal/test/intgharness"
 	"github.com/stretchr/testify/assert"
@@ -23,6 +23,11 @@ import (
 // restartQuiet is long enough for a restart to be enqueued and dispatched once
 // the one second restart wait of the fixtures has elapsed.
 const restartQuiet = 5 * time.Second
+
+// runLockStale is when the run store of a DAG takes over a lock that a dead
+// process left behind. A run process holds that lock while it writes its
+// status, so a kill can leave it, and the restart of the DAG waits for it.
+const runLockStale = 30 * time.Second
 
 // alwaysOnDAGYAML returns a DAG that the scheduler keeps alive. Each test uses
 // its own DAG name because the socket of a run is named after its DAG.
@@ -41,22 +46,36 @@ steps:
 // runs returns the runs of the fixture DAG, newest first.
 func (f *fixture) runs() []ir.DAGRunStatus {
 	f.t.Helper()
-	runs, err := f.th.DAGRunRepository.RecentStatuses(f.th.Context, f.dag.Name, 100)
+	runs, err := f.readRuns()
 	require.NoError(f.t, err)
-	slices.SortStableFunc(runs, func(a, b ir.DAGRunStatus) int {
-		return cmp.Compare(b.CreatedAt, a.CreatedAt)
-	})
 	return runs
 }
 
-// waitForRuns waits until the runs of the fixture DAG satisfy cond.
+func (f *fixture) readRuns() ([]ir.DAGRunStatus, error) {
+	runs, err := f.th.DAGRunRepository.RecentStatuses(f.th.Context, f.dag.Name, 100)
+	if err != nil {
+		return nil, err
+	}
+	slices.SortStableFunc(runs, func(a, b ir.DAGRunStatus) int {
+		return cmp.Compare(b.CreatedAt, a.CreatedAt)
+	})
+	return runs, nil
+}
+
+// waitForRuns waits until the runs of the fixture DAG satisfy cond. The
+// condition runs on another goroutine, where a failing require would only stop
+// that goroutine, so a read error ends the wait and fails the test after it.
 func (f *fixture) waitForRuns(label string, timeout time.Duration, cond func([]ir.DAGRunStatus) bool) []ir.DAGRunStatus {
 	f.t.Helper()
-	var runs []ir.DAGRunStatus
+	var (
+		runs    []ir.DAGRunStatus
+		readErr error
+	)
 	f.h.Wait.EventuallyEveryWithin(label, queueTestTimeout(timeout), 100*time.Millisecond, func() bool {
-		runs = f.runs()
-		return cond(runs)
+		runs, readErr = f.readRuns()
+		return readErr != nil || cond(runs)
 	})
+	require.NoError(f.t, readErr)
 	return runs
 }
 
@@ -167,24 +186,7 @@ func TestRestartPolicyStop(t *testing.T) {
 func TestRestartPolicyResumesDroppedRestart(t *testing.T) {
 	f := newFixture(t, alwaysOnDAGYAML("restart-dropped", "unless-stopped", "echo ok"))
 	require.NoError(t, f.th.DAGRepository.SetSuspended(f.th.Context, f.dag.FileName(), true))
-
-	runID, err := ir.NewDAGRunID()
-	require.NoError(t, err)
-	require.NoError(t, scheduler.EnqueueCatchupRun(
-		f.th.Context,
-		f.th.DAGRunRepository,
-		f.th.QueueStore,
-		f.th.Config.Paths.LogDir,
-		f.th.Config.Paths.ArtifactDir,
-		f.th.Config.Paths.BaseConfig,
-		"",
-		f.dag.FileName(),
-		f.dag,
-		runID,
-		ir.TriggerTypeRestart,
-		time.Now(),
-		"",
-	))
+	runID := f.enqueueByScheduler(ir.TriggerTypeRestart, time.Now())
 
 	f.StartScheduler(60 * time.Second)
 	defer f.Stop()
@@ -197,6 +199,43 @@ func TestRestartPolicyResumesDroppedRestart(t *testing.T) {
 	f.waitForRuns("a run after the DAG is resumed", 20*time.Second, func(runs []ir.DAGRunStatus) bool {
 		return countStatus(runs, ir.Succeeded) >= 1
 	})
+}
+
+// Dequeuing a restart counts as an operator stop: an unless-stopped DAG stays
+// stopped, and an always DAG goes on with a new run.
+func TestRestartPolicyDequeue(t *testing.T) {
+	for _, tt := range []struct {
+		policy    string
+		restarted bool
+	}{
+		{"always", true},
+		{"unless-stopped", false},
+	} {
+		t.Run(tt.policy, func(t *testing.T) {
+			f := newFixture(t, alwaysOnDAGYAML("restart-dequeue-"+tt.policy, tt.policy, "echo ok"))
+			runID := f.enqueueByScheduler(ir.TriggerTypeRestart, time.Now())
+			f.th.RunCommand(t, cmd.Dequeue(), test.CmdTest{
+				Args: []string{"dequeue", f.queue, "--dag-run", f.dag.Name + ":" + runID},
+			})
+
+			f.StartScheduler(60 * time.Second)
+			defer f.Stop()
+
+			var runs []ir.DAGRunStatus
+			if tt.restarted {
+				runs = f.waitForRuns("a run after the dequeued one", 20*time.Second, func(runs []ir.DAGRunStatus) bool {
+					return countStatus(runs, ir.Succeeded) >= 1
+				})
+			} else {
+				time.Sleep(restartQuiet)
+				runs = f.runs()
+				require.Len(t, runs, 1, "a dequeued restart is not queued again")
+			}
+			dequeued := runs[len(runs)-1]
+			assert.Equal(t, runID, dequeued.DAGRunID)
+			assert.Equal(t, ir.Aborted, dequeued.Status, "the dequeued run stays in the history")
+		})
+	}
 }
 
 // A run aborted because a DAG-level precondition is not met was not stopped by
@@ -230,14 +269,16 @@ steps:
 
 // A run whose process is killed leaves a running status behind. The zombie
 // detector marks it failed, and the DAG is then restarted, once and only after
-// that: a stale status keeps the DAG busy until it is repaired.
+// that: a stale status keeps the DAG busy until it is repaired. The kill comes
+// right after the run starts, while its process writes its status, so the
+// restart may wait for the run lock to go stale.
 func TestRestartPolicyRestartsAfterRunProcessIsKilled(t *testing.T) {
 	release := filepath.Join(t.TempDir(), "release")
 	f := newFixture(t,
 		alwaysOnDAGYAML("restart-killed", "unless-stopped", intgharness.PortableCommands().WaitForFile(release)),
 		WithProcConfig(queueTestProcHeartbeatInterval, queueTestProcStaleThreshold),
 		WithZombieConfig(50*time.Millisecond, 1),
-	).StartScheduler(60 * time.Second)
+	).StartScheduler(runLockStale + 90*time.Second)
 	defer f.Stop()
 	defer func() { _ = os.WriteFile(release, nil, 0600) }()
 
@@ -250,7 +291,7 @@ func TestRestartPolicyRestartsAfterRunProcessIsKilled(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, process.Kill())
 
-	runs = f.waitForRuns("the killed run repaired and a restart running", 30*time.Second, func(runs []ir.DAGRunStatus) bool {
+	runs = f.waitForRuns("the killed run repaired and a restart running", runLockStale+30*time.Second, func(runs []ir.DAGRunStatus) bool {
 		return len(runs) >= 2 && runs[0].Status == ir.Running && runs[0].DAGRunID != killed.DAGRunID
 	})
 	assert.Equal(t, ir.TriggerTypeRestart, runs[0].TriggerType)

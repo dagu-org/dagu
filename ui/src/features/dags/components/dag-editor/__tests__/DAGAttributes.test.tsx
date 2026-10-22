@@ -48,7 +48,7 @@ describe('DAGAttributes', () => {
     );
 
     expect(
-      screen.getByText('restart: unless-stopped · 15s')
+      screen.getByText('Restart: unless-stopped · 15s')
     ).toBeInTheDocument();
     expect(screen.queryByText('No schedule defined')).not.toBeInTheDocument();
   });
@@ -56,7 +56,7 @@ describe('DAGAttributes', () => {
   it('renders no restart policy for other DAGs', () => {
     render(<DAGAttributes dag={{ name: 'plain-dag' }} />);
 
-    expect(screen.queryByText(/^restart:/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Restart:/)).not.toBeInTheDocument();
     expect(screen.getByText('No schedule defined')).toBeInTheDocument();
   });
 

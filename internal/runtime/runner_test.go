@@ -1544,6 +1544,24 @@ func TestRunner(t *testing.T) {
 		assert.Contains(t, string(content), "downstream")
 	})
 
+	t.Run("RedirectToDevNull", func(t *testing.T) {
+		if windowsShellTest() {
+			t.Skip("uses /dev/null")
+		}
+		r := setupRunner(t)
+
+		plan := r.newPlan(t,
+			newStep("quiet",
+				withCommand("echo discarded"),
+				withStdout("/dev/null"),
+				withStderr("/dev/null"),
+			),
+		)
+
+		result := plan.assertRun(t, ir.Succeeded)
+		result.assertNodeStatus(t, "quiet", ir.NodeSucceeded)
+	})
+
 	t.Run("StdinPipesStepStdoutFileToProcess", func(t *testing.T) {
 		if windowsShellTest() {
 			t.Skip("uses cat to read stdin")

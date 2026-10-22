@@ -96,7 +96,7 @@ func (w *Writer) write(st ir.DAGRunStatus) error {
 		return ErrWriterNotOpen
 	}
 
-	if err := w.encoder.Encode(st); err != nil {
+	if err := w.encoder.Encode(ir.StoredStatus(st)); err != nil {
 		return fmt.Errorf("failed to encode status: %w", err)
 	}
 

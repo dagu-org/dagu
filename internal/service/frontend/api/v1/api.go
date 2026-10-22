@@ -56,6 +56,7 @@ import (
 	"github.com/dagucloud/dagu/v2/internal/view"
 	"github.com/dagucloud/dagu/v2/internal/wiki"
 	"github.com/dagucloud/dagu/v2/internal/workspace"
+	"github.com/dagucloud/dagu/v2/internal/workspace/deprecation"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/go-chi/chi/v5"
@@ -117,6 +118,7 @@ type API struct {
 	baseConfigProvider   dagsettings.BaseConfigProvider
 	oidcRoleMapping      func() config.OIDCRoleMapping
 	openCodeHost         *opencodehost.Host
+	workspaceDeprecation deprecation.Sources
 }
 
 type processRepository interface {
@@ -386,6 +388,14 @@ func WithArtifactRepository(ar *persis.ArtifactRepository) APIOption {
 func WithWorkspaceStore(s workspace.Store) APIOption {
 	return func(a *API) {
 		a.workspaceStore = s
+	}
+}
+
+// WithWorkspaceDeprecation sets where the workspace settings that v3.0 stops
+// applying are read from.
+func WithWorkspaceDeprecation(src deprecation.Sources) APIOption {
+	return func(a *API) {
+		a.workspaceDeprecation = src
 	}
 }
 

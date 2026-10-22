@@ -72,6 +72,7 @@ import (
 	"github.com/dagucloud/dagu/v2/internal/tunnel"
 	"github.com/dagucloud/dagu/v2/internal/upgrade"
 	workspacepkg "github.com/dagucloud/dagu/v2/internal/workspace"
+	"github.com/dagucloud/dagu/v2/internal/workspace/deprecation"
 )
 
 const (
@@ -145,6 +146,7 @@ type Server struct {
 	remoteNodeResolver   *remotenode.Resolver
 	upgradeStore         upgrade.CacheStore
 	routeRegistrars      []RouteRegistrar
+	workspaceDeprecation deprecation.Sources
 
 	// notificationMonitorsDisabled leaves DAG-run notification and incident
 	// delivery to another service in the same process.
@@ -613,6 +615,9 @@ func NewServer(setup ServerConfig, opts ...ServerOption) (*Server, error) {
 		updateInfoChecker = &updateChecker{store: upgradeStore}
 	}
 
+	workspaceDeprecation := workspaceDeprecationSources(cfg, dr, stores, authSvc)
+	apiOpts = append(apiOpts, apiv1.WithWorkspaceDeprecation(workspaceDeprecation))
+
 	// Note: SSO/OIDC gating is applied after opts are processed (see below)
 
 	srv := &Server{
@@ -634,6 +639,7 @@ func NewServer(setup ServerConfig, opts ...ServerOption) (*Server, error) {
 		dagRepository:        dr,
 		remoteNodeResolver:   remoteNodeResolver,
 		upgradeStore:         upgradeStore,
+		workspaceDeprecation: workspaceDeprecation,
 		funcsConfig: funcsConfig{
 			NavbarColor:           cfg.UI.NavbarColor,
 			NavbarTitle:           cfg.UI.NavbarTitle,
@@ -997,6 +1003,7 @@ func (srv *Server) Serve(ctx context.Context) error {
 	if srv.onReady != nil {
 		srv.onReady(webURL)
 	}
+	srv.warnWorkspaceDeprecation(ctx)
 	return srv.setupGracefulShutdown(ctx, serveErr)
 }
 

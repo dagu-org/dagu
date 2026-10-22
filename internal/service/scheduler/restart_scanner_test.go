@@ -46,9 +46,12 @@ func TestDecideRestart(t *testing.T) {
 		},
 		{
 			name:   "WaitJustElapsed",
-			latest: finished(ir.Succeeded, wait),
-			start:  true, reason: "previous_run_ended", previousEnd: now.Add(-wait),
+			latest: finished(ir.Succeeded, wait+time.Second),
+			start:  true, reason: "previous_run_ended", previousEnd: now.Add(-wait - time.Second),
 		},
+		// The end is stored to the second, so the run may have ended up to a
+		// second after it.
+		{name: "WaitWithinTheEndSecond", latest: finished(ir.Succeeded, wait), reason: "waiting"},
 		{name: "Waiting", latest: finished(ir.Failed, 5*time.Second), reason: "waiting"},
 		{
 			name:   "AfterOutage",
@@ -122,6 +125,7 @@ type restartHarness struct {
 	running    bool
 	queued     bool
 	latest     ir.DAGRunStatus
+	latestErr  error
 	stopped    map[string]bool
 	stopErr    error
 	stopChecks int
@@ -162,7 +166,7 @@ func newRestartHarness(t *testing.T, dags ...*ir.DAG) *restartHarness {
 		IsRunning: func(context.Context, *ir.DAG) (bool, error) { return h.running, nil },
 		IsQueued:  func(context.Context, *ir.DAG) (bool, error) { return h.queued, nil },
 		GetLatestStatus: func(context.Context, *ir.DAG) (ir.DAGRunStatus, error) {
-			return h.latest, nil
+			return h.latest, h.latestErr
 		},
 		IsStopRequested: func(_ context.Context, _ *ir.DAG, runID string) (bool, error) {
 			h.stopChecks++
@@ -191,6 +195,7 @@ func (h *restartHarness) scan() {
 func (h *restartHarness) endRun(status ir.Status, ago time.Duration) {
 	h.latest = ir.DAGRunStatus{
 		DAGRunID:   "run-1",
+		AttemptID:  "attempt-1",
 		Status:     status,
 		FinishedAt: h.now.Add(-ago).Format(time.RFC3339),
 	}
@@ -227,10 +232,10 @@ func TestRestartScanner(t *testing.T) {
 		assert.Empty(t, h.enqueued, "the wait has not elapsed")
 		assert.Contains(t, h.logs.String(), "reason=waiting")
 
-		h.now = h.now.Add(6 * time.Second)
+		h.now = h.now.Add(7 * time.Second)
 		h.scan()
 		require.Len(t, h.enqueued, 1)
-		assert.Equal(t, GenerateRestartRunID("svc", "run-1", h.now.Add(-10*time.Second)), h.enqueued[0].runID)
+		assert.Equal(t, GenerateRestartRunID("svc", "run-1", h.now.Add(-11*time.Second)), h.enqueued[0].runID)
 	})
 
 	t.Run("Succeeded", func(t *testing.T) {
@@ -280,17 +285,21 @@ func TestRestartScanner(t *testing.T) {
 		for _, tt := range []struct {
 			name      string
 			policy    ir.RestartPolicy
+			status    ir.Status
 			stopped   bool
 			restarted bool
 		}{
-			{"StoppedRunStaysStopped", ir.RestartPolicyUnlessStopped, true, false},
-			{"OtherAbortRestarts", ir.RestartPolicyUnlessStopped, false, true},
-			{"AlwaysIgnoresStops", ir.RestartPolicyAlways, true, true},
+			{"StoppedRunStaysStopped", ir.RestartPolicyUnlessStopped, ir.Aborted, true, false},
+			{"OtherAbortRestarts", ir.RestartPolicyUnlessStopped, ir.Aborted, false, true},
+			// A stopped distributed run whose worker is gone ends as failed.
+			{"StoppedFailedRunStaysStopped", ir.RestartPolicyUnlessStopped, ir.Failed, true, false},
+			{"FailedRunRestarts", ir.RestartPolicyUnlessStopped, ir.Failed, false, true},
+			{"AlwaysIgnoresStops", ir.RestartPolicyAlways, ir.Aborted, true, true},
 		} {
 			t.Run(tt.name, func(t *testing.T) {
 				t.Parallel()
 				h := newRestartHarness(t, alwaysOnDAG("svc", tt.policy))
-				h.endRun(ir.Aborted, time.Hour)
+				h.endRun(tt.status, time.Hour)
 				h.stopped["run-1"] = tt.stopped
 				h.scan()
 				assert.Equal(t, tt.restarted, len(h.enqueued) == 1)
@@ -316,6 +325,21 @@ func TestRestartScanner(t *testing.T) {
 		assert.Equal(t, 2, h.stopChecks, "a DAG that left the scheduler is forgotten")
 	})
 
+	t.Run("NewAttemptOfAStoppedRun", func(t *testing.T) {
+		t.Parallel()
+		h := newRestartHarness(t, alwaysOnDAG("svc", ir.RestartPolicyUnlessStopped))
+		h.endRun(ir.Aborted, time.Hour)
+		h.stopped["run-1"] = true
+		h.scan()
+		assert.Empty(t, h.enqueued)
+
+		// A retry of the run adds an attempt, which ends aborted without a stop.
+		h.latest.AttemptID = "attempt-2"
+		h.stopped["run-1"] = false
+		h.scan()
+		assert.Len(t, h.enqueued, 1, "the stop of an earlier attempt does not hold")
+	})
+
 	t.Run("StopCheckFails", func(t *testing.T) {
 		t.Parallel()
 		h := newRestartHarness(t, alwaysOnDAG("svc", ir.RestartPolicyUnlessStopped))
@@ -323,6 +347,15 @@ func TestRestartScanner(t *testing.T) {
 		h.stopErr = errors.New("store unavailable")
 		h.scan()
 		assert.Empty(t, h.enqueued, "a run that may have been stopped is not restarted")
+		assert.Equal(t, 1, h.logged("Restart scanner failed to process DAG"))
+	})
+
+	t.Run("LatestStatusFails", func(t *testing.T) {
+		t.Parallel()
+		h := newRestartHarness(t, alwaysOnDAG("svc", ir.RestartPolicyAlways))
+		h.latestErr = errors.New("status unreadable")
+		h.scan()
+		assert.Empty(t, h.enqueued, "an unreadable latest run is not taken for no run")
 		assert.Equal(t, 1, h.logged("Restart scanner failed to process DAG"))
 	})
 

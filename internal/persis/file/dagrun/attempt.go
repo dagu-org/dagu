@@ -523,35 +523,34 @@ func parseStatusFileWithContext(ctx context.Context, file string) (*ir.DAGRunSta
 	defer func() {
 		_ = f.Close()
 	}()
-
-	var (
-		offset int64
-		result *ir.DAGRunStatus
-	)
-
-	// Read append-only file from the beginning and find the last status
-	for {
-		if err := ctx.Err(); err != nil {
-			return nil, fmt.Errorf("%w: %w", ErrReadFailed, err)
-		}
-		line, nextOffset, err := readLineFrom(f, offset)
-		if err == io.EOF {
-			if result == nil {
-				return nil, err
-			}
-			return result, nil
-		} else if err != nil {
-			return nil, fmt.Errorf("%w: %w", ErrReadFailed, err)
-		}
-
-		offset = nextOffset
-		if len(line) > 0 {
-			status, err := ir.StatusFromJSON(string(line))
-			if err == nil {
-				result = status
-			}
-		}
+	info, err := f.Stat()
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrReadFailed, err)
 	}
+
+	// The file is append-only, so the latest status is its last valid line.
+	// Reading from the end decodes only that line, however many snapshots
+	// came before it.
+	var result *ir.DAGRunStatus
+	err = fileutil.ReadLinesBackward(ctx, f, info.Size(), func(line []byte, terminated bool) (bool, error) {
+		// A line without its newline is still being written.
+		if !terminated || len(line) == 0 {
+			return false, nil
+		}
+		status, err := ir.StatusFromJSON(string(line))
+		if err != nil {
+			return false, nil
+		}
+		result = status
+		return true, nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrReadFailed, err)
+	}
+	if result == nil {
+		return nil, io.EOF
+	}
+	return result, nil
 }
 
 func openStatusFileWithRetry(path string) (*os.File, error) {

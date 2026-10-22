@@ -13,6 +13,20 @@ import (
 	"github.com/dagucloud/dagu/v2/internal/ir"
 )
 
+// Only the scheduler that holds the scheduler lock runs the scanner. A DAG gets
+// no new run while it has a live process, a queued item or an active run, or
+// while its latest run cannot be read. The ID of a restart follows from the run
+// it replaces, so two schedulers that decide the same restart around a failover
+// create one run.
+//
+// A run that an operator stopped carries a stop request on its attempt,
+// whatever status it ends with: a stopped distributed run whose worker is gone
+// ends as failed. Dequeuing a restart leaves the same request
+// (queue.AbortQueuedDAGRun). A run whose process died has none, so the DAG
+// restarts once the zombie detector or the coordinator marks the run failed. A
+// process killed while it writes its status can leave the run lock of the DAG
+// behind, which delays the restart until the lock is stale.
+
 const (
 	// restartScanInterval is how often always-on DAGs are checked. It bounds the
 	// delay a restart can add to restart_wait_sec.
@@ -36,7 +50,9 @@ type RestartScannerConfig struct {
 	IsRunning IsRunningFunc
 	// IsQueued reports whether a DAG has queued items.
 	IsQueued IsQueuedFunc
-	// GetLatestStatus returns the status of the latest run of a DAG.
+	// GetLatestStatus returns the status of the latest run of a DAG, the
+	// initial status for a DAG without a run, and an error when the latest run
+	// cannot be read.
 	GetLatestStatus GetLatestStatusFunc
 	// IsStopRequested reports whether an operator stopped a run.
 	IsStopRequested StopRequestedFunc
@@ -61,8 +77,8 @@ type RestartScanner struct {
 
 	warnedNoQueue map[string]struct{}
 	lastErrorLog  map[string]time.Time
-	// stoppedRuns maps a DAG name to its latest run, once an operator is known
-	// to have stopped that run.
+	// stoppedRuns maps a DAG name to the attempt of its latest run, once an
+	// operator is known to have stopped that attempt.
 	stoppedRuns map[string]string
 }
 
@@ -162,8 +178,8 @@ func (s *RestartScanner) process(ctx context.Context, entry DAGEntry, now time.T
 		return err
 	}
 	decision := decideRestart(dag.RestartWait, &status, now)
-	if decision.start && dag.RestartPolicy == ir.RestartPolicyUnlessStopped && status.Status == ir.Aborted {
-		stopped, err := s.stoppedByOperator(ctx, dag, status.DAGRunID)
+	if decision.start && dag.RestartPolicy == ir.RestartPolicyUnlessStopped && status.DAGRunID != "" {
+		stopped, err := s.stoppedByOperator(ctx, dag, &status)
 		if err != nil {
 			return err
 		}
@@ -201,21 +217,25 @@ func (s *RestartScanner) process(ctx context.Context, entry DAGEntry, now time.T
 	return nil
 }
 
-// stoppedByOperator reports whether an operator stopped the run. Other aborted
-// runs, such as a run whose DAG-level precondition was not met or a restart
-// dropped from the queue while the DAG was suspended, do not stop the DAG.
-func (s *RestartScanner) stoppedByOperator(ctx context.Context, dag *ir.DAG, runID string) (bool, error) {
-	if s.stoppedRuns[dag.Name] == runID {
+// stoppedByOperator reports whether an operator stopped the run, whatever
+// status it ended with: a stopped distributed run whose worker is gone ends as
+// failed. Other runs, such as a run whose DAG-level precondition was not met or
+// a restart dropped from the queue while the DAG was suspended, do not stop the
+// DAG.
+func (s *RestartScanner) stoppedByOperator(ctx context.Context, dag *ir.DAG, status *ir.DAGRunStatus) (bool, error) {
+	if status.AttemptID != "" && s.stoppedRuns[dag.Name] == status.AttemptID {
 		return true, nil
 	}
 	if s.cfg.IsStopRequested == nil {
-		return true, nil
+		return status.Status == ir.Aborted, nil
 	}
-	stopped, err := s.cfg.IsStopRequested(ctx, dag, runID)
+	stopped, err := s.cfg.IsStopRequested(ctx, dag, status.DAGRunID)
 	if err != nil || !stopped {
 		return false, err
 	}
-	s.stoppedRuns[dag.Name] = runID
+	if status.AttemptID != "" {
+		s.stoppedRuns[dag.Name] = status.AttemptID
+	}
 	return true, nil
 }
 
@@ -279,7 +299,9 @@ func decideRestart(wait time.Duration, latest *ir.DAGRunStatus, now time.Time) r
 	if !ok {
 		return restartDecision{start: true, reason: "previous_run_end_unknown"}
 	}
-	if now.Before(endedAt.Add(wait)) {
+	// The end is stored to the second, so the run may have ended up to a second
+	// after it.
+	if now.Before(endedAt.Add(time.Second + wait)) {
 		return restartDecision{reason: "waiting"}
 	}
 	return restartDecision{start: true, reason: "previous_run_ended", previousEnd: endedAt}

@@ -8644,7 +8644,7 @@
         "output": {
           "type": "string",
           "minLength": 1,
-          "description": "xlsx.write_cells: workbook to write the result to, leaving path as it was. xlsx.convert: the csv, json, or jsonl file to write."
+          "description": "xlsx.write_cells, xlsx.update_rows, and xlsx.append: workbook to write the result to, leaving path as it was. xlsx.convert: the csv, json, or jsonl file to write."
         },
         "operation": {
           "type": "string",
@@ -8945,7 +8945,6 @@
         },
         "until": {
           "type": "string",
-          "format": "date-time",
           "description": "RFC3339 timestamp for wait.until."
         },
         "path": {
@@ -8955,12 +8954,14 @@
         },
         "state": {
           "type": "string",
-          "enum": ["exists", "missing"],
+          "anyOf": [
+            { "enum": ["exists", "missing"] },
+            { "pattern": "\\$\\{[^}]+\\}|\\$[A-Za-z_][A-Za-z0-9_]*", "description": "Value reference resolved at runtime." }
+          ],
           "description": "File state to wait for. Defaults to exists."
         },
         "url": {
           "type": "string",
-          "format": "uri",
           "description": "Absolute URL for wait.http."
         },
         "method": {
@@ -8968,10 +8969,10 @@
           "description": "HTTP method for wait.http. Defaults to GET."
         },
         "status": {
-          "type": "integer",
+          "type": ["integer", "string"],
           "minimum": 100,
           "maximum": 599,
-          "description": "Expected HTTP status for wait.http. Defaults to 200."
+          "description": "Expected HTTP status for wait.http. Defaults to 200. A string must be an integer or hold a ${...} or $VAR reference that resolves to one between 100 and 599 when the step runs."
         },
         "headers": {
           "type": "object",

@@ -566,8 +566,11 @@ func (d *DAG) NextRun(now time.Time) time.Time {
 func (d *DAG) initializeDefaults() {
 	const (
 		defaultHistRetentionDays = 30
-		defaultMaxCleanUpTime    = 5 * time.Second
-		defaultMaxActiveRuns     = 1
+		// An always-on DAG adds a run at each restart, so it keeps a number of
+		// runs rather than days of them.
+		defaultAlwaysOnHistRetentionRuns = 100
+		defaultMaxCleanUpTime            = 5 * time.Second
+		defaultMaxActiveRuns             = 1
 	)
 
 	if d.Type == "" {
@@ -577,7 +580,11 @@ func (d *DAG) initializeDefaults() {
 		d.LogOutput = LogOutputSeparate
 	}
 	if d.HistRetentionDays == 0 && d.HistRetentionRuns == 0 {
-		d.HistRetentionDays = defaultHistRetentionDays
+		if d.RestartPolicy.Enabled() {
+			d.HistRetentionRuns = defaultAlwaysOnHistRetentionRuns
+		} else {
+			d.HistRetentionDays = defaultHistRetentionDays
+		}
 	}
 	if d.MaxCleanUpTime == 0 {
 		d.MaxCleanUpTime = defaultMaxCleanUpTime

@@ -32,11 +32,14 @@ export function LicenseActions({
         )}
       </p>
     );
+  const free = isFreeLicense(license);
+  // A Community server starts the trial by connecting with it chosen; one on
+  // free monitoring starts it from its page in Dagu Console.
   const action = license.error
     ? 'manage'
-    : license.community
+    : license.community || free
       ? 'trial'
-      : license.plan === 'trial' || license.valid || isFreeLicense(license)
+      : license.plan === 'trial' || license.valid
         ? 'plans'
         : 'manage';
   const label =
@@ -50,13 +53,21 @@ export function LicenseActions({
   return (
     <div className="flex flex-wrap items-center gap-2">
       <Button asChild size="sm" variant="outline">
-        <a
-          href={licenseLink(action, content)}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          {ts(label)}
-        </a>
+        {action === 'trial' && license.community ? (
+          <Link to="/license?trial=1#monitoring">{ts(label)}</Link>
+        ) : (
+          <a
+            href={
+              action === 'trial'
+                ? license.consoleUrl || licenseLink('manage', content)
+                : licenseLink(action, content)
+            }
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {ts(label)}
+          </a>
+        )}
       </Button>
       {action !== 'plans' && (
         <Button asChild variant="link" size="sm">

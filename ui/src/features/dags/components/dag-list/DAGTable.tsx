@@ -39,7 +39,7 @@ import { DAGNameInputModal } from '@/components/DAGNameInputModal';
 import { components, Status } from '../../../../api/v1/schema';
 import dayjs from '../../../../lib/dayjs';
 import {
-  getRestartLabel,
+  getRestartValue,
   getScheduleKey,
   getScheduleLabel,
   isServiceDAG,
@@ -270,7 +270,7 @@ function DAGCard({
             variant="outline"
             className="h-[18px] rounded px-1.5 py-0 font-mono text-[11px] font-normal normal-case tracking-normal"
           >
-            {getRestartLabel(dag.dag)}
+            <I18nText text={'Restart'} />: {getRestartValue(dag.dag)}
           </Badge>
         )}
         {dag.latestDAGRun.startedAt && dag.latestDAGRun.startedAt !== '-' && (
@@ -346,7 +346,9 @@ function DAGCard({
           <span className="text-xs text-muted-foreground truncate">
             {dag.suspended ? (
               <I18nText text={'Suspended'} />
-            ) : hasSchedule || isService ? (
+            ) : isService ? (
+              <I18nText text={'Enabled'} />
+            ) : hasSchedule ? (
               <I18nText text={'Live'} />
             ) : (
               <I18nText text={'No schedule'} />
@@ -932,10 +934,10 @@ const defaultColumns = [
                 variant="outline"
                 className="h-[18px] w-fit rounded px-1.5 py-0 font-mono text-[11px] font-normal normal-case tracking-normal"
               >
-                {getRestartLabel(data.dag.dag)}
+                <I18nText text={'Restart'} />: {getRestartValue(data.dag.dag)}
               </Badge>
               <span className="text-xs text-muted-foreground font-normal leading-tight">
-                <I18nText text={data.dag.suspended ? 'Suspended' : 'Live'} />
+                <I18nText text={data.dag.suspended ? 'Suspended' : 'Enabled'} />
               </span>
             </div>
           </div>

@@ -11421,6 +11421,29 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /workspaces/deprecation:
+    get:
+      summary: "List workspace settings removed in v3.0"
+      description: "Lists the workspace settings in use that stop applying when workspaces are removed in v3.0. Admin only."
+      operationId: "getWorkspaceDeprecation"
+      tags:
+        - "workspaces"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "Workspace settings in use"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceDeprecationResponse"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /workspaces/{workspaceId}:
     get:
       summary: "Get workspace by ID"
@@ -19149,6 +19172,39 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/WorkspaceResponse"
+
+    WorkspaceDeprecationResponse:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          description: "Workspace settings in use, ordered by kind and name"
+          items:
+            $ref: "#/components/schemas/WorkspaceDeprecationItem"
+
+    WorkspaceDeprecationItem:
+      type: object
+      required:
+        - kind
+        - name
+      properties:
+        kind:
+          type: string
+          enum:
+            - baseConfig
+            - secret
+            - profileEntry
+            - notificationRoute
+            - incidentPolicy
+            - configKey
+            - user
+            - apiKey
+            - wikiDirectory
+        name:
+          type: string
+          description: "The setting, such as a workspace, a secret and its workspace, or a username"
 
 # Apply security requirements globally
 security:

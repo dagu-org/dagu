@@ -484,15 +484,12 @@ func (h *remoteTaskHandler) loadDAG(ctx context.Context, task *coordinatorv1.Tas
 		loadOpts = append(loadOpts, spec.WithBaseConfig(h.config.Paths.BaseConfig))
 	}
 
-	// Pass task params to the DAG (e.g., from parallel execution items)
-	if task.Params != "" {
-		loadOpts = append(loadOpts, spec.WithParams(task.Params))
-	} else if params, err := previousStatusParams(task); err != nil {
+	params, err := taskLoadParams(task)
+	if err != nil {
 		cleanupFunc()
 		return nil, err
-	} else if len(params) > 0 {
-		loadOpts = append(loadOpts, spec.WithParams(spec.QuoteRuntimeParams(params, nil)))
 	}
+	loadOpts = append(loadOpts, spec.WithParams(params))
 
 	dag, err := spec.Load(ctx, tempFile, loadOpts...)
 	if err != nil {
@@ -531,14 +528,12 @@ func (h *remoteTaskHandler) loadWorkspaceDAG(ctx context.Context, task *coordina
 	if task.BaseConfig != "" {
 		loadOpts = append(loadOpts, spec.WithBaseConfigContent([]byte(task.BaseConfig)))
 	}
-	if task.Params != "" {
-		loadOpts = append(loadOpts, spec.WithParams(task.Params))
-	} else if params, err := previousStatusParams(task); err != nil {
+	params, err := taskLoadParams(task)
+	if err != nil {
 		cleanupFunc()
 		return nil, err
-	} else if len(params) > 0 {
-		loadOpts = append(loadOpts, spec.WithParams(spec.QuoteRuntimeParams(params, nil)))
 	}
+	loadOpts = append(loadOpts, spec.WithParams(params))
 
 	dag, err := spec.Load(ctx, workspace.dagFile, loadOpts...)
 	if err != nil {
@@ -902,6 +897,20 @@ func (h *remoteTaskHandler) dagToolsBasePath() string {
 		}
 	}
 	return os.Getenv("PATH")
+}
+
+// taskLoadParams returns the runtime params a task's DAG is loaded with.
+// Params are always applied so that a task without params still enforces the
+// DAG's required params. A retry without params reuses the previous attempt's.
+func taskLoadParams(task *coordinatorv1.Task) (any, error) {
+	if task.Params != "" {
+		return task.Params, nil
+	}
+	params, err := previousStatusParams(task)
+	if err != nil {
+		return nil, err
+	}
+	return spec.QuoteRuntimeParams(params, nil), nil
 }
 
 func previousStatusParams(task *coordinatorv1.Task) ([]string, error) {

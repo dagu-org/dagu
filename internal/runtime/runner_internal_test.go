@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagucloud/dagu/v2/internal/cmn/config"
 	"github.com/dagucloud/dagu/v2/internal/cmn/runenv"
 	cmnvalue "github.com/dagucloud/dagu/v2/internal/cmn/value"
 
@@ -735,7 +736,11 @@ echo complete > "${outputs.artifact}"
 		WorkingDirExplicit: true,
 		Shell:              "sh",
 	}
-	ctx := NewContext(context.Background(), dag, "run-1", filepath.Join(workingDir, "dag.log"))
+	// touch comes from the host PATH, which steps only see through BaseEnv.
+	ctx := config.WithConfig(context.Background(), &config.Config{
+		Core: config.Core{BaseEnv: config.NewBaseEnv([]string{"PATH=" + os.Getenv("PATH")})},
+	})
+	ctx = NewContext(ctx, dag, "run-1", filepath.Join(workingDir, "dag.log"))
 
 	require.NoError(t, runner.Run(ctx, plan, nil))
 	content, err := os.ReadFile(outputPath)

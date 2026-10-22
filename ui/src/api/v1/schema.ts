@@ -4242,6 +4242,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspaces/deprecation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List workspace settings removed in v3.0
+         * @description Lists the workspace settings in use that stop applying when workspaces are removed in v3.0. Admin only.
+         */
+        get: operations["getWorkspaceDeprecation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspaces/{workspaceId}": {
         parameters: {
             query?: never;
@@ -8006,6 +8026,16 @@ export interface components {
         };
         WorkspaceListResponse: {
             workspaces: components["schemas"]["WorkspaceResponse"][];
+        };
+        WorkspaceDeprecationResponse: {
+            /** @description Workspace settings in use, ordered by kind and name */
+            items: components["schemas"]["WorkspaceDeprecationItem"][];
+        };
+        WorkspaceDeprecationItem: {
+            /** @enum {string} */
+            kind: WorkspaceDeprecationItemKind;
+            /** @description The setting, such as a workspace, a secret and its workspace, or a username */
+            name: string;
         };
     };
     responses: never;
@@ -22262,6 +22292,38 @@ export interface operations {
             };
         };
     };
+    getWorkspaceDeprecation: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Workspace settings in use */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceDeprecationResponse"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     getWorkspace: {
         parameters: {
             query?: {
@@ -22916,6 +22978,17 @@ export enum ViewSpecType {
     workflow = "workflow",
     run = "run",
     artifact = "artifact"
+}
+export enum WorkspaceDeprecationItemKind {
+    baseConfig = "baseConfig",
+    secret = "secret",
+    profileEntry = "profileEntry",
+    notificationRoute = "notificationRoute",
+    incidentPolicy = "incidentPolicy",
+    configKey = "configKey",
+    user = "user",
+    apiKey = "apiKey",
+    wikiDirectory = "wikiDirectory"
 }
 export enum ComponentsParametersEventLogPaginationMode {
     offset = "offset",

@@ -826,12 +826,6 @@ func (s *dagBuildState) collectWarnings() {
 		))
 	}
 
-	if s.result.RestartPolicy.Enabled() && !s.hasHistoryRetention() {
-		s.result.BuildWarnings = append(s.result.BuildWarnings,
-			"restart_policy starts a new run each time the previous one ends, so a DAG that keeps failing "+
-				"fills its history: set hist_retention_runs or hist_retention_days to bound it (the default keeps 30 days).")
-	}
-
 	for _, sched := range s.result.Schedule {
 		s.result.BuildWarnings = append(s.result.BuildWarnings, sched.Warnings...)
 	}
@@ -845,16 +839,6 @@ func (s *dagBuildState) collectWarnings() {
 		s.result.BuildWarnings = append(s.result.BuildWarnings, harnessWorkingDirWarnings(s.result)...)
 		s.result.BuildWarnings = append(s.result.BuildWarnings, executorConfigWarnings(s.result)...)
 	}
-}
-
-// hasHistoryRetention reports whether the DAG, or its base configuration, sets
-// how long the history of its runs is kept.
-func (s *dagBuildState) hasHistoryRetention() bool {
-	if s.spec.HistRetentionDays != nil || s.spec.HistRetentionRuns != nil {
-		return true
-	}
-	base := s.ctx.baseDAG
-	return base != nil && (base.HistRetentionDays > 0 || base.HistRetentionRuns > 0)
 }
 
 // harnessWorkingDirWarnings reports harness steps that leave the agent's
