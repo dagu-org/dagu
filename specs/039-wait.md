@@ -55,9 +55,13 @@ set, otherwise in the run-configured zone. The logical day is the date of
 `context.run.scheduled_at` when the run has one, and retries of that run
 keep it; otherwise it is the date of `context.attempt.started_at`, so a
 retry of a manual run that starts on a later day resolves on that day. A
-clock time never rolls over to the next day. `with.timezone` applies only
-to clock times and is ignored for RFC3339 timestamps. `with.offset` (a
-duration, may be negative) shifts the resolved deadline.
+clock time never rolls over to the next day. As in RFC 5545, a clock time
+that a daylight-saving transition skips is read with the UTC offset in
+effect before the gap, so `02:30` on the night `America/New_York` springs
+forward resolves to `03:30` EDT, and a clock time that a transition repeats
+resolves to its first occurrence. `with.timezone` applies only to clock
+times and is ignored for RFC3339 timestamps. `with.offset` (a duration,
+may be negative) shifts the resolved deadline.
 
 `with.if_past` selects behavior, for both forms, when the deadline is
 already past as the step starts: `continue` (default) succeeds

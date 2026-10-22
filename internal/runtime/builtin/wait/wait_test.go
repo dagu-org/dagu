@@ -255,6 +255,36 @@ func TestClockDeadlineAppliesOffset(t *testing.T) {
 	}
 }
 
+// Clock times that a daylight-saving transition skips or repeats resolve as in
+// RFC 5545: a skipped time is read with the UTC offset before the gap, and a
+// repeated time resolves to its first occurrence.
+func TestClockDeadlineAcrossDST(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name  string
+		zone  string
+		day   time.Time
+		clock clockTime
+		want  time.Time
+	}{
+		// 02:30 EST does not exist; it reads as 03:30 EDT.
+		{name: "gap", zone: "America/New_York", day: time.Date(2026, 3, 8, 0, 0, 0, 0, time.UTC), clock: clockTime{hour: 2, minute: 30}, want: time.Date(2026, 3, 8, 7, 30, 0, 0, time.UTC)},
+		// The gap starts at midnight; 00:30 reads as 01:30 CDT on the same day.
+		{name: "gapAtMidnight", zone: "America/Havana", day: time.Date(2026, 3, 8, 0, 0, 0, 0, time.UTC), clock: clockTime{minute: 30}, want: time.Date(2026, 3, 8, 5, 30, 0, 0, time.UTC)},
+		// 02:30 occurs in AEDT and then in AEST; the AEDT one comes first.
+		{name: "overlap", zone: "Australia/Sydney", day: time.Date(2026, 4, 5, 0, 0, 0, 0, time.UTC), clock: clockTime{hour: 2, minute: 30}, want: time.Date(2026, 4, 4, 15, 30, 0, 0, time.UTC)},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			loc, err := time.LoadLocation(tt.zone)
+			require.NoError(t, err)
+			base := time.Date(tt.day.Year(), tt.day.Month(), tt.day.Day(), 12, 0, 0, 0, loc)
+			require.Equal(t, tt.want, clockDeadline(base, tt.clock, loc, 0).UTC())
+		})
+	}
+}
+
 // A clock time that already passed on the logical day follows if_past rather
 // than rolling over to the next day. 00:00 minus 1s on today's logical day is
 // always past, while the same time a day later is always ahead.
