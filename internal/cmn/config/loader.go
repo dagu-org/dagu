@@ -456,8 +456,27 @@ func (l *ConfigLoader) Load() (*Config, error) {
 	l.finalizeBaseEnv(cfg)
 	cfg.Notices = l.notices
 	cfg.Warnings = l.warnings
+	cfg.WorkspaceAccessKeys = l.workspaceAccessKeys()
 
 	return cfg, nil
+}
+
+// workspaceAccessKeys returns the workspace access keys set by a config
+// file or the environment.
+func (l *ConfigLoader) workspaceAccessKeys() []string {
+	const proxyWorkspaceMappings = "auth.proxy.role_mapping.workspace_mappings"
+	var keys []string
+	for _, key := range []string{
+		"auth.oidc.role_mapping.workspace_mappings",
+		"auth.oidc.role_mapping.default_workspace_access",
+		proxyWorkspaceMappings,
+		"auth.proxy.role_mapping.default_workspace_access",
+	} {
+		if l.v.IsSet(key) || key == proxyWorkspaceMappings && l.trustedProxyWorkspaceMappingsSet {
+			keys = append(keys, key)
+		}
+	}
+	return keys
 }
 
 // buildConfig transforms the Definition into a validated Config structure,
@@ -1706,6 +1725,7 @@ func (l *ConfigLoader) loadSchedulerConfig(cfg *Config, def Definition) {
 		cfg.Scheduler.ZombieDetectionInterval = l.parseDuration("scheduler.zombie_detection_interval", def.Scheduler.ZombieDetectionInterval)
 		cfg.Scheduler.RetryFailureWindow = l.parseDuration("scheduler.retry_failure_window", def.Scheduler.RetryFailureWindow)
 		cfg.Scheduler.FailureThreshold = def.Scheduler.FailureThreshold
+		cfg.Scheduler.WakeHold = l.parseDuration("scheduler.wake_hold", def.Scheduler.WakeHold)
 	}
 
 	l.setSchedulerDefaults(cfg)
@@ -1976,6 +1996,11 @@ func (l *ConfigLoader) loadLicenseConfig(cfg *Config, def Definition) {
 func (l *ConfigLoader) loadCloudConfig(cfg *Config, def Definition) {
 	if def.Cloud != nil {
 		cfg.Cloud.Report = ReportLevel(strings.ToLower(strings.TrimSpace(def.Cloud.Report)))
+		cfg.Cloud.RemoteAccess = RemoteAccessLevel(strings.ToLower(strings.TrimSpace(def.Cloud.RemoteAccess)))
+	}
+	if l.v.IsSet("cloud.remote_approvals") {
+		approvals := l.v.GetBool("cloud.remote_approvals")
+		cfg.Cloud.RemoteApprovals = &approvals
 	}
 }
 
@@ -2436,6 +2461,7 @@ var envBindings = []envBinding{
 	{key: "scheduler.zombie_detection_interval", env: "SCHEDULER_ZOMBIE_DETECTION_INTERVAL"},
 	{key: "scheduler.retry_failure_window", env: "SCHEDULER_RETRY_FAILURE_WINDOW"},
 	{key: "scheduler.failure_threshold", env: "SCHEDULER_FAILURE_THRESHOLD"},
+	{key: "scheduler.wake_hold", env: "SCHEDULER_WAKE_HOLD"},
 
 	// Proc
 	{key: "proc.heartbeat_interval", env: "PROC_HEARTBEAT_INTERVAL"},
@@ -2593,6 +2619,8 @@ var envBindings = []envBinding{
 
 	// Dagu Console
 	{key: "cloud.report", env: "CLOUD_REPORT"},
+	{key: "cloud.remote_access", env: "CLOUD_REMOTE_ACCESS"},
+	{key: "cloud.remote_approvals", env: "CLOUD_REMOTE_APPROVALS"},
 
 	// GitSync
 	{key: "git_sync.enabled", env: "GITSYNC_ENABLED"},

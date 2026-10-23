@@ -19,7 +19,8 @@ import { cn } from '@/lib/utils';
 /** A level at which this server reports to Dagu Console. */
 export type ReportingLevel =
   | LicenseMonitoringLevel.health
-  | LicenseMonitoringLevel.runs;
+  | LicenseMonitoringLevel.runs
+  | LicenseMonitoringLevel.errors;
 
 /** What each level sends, worded as RFC 002 lists it. */
 const choices: { level: ReportingLevel; title: string; sends: string }[] = [
@@ -27,19 +28,25 @@ const choices: { level: ReportingLevel; title: string; sends: string }[] = [
     level: LicenseMonitoringLevel.health,
     title: 'Health only',
     sends:
-      'Sends the Dagu version, OS, architecture, process start time, and service counts: schedulers holding the scheduler lock, and registered coordinators.',
+      "Sends the Dagu version, OS, architecture, process start time, service counts (schedulers holding the scheduler lock, and registered coordinators), the scheduler's last tick and whether it is paused, and how far remote access lets calls from Dagu Cloud go.",
   },
   {
     level: LicenseMonitoringLevel.runs,
-    title: 'Health and run status (recommended)',
+    title: 'Health and run status',
     sends:
-      'Sends the health fields, plus the status of each top-level DAG run that finishes, with its failed step names (up to 50) and how it was triggered, and the list of runs queued, running, or waiting. Each run is sent as its DAG name, run ID, attempt ID, status, trigger, and queued, started, and finished times. No parameters, logs, or outputs.',
+      "Sends the health fields, plus the status of each top-level DAG run that finishes, with its failed step names (up to 50) and how it was triggered, and the list of runs queued, running, or waiting. Each run is sent as its DAG name, run ID, attempt ID, status, trigger, and queued, started, and finished times. Also each scheduled DAG's next run, and whether its latest scheduled run started. No parameters, logs, or outputs.",
+  },
+  {
+    level: LicenseMonitoringLevel.errors,
+    title: 'Health, run status, and error messages (recommended)',
+    sends:
+      "Sends everything Health and run status sends, plus why each failed run failed: the error messages of up to 5 failed steps and handlers, or the run's own, each up to 2 KB from its end. A step's error can end with the last lines of its stderr, with the values of workflow secrets masked.",
   },
 ];
 
 /** What no report sends, at any level. */
 export const neverSent =
-  'Never sent: logs, outputs, parameters, environment, step commands, DAG YAML, the values of workflow secrets, and error message text.';
+  'Never sent: full logs, outputs, parameters, environment, step commands, DAG YAML, schedule expressions, and the values of workflow secrets.';
 
 /** Lets an administrator pick a level, listing what each one sends. */
 export function ReportingChoices({
@@ -107,6 +114,7 @@ export function ReportingChoices({
 export function MonitoringDialog({
   open,
   level,
+  suggested,
   prompt = false,
   onSave,
   onCancel,
@@ -114,6 +122,8 @@ export function MonitoringDialog({
   open: boolean;
   /** The level in effect; its choice starts selected when it reports. */
   level?: LicenseMonitoringLevel;
+  /** The choice that starts selected instead of the level in effect. */
+  suggested?: ReportingLevel;
   /** Offers failure emails instead of presenting a setting. */
   prompt?: boolean;
   onSave: (level: ReportingLevel) => Promise<void>;
@@ -121,23 +131,22 @@ export function MonitoringDialog({
 }) {
   const { ts } = useI18n();
   const [selected, setSelected] = useState<ReportingLevel>(
-    LicenseMonitoringLevel.runs
+    LicenseMonitoringLevel.errors
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const reporting =
-    level === LicenseMonitoringLevel.health ||
-    level === LicenseMonitoringLevel.runs;
+  const reporting = level !== undefined && level !== LicenseMonitoringLevel.off;
 
   useEffect(() => {
     if (!open) return;
     setSelected(
-      level === LicenseMonitoringLevel.health
-        ? LicenseMonitoringLevel.health
-        : LicenseMonitoringLevel.runs
+      suggested ??
+        (level === undefined || level === LicenseMonitoringLevel.off
+          ? LicenseMonitoringLevel.errors
+          : level)
     );
     setError(null);
-  }, [open, level]);
+  }, [open, level, suggested]);
 
   async function save() {
     setSaving(true);

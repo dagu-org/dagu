@@ -11,9 +11,11 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 	"unicode/utf8"
 
+	"github.com/dagucloud/dagu/v2/internal/cmn/config"
 	"github.com/dagucloud/dagu/v2/internal/cmn/dirlock"
 	"github.com/dagucloud/dagu/v2/internal/cmn/logger"
 	"github.com/dagucloud/dagu/v2/internal/cmn/logger/tag"
@@ -35,10 +37,14 @@ const (
 	maxFailedSteps   = 50
 	// maxStepNameBytes is the longest failed step name Dagu Console keeps.
 	maxStepNameBytes = 512
+	// maxRunErrors and maxErrorBytes bound the errors a finished run carries
+	// at the errors level, as Dagu Console keeps them.
+	maxRunErrors  = 5
+	maxErrorBytes = 2048
 	// maxNameBytes and maxIDBytes are the longest DAG name and run or
 	// attempt ID Dagu Console keeps; reports leave out a run with a longer
-	// one. With them, a finished run encodes to about 28 KiB at most, and
-	// about 160 KiB even if JSON escapes every byte: always inside a batch.
+	// one. With them, a finished run encodes to about 41 KiB at most, and
+	// about 245 KiB even if JSON escapes every byte: always inside a batch.
 	maxNameBytes = 512
 	maxIDBytes   = 256
 	// caughtUpSaveInterval is how often an idle reporter records that it has
@@ -127,6 +133,16 @@ type finishedRun struct {
 	StartedAt   reportTime `json:"started_at"`
 	FinishedAt  string     `json:"finished_at"`
 	FailedSteps []string   `json:"failed_steps"`
+	// Errors say why the run failed; reports carry them only at the errors
+	// level.
+	Errors []stepError `json:"errors,omitempty"`
+}
+
+// stepError is why a run failed: a failed step's error, or the run's own
+// when Step is empty.
+type stepError struct {
+	Step    string `json:"step"`
+	Message string `json:"message"`
 }
 
 // reportGap tells Dagu Console that events after Since were lost.
@@ -178,6 +194,9 @@ func newReportedEvent(event *eventstore.Event) (reportedEvent, bool) {
 			FinishedAt:  finishedAt,
 			FailedSteps: failedSteps(status),
 		}
+		if runFailed(status.Status) {
+			reported.finished.Errors = runErrors(status)
+		}
 	}
 	return reported, true
 }
@@ -195,6 +214,61 @@ func failedSteps(status *ir.DAGRunStatus) []string {
 		}
 	}
 	return names
+}
+
+// runFailed reports whether a run ended without succeeding: failed,
+// aborted, or rejected. A run that partly succeeded did not fail.
+func runFailed(status ir.Status) bool {
+	return status == ir.Failed || status == ir.Aborted || status == ir.Rejected
+}
+
+// runErrors returns why status failed: the errors of its failed steps,
+// handlers included, in run order, else the run's own, at most maxRunErrors
+// of them. Each is without terminal escapes and cut to its last
+// maxErrorBytes, where an error says what went wrong. A step's error is
+// masked as the run's status is, and ends with the tail of its stderr.
+func runErrors(status *ir.DAGRunStatus) []stepError {
+	var errs []stepError
+	for _, node := range status.NodesInRunOrder() {
+		if node.Status != ir.NodeFailed {
+			continue
+		}
+		if message := errorMessage(node.Error); message != "" {
+			errs = append(errs, stepError{Step: truncateBytes(node.Step.Name, maxStepNameBytes), Message: message})
+			if len(errs) == maxRunErrors {
+				return errs
+			}
+		}
+	}
+	if message := errorMessage(status.Error); len(errs) == 0 && message != "" {
+		errs = append(errs, stepError{Message: message})
+	}
+	return errs
+}
+
+// errorMessage is an error as reports carry it: trimmed, without terminal
+// escapes, and cut to its last maxErrorBytes after an ellipsis.
+func errorMessage(text string) string {
+	text = strings.TrimSpace(stringutil.StripANSI(text))
+	if len(text) <= maxErrorBytes {
+		return text
+	}
+	const ellipsis = "…"
+	i := len(text) - (maxErrorBytes - len(ellipsis))
+	for i < len(text) && !utf8.RuneStart(text[i]) {
+		i++
+	}
+	return ellipsis + text[i:]
+}
+
+// withoutErrors returns runs as a level that sends no errors carries them.
+func withoutErrors(runs []finishedRun) []finishedRun {
+	out := make([]finishedRun, len(runs))
+	for i, run := range runs {
+		run.Errors = nil
+		out[i] = run
+	}
+	return out
 }
 
 // truncateBytes shortens s to at most n bytes without splitting a character.
@@ -655,6 +729,12 @@ func (f *eventFeed) stopRebuild() {
 	f.rebuild = nil
 }
 
+// reports reports whether this process reports the events, holding their
+// lease.
+func (f *eventFeed) reports() bool {
+	return f != nil && f.loaded
+}
+
 // fill adds the prepared finished runs, the runs in progress, and any gap to
 // req.
 func (f *eventFeed) fill(req *reportRequest) {
@@ -663,6 +743,9 @@ func (f *eventFeed) fill(req *reportRequest) {
 	}
 	if f.batch != nil {
 		req.Finished = f.batch.finished
+		if req.Level != config.ReportErrors {
+			req.Finished = withoutErrors(req.Finished)
+		}
 		req.Cursor = f.batch.token
 	}
 	if !f.state.GapSince.IsZero() {

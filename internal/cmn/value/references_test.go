@@ -435,3 +435,33 @@ func TestIsWholeReference(t *testing.T) {
 		assert.False(t, value.IsWholeReference(text), "%q should not be a whole reference", text)
 	}
 }
+
+func TestHasAnyReference(t *testing.T) {
+	t.Parallel()
+
+	withReference := []string{
+		"${params.delay}",
+		"${BASE_URL}",
+		"$BASE_URL",
+		"${BASE_URL}/health",
+		"http://$HOST:8080/ready",
+		"${SECS}s",
+		"$params.delay",
+		"$1",
+	}
+	for _, text := range withReference {
+		assert.True(t, value.HasAnyReference(text), "%q should hold a reference", text)
+	}
+
+	withoutReference := []string{
+		"",
+		"30s",
+		"http://example.com/ready",
+		"$",
+		`\${BASE_URL}/health`,
+		`\$BASE_URL`,
+	}
+	for _, text := range withoutReference {
+		assert.False(t, value.HasAnyReference(text), "%q should not hold a reference", text)
+	}
+}

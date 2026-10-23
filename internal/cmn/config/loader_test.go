@@ -178,6 +178,7 @@ func TestLoad_Env(t *testing.T) {
 
 		"DAGU_SCHEDULER_PORT":                      "9999",
 		"DAGU_SCHEDULER_ZOMBIE_DETECTION_INTERVAL": "90s",
+		"DAGU_SCHEDULER_WAKE_HOLD":                 "4m",
 
 		"DAGU_AUTH_OIDC_CLIENT_ID":     "test-client-id",
 		"DAGU_AUTH_OIDC_CLIENT_SECRET": "test-secret",
@@ -374,6 +375,7 @@ func TestLoad_Env(t *testing.T) {
 			ZombieDetectionInterval: 90 * time.Second,
 			RetryFailureWindow:      24 * time.Hour,
 			FailureThreshold:        3,
+			WakeHold:                4 * time.Minute,
 		},
 		Monitoring: MonitoringConfig{
 			Retention: 24 * time.Hour,
@@ -684,6 +686,14 @@ cloud:
 		require.True(t, report.Reports())
 	})
 
+	t.Run("Errors", func(t *testing.T) {
+		t.Setenv("DAGU_CLOUD_REPORT", "errors")
+		report := testLoad(t).Cloud.Report
+		require.Equal(t, ReportErrors, report)
+		require.True(t, report.Reports())
+		require.True(t, report.ReportsRuns(), "the errors level reports runs too")
+	})
+
 	t.Run("Env", func(t *testing.T) {
 		t.Setenv("DAGU_CLOUD_REPORT", "Health")
 		require.Equal(t, ReportHealth, testLoad(t).Cloud.Report)
@@ -700,6 +710,52 @@ cloud:
 			err := loadWithErrorFromYAML(t, "cloud:\n  report: "+value+"\n")
 			require.ErrorContains(t, err, "invalid cloud.report", value)
 		}
+	})
+}
+
+func TestLoad_CloudRemoteAccess(t *testing.T) {
+	t.Run("DefaultIsChosenInTheUI", func(t *testing.T) {
+		t.Setenv("DAGU_CLOUD_REMOTE_ACCESS", "")
+		t.Setenv("DAGU_CLOUD_REMOTE_APPROVALS", "")
+		cloud := testLoad(t).Cloud
+		require.Equal(t, RemoteAccessLevel(""), cloud.RemoteAccess)
+		require.Nil(t, cloud.RemoteApprovals)
+	})
+
+	t.Run("YAML", func(t *testing.T) {
+		t.Setenv("DAGU_CLOUD_REMOTE_ACCESS", "")
+		t.Setenv("DAGU_CLOUD_REMOTE_APPROVALS", "")
+		cfg := loadFromYAML(t, `
+cloud:
+  remote_access: Operator
+  remote_approvals: false
+`)
+		require.Equal(t, RemoteAccessOperator, cfg.Cloud.RemoteAccess)
+		require.Equal(t, new(false), cfg.Cloud.RemoteApprovals)
+	})
+
+	t.Run("Env", func(t *testing.T) {
+		t.Setenv("DAGU_CLOUD_REMOTE_ACCESS", "developer")
+		t.Setenv("DAGU_CLOUD_REMOTE_APPROVALS", "true")
+		cloud := testLoad(t).Cloud
+		require.Equal(t, RemoteAccessDeveloper, cloud.RemoteAccess)
+		require.Equal(t, new(true), cloud.RemoteApprovals)
+	})
+
+	t.Run("Invalid", func(t *testing.T) {
+		t.Setenv("DAGU_CLOUD_REMOTE_ACCESS", "")
+		for _, value := range []string{"admin", "manager", "true"} {
+			err := loadWithErrorFromYAML(t, "cloud:\n  remote_access: "+value+"\n")
+			require.ErrorContains(t, err, "invalid cloud.remote_access", value)
+		}
+	})
+
+	// A typo in the environment must not lock approvals off.
+	t.Run("InvalidApprovals", func(t *testing.T) {
+		t.Setenv("DAGU_CLOUD_REMOTE_ACCESS", "")
+		t.Setenv("DAGU_CLOUD_REMOTE_APPROVALS", "yes please")
+		err := loadWithErrorFromYAML(t, "cloud:\n  report: off\n")
+		require.ErrorContains(t, err, "cloud.remote_approvals")
 	})
 }
 
@@ -906,6 +962,7 @@ scheduler:
   lock_stale_threshold: 50s
   lock_retry_interval: 10s
   zombie_detection_interval: 60s
+  wake_hold: 3m
 `)
 
 	utcLoc, _ := time.LoadLocation("UTC")
@@ -1093,6 +1150,7 @@ scheduler:
 			ZombieDetectionInterval: 60 * time.Second,
 			RetryFailureWindow:      24 * time.Hour,
 			FailureThreshold:        3,
+			WakeHold:                3 * time.Minute,
 		},
 		Monitoring: MonitoringConfig{
 			Retention: 24 * time.Hour,
@@ -1761,6 +1819,49 @@ func TestLoad_OIDCWorkspaceAccessDefaultsToAll(t *testing.T) {
 
 	require.Equal(t, OIDCDefaultWorkspaceAccessAll, cfg.Server.Auth.OIDC.RoleMapping.DefaultWorkspaceAccess)
 	require.False(t, cfg.Server.Auth.OIDC.RoleMapping.WorkspaceAccessPolicyActive())
+}
+
+func TestLoad_WorkspaceAccessKeys(t *testing.T) {
+	t.Run("None", func(t *testing.T) {
+		cfg := loadFromYAML(t, "# minimal config")
+
+		require.Empty(t, cfg.WorkspaceAccessKeys)
+	})
+
+	t.Run("FromYAML", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+auth:
+  mode: builtin
+  oidc:
+    role_mapping:
+      default_workspace_access: all
+  proxy:
+    role_mapping:
+      workspace_mappings:
+        sre-team:
+          - workspace: payments
+            role: viewer
+      default_workspace_access: none
+`)
+
+		require.Equal(t, []string{
+			"auth.oidc.role_mapping.default_workspace_access",
+			"auth.proxy.role_mapping.workspace_mappings",
+			"auth.proxy.role_mapping.default_workspace_access",
+		}, cfg.WorkspaceAccessKeys)
+	})
+
+	t.Run("FromEnvironment", func(t *testing.T) {
+		cfg := loadWithEnv(t, "# minimal config", map[string]string{
+			"DAGU_AUTH_OIDC_WORKSPACE_MAPPINGS":       `{"sre-team":[{"workspace":"payments","role":"viewer"}]}`,
+			"DAGU_AUTH_OIDC_DEFAULT_WORKSPACE_ACCESS": "none",
+		})
+
+		require.Equal(t, []string{
+			"auth.oidc.role_mapping.workspace_mappings",
+			"auth.oidc.role_mapping.default_workspace_access",
+		}, cfg.WorkspaceAccessKeys)
+	})
 }
 
 func TestLoad_OIDCWorkspaceMappingCamelCaseKeyHints(t *testing.T) {

@@ -72,7 +72,11 @@ func appendPowerShellCommandArgs(args []string, cmdStr string) []string {
 	if !hasShellArg(result, "-Command", "-C") {
 		result = append(result, "-Command")
 	}
-	return append(result, cmdStr)
+	// A using directive must be the first statement, so it cannot follow the import.
+	if fields := strings.Fields(cmdStr); len(fields) > 0 && strings.EqualFold(fields[0], "using") {
+		return append(result, cmdStr)
+	}
+	return append(result, cmdutil.PowerShellImportCoreModules+"; "+cmdStr)
 }
 
 func appendShellCommandArgs(args []string, flag, cmdStr string) []string {

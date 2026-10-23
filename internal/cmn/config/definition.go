@@ -456,6 +456,7 @@ type SchedulerDef struct {
 	HeartbeatInterval       string `mapstructure:"heartbeat_interval"`        // Deprecated: use proc.heartbeat_interval
 	StaleThreshold          string `mapstructure:"stale_threshold"`           // Deprecated: use proc.stale_threshold
 	FailureThreshold        int    `mapstructure:"failure_threshold"`         // Default: 3
+	WakeHold                string `mapstructure:"wake_hold"`                 // Default: 0, no hold after the host wakes
 }
 
 // QueueConfigDef configures global queue settings.
@@ -603,4 +604,8 @@ type LicenseDef struct {
 // CloudDef configures what a licensed server shares with Dagu Console.
 type CloudDef struct {
 	Report string `mapstructure:"report"` // off, health, or runs; unset reports nothing
+	// RemoteAccess is off, viewer, operator, or developer; unset is chosen in the UI.
+	RemoteAccess string `mapstructure:"remote_access"`
+	// RemoteApprovals is unset to choose in the UI.
+	RemoteApprovals *bool `mapstructure:"remote_approvals"`
 }

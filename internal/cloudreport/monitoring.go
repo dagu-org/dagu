@@ -54,6 +54,10 @@ type Status struct {
 	// NoticeDismissed reports that an administrator dismissed the notice
 	// asking them to choose a level.
 	NoticeDismissed bool
+	// ErrorsOffered reports that an administrator was offered to send error
+	// messages: they chose a level, which they choose among choices that
+	// include them, or dismissed the notice that offers them.
+	ErrorsOffered bool
 	// LastReportAt is when Dagu Console accepted the last report this
 	// process sent, or zero before the first.
 	LastReportAt time.Time
@@ -71,6 +75,9 @@ type Status struct {
 type choice struct {
 	Level           config.ReportLevel `json:"level,omitempty"`
 	NoticeDismissed bool               `json:"notice_dismissed,omitempty"`
+	// ErrorsOffered is unset in a choice made before servers could send
+	// error messages.
+	ErrorsOffered bool `json:"errors_offered,omitempty"`
 	// ReportedLevel lets a restarted server know whether Dagu Console still
 	// expects reports from it.
 	ReportedLevel config.ReportLevel `json:"reported_level,omitempty"`
@@ -98,6 +105,7 @@ func (m *Monitoring) Status(ctx context.Context) (Status, error) {
 			return Status{}, err
 		}
 		status.Level, status.Chosen, status.NoticeDismissed = c.Level, c.Level != "", c.NoticeDismissed
+		status.ErrorsOffered = c.ErrorsOffered
 		if !status.Chosen {
 			status.Level = config.ReportOff
 		}
@@ -117,20 +125,21 @@ func (m *Monitoring) Status(ctx context.Context) (Status, error) {
 	return status, nil
 }
 
-// SetLevel chooses the level. It fails with ErrLevelConfigured when
-// configuration fixes the level, and with ErrUnknownLevel for an unknown one.
+// SetLevel chooses the level, which also counts as offering error messages.
+// It fails with ErrLevelConfigured when configuration fixes the level, and
+// with ErrUnknownLevel for an unknown one.
 func (m *Monitoring) SetLevel(ctx context.Context, level config.ReportLevel) error {
 	if m.configured != "" {
 		return ErrLevelConfigured
 	}
 	switch level {
-	case config.ReportOff, config.ReportHealth, config.ReportRuns:
+	case config.ReportOff, config.ReportHealth, config.ReportRuns, config.ReportErrors:
 	default:
 		return fmt.Errorf("%w: %q", ErrUnknownLevel, level)
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if err := m.updateLocked(ctx, func(c *choice) { c.Level = level }); err != nil {
+	if err := m.updateLocked(ctx, func(c *choice) { c.Level, c.ErrorsOffered = level, true }); err != nil {
 		return err
 	}
 	if m.onChange != nil {
@@ -147,6 +156,16 @@ func (m *Monitoring) DismissNotice(ctx context.Context) error {
 		return nil
 	}
 	return m.update(ctx, func(c *choice) { c.NoticeDismissed = true })
+}
+
+// DismissErrorsNotice records that an administrator dismissed the notice
+// offering to send error messages. Like DismissNotice, it does nothing when
+// configuration fixes the level.
+func (m *Monitoring) DismissErrorsNotice(ctx context.Context) error {
+	if m.configured != "" {
+		return nil
+	}
+	return m.update(ctx, func(c *choice) { c.ErrorsOffered = true })
 }
 
 // level returns the level in effect.

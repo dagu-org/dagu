@@ -60,6 +60,9 @@ function makeConfig(overrides: Partial<Config> = {}): Config {
     gitSyncEnabled: false,
     updateAvailable: false,
     latestVersion: '',
+    upgradeCommand: '',
+    restartRequired: false,
+    restartCommand: '',
     permissions: { writeDags: false, runDags: false },
     license: {
       valid: true,
@@ -168,6 +171,29 @@ describe('LoginPage', () => {
     await signIn();
 
     expect(await screen.findByTestId('location')).toHaveTextContent(/^\/$/);
+  });
+
+  // Without built-in authentication there is nothing to sign in to.
+  it('redirects to the dashboard when authentication is off', async () => {
+    render(
+      <UserPreferencesProvider>
+        <I18nProvider>
+          <MemoryRouter initialEntries={['/login']}>
+            <ConfigContext.Provider value={makeConfig({ authMode: 'none' })}>
+              <Routes>
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/" element={<h1>Dashboard</h1>} />
+              </Routes>
+            </ConfigContext.Provider>
+          </MemoryRouter>
+        </I18nProvider>
+      </UserPreferencesProvider>
+    );
+
+    expect(
+      await screen.findByRole('heading', { name: 'Dashboard' })
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText('Username')).not.toBeInTheDocument();
   });
 
   it('renders the configured explicit login link', () => {

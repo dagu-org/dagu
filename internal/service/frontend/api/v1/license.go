@@ -373,7 +373,7 @@ func (a *API) setReportLevel(ctx context.Context, level config.ReportLevel) erro
 
 func knownReportLevel(level config.ReportLevel) bool {
 	switch level {
-	case config.ReportOff, config.ReportHealth, config.ReportRuns:
+	case config.ReportOff, config.ReportHealth, config.ReportRuns, config.ReportErrors:
 		return true
 	}
 	return false
@@ -384,7 +384,7 @@ func knownReportLevel(level config.ReportLevel) bool {
 func unknownReportLevelError(field string) error {
 	return &Error{
 		Code:       api.ErrorCodeBadRequest,
-		Message:    field + " must be one of: off, health, runs",
+		Message:    field + " must be one of: off, health, runs, errors",
 		HTTPStatus: http.StatusBadRequest,
 	}
 }
@@ -403,6 +403,22 @@ func (a *API) DismissLicenseMonitoringNotice(ctx context.Context, _ api.DismissL
 		return nil, err
 	}
 	return api.DismissLicenseMonitoringNotice200JSONResponse(status), nil
+}
+
+// DismissLicenseMonitoringErrorsNotice stops offering administrators to have
+// this server also send error messages to Dagu Console.
+func (a *API) DismissLicenseMonitoringErrorsNotice(ctx context.Context, _ api.DismissLicenseMonitoringErrorsNoticeRequestObject) (api.DismissLicenseMonitoringErrorsNoticeResponseObject, error) {
+	if err := a.requireCloudReport(ctx); err != nil {
+		return nil, err
+	}
+	if err := a.cloudReport.DismissErrorsNotice(ctx); err != nil {
+		return nil, internalError(err)
+	}
+	status, err := a.licenseMonitoring(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return api.DismissLicenseMonitoringErrorsNotice200JSONResponse(status), nil
 }
 
 func (a *API) requireCloudReport(ctx context.Context) error {
@@ -429,6 +445,7 @@ func (a *API) licenseMonitoring(ctx context.Context) (api.LicenseMonitoring, err
 		Configured:      status.Configured,
 		Chosen:          status.Chosen,
 		NoticeDismissed: status.NoticeDismissed,
+		ErrorsOffered:   status.ErrorsOffered,
 	}
 	if !status.LastReportAt.IsZero() {
 		monitoring.LastReportAt = ptrOf(stringutil.FormatTime(status.LastReportAt))

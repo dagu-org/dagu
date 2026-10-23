@@ -82,6 +82,20 @@ func TestStartupBanner(t *testing.T) {
 	}
 }
 
+// The banner on a terminal and the log line elsewhere offer the same
+// free monitoring page, and only to a server that could still connect.
+func TestMonitoringOffer(t *testing.T) {
+	const url = "http://localhost:8080/dagu"
+	link, ok := monitoringOffer(url, &license.Status{Community: true})
+	require.True(t, ok)
+	require.Equal(t, url+"/license#monitoring", link)
+
+	for _, status := range []*license.Status{nil, {Plan: "pro", Valid: true}, {Community: true, Source: license.SourceEnvKey}} {
+		_, ok := monitoringOffer(url, status)
+		require.False(t, ok)
+	}
+}
+
 func TestStopLocalAgentSessionCleanupHonorsShutdownContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
@@ -114,7 +128,7 @@ func TestStartCloudReport(t *testing.T) {
 	for _, level := range []config.ReportLevel{"", config.ReportOff, config.ReportHealth, config.ReportRuns} {
 		t.Run("level "+string(level), func(t *testing.T) {
 			ctx := newContext(level)
-			reporter := startCloudReport(ctx, newCloudReportMonitoring(ctx))
+			reporter := startCloudReport(ctx, newCloudReportMonitoring(ctx), newCloudAccess(ctx))
 			require.NotNil(t, reporter)
 			reporter.Stop()
 		})
@@ -125,7 +139,8 @@ func TestStartCloudReport(t *testing.T) {
 		ctx.LicenseManager = nil
 		monitoring := newCloudReportMonitoring(ctx)
 		require.Nil(t, monitoring)
-		require.Nil(t, startCloudReport(ctx, monitoring))
+		require.Nil(t, newCloudAccess(ctx))
+		require.Nil(t, startCloudReport(ctx, monitoring, nil))
 	})
 }
 

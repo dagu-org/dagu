@@ -46,6 +46,9 @@ type Config struct {
 	Cloud           CloudConfig
 	Notices         []string
 	Warnings        []string
+	// WorkspaceAccessKeys lists the workspace access keys the configuration
+	// sets. Workspaces are removed in v3.0, which makes these keys unknown.
+	WorkspaceAccessKeys []string
 }
 
 // OpenCodeConfig configures the process-local managed OpenCode service.
@@ -223,7 +226,32 @@ type CloudConfig struct {
 	// Report is how much the server reports to Dagu Console. Empty means it
 	// is not set, and the server reports nothing.
 	Report ReportLevel
+	// RemoteAccess is the highest role a Dagu Cloud user gets on calls Dagu
+	// Cloud carries to this server. Empty means it is not set, and an
+	// administrator chooses it; until then it is off.
+	RemoteAccess RemoteAccessLevel
+	// RemoteApprovals lets those calls approve, reject, or push back steps
+	// waiting for a person. Nil means it is not set, and an administrator
+	// chooses it; until then they cannot.
+	RemoteApprovals *bool
 }
+
+// RemoteAccessLevel is the highest role a Dagu Cloud user gets on a server.
+type RemoteAccessLevel string
+
+const (
+	// RemoteAccessOff refuses every call from Dagu Cloud.
+	RemoteAccessOff RemoteAccessLevel = "off"
+	// RemoteAccessViewer lets calls read DAGs, runs, and logs.
+	RemoteAccessViewer RemoteAccessLevel = "viewer"
+	// RemoteAccessOperator also lets calls start, enqueue, retry, and stop
+	// runs of existing DAGs.
+	RemoteAccessOperator RemoteAccessLevel = "operator"
+	// RemoteAccessDeveloper also lets calls change DAG definitions and run
+	// inline specs. DAG steps run commands, so it lets Dagu Cloud users run
+	// any command on the host as the user Dagu runs as.
+	RemoteAccessDeveloper RemoteAccessLevel = "developer"
+)
 
 // ReportLevel is how much a server reports to Dagu Console, beyond the
 // license check-in every licensed server makes.
@@ -237,11 +265,19 @@ const (
 	ReportHealth ReportLevel = "health"
 	// ReportRuns also reports DAG-run status changes.
 	ReportRuns ReportLevel = "runs"
+	// ReportErrors also reports why DAG runs failed: each failed step's
+	// error message.
+	ReportErrors ReportLevel = "errors"
 )
 
 // Reports reports whether the level sends anything.
 func (l ReportLevel) Reports() bool {
-	return l == ReportHealth || l == ReportRuns
+	return l == ReportHealth || l.ReportsRuns()
+}
+
+// ReportsRuns reports whether the level sends DAG-run status.
+func (l ReportLevel) ReportsRuns() bool {
+	return l == ReportRuns || l == ReportErrors
 }
 
 // ExecutionMode represents the default execution mode for DAGs.
@@ -724,6 +760,11 @@ type Scheduler struct {
 	ZombieDetectionInterval time.Duration // Default: 45s; 0 disables
 	RetryFailureWindow      time.Duration // Default: 24h; 0 disables DAG-level retry scanning. Current limitation: the window is evaluated from the original DAG-run timestamp/day bucket, not the latest failed attempt timestamp.
 	FailureThreshold        int           // Default: 3
+	// WakeHold is how long at most the scheduler holds its ticks after the
+	// host wakes from sleep, pausing itself until the pause is cleared through
+	// the API, so definitions can be refreshed before the first tick. 0 (the
+	// default) never holds.
+	WakeHold time.Duration
 }
 
 // PostgresPoolConfig holds PostgreSQL connection pool settings for workers.
@@ -776,6 +817,9 @@ func (c *Config) Validate() error {
 		return err
 	}
 	if err := c.validateExecutionMode(); err != nil {
+		return err
+	}
+	if err := c.validateCloudRemoteAccess(); err != nil {
 		return err
 	}
 	if err := c.validateCloudReport(); err != nil {
@@ -840,6 +884,9 @@ func (c *Config) validateScheduler() error {
 	}
 	if c.Scheduler.LockRetryInterval < 0 {
 		return fmt.Errorf("scheduler.lock_retry_interval must be >= 0")
+	}
+	if c.Scheduler.WakeHold < 0 {
+		return fmt.Errorf("scheduler.wake_hold must be >= 0")
 	}
 	if c.Scheduler.ZombieDetectionInterval < 0 {
 		return fmt.Errorf("scheduler.zombie_detection_interval must be >= 0")
@@ -1347,10 +1394,20 @@ func (c *Config) validateExecutionMode() error {
 // validateCloudReport validates what the server reports to Dagu Console.
 func (c *Config) validateCloudReport() error {
 	switch c.Cloud.Report {
-	case "", ReportOff, ReportHealth, ReportRuns:
+	case "", ReportOff, ReportHealth, ReportRuns, ReportErrors:
 		return nil
 	default:
-		return fmt.Errorf("invalid cloud.report: %q (must be one of: off, health, runs)", c.Cloud.Report)
+		return fmt.Errorf("invalid cloud.report: %q (must be one of: off, health, runs, errors)", c.Cloud.Report)
+	}
+}
+
+// validateCloudRemoteAccess validates the role cap on calls from Dagu Cloud.
+func (c *Config) validateCloudRemoteAccess() error {
+	switch c.Cloud.RemoteAccess {
+	case "", RemoteAccessOff, RemoteAccessViewer, RemoteAccessOperator, RemoteAccessDeveloper:
+		return nil
+	default:
+		return fmt.Errorf("invalid cloud.remote_access: %q (must be one of: off, viewer, operator, developer)", c.Cloud.RemoteAccess)
 	}
 }
 

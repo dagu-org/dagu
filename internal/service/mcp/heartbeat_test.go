@@ -34,10 +34,14 @@ func TestSSEHeartbeatRepeats(t *testing.T) {
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	stream := bufio.NewReader(resp.Body)
-	for range 3 {
+	for heartbeats := 0; heartbeats < 3; {
 		line, err := stream.ReadString('\n')
 		require.NoError(t, err)
-		require.Equal(t, ": heartbeat\n", line)
+		// The SDK opens the stream with a comment of its own.
+		if line != ": ok\n" {
+			require.Equal(t, ": heartbeat\n", line)
+			heartbeats++
+		}
 		blank, err := stream.ReadString('\n')
 		require.NoError(t, err)
 		require.Equal(t, "\n", blank)

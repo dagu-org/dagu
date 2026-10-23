@@ -406,6 +406,26 @@ func (st *DAGRunStatus) NodeByName(name string) (*Node, error) {
 	return nil, fmt.Errorf("node %s not found", name)
 }
 
+// StoredStatus returns the status as a status file stores it: each node keeps
+// an output repeated under its other output fields once. Reading it back with
+// StatusFromJSON restores every field. The status passed in is not changed.
+func StoredStatus(st DAGRunStatus) DAGRunStatus {
+	stored := st
+	if st.Nodes != nil {
+		stored.Nodes = make([]*Node, len(st.Nodes))
+		for i, node := range st.Nodes {
+			stored.Nodes[i] = storedNode(node)
+		}
+	}
+	stored.OnInit = storedNode(st.OnInit)
+	stored.OnExit = storedNode(st.OnExit)
+	stored.OnSuccess = storedNode(st.OnSuccess)
+	stored.OnFailure = storedNode(st.OnFailure)
+	stored.OnAbort = storedNode(st.OnAbort)
+	stored.OnWait = storedNode(st.OnWait)
+	return stored
+}
+
 // StatusFromJSON deserializes a JSON string into a Status object
 func StatusFromJSON(s string) (*DAGRunStatus, error) {
 	var status DAGRunStatus

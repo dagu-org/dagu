@@ -20,6 +20,8 @@ const (
 	TypeErrorWarn TypeErrorMode = "warn"
 	// TypeErrorNull is accepted as a spelling of TypeErrorWarn.
 	TypeErrorNull TypeErrorMode = "null"
+	// TypeErrorKeep keeps the cell's value as read and records a warning.
+	TypeErrorKeep TypeErrorMode = "keep"
 )
 
 func (m TypeErrorMode) warns() bool {
@@ -252,10 +254,14 @@ func (w *file) readRow(sheet string, reg region, r int, grid [][]string, merges 
 		if t, ok := types[name]; ok && value != nil {
 			coerced, cerr := coerce(value, t, w.date1904)
 			if cerr != nil {
-				if opts.OnTypeError.warns() {
+				switch {
+				case opts.OnTypeError == TypeErrorKeep:
+					warn(fmt.Sprintf("%s!%s: %v", sheet, cellName(c, r), cerr))
+					coerced = value
+				case opts.OnTypeError.warns():
 					warn(fmt.Sprintf("%s!%s: %v", sheet, cellName(c, r), cerr))
 					coerced = nil
-				} else {
+				default:
 					return nil, false, w.cellError(sheet, c, r, cerr.Error())
 				}
 			}

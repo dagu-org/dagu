@@ -15,6 +15,7 @@ const instructions = `Dagu exposes a compact MCP surface for DAG workflow operat
 Use dagu_read for current state, Wiki pages, and trusted reference resources.
 Use dagu_change with mode=preview before mode=apply when editing DAG YAML, DAG default profiles, or Wiki pages.
 Use dagu_execute for start, enqueue, retry, and stop. retry and stop are actions inside dagu_execute.
+When a run waits for a person, dagu_execute action=approve, reject, or push_back decides the waiting step that dagu_read target=run lists.
 MCP Apps hosts can render run-related dagu_read and dagu_execute results in Dagu's interactive run inspector.
 To follow a run to completion, pass wait=true to dagu_execute, or read the returned dagu://runs/... resource, or subscribe to it to receive a resource update notification when the run reaches a terminal state or stops at a waiting checkpoint.`
 
@@ -55,7 +56,8 @@ Authoring rules:
 - For data transformation between steps (parsing, filtering, reshaping, regex extraction, computing values), use js.run instead of python -c, Python or Node heredocs, or awk, sed, and jq pipelines in run. It needs no interpreter on the host or worker, its script is passed as written so ${...} and $ need no escaping, and dagu_change preview reports script syntax errors with the line. Keep run for CLIs and for work that needs the network, files, environment variables, or a library. A single jq path is fine in jq.filter.
 - DAG YAML does not contain the server-side default runtime profile. A schedule profile is an activation filter: the schedule runs only when it matches the DAG's effective default profile. Read it with dagu_read target=dag_profile. Set or clear it with dagu_change type=set_dag_profile or clear_dag_profile.
 - A DAG profile change is visible to the scheduler on its next minute tick. Time spent under a non-matching profile is not scheduler downtime, so catch-up does not replay those schedule slots.
-- Declared value outputs use a step-level outputs field and write records to DAGU_OUTPUT_FILE. Later steps read them as ${steps.step_id.outputs.name}.
+- Declared value outputs use a step-level outputs field and write records to DAGU_OUTPUT_FILE. Later steps read them as ${steps.step_id.outputs.name}. Dagu does not read stdout for them, so the command can keep logging to stdout.
+- String-form output: NAME captures the whole trimmed stdout, log lines included, into the env variable NAME.
 - type: build is for local workflows that transform stable regular-file inputs into reusable file outputs.
 - A build path step declares named inputs entries with path and at most one outputs entry with path. Only host command or shell steps without containers may declare build paths. Matching canonical producer-output and consumer-input paths infer dependencies, and each output path must have one producer.
 - Inside the owning step, ${inputs.name} is the final input path and ${outputs.name} is a fresh per-attempt staging path. Write the result to ${outputs.name}; after commit or reuse, dependent steps read the final path as ${steps.step_id.outputs.name}. stdout, stderr, and artifact stream destinations must not target declared build paths.
@@ -64,7 +66,7 @@ Authoring rules:
 - human.task defines a processless root-DAG operator step with an explicit id, required with.prompt, and optional flat scalar with.form JSON Schema. Omit form for acknowledgement-only tasks.
 - Human task form properties that are required or have defaults become ${steps.step_id.outputs.name} values after completion. Do not declare outputs on a human.task step; additionalProperties defaults to false.
 - Optional with.push_back lets the operator send a human task back instead of completing it: rewind_to names a step the task depends on, and optional form is a flat feedback schema whose additionalProperties must stay false. A push-back re-runs that step and every step that depends on it, directly or transitively, with the feedback as push-back context (DAG_PUSHBACK, DAG_PUSHBACK_ITERATION, and one environment variable per feedback property), then opens the task again. Feedback is limited to 16 KiB as JSON. Human tasks have no reject operation.
-- Human tasks cannot run in sub-DAGs, lifecycle handlers, or foreach.steps. Root DAGs containing human tasks may run locally or on distributed workers selected by DAG-level worker_selector. The MCP tool surface does not expose human-task completion or push-back; they use the local dagu human-task complete and dagu human-task push-back commands.
+- Human tasks cannot run in sub-DAGs, lifecycle handlers, or foreach.steps. Root DAGs containing human tasks may run locally or on distributed workers selected by DAG-level worker_selector. Over MCP, dagu_execute action=approve completes a waiting human task with inputs as its form values and action=push_back pushes it back with inputs as its feedback; locally, dagu human-task complete and dagu human-task push-back do the same.
 - type: agent lets the configured llm pick which step runs next instead of a dependency graph. It requires llm and a non-empty tasks list, where each task has a name and a description stating when it is finished. depends and router steps are rejected, and the reserved names __agent__ and ask_user cannot be used for steps.
 - Use context references for run metadata, such as ${context.dag.name}, ${context.run.id}, and ${context.paths.artifacts_dir}.
 - git.worktree.add creates or reuses a linked worktree in the local repository containing the step working_dir. Omit branch for a Dagu-generated branch, or set branch with create_branch: true and optional base to create a named branch.
@@ -87,8 +89,8 @@ Authoring rules:
 - mail.search publishes messages (oldest first; each has id, message_id, folder, from_name, from_address, to, cc, subject, date, unread, flagged, text, attachments), count, and truncated; do not declare outputs on the step. Searching never marks email read.
 - mail.organize takes emails as an ID, an email from mail.search, an {id, move_to} object, or a list, with mark (read, unread, flagged, unflagged) and/or move (folder, archive, trash). To process each email once, loop over messages with foreach and mark each email read inside the loop after its work, so a failed email stays unread for the next run.
 - xlsx.read reads an .xlsx sheet without a spreadsheet application: with.path, optional sheet, range (A2:F, Sheet!A2:F, a named range, or a table), header (true, false, a row number, or [3, 4] for two header rows), columns (names or {name: alias}), types ({amount: number, due: date}; a pinned column also reads Japanese forms: ￥123,000, 12万3,500円, ▲1,000, (1,000), 10%, 税込1,000, kanji numerals, 2026年10月3日, 令和8年10月3日, R8.10.3, 2026年10月 as its first day, 10月3日 in the current year, 午後2時30分 after a date, and はい/いいえ, 有/無, 済/未, ○/× under boolean), where ({Status: ""} or {Status: {ne: Done}}), max_rows, and skip_hidden (true leaves out rows hidden by a filter or by hand). It publishes rows (objects keyed by header, each with _row), count, headers, sheet, range, warnings, and truncated; do not declare outputs on the step. Numbers stay numbers, dates become ISO text, and text keeps leading zeros. Read a workbook first with dagu_read target=workbook to learn its sheets, headers, and types.
-- xlsx.write and xlsx.append write rows (usually ${steps.<id>.outputs.rows}; pass columns such as ${steps.<id>.outputs.headers} to keep column order) or an input json, jsonl, or csv file to a sheet; xlsx.info and xlsx.list_sheets describe a workbook. Writers publish path, sheet, changes ({rows_updated, rows_appended, columns_added, cells_changed}), dry_run, and warnings; dry_run: true reports without saving, wait_for_unlock: 5m retries a workbook another program holds open, and artifact: true keeps a copy with the run.
-- xlsx.update_rows writes results back to the rows they came from: key names the column that identifies a row (or _row), rows carry the key and the fields to write, and set maps sheet columns to row fields ({Status: status}) or literals ({Reviewed: {value: yes}}); without set every field other than the key and _row goes to the column of the same name. missing is fail, skip, or append. Before any cell is written the step checks that the key column is still in the header row and that a row addressed by _row still holds its key, and refuses when either changed; with key: _row there is no key to compare, so only the row number's range is checked and a sheet whose rows moved is not detected. A set column the sheet lacks is added at the right of the header. For "do this for each row and mark it done", read with where: {Status: ""}, foreach over the rows with a collect that carries the key and the result fields, and pass that collected output to update_rows.
+- xlsx.write and xlsx.append write rows (usually ${steps.<id>.outputs.rows}; pass columns such as ${steps.<id>.outputs.headers} to keep column order) or an input json, jsonl, or csv file to a sheet; xlsx.info and xlsx.list_sheets describe a workbook. Writers publish path, sheet, changes ({rows_updated, rows_appended, columns_added, cells_changed}), dry_run, and warnings; dry_run: true reports without saving, wait_for_unlock: 5m retries a workbook another program holds open, and artifact: true keeps a copy with the run. xlsx.append takes output to write the result to another workbook and leave path untouched; an existing output is replaced, so a fixed output inside a foreach keeps only the last iteration's rows.
+- xlsx.update_rows writes results back to the rows they came from: key names the column that identifies a row (or _row), rows carry the key and the fields to write, and set maps sheet columns to row fields ({Status: status}) or literals ({Reviewed: {value: yes}}); without set every field other than the key and _row goes to the column of the same name. missing is fail, skip, or append. Before any cell is written the step checks that the key column is still in the header row and that a row addressed by _row still holds its key, and refuses when either changed; with key: _row there is no key to compare, so only the row number's range is checked and a sheet whose rows moved is not detected. A set column the sheet lacks is added at the right of the header. For "do this for each row and mark it done", read with where: {Status: ""}, foreach over the rows with a collect that carries the key and the result fields, and pass that collected output to update_rows. output writes the updated workbook to another file and leaves path untouched.
 - xlsx.validate checks a sheet against rules before a workflow acts on it: required (columns the header must have), not_blank, unique, types ({Amount: number}), allowed ({Status: [Open, Done]}); at least one. It publishes ok, problems (each with code missing_column, blank, type, duplicate, or not_allowed, plus sheet, cell, row, column, message), count, rows, headers, sheet, range, warnings, truncated. on_problem: warn (default) succeeds with the problems published; fail fails the step after listing them and publishes nothing. To stop and ask someone, add a human.task step with a precondition on ${steps.<id>.outputs.count} (expected "num:>0") and continue_on: {skipped: true}.
 - xlsx.write_cells fills a template: cells maps addresses (B2, Sheet1!B2, or a defined name for one cell) to a value, {value: v, type: t}, {formula: "=SUM(B2:B9)"}, or null to clear; styles are kept. merge lists ranges to merge first ([A1:D1]); a range over a filled cell or another merged region fails the step, and changes.merged counts the ranges merged. output writes the result to a new workbook and leaves path untouched; the workbook at path must exist. xlsx.sheet takes operation add, copy, rename, or delete with sheet, to, if_exists (fail, skip, replace), missing (fail, skip), position, and publishes sheets; use if_exists: skip for reruns. xlsx.convert exports a sheet to the csv, json, or jsonl file named by output (format from the extension or format), with every row and for csv encoding (utf-8, utf-8-bom, shift_jis) and delimiter; the reverse is xlsx.write with input, whose csv takes the same encoding and delimiter. dagu dry warns when an xlsx step's workbook, sheet, or column does not exist.
 - xlsx.extract reads fields out of a sheet laid out as a form rather than a table, such as a quote whose layout differs by supplier: with.instruction says what to find and with.schema (type: object) names the fields as properties, each optionally typed (string, number, integer, boolean, or string with format date or date-time) and described. A model is shown the sheet's cells (address, kind, bold or fill, text cut to 200 characters; send_values: false hides non-text values) and answers only the address of each field's cell or null; the engine then reads the typed value from that cell, so no value is invented. It needs the DAG-level llm block or with.llm. Outputs are each property, cells (property to the Sheet!B7 it was read from), sheet, warnings, and source (model or cache); do not declare outputs on the step. The model also names the cells that are labels, and the answered addresses are cached by the sheet's shape with a digest of each label, so a layout seen before makes no model request as long as the instruction, the schema, and the labels are unchanged; a form of the same template with a box left blank is read from the cache too, while a label renamed in place asks again. cache: false asks every run, and dagu xlsx cache clear <dag> drops the cache. A pinned type reads Japanese text as xlsx.read does: yen amounts, kanji numerals, ▲ negatives, percent, price tags, kanji and era dates with 午前/午後 times, and yes/no marks under boolean.
@@ -106,16 +108,16 @@ The server intentionally exposes three tools.
 
 - dagu_read: read DAGs, DAG specs, DAG default profiles, Wiki pages, DAG-runs, logs, list views, and reference resources.
 - dagu_change: preview or apply DAG YAML, DAG default profile, and workspace-aware Wiki changes.
-- dagu_execute: start, enqueue, retry, or stop a DAG-run.
+- dagu_execute: start, enqueue, retry, or stop a DAG-run, or approve, reject, or push back a step that waits for a person.
 
 Detailed tool references:
 
 - dagu://reference/read-tool: dagu_read inputs, targets, URI mode, query parameters, outputs, and errors.
 - dagu://reference/change-tool: dagu_change preview and apply contract for DAG YAML, DAG profiles, and Wiki changes.
-- dagu://reference/execute-tool: dagu_execute start, enqueue, retry, and stop contract.
+- dagu://reference/execute-tool: dagu_execute start, enqueue, retry, stop, approve, reject, and push_back contract.
 - dagu://reference/apps: interactive run inspector behavior for MCP Apps hosts.
 
-Use dagu_execute action=retry with name and dagRunId for retry. Use action=stop with name and dagRunId for stop. Use action=start or action=enqueue with targetType=dag for a stored DAG, or targetType=inline_spec with spec for an ad hoc run.`,
+Use dagu_execute action=retry with name and dagRunId for retry. Use action=stop with name and dagRunId for stop. Use action=start or action=enqueue with targetType=dag for a stored DAG, or targetType=inline_spec with spec for an ad hoc run. Use action=approve, reject, or push_back with name, dagRunId, stepName, and the attemptId read from the run to decide a step waiting for a person.`,
 		},
 		{
 			topic:       "apps",
@@ -269,22 +271,26 @@ Errors:
 			description: "Detailed dagu_execute input, output, and error reference.",
 			text: `# dagu_execute reference
 
-Purpose: control DAG execution through start, enqueue, retry, and stop actions.
+Purpose: control DAG execution through start, enqueue, retry, and stop actions, and decide steps that wait for a person through approve, reject, and push_back.
 
 Fields:
 
-- action: required. Values are start, enqueue, retry, and stop.
-- targetType: dag, inline_spec, or run. Defaults to run for retry and stop, inline_spec when spec is present, otherwise dag.
+- action: required. Values are start, enqueue, retry, stop, approve, reject, and push_back.
+- targetType: dag, inline_spec, or run. Defaults to run for retry, stop, approve, reject, and push_back, inline_spec when spec is present, otherwise dag.
 - name: DAG name. Required for every action, including inline runs.
 - spec: inline DAG YAML for start or enqueue with targetType=inline_spec; otherwise invalid.
-- dagRunId: DAG-run identifier. Required for retry and stop. Optional override for start and enqueue.
+- dagRunId: DAG-run identifier. Required for retry, stop, approve, reject, and push_back. Optional override for start and enqueue.
 - params: run parameters for start and enqueue, as a JSON object or a JSON-encoded string.
 - queue: queue name for enqueue.
 - singleton: singleton run flag for start and enqueue.
 - noReuse: when true for start or enqueue, execute eligible build steps instead of reusing prior materializations.
 - labels: labels for start and enqueue.
-- stepName: optional step name for retry.
+- stepName: optional step name for retry. Required for approve, reject, and push_back: the waiting step to decide.
 - includeDownstream: when true, retry the selected step and every reachable descendant. Requires stepName.
+- subDAGRunId: for approve, reject, and push_back, the sub-DAG run that owns the waiting step when it runs inside a sub-DAG run of dagRunId.
+- inputs: object for approve and push_back. An approval gate takes string values for the names its input list declares; a human task takes its form values on approve and its push-back feedback on push_back.
+- reason: optional reason for reject.
+- attemptId: for approve, reject, and push_back, the attemptId from the run details the decision is based on. When the run has moved to another attempt, the decision is refused with conflict.
 - wait: when true, wait for the identified run to reach a terminal state or a waiting checkpoint before returning. Requires a name that identifies the run.
 - waitTimeoutSeconds: maximum seconds to wait, from 1 to 300. Defaults to 60.
 
@@ -294,7 +300,8 @@ Action behavior:
 - enqueue enqueues a stored DAG or inline spec.
 - retry retries an existing DAG-run and may target a step with stepName, optionally including downstream steps.
 - stop stops an existing DAG-run.
-- Fields unsupported by an action are invalid. params, singleton, noReuse, and labels apply only to start and enqueue; queue only to enqueue; stepName and includeDownstream only to retry.
+- approve, reject, and push_back decide a step that dagu_read target=run reports as waiting with approval or humanTask. For an approval gate, approve lets the step continue with inputs, reject rejects it with reason, and push_back sends it back for re-execution with inputs as feedback. For a human task, approve completes it and push_back pushes it back; human tasks cannot be rejected.
+- Fields unsupported by an action are invalid. params, singleton, noReuse, and labels apply only to start and enqueue; queue only to enqueue; includeDownstream only to retry; stepName only to retry, approve, reject, and push_back; subDAGRunId and attemptId only to approve, reject, and push_back; inputs only to approve and push_back; reason only to reject.
 - With wait=true, the call returns once the run reaches a terminal state, stops at a waiting checkpoint, or the timeout elapses. A run stopped at a checkpoint has completed=false and reports each waiting step under run.steps as humanTask or approval with its prompt; resolve them to resume the run. On timeout the run keeps executing and the output has completed=false.
 
 Output:
@@ -302,14 +309,15 @@ Output:
 - Successful result text begins with Dagu execute action completed.
 - Structured output has action, targetType, dagName, dagRunId, and references.
 - When a run is identified, output includes runUri and logsUri. Without wait, it also includes subscribe guidance.
+- approve, reject, and push_back output also has stepName, subDAGRunId when given, and, without wait, the run status and statusLabel observed after the decision.
 - With wait=true, output has completed plus the last observed status and statusLabel, and a completed run includes the run detail summary under run with per-step statuses and errors.
 
 Errors:
 
-- invalid_tool_input for missing fields, unknown action, unsupported targetType, or malformed input.
+- invalid_tool_input for missing fields, unknown action, unsupported targetType, or malformed input, when reject targets a human task, or when inputs do not fit the waiting step.
 - unauthorized when the caller cannot perform the requested execution operation.
-- resource_not_found when the named DAG or DAG-run does not exist. A misspelled stored-DAG name carries close existing names under details.didYouMean.
-- conflict when a singleton run is already running or queued.
+- resource_not_found when the named DAG, DAG-run, or step does not exist. A misspelled stored-DAG name carries close existing names under details.didYouMean.
+- conflict when a singleton run is already running or queued, when the step to decide is not waiting for a person, or when attemptId differs from the run's current attempt, which details.attemptId reports.
 - resource_unavailable or internal_error for runtime failures.`,
 		},
 		{

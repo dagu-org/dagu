@@ -36,6 +36,7 @@ import (
 	apiv1 "github.com/dagucloud/dagu/v2/internal/service/frontend/api/v1"
 	frontendauth "github.com/dagucloud/dagu/v2/internal/service/frontend/auth"
 	"github.com/dagucloud/dagu/v2/internal/service/frontend/sse"
+	"github.com/dagucloud/dagu/v2/internal/upgrade"
 )
 
 // testContext returns a context that is cancelled when the test ends,
@@ -850,6 +851,51 @@ func TestLocalURL(t *testing.T) {
 			assert.Equal(t, tt.want, localURL(tt.addr, tt.useTLS, tt.basePath))
 		})
 	}
+}
+
+type staticUpgradeCacheStore struct {
+	cache *upgrade.UpgradeCheckCache
+}
+
+func (s staticUpgradeCacheStore) Load() (*upgrade.UpgradeCheckCache, error) {
+	return s.cache, nil
+}
+
+func (s staticUpgradeCacheStore) Save(*upgrade.UpgradeCheckCache) error {
+	return nil
+}
+
+func TestUpdateCheckerStatus(t *testing.T) {
+	t.Parallel()
+
+	wantCommand := upgrade.DetectInstallMethod().UpgradeCommand()
+
+	t.Run("cached release", func(t *testing.T) {
+		t.Parallel()
+
+		checker := newUpdateChecker(context.Background(), staticUpgradeCacheStore{cache: &upgrade.UpgradeCheckCache{
+			LastCheck:       time.Now(),
+			LatestVersion:   "v9.9.9",
+			UpdateAvailable: true,
+		}})
+
+		status := checker.UpdateStatus()
+		assert.True(t, status.UpdateAvailable)
+		assert.Equal(t, "v9.9.9", status.LatestVersion)
+		assert.Equal(t, wantCommand, status.UpgradeCommand)
+		assert.False(t, status.RestartRequired)
+	})
+
+	// Restart detection is local, so it stays on when update checks are disabled.
+	t.Run("update checks disabled", func(t *testing.T) {
+		t.Parallel()
+
+		status := newUpdateChecker(context.Background(), nil).UpdateStatus()
+		assert.False(t, status.UpdateAvailable)
+		assert.Empty(t, status.LatestVersion)
+		assert.Equal(t, wantCommand, status.UpgradeCommand)
+		assert.False(t, status.RestartRequired)
+	})
 }
 
 func TestEvaluateConfiguredBasePathKeepsRedirectsLocal(t *testing.T) {

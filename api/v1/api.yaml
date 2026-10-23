@@ -8926,6 +8926,127 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /license/monitoring/dismiss-errors-notice:
+    post:
+      summary: "Dismiss the notice that offers to send error messages"
+      description: "Stops offering administrators to have this server also send the error messages of failed runs to Dagu Console. Admin only."
+      operationId: "dismissLicenseMonitoringErrorsNotice"
+      tags:
+        - "system"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "What this server reports"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LicenseMonitoring"
+        "400":
+          description: "License management is not available"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Insufficient permissions"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /license/remote-access:
+    get:
+      summary: "Get how far calls from Dagu Cloud may go on this server"
+      description: "Returns the highest role calls from Dagu Cloud get on this server, whether they may decide steps waiting for a person, whether configuration fixes either, and whether this server process holds its connection for those calls. Admin only."
+      operationId: "getLicenseRemoteAccess"
+      tags:
+        - "system"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "Remote access on this server"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LicenseRemoteAccess"
+        "400":
+          description: "License management is not available"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Insufficient permissions"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    put:
+      summary: "Choose how far calls from Dagu Cloud may go on this server"
+      description: "Sets the highest role calls from Dagu Cloud get on this server, whether they may decide steps waiting for a person, or both. Changes apply at once; off closes the connection and ends the calls in flight. Admin only."
+      operationId: "updateLicenseRemoteAccess"
+      tags:
+        - "system"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                level:
+                  $ref: "#/components/schemas/LicenseRemoteAccessLevel"
+                approvals:
+                  type: boolean
+                  description: "Whether calls from Dagu Cloud may approve, reject, or push back steps waiting for a person"
+      responses:
+        "200":
+          description: "Remote access on this server after the change"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LicenseRemoteAccess"
+        "400":
+          description: "Unknown level, nothing to change, or license management is not available"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Insufficient permissions"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "cloud.remote_access or cloud.remote_approvals in the configuration fixes the setting"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /wiki:
     get:
       summary: "List Wiki pages"
@@ -11269,6 +11390,29 @@ paths:
                 $ref: "#/components/schemas/Error"
         "409":
           description: "Name already exists"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /workspaces/deprecation:
+    get:
+      summary: "List workspace settings removed in v3.0"
+      description: "Lists the workspace settings in use that stop applying when workspaces are removed in v3.0. Admin only."
+      operationId: "getWorkspaceDeprecation"
+      tags:
+        - "workspaces"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "Workspace settings in use"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceDeprecationResponse"
+        default:
+          description: "Generic error response"
           content:
             application/json:
               schema:
@@ -15259,6 +15403,9 @@ components:
             approvalResumePending:
               type: boolean
               description: "Whether a root run has a saved approval and ready work whose resume still needs to be accepted"
+            attemptId:
+              type: string
+              description: "Identifier of the attempt this status belongs to. Each retry of the DAG-run, including a resume after manual action, records a new attempt."
           required:
             - rootDAGRunName
             - rootDAGRunId
@@ -17328,8 +17475,8 @@ components:
 
     LicenseMonitoringLevel:
       type: string
-      enum: ["off", "health", "runs"]
-      description: "How much this server reports to Dagu Console: off sends nothing but one report saying so after health or runs, health sends its version and which services run, and runs also sends the status of finished DAG runs and the runs in progress"
+      enum: ["off", "health", "runs", "errors"]
+      description: "How much this server reports to Dagu Console: off sends nothing but one report saying so after health, runs, or errors, health sends its version and which services run, runs also sends the status of finished DAG runs and the runs in progress, and errors also sends the error messages of failed runs"
 
     LicenseMonitoring:
       type: object
@@ -17346,6 +17493,9 @@ components:
         noticeDismissed:
           type: boolean
           description: "Whether an administrator dismissed the notice that asks what to report"
+        errorsOffered:
+          type: boolean
+          description: "Whether an administrator was offered to send error messages: they chose a level on this server, or dismissed the notice that offers them"
         lastReportAt:
           type: string
           description: "When Dagu Console accepted the last report this server sent"
@@ -17361,6 +17511,40 @@ components:
         - configured
         - chosen
         - noticeDismissed
+        - errorsOffered
+
+    LicenseRemoteAccessLevel:
+      type: string
+      enum: ["off", "viewer", "operator", "developer"]
+      description: "The highest role calls from Dagu Cloud get on this server: off refuses them, viewer reads DAGs, runs, and logs, operator also starts, enqueues, retries, and stops runs of existing DAGs, and developer also changes DAG definitions and runs inline specs"
+
+    LicenseRemoteAccess:
+      type: object
+      description: "How far calls from Dagu Cloud may go on this server, and whether they reach it"
+      properties:
+        level:
+          $ref: "#/components/schemas/LicenseRemoteAccessLevel"
+        levelConfigured:
+          type: boolean
+          description: "Whether cloud.remote_access in the configuration fixes the level"
+        approvals:
+          type: boolean
+          description: "Whether calls from Dagu Cloud may approve, reject, or push back steps waiting for a person"
+        approvalsConfigured:
+          type: boolean
+          description: "Whether cloud.remote_approvals in the configuration fixes approvals"
+        connected:
+          type: boolean
+          description: "Whether this server process holds its connection to the relay, so calls from Dagu Cloud reach it"
+        error:
+          type: string
+          description: "Why the last connection failed or Dagu Cloud refused it, such as a workspace without a plan or a trial"
+      required:
+        - level
+        - levelConfigured
+        - approvals
+        - approvalsConfigured
+        - connected
 
     ChangePasswordRequest:
       type: object
@@ -18859,6 +19043,39 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/WorkspaceResponse"
+
+    WorkspaceDeprecationResponse:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          description: "Workspace settings in use, ordered by kind and name"
+          items:
+            $ref: "#/components/schemas/WorkspaceDeprecationItem"
+
+    WorkspaceDeprecationItem:
+      type: object
+      required:
+        - kind
+        - name
+      properties:
+        kind:
+          type: string
+          enum:
+            - baseConfig
+            - secret
+            - profileEntry
+            - notificationRoute
+            - incidentPolicy
+            - configKey
+            - user
+            - apiKey
+            - wikiDirectory
+        name:
+          type: string
+          description: "The setting, such as a workspace, a secret and its workspace, or a username"
 
 # Apply security requirements globally
 security:

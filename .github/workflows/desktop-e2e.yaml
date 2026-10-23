@@ -37,7 +37,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.27.2"
+  GO_VERSION: "1.27.3"
 
 jobs:
   windows-desktop:

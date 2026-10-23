@@ -37,7 +37,7 @@ Load only the reference file that matches the task.
 ## High-Signal Rules
 
 - `output:` has two modes:
-  - string form captures trimmed stdout into an env-scope variable such as `${env.VERSION}`
+  - string form captures trimmed stdout, including any log lines, into an env-scope variable such as `${env.VERSION}`
   - object form publishes structured step-scoped output for `${step_id.output.*}` access
 - Value declarations in step `outputs:` publish explicit values through `${steps.<step_id>.outputs.<name>}`. Write those values to `$DAGU_OUTPUT_FILE`; Dagu captures them only after the command succeeds. Build path declarations publish the final materialization path after commit or reuse.
 - `human.task` is a processless root-DAG step with an explicit `id`, a required `with.prompt`, and an optional flat scalar form. A root DAG containing one can run locally or on a distributed worker. Every declared form property is a step output, published when submitted or defaulted, and available as `${steps.<step_id>.outputs.<name>}`. Optional `with.push_back` (`rewind_to` plus an optional feedback `form`) lets the operator send the work back to an upstream step instead of completing it.

@@ -3490,6 +3490,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/license/monitoring/dismiss-errors-notice": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dismiss the notice that offers to send error messages
+         * @description Stops offering administrators to have this server also send the error messages of failed runs to Dagu Console. Admin only.
+         */
+        post: operations["dismissLicenseMonitoringErrorsNotice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/license/remote-access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get how far calls from Dagu Cloud may go on this server
+         * @description Returns the highest role calls from Dagu Cloud get on this server, whether they may decide steps waiting for a person, whether configuration fixes either, and whether this server process holds its connection for those calls. Admin only.
+         */
+        get: operations["getLicenseRemoteAccess"];
+        /**
+         * Choose how far calls from Dagu Cloud may go on this server
+         * @description Sets the highest role calls from Dagu Cloud get on this server, whether they may decide steps waiting for a person, or both. Changes apply at once; off closes the connection and ends the calls in flight. Admin only.
+         */
+        put: operations["updateLicenseRemoteAccess"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/wiki": {
         parameters: {
             query?: never;
@@ -4172,6 +4216,26 @@ export interface paths {
         put?: never;
         /** Create a workspace */
         post: operations["createWorkspace"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/deprecation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List workspace settings removed in v3.0
+         * @description Lists the workspace settings in use that stop applying when workspaces are removed in v3.0. Admin only.
+         */
+        get: operations["getWorkspaceDeprecation"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -6049,6 +6113,8 @@ export interface components {
             humanTaskResumePending?: boolean;
             /** @description Whether a root run has a saved approval and ready work whose resume still needs to be accepted */
             approvalResumePending?: boolean;
+            /** @description Identifier of the attempt this status belongs to. Each retry of the DAG-run, including a resume after manual action, records a new attempt. */
+            attemptId?: string;
         };
         /** @description One file within a DAG-run's artifact directory */
         ArtifactListFile: {
@@ -7091,7 +7157,7 @@ export interface components {
             error?: string;
         };
         /**
-         * @description How much this server reports to Dagu Console: off sends nothing but one report saying so after health or runs, health sends its version and which services run, and runs also sends the status of finished DAG runs and the runs in progress
+         * @description How much this server reports to Dagu Console: off sends nothing but one report saying so after health, runs, or errors, health sends its version and which services run, runs also sends the status of finished DAG runs and the runs in progress, and errors also sends the error messages of failed runs
          * @enum {string}
          */
         LicenseMonitoringLevel: LicenseMonitoringLevel;
@@ -7104,6 +7170,8 @@ export interface components {
             chosen: boolean;
             /** @description Whether an administrator dismissed the notice that asks what to report */
             noticeDismissed: boolean;
+            /** @description Whether an administrator was offered to send error messages: they chose a level on this server, or dismissed the notice that offers them */
+            errorsOffered: boolean;
             /** @description When Dagu Console accepted the last report this server sent */
             lastReportAt?: string;
             /** @description JSON body of the last report, as sent, with heartbeat_secret replaced by "[redacted]" */
@@ -7113,6 +7181,25 @@ export interface components {
              * @description When Dagu Console stores this server's finished runs again, after its workspace reached the daily limit; absent when the last accepted report was not told of a pause
              */
             runsPausedUntil?: string;
+        };
+        /**
+         * @description The highest role calls from Dagu Cloud get on this server: off refuses them, viewer reads DAGs, runs, and logs, operator also starts, enqueues, retries, and stops runs of existing DAGs, and developer also changes DAG definitions and runs inline specs
+         * @enum {string}
+         */
+        LicenseRemoteAccessLevel: LicenseRemoteAccessLevel;
+        /** @description How far calls from Dagu Cloud may go on this server, and whether they reach it */
+        LicenseRemoteAccess: {
+            level: components["schemas"]["LicenseRemoteAccessLevel"];
+            /** @description Whether cloud.remote_access in the configuration fixes the level */
+            levelConfigured: boolean;
+            /** @description Whether calls from Dagu Cloud may approve, reject, or push back steps waiting for a person */
+            approvals: boolean;
+            /** @description Whether cloud.remote_approvals in the configuration fixes approvals */
+            approvalsConfigured: boolean;
+            /** @description Whether this server process holds its connection to the relay, so calls from Dagu Cloud reach it */
+            connected: boolean;
+            /** @description Why the last connection failed or Dagu Cloud refused it, such as a workspace without a plan or a trial */
+            error?: string;
         };
         /** @description Request body for changing password */
         ChangePasswordRequest: {
@@ -7862,6 +7949,16 @@ export interface components {
         };
         WorkspaceListResponse: {
             workspaces: components["schemas"]["WorkspaceResponse"][];
+        };
+        WorkspaceDeprecationResponse: {
+            /** @description Workspace settings in use, ordered by kind and name */
+            items: components["schemas"]["WorkspaceDeprecationItem"][];
+        };
+        WorkspaceDeprecationItem: {
+            /** @enum {string} */
+            kind: WorkspaceDeprecationItemKind;
+            /** @description The setting, such as a workspace, a secret and its workspace, or a username */
+            name: string;
         };
     };
     responses: never;
@@ -18954,6 +19051,173 @@ export interface operations {
             };
         };
     };
+    dismissLicenseMonitoringErrorsNotice: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description What this server reports */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LicenseMonitoring"];
+                };
+            };
+            /** @description License management is not available */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getLicenseRemoteAccess: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Remote access on this server */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LicenseRemoteAccess"];
+                };
+            };
+            /** @description License management is not available */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    updateLicenseRemoteAccess: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    level?: components["schemas"]["LicenseRemoteAccessLevel"];
+                    /** @description Whether calls from Dagu Cloud may approve, reject, or push back steps waiting for a person */
+                    approvals?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Remote access on this server after the change */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LicenseRemoteAccess"];
+                };
+            };
+            /** @description Unknown level, nothing to change, or license management is not available */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description cloud.remote_access or cloud.remote_approvals in the configuration fixes the setting */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     listWikiPages: {
         parameters: {
             query?: {
@@ -21911,6 +22175,38 @@ export interface operations {
             };
         };
     };
+    getWorkspaceDeprecation: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Workspace settings in use */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceDeprecationResponse"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     getWorkspace: {
         parameters: {
             query?: {
@@ -22404,7 +22700,14 @@ export enum LicenseConnectStatusState {
 export enum LicenseMonitoringLevel {
     off = "off",
     health = "health",
-    runs = "runs"
+    runs = "runs",
+    errors = "errors"
+}
+export enum LicenseRemoteAccessLevel {
+    off = "off",
+    viewer = "viewer",
+    operator = "operator",
+    developer = "developer"
 }
 export enum APIKeyAllowedSurfaces {
     rest_api = "rest_api",
@@ -22545,6 +22848,17 @@ export enum ViewSpecType {
     workflow = "workflow",
     run = "run",
     artifact = "artifact"
+}
+export enum WorkspaceDeprecationItemKind {
+    baseConfig = "baseConfig",
+    secret = "secret",
+    profileEntry = "profileEntry",
+    notificationRoute = "notificationRoute",
+    incidentPolicy = "incidentPolicy",
+    configKey = "configKey",
+    user = "user",
+    apiKey = "apiKey",
+    wikiDirectory = "wikiDirectory"
 }
 export enum ComponentsParametersEventLogPaginationMode {
     offset = "offset",

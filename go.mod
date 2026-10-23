@@ -1,6 +1,6 @@
 module github.com/dagucloud/dagu/v2
 
-go 1.27.2
+go 1.27.3
 
 require (
 	cloud.google.com/go/secretmanager v1.20.0
@@ -23,6 +23,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.41.9
 	github.com/bmatcuk/doublestar/v4 v4.8.1
 	github.com/browserbase/stagehand/packages/sdk-go/v4 v4.1.0
+	github.com/coder/acp-go-sdk v0.13.5
 	github.com/coder/websocket v1.8.15
 	github.com/containerd/errdefs v1.0.0
 	github.com/containerd/platforms v1.0.0-rc.5
@@ -58,7 +59,7 @@ require (
 	github.com/mholt/archives v0.1.5
 	github.com/moby/moby/api v1.54.2
 	github.com/moby/moby/client v0.3.0
-	github.com/modelcontextprotocol/go-sdk v1.6.1
+	github.com/modelcontextprotocol/go-sdk v1.7.0
 	github.com/oapi-codegen/nethttp-middleware v1.1.2
 	github.com/oapi-codegen/oapi-codegen/v2 v2.7.2
 	github.com/oapi-codegen/runtime v1.7.0
@@ -87,7 +88,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.46.0
 	go.opentelemetry.io/otel/trace v1.46.0
 	golang.org/x/crypto v0.58.0
-	golang.org/x/crypto/x509roots/fallback v0.0.0-20261014201258-cf169cd0986f
+	golang.org/x/crypto/x509roots/fallback v0.0.0-20261020153306-9f2b28d4331a
 	golang.org/x/net v0.61.0
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.24.0

@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagucloud/dagu/v2/internal/cloudaccess"
 	"github.com/dagucloud/dagu/v2/internal/cmn/config"
 	"github.com/dagucloud/dagu/v2/internal/cmn/logger"
 	"github.com/dagucloud/dagu/v2/internal/license"
@@ -61,6 +62,7 @@ func TestReportPayload(t *testing.T) {
 		"server_id": "srv-1",
 		"heartbeat_secret": "hb-secret",
 		"level": "runs",
+		"sent_at": "2026-10-10T09:30:30Z",
 		"health": {
 			"version": %q,
 			"os": %q,
@@ -72,6 +74,32 @@ func TestReportPayload(t *testing.T) {
 			]
 		}
 	}`, config.Version, runtime.GOOS, runtime.GOARCH), report.body)
+}
+
+// stubRemoteAccess lets calls from Dagu Cloud operate and decide waiting
+// steps.
+type stubRemoteAccess struct{}
+
+func (stubRemoteAccess) Status(context.Context) (cloudaccess.Status, error) {
+	return cloudaccess.Status{Level: config.RemoteAccessOperator, Approvals: true}, nil
+}
+
+func TestReportCarriesRemoteAccess(t *testing.T) {
+	t.Parallel()
+
+	console := newFakeConsole(t)
+	r := newReporter(console.credentials, nil, fixedLevel(config.ReportHealth))
+	r.remote = stubRemoteAccess{}
+	clock := startReporter(t.Context(), t, r, noJitter)
+
+	clock.wait()
+	clock.elapse()
+	var body struct {
+		Health map[string]any `json:"health"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(console.next(t).body), &body))
+	assert.Equal(t, "operator", body.Health["remote_access"])
+	assert.Equal(t, true, body.Health["remote_approvals"])
 }
 
 func TestReportWithoutServices(t *testing.T) {
@@ -125,6 +153,32 @@ func TestReportNextInterval(t *testing.T) {
 			assert.Equal(t, tc.want, clock.next())
 		})
 	}
+}
+
+// A report that Dagu Console answers with license_refresh, as when the
+// workspace started a trial, checks in for the license at once; within
+// refreshEvery, further answers ask for nothing more.
+func TestReportRefreshesTheLicenseWhenAsked(t *testing.T) {
+	t.Parallel()
+
+	refresh := `{"next_report_seconds": 60, "license_refresh": true}`
+	console := newFakeConsole(t,
+		consoleResponse{status: http.StatusOK, body: refresh},
+		consoleResponse{status: http.StatusOK, body: refresh},
+		consoleResponse{status: http.StatusOK, body: `{"next_report_seconds": 60}`})
+	r := newReporter(console.credentials, nil, fixedLevel(config.ReportRuns))
+	var refreshed atomic.Int32
+	r.refresh = func(context.Context) error {
+		refreshed.Add(1)
+		return errors.New("console unreachable")
+	}
+	clock := startReporter(t.Context(), t, r, noJitter)
+
+	clock.wait()
+	clock.next()
+	assert.Equal(t, int32(1), refreshed.Load())
+	clock.next()
+	assert.Equal(t, int32(1), refreshed.Load(), "a failed refresh is not retried within refreshEvery")
 }
 
 func TestReportJitter(t *testing.T) {
@@ -398,6 +452,7 @@ func startReporterSpawning(
 	clock := &fakeClock{t: t, waits: make(chan time.Duration, 16), fire: make(chan time.Time), at: start}
 	r.after = clock.after
 	r.random = random
+	r.now = clock.now
 	r.startedAt = testStartedAt
 	if r.events != nil {
 		r.events.now = clock.now

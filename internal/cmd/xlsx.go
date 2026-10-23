@@ -109,6 +109,12 @@ header line and one line per row.
 
 A path of "-" reads the workbook from standard input, up to 64 MiB.
 
+--types pins column types as xlsx.read's types does, Japanese forms such as
+１２３,４５６ and 令和8年10月3日 included: name:type pairs, or a JSON object
+when a name holds a comma. A cell that cannot convert fails the read, or
+with --on-type-error warn reads as null, or with keep stays as it was read;
+both of those add a warning.
+
 A protected workbook needs a password. Set DAGU_XLSX_PASSWORD rather
 than --password where other users share the host: a flag value shows in
 the process list and stays in shell history. The flag wins when both are
@@ -117,6 +123,7 @@ set.
 		Example: `  dagu xlsx read orders.xlsx
   dagu xlsx read orders.xlsx --sheet Orders --range A2:F --header false
   dagu xlsx read orders.xlsx --columns "Invoice No,Amount" --format json
+  dagu xlsx read orders.xlsx --types "Amount:number,Due:date" --on-type-error keep
   dagu xlsx read orders.xlsx --skip-hidden`,
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
@@ -126,6 +133,8 @@ set.
 	cmd.Flags().String("range", "", "Cell range, Sheet!A2:F reference, named range, or table name")
 	cmd.Flags().String("header", "true", "Header: true, false, a row number, or rows such as 3,4")
 	cmd.Flags().String("columns", "", "Columns to keep, comma-separated, with optional name:alias renames")
+	cmd.Flags().String("types", "", "Column types to pin: name:type pairs, comma-separated, or a JSON object")
+	cmd.Flags().String("on-type-error", "fail", "What a cell that fails its type does: fail, warn (read as null; also spelled null), or keep")
 	cmd.Flags().Int("max-rows", 0, "Most rows to print (default 5000)")
 	cmd.Flags().Bool("skip-hidden", false, "Leave out rows hidden by a filter or by hand")
 	cmd.Flags().String("password", "", "Password of a protected workbook; prefer DAGU_XLSX_PASSWORD, which keeps it out of the process list")
@@ -230,6 +239,17 @@ func runXlsxRead(cmd *cobra.Command, args []string) error {
 		if opts.Columns, err = workbook.ParseColumns(columns); err != nil {
 			return fmt.Errorf("--columns: %w", err)
 		}
+	}
+	types, _ := cmd.Flags().GetString("types")
+	if opts.Types, err = workbook.ParseTypes(types); err != nil {
+		return fmt.Errorf("--types: %w", err)
+	}
+	onTypeError, _ := cmd.Flags().GetString("on-type-error")
+	switch mode := workbook.TypeErrorMode(onTypeError); mode {
+	case workbook.TypeErrorFail, workbook.TypeErrorWarn, workbook.TypeErrorNull, workbook.TypeErrorKeep:
+		opts.OnTypeError = mode
+	default:
+		return fmt.Errorf("--on-type-error: %q is not fail, warn, null, or keep", onTypeError)
 	}
 
 	var result *workbook.ReadResult

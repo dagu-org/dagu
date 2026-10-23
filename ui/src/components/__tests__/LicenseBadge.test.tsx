@@ -67,6 +67,7 @@ const reporting = (lastReportAt?: string): LicenseMonitoring => ({
   configured: false,
   chosen: true,
   noticeDismissed: false,
+  errorsOffered: false,
   lastReportAt,
 });
 
@@ -184,26 +185,27 @@ describe('license presentation', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('tags trial and comparison links with the feature entry point', () => {
-    renderLicense({ community: true, valid: false });
-    const link = new URL(
-      screen
-        .getByRole('link', { name: 'Start free trial' })
-        .getAttribute('href')!
-    );
-    expect(link.origin + link.pathname).toBe('https://console.dagu.sh/signup');
-    expect(Object.fromEntries(link.searchParams)).toEqual({
-      source: 'dagu-ui',
-      medium: 'product',
-      content: 'audit',
-      deployment: 'self-hosted',
-      intent: 'license-trial',
-      plan: 'trial',
-    });
+  // A Community server starts its trial by connecting with it chosen; one on
+  // free monitoring starts it from its page in Dagu Console.
+  it('starts the trial where this server can start it', () => {
+    const view = renderLicense({ community: true, valid: false });
+    expect(
+      screen.getByRole('link', { name: 'Start free trial' })
+    ).toHaveAttribute('href', '/license?trial=1#monitoring');
     expect(screen.getByRole('link', { name: 'View plans' })).toHaveAttribute(
       'href',
-      expect.stringContaining('https://dagu.sh/pricing?')
+      expect.stringContaining('content=audit')
     );
+    view.unmount();
+
+    renderLicense({
+      plan: 'free',
+      features: [],
+      consoleUrl: 'https://console.dagu.sh/servers?server=srv-1',
+    });
+    expect(
+      screen.getByRole('link', { name: 'Start free trial' })
+    ).toHaveAttribute('href', 'https://console.dagu.sh/servers?server=srv-1');
   });
 
   it('offers renewal when a paid license expires', () => {

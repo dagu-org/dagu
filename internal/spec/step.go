@@ -1040,15 +1040,6 @@ func buildStepRepeatPolicy(_ stepBuildContext, s *step) (ir.RepeatPolicy, error)
 		return ir.RepeatPolicy{}, nil
 	}
 
-	// Validate that explicit string while/until modes have appropriate conditions
-	// (bool true is allowed without conditions for backward compatibility)
-	if rp.Repeat.IsSet() && !rp.Repeat.IsBool() {
-		m := rp.Repeat.String()
-		if (m == "while" || m == "until") && rp.Condition == "" && len(rp.ExitCode) == 0 {
-			return ir.RepeatPolicy{}, fmt.Errorf("repeat mode '%s' requires either 'condition' or 'exit_code' to be specified", m)
-		}
-	}
-
 	var result ir.RepeatPolicy
 	result.RepeatMode = mode
 
@@ -2174,7 +2165,16 @@ func buildStepExecutor(ctx stepBuildContext, s *step, result *ir.Step) error {
 		mergeRedisConfig(ctx.dag.Redis, result.ExecutorConfig.Config)
 	}
 	if result.ExecutorConfig.Type == "harness" && ctx.dag != nil && ctx.dag.Harness != nil {
-		result.ExecutorConfig.Config = mergeHarnessConfig(ctx.dag.Harness, ctx.dag.Harnesses, stepConfig)
+		config, inherited := mergeHarnessConfig(ctx.dag.Harness, ctx.dag.Harnesses, stepConfig)
+		result.ExecutorConfig.Config = config
+		// A provider chosen by a variable is unknown here, so the runtime filters
+		// the inherited options once the provider resolves.
+		if len(inherited) > 0 && strings.Contains(harnessProviderName(config), "${") {
+			if result.ExecutorConfig.Metadata == nil {
+				result.ExecutorConfig.Metadata = make(map[string]any, 1)
+			}
+			result.ExecutorConfig.Metadata[ir.HarnessInheritedOptionsKey] = inherited
+		}
 	}
 	if isKubernetesExecutorType(result.ExecutorConfig.Type) && ctx.dag != nil && ctx.dag.Kubernetes != nil {
 		result.ExecutorConfig.Config = mergeKubernetesExecutorConfig(ctx.dag.Kubernetes, result.ExecutorConfig.Config)
@@ -2249,7 +2249,9 @@ func mergeRedisConfig(dagRedis *ir.RedisConfig, stepConfig map[string]any) {
 	setIfMissing("max_retries", dagRedis.MaxRetries)
 }
 
-func mergeHarnessConfig(dagHarness *ir.HarnessConfig, defs ir.HarnessDefinitions, stepConfig map[string]any) map[string]any {
+// mergeHarnessConfig applies DAG-level harness defaults to a step config and
+// returns the merged config with the sorted keys it inherited.
+func mergeHarnessConfig(dagHarness *ir.HarnessConfig, defs ir.HarnessDefinitions, stepConfig map[string]any) (map[string]any, []string) {
 	effectiveProvider := harnessProviderName(stepConfig)
 	if effectiveProvider == "" && dagHarness != nil {
 		effectiveProvider = harnessProviderName(dagHarness.Config)
@@ -2264,19 +2266,29 @@ func mergeHarnessConfig(dagHarness *ir.HarnessConfig, defs ir.HarnessDefinitions
 	}
 
 	if dagHarness == nil {
-		return merged
+		return merged, nil
 	}
 
+	def := defs[effectiveProvider]
 	dagConfig := dagHarness.Config
 	if ir.IsEffectiveBuiltinCLIHarnessProvider(effectiveProvider, defs) {
 		dagConfig = ir.NormalizeBuiltinHarnessFlagKeys(dagConfig)
 	}
+	// Remote ACP agents accept no CLI options, so DAG-level options meant for
+	// other providers are not inherited.
+	remoteACP := def != nil && def.IsRemote()
 
+	var inherited []string
 	for key, value := range dagConfig {
+		if remoteACP && key != "provider" && key != "acp_permission" {
+			continue
+		}
 		if _, exists := merged[key]; !exists {
 			merged[key] = cloneAny(value)
+			inherited = append(inherited, key)
 		}
 	}
+	slices.Sort(inherited)
 
 	if _, exists := stepConfig["fallback"]; exists {
 		merged["fallback"] = cloneAny(stepConfig["fallback"])
@@ -2284,7 +2296,7 @@ func mergeHarnessConfig(dagHarness *ir.HarnessConfig, defs ir.HarnessDefinitions
 		merged["fallback"] = cloneAny(dagHarness.Fallback)
 	}
 
-	return merged
+	return merged, inherited
 }
 
 func harnessProviderName(cfg map[string]any) string {
