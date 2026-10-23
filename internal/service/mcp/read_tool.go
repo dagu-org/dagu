@@ -296,7 +296,12 @@ func (svc *Service) readToolImpl(ctx context.Context, input readInput) (*mcpsdk.
 				raw, err = svc.api.GetDAGRunDetailsData(ctx, input.Name+"/"+input.DAGRunID)
 			}
 			if err == nil {
-				data, err = normalizeRunDetails(raw, addr)
+				var details map[string]any
+				details, err = normalizeRunDetails(raw, addr)
+				if err == nil {
+					svc.attachBoundedRunOutputs(ctx, details, addr)
+					data = details
+				}
 			}
 		}
 	case readTargetRunLogs:

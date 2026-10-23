@@ -335,6 +335,7 @@ func (svc *Service) waitForRun(ctx context.Context, input executeInput, dagRunID
 					return "Dagu execute action completed, but waiting for the run failed. Poll the runUri resource for completion."
 				}
 				output["completed"] = terminal
+				svc.attachBoundedRunOutputs(ctx, details, runAddress{name: input.Name, dagRunID: dagRunID})
 				output["run"] = details
 				if waiting {
 					return "Dagu execute action completed. The run is waiting for manual action; its waiting steps and their prompts are in the run details."

@@ -1131,6 +1131,45 @@ func (a *API) GetDAGRunOutputs(ctx context.Context, request api.GetDAGRunOutputs
 	}, nil
 }
 
+// GetDAGRunOutputsData returns collected step outputs for callers outside the
+// HTTP layer. It applies the same attempt resolution and workspace visibility
+// checks as GetDAGRunOutputs, without exposing execution params.
+func (a *API) GetDAGRunOutputsData(ctx context.Context, ref ir.DAGRunRef, subRunID string) (*ir.DAGRunOutputs, error) {
+	var attempt dagrun.Attempt
+	if subRunID != "" {
+		// A caller visible to the child but not the root must not reach it.
+		if err := a.requireDAGRunVisible(ctx, ref); err != nil {
+			return nil, err
+		}
+		var err error
+		if attempt, _, err = a.getReferencedAttemptWithRoot(ctx, ref, subRunID, ""); err != nil {
+			return nil, fmt.Errorf("sub dag-run ID %s not found for DAG %s: %w", subRunID, ref.Name, err)
+		}
+	} else if ref.ID == "latest" {
+		var err error
+		if attempt, err = a.dagRunRepository.LatestAttempt(ctx, ref.Name, persis.DAGRunLatestAttemptOptions{}); err != nil {
+			return nil, fmt.Errorf("no dag-runs found for DAG %s", ref.Name)
+		}
+	} else {
+		var err error
+		if attempt, err = a.dagRunRepository.FindAttempt(ctx, ref); err != nil {
+			return nil, fmt.Errorf("dag-run ID %s not found for DAG %s", ref.ID, ref.Name)
+		}
+	}
+	workspaceName, err := workspaceNameForAttempt(ctx, attempt)
+	if err != nil {
+		return nil, err
+	}
+	if err := a.requireWorkspaceVisible(ctx, workspaceName); err != nil {
+		return nil, err
+	}
+	outputs, err := attempt.ReadOutputs(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error reading outputs: %w", err)
+	}
+	return outputs, nil
+}
+
 func (a *API) GetDAGRunStepLog(ctx context.Context, request api.GetDAGRunStepLogRequestObject) (api.GetDAGRunStepLogResponseObject, error) {
 	ref := ir.NewDAGRunRef(request.Name, request.DagRunId)
 	dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
