@@ -335,7 +335,8 @@ jobs:
     name: E2E (${{ matrix.shard }}/${{ matrix.shard_total }})
     needs: changes
     if: needs.changes.outputs.e2e == 'true'
-    runs-on: ubuntu-latest
+    # Playwright does not support Chromium on the ubuntu-26.04 image yet.
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
     strategy:
       fail-fast: false
