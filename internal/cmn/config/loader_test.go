@@ -2455,6 +2455,21 @@ remote_nodes:
 		assert.Contains(t, err.Error(), "set either remote_nodes[0].auth_token or remote_nodes[0].auth_token_file, not both")
 	})
 
+	t.Run("BothSetWithTheFileFromEnv", func(t *testing.T) {
+		path := writeSecretFile(t, "from-file")
+		t.Setenv("DAGU_AUTH_TOKEN_SECRET_FILE", path)
+		err := loadWithErrorFromYAML(t, `
+auth:
+  mode: builtin
+  builtin:
+    token:
+      secret: inline-secret
+`)
+		require.Error(t, err)
+		// The file is named by the variable, so the message names the variable.
+		assert.Contains(t, err.Error(), "set either auth.builtin.token.secret or DAGU_AUTH_TOKEN_SECRET_FILE, not both")
+	})
+
 	t.Run("BothSetFromEnv", func(t *testing.T) {
 		path := writeSecretFile(t, "from-file")
 		t.Setenv("DAGU_GITSYNC_AUTH_TOKEN", "inline-token")

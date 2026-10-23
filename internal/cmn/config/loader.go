@@ -318,11 +318,16 @@ func (l *ConfigLoader) readSecretFile(secret secretFile) error {
 	if secret.set || *secret.value != "" {
 		// The inline value may come from the environment, where the operator
 		// looks for the variable and not for the key.
-		inline := secret.key
+		// The same holds for the _file side: DAGU_..._FILE can name the file while
+		// the key is in the configuration file.
+		inline, fileKey := secret.key, secret.key+"_file"
 		if secret.env != "" {
 			inline = secret.env
 		}
-		return fmt.Errorf("set either %s or %s_file, not both", inline, secret.key)
+		if env := inlineEnvName(fileKey); env != "" {
+			fileKey = env
+		}
+		return fmt.Errorf("set either %s or %s, not both", inline, fileKey)
 	}
 	path, err := l.resolvePath(secret.key+"_file", secret.file)
 	if err != nil {
