@@ -21,6 +21,10 @@ import (
 type config struct {
 	Duration       string            `mapstructure:"duration"`
 	Until          string            `mapstructure:"until"`
+	Offset         string            `mapstructure:"offset"`
+	Timezone       string            `mapstructure:"timezone"`
+	IfPast         string            `mapstructure:"if_past"`
+	Window         string            `mapstructure:"window"`
 	Path           string            `mapstructure:"path"`
 	State          string            `mapstructure:"state"`
 	URL            string            `mapstructure:"url"`
@@ -32,13 +36,29 @@ type config struct {
 	RequestTimeout string            `mapstructure:"request_timeout"`
 }
 
+const (
+	ifPastContinue = "continue"
+	ifPastFail     = "fail"
+	ifPastWindow   = "window"
+)
+
 type parsedConfig struct {
 	config
 	duration       time.Duration
 	until          time.Time
+	clock          *clockTime     // set when with.until is HH:MM[:SS]
+	location       *time.Location // with.timezone; nil means the run-configured zone
 	expectedStatus int
+	offset         time.Duration
+	ifPast         string
+	window         time.Duration
 	pollInterval   time.Duration
 	requestTimeout time.Duration
+}
+
+// clockTime is a with.until time of day, resolved against a date at run time.
+type clockTime struct {
+	hour, minute, second int
 }
 
 func defaultConfig() config {
@@ -92,6 +112,9 @@ func parseConfig(operation string, cfg config, deferReferences bool) (parsedConf
 
 	switch operation {
 	case opDuration:
+		if err := rejectUntilOnlyFields(cfg, operation); err != nil {
+			return parsed, err
+		}
 		if strings.TrimSpace(cfg.Duration) == "" {
 			return parsed, fmt.Errorf("wait: duration is required for %s", operation)
 		}
@@ -106,14 +129,13 @@ func parseConfig(operation string, cfg config, deferReferences bool) (parsedConf
 		if strings.TrimSpace(cfg.Until) == "" {
 			return parsed, fmt.Errorf("wait: until is required for %s", operation)
 		}
-		if !deferred(cfg.Until) {
-			until, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(cfg.Until))
-			if err != nil {
-				return parsed, withUnresolvedHint(fmt.Errorf("wait: until must be RFC3339 timestamp: %w", err), cfg.Until)
-			}
-			parsed.until = until
+		if err := parseUntilFields(cfg, deferred, &parsed); err != nil {
+			return parsed, err
 		}
 	case opFile:
+		if err := rejectUntilOnlyFields(cfg, operation); err != nil {
+			return parsed, err
+		}
 		if strings.TrimSpace(cfg.Path) == "" {
 			return parsed, fmt.Errorf("wait: path is required for %s", operation)
 		}
@@ -125,6 +147,9 @@ func parseConfig(operation string, cfg config, deferReferences bool) (parsedConf
 			}
 		}
 	case opHTTP:
+		if err := rejectUntilOnlyFields(cfg, operation); err != nil {
+			return parsed, err
+		}
 		if strings.TrimSpace(cfg.URL) == "" {
 			return parsed, fmt.Errorf("wait: url is required for %s", operation)
 		}
@@ -183,6 +208,108 @@ func parseStatus(raw any) (int, error) {
 	return status, nil
 }
 
+// parseUntilFields validates the wait.until options and records the literal
+// values. The executor resolves clock times on the run's logical day. The
+// signed offset is stored separately and applied once by the executor, so
+// both RFC3339 and clock-time deadlines shift exactly once.
+func parseUntilFields(cfg config, deferred func(string) bool, parsed *parsedConfig) error {
+	if tz := strings.TrimSpace(cfg.Timezone); tz != "" && !deferred(cfg.Timezone) {
+		loc, err := time.LoadLocation(tz)
+		if err != nil {
+			return withUnresolvedHint(fmt.Errorf("wait: timezone must be an IANA name: %w", err), cfg.Timezone)
+		}
+		parsed.location = loc
+	}
+	if raw := strings.TrimSpace(cfg.Offset); raw != "" && !deferred(cfg.Offset) {
+		offset, err := time.ParseDuration(raw)
+		if err != nil {
+			return withUnresolvedHint(fmt.Errorf("wait: offset must be a duration: %w", err), cfg.Offset)
+		}
+		parsed.offset = offset
+	}
+	// Whether with.window is set is known even when its value is deferred, so
+	// the pairing with if_past only waits on if_past itself.
+	if !deferred(cfg.IfPast) {
+		switch cfg.IfPast {
+		case "":
+			parsed.ifPast = ifPastContinue
+		case ifPastContinue, ifPastFail, ifPastWindow:
+			parsed.ifPast = cfg.IfPast
+		default:
+			return withUnresolvedHint(fmt.Errorf("wait: if_past must be %q, %q, or %q", ifPastContinue, ifPastFail, ifPastWindow), cfg.IfPast)
+		}
+		hasWindow := strings.TrimSpace(cfg.Window) != ""
+		if parsed.ifPast == ifPastWindow && !hasWindow {
+			return fmt.Errorf("wait: window is required when if_past is %q", ifPastWindow)
+		}
+		if parsed.ifPast != ifPastWindow && hasWindow {
+			return fmt.Errorf("wait: window requires if_past %q", ifPastWindow)
+		}
+	}
+	if strings.TrimSpace(cfg.Window) != "" && !deferred(cfg.Window) {
+		window, err := parsePositiveDuration("window", cfg.Window)
+		if err != nil {
+			return withUnresolvedHint(err, cfg.Window)
+		}
+		parsed.window = window
+	}
+	if !deferred(cfg.Until) {
+		raw := strings.TrimSpace(cfg.Until)
+		if until, err := time.Parse(time.RFC3339Nano, raw); err == nil {
+			parsed.until = until
+		} else {
+			clock, err := parseClock(raw)
+			if err != nil {
+				return withUnresolvedHint(err, cfg.Until)
+			}
+			parsed.clock = &clock
+		}
+	}
+	return nil
+}
+
+var errInvalidUntil = fmt.Errorf("wait: until must be RFC3339 timestamp or HH:MM[:SS]")
+
+func parseClock(raw string) (clockTime, error) {
+	parts := strings.Split(raw, ":")
+	if len(parts) < 2 || len(parts) > 3 {
+		return clockTime{}, errInvalidUntil
+	}
+	nums := make([]int, len(parts))
+	for i, p := range parts {
+		n, err := strconv.Atoi(strings.TrimSpace(p))
+		if err != nil {
+			return clockTime{}, errInvalidUntil
+		}
+		nums[i] = n
+	}
+	clock := clockTime{hour: nums[0], minute: nums[1]}
+	if len(nums) == 3 {
+		clock.second = nums[2]
+	}
+	if clock.hour < 0 || clock.hour > 23 || clock.minute < 0 || clock.minute > 59 || clock.second < 0 || clock.second > 59 {
+		return clockTime{}, errInvalidUntil
+	}
+	return clock, nil
+}
+
+func rejectUntilOnlyFields(cfg config, operation string) error {
+	for _, field := range []struct {
+		name  string
+		value string
+	}{
+		{"offset", cfg.Offset},
+		{"timezone", cfg.Timezone},
+		{"if_past", cfg.IfPast},
+		{"window", cfg.Window},
+	} {
+		if strings.TrimSpace(field.value) != "" {
+			return fmt.Errorf("wait: %s is only valid for %s", field.name, opUntil)
+		}
+	}
+	return nil
+}
+
 func parsePositiveDuration(field, value string) (time.Duration, error) {
 	value = strings.TrimSpace(value)
 	if value == "" {
@@ -203,7 +330,11 @@ var configSchema = &jsonschema.Schema{
 	AdditionalProperties: &jsonschema.Schema{Not: &jsonschema.Schema{}},
 	Properties: map[string]*jsonschema.Schema{
 		"duration":        {Type: "string", Description: "Duration to wait for action: wait.duration, such as 30s or 5m."},
-		"until":           {Type: "string", Description: "RFC3339 timestamp for action: wait.until."},
+		"until":           {Type: "string", Description: "RFC3339 timestamp or HH:MM[:SS] clock time for action: wait.until."},
+		"offset":          {Type: "string", Description: "Duration added to with.until, such as 5m. Only valid for action: wait.until."},
+		"timezone":        {Type: "string", Description: "IANA timezone for HH:MM[:SS] with.until values. Ignored when with.until is RFC3339. Only valid for action: wait.until."},
+		"if_past":         {Type: "string", Description: "Behavior when with.until is already past: continue, fail, or window. Only valid for action: wait.until. Defaults to continue."},
+		"window":          {Type: "string", Description: "How long after with.until still counts as on time when if_past is window. Only valid for action: wait.until."},
 		"path":            {Type: "string", Description: "File or directory path for action: wait.file."},
 		"state":           {Type: "string", Description: "File state to wait for: exists or missing. Defaults to exists."},
 		"url":             {Type: "string", Description: "Absolute URL for action: wait.http."},

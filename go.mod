@@ -23,6 +23,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.41.9
 	github.com/bmatcuk/doublestar/v4 v4.8.1
 	github.com/browserbase/stagehand/packages/sdk-go/v4 v4.1.0
+	github.com/coder/acp-go-sdk v0.13.5
 	github.com/coder/websocket v1.8.15
 	github.com/containerd/errdefs v1.0.0
 	github.com/containerd/platforms v1.0.0-rc.5

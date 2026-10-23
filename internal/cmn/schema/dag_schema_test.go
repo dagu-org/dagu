@@ -710,6 +710,10 @@ steps:
   - action: wait.until
     with:
       until: "2026-01-02T03:04:05Z"
+      offset: 5m
+      timezone: Europe/London
+      if_past: window
+      window: 10m
   - action: wait.file
     with:
       path: out/ready.flag
@@ -723,6 +727,19 @@ steps:
 `,
 		},
 		{
+			name: "WaitActionsReferenceIfPast",
+			spec: `
+steps:
+  - action: wait.until
+    with:
+      until: "09:00"
+      offset: ${params.offset}
+      timezone: ${params.zone}
+      if_past: ${params.on_past}
+      window: ${params.grace}
+`,
+		},
+		{
 			name: "RejectWaitActionUnknownConfigField",
 			spec: `
 steps:
@@ -730,6 +747,17 @@ steps:
     with:
       duration: 10s
       seconds: 10
+`,
+			wantErr: "did not validate",
+		},
+		{
+			name: "RejectWaitUntilUnknownIfPast",
+			spec: `
+steps:
+  - action: wait.until
+    with:
+      until: "09:00"
+      if_past: retry
 `,
 			wantErr: "did not validate",
 		},

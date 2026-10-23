@@ -66,6 +66,9 @@ export type Config = {
   gitSyncEnabled: boolean;
   updateAvailable: boolean;
   latestVersion: string;
+  upgradeCommand: string;
+  restartRequired: boolean;
+  restartCommand: string;
   permissions: {
     writeDags: boolean;
     runDags: boolean;

@@ -43,6 +43,9 @@ function makeConfig(): Config {
     gitSyncEnabled: false,
     updateAvailable: false,
     latestVersion: '',
+    upgradeCommand: '',
+    restartRequired: false,
+    restartCommand: '',
     permissions: { writeDags: true, runDags: true },
     license: {
       valid: true,

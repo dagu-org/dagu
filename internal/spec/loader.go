@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -1148,20 +1147,7 @@ func (*mergeTransformer) Transformer(
 				return nil
 			}
 
-			cloneDef := func(def *ir.HarnessDefinition) *ir.HarnessDefinition {
-				if def == nil {
-					return nil
-				}
-				return &ir.HarnessDefinition{
-					Binary:         def.Binary,
-					PrefixArgs:     append([]string(nil), def.PrefixArgs...),
-					PromptMode:     def.PromptMode,
-					PromptFlag:     def.PromptFlag,
-					PromptPosition: def.PromptPosition,
-					FlagStyle:      def.FlagStyle,
-					OptionFlags:    maps.Clone(def.OptionFlags),
-				}
-			}
+			cloneDef := ir.CloneHarnessDefinition
 
 			cloneDefs := func(defs ir.HarnessDefinitions) ir.HarnessDefinitions {
 				if defs == nil {

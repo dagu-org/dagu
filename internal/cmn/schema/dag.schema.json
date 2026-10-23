@@ -5179,8 +5179,57 @@
     "harnessNamedDefinition": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["binary"],
       "allOf": [
+        {
+          "if": {"required": ["transport"]},
+          "then": {
+            "required": ["protocol"],
+            "properties": {"protocol": {"const": "acp"}}
+          }
+        },
+        {
+          "if": {
+            "required": ["transport"],
+            "properties": {"transport": {"enum": ["websocket", "http"]}}
+          },
+          "then": {
+            "required": ["url", "cwd"],
+            "not": {"anyOf": [
+              {"required": ["binary"]},
+              {"required": ["prefix_args"]},
+              {"required": ["option_flags"]},
+              {"required": ["flag_style"]}
+            ]}
+          },
+          "else": {
+            "required": ["binary"],
+            "not": {"anyOf": [
+              {"required": ["url"]},
+              {"required": ["headers"]},
+              {"required": ["cwd"]},
+              {"required": ["ca_file"]}
+            ]}
+          }
+        },
+        {
+          "if": {"required": ["bearer_subprotocol"]},
+          "then": {"properties": {"transport": {"const": "websocket"}}, "required": ["transport"]}
+        },
+        {
+          "if": {
+            "properties": {"protocol": {"const": "acp"}},
+            "required": ["protocol"]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {"required": ["prompt_mode"]},
+                {"required": ["prompt_flag"]},
+                {"required": ["prompt_position"]}
+              ]
+            }
+          }
+        },
         {
           "if": {
             "properties": {
@@ -5205,6 +5254,36 @@
         }
       ],
       "properties": {
+        "transport": {
+          "type": "string",
+          "enum": ["stdio", "websocket", "http"],
+          "description": "ACP transport: stdio (default), websocket (ws/wss), or http (Streamable HTTP)."
+        },
+        "url": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Remote endpoint matching the transport: ws/wss or http/https. Supports workflow variable references."
+        },
+        "cwd": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Absolute working directory on the remote agent host."
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {"type": "string"},
+          "description": "Remote request headers, such as Authorization. Values support workflow variable references."
+        },
+        "ca_file": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional PEM CA roots for this remote connection, in addition to system roots. Relative paths use the local step working directory."
+        },
+        "bearer_subprotocol": {
+          "type": "boolean",
+          "default": false,
+          "description": "Opt in to bearer.<token> WebSocket subprotocol authentication for compatible bridges. Tokens must be valid HTTP tokens; keep disabled when Authorization headers suffice."
+        },
         "binary": {
           "type": "string",
           "description": "CLI binary name or path for the custom harness."
@@ -5215,6 +5294,11 @@
             "type": "string"
           },
           "description": "Arguments that always appear before prompt placement and runtime flags."
+        },
+        "protocol": {
+          "type": "string",
+          "enum": ["cli", "acp"],
+          "description": "Communication protocol. Defaults to cli; acp connects to an ACP agent using the selected transport."
         },
         "prompt_mode": {
           "type": "string",
@@ -8945,7 +9029,27 @@
         },
         "until": {
           "type": "string",
-          "description": "RFC3339 timestamp for wait.until."
+          "description": "RFC3339 timestamp or HH:MM[:SS] clock time for wait.until."
+        },
+        "offset": {
+          "type": "string",
+          "description": "Duration added to with.until, such as 5m. Only valid for wait.until."
+        },
+        "timezone": {
+          "type": "string",
+          "description": "IANA timezone for HH:MM[:SS] with.until values. Ignored when with.until is RFC3339. Only valid for wait.until."
+        },
+        "if_past": {
+          "type": "string",
+          "anyOf": [
+            { "enum": ["continue", "fail", "window"] },
+            { "pattern": "\\$\\{[^}]+\\}|\\$[A-Za-z_][A-Za-z0-9_]*", "description": "Value reference resolved at runtime." }
+          ],
+          "description": "Behavior when with.until is already past: continue, fail, or window. Only valid for wait.until. Defaults to continue."
+        },
+        "window": {
+          "type": "string",
+          "description": "How long after with.until still counts as on time when if_past is window. Only valid for wait.until."
         },
         "path": {
           "type": "string",

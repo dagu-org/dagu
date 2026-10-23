@@ -610,10 +610,7 @@ func NewServer(setup ServerConfig, opts ...ServerOption) (*Server, error) {
 	}
 
 	upgradeStore := stores.Upgrade
-	var updateInfoChecker UpdateChecker
-	if upgradeStore != nil {
-		updateInfoChecker = &updateChecker{store: upgradeStore}
-	}
+	updateInfoChecker := newUpdateChecker(ctx, upgradeStore)
 
 	workspaceDeprecation := workspaceDeprecationSources(cfg, dr, stores, authSvc)
 	apiOpts = append(apiOpts, apiv1.WithWorkspaceDeprecation(workspaceDeprecation))
@@ -744,20 +741,42 @@ func NewServer(setup ServerConfig, opts ...ServerOption) (*Server, error) {
 	return srv, nil
 }
 
-// updateChecker implements UpdateChecker by reading from the upgrade cache store.
+// updateChecker implements UpdateChecker from the upgrade cache store and the
+// binary the server started from.
 type updateChecker struct {
-	store upgrade.CacheStore
+	store          upgrade.CacheStore // nil when update checks are disabled
+	binary         *upgrade.RunningBinary
+	upgradeCommand string
+	restartCommand string
 }
 
-func (u *updateChecker) GetUpdateInfo() (bool, string) {
+func newUpdateChecker(ctx context.Context, store upgrade.CacheStore) *updateChecker {
+	binary, err := upgrade.CaptureRunningBinary()
+	if err != nil {
+		logger.Debug(ctx, "Cannot detect replacement of the running binary", tag.Error(err))
+	}
+	return &updateChecker{
+		store:          store,
+		binary:         binary,
+		upgradeCommand: upgrade.DetectInstallMethod().UpgradeCommand(),
+		restartCommand: upgrade.RestartCommand(),
+	}
+}
+
+func (u *updateChecker) UpdateStatus() UpdateStatus {
+	status := UpdateStatus{
+		UpgradeCommand:  u.upgradeCommand,
+		RestartRequired: u.binary != nil && u.binary.Replaced(),
+		RestartCommand:  u.restartCommand,
+	}
 	if u.store == nil {
-		return false, ""
+		return status
 	}
-	cache := upgrade.GetCachedUpdateInfo(u.store)
-	if cache == nil {
-		return false, ""
+	if cache := upgrade.GetCachedUpdateInfo(u.store); cache != nil {
+		status.UpdateAvailable = cache.UpdateAvailable
+		status.LatestVersion = cache.LatestVersion
 	}
-	return cache.UpdateAvailable, cache.LatestVersion
+	return status
 }
 
 // tunnelHosts returns the tunnel's host name while one is connected.

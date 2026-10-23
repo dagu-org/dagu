@@ -846,7 +846,7 @@ func (s *dagBuildState) collectWarnings() {
 func harnessWorkingDirWarnings(dag *ir.DAG) []string {
 	var warnings []string
 	walkSteps(dag, func(step ir.Step, path string) {
-		if step.ExecutorConfig.Type == "harness" {
+		if step.ExecutorConfig.Type == "harness" && !harnessRunsRemotely(step.ExecutorConfig.Config, dag.Harnesses) {
 			container := step.Container
 			if container == nil {
 				container = dag.Container
@@ -865,6 +865,27 @@ func harnessWorkingDirWarnings(dag *ir.DAG) []string {
 		}
 	})
 	return warnings
+}
+
+// harnessRunsRemotely reports whether every provider attempt of a harness step
+// connects to a remote ACP agent, which has no local workspace.
+func harnessRunsRemotely(config map[string]any, defs ir.HarnessDefinitions) bool {
+	attempts := []map[string]any{config}
+	switch fallback := config["fallback"].(type) {
+	case []map[string]any:
+		attempts = append(attempts, fallback...)
+	case []any:
+		for _, item := range fallback {
+			attempt, _ := item.(map[string]any)
+			attempts = append(attempts, attempt)
+		}
+	}
+	for _, attempt := range attempts {
+		if def := defs[harnessProviderName(attempt)]; def == nil || !def.IsRemote() {
+			return false
+		}
+	}
+	return true
 }
 
 // executorConfigWarnings returns the warnings each step's executor reports
@@ -2905,6 +2926,7 @@ func parseHarnessDefinitions(raw map[string]any) (ir.HarnessDefinitions, error) 
 	return defs, nil
 }
 
+// parseHarnessDefinition validates a named CLI or ACP harness and applies CLI defaults.
 func parseHarnessDefinition(name string, raw map[string]any) (*ir.HarnessDefinition, error) {
 	def := &ir.HarnessDefinition{
 		PromptMode:     ir.HarnessPromptModeArg,
@@ -2924,6 +2946,40 @@ func parseHarnessDefinition(name string, raw map[string]any) (*ir.HarnessDefinit
 				)
 			}
 			def.Binary = strings.TrimSpace(binary)
+
+		case "transport", "url", "cwd", "ca_file":
+			text, ok := value.(string)
+			if !ok || strings.TrimSpace(text) == "" {
+				return nil, ir.NewValidationError(fmt.Sprintf("harnesses.%s.%s", name, key), value, fmt.Errorf("%s must be a non-empty string", key))
+			}
+			switch key {
+			case "transport":
+				def.Transport = ir.HarnessTransport(text)
+			case "url":
+				def.URL = text
+			case "cwd":
+				def.Cwd = text
+			case "ca_file":
+				def.CAFile = text
+			}
+		case "bearer_subprotocol":
+			enabled, ok := value.(bool)
+			if !ok {
+				return nil, ir.NewValidationError(fmt.Sprintf("harnesses.%s.%s", name, key), value, fmt.Errorf("bearer_subprotocol must be a boolean"))
+			}
+			def.BearerSubprotocol = enabled
+		case "headers":
+			headers, err := harnessStringMap(value)
+			if err != nil {
+				return nil, ir.NewValidationError(fmt.Sprintf("harnesses.%s.headers", name), value, fmt.Errorf("headers must map names to strings"))
+			}
+			def.Headers = headers
+		case "protocol":
+			protocol, ok := value.(string)
+			if !ok || (ir.HarnessProtocol(protocol) != ir.HarnessProtocolCLI && ir.HarnessProtocol(protocol) != ir.HarnessProtocolACP) {
+				return nil, ir.NewValidationError(fmt.Sprintf("harnesses.%s.protocol", name), value, fmt.Errorf("protocol must be cli or acp"))
+			}
+			def.Protocol = ir.HarnessProtocol(protocol)
 		case "prefix_args":
 			prefixArgs, err := harnessStringSlice(value)
 			if err != nil {
@@ -2985,12 +3041,36 @@ func parseHarnessDefinition(name string, raw map[string]any) (*ir.HarnessDefinit
 		}
 	}
 
-	if def.Binary == "" {
-		return nil, ir.NewValidationError(
-			fmt.Sprintf("harnesses.%s.binary", name),
-			raw["binary"],
-			fmt.Errorf("binary is required"),
-		)
+	if def.IsRemote() {
+		for _, key := range []string{"binary", "prefix_args", "option_flags", "flag_style"} {
+			if _, exists := raw[key]; exists {
+				return nil, ir.NewValidationError(fmt.Sprintf("harnesses.%s.%s", name, key), raw[key], fmt.Errorf("%s is not supported with remote transport", key))
+			}
+		}
+	} else {
+		for _, key := range []string{"url", "headers", "cwd", "ca_file"} {
+			if _, exists := raw[key]; exists {
+				return nil, ir.NewValidationError(fmt.Sprintf("harnesses.%s.%s", name, key), raw[key], fmt.Errorf("%s requires a remote transport", key))
+			}
+		}
+	}
+
+	if _, exists := raw["bearer_subprotocol"]; exists && def.Transport != ir.HarnessTransportWebSocket {
+		return nil, ir.NewValidationError(fmt.Sprintf("harnesses.%s.bearer_subprotocol", name), raw["bearer_subprotocol"], fmt.Errorf("bearer_subprotocol requires transport: websocket"))
+	}
+	if !def.IsRemote() && def.Binary == "" {
+		return nil, ir.NewValidationError(fmt.Sprintf("harnesses.%s.binary", name), raw["binary"], fmt.Errorf("binary is required"))
+	}
+	if err := def.ValidateConnection(); err != nil {
+		return nil, ir.NewValidationError(fmt.Sprintf("harnesses.%s", name), nil, err)
+	}
+
+	if def.Protocol == ir.HarnessProtocolACP {
+		for _, key := range []string{"prompt_mode", "prompt_flag", "prompt_position"} {
+			if _, exists := raw[key]; exists {
+				return nil, ir.NewValidationError(fmt.Sprintf("harnesses.%s.%s", name, key), raw[key], fmt.Errorf("ACP sends prompts over the protocol; %s is not supported", key))
+			}
+		}
 	}
 
 	switch def.PromptMode {

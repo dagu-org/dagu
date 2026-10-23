@@ -2648,6 +2648,9 @@ const english = {
   "Not read: too many runs": "Not read: too many runs",
   "Last {count} days": "Last {count} days",
   "{name}: {count} runs": "{name}: {count} runs",
+  "Update available: v{current} → {latest} {releaseLink}": "Update available: v{current} → {latest} {releaseLink}",
+  "A new Dagu binary is installed. Run {command} to restart and use it.": "A new Dagu binary is installed. Run {command} to restart and use it.",
+  "A new Dagu binary is installed. Restart Dagu to use it.": "A new Dagu binary is installed. Restart Dagu to use it.",
 } as const;
 
 export type StaticMessage = keyof typeof english;
@@ -5242,6 +5245,9 @@ const chinese = {
   "Not read: too many runs": "未读取：运行次数过多",
   "Last {count} days": "最近 {count} 天",
   "{name}: {count} runs": "{name}：{count} 次运行",
+  "Update available: v{current} → {latest} {releaseLink}": "有可用更新：v{current} → {latest} {releaseLink}",
+  "A new Dagu binary is installed. Run {command} to restart and use it.": "已安装新的 Dagu 二进制文件。运行 {command} 重启后即可使用。",
+  "A new Dagu binary is installed. Restart Dagu to use it.": "已安装新的 Dagu 二进制文件。重启 Dagu 后即可使用。",
 } as const satisfies Record<StaticMessage, string>;
 
 const japanese = {
@@ -7912,6 +7918,9 @@ const japanese = {
   "Not read: too many runs": "未読み込み：実行が多すぎます",
   "Last {count} days": "過去 {count} 日間",
   "{name}: {count} runs": "{name}: {count} 件の実行",
+  "Update available: v{current} → {latest} {releaseLink}": "更新があります：v{current} → {latest} {releaseLink}",
+  "A new Dagu binary is installed. Run {command} to restart and use it.": "新しい Dagu バイナリがインストールされました。{command} を実行して再起動すると使用できます。",
+  "A new Dagu binary is installed. Restart Dagu to use it.": "新しい Dagu バイナリがインストールされました。Dagu を再起動すると使用できます。",
 } as const satisfies Record<StaticMessage, string>;
 
 export const staticMessages = {
