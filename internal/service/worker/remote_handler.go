@@ -682,8 +682,9 @@ func (h *remoteTaskHandler) executeDAGRun(
 	// Create a scheduler log writer. Remote reporters close it before terminal
 	// status so buffered scheduler chunks and the final marker reach coordinator.
 	var logWriter io.Writer = logFile
+	var streamingWriter io.WriteCloser
 	if logStreamer != nil {
-		streamingWriter := logStreamer.NewSchedulerLogWriter(ctx, logFile)
+		streamingWriter = logStreamer.NewSchedulerLogWriter(ctx, logFile)
 		defer func() {
 			closeCtx, cancel := schedulerLogCloseContext(ctx, remoteSchedulerLogFinalizeTimeout)
 			defer cancel()
@@ -772,6 +773,7 @@ func (h *remoteTaskHandler) executeDAGRun(
 		WorkerID:                 h.workerID,
 		StatusPusher:             statusPusher,
 		LogWriterFactory:         logStreamer,
+		SchedulerLogWriter:       streamingWriter,
 		ExtraEnvs:                extraEnvs,
 		QueuedRun:                run.queued,
 		AttemptID:                attemptID,

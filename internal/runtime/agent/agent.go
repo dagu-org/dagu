@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"maps"
 	"net/http"
@@ -225,6 +226,9 @@ type Agent struct {
 	// When nil, logs are written to local filesystem.
 	logWriterFactory runctx.LogWriterFactory
 
+	// schedulerLogWriter is the caller's writer for a sub-DAG run's scheduler log.
+	schedulerLogWriter io.Writer
+
 	// scheduleTime is the RFC 3339 timestamp of when this run was scheduled.
 	// Set by the scheduler for cron-triggered runs; empty for manual runs.
 	scheduleTime string
@@ -354,6 +358,10 @@ type Options struct {
 	// LogWriterFactory is used to create log writers for step output.
 	// When nil, logs are written to local filesystem.
 	LogWriterFactory runctx.LogWriterFactory
+	// SchedulerLogWriter receives a sub-DAG run's scheduler log when the
+	// caller already writes and finalizes the run's log file. When nil, a
+	// sub-DAG run opens its own writer through LogWriterFactory.
+	SchedulerLogWriter io.Writer
 	// QueuedRun indicates this execution is from a queued item.
 	// When true, the agent will find the existing dag-run (created by enqueue)
 	// instead of creating a new one. This is used for distributed execution
@@ -466,6 +474,7 @@ func New(
 		statusPusher:             opts.StatusPusher,
 		subWorkflowRunnerFactory: opts.SubWorkflowRunnerFactory,
 		logWriterFactory:         opts.LogWriterFactory,
+		schedulerLogWriter:       opts.SchedulerLogWriter,
 		queuedRun:                opts.QueuedRun,
 		attemptID:                opts.AttemptID,
 		triggerType:              opts.TriggerType,
@@ -2008,6 +2017,10 @@ func (a *Agent) createSubWorkflowRunner(ctx context.Context) (runtimeexec.SubWor
 func (a *Agent) withSubDAGRunSchedulerLogWriter(ctx context.Context) (context.Context, func(), bool) {
 	if !a.isSubDAGRun.Load() || a.logFile == "" {
 		return ctx, func() {}, false
+	}
+	if a.schedulerLogWriter != nil {
+		ctx = logger.WithLogger(ctx, logger.NewLogger(logger.WithRunWriter(a.schedulerLogWriter)))
+		return ctx, func() {}, true
 	}
 	streamer, ok := a.logWriterFactory.(runtime.SchedulerLogStreamer)
 	if !ok || streamer == nil {
