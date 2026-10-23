@@ -2549,7 +2549,9 @@ func TestLoadServerRemoteNodesCopiesEveryField(t *testing.T) {
 	node := reflect.ValueOf(cfg.Server.RemoteNodes[0])
 	for i := range defValue.NumField() {
 		name := defValue.Type().Field(i).Name
-		if strings.HasSuffix(name, "File") {
+		// The two _file fields that loadSecretFiles consumes. A path that the
+		// runtime node should carry, such as a future CA file, must arrive.
+		if name == "BasicAuthPasswordFile" || name == "AuthTokenFile" {
 			continue
 		}
 		got := node.FieldByName(name)
