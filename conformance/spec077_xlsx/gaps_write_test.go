@@ -230,6 +230,28 @@ func TestXlsxUpdateRowsErrors(t *testing.T) {
 	}
 }
 
+// TestXlsxUpdateRowsEmpty covers an empty rows list: it succeeds with no
+// changes whether set is given or not, and the workbook keeps its values.
+func TestXlsxUpdateRowsEmpty(t *testing.T) {
+	t.Parallel()
+	dagu := harness.NewRunner(t)
+	dagu.Run("start", "update_rows_empty.yaml").ExpectExitCode(0)
+
+	var out struct {
+		ByRow      changes          `json:"by_row"`
+		DefaultSet changes          `json:"default_set"`
+		Headers    []string         `json:"headers"`
+		Rows       []map[string]any `json:"rows"`
+	}
+	readJSON(t, dagu, "out.json", &out)
+	require.Zero(t, out.ByRow.RowsUpdated, "a set field is not checked against an empty rows list")
+	require.Zero(t, out.ByRow.CellsChanged)
+	require.Zero(t, out.DefaultSet.RowsUpdated, "an empty rows list with no set is not an error")
+	require.Zero(t, out.DefaultSet.CellsChanged)
+	require.Equal(t, []string{"Invoice No", "Status"}, out.Headers)
+	require.Equal(t, []map[string]any{{"_row": float64(2), "Invoice No": "INV-1", "Status": "Open"}}, out.Rows, "the workbook keeps its values")
+}
+
 // TestXlsxSheetCopyThenAppend is the spec's month example run twice: the
 // copy is skipped on the rerun and the append adds below the first rows.
 func TestXlsxSheetCopyThenAppend(t *testing.T) {

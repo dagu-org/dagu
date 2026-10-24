@@ -395,9 +395,13 @@ A literal that is text in the canonical form of a number, `100` or `-12.5`,
 is written as a number, since a reference interpolated into `with` arrives
 as text; `{value: "007", type: string}` pins text, and `type` takes any
 column type. Without `set`, every field other than the key and `_row` goes
-to the column of the same name. A field in `set` that no row carries is an
-error:
-`set.Status: field "state" is not in any row`. A column that is not in the
+to the column of the same name. When `rows` has rows, a field in `set`
+that no row carries is an error:
+`set.Status: field "state" is not in any row`. An empty `rows` list is not
+an error: no field is checked against the rows, no row changes, and the
+step reports `rows_updated: 0`, so a scheduled run with nothing pending
+succeeds. The checks on the sheet, the header row, `key`, and the `set`
+column names still apply. A column that is not in the
 header row is added at the right, its header cell copying the style of the
 last header cell; a new header cell inside a merged cell fails as it does
 for an append.
