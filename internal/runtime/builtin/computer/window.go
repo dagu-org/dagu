@@ -200,6 +200,27 @@ func (r *run) fits(w desktop.WindowID) bool {
 	return w.Known() && !r.driver.Owned(w) && !r.fitted[w.Handle]
 }
 
+// elementOwner reports a window the step never operates that an action on
+// an element would reach: the window under the element's centre, where the
+// elements reader finds the element first, or the window in front, where it
+// looks for the element next.
+func (r *run) elementOwner(e desktop.Element) (desktop.WindowID, bool) {
+	if !e.Bounds.Empty() {
+		if w := r.driver.WindowAt(elementCentre(e)); r.driver.Owned(w) {
+			return w, true
+		}
+	}
+	if w := r.driver.FocusedWindow(); r.driver.Owned(w) {
+		return w, true
+	}
+	return desktop.WindowID{}, false
+}
+
+// ownedMessage says why the step will not operate a window.
+func ownedMessage(w desktop.WindowID) string {
+	return fmt.Sprintf("%q belongs to the application that runs this step, which it never operates", w.Title)
+}
+
 // describeWindow names a window for the step log.
 func describeWindow(w desktop.WindowID) string {
 	if w.Title == "" {

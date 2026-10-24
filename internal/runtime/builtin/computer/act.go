@@ -482,6 +482,12 @@ func (l *actLoop) invokeElement(ctx context.Context, els desktop.Elements, actio
 		return false, nil, computeruse.Result{}
 	}
 	result = computeruse.Result{CallID: action.CallID}
+	// The element is acted on wherever it is now, so the step makes sure
+	// that is not a window it never operates, as a pointer action does.
+	if own, owned := l.r.elementOwner(e); owned {
+		result.Error = ownedMessage(own)
+		return true, nil, result
+	}
 	if focus {
 		if err := els.Focus(e); err != nil {
 			result.Error = l.r.masker.MaskString(err.Error())

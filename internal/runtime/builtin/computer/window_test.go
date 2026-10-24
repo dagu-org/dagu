@@ -246,3 +246,43 @@ func TestMaximizeWaitsForAnIdleDesktop(t *testing.T) {
 	assert.Equal(t, []string{waitReasonPerson}, waitReasons(session))
 	require.Len(t, run.backend.maximizedWindows(), 1)
 }
+
+// An element the model names is acted on wherever it is now, so an element
+// in a window the step never operates is refused as a pointer action there
+// is, and the model is told why.
+func TestModelElementInAProtectedWindowIsRefused(t *testing.T) {
+	t.Parallel()
+
+	run := newTestRun(t)
+	run.elements = newFakeElements()
+	run.backend.app = "Kitewell"
+	run.protectApps = []string{"kitewell"}
+	session := &scriptedSession{turns: []*computeruse.Turn{
+		actions(computeruse.Action{CallID: "x", Kind: computeruse.KindClick, ElementID: "e1"}),
+		done("Could not save"),
+	}}
+	run.sessions = []*scriptedSession{session}
+	require.NoError(t, run.execute(`{"idle": "0", "do": [{"act": "Save the form"}]}`, nil).err)
+
+	assert.Empty(t, run.backend.inputs(), "the button is not invoked")
+	require.Len(t, session.observations, 2)
+	require.Len(t, session.observations[1].Results, 1)
+	assert.Contains(t, session.observations[1].Results[0].Error, "belongs to the application that runs this step")
+}
+
+// A replay never has an element in a window the step never operates act by
+// itself, as input: direct would; it misses, naming why.
+func TestReplayRefusesAnElementInAProtectedWindow(t *testing.T) {
+	t.Parallel()
+
+	const steps = `{"do": [{"act": "Save the invoice"}]}`
+	run := elementRun(t)
+	run.sessions = []*scriptedSession{{turns: []*computeruse.Turn{actions(clickAt(235, 194)), done("Saved")}}}
+	require.NoError(t, run.execute(steps, nil).err)
+
+	run.protectApps = []string{"expense"}
+	run.backend.events = nil
+	replayed := run.execute(`{"ai": "never", "input": "direct", "do": [{"act": "Save the invoice"}]}`, nil)
+	require.ErrorContains(t, replayed.err, "which it never operates")
+	assert.Empty(t, run.backend.inputs(), "the button is not invoked")
+}

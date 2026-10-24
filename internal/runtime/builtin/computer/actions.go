@@ -84,7 +84,7 @@ func (r *run) runAction(ctx context.Context, action computeruse.Action, toFull p
 	// The step never operates the application that runs it: a keystroke
 	// to a window of its own a person just focused could close it.
 	if own, ok := r.ownWindow(action, at, toFull); ok {
-		result.Error = fmt.Sprintf("%q belongs to the application that runs this step, which it never operates", own.Title)
+		result.Error = ownedMessage(own)
 		return result
 	}
 	var err error

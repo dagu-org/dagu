@@ -499,6 +499,9 @@ func (r *run) replayByElement(ctx context.Context, index, position, total int, t
 			if reason != "" {
 				return fmt.Sprintf("%s was not found within %s at turn %d of %d: %s", rec.Element.describe(), findWithin, position+1, total, reason), nil
 			}
+			if own, owned := r.elementOwner(found); owned {
+				return fmt.Sprintf("%s at turn %d of %d: %s", rec.Element.describe(), position+1, total, ownedMessage(own)), nil
+			}
 			if direct {
 				done, reason, err := r.direct(ctx, index, position, total, els, rec, found, findWithin)
 				if err != nil || reason != "" {
