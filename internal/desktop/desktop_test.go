@@ -65,6 +65,11 @@ func (b *recordingBackend) WindowAt(int, int) desktop.WindowID { return desktop.
 func (b *recordingBackend) Windows() []desktop.WindowID        { return nil }
 func (b *recordingBackend) Raise(desktop.WindowID) error       { return nil }
 
+func (b *recordingBackend) Maximize(w desktop.WindowID) (bool, error) {
+	b.events = append(b.events, "maximize "+w.App)
+	return true, nil
+}
+
 func (b *recordingBackend) Close() error { return nil }
 
 func upDown(down bool) string {
@@ -231,4 +236,15 @@ func TestDiagnosticsAwaitsPerson(t *testing.T) {
 	for _, codes := range [][]string{nil, {"screen_recording"}, {"screen_locked", "accessibility"}, {"service_session"}, {"unsupported"}} {
 		assert.False(t, diagnostics(codes...).AwaitsPerson(), codes)
 	}
+}
+
+func TestDriverOwnedProtectsApps(t *testing.T) {
+	t.Parallel()
+
+	driver := desktop.New(&recordingBackend{})
+	driver.ProtectApps(" kitewell ", "")
+
+	assert.True(t, driver.Owned(desktop.WindowID{Handle: 1, PID: 999999, App: "Kitewell"}), "a protected app is owned whatever its process")
+	assert.False(t, driver.Owned(desktop.WindowID{Handle: 2, PID: 999999, App: "TextEdit"}))
+	assert.False(t, driver.Owned(desktop.WindowID{Handle: 3}), "a window the system does not name is nobody's")
 }

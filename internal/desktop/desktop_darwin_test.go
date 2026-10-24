@@ -124,3 +124,60 @@ func TestDarwinDesktop(t *testing.T) {
 	assert.InDelta(t, 200, x, 2)
 	assert.InDelta(t, 300, y, 2)
 }
+
+// TestDarwinWindows opens windows of its own and changes their size and
+// order, so it runs only when asked to with DAGU_DESKTOP_E2E=1 on a desktop
+// with the required permissions.
+func TestDarwinWindows(t *testing.T) {
+	if os.Getenv("DAGU_DESKTOP_E2E") != "1" {
+		t.Skip("set DAGU_DESKTOP_E2E=1 to run on an interactive desktop")
+	}
+	require.NoError(t, Check().Err())
+	backend, err := newDarwinBackend()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = backend.Close() })
+
+	fixture := exec.Command("/usr/bin/osascript", "-l", "JavaScript", "testdata/windows.js")
+	require.NoError(t, fixture.Start())
+	t.Cleanup(func() {
+		_ = fixture.Process.Kill()
+		_ = fixture.Wait()
+	})
+	find := func(title string) WindowID {
+		var found WindowID
+		require.Eventually(t, func() bool {
+			for _, w := range backend.Windows() {
+				if w.Title == title && w.PID == uint32(fixture.Process.Pid) { //nolint:gosec // process ids fit 32 bits
+					found = w
+					return true
+				}
+			}
+			return false
+		}, 15*time.Second, 100*time.Millisecond, "the window %q never appeared", title)
+		return found
+	}
+	window, fixed := find("dagu-window-e2e"), find("dagu-fixed-e2e")
+
+	assert.Equal(t, "osascript", window.App)
+	assert.InDelta(t, 400*backend.display.scale, window.Bounds.Dx(), 2)
+	assert.Equal(t, window.Handle, backend.WindowAt(window.Bounds.Min.X+20, window.Bounds.Min.Y+20).Handle)
+
+	require.NoError(t, backend.Raise(window))
+	require.Eventually(t, func() bool { return backend.FocusedWindow().Handle == window.Handle }, 5*time.Second, 100*time.Millisecond)
+
+	maximized, err := backend.Maximize(fixed)
+	require.NoError(t, err)
+	assert.False(t, maximized, "a window of fixed size keeps its size")
+
+	maximized, err = backend.Maximize(window)
+	require.NoError(t, err)
+	assert.True(t, maximized)
+	area, err := backend.workArea()
+	require.NoError(t, err)
+	require.Eventually(t, func() bool {
+		return nearRect(find("dagu-window-e2e").Bounds, backend.toPixelRect(area), 4)
+	}, 5*time.Second, 100*time.Millisecond, "the window fills the work area")
+	maximized, err = backend.Maximize(find("dagu-window-e2e"))
+	require.NoError(t, err)
+	assert.False(t, maximized, "a maximized window is left as it is")
+}

@@ -76,6 +76,11 @@ type Backend interface {
 	// Raise brings a window to the foreground. It is a best effort: the
 	// system may refuse a foreground change asked by a background process.
 	Raise(w WindowID) error
+	// Maximize makes a window fill the primary display's work area, moving
+	// it there from another display. It reports false, doing nothing, for
+	// a window that cannot be maximized, such as a dialog or a window of
+	// fixed size, and for one already maximized.
+	Maximize(w WindowID) (bool, error)
 	// LastInput reports when the desktop last received pointer or keyboard
 	// input from any source, the driver included, or the zero time when it
 	// cannot tell.
@@ -168,6 +173,9 @@ type WindowID struct {
 	// stable identity a replay raises a window by, since a title often
 	// shows the document's contents. Empty where the system does not say.
 	App string
+	// Bounds is the window's frame in display pixels, empty where the
+	// system does not say.
+	Bounds image.Rectangle
 }
 
 // Known reports a window the system named.
@@ -184,6 +192,10 @@ type Driver struct {
 	// first action that needs it.
 	owned     map[uint32]bool
 	ownedOnce sync.Once
+	// protectedApps are applications, by App, whose windows the driver
+	// never operates either, such as the one a person runs the automation
+	// from when the system did not start it as the automation's parent.
+	protectedApps []string
 }
 
 // New returns a driver for a backend.
@@ -217,6 +229,10 @@ func (d *Driver) Windows() []WindowID { return d.backend.Windows() }
 // Raise brings a window to the foreground, a best effort.
 func (d *Driver) Raise(w WindowID) error { return d.backend.Raise(w) }
 
+// Maximize makes a window fill the primary display's work area. It reports
+// false for a window that cannot be maximized or already is.
+func (d *Driver) Maximize(w WindowID) (bool, error) { return d.backend.Maximize(w) }
+
 // Protect adds processes whose windows the driver never operates.
 func (d *Driver) Protect(pids ...uint32) {
 	if d.owned == nil {
@@ -227,10 +243,27 @@ func (d *Driver) Protect(pids ...uint32) {
 	}
 }
 
+// ProtectApps adds applications, by App compared ignoring case, whose
+// windows the driver never operates.
+func (d *Driver) ProtectApps(apps ...string) {
+	for _, app := range apps {
+		if app = strings.TrimSpace(app); app != "" {
+			d.protectedApps = append(d.protectedApps, app)
+		}
+	}
+}
+
 // Owned reports a window of the automation's own application, which a step
 // never operates: a keystroke to it could close the application that runs
 // the step.
-func (d *Driver) Owned(w WindowID) bool { return w.PID != 0 && d.family()[w.PID] }
+func (d *Driver) Owned(w WindowID) bool {
+	if w.PID != 0 && d.family()[w.PID] {
+		return true
+	}
+	return w.App != "" && slices.ContainsFunc(d.protectedApps, func(app string) bool {
+		return strings.EqualFold(app, w.App)
+	})
+}
 
 // InputSentAt reports when the driver last sent input.
 func (d *Driver) InputSentAt() time.Time {
