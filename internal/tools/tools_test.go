@@ -62,6 +62,57 @@ func TestToolsetHashChangesWithPlatform(t *testing.T) {
 	assert.NotEqual(t, linuxHash, windowsHash)
 }
 
+func TestToolsetHashLocalRegistry(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "registry.yaml")
+	cfg := &ir.ToolConfig{Registry: &ir.ToolRegistry{Type: "local", Path: path}}
+	require.NoError(t, os.WriteFile(path, []byte("first"), 0o600))
+	first, err := ToolsetHash(cfg, "linux/amd64")
+	require.NoError(t, err)
+	again, err := ToolsetHash(cfg, "linux/amd64")
+	require.NoError(t, err)
+	require.Equal(t, first, again)
+	require.NoError(t, os.WriteFile(path, []byte("changed"), 0o600))
+	changed, err := ToolsetHash(cfg, "linux/amd64")
+	require.NoError(t, err)
+	require.NotEqual(t, first, changed)
+	require.NoError(t, os.Remove(path))
+	_, err = ToolsetHash(cfg, "linux/amd64")
+	require.Error(t, err)
+}
+
+// The documented limit must reject oversized files instead of hashing a prefix.
+func TestToolsetHashLocalRegistryLimit(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		size      int64
+		wantError bool
+	}{
+		{"at limit", 16 << 20, false}, {"over limit", (16 << 20) + 1, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "registry.yaml")
+			file, err := os.Create(path)
+			require.NoError(t, err)
+			require.NoError(t, file.Truncate(tc.size))
+			require.NoError(t, file.Close())
+			cfg := &ir.ToolConfig{Registry: &ir.ToolRegistry{Type: "local", Path: path}}
+			hash, err := ToolsetHash(cfg, "linux/amd64")
+			if tc.wantError {
+				require.ErrorContains(t, err, "exceeds")
+				require.Empty(t, hash)
+			} else {
+				require.NoError(t, err)
+				require.NotEmpty(t, hash)
+			}
+		})
+	}
+}
+
+func TestToolsetHashLocalRegistryDirectory(t *testing.T) {
+	_, err := ToolsetHash(&ir.ToolConfig{Registry: &ir.ToolRegistry{Type: "local", Path: t.TempDir()}}, "linux/amd64")
+	require.ErrorContains(t, err, "not a regular file")
+}
+
 func TestEnvVarsExposeAquaToolset(t *testing.T) {
 	t.Parallel()
 

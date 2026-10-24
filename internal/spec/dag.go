@@ -3187,7 +3187,11 @@ func buildToolRegistry(registry *toolRegistry) (*ir.ToolRegistry, error) {
 		typ = "standard"
 	}
 	if name == "" {
-		name = "standard"
+		if typ == "local" {
+			name = "local"
+		} else {
+			name = "standard"
+		}
 	}
 
 	switch typ {
@@ -3222,6 +3226,16 @@ func buildToolRegistry(registry *toolRegistry) (*ir.ToolRegistry, error) {
 			RepoName:  repoName,
 			Ref:       ref,
 			Path:      path,
+		}, nil
+	case "local":
+		path := strings.TrimSpace(registry.Path)
+		if err := ir.ValidateWorkerAbsPath(path); err != nil {
+			return nil, fmt.Errorf("registry.%w", err)
+		}
+		return &ir.ToolRegistry{
+			Name: name,
+			Type: typ,
+			Path: path,
 		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported tools registry type %q", typ)

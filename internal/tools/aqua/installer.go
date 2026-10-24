@@ -151,7 +151,7 @@ func (i *Installer) installResolved(ctx context.Context, cfg *ir.ToolConfig, opt
 	if err != nil {
 		return nil, err
 	}
-	paths = applyDigestIsolation(paths, cfg)
+	paths = applyRootIsolation(paths, cfg)
 	if manifest, err := readyManifest(paths, platform, hash); err != nil {
 		return nil, err
 	} else if manifest != nil {
@@ -412,13 +412,13 @@ func (i *Installer) packageCommands(ctx context.Context, cfg *ir.ToolConfig, par
 	return commandSets, nil
 }
 
-// applyDigestIsolation moves the aqua root under the toolset env dir when any
-// package declares a digest. Digest verification compares against checksums
-// recorded for this install, and aqua skips downloading packages that already
-// exist under the root; a shared root could therefore hold bytes the recorded
-// checksums do not describe.
-func applyDigestIsolation(paths tools.CacheLayout, cfg *ir.ToolConfig) tools.CacheLayout {
-	if !hasPackageDigests(cfg) {
+// applyRootIsolation gives local registries and digest-pinned packages a private
+// aqua root so its exists-check cannot reuse bytes from another toolset. Local
+// registry content is part of the hash, so an interrupted install can reuse the
+// same root; only digest-pinned installs need to clear the env before verifying.
+func applyRootIsolation(paths tools.CacheLayout, cfg *ir.ToolConfig) tools.CacheLayout {
+	local := cfg.Registry != nil && strings.TrimSpace(cfg.Registry.Type) == "local"
+	if !hasPackageDigests(cfg) && !local {
 		return paths
 	}
 	paths.RootDir = filepath.Join(paths.EnvDir, "root")
@@ -758,8 +758,11 @@ func describeRegistry(registry *ir.ToolRegistry) string {
 	if registry == nil {
 		return "standard"
 	}
-	if strings.TrimSpace(registry.Type) == "github_content" {
+	switch strings.TrimSpace(registry.Type) {
+	case "github_content":
 		return fmt.Sprintf("%s/%s@%s", registry.RepoOwner, registry.RepoName, shortRef(registry.Ref))
+	case "local":
+		return "local:" + strings.TrimSpace(registry.Path)
 	}
 	return "standard@" + shortRef(registry.Ref)
 }

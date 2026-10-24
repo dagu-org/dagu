@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,6 +23,8 @@ const (
 	configFileName   = "aqua.yaml"
 	checksumFileName = "aqua-checksums.json"
 	manifestFileName = "manifest.json"
+
+	maxLocalRegistryBytes = 16 << 20
 
 	// EnvManifest points command executors to the resolved Dagu tools manifest.
 	EnvManifest = "DAGU_TOOLS_MANIFEST"
@@ -135,11 +138,23 @@ func ToolsetHash(cfg *ir.ToolConfig, platform string) (string, error) {
 		return "", fmt.Errorf("tools config is required")
 	}
 	payload := struct {
-		Platform string         `json:"platform"`
-		Tools    *ir.ToolConfig `json:"tools"`
+		Platform            string         `json:"platform"`
+		Tools               *ir.ToolConfig `json:"tools"`
+		LocalRegistryDigest string         `json:"localRegistryDigest,omitempty"`
 	}{
 		Platform: platform,
 		Tools:    cfg,
+	}
+	if cfg.Registry != nil && strings.TrimSpace(cfg.Registry.Type) == "local" {
+		path := strings.TrimSpace(cfg.Registry.Path)
+		if err := ir.ValidateWorkerAbsPath(path); err != nil {
+			return "", fmt.Errorf("registry.%w", err)
+		}
+		digest, err := localRegistryDigest(path)
+		if err != nil {
+			return "", fmt.Errorf("read local registry: %w", err)
+		}
+		payload.LocalRegistryDigest = digest
 	}
 	data, err := json.Marshal(payload)
 	if err != nil {
@@ -147,6 +162,42 @@ func ToolsetHash(cfg *ir.ToolConfig, platform string) (string, error) {
 	}
 	sum := sha256.Sum256(data)
 	return hex.EncodeToString(sum[:]), nil
+}
+
+// localRegistryDigest rejects special files before open, which could block on a FIFO.
+func localRegistryDigest(path string) (string, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return "", err
+	}
+	if !info.Mode().IsRegular() {
+		return "", fmt.Errorf("local registry %q is not a regular file", path)
+	}
+	file, err := os.Open(path) //nolint:gosec
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = file.Close() }()
+	info, err = file.Stat()
+	if err != nil {
+		return "", err
+	}
+	if !info.Mode().IsRegular() {
+		return "", fmt.Errorf("local registry %q is not a regular file", path)
+	}
+	if info.Size() > maxLocalRegistryBytes {
+		return "", fmt.Errorf("local registry %q exceeds %d bytes", path, maxLocalRegistryBytes)
+	}
+	digest := sha256.New()
+	// Read one extra byte to detect a file that grows past the limit after stat.
+	n, err := io.Copy(digest, io.LimitReader(file, maxLocalRegistryBytes+1))
+	if err != nil {
+		return "", err
+	}
+	if n > maxLocalRegistryBytes {
+		return "", fmt.Errorf("local registry %q exceeds %d bytes", path, maxLocalRegistryBytes)
+	}
+	return hex.EncodeToString(digest.Sum(nil)), nil
 }
 
 // EnvVars returns the runtime env vars needed to expose a resolved aqua toolset.
