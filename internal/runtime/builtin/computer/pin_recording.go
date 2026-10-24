@@ -84,7 +84,7 @@ var unpinnableReasons = map[string]string{
 // format, or one that recorded nothing.
 func PinRecording(entry json.RawMessage) (PinnedOperation, bool) {
 	var rec recording
-	if err := json.Unmarshal(entry, &rec); err != nil || rec.Version != recordingVersion {
+	if err := json.Unmarshal(entry, &rec); err != nil || !replayable(rec.Version) {
 		return PinnedOperation{}, false
 	}
 	system := rec.System

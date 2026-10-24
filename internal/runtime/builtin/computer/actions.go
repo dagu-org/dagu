@@ -47,7 +47,7 @@ func (r *run) performOne(ctx context.Context, index int, action computeruse.Acti
 	if element != nil && action.Kind == computeruse.KindType {
 		r.proveValue(element, action.Text)
 	}
-	rec := recordAction(display, seen.full, element)
+	rec := recordAction(display, element)
 	return result, &rec
 }
 

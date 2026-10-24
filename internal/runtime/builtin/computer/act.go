@@ -130,7 +130,7 @@ func (r *run) act(ctx context.Context, index int, spec actSpec, timeout time.Dur
 			if choice == aiNever {
 				return replayMiss{err: errors.New("there is no recording of it on this host"), via: agentstep.ViaScreen}
 			}
-		case entry.Version != recordingVersion:
+		case !replayable(entry.Version):
 			// An older recording is ignored once; what this run records
 			// replaces it.
 			r.cache.Drop(key)
@@ -279,7 +279,7 @@ func (l *actLoop) run(ctx context.Context) error {
 		return err
 	}
 	var err error
-	if l.seen, err = l.r.observe(ctx, l.limit); err != nil {
+	if l.seen, err = l.look(ctx); err != nil {
 		return err
 	}
 	l.outcome.recording.Width, l.outcome.recording.Height = l.seen.full.Bounds().Dx(), l.seen.full.Bounds().Dy()
@@ -309,7 +309,7 @@ func (l *actLoop) run(ctx context.Context) error {
 			}
 			l.capped = true
 			logAction(l.r.timeline, l.index, "the task has used the actions it may take; asking the model to report")
-			if l.seen, err = l.r.observe(ctx, l.limit); err != nil {
+			if l.seen, err = l.look(ctx); err != nil {
 				return err
 			}
 			obs = computeruse.Observation{Screen: l.seen.forModel(), Results: skippedResults(turn.Actions), Note: capNote}
@@ -352,7 +352,7 @@ func (l *actLoop) run(ctx context.Context) error {
 		if verify {
 			note = verifyNote
 		}
-		if l.seen, err = l.r.observe(ctx, l.limit); err != nil {
+		if l.seen, err = l.look(ctx); err != nil {
 			return err
 		}
 		// A round that repeats the previous one and leaves the screen as it
@@ -375,6 +375,13 @@ func (l *actLoop) run(ctx context.Context) error {
 			Elements:     l.offerElements(),
 		}
 	}
+}
+
+// look maximizes the front window when the step asks for it, then waits
+// for a still screen and captures what the model sees next.
+func (l *actLoop) look(ctx context.Context) (screen, error) {
+	l.r.fit(l.index)
+	return l.r.observe(ctx, l.limit)
 }
 
 // offerElements lists the actionable elements of the front window for the
@@ -502,7 +509,7 @@ func (l *actLoop) recordInvoked(action computeruse.Action, e desktop.Element) re
 	centre := elementCentre(e)
 	display := computeruse.Action{Kind: computeruse.KindClick, Count: action.Count, Button: action.Button, Point: &computeruse.Point{X: centre.X, Y: centre.Y}}
 	element := l.r.recordElement(e, &centre, l.r.driver.WindowAt(centre).App)
-	return recordAction(display, l.seen.full, element)
+	return recordAction(display, element)
 }
 
 // reconcile waits for a person using the desktop to pause, then reports
@@ -555,9 +562,9 @@ func (l *actLoop) personUsed(ctx context.Context) (bool, error) {
 // chose the turn's actions on, overall and where each action lands.
 func (l *actLoop) unchanged(ctx context.Context, turn *computeruse.Turn) (bool, error) {
 	// A person who clicked another window changed nothing a screenshot
-	// shows, but keys and typing now go there. The focus must be the
-	// window the model saw; where the system does not report it, a turn
-	// that types or presses keys goes back to the model.
+	// shows, but keys and typing now go there. A turn that types or
+	// presses keys goes back to the model when the focus is known to have
+	// left the window the model saw.
 	if l.focusLeftModel(turn) {
 		return false, nil
 	}
@@ -570,14 +577,51 @@ func (l *actLoop) unchanged(ctx context.Context, turn *computeruse.Turn) (bool, 
 	if l.focusLeftModel(turn) {
 		return false, nil
 	}
-	chosen := recordedTurn{Screen: desktop.FingerprintOf(l.seen.full)}
+	// Only the window the actions land on is compared, so a change
+	// elsewhere, such as a clock or a notification, does not send the turn
+	// back to the model.
+	v := l.view(turn.Actions)
+	chosen := recordedTurn{Screen: v.fingerprint(l.seen.full)}
 	for _, action := range turn.Actions {
 		if display, ok := l.r.toDisplay(action, l.seen); ok {
-			chosen.Actions = append(chosen.Actions, recordAction(display, l.seen.full, nil))
+			chosen.Actions = append(chosen.Actions, v.place(recordAction(display, nil), l.seen.full))
 		}
 	}
-	entry := recording{Width: l.seen.full.Bounds().Dx(), Height: l.seen.full.Bounds().Dy()}
-	return matches(current, entry, chosen), nil
+	if current.Bounds() != l.seen.full.Bounds() {
+		return false, nil
+	}
+	return matches(current, v, chosen), nil
+}
+
+// view is where a turn's actions are compared and recorded: the application
+// window under its first pointer action, or the window with the keyboard
+// focus for a turn that only types or presses keys, or the whole display
+// where the system names no window.
+func (l *actLoop) view(actions []computeruse.Action) view {
+	display := displayView(l.seen.full)
+	for _, action := range actions {
+		if at, ok := l.pointOf(action); ok {
+			return l.r.windowView(l.r.driver.WindowAt(at), display)
+		}
+	}
+	return l.r.windowView(l.r.driver.FocusedWindow(), display)
+}
+
+// pointOf is where a pointer action lands in display pixels: the centre of
+// the element it names, or its position on the screen the model saw.
+func (l *actLoop) pointOf(action computeruse.Action) (image.Point, bool) {
+	if action.ElementID != "" {
+		e, ok := l.choices[action.ElementID]
+		if !ok {
+			return image.Point{}, false
+		}
+		return elementCentre(e), true
+	}
+	display, ok := l.r.toDisplay(action, l.seen)
+	if !ok {
+		return image.Point{}, false
+	}
+	return target(display)
 }
 
 // focusLeftModel reports that a turn's keys would reach a window other than
@@ -590,7 +634,7 @@ func (l *actLoop) focusLeftModel(turn *computeruse.Turn) bool {
 		return false
 	}
 	focus := l.r.driver.FocusedWindow()
-	return focus.Known() && l.seen.focus.Known() && focus != l.seen.focus
+	return focus.Known() && l.seen.focus.Known() && focus.Handle != l.seen.focus.Handle
 }
 
 // usesKeyboard reports a turn that sends keys to whatever window has the
@@ -632,6 +676,8 @@ func describeRound(actions []computeruse.Action) string {
 func (l *actLoop) apply(ctx context.Context, turn *computeruse.Turn) []computeruse.Result {
 	l.touched = l.touched || len(turn.Actions) > 0
 	l.outcome.actions += len(turn.Actions)
+	// The window is read before the actions run, as the model saw it.
+	v := l.view(turn.Actions)
 	els, _ := l.r.elementsIfAvailable()
 	results := make([]computeruse.Result, len(turn.Actions))
 	var recorded []recordedAction
@@ -675,8 +721,12 @@ func (l *actLoop) apply(ctx context.Context, turn *computeruse.Turn) []computeru
 		recorded = appendRecorded(recorded, rec)
 	}
 	if len(recorded) > 0 {
+		for i := range recorded {
+			recorded[i] = v.place(recorded[i], l.seen.full)
+		}
 		l.outcome.recording.Turns = append(l.outcome.recording.Turns, recordedTurn{
-			Screen:    desktop.FingerprintOf(l.seen.full),
+			Screen:    v.fingerprint(l.seen.full),
+			Window:    v.window,
 			Actions:   recorded,
 			Confirmed: turn.Confirmation != "",
 		})
@@ -709,7 +759,8 @@ func (l *actLoop) finish(ctx context.Context, turn *computeruse.Turn) error {
 			return err
 		}
 	}
-	l.outcome.recording.Final = desktop.FingerprintOf(final)
+	v := l.r.windowView(l.r.driver.FocusedWindow(), displayView(final))
+	l.outcome.recording.Final, l.outcome.recording.FinalWindow = v.fingerprint(final), v.window
 	l.outcome.recording.Version = recordingVersion
 	l.outcome.recording.System, l.outcome.recording.SavedAt = l.r.system, time.Now().UTC()
 	if len(l.elements) > 0 {

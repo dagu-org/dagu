@@ -91,6 +91,11 @@ type run struct {
 	// answers holds the values people gave to ask operations.
 	answers map[string]string
 	outputs map[string]any
+	// maximize is whether the operation running maximizes the front window
+	// before it looks at the screen, and fitted are the windows this
+	// attempt already maximized or found it could not.
+	maximize bool
+	fitted   map[uint64]bool
 }
 
 func newRun(ctx context.Context, e *computerExecutor) (*run, error) {
@@ -145,6 +150,7 @@ func newRun(ctx context.Context, e *computerExecutor) (*run, error) {
 		system:      e.system,
 		answers:     map[string]string{},
 		outputs:     map[string]any{},
+		fitted:      map[uint64]bool{},
 	}
 	if r.variables == nil {
 		r.variables = map[string]string{}
@@ -161,6 +167,10 @@ func (r *run) execute(ctx context.Context) error {
 	}
 	for i := start; i < len(r.cfg.Do); i++ {
 		op := r.cfg.Do[i]
+		r.maximize = r.cfg.maximizes(op.maximize())
+		if op.looksAtScreen() {
+			r.fit(i)
+		}
 		if op.When != nil {
 			began, before := time.Now(), r.usage
 			// A statement is judged once; an exact check keeps looking for a
@@ -277,6 +287,7 @@ func (r *run) start(ctx context.Context) (int, error) {
 		return 0, fmt.Errorf("open the desktop: %w", err)
 	}
 	r.driver = driver
+	r.driver.ProtectApps(r.exec.protectedApps...)
 	r.driver.AssumeInputSent(r.lease.lastInput())
 	if cursor > 0 {
 		r.timeline.Lifecycle(agentstep.StatusRunning, "Resumed after input")
@@ -340,7 +351,7 @@ func (r *run) extract(ctx context.Context, index int, spec extractSpec, timeout 
 	pins := pinnedBindings(spec, r.system)
 	if choice != aiEveryRun {
 		device, ok := r.cache.Lookup(key)
-		if ok && device.Version != recordingVersion {
+		if ok && !replayable(device.Version) {
 			r.cache.Drop(key)
 			device, ok = recording{}, false
 		}

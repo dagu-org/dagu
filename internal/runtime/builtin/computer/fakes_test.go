@@ -65,6 +65,10 @@ type fakeBackend struct {
 	onRaise func(desktop.WindowID)
 	// captures counts the screenshots taken.
 	captures int
+	// maximized records the windows Maximize changed. A window in
+	// fixedSize cannot be maximized; one maximized once stays so.
+	maximized []desktop.WindowID
+	fixedSize map[uint64]bool
 }
 
 func newFakeBackend(width, height int) *fakeBackend {
@@ -546,6 +550,23 @@ func (b *fakeBackend) Raise(w desktop.WindowID) error {
 	return nil
 }
 
+func (b *fakeBackend) Maximize(w desktop.WindowID) (bool, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.fixedSize[w.Handle] || slices.ContainsFunc(b.maximized, func(m desktop.WindowID) bool { return m.Handle == w.Handle }) {
+		return false, nil
+	}
+	b.maximized = append(b.maximized, w)
+	return true, nil
+}
+
+// maximizedWindows lists the windows Maximize changed.
+func (b *fakeBackend) maximizedWindows() []desktop.WindowID {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return slices.Clone(b.maximized)
+}
+
 // focusOn moves the keyboard focus to a window.
 func (b *fakeBackend) focusOn(window desktop.WindowID) {
 	b.mu.Lock()
@@ -664,9 +685,11 @@ type testRun struct {
 	// parent, when set, is the context the step runs under, so a test can
 	// cancel it.
 	parent context.Context
-	// protect names processes whose windows the step must not operate.
-	protect  []uint32
-	launches [][]string
+	// protect names processes, and protectApps applications, whose windows
+	// the step must not operate.
+	protect     []uint32
+	protectApps []string
+	launches    [][]string
 	// remote runs the step as if in a remote desktop session rather than
 	// at the console, where it does not wait for a person by default.
 	remote bool
@@ -748,6 +771,7 @@ func (r *testRun) execute(withJSON string, session *ir.AgentSession) *stepExecut
 		r.elements.mu.Unlock()
 		return r.elements, nil
 	}
+	execution.exec.protectedApps = r.protectApps
 	// A replay looks once for what it needs, so a miss is quick; a test
 	// that wants waiting sets find_within.
 	execution.exec.findWithin = 0
