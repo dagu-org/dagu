@@ -228,16 +228,22 @@ func (e *axElements) read(ref uintptr, pool *[]uintptr) (axNode, error) {
 	return n, nil
 }
 
-// valueText writes an element's value as text: a string as it is, and a
-// number, such as a checkbox's state, in digits.
+// valueText writes an element's value as text: a string as it is, a number,
+// such as a checkbox's state, in digits, and a boolean as 1 or 0, as a
+// checkbox's state reads.
 func valueText(value uintptr) string {
 	switch cfGetTypeID(value) {
 	case cfStringGetTypeID():
 		return goString(value)
-	case cfNumberGetTypeID(), cfBooleanGetTypeID():
+	case cfNumberGetTypeID():
 		if n, ok := cfFloat(value); ok {
 			return strconv.FormatFloat(n, 'f', -1, 64)
 		}
+	case cfBooleanGetTypeID():
+		if cfBooleanGetValue(value) {
+			return "1"
+		}
+		return "0"
 	}
 	return ""
 }

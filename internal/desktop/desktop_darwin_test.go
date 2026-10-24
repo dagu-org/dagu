@@ -210,3 +210,16 @@ func TestRoleOf(t *testing.T) {
 		assert.Equal(t, tc.want, roleOf(tc.role, tc.subrole, tc.parent), "%s/%s in %s", tc.role, tc.subrole, tc.parent)
 	}
 }
+
+// An element's value reads as text whether the application gives a string
+// or a boolean, as a checkbox's state may come.
+func TestValueText(t *testing.T) {
+	t.Parallel()
+
+	require.NoError(t, load())
+	assert.Equal(t, "1", valueText(cfBooleanTrue))
+	text := cfString("保存しました")
+	require.NotZero(t, text)
+	defer cfRelease(text)
+	assert.Equal(t, "保存しました", valueText(text))
+}
