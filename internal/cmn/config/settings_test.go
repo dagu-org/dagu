@@ -20,11 +20,11 @@ func loadSettings(t *testing.T, yamlContent string) map[string]Setting {
 	require.NoError(t, os.WriteFile(configFile, []byte(yamlContent), 0600))
 
 	loader := NewConfigLoader(viper.New(), WithAppHomeDir(t.TempDir()), WithConfigFile(configFile))
-	_, err := loader.Load()
+	cfg, err := loader.Load()
 	require.NoError(t, err)
 
 	settings := make(map[string]Setting)
-	for _, s := range loader.Settings() {
+	for _, s := range loader.Settings(cfg) {
 		_, dup := settings[s.Key]
 		require.False(t, dup, "key %s is listed twice", s.Key)
 		settings[s.Key] = s
@@ -89,6 +89,22 @@ func TestSettingsListsAPIBasePath(t *testing.T) {
 
 	settings := loadSettings(t, "api_base_path: /custom/api\n")
 	assert.Equal(t, Setting{Key: "api_base_path", Value: "/custom/api", Source: SourceFile}, settings["api_base_path"])
+}
+
+// With no auth.mode set, Load runs the server in builtin mode; the report
+// says so rather than showing an empty value.
+func TestSettingsAuthMode(t *testing.T) {
+	t.Setenv("DAGU_AUTH_MODE", "")
+
+	t.Run("Default", func(t *testing.T) {
+		settings := loadSettings(t, "")
+		assert.Equal(t, Setting{Key: "auth.mode", Value: "builtin", Source: SourceDefault}, settings["auth.mode"])
+	})
+
+	t.Run("File", func(t *testing.T) {
+		settings := loadSettings(t, "auth:\n  mode: none\n")
+		assert.Equal(t, Setting{Key: "auth.mode", Value: "none", Source: SourceFile}, settings["auth.mode"])
+	})
 }
 
 func TestSettingsMasksSecrets(t *testing.T) {

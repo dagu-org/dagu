@@ -21,7 +21,7 @@ const (
 // MaskedValue replaces the value of a secret setting that is set.
 const MaskedValue = "********"
 
-// Setting is one configuration key with its effective value and the source
+// Setting is one configuration key with its value and the source
 // that supplied it.
 type Setting struct {
 	Key    string `json:"key"`
@@ -30,9 +30,10 @@ type Setting struct {
 }
 
 // Settings reports every key in the environment binding table, in table
-// order, with the value the configuration layer resolved for it. Secret
-// values are masked. Call it after Load.
-func (l *ConfigLoader) Settings() []Setting {
+// order, with the value read from its source before Dagu applies its own
+// defaults. The exception is auth.mode, which reports the mode cfg runs in.
+// Secret values are masked. cfg is the Config that Load returned.
+func (l *ConfigLoader) Settings(cfg *Config) []Setting {
 	prefix := strings.ToUpper(AppSlug) + "_"
 
 	type keyInfo struct {
@@ -60,6 +61,11 @@ func (l *ConfigLoader) Settings() []Setting {
 	for _, key := range keys {
 		info := infos[key]
 		value := formatSettingValue(l.v.Get(key))
+		// Load picks a mode when none or an invalid one is configured, and
+		// whether auth is on is what this report is most often read for.
+		if key == "auth.mode" && cfg.Server.Auth.Mode != "" {
+			value = string(cfg.Server.Auth.Mode)
+		}
 		if info.secret && value != "" {
 			value = MaskedValue
 		}

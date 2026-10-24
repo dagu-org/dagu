@@ -53,6 +53,10 @@ type Context struct {
 	Quiet   bool
 	Scope   commandScope
 
+	// configLoader is the loader that produced Config; it still knows where
+	// each value came from.
+	configLoader *config.ConfigLoader
+
 	EventSourceInstance string
 	Persistence         Persistence
 	DAGRunMgr           runtime.Manager
@@ -140,15 +144,38 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	commandName := commandFamilyName(cmd)
 	scope := scopeForCommand(commandName)
 
+	v := viper.New()
+	bindFlags(v, cmd, flags...)
+
 	quiet, err := cmd.Flags().GetBool("quiet")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get quiet flag: %w", err)
 	}
-
-	loader, err := newConfigLoader(cmd, flags)
+	daguHome, err := cmd.Flags().GetString("dagu-home")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get dagu-home flag: %w", err)
 	}
+
+	var configLoaderOpts []config.ConfigLoaderOption
+	if daguHome != "" {
+		if resolvedHome := fileutil.ResolvePathOrBlank(daguHome); resolvedHome != "" {
+			configLoaderOpts = append(configLoaderOpts, config.WithAppHomeDir(resolvedHome))
+		}
+	}
+
+	// Use a custom config file if provided via the command flag "config"
+	cfgPath, err := cmd.Flags().GetString("config")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get config flag: %w", err)
+	}
+	if cfgPath != "" {
+		configLoaderOpts = append(configLoaderOpts, config.WithConfigFile(cfgPath))
+	}
+
+	// Set service type based on command to load only necessary config sections
+	configLoaderOpts = append(configLoaderOpts, config.WithService(serviceForCommand(commandName)))
+
+	loader := config.NewConfigLoader(v, configLoaderOpts...)
 	cfg, err := loader.Load()
 	if err != nil {
 		return nil, err
@@ -231,6 +258,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 			Config:              cfg,
 			Quiet:               quiet,
 			Flags:               flags,
+			configLoader:        loader,
 			EventSourceInstance: eventSourceInstance,
 			ContextStore:        contextStore,
 			CLIContext:          selectedContext,
@@ -267,6 +295,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 			Config:              cfg,
 			Quiet:               quiet,
 			Flags:               flags,
+			configLoader:        loader,
 			EventSourceInstance: eventSourceInstance,
 			ContextStore:        contextStore,
 			CLIContext:          selectedContext,
@@ -370,6 +399,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		backend:             backend,
 		event:               eventService,
 		Flags:               flags,
+		configLoader:        loader,
 		Caches:              caches,
 		LicenseManager:      licMgr,
 		ContextStore:        contextStore,
@@ -464,39 +494,6 @@ func eventSourceServiceForCommand(cmdName string) string {
 
 // serviceForCommand determines which config.Service to load for a given command name.
 // Returns the appropriate service type for the command, or ServiceNone to load all config.
-// newConfigLoader returns a loader for the command's configuration, honoring
-// its bound flags, --dagu-home and --config.
-func newConfigLoader(cmd *cobra.Command, flags []commandLineFlag) (*config.ConfigLoader, error) {
-	v := viper.New()
-	bindFlags(v, cmd, flags...)
-
-	daguHome, err := cmd.Flags().GetString("dagu-home")
-	if err != nil {
-		return nil, fmt.Errorf("failed to get dagu-home flag: %w", err)
-	}
-
-	var configLoaderOpts []config.ConfigLoaderOption
-	if daguHome != "" {
-		if resolvedHome := fileutil.ResolvePathOrBlank(daguHome); resolvedHome != "" {
-			configLoaderOpts = append(configLoaderOpts, config.WithAppHomeDir(resolvedHome))
-		}
-	}
-
-	// Use a custom config file if provided via the command flag "config"
-	cfgPath, err := cmd.Flags().GetString("config")
-	if err != nil {
-		return nil, fmt.Errorf("failed to get config flag: %w", err)
-	}
-	if cfgPath != "" {
-		configLoaderOpts = append(configLoaderOpts, config.WithConfigFile(cfgPath))
-	}
-
-	// Set service type based on command to load only necessary config sections
-	configLoaderOpts = append(configLoaderOpts, config.WithService(serviceForCommand(commandFamilyName(cmd))))
-
-	return config.NewConfigLoader(v, configLoaderOpts...), nil
-}
-
 func serviceForCommand(cmdName string) config.Service {
 	switch cmdName {
 	case "server":

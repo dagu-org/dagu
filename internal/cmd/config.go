@@ -23,9 +23,11 @@ func Config() *cobra.Command {
 This is useful for debugging workflows, inspecting stored data,
 or verifying which directories Dagu is using in the current environment.
 
-With --values, print each setting instead, with its effective value and the
-source that supplied it: default, file, or env:<NAME>. Secret values are
-masked. Use --format json for a list a script can read.
+With --values, print each setting instead, with the source that supplied it:
+default, file, or env:<NAME>. Values are shown as read from the file, the
+environment or the defaults, before Dagu's own resolution, so a setting Dagu
+fills in later can show as empty. auth.mode shows the mode Dagu runs in.
+Secret values are masked. Use --format json for a list a script can read.
 
 Example:
   dagu config
@@ -40,7 +42,7 @@ Example:
 var (
 	configValuesFlag = commandLineFlag{
 		name:   "values",
-		usage:  "Print each setting with its effective value and source",
+		usage:  "Print each setting with its value and source",
 		isBool: true,
 	}
 
@@ -73,16 +75,7 @@ func runConfig(ctx *Context, _ []string) error {
 		return fmt.Errorf("invalid format '%s'. Valid formats: table, json", format)
 	}
 
-	// The context keeps only the built Config, so load again to learn where
-	// each value came from.
-	loader, err := newConfigLoader(ctx.Command, ctx.Flags)
-	if err != nil {
-		return err
-	}
-	if _, err := loader.Load(); err != nil {
-		return err
-	}
-	settings := loader.Settings()
+	settings := ctx.configLoader.Settings(ctx.Config)
 
 	out := ctx.Command.OutOrStdout()
 	if format == "json" {
