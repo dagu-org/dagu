@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"slices"
 	"sync"
 
 	"github.com/dagucloud/dagu/v2/internal/cmn/masking"
@@ -31,6 +33,8 @@ type modelBridge struct {
 	models    []ir.ModelEntry
 	providers []llmpkg.Provider
 	masker    *masking.Masker
+	// log receives the answers a model gave that could not be used.
+	log io.Writer
 	// runCtx bounds every request. The browser runtime calls generate with
 	// its own context, which carries no step cancellation.
 	runCtx    context.Context
@@ -45,9 +49,9 @@ type modelBridge struct {
 // runtime environment. Provider settings such as base_url and API keys are
 // resolved here because the browser runtime's callbacks carry no step
 // environment. Without a configuration, every request fails.
-func newModelBridge(ctx context.Context, cfg *ir.LLMConfig, masker *masking.Masker, factory providerFactory) (*modelBridge, error) {
+func newModelBridge(ctx context.Context, cfg *ir.LLMConfig, masker *masking.Masker, log io.Writer, factory providerFactory) (*modelBridge, error) {
 	if cfg == nil {
-		return &modelBridge{masker: masker, runCtx: ctx}, nil
+		return &modelBridge{masker: masker, log: log, runCtx: ctx}, nil
 	}
 	models, err := runtime.ResolveModels(ctx, cfg.GetModels())
 	if err != nil {
@@ -67,6 +71,7 @@ func newModelBridge(ctx context.Context, cfg *ir.LLMConfig, masker *masking.Mask
 		models:    models,
 		providers: providers,
 		masker:    masker,
+		log:       log,
 		runCtx:    ctx,
 	}, nil
 }
@@ -148,7 +153,8 @@ func (b *modelBridge) generate(ctx context.Context, req generateRequest) (genera
 		if chatReq.Temperature == nil {
 			chatReq.Temperature = req.Temperature
 		}
-		resp, err := llmpkg.ChatWithRetry(ctx, b.providers[i], chatReq, llmpkg.DefaultLogicalRetryConfig())
+		answer, usage, err := b.ask(ctx, b.providers[i], model, chatReq)
+		b.record(usage)
 		if err != nil {
 			if ctx.Err() != nil {
 				return generateResponse{}, ctx.Err()
@@ -156,13 +162,9 @@ func (b *modelBridge) generate(ctx context.Context, req generateRequest) (genera
 			errs = append(errs, fmt.Errorf("%s/%s: %w", model.Provider, model.Name, err))
 			continue
 		}
-		answer, err := agentstep.StructuredAnswer(resp)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("%s/%s: %w", model.Provider, model.Name, err))
-			continue
-		}
-		usage := tokenUsage{Input: resp.Usage.PromptTokens, Output: resp.Usage.CompletionTokens}
-		b.record(usage, model.Name)
+		b.mu.Lock()
+		b.lastModel = model.Name
+		b.mu.Unlock()
 		return generateResponse{JSON: answer, Usage: usage}, nil
 	}
 	b.mu.Lock()
@@ -171,12 +173,41 @@ func (b *modelBridge) generate(ctx context.Context, req generateRequest) (genera
 	return generateResponse{}, fmt.Errorf("model request failed: %w", errors.Join(errs...))
 }
 
-func (b *modelBridge) record(usage tokenUsage, model string) {
+// ask asks one model for a structured answer and returns the tokens its
+// calls used. An answer that cannot be used is logged and corrected once,
+// as plain messages, before the model counts as failed.
+func (b *modelBridge) ask(ctx context.Context, provider llmpkg.Provider, model ir.ModelEntry, req *llmpkg.ChatRequest) (json.RawMessage, tokenUsage, error) {
+	var usage tokenUsage
+	corrected := false
+	for {
+		resp, err := llmpkg.ChatWithRetry(ctx, provider, req, llmpkg.DefaultLogicalRetryConfig())
+		if err != nil {
+			return nil, usage, err
+		}
+		usage.Input += resp.Usage.PromptTokens
+		usage.Output += resp.Usage.CompletionTokens
+		answer, err := agentstep.StructuredAnswer(resp)
+		if err == nil {
+			return answer, usage, nil
+		}
+		rejected := b.masker.MaskString(agentstep.RejectedAnswer(resp))
+		_, _ = fmt.Fprintf(b.log, "warning: %s/%s answer rejected: %v\n%s\n", model.Provider, model.Name, err, rejected)
+		if corrected {
+			return nil, usage, err
+		}
+		corrected = true
+		req.Messages = append(slices.Clip(req.Messages),
+			llmpkg.Message{Role: llmpkg.RoleAssistant, Content: rejected},
+			llmpkg.Message{Role: llmpkg.RoleUser, Content: agentstep.Correction(err)},
+		)
+	}
+}
+
+func (b *modelBridge) record(usage tokenUsage) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.usage.Input += usage.Input
 	b.usage.Output += usage.Output
-	b.lastModel = model
 }
 
 // toolParameters converts the requested response schema into tool parameters.

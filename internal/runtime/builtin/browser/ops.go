@@ -115,7 +115,7 @@ func newRun(ctx context.Context, e *browserExecutor) (*run, error) {
 		stepKey = e.step.Name
 	}
 	masker := agentstep.NewMasker(secrets, nil)
-	bridge, err := newModelBridge(ctx, e.step.LLM, masker, e.newProvider)
+	bridge, err := newModelBridge(ctx, e.step.LLM, masker, e.stderr, e.newProvider)
 	if err != nil {
 		return nil, err
 	}

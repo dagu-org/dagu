@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"maps"
 	"os"
 	"path/filepath"
@@ -499,7 +500,7 @@ func (s *Sessions) modelBridge(ctx context.Context, cfg *ir.LLMConfig, masker *m
 		}
 		return &modelBridge{masker: masker, runCtx: ctx}, noModel, nil
 	}
-	bridge, err := newModelBridge(ctx, cfg, masker, s.newProvider)
+	bridge, err := newModelBridge(ctx, cfg, masker, io.Discard, s.newProvider)
 	if err != nil {
 		return nil, nil, err
 	}
