@@ -455,6 +455,11 @@ func (r *run) direct(ctx context.Context, index, position, total int, els deskto
 	}
 	deadline := time.Now().Add(findWithin)
 	for {
+		// The element is found again on each try, so where it is now is
+		// checked each time, as the first try's was.
+		if own, owned := r.elementOwner(found); owned {
+			return false, fmt.Sprintf("%s at turn %d of %d: %s", rec.Element.describe(), position+1, total, ownedMessage(own)), nil
+		}
 		err := els.Apply(found, pattern, value)
 		switch {
 		case err == nil:
@@ -464,18 +469,23 @@ func (r *run) direct(ctx context.Context, index, position, total int, els deskto
 			logAction(r.timeline, index, fmt.Sprintf("%s offers no %s pattern; using the screen", rec.Element.describe(), pattern))
 			return false, "", nil
 		case errors.Is(err, desktop.ErrDisabled) || errors.Is(err, desktop.ErrNotFound):
-			if !time.Now().Before(deadline) {
-				return false, fmt.Sprintf("%s could not be %s within %s at turn %d of %d: %s", rec.Element.describe(), patternVerbs[pattern], findWithin, position+1, total, directReason(err)), nil
-			}
-			if err := sleep(ctx, min(exactPollInterval, time.Until(deadline))); err != nil {
-				return false, "", err
-			}
-			again, reason, err := r.resolveElement(ctx, index, els, *rec.Element, 0)
-			if err != nil {
-				return false, "", err
-			}
-			if reason == "" {
-				found = again
+			// The element is looked for again until it is there, never
+			// tried again as it was, which may now name another element.
+			for {
+				if !time.Now().Before(deadline) {
+					return false, fmt.Sprintf("%s could not be %s within %s at turn %d of %d: %s", rec.Element.describe(), patternVerbs[pattern], findWithin, position+1, total, directReason(err)), nil
+				}
+				if err := sleep(ctx, min(exactPollInterval, time.Until(deadline))); err != nil {
+					return false, "", err
+				}
+				again, reason, err := r.resolveElement(ctx, index, els, *rec.Element, 0)
+				if err != nil {
+					return false, "", err
+				}
+				if reason == "" {
+					found = again
+					break
+				}
 			}
 		default:
 			return false, fmt.Sprintf("%s could not be %s at turn %d of %d: %v", rec.Element.describe(), patternVerbs[pattern], position+1, total, err), nil

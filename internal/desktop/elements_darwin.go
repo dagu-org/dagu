@@ -351,14 +351,22 @@ func (e *axElements) asWindow(ref uintptr, pid int32) (axWindow, error) {
 
 // openWeb turns on the accessibility tree of a Chromium or Electron
 // application, which builds it only when a client asks, and reports whether
-// the application is one: other applications refuse the attribute.
+// the application is one: other applications refuse the attribute. An
+// application that does not answer, as one starting up may not, is asked
+// again next time rather than taken for one that refused.
 func (e *axElements) openWeb(app uintptr, pid int32) bool {
-	web, met := e.web[pid]
-	if !met {
-		web = axSet(app, "AXManualAccessibility", cfBooleanTrue) == nil
-		e.web[pid] = web
+	if web, met := e.web[pid]; met {
+		return web
 	}
-	return web
+	switch axUIElementSetAttributeValue(app, cfName("AXManualAccessibility"), cfBooleanTrue) {
+	case axErrorSuccess:
+		e.web[pid] = true
+	case axErrorCannotComplete:
+		return false
+	default:
+		e.web[pid] = false
+	}
+	return e.web[pid]
 }
 
 func release(refs []uintptr) {

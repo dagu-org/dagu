@@ -9,6 +9,7 @@ import (
 	"image/draw"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/dagucloud/dagu/v2/internal/computerhost"
 	"github.com/dagucloud/dagu/v2/internal/desktop"
@@ -285,4 +286,30 @@ func TestReplayRefusesAnElementInAProtectedWindow(t *testing.T) {
 	replayed := run.execute(`{"ai": "never", "input": "direct", "do": [{"act": "Save the invoice"}]}`, nil)
 	require.ErrorContains(t, replayed.err, "which it never operates")
 	assert.Empty(t, run.backend.inputs(), "the button is not invoked")
+}
+
+// A direct replay that waits for a disabled element checks where the
+// element is before each try, so a protected window that came to the front
+// meanwhile is never acted on.
+func TestDirectReplayRechecksTheWindowBeforeEachTry(t *testing.T) {
+	t.Parallel()
+
+	const steps = `{"do": [{"act": "Save the invoice"}]}`
+	run := elementRun(t)
+	run.sessions = []*scriptedSession{{turns: []*computeruse.Turn{actions(clickAt(235, 194)), done("Saved")}}}
+	require.NoError(t, run.execute(steps, nil).err)
+
+	run.protectApps = []string{"Kitewell"}
+	run.elements.failPattern("saveButton", desktop.ErrDisabled)
+	go func() {
+		time.Sleep(300 * time.Millisecond)
+		run.backend.focusOn(desktop.WindowID{Handle: 9, Title: "Kitewell", PID: 77, App: "Kitewell"})
+		run.elements.mu.Lock()
+		delete(run.elements.applyErr, "saveButton")
+		run.elements.mu.Unlock()
+	}()
+	run.backend.events = nil
+	failed := run.execute(`{"ai": "never", "input": "direct", "idle": "0", "find_within": "3s", "do": [{"act": "Save the invoice"}]}`, nil)
+	require.ErrorContains(t, failed.err, "which it never operates")
+	assert.Empty(t, run.backend.inputs(), "the button is not invoked once the protected window is in front")
 }
