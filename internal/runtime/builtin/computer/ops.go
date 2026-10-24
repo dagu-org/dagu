@@ -640,7 +640,7 @@ func (r *run) elementsReader() (desktop.Elements, error) {
 	els, err := r.exec.openElements()
 	if err != nil {
 		if errors.Is(err, desktop.ErrElementsUnsupported) {
-			return nil, fmt.Errorf("exact checks need 64-bit Windows: %w", err)
+			return nil, fmt.Errorf("exact checks need macOS or 64-bit Windows: %w", err)
 		}
 		return nil, fmt.Errorf("open the elements: %w", err)
 	}

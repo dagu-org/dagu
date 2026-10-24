@@ -443,10 +443,7 @@ func (b *darwinBackend) Capture() (*image.RGBA, error) {
 }
 
 func (b *darwinBackend) toPoints(x, y int) cgPoint {
-	return cgPoint{
-		X: b.display.bounds.Origin.X + float64(x)/b.display.scale,
-		Y: b.display.bounds.Origin.Y + float64(y)/b.display.scale,
-	}
+	return b.display.points(image.Pt(x, y))
 }
 
 func (b *darwinBackend) location() cgPoint {
