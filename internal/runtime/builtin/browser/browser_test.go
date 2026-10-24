@@ -1091,7 +1091,7 @@ func TestModelBridgeFallsBackAndMasks(t *testing.T) {
 		return working, nil
 	}
 	ctx := runtime.WithEnv(t.Context(), runtime.Env{Scope: value.NewEnvScope(nil, false)})
-	bridge, err := newModelBridge(ctx, cfg, agentstep.NewMasker(map[string]string{"TOKEN": "s3cr3t-token"}, nil), factory)
+	bridge, err := newModelBridge(ctx, cfg, agentstep.NewMasker(map[string]string{"TOKEN": "s3cr3t-token"}, nil), io.Discard, factory)
 	require.NoError(t, err)
 
 	resp, err := bridge.generate(ctx, generateRequest{
@@ -1108,6 +1108,89 @@ func TestModelBridgeFallsBackAndMasks(t *testing.T) {
 	assert.Equal(t, agentstep.ToolChoiceRequired, request.ToolChoice)
 	assert.NotContains(t, request.Tools[0].Function.Parameters, "$schema")
 	assert.Equal(t, "tree contains *******", lastUserText(request))
+}
+
+// alwaysProse never answers through the respond tool.
+func alwaysProse(*llmpkg.ChatRequest) (string, error) {
+	return "I would click the checkout button.", nil
+}
+
+func TestUnusableAnswerIsCorrected(t *testing.T) {
+	t.Parallel()
+
+	// The model answers in prose, holding a secret, until it is told why
+	// that cannot be used.
+	model := pageModel(nil)
+	run := newTestRun(t, func(req *llmpkg.ChatRequest) (string, error) {
+		if strings.Contains(lastUserText(req), "Call the respond tool again") {
+			return model(req)
+		}
+		return "I would click the checkout button with s3cr3t-token.", nil
+	})
+	run.secrets = map[string]string{"TOKEN": "s3cr3t-token"}
+	execution := run.execute(`{"do": [{"act": "Click the checkout button"}]}`, nil)
+	require.NoError(t, execution.err)
+
+	require.Equal(t, 2, run.provider.callCount())
+	corrected := run.provider.calls[1].Messages
+	require.Len(t, corrected, 3)
+	assert.Equal(t, llmpkg.RoleAssistant, corrected[1].Role)
+	assert.Equal(t, "I would click the checkout button with *******.", corrected[1].Content)
+	assert.Equal(t, llmpkg.RoleUser, corrected[2].Role)
+	assert.Contains(t, corrected[2].Content, "model did not return structured output")
+
+	log := execution.stderr.String()
+	assert.Contains(t, log, "openai/test-model answer rejected: model did not return structured output")
+	assert.Contains(t, log, "I would click the checkout button with *******.")
+	assert.NotContains(t, log, "s3cr3t-token")
+	assert.Equal(t, int64(24), execution.exec.GetAgentSession().Usage.TotalTokens, "both answers count")
+}
+
+func TestUnusableCorrectionFailsOperation(t *testing.T) {
+	t.Parallel()
+
+	run := newTestRun(t, alwaysProse)
+	execution := run.execute(`{"do": [{"act": "Click the checkout button"}]}`, nil)
+
+	require.ErrorContains(t, execution.err, "do[0] act failed: model request failed: openai/test-model: model did not return structured output")
+	assert.Equal(t, 2, run.provider.callCount())
+	assert.Equal(t, int64(24), execution.exec.GetAgentSession().Usage.TotalTokens, "both answers count")
+}
+
+func TestModelBridgeFallsBackAfterCorrection(t *testing.T) {
+	t.Parallel()
+
+	primary := &scriptedProvider{answer: alwaysProse}
+	backup := &scriptedProvider{answer: func(*llmpkg.ChatRequest) (string, error) {
+		return `{"ok":true}`, nil
+	}}
+	cfg := &ir.LLMConfig{Models: []ir.ModelEntry{
+		{Provider: "openai", Name: "primary"},
+		{Provider: "openai", Name: "backup"},
+	}}
+	factory := func(_ context.Context, cfg *ir.LLMConfig) (llmpkg.Provider, error) {
+		if cfg.Model == "primary" {
+			return primary, nil
+		}
+		return backup, nil
+	}
+	ctx := runtime.WithEnv(t.Context(), runtime.Env{Scope: value.NewEnvScope(nil, false)})
+	var log bytes.Buffer
+	bridge, err := newModelBridge(ctx, cfg, agentstep.NewMasker(nil, nil), &log, factory)
+	require.NoError(t, err)
+
+	resp, err := bridge.generate(ctx, generateRequest{
+		Messages: []generateMessage{{Role: "user", Text: "instruction: Click the checkout button"}},
+		Schema:   json.RawMessage(`{"type":"object"}`),
+	})
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"ok":true}`, string(resp.JSON))
+	assert.Equal(t, "backup", bridge.modelName())
+	assert.Equal(t, 2, primary.callCount())
+	require.Equal(t, 1, backup.callCount())
+	assert.Len(t, backup.calls[0].Messages, 1, "the backup model gets the original request")
+	assert.Equal(t, 36, bridge.totals().total())
+	assert.Equal(t, 2, strings.Count(log.String(), "openai/primary answer rejected"))
 }
 
 func TestCheckAllowedDomain(t *testing.T) {

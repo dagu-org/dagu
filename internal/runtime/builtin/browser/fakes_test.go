@@ -427,6 +427,8 @@ func (e *fakeEngine) actInstructions() []string {
 }
 
 // scriptedProvider answers each model request through a respond tool call.
+// An answer that is not JSON comes back as text, as from a model that
+// ignored the tool.
 type scriptedProvider struct {
 	answer func(req *llmpkg.ChatRequest) (string, error)
 	mu     sync.Mutex
@@ -441,12 +443,16 @@ func (p *scriptedProvider) Chat(_ context.Context, req *llmpkg.ChatRequest) (*ll
 	if err != nil {
 		return nil, err
 	}
+	usage := llmpkg.Usage{PromptTokens: 10, CompletionTokens: 2, TotalTokens: 12}
+	if !json.Valid([]byte(arguments)) {
+		return &llmpkg.ChatResponse{Content: arguments, Usage: usage}, nil
+	}
 	return &llmpkg.ChatResponse{
 		ToolCalls: []llmpkg.ToolCall{{
 			ID: "call-1", Type: "function",
 			Function: llmpkg.ToolCallFunction{Name: agentstep.RespondToolName, Arguments: arguments},
 		}},
-		Usage: llmpkg.Usage{PromptTokens: 10, CompletionTokens: 2, TotalTokens: 12},
+		Usage: usage,
 	}, nil
 }
 

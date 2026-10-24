@@ -121,6 +121,31 @@ func StructuredAnswer(resp *llmpkg.ChatResponse) (json.RawMessage, error) {
 	return nil, errors.New("model did not return structured output")
 }
 
+const (
+	correctionFormat = "Your answer could not be used: %v. Call the respond tool again with arguments that match its parameter schema."
+	emptyAnswer      = "(no answer)"
+)
+
+// Correction asks a model to answer again through the respond tool after
+// an answer that could not be used for reason.
+func Correction(reason error) string {
+	return fmt.Sprintf(correctionFormat, reason)
+}
+
+// RejectedAnswer returns what the model answered: the respond call's
+// arguments, otherwise its text.
+func RejectedAnswer(resp *llmpkg.ChatResponse) string {
+	for _, call := range resp.ToolCalls {
+		if call.Function.Name == RespondToolName {
+			return call.Function.Arguments
+		}
+	}
+	if resp.Content != "" {
+		return resp.Content
+	}
+	return emptyAnswer
+}
+
 // lockHeartbeatInterval keeps a held lock well inside dirlock's staleness
 // threshold.
 const lockHeartbeatInterval = 10 * time.Second

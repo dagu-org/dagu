@@ -132,7 +132,11 @@ listed, each model request tries them in order.
 
 Every model request asks for a tool call whose parameters are the response
 schema. A reply without a tool call is accepted when its text is valid JSON.
-Models that follow tool-call schemas reliably are required for dependable
+Any other reply gets one correction: the next request to the same model
+carries the rejected reply as an assistant message, followed by a user message
+stating why it was rejected, and the step log shows the rejected reply. When
+the corrected reply is also unusable, that model has failed and the next
+listed model is tried. Models that follow tool-call schemas reliably are required for dependable
 results.
 
 ### Variables and secrets
