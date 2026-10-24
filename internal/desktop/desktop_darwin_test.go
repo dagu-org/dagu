@@ -119,10 +119,12 @@ func TestDarwinDesktop(t *testing.T) {
 	backend, err := newDarwinBackend()
 	require.NoError(t, err)
 	require.NoError(t, backend.MoveTo(200, 300))
-	x, y, err := backend.Position()
-	require.NoError(t, err)
-	assert.InDelta(t, 200, x, 2)
-	assert.InDelta(t, 300, y, 2)
+	// The window server applies a posted event a moment later.
+	var x, y int
+	assert.Eventually(t, func() bool {
+		x, y, err = backend.Position()
+		return err == nil && abs(x-200) <= 2 && abs(y-300) <= 2
+	}, time.Second, 10*time.Millisecond, "the pointer is at %d,%d, not 200,300", x, y)
 }
 
 // TestDarwinWindows opens windows of its own and changes their size and
@@ -180,4 +182,31 @@ func TestDarwinWindows(t *testing.T) {
 	maximized, err = backend.Maximize(find("dagu-window-e2e"))
 	require.NoError(t, err)
 	assert.False(t, maximized, "a maximized window is left as it is")
+}
+
+func TestRoleOf(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		role, subrole, parent string
+		want                  string
+	}{
+		{"AXButton", "", "AXGroup", RoleButton},
+		{"AXTextField", "AXSecureTextField", "AXGroup", RoleTextField},
+		{"AXTextArea", "", "AXScrollArea", RoleTextField},
+		{"AXStaticText", "", "AXGroup", RoleText},
+		{"AXCheckBox", "AXToggle", "AXGroup", RoleCheckbox},
+		{"AXRadioButton", "", "AXRadioGroup", RoleRadio},
+		{"AXRadioButton", "", "AXTabGroup", RoleTab},
+		{"AXRadioButton", "AXTabButton", "AXGroup", RoleTab},
+		{"AXPopUpButton", "", "AXGroup", RoleComboBox},
+		{"AXRow", "AXTableRow", "AXTable", RoleListItem},
+		{"AXCell", "", "AXRow", RoleCell},
+		{"AXTable", "", "AXScrollArea", RoleList},
+		{"AXGroup", "", "AXWindow", RoleGroup},
+		{"AXWindow", "AXStandardWindow", "AXApplication", RoleWindow},
+		{"AXScrollArea", "", "AXWindow", RoleOther},
+	} {
+		assert.Equal(t, tc.want, roleOf(tc.role, tc.subrole, tc.parent), "%s/%s in %s", tc.role, tc.subrole, tc.parent)
+	}
 }

@@ -22,6 +22,9 @@ const (
 	cfNumberDoubleType = 13
 	axValueCGPointType = 1
 	axValueCGSizeType  = 2
+	// axValueErrorType marks an attribute that a multiple-attribute read
+	// could not read.
+	axValueErrorType = 5
 	// procPIDPathMax is PROC_PIDPATHINFO_MAXSIZE.
 	procPIDPathMax = 4096
 	// axMessagingTimeout bounds each Accessibility request to an
@@ -74,8 +77,19 @@ var (
 	axValueCreateSize                      func(kind uint32, value *cgSize) uintptr
 	axValueGetPoint                        func(value uintptr, kind uint32, out *cgPoint) bool
 	axValueGetSize                         func(value uintptr, kind uint32, out *cgSize) bool
+	axValueGetType                         func(value uintptr) uint32
+	axValueGetTypeID                       func() uintptr
+	axUIElementCopyMultipleAttributeValues func(element, attributes uintptr, options uint32, values *uintptr) int32
+	axUIElementCopyElementAtPosition       func(application uintptr, x, y float32, element *uintptr) int32
+	axUIElementCopyActionNames             func(element uintptr, names *uintptr) int32
+	cfArrayCreate                          func(alloc uintptr, values *uintptr, count int, callBacks uintptr) uintptr
+	cfEqual                                func(a, b uintptr) bool
 	procPIDPath                            func(pid int32, buffer *byte, size uint32) int32
 )
+
+// cfTypeArrayCallBacks is the address of kCFTypeArrayCallBacks, which an
+// array of Core Foundation objects retains its values with.
+var cfTypeArrayCallBacks uintptr
 
 // Keys of the window server's window descriptions, resolved when the
 // libraries load.
@@ -117,6 +131,18 @@ func loadWindowFuncs(cg, cf, as uintptr) error {
 	purego.RegisterLibFunc(&axValueCreateSize, as, "AXValueCreate")
 	purego.RegisterLibFunc(&axValueGetPoint, as, "AXValueGetValue")
 	purego.RegisterLibFunc(&axValueGetSize, as, "AXValueGetValue")
+	purego.RegisterLibFunc(&axValueGetType, as, "AXValueGetType")
+	purego.RegisterLibFunc(&axValueGetTypeID, as, "AXValueGetTypeID")
+	purego.RegisterLibFunc(&axUIElementCopyMultipleAttributeValues, as, "AXUIElementCopyMultipleAttributeValues")
+	purego.RegisterLibFunc(&axUIElementCopyElementAtPosition, as, "AXUIElementCopyElementAtPosition")
+	purego.RegisterLibFunc(&axUIElementCopyActionNames, as, "AXUIElementCopyActionNames")
+	purego.RegisterLibFunc(&cfArrayCreate, cf, "CFArrayCreate")
+	purego.RegisterLibFunc(&cfEqual, cf, "CFEqual")
+	callBacks, err := purego.Dlsym(cf, "kCFTypeArrayCallBacks")
+	if err != nil {
+		return fmt.Errorf("load kCFTypeArrayCallBacks: %w", err)
+	}
+	cfTypeArrayCallBacks = callBacks
 	libSystem, err := purego.Dlopen(libSystemPath, purego.RTLD_NOW|purego.RTLD_GLOBAL)
 	if err != nil {
 		return fmt.Errorf("load libSystem: %w", err)
@@ -352,6 +378,37 @@ func axPerform(element uintptr, action string) error {
 		return axError(action, code)
 	}
 	return nil
+}
+
+// axActions lists the actions an element offers.
+func axActions(element uintptr) []string {
+	var names uintptr
+	if axUIElementCopyActionNames(element, &names) != axErrorSuccess || names == 0 {
+		return nil
+	}
+	defer cfRelease(names)
+	values := cfArray(names)
+	out := make([]string, 0, len(values))
+	for _, name := range values {
+		out = append(out, goString(name))
+	}
+	return out
+}
+
+// cfStringArray makes a Core Foundation array of strings the caller
+// releases.
+func cfStringArray(names []string) uintptr {
+	refs := make([]uintptr, len(names))
+	for i, name := range names {
+		refs[i] = cfName(name)
+	}
+	return cfArrayCreate(0, &refs[0], len(refs), cfTypeArrayCallBacks)
+}
+
+// axMissing reports a value a multiple-attribute read put in place of an
+// attribute it could not read.
+func axMissing(value uintptr) bool {
+	return value == 0 || (cfGetTypeID(value) == axValueGetTypeID() && axValueGetType(value) == axValueErrorType)
 }
 
 // axError describes an Accessibility error code.

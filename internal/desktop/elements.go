@@ -16,7 +16,7 @@ import (
 var ErrNoElements = errors.New("the application exposes no accessible elements")
 
 // ErrElementsUnsupported reports a system that cannot read elements.
-var ErrElementsUnsupported = errors.New("accessible elements are supported on 64-bit Windows only")
+var ErrElementsUnsupported = errors.New("accessible elements are supported on macOS and 64-bit Windows only")
 
 // ErrNoPattern reports an element that cannot perform a pattern itself, so
 // the action falls back to the pointer and keys.
@@ -28,7 +28,7 @@ var ErrDisabled = errors.New("the element is disabled")
 
 // Pattern is something an element does by itself when asked through the
 // system's automation, with no pointer or key: the UI Automation control
-// patterns on Windows.
+// patterns on Windows, and Accessibility actions and attributes on macOS.
 type Pattern string
 
 const (
@@ -87,7 +87,8 @@ type Element struct {
 	Role string
 	Name string
 	// ID is the identifier the application gives the element, when it
-	// sets one: the UI Automation AutomationId on Windows.
+	// sets one: the UI Automation AutomationId on Windows, and on macOS the
+	// accessibility identifier, or a web page's element id.
 	ID string
 	// Value is what the element holds, such as the text of a field. It is
 	// blank for a password field.

@@ -92,7 +92,17 @@ func (b *darwinBackend) listWindows() []windowInfo {
 
 // toPixelRect converts a frame in global points to display pixels.
 func (b *darwinBackend) toPixelRect(frame cgRect) image.Rectangle {
-	scale, origin := b.display.scale, b.display.bounds.Origin
+	return b.display.pixelRect(frame)
+}
+
+// points converts a position in the display's pixels to global points.
+func (d display) points(at image.Point) cgPoint {
+	return cgPoint{X: d.bounds.Origin.X + float64(at.X)/d.scale, Y: d.bounds.Origin.Y + float64(at.Y)/d.scale}
+}
+
+// pixelRect converts a frame in global points to the display's pixels.
+func (d display) pixelRect(frame cgRect) image.Rectangle {
+	scale, origin := d.scale, d.bounds.Origin
 	return image.Rect(
 		int(math.Round((frame.Origin.X-origin.X)*scale)),
 		int(math.Round((frame.Origin.Y-origin.Y)*scale)),
@@ -149,23 +159,43 @@ func (b *darwinBackend) FocusedWindow() WindowID {
 }
 
 // focusedApplication is the process of the application that has the
-// keyboard focus, or 0 when Accessibility does not say.
+// keyboard focus, or 0 when the system does not say. Accessibility's
+// system-wide answer is asked first; it can fail for a process started from
+// a service or a terminal, and the owner of the front application window,
+// which the window server orders first, answers then.
 func focusedApplication() int32 {
-	system := axUIElementCreateSystemWide()
-	if system == 0 {
+	if system := axUIElementCreateSystemWide(); system != 0 {
+		app := axCopy(system, "AXFocusedApplication")
+		cfRelease(system)
+		if app != 0 {
+			var pid int32
+			code := axUIElementGetPid(app, &pid)
+			cfRelease(app)
+			if code == axErrorSuccess && pid > 0 {
+				return pid
+			}
+		}
+	}
+	return frontWindowOwner()
+}
+
+// frontWindowOwner is the process that owns the front application window.
+func frontWindowOwner() int32 {
+	list := cgWindowListCopyWindowInfo(windowListOnScreenOnly|windowListExcludeDesktopItems, 0)
+	if list == 0 {
 		return 0
 	}
-	defer cfRelease(system)
-	app := axCopy(system, "AXFocusedApplication")
-	if app == 0 {
-		return 0
+	defer cfRelease(list)
+	for _, dict := range cfArray(list) {
+		layer, _ := cfInt(cfDictionaryGetValue(dict, cgWindowLayerKey))
+		if alpha, ok := cfFloat(cfDictionaryGetValue(dict, cgWindowAlphaKey)); layer != normalWindowLayer || (ok && alpha == 0) {
+			continue
+		}
+		if pid, ok := cfInt(cfDictionaryGetValue(dict, cgWindowOwnerPIDKey)); ok && pid > 0 {
+			return int32(pid) //nolint:gosec // process ids fit 32 bits
+		}
 	}
-	defer cfRelease(app)
-	var pid int32
-	if axUIElementGetPid(app, &pid) != axErrorSuccess {
-		return 0
-	}
-	return pid
+	return 0
 }
 
 // Raise brings a window's application to the front and the window above
