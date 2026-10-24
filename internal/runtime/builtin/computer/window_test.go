@@ -1,0 +1,288 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package computer
+
+import (
+	"image"
+	"image/color"
+	"image/draw"
+	"path/filepath"
+	"testing"
+
+	"github.com/dagucloud/dagu/v2/internal/computerhost"
+	"github.com/dagucloud/dagu/v2/internal/desktop"
+	"github.com/dagucloud/dagu/v2/internal/llm/computeruse"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// reportWindow is the application window the window tests operate.
+var reportWindow = desktop.WindowID{Handle: 7, Title: "Report", PID: 42, App: "report", Bounds: image.Rect(100, 100, 500, 400)}
+
+// desk draws a desktop of background stripes with the report window's
+// content at bounds; a different background changes everything but the
+// window.
+func desk(background int, bounds image.Rectangle) *image.RGBA {
+	img := stripes(800, 600, background)
+	draw.Draw(img, bounds, pattern(bounds.Dx(), bounds.Dy(), 0), image.Point{}, draw.Src)
+	return img
+}
+
+// windowRun is a desktop that shows the report window at bounds and names
+// it as the window in front and under any position inside it.
+func windowRun(t *testing.T, bounds image.Rectangle) *testRun {
+	t.Helper()
+	run := newTestRun(t)
+	run.backend = newFakeBackend(800, 600)
+	run.placeWindow(bounds)
+	return run
+}
+
+// placeWindow moves the report window to bounds, on a background of three
+// stripes.
+func (r *testRun) placeWindow(bounds image.Rectangle) {
+	window := reportWindow
+	window.Bounds = bounds
+	r.backend.mu.Lock()
+	defer r.backend.mu.Unlock()
+	r.backend.screen = desk(3, bounds)
+	r.backend.windows = []desktop.WindowID{window}
+	r.backend.focus = window
+	r.backend.windowAt = func(x, y int) desktop.WindowID {
+		if image.Pt(x, y).In(window.Bounds) {
+			return window
+		}
+		return desktop.WindowID{}
+	}
+}
+
+// A turn is recorded on the window its click lands on, relative to the
+// window's corner, so a replay ignores everything around the window.
+func TestReplayComparesOnlyTheWindow(t *testing.T) {
+	t.Parallel()
+
+	const steps = `{"maximize": false, "do": [{"act": "Open the report"}]}`
+	run := windowRun(t, reportWindow.Bounds)
+	run.sessions = []*scriptedSession{{turns: []*computeruse.Turn{actions(clickAt(150, 160)), done("Opened")}}}
+	require.NoError(t, run.execute(steps, nil).err)
+
+	entry := lookupRecording(t, run, "Open the report")
+	require.Len(t, entry.Turns, 1)
+	assert.Equal(t, &recordedWindow{App: "report", Title: "Report", Width: 400, Height: 300}, entry.Turns[0].Window)
+	assert.Equal(t, &computeruse.Point{X: 50, Y: 60}, entry.Turns[0].Actions[0].Action.Point, "relative to the window")
+	assert.Equal(t, entry.Turns[0].Window, entry.FinalWindow)
+
+	run.backend.script(desk(9, reportWindow.Bounds))
+	replayed := run.execute(steps, nil)
+	require.NoError(t, replayed.err, "no session is left, so a model call would fail")
+	assert.Equal(t, []string{"act:cache-hit"}, eventNames(replayed.exec.GetAgentSession()))
+	assert.Contains(t, run.backend.inputs(), "move 150,160")
+}
+
+// A replay finds a window that moved and clicks where its turn landed on
+// the window, not on the display.
+func TestReplayFollowsAMovedWindow(t *testing.T) {
+	t.Parallel()
+
+	const steps = `{"maximize": false, "do": [{"act": "Open the report"}]}`
+	run := windowRun(t, reportWindow.Bounds)
+	run.sessions = []*scriptedSession{{turns: []*computeruse.Turn{actions(clickAt(150, 160)), done("Opened")}}}
+	require.NoError(t, run.execute(steps, nil).err)
+
+	run.placeWindow(reportWindow.Bounds.Add(image.Pt(120, 80)))
+	run.backend.events = nil
+	replayed := run.execute(steps, nil)
+	require.NoError(t, replayed.err)
+	assert.Equal(t, []string{"act:cache-hit"}, eventNames(replayed.exec.GetAgentSession()))
+	assert.Contains(t, run.backend.inputs(), "move 270,240")
+}
+
+// A window of another size shows a different layout, so the turn misses and
+// the model repairs the recording.
+func TestReplayMissesAResizedWindow(t *testing.T) {
+	t.Parallel()
+
+	const steps = `{"maximize": false, "do": [{"act": "Open the report"}]}`
+	run := windowRun(t, reportWindow.Bounds)
+	run.sessions = []*scriptedSession{{turns: []*computeruse.Turn{actions(clickAt(150, 160)), done("Opened")}}}
+	require.NoError(t, run.execute(steps, nil).err)
+
+	run.placeWindow(image.Rect(100, 100, 500, 350))
+	run.sessions = []*scriptedSession{{turns: []*computeruse.Turn{actions(clickAt(150, 160)), done("Opened")}}}
+	healed := run.execute(steps, nil)
+	require.NoError(t, healed.err)
+	assert.Equal(t, []string{"act:healed"}, eventNames(healed.exec.GetAgentSession()))
+	assert.Contains(t, healed.stderr.String(), "the window of report differs from the recording")
+}
+
+// A recording made before windows were recorded keeps replaying on the
+// whole display, at display positions.
+func TestReplaysARecordingWithoutWindows(t *testing.T) {
+	t.Parallel()
+
+	run := windowRun(t, reportWindow.Bounds)
+	screen := run.backend.screen
+	at := image.Pt(150, 160)
+	target := desktop.FingerprintAround(screen, at, targetRadius(screen.Bounds()))
+	cache := openReplayCache(run.computerDir(), "invoices", "post")
+	cache.Stage(replayKey(0, "Open the report"), recording{
+		Version: oldestRecordingVersion, Width: 800, Height: 600,
+		Turns: []recordedTurn{{
+			Screen:  desktop.FingerprintOf(screen),
+			Actions: []recordedAction{{Action: clickAt(at.X, at.Y), Target: &target}},
+		}},
+		Final: desktop.FingerprintOf(screen),
+	})
+	require.NoError(t, cache.Commit(t.Context()))
+
+	replayed := run.execute(`{"maximize": false, "do": [{"act": "Open the report"}]}`, nil)
+	require.NoError(t, replayed.err, "no session is left, so a model call would fail")
+	assert.Equal(t, []string{"act:cache-hit"}, eventNames(replayed.exec.GetAgentSession()))
+	assert.Contains(t, run.backend.inputs(), "move 150,160")
+}
+
+// A change outside the window between the screenshot and the actions does
+// not send the model's actions back to it.
+func TestActionsRunDespiteChangesOutsideTheWindow(t *testing.T) {
+	t.Parallel()
+
+	run := windowRun(t, reportWindow.Bounds)
+	session := &scriptedSession{turns: []*computeruse.Turn{actions(clickAt(150, 160)), done("Opened")}}
+	session.onNext = func() { run.backend.show(desk(11, reportWindow.Bounds)) }
+	run.sessions = []*scriptedSession{session}
+	require.NoError(t, run.execute(`{"maximize": false, "do": [{"act": "Open the report"}]}`, nil).err)
+
+	assert.Contains(t, run.backend.inputs(), "move 150,160")
+	for _, obs := range session.observations {
+		assert.NotEqual(t, divergedNote, obs.Note)
+	}
+}
+
+// The front window is maximized before the step looks at it, once, and
+// only when the step allows it and the window is one the step operates.
+func TestMaximizesTheFrontWindow(t *testing.T) {
+	t.Parallel()
+
+	const steps = `{"do": [{"act": "Open the report"}, {"screenshot": "after"}]}`
+	turns := func() []*scriptedSession {
+		return []*scriptedSession{{turns: []*computeruse.Turn{actions(clickAt(150, 160)), done("Opened")}}}
+	}
+
+	run := windowRun(t, reportWindow.Bounds)
+	run.sessions = turns()
+	maximized := run.execute(steps, nil)
+	require.NoError(t, maximized.err)
+	require.Len(t, run.backend.maximizedWindows(), 1, "each window is maximized once")
+	assert.Equal(t, reportWindow.Handle, run.backend.maximizedWindows()[0].Handle)
+	assert.Contains(t, maximized.stderr.String(), `maximized report "Report"`)
+
+	for name, configure := range map[string]func(*testRun) string{
+		"turned off": func(*testRun) string { return `{"maximize": false, "do": [{"act": "Open the report"}]}` },
+		"turned off act": func(*testRun) string {
+			return `{"do": [{"act": {"instruction": "Open the report", "maximize": false}}]}`
+		},
+		"protected": func(r *testRun) string {
+			r.protectApps = []string{"Report"}
+			return steps
+		},
+		"fixed size": func(r *testRun) string {
+			r.backend.fixedSize = map[uint64]bool{reportWindow.Handle: true}
+			return steps
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			run := windowRun(t, reportWindow.Bounds)
+			run.sessions = turns()
+			execution := run.execute(configure(run), nil)
+			require.NoError(t, execution.err)
+			assert.Empty(t, run.backend.maximizedWindows())
+			assert.NotContains(t, execution.stderr.String(), "maximized")
+			if name == "protected" {
+				assert.NotContains(t, run.backend.inputs(), "move 150,160", "a protected window is never operated")
+			}
+		})
+	}
+}
+
+// computerDir is where the run's steps keep their recordings.
+func (r *testRun) computerDir() string {
+	return filepath.Join(r.dataDir, computerhost.DataDirName)
+}
+
+// A window the replay finds off the display shows nothing to compare, so
+// the turn misses rather than matching an empty picture, which hashes like a
+// window of one flat colour.
+func TestReplayMissesAWindowOffTheDisplay(t *testing.T) {
+	t.Parallel()
+
+	const steps = `{"maximize": false, "do": [{"act": "Open the report"}]}`
+	run := windowRun(t, reportWindow.Bounds)
+	flat := stripes(800, 600, 3)
+	draw.Draw(flat, reportWindow.Bounds, image.NewUniform(color.Gray{Y: 128}), image.Point{}, draw.Src)
+	run.backend.script(flat)
+	run.sessions = []*scriptedSession{{turns: []*computeruse.Turn{actions(clickAt(150, 160)), done("Opened")}}}
+	require.NoError(t, run.execute(steps, nil).err)
+
+	run.placeWindow(image.Rect(900, 100, 1300, 400))
+	run.sessions = []*scriptedSession{{turns: []*computeruse.Turn{done("Nothing to do")}}}
+	healed := run.execute(steps, nil)
+	require.NoError(t, healed.err)
+	assert.Equal(t, []string{"act:healed"}, eventNames(healed.exec.GetAgentSession()))
+	assert.NotContains(t, run.backend.inputs(), "move 1050,460", "nothing is clicked off the display")
+}
+
+// Maximizing a window waits, as input does, until nobody is using the
+// desktop.
+func TestMaximizeWaitsForAnIdleDesktop(t *testing.T) {
+	t.Parallel()
+
+	run := windowRun(t, reportWindow.Bounds)
+	run.backend.personKeepsUsing(2)
+	execution := run.execute(`{"idle": "20ms", "do": [{"screenshot": "report"}]}`, nil)
+	require.NoError(t, execution.err)
+	session := execution.exec.GetAgentSession()
+	assert.Equal(t, []string{waitReasonPerson}, waitReasons(session))
+	require.Len(t, run.backend.maximizedWindows(), 1)
+}
+
+// An element the model names is acted on wherever it is now, so an element
+// in a window the step never operates is refused as a pointer action there
+// is, and the model is told why.
+func TestModelElementInAProtectedWindowIsRefused(t *testing.T) {
+	t.Parallel()
+
+	run := newTestRun(t)
+	run.elements = newFakeElements()
+	run.backend.app = "Kitewell"
+	run.protectApps = []string{"kitewell"}
+	session := &scriptedSession{turns: []*computeruse.Turn{
+		actions(computeruse.Action{CallID: "x", Kind: computeruse.KindClick, ElementID: "e1"}),
+		done("Could not save"),
+	}}
+	run.sessions = []*scriptedSession{session}
+	require.NoError(t, run.execute(`{"idle": "0", "do": [{"act": "Save the form"}]}`, nil).err)
+
+	assert.Empty(t, run.backend.inputs(), "the button is not invoked")
+	require.Len(t, session.observations, 2)
+	require.Len(t, session.observations[1].Results, 1)
+	assert.Contains(t, session.observations[1].Results[0].Error, "belongs to the application that runs this step")
+}
+
+// A replay never has an element in a window the step never operates act by
+// itself, as input: direct would; it misses, naming why.
+func TestReplayRefusesAnElementInAProtectedWindow(t *testing.T) {
+	t.Parallel()
+
+	const steps = `{"do": [{"act": "Save the invoice"}]}`
+	run := elementRun(t)
+	run.sessions = []*scriptedSession{{turns: []*computeruse.Turn{actions(clickAt(235, 194)), done("Saved")}}}
+	require.NoError(t, run.execute(steps, nil).err)
+
+	run.protectApps = []string{"expense"}
+	run.backend.events = nil
+	replayed := run.execute(`{"ai": "never", "input": "direct", "do": [{"act": "Save the invoice"}]}`, nil)
+	require.ErrorContains(t, replayed.err, "which it never operates")
+	assert.Empty(t, run.backend.inputs(), "the button is not invoked")
+}

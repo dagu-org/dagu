@@ -184,8 +184,29 @@ The act fails when:
 
 A step never operates the application that runs it: an action aimed at one
 of its windows, or keys and typing while one has the focus, fails with a
-result naming the window, and the model is told. On Windows those are the
-windows of the Dagu process and the processes that started it.
+result naming the window, and the model is told. Those are the windows of
+the Dagu process and the processes that started it, and on any system the
+windows of the applications named, by executable name and separated by
+commas, in the `DAGU_DESKTOP_PROTECTED_APPS` environment variable. The
+variable protects an application a person starts automation from when a
+service manager, rather than that application, starts Dagu, as on macOS.
+
+### Window size
+
+Unless `with.maximize` is `false`, a step maximizes the window in front
+before an operation looks at the screen: before an `act` and each model turn
+of it, each replayed turn and while a pixel turn waits for its screen, and
+before an `extract`, an `expect`, a `when`, and a `screenshot`. An `act` or
+an `extract` may set its own `maximize`. The application is then operated at
+one size every run, so recordings replay, and the model reads larger text.
+On Windows the window is maximized as its maximize button would; on macOS it
+fills the main display between the menu bar and the Dock, without entering
+full screen, which would move it to a Space of its own. A window on another
+display moves to the main display, the only one captured. A dialog, a sheet,
+a panel, a window of fixed size, a window already maximized, and a window of
+a protected application are left as they are. Each window is maximized at
+most once per step attempt, so a window a person or its application resizes
+afterwards keeps its size. The step log names each window it maximized.
 
 The step log lists each action; the timeline records one event per operation.
 
@@ -197,11 +218,12 @@ pointer or keyboard for `with.idle` (default `5s`), and logs that it is
 waiting in an event named `person`. Input the step itself sent does not count, including input sent by
 the step that held the desktop before it. When a person uses the desktop
 after the screenshot the model answered, the step waits for the idle period
-again. If the screen then still looks like the one the model saw, overall
-and where each action lands, and the keyboard focus is still on the window
-it was on, the actions run; otherwise they are not run, and the new
-screenshot is sent with a note saying why. Where the system does not report
-the focus, a turn that types or presses keys is not run either. The end of
+again. If the window the actions land on still looks as the model saw it,
+overall and where each action lands, and the keyboard focus is still on the
+window it was on, the actions run; otherwise they are not run, and the new
+screenshot is sent with a note saying why. A change elsewhere on the screen
+does not stop the actions. Where the system does not report the focus, the
+screen check alone guards a turn that types or presses keys. The end of
 a wait is a lifecycle event of its own, `running`, so a view knows the step
 is at work again. Skipped actions do
 not count toward `max_actions`. The waiting does not count toward the
@@ -308,15 +330,24 @@ turn replays by its elements when every pointer action of the turn has one
 and the application in front is the recorded one: each element is found again,
 with the recorded path breaking a tie between equal matches, and the action
 runs where it is now, typing into it after focusing it. Otherwise the turn
-replays by its pixels, which need the recorded display size and each
-screen, and the area around each pointer action, to look as recorded. A
+replays by its pixels within the application window it was recorded on: the
+window its first pointer action landed on, or the window with the keyboard
+focus for a turn that only types or presses keys, or the front window of
+that window's application when the action landed on a menu. The replay
+finds the application's front window of the recorded size, needs that
+window, and the area around each pointer action inside it, to look as
+recorded, and acts at the recorded positions relative to the window's
+corner. A window that moved and a change elsewhere on the screen do not
+stop it; a window of another size does. A turn recorded where the system
+named no window compares the whole display, which then needs the recorded
+display size. A
 replayed action waits for its element, and a pixel turn for its screen,
 looking again every quarter second until `find_within` passes: 10 seconds
 unless `with.find_within` or `act.find_within` says otherwise, 0 to look
 once. The wait counts toward the operation timeout. After the last turn, a
 replay whose turns all ran by elements needs its landmarks in front, when
-the recording has some; any other replay needs the screen to look as
-recorded.
+the recording has some; any other replay needs the window the act ended on,
+or the whole display where the system named none, to look as recorded.
 
 `with.input`, or `act.input` for one act, says how a replayed action
 reaches the application. `screen`, the default, sends the pointer and keys

@@ -58,6 +58,8 @@ func TestValidateStep(t *testing.T) {
 		{name: "never with extract of an object field", with: `{"ai": "never", "do": [{"extract": {"instruction": "a", "schema": {"type": "object", "properties": {"total": {"type": "number"}, "lines": {"type": "object"}}}}}]}`, llm: model, want: `extract under never cannot read lines`},
 		{name: "extract that overrides never", with: `{"ai": "never", "do": [{"extract": {"instruction": "a", "ai": "on_miss", "schema": {"type": "object"}}}]}`, llm: model},
 		{name: "ai and cache", with: `{"ai": "never", "cache": true, "do": [{"act": "x"}]}`, llm: model, want: "set ai or cache, not both"},
+		{name: "maximize on the step and an operation", with: `{"maximize": false, "do": [{"act": {"instruction": "x", "maximize": true}}, {"extract": {"instruction": "a", "maximize": true, "schema": {"type": "object"}}}]}`, llm: model},
+		{name: "maximize that is not a boolean", with: `{"maximize": "yes", "do": [{"act": "x"}]}`, llm: model, want: "maximize"},
 		{name: "ai and cache on act", with: `{"do": [{"act": {"instruction": "x", "ai": "never", "cache": false}}]}`, llm: model, want: "act: set ai or cache, not both"},
 		{name: "unknown ai", with: `{"ai": "sometimes", "do": [{"act": "x"}]}`, llm: model, want: "ai"},
 		{name: "find within", with: `{"find_within": "5s", "do": [{"act": {"instruction": "x", "find_within": "0"}}]}`, llm: model},

@@ -99,8 +99,11 @@ type config struct {
 	// default, or direct.
 	Input string `json:"input,omitempty"`
 	// MaxRows bounds how many rows an extract reads from a table.
-	MaxRows int         `json:"max_rows,omitempty"`
-	Do      []operation `json:"do"`
+	MaxRows int `json:"max_rows,omitempty"`
+	// Maximize, true unless set false, maximizes the front window before an
+	// operation looks at the screen.
+	Maximize *bool       `json:"maximize,omitempty"`
+	Do       []operation `json:"do"`
 }
 
 // operation is one item of with.do. Exactly one operation field is set.
@@ -116,6 +119,23 @@ type operation struct {
 	Timeout    string       `json:"timeout,omitempty"`
 }
 
+// maximize is the operation's own maximize setting, if it has one.
+func (o operation) maximize() *bool {
+	switch {
+	case o.Act != nil:
+		return o.Act.Maximize
+	case o.Extract != nil:
+		return o.Extract.Maximize
+	}
+	return nil
+}
+
+// looksAtScreen reports an operation that reads or acts on the screen, or
+// checks it before running, which the front window is maximized for.
+func (o operation) looksAtScreen() bool {
+	return o.Act != nil || o.Extract != nil || o.Expect != nil || o.Screenshot != "" || o.When != nil
+}
+
 type launchSpec struct {
 	Command string   `json:"command"`
 	Args    []string `json:"args,omitempty"`
@@ -128,6 +148,7 @@ type actSpec struct {
 	MaxActions  int    `json:"max_actions,omitempty"`
 	FindWithin  string `json:"find_within,omitempty"`
 	Input       string `json:"input,omitempty"`
+	Maximize    *bool  `json:"maximize,omitempty"`
 	// Recorded holds the act's pinned steps, keyed by system (windows or
 	// macos). A device of that system runs them first, ignoring its own
 	// recording, so a learned act travels across devices.
@@ -138,6 +159,7 @@ type extractSpec struct {
 	Instruction string         `json:"instruction"`
 	AI          string         `json:"ai,omitempty"`
 	MaxRows     int            `json:"max_rows,omitempty"`
+	Maximize    *bool          `json:"maximize,omitempty"`
 	Schema      map[string]any `json:"schema"`
 	// Fields holds the extract's pinned bindings, keyed by system then by
 	// output name, so a device reads them with no model even if it never
@@ -375,6 +397,18 @@ func (c config) direct(spec actSpec) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+// maximizes reports whether the front window is maximized before an
+// operation looks at the screen: the operation's own setting, the step's,
+// or true.
+func (c config) maximizes(own *bool) bool {
+	for _, value := range []*bool{own, c.Maximize} {
+		if value != nil {
+			return *value
+		}
+	}
+	return true
 }
 
 // maxActions returns the action budget of an act.
@@ -819,6 +853,7 @@ var operationSchema = &jsonschema.Schema{
 				"max_actions": positiveInteger(),
 				"find_within": agentstep.StringSchema(),
 				"input":       inputSchema(),
+				"maximize":    {Type: "boolean"},
 				"recorded":    pinnedBySystem(pinnedStepsSchema),
 			},
 		},
@@ -830,6 +865,7 @@ var operationSchema = &jsonschema.Schema{
 				"instruction": agentstep.NonEmptyString(),
 				"ai":          aiSchema(),
 				"max_rows":    positiveInteger(),
+				"maximize":    {Type: "boolean"},
 				"schema":      {Type: "object"},
 				"fields": pinnedBySystem(func() *jsonschema.Schema {
 					return &jsonschema.Schema{Type: "object", AdditionalProperties: pinnedFieldSchema()}
@@ -879,6 +915,7 @@ var configSchema = &jsonschema.Schema{
 		"find_within":     agentstep.StringSchema(),
 		"input":           inputSchema(),
 		"max_rows":        positiveInteger(),
+		"maximize":        {Type: "boolean"},
 		"do":              {Type: "array", MinItems: new(1), Items: operationSchema},
 	},
 	Defs: map[string]*jsonschema.Schema{"selector": selectorSchema()},

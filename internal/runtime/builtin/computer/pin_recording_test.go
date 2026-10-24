@@ -238,14 +238,15 @@ func TestPinnedRecordingReadsExtractOnAnotherDevice(t *testing.T) {
 	assert.Empty(t, device.vision.requests, "no model request")
 }
 
-// Only a recording of the current format that recorded something converts;
-// one that does not name its system was made on this host.
+// Only a recording of a format this engine replays that recorded something
+// converts; one that does not name its system was made on this host.
 func TestPinRecordingSkipsWhatCannotReplay(t *testing.T) {
 	t.Parallel()
 
 	enter := []recordedTurn{{Actions: []recordedAction{{Action: keyPress("enter")}}}}
 	for name, entry := range map[string]string{
-		"older format": marshal(t, recording{Version: recordingVersion - 1, Turns: enter}),
+		"older format": marshal(t, recording{Version: oldestRecordingVersion - 1, Turns: enter}),
+		"newer format": marshal(t, recording{Version: recordingVersion + 1, Turns: enter}),
 		"nothing":      marshal(t, recording{Version: recordingVersion}),
 		"not json":     `{`,
 	} {
@@ -258,4 +259,7 @@ func TestPinRecordingSkipsWhatCannotReplay(t *testing.T) {
 	assert.Equal(t, hostSystem(), pinned.System)
 	assert.Equal(t, 3, pinned.Op)
 	assert.True(t, pinned.SavedAt.IsZero())
+
+	_, ok = PinRecording(json.RawMessage(marshal(t, recording{Version: oldestRecordingVersion, Turns: enter})))
+	assert.True(t, ok, "a recording from before windows were recorded still converts")
 }

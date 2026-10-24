@@ -1,0 +1,344 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+//go:build darwin
+
+package desktop
+
+import (
+	"errors"
+	"image"
+	"math"
+	"path/filepath"
+	"sync"
+
+	"github.com/ebitengine/purego"
+	"github.com/ebitengine/purego/objc"
+)
+
+const appKitPath = "/System/Library/Frameworks/AppKit.framework/AppKit"
+
+// Options of CGWindowListCopyWindowInfo: windows on the screen, without
+// the desktop's own.
+const (
+	windowListOnScreenOnly        = 1 << 0
+	windowListExcludeDesktopItems = 1 << 4
+)
+
+// Window levels of the window server.
+const (
+	// normalWindowLayer holds applications' document and main windows.
+	normalWindowLayer = 0
+	// mainMenuWindowLayer holds the menu bar.
+	mainMenuWindowLayer = 24
+	// overlayWindowLayer and above hold overlays, the screen saver, and the
+	// cursor, which never take a click meant for a window under them.
+	overlayWindowLayer = 1000
+)
+
+// frameTolerance is how far, in points, a window's frame may be from the
+// work area and still count as maximized, and how far an Accessibility
+// frame may be from the window server's for the two to name one window.
+const frameTolerance = 2
+
+// windowInfo is one window the window server lists.
+type windowInfo struct {
+	id    WindowID
+	layer int64
+}
+
+// listWindows lists the windows on the screen, the front first.
+func (b *darwinBackend) listWindows() []windowInfo {
+	list := cgWindowListCopyWindowInfo(windowListOnScreenOnly|windowListExcludeDesktopItems, 0)
+	if list == 0 {
+		return nil
+	}
+	defer cfRelease(list)
+	apps := map[int64]string{}
+	var out []windowInfo
+	for _, dict := range cfArray(list) {
+		number, _ := cfInt(cfDictionaryGetValue(dict, cgWindowNumberKey))
+		pid, _ := cfInt(cfDictionaryGetValue(dict, cgWindowOwnerPIDKey))
+		layer, _ := cfInt(cfDictionaryGetValue(dict, cgWindowLayerKey))
+		if alpha, ok := cfFloat(cfDictionaryGetValue(dict, cgWindowAlphaKey)); ok && alpha == 0 {
+			continue
+		}
+		var frame cgRect
+		if bounds := cfDictionaryGetValue(dict, cgWindowBoundsKey); bounds == 0 || !cgRectMakeWithDictionaryRepresentation(bounds, &frame) {
+			continue
+		}
+		rect := b.toPixelRect(frame)
+		if number <= 0 || pid <= 0 || rect.Empty() {
+			continue
+		}
+		app, ok := apps[pid]
+		if !ok {
+			app = processApp(int32(pid)) //nolint:gosec // process ids fit 32 bits
+			apps[pid] = app
+		}
+		out = append(out, windowInfo{
+			id: WindowID{
+				Handle: uint64(number), //nolint:gosec // window numbers are positive
+				Title:  goString(cfDictionaryGetValue(dict, cgWindowNameKey)),
+				PID:    uint32(pid), //nolint:gosec // process ids fit 32 bits
+				App:    app,
+				Bounds: rect,
+			},
+			layer: layer,
+		})
+	}
+	return out
+}
+
+// toPixelRect converts a frame in global points to display pixels.
+func (b *darwinBackend) toPixelRect(frame cgRect) image.Rectangle {
+	scale, origin := b.display.scale, b.display.bounds.Origin
+	return image.Rect(
+		int(math.Round((frame.Origin.X-origin.X)*scale)),
+		int(math.Round((frame.Origin.Y-origin.Y)*scale)),
+		int(math.Round((frame.Origin.X+frame.Size.Width-origin.X)*scale)),
+		int(math.Round((frame.Origin.Y+frame.Size.Height-origin.Y)*scale)),
+	)
+}
+
+// processApp is a process's executable name, such as TextEdit: unlike the
+// name the window server shows, it does not change with the language of
+// the user interface.
+func processApp(pid int32) string {
+	buffer := make([]byte, procPIDPathMax)
+	n := procPIDPath(pid, &buffer[0], procPIDPathMax)
+	if n <= 0 {
+		return ""
+	}
+	return filepath.Base(string(buffer[:n]))
+}
+
+// Windows lists the applications' windows on the screen, the front first.
+func (b *darwinBackend) Windows() []WindowID {
+	var out []WindowID
+	for _, w := range b.listWindows() {
+		if w.layer == normalWindowLayer {
+			out = append(out, w.id)
+		}
+	}
+	return out
+}
+
+// WindowAt names the front window under a position, menus and the menu
+// bar included, and overlays left out.
+func (b *darwinBackend) WindowAt(x, y int) WindowID {
+	at := image.Pt(x, y)
+	for _, w := range b.listWindows() {
+		if w.layer < overlayWindowLayer && at.In(w.id.Bounds) {
+			return w.id
+		}
+	}
+	return WindowID{}
+}
+
+// FocusedWindow names the front window of the application that has the
+// keyboard focus.
+func (b *darwinBackend) FocusedWindow() WindowID {
+	pid := focusedApplication()
+	for _, w := range b.listWindows() {
+		if w.layer == normalWindowLayer && (pid == 0 || w.id.PID == uint32(pid)) { //nolint:gosec // process ids are positive
+			return w.id
+		}
+	}
+	return WindowID{}
+}
+
+// focusedApplication is the process of the application that has the
+// keyboard focus, or 0 when Accessibility does not say.
+func focusedApplication() int32 {
+	system := axUIElementCreateSystemWide()
+	if system == 0 {
+		return 0
+	}
+	defer cfRelease(system)
+	app := axCopy(system, "AXFocusedApplication")
+	if app == 0 {
+		return 0
+	}
+	defer cfRelease(app)
+	var pid int32
+	if axUIElementGetPid(app, &pid) != axErrorSuccess {
+		return 0
+	}
+	return pid
+}
+
+// Raise brings a window's application to the front and the window above
+// its other windows.
+func (b *darwinBackend) Raise(w WindowID) error {
+	if w.PID == 0 {
+		return nil
+	}
+	app := axUIElementCreateApplication(int32(w.PID)) //nolint:gosec // process ids fit 32 bits
+	if app == 0 {
+		return nil
+	}
+	defer cfRelease(app)
+	_ = axSet(app, "AXFrontmost", cfBooleanTrue)
+	if window := b.axWindow(app, w); window != 0 {
+		_ = axPerform(window, "AXRaise")
+		cfRelease(window)
+	}
+	return nil
+}
+
+// Maximize fills the main display's work area, between the menu bar and
+// the Dock, with a standard window that can be zoomed. It does not use full
+// screen, which would move the window to a Space of its own.
+func (b *darwinBackend) Maximize(w WindowID) (bool, error) {
+	if w.PID == 0 {
+		return false, nil
+	}
+	app := axUIElementCreateApplication(int32(w.PID)) //nolint:gosec // process ids fit 32 bits
+	if app == 0 {
+		return false, nil
+	}
+	defer cfRelease(app)
+	window := b.axWindow(app, w)
+	if window == 0 {
+		return false, nil
+	}
+	defer cfRelease(window)
+	if !zoomable(window) {
+		return false, nil
+	}
+	area, err := b.workArea()
+	if err != nil {
+		return false, err
+	}
+	if frame, ok := axFrame(window); ok && sameFrame(frame, area) {
+		return false, nil
+	}
+	// The position goes first so the new size fits the display, and again
+	// last, since an application may move a window it resizes.
+	if err := axSetPoint(window, "AXPosition", area.Origin); err != nil {
+		return false, err
+	}
+	if err := axSetSize(window, "AXSize", area.Size); err != nil {
+		return false, err
+	}
+	_ = axSetPoint(window, "AXPosition", area.Origin)
+	return true, nil
+}
+
+// zoomable reports a standard window, not minimized or in full screen,
+// whose zoom button is enabled and whose frame can be set: a dialog, a
+// panel, a sheet, or a window of fixed size is left as it is.
+func zoomable(window uintptr) bool {
+	if subrole := axString(window, "AXSubrole"); subrole != "AXStandardWindow" {
+		return false
+	}
+	if minimized, _ := axBool(window, "AXMinimized"); minimized {
+		return false
+	}
+	if full, _ := axBool(window, "AXFullScreen"); full {
+		return false
+	}
+	button := axCopy(window, "AXZoomButton")
+	if button == 0 {
+		return false
+	}
+	enabled, ok := axBool(button, "AXEnabled")
+	cfRelease(button)
+	if ok && !enabled {
+		return false
+	}
+	return axSettable(window, "AXSize") && axSettable(window, "AXPosition")
+}
+
+// axWindow finds the Accessibility window of an application that the
+// window server lists as w: by its frame, else by its title. The caller
+// releases a non-zero window.
+func (b *darwinBackend) axWindow(app uintptr, w WindowID) uintptr {
+	windows := axCopy(app, "AXWindows")
+	if windows == 0 {
+		return 0
+	}
+	defer cfRelease(windows)
+	var byTitle uintptr
+	for _, window := range cfArray(windows) {
+		if frame, ok := axFrame(window); ok && nearRect(b.toPixelRect(frame), w.Bounds, int(math.Ceil(frameTolerance*b.display.scale))) {
+			cfRetain(window)
+			return window
+		}
+		if byTitle == 0 && w.Title != "" && axString(window, "AXTitle") == w.Title {
+			byTitle = window
+		}
+	}
+	if byTitle != 0 {
+		cfRetain(byTitle)
+	}
+	return byTitle
+}
+
+// workArea is the main display's frame without the menu bar and the Dock,
+// in global points.
+func (b *darwinBackend) workArea() (cgRect, error) {
+	if area, ok := visibleFrame(); ok {
+		return area, nil
+	}
+	// Without AppKit, the work area is the display below the menu bar.
+	area := b.display.bounds
+	for _, w := range b.listWindows() {
+		if w.layer == mainMenuWindowLayer && w.id.Bounds.Min.Y == 0 {
+			top := float64(w.id.Bounds.Dy()) / b.display.scale
+			area.Origin.Y += top
+			area.Size.Height -= top
+			break
+		}
+	}
+	if area.Size.Width <= 0 || area.Size.Height <= 0 {
+		return cgRect{}, errors.New("the display's work area is unavailable")
+	}
+	return area, nil
+}
+
+var (
+	appKitOnce sync.Once
+	appKitErr  error
+)
+
+// visibleFrame reads the main screen's visible frame from AppKit, which
+// knows where the menu bar and the Dock are, and converts it to global
+// points with the origin at the top left.
+func visibleFrame() (cgRect, bool) {
+	appKitOnce.Do(func() {
+		_, appKitErr = purego.Dlopen(appKitPath, purego.RTLD_NOW|purego.RTLD_GLOBAL)
+	})
+	if appKitErr != nil {
+		return cgRect{}, false
+	}
+	screens := objc.ID(objc.GetClass("NSScreen")).Send(objc.RegisterName("screens"))
+	if screens == 0 || objc.Send[uintptr](screens, objc.RegisterName("count")) == 0 {
+		return cgRect{}, false
+	}
+	// The first screen holds the menu bar: it is the main display, whose
+	// bottom left is AppKit's origin.
+	main := screens.Send(objc.RegisterName("objectAtIndex:"), uintptr(0))
+	frame := objc.Send[cgRect](main, objc.RegisterName("frame"))
+	visible := objc.Send[cgRect](main, objc.RegisterName("visibleFrame"))
+	if visible.Size.Width <= 0 || visible.Size.Height <= 0 {
+		return cgRect{}, false
+	}
+	return cgRect{
+		Origin: cgPoint{X: visible.Origin.X, Y: frame.Size.Height - visible.Origin.Y - visible.Size.Height},
+		Size:   visible.Size,
+	}, true
+}
+
+// sameFrame reports frames within frameTolerance points of each other.
+func sameFrame(a, b cgRect) bool {
+	return math.Abs(a.Origin.X-b.Origin.X) <= frameTolerance && math.Abs(a.Origin.Y-b.Origin.Y) <= frameTolerance &&
+		math.Abs(a.Size.Width-b.Size.Width) <= frameTolerance && math.Abs(a.Size.Height-b.Size.Height) <= frameTolerance
+}
+
+// nearRect reports rectangles whose corners are within tolerance pixels.
+func nearRect(a, b image.Rectangle, tolerance int) bool {
+	return abs(a.Min.X-b.Min.X) <= tolerance && abs(a.Min.Y-b.Min.Y) <= tolerance &&
+		abs(a.Max.X-b.Max.X) <= tolerance && abs(a.Max.Y-b.Max.Y) <= tolerance
+}

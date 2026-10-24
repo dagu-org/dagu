@@ -188,6 +188,9 @@ func load() error {
 		}
 		purego.RegisterLibFunc(&axIsProcessTrusted, as, "AXIsProcessTrusted")
 		purego.RegisterLibFunc(&axIsProcessTrustedWithOptions, as, "AXIsProcessTrustedWithOptions")
+		if errLoad = loadWindowFuncs(cg, cf, as); errLoad != nil {
+			return
+		}
 		iokit, err := purego.Dlopen(ioKitPath, purego.RTLD_NOW|purego.RTLD_GLOBAL)
 		if err != nil {
 			errLoad = fmt.Errorf("load IOKit: %w", err)
@@ -546,13 +549,6 @@ func (b *darwinBackend) LastInput() time.Time {
 	seconds := cgEventSourceSecondsSinceLast(eventSourceStateHIDSystem, anyInputEventType)
 	return time.Now().Add(-time.Duration(seconds * float64(time.Second)))
 }
-
-// FocusedWindow and WindowAt are not yet read on macOS, so the focus is
-// unknown there and a step treats it conservatively.
-func (b *darwinBackend) FocusedWindow() WindowID    { return WindowID{} }
-func (b *darwinBackend) WindowAt(int, int) WindowID { return WindowID{} }
-func (b *darwinBackend) Windows() []WindowID        { return nil }
-func (b *darwinBackend) Raise(WindowID) error       { return nil }
 
 func (b *darwinBackend) Close() error {
 	b.wake()

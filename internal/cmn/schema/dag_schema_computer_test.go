@@ -34,6 +34,7 @@ steps:
       mode: native
       ai: on_miss
       find_within: 5s
+      maximize: false
       max_actions: 40
       on_confirmation: allow
       screenshots: each
@@ -46,7 +47,7 @@ steps:
           when: A login form is visible
         - act: {instruction: Open billing, cache: false, max_actions: 10}
           timeout: 2m
-        - act: {instruction: Save it, ai: never, find_within: "0"}
+        - act: {instruction: Save it, ai: never, find_within: "0", maximize: true}
         - act:
             instruction: Submit
             recorded:
@@ -82,6 +83,7 @@ steps:
 		{"unknown ai on act", "ai: never", "ai: always"},
 		{"unknown confirmation policy", "on_confirmation: allow", "on_confirmation: ask"},
 		{"zero max actions", "max_actions: 40", "max_actions: 0"},
+		{"maximize that is not a boolean", "maximize: false", "maximize: sometimes"},
 		{"launch without command", "{command: open, args: [-a, TextEdit]}", "{args: [-a, TextEdit]}"},
 		{"two check keys", "{text: Posted, within: 10s}", "{text: Posted, window: App}"},
 		{"statement and text", "{statement: A document number is shown, within: 30s}", "{statement: Shown, text: Posted}"},
