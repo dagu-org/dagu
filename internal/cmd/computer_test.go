@@ -192,8 +192,8 @@ func TestComputerElementsInvalidInput(t *testing.T) {
 
 // A system that cannot read elements says so with a code.
 func TestComputerElementsUnsupported(t *testing.T) {
-	if goruntime.GOOS == "windows" {
-		t.Skip("the result depends on the desktop session")
+	if goruntime.GOOS == "windows" || goruntime.GOOS == "darwin" {
+		t.Skip("macOS and Windows read elements; the result depends on the desktop session")
 	}
 	t.Parallel()
 
@@ -206,10 +206,7 @@ func TestComputerElementsUnsupported(t *testing.T) {
 		} `json:"error"`
 	}
 	require.NoError(t, json.Unmarshal([]byte(out), &result), out)
-	assert.Contains(t, []string{"unsupported", "no_session", "other_session", "screen_locked", "no_display", "screen_recording", "accessibility", "load_failed", "service_session", "session_disconnected"}, result.Error.Code)
-	if goruntime.GOOS != "darwin" {
-		assert.Equal(t, "unsupported", result.Error.Code)
-	}
+	assert.Equal(t, "unsupported", result.Error.Code)
 }
 
 func computerReplayCache(th test.Command) *replaycache.Store {

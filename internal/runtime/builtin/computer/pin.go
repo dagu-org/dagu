@@ -294,9 +294,9 @@ func (r *run) replayPinned(ctx context.Context, index int, steps []pinnedStep, d
 	var result pinnedOutcome
 	els, err := r.elementsIfAvailable()
 	if err != nil {
-		// A pin replays only by element; a host that reads none, macOS
-		// until phase 8 or a 32-bit Windows, misses rather than failing, so
-		// on_miss hands the act to the model and never reports the miss.
+		// A pin replays only by element; a host that reads none, such as a
+		// 32-bit Windows, misses rather than failing, so on_miss hands the
+		// act to the model and never reports the miss.
 		result.reason = fmt.Sprintf("pinned steps need the window's elements, which this host cannot read: %v", err)
 		return result, nil
 	}

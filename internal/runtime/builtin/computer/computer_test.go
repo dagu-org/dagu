@@ -479,7 +479,7 @@ func TestExactConditions(t *testing.T) {
 		t.Parallel()
 		run := newTestRun(t)
 		execution := run.execute(`{"do": [{"expect": {"text": "完了"}}]}`, nil)
-		require.ErrorContains(t, execution.err, "exact checks need 64-bit Windows: accessible elements are supported on 64-bit Windows only")
+		require.ErrorContains(t, execution.err, "exact checks need macOS or 64-bit Windows: accessible elements are supported on macOS and 64-bit Windows only")
 	})
 
 	t.Run("placeholders from a variable and an ask", func(t *testing.T) {
@@ -890,8 +890,8 @@ func TestPinnedExtractReads(t *testing.T) {
 	assert.Empty(t, run.vision.requests, "no model request")
 }
 
-// A host that reads no elements, macOS until phase 8 or a 32-bit Windows,
-// misses a pinned act rather than failing it: under never it reports the miss
+// A host that reads no elements, such as a 32-bit Windows, misses a pinned
+// act rather than failing it: under never it reports the miss
 // naming the cause, so on_miss can still hand the act to the model.
 func TestPinnedActMissesWithoutElements(t *testing.T) {
 	t.Parallel()

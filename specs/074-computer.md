@@ -131,7 +131,8 @@ and earlier `ask` answers, which validation checks as it does for an
 `act`; a selector's `id` and `app` are identifiers and stay as written. An
 exact check never reaches the model, so the secret check does not apply to
 it, and its values are masked in the timeline as typed values are. Exact
-checks need 64-bit Windows; elsewhere the step fails at the first one.
+checks need macOS or 64-bit Windows; elsewhere the step fails at the first
+one.
 
 ### Model
 
@@ -458,11 +459,10 @@ device of a system with no first-time learning, an act takes `recorded` and
 an extract takes `fields`, written into the step and keyed by system
 (`windows` or `macos`). A device whose system matches runs them ahead of its
 own recording; a block for another system is ignored. The system is the
-host's: Windows runs the `windows` block, macOS the `macos` block. A `macos`
-pin is accepted now but runs only once the macOS element reader lands (phase
-8); until then a Mac host reads no elements, so a `macos` pin misses rather
-than failing, and `on_miss` hands the act to the model while `never` reports
-the miss. A Windows host that cannot open UI Automation behaves the same.
+host's: Windows runs the `windows` block, macOS the `macos` block. A host
+that cannot read elements, such as a Windows host that cannot open UI
+Automation, misses a pin rather than failing, and `on_miss` hands the act to
+the model while `never` reports the miss.
 
 `recorded` is a list of steps, each exactly one of: `click`, `double_click`,
 `right_click` (a selector); `type` (`{into, text}`, where `text` keeps its
@@ -592,12 +592,29 @@ Elements are read on 64-bit Windows through UI Automation, so Win32,
 WinForms, WPF, UWP, Office, and Chromium windows expose them; a Chromium
 window builds its tree when first asked. A window of a process run as
 administrator, or one that draws its own controls, gives `no_elements`.
-Other systems give `unsupported`. Direct input uses the control patterns
-the same elements offer: Invoke, Toggle, SelectionItem, ExpandCollapse, and
-Value, with ScrollItem to bring an item into view first. A pattern call
-runs on a thread of its own, so an application that opens a dialog inside
-the call holds only that call, which comes back as a miss after five
-seconds while the elements stay readable.
+Direct input uses the control patterns the same elements offer: Invoke,
+Toggle, SelectionItem, ExpandCollapse, and Value, with ScrollItem to bring
+an item into view first. A pattern call runs on a thread of its own, so an
+application that opens a dialog inside the call holds only that call, which
+comes back as a miss after five seconds while the elements stay readable.
+
+On macOS elements are read through Accessibility, with the Accessibility
+permission a step already needs, so AppKit, SwiftUI, Catalyst, and Chromium
+and Electron windows expose them. The step turns on a Chromium or Electron
+application's tree, which it builds a moment after a client asks, through
+its `AXManualAccessibility` attribute. Roles map from Accessibility roles:
+`AXButton` is a `button`, `AXTextField` and `AXTextArea` a `text_field`,
+`AXStaticText` a `text` named by what it shows, `AXCheckBox` a `checkbox`,
+`AXRadioButton` a `radio`, or a `tab` in a tab group, `AXPopUpButton` and
+`AXComboBox` a `combo_box`, `AXRow` a `list_item`, `AXCell` a `cell`,
+`AXTable`, `AXOutline`, and `AXList` a `list`, and `AXGroup` a `group`,
+named by the element that titles it when it has no title of its own. An
+element's id is its accessibility identifier, or a web page's element id.
+Direct input presses an element, sets its selected state, shows its menu,
+or sets its value. Every request to an application is bounded by a two
+second timeout, so an application that opens a dialog inside a press holds
+only that call, which comes back as a miss while the elements stay
+readable. Other systems give `unsupported`.
 
 ## Errors
 
