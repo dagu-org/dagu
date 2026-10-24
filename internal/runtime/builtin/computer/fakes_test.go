@@ -171,8 +171,10 @@ type fakeElements struct {
 	// pattern on an element.
 	patterns map[string][]desktop.Pattern
 	applyErr map[string]error
-	// onApply sees every pattern the executor applies.
-	onApply func(desktop.Element, desktop.Pattern, string)
+	// onApply sees every pattern the executor applies, and onRefuse every
+	// one applyErr fails, after the failure is decided.
+	onApply  func(desktop.Element, desktop.Pattern, string)
+	onRefuse func(desktop.Element, desktop.Pattern, error)
 	// tableHeaders and tableRows are the columns and rows a container
 	// exposes, for Rows; tableErr fails Rows when set.
 	tableHeaders []string
@@ -351,7 +353,11 @@ func (f *fakeElements) Apply(e desktop.Element, pattern desktop.Pattern, value s
 	f.mu.Lock()
 	id := focusedID(e)
 	if err, ok := f.applyErr[id]; ok {
+		onRefuse := f.onRefuse
 		f.mu.Unlock()
+		if onRefuse != nil {
+			onRefuse(e, pattern, err)
+		}
 		return err
 	}
 	offered, listed := f.patterns[id]

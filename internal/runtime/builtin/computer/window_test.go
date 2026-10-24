@@ -9,7 +9,6 @@ import (
 	"image/draw"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/dagucloud/dagu/v2/internal/computerhost"
 	"github.com/dagucloud/dagu/v2/internal/desktop"
@@ -301,13 +300,14 @@ func TestDirectReplayRechecksTheWindowBeforeEachTry(t *testing.T) {
 
 	run.protectApps = []string{"Kitewell"}
 	run.elements.failPattern("saveButton", desktop.ErrDisabled)
-	go func() {
-		time.Sleep(300 * time.Millisecond)
+	// The first try finds the button disabled; by the next, the protected
+	// window is in front and the button is enabled.
+	run.elements.onRefuse = func(desktop.Element, desktop.Pattern, error) {
 		run.backend.focusOn(desktop.WindowID{Handle: 9, Title: "Kitewell", PID: 77, App: "Kitewell"})
 		run.elements.mu.Lock()
 		delete(run.elements.applyErr, "saveButton")
 		run.elements.mu.Unlock()
-	}()
+	}
 	run.backend.events = nil
 	failed := run.execute(`{"ai": "never", "input": "direct", "idle": "0", "find_within": "3s", "do": [{"act": "Save the invoice"}]}`, nil)
 	require.ErrorContains(t, failed.err, "which it never operates")
