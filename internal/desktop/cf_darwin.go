@@ -24,6 +24,10 @@ const (
 	axValueCGSizeType  = 2
 	// procPIDPathMax is PROC_PIDPATHINFO_MAXSIZE.
 	procPIDPathMax = 4096
+	// axMessagingTimeout bounds each Accessibility request to an
+	// application, in seconds, so one that does not answer cannot hold a
+	// step for the system's default of six seconds a request.
+	axMessagingTimeout = 2
 )
 
 // Accessibility error codes.
@@ -118,6 +122,12 @@ func loadWindowFuncs(cg, cf, as uintptr) error {
 		return fmt.Errorf("load libSystem: %w", err)
 	}
 	purego.RegisterLibFunc(&procPIDPath, libSystem, "proc_pidpath")
+	// Set on the system-wide element, the timeout bounds every request this
+	// process makes, to every element.
+	if system := axUIElementCreateSystemWide(); system != 0 {
+		_ = axUIElementSetMessagingTimeout(system, axMessagingTimeout)
+		cfRelease(system)
+	}
 	for _, key := range []struct {
 		name string
 		ref  *uintptr

@@ -213,7 +213,9 @@ func (r *run) replay(ctx context.Context, index int, entry recording, budget int
 		if err := r.awaitPerson(ctx); err != nil {
 			return outcome, err
 		}
-		r.fit(index)
+		if err := r.fit(ctx, index); err != nil {
+			return outcome, err
+		}
 		if elementTurn(turn) {
 			if els == nil {
 				els, _ = r.elementsIfAvailable()
@@ -284,7 +286,9 @@ func (r *run) awaitScreen(ctx context.Context, index int, entry recording, turn 
 		// A window that appears while the turn waits, such as one an
 		// application is still opening, is maximized as it was when the
 		// turn was recorded.
-		r.fit(index)
+		if err := r.fit(ctx, index); err != nil {
+			return view{}, false, err
+		}
 		current, err := r.settle(ctx)
 		if err != nil {
 			return view{}, false, err
@@ -308,8 +312,7 @@ func (r *run) turnView(current *image.RGBA, entry recording, turn recordedTurn) 
 	if turn.Window == nil {
 		return displayView(current), current.Bounds().Dx() == entry.Width && current.Bounds().Dy() == entry.Height
 	}
-	rect, ok := r.findWindow(*turn.Window)
-	return view{rect: rect, window: turn.Window}, ok
+	return r.placedView(current, *turn.Window)
 }
 
 // finalView finds where the screen an act ended on is compared now.
@@ -317,8 +320,14 @@ func (r *run) finalView(final *image.RGBA, entry recording) (view, bool) {
 	if entry.FinalWindow == nil {
 		return displayView(final), true
 	}
-	rect, ok := r.findWindow(*entry.FinalWindow)
-	return view{rect: rect, window: entry.FinalWindow}, ok
+	return r.placedView(final, *entry.FinalWindow)
+}
+
+// placedView finds a recorded window now. A window off the display shows
+// nothing to compare, so it is not found.
+func (r *run) placedView(current *image.RGBA, rec recordedWindow) (view, bool) {
+	rect, ok := r.findWindow(rec)
+	return view{rect: rect, window: &rec}, ok && rect.Overlaps(current.Bounds())
 }
 
 // matches reports whether a screen looks like the one a recorded turn was

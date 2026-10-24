@@ -4,6 +4,7 @@
 package computer
 
 import (
+	"context"
 	"fmt"
 	"image"
 	"os"
@@ -165,14 +166,22 @@ func (r *run) findWindow(rec recordedWindow) (image.Rectangle, bool) {
 // Each window is maximized at most once in a step attempt, so one a person
 // or its application resizes afterwards is left as it is. A window the step
 // never operates, one that cannot be maximized, and one already maximized
-// are left alone.
-func (r *run) fit(index int) {
+// are left alone. Resizing a window moves what a person may be working on,
+// so it waits for an idle desktop as input does.
+func (r *run) fit(ctx context.Context, index int) error {
 	if !r.maximize || r.driver == nil {
-		return
+		return nil
 	}
+	if w := r.driver.FocusedWindow(); !r.fits(w) {
+		return nil
+	}
+	if err := r.awaitPerson(ctx); err != nil {
+		return err
+	}
+	// The window in front may have changed while the step waited.
 	w := r.driver.FocusedWindow()
-	if !w.Known() || r.driver.Owned(w) || r.fitted[w.Handle] {
-		return
+	if !r.fits(w) {
+		return nil
 	}
 	r.fitted[w.Handle] = true
 	done, err := r.driver.Maximize(w)
@@ -182,6 +191,13 @@ func (r *run) fit(index int) {
 	case done:
 		logAction(r.timeline, index, "maximized "+describeWindow(w))
 	}
+	return nil
+}
+
+// fits reports a window fit has yet to try: one the system names, that the
+// step may operate, and that this attempt has not tried.
+func (r *run) fits(w desktop.WindowID) bool {
+	return w.Known() && !r.driver.Owned(w) && !r.fitted[w.Handle]
 }
 
 // describeWindow names a window for the step log.

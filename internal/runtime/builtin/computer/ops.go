@@ -169,7 +169,11 @@ func (r *run) execute(ctx context.Context) error {
 		op := r.cfg.Do[i]
 		r.maximize = r.cfg.maximizes(op.maximize())
 		if op.looksAtScreen() {
-			r.fit(i)
+			began, before := time.Now(), r.usage
+			if err := r.fit(ctx, i); err != nil {
+				r.reportFailure(i, op.kind(), op.subject(), err, began, before)
+				return r.fail(ctx, i, op.kind(), err)
+			}
 		}
 		if op.When != nil {
 			began, before := time.Now(), r.usage

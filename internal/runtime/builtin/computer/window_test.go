@@ -5,6 +5,7 @@ package computer
 
 import (
 	"image"
+	"image/color"
 	"image/draw"
 	"path/filepath"
 	"testing"
@@ -208,4 +209,40 @@ func TestMaximizesTheFrontWindow(t *testing.T) {
 // computerDir is where the run's steps keep their recordings.
 func (r *testRun) computerDir() string {
 	return filepath.Join(r.dataDir, computerhost.DataDirName)
+}
+
+// A window the replay finds off the display shows nothing to compare, so
+// the turn misses rather than matching an empty picture, which hashes like a
+// window of one flat colour.
+func TestReplayMissesAWindowOffTheDisplay(t *testing.T) {
+	t.Parallel()
+
+	const steps = `{"maximize": false, "do": [{"act": "Open the report"}]}`
+	run := windowRun(t, reportWindow.Bounds)
+	flat := stripes(800, 600, 3)
+	draw.Draw(flat, reportWindow.Bounds, image.NewUniform(color.Gray{Y: 128}), image.Point{}, draw.Src)
+	run.backend.script(flat)
+	run.sessions = []*scriptedSession{{turns: []*computeruse.Turn{actions(clickAt(150, 160)), done("Opened")}}}
+	require.NoError(t, run.execute(steps, nil).err)
+
+	run.placeWindow(image.Rect(900, 100, 1300, 400))
+	run.sessions = []*scriptedSession{{turns: []*computeruse.Turn{done("Nothing to do")}}}
+	healed := run.execute(steps, nil)
+	require.NoError(t, healed.err)
+	assert.Equal(t, []string{"act:healed"}, eventNames(healed.exec.GetAgentSession()))
+	assert.NotContains(t, run.backend.inputs(), "move 1050,460", "nothing is clicked off the display")
+}
+
+// Maximizing a window waits, as input does, until nobody is using the
+// desktop.
+func TestMaximizeWaitsForAnIdleDesktop(t *testing.T) {
+	t.Parallel()
+
+	run := windowRun(t, reportWindow.Bounds)
+	run.backend.personKeepsUsing(2)
+	execution := run.execute(`{"idle": "20ms", "do": [{"screenshot": "report"}]}`, nil)
+	require.NoError(t, execution.err)
+	session := execution.exec.GetAgentSession()
+	assert.Equal(t, []string{waitReasonPerson}, waitReasons(session))
+	require.Len(t, run.backend.maximizedWindows(), 1)
 }
